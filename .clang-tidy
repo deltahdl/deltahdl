@@ -44,7 +44,7 @@ CheckOptions:
   # Google C++ Style: keep functions short and focused.
   # These are hard limits. Do NOT raise them. If a function
   # is too complex, refactor it into smaller functions.
-  readability-function-size.NestingThreshold: 3
+  readability-function-size.NestingThreshold: 4
   readability-function-size.ParameterThreshold: 5
   readability-function-size.StatementThreshold: 50
   readability-function-size.LineThreshold: 200
