@@ -19,7 +19,7 @@ static CompilationUnit* parse(const std::string& src) {
 }
 
 TEST_CASE("Parse empty module", "[parser]") {
-  auto* cu = parse("module empty; endmodule");
+  const auto* cu = parse("module empty; endmodule");
   REQUIRE(cu != nullptr);
   REQUIRE(cu->modules.size() == 1);
   REQUIRE(cu->modules[0]->name == "empty");
@@ -27,7 +27,7 @@ TEST_CASE("Parse empty module", "[parser]") {
 }
 
 TEST_CASE("Parse module with initial block", "[parser]") {
-  auto* cu = parse(
+  const auto* cu = parse(
       "module hello;\n"
       "  initial $display(\"Hello\");\n"
       "endmodule\n");
@@ -38,7 +38,7 @@ TEST_CASE("Parse module with initial block", "[parser]") {
 }
 
 TEST_CASE("Parse module with ports", "[parser]") {
-  auto* cu = parse(
+  const auto* cu = parse(
       "module mux(input logic a, input logic b, input logic sel, output logic "
       "y);\n"
       "  assign y = sel ? b : a;\n"
@@ -53,7 +53,7 @@ TEST_CASE("Parse module with ports", "[parser]") {
 }
 
 TEST_CASE("Parse continuous assignment", "[parser]") {
-  auto* cu = parse(
+  const auto* cu = parse(
       "module top;\n"
       "  logic a, b;\n"
       "  assign a = b;\n"
@@ -69,7 +69,7 @@ TEST_CASE("Parse continuous assignment", "[parser]") {
 }
 
 TEST_CASE("Parse always_ff block", "[parser]") {
-  auto* cu = parse(
+  const auto* cu = parse(
       "module counter(input logic clk, rst);\n"
       "  logic [7:0] count;\n"
       "  always_ff @(posedge clk or posedge rst)\n"
@@ -89,7 +89,7 @@ TEST_CASE("Parse always_ff block", "[parser]") {
 }
 
 TEST_CASE("Parse expression precedence", "[parser]") {
-  auto* cu = parse(
+  const auto* cu = parse(
       "module expr;\n"
       "  logic a;\n"
       "  assign a = 1 + 2 * 3;\n"
@@ -100,7 +100,7 @@ TEST_CASE("Parse expression precedence", "[parser]") {
 }
 
 TEST_CASE("Parse multiple modules", "[parser]") {
-  auto* cu = parse(
+  const auto* cu = parse(
       "module a; endmodule\n"
       "module b; endmodule\n"
       "module c; endmodule\n");

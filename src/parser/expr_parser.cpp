@@ -5,12 +5,7 @@ namespace delta {
 // Pratt parser: binding powers for SystemVerilog operators (IEEE 1800-2023 §11)
 // Higher binding power = tighter binding
 
-struct BpPair {
-  int left;
-  int right;
-};
-
-static BpPair infix_bp(TokenKind kind) {
+static std::pair<int, int> infix_bp(TokenKind kind) {
   switch (kind) {
     case TokenKind::PipeDashGt:
     case TokenKind::PipeEqGt:

@@ -223,15 +223,26 @@ jobs:
       - name: Detect copy-paste
         run: |
           pmd cpd --minimum-tokens 100 --language cpp --dir src/
+      - name: Configure build
+        run: |
+          cmake -B build -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
       - name: Run cppcheck
         # NEVER use --suppress. Fix the code instead.
         run: |
-          cppcheck --enable=all --error-exitcode=1 \
-            --std=c++23 -I src src/ test/
+          CATCH2=$(find build/_deps -name catch2-src -type d)
+          cppcheck --enable=all --std=c++23 \
+            -I src -I "$CATCH2/src" \
+            src/ test/ 2>&1 | tee /tmp/cppcheck.log
+          SEV='(error|warning|style|performance|portability):'
+          FOUND=$(grep -cE ": $SEV" /tmp/cppcheck.log || true)
+          if [ "$FOUND" -gt 0 ]; then
+            grep -E ": $SEV" /tmp/cppcheck.log
+            echo "FAIL: $FOUND cppcheck finding(s)"
+            exit 1
+          fi
       - name: Run clang-tidy
         run: |
-          cmake -B build -DCMAKE_CXX_COMPILER=clang++-18 \
-                -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
           find src -name '*.cpp' | \
             xargs clang-tidy-18 -p build \
               --warnings-as-errors=\

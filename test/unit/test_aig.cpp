@@ -5,13 +5,15 @@
 using namespace delta;
 
 TEST_CASE("AIG literal helpers", "[aig]") {
-  auto lit = aig_lit(5, false);
-  REQUIRE(aig_var(lit) == 5);
-  REQUIRE_FALSE(aig_is_compl(lit));
+  for (uint32_t id = 0; id < 10; ++id) {
+    auto lit = aig_lit(id, false);
+    REQUIRE(aig_var(lit) == id);
+    REQUIRE_FALSE(aig_is_compl(lit));
 
-  auto lit_c = aig_lit(5, true);
-  REQUIRE(aig_var(lit_c) == 5);
-  REQUIRE(aig_is_compl(lit_c));
+    auto lit_c = aig_lit(id, true);
+    REQUIRE(aig_var(lit_c) == id);
+    REQUIRE(aig_is_compl(lit_c));
+  }
 }
 
 TEST_CASE("AIG add input", "[aig]") {

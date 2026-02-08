@@ -1,5 +1,6 @@
 #include "elaboration/elaborator.h"
 
+#include <algorithm>
 #include <format>
 #include <optional>
 
@@ -34,10 +35,9 @@ RtlirDesign* Elaborator::elaborate(std::string_view top_module_name) {
 }
 
 ModuleDecl* Elaborator::find_module(std::string_view name) const {
-  for (auto* mod : unit_->modules) {
-    if (mod->name == name) return mod;
-  }
-  return nullptr;
+  auto it = std::find_if(unit_->modules.begin(), unit_->modules.end(),
+                         [name](auto* mod) { return mod->name == name; });
+  return (it != unit_->modules.end()) ? *it : nullptr;
 }
 
 static std::optional<int64_t> find_param_override(
@@ -81,7 +81,7 @@ RtlirModule* Elaborator::elaborate_module(ModuleDecl* decl,
 
 // --- Port elaboration ---
 
-void Elaborator::elaborate_ports(ModuleDecl* decl, RtlirModule* mod) {
+void Elaborator::elaborate_ports(const ModuleDecl* decl, RtlirModule* mod) {
   for (const auto& port : decl->ports) {
     RtlirPort rp;
     rp.name = port.name;
@@ -174,7 +174,7 @@ void Elaborator::elaborate_item(ModuleItem* item, RtlirModule* mod) {
   }
 }
 
-void Elaborator::elaborate_items(ModuleDecl* decl, RtlirModule* mod) {
+void Elaborator::elaborate_items(const ModuleDecl* decl, RtlirModule* mod) {
   for (auto* item : decl->items) {
     elaborate_item(item, mod);
   }

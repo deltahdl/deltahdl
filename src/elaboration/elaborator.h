@@ -37,13 +37,13 @@ class Elaborator {
   RtlirModule* elaborate_module(ModuleDecl* decl, const ParamList& params);
 
   /// Populate ports from module declaration port list.
-  void elaborate_ports(ModuleDecl* decl, RtlirModule* mod);
+  void elaborate_ports(const ModuleDecl* decl, RtlirModule* mod);
 
   /// Elaborate a single module item into RTLIR.
   void elaborate_item(ModuleItem* item, RtlirModule* mod);
 
   /// Walk module items and populate nets, vars, assigns, processes.
-  void elaborate_items(ModuleDecl* decl, RtlirModule* mod);
+  void elaborate_items(const ModuleDecl* decl, RtlirModule* mod);
 
   Arena& arena_;
   DiagEngine& diag_;

@@ -145,12 +145,8 @@ bool Preprocessor::try_expand_macro(std::string_view trimmed,
 }
 
 bool Preprocessor::is_active() const {
-  for (bool active : cond_stack_) {
-    if (!active) {
-      return false;
-    }
-  }
-  return true;
+  return std::all_of(cond_stack_.begin(), cond_stack_.end(),
+                     [](bool active) { return active; });
 }
 
 void Preprocessor::handle_define(std::string_view rest, SourceLoc loc) {

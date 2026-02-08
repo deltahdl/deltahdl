@@ -111,7 +111,7 @@ TEST_CASE("Logic4Vec creation and to_string", "[types]") {
 
 TEST_CASE("Arena allocation", "[arena]") {
   Arena arena;
-  auto* p1 = arena.alloc_array<uint64_t>(10);
+  const auto* p1 = arena.alloc_array<uint64_t>(10);
   REQUIRE(p1 != nullptr);
   auto* p2 = arena.alloc_array<uint32_t>(100);
   REQUIRE(p2 != nullptr);

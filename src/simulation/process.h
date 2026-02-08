@@ -13,8 +13,8 @@ namespace delta {
 struct SimCoroutine {
   struct promise_type {
     SimCoroutine get_return_object() {
-      auto handle = std::coroutine_handle<promise_type>::from_promise(*this);
-      return SimCoroutine{handle};
+      auto h = std::coroutine_handle<promise_type>::from_promise(*this);
+      return SimCoroutine{h};
     }
 
     std::suspend_always initial_suspend() noexcept { return {}; }
