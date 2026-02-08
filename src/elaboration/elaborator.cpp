@@ -167,6 +167,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       break;
     case ModuleItemKind::kGenerateFor:
     case ModuleItemKind::kGenerateIf:
+    case ModuleItemKind::kGenerateCase:
       diag_.Warning(item->loc, "generate blocks are not yet elaborated");
       break;
     case ModuleItemKind::kTypedef:

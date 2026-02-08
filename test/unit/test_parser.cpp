@@ -497,6 +497,83 @@ TEST(Parser, GenerateRegion) {
   EXPECT_TRUE(found_gen);
 }
 
+TEST(Parser, GenerateCase) {
+  auto r = Parse(
+      "module t;\n"
+      "  case (WIDTH)\n"
+      "    1: begin\n"
+      "      assign a = b;\n"
+      "    end\n"
+      "    2: begin\n"
+      "      assign a = c;\n"
+      "    end\n"
+      "  endcase\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kGenerateCase);
+  EXPECT_NE(item->gen_cond, nullptr);
+  ASSERT_EQ(item->gen_case_items.size(), 2);
+  EXPECT_FALSE(item->gen_case_items[0].is_default);
+  EXPECT_EQ(item->gen_case_items[0].patterns.size(), 1);
+  EXPECT_FALSE(item->gen_case_items[0].body.empty());
+  EXPECT_EQ(item->gen_case_items[1].patterns.size(), 1);
+}
+
+TEST(Parser, GenerateCaseDefault) {
+  auto r = Parse(
+      "module t;\n"
+      "  case (WIDTH)\n"
+      "    1: begin\n"
+      "      assign a = b;\n"
+      "    end\n"
+      "    default: begin\n"
+      "      assign a = c;\n"
+      "    end\n"
+      "  endcase\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->gen_case_items.size(), 2);
+  EXPECT_TRUE(item->gen_case_items[1].is_default);
+}
+
+TEST(Parser, GenerateCaseMultiPattern) {
+  auto r = Parse(
+      "module t;\n"
+      "  case (WIDTH)\n"
+      "    1, 2: begin\n"
+      "      assign a = b;\n"
+      "    end\n"
+      "  endcase\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->gen_case_items.size(), 1);
+  EXPECT_EQ(item->gen_case_items[0].patterns.size(), 2);
+}
+
+TEST(Parser, GenerateCaseInRegion) {
+  auto r = Parse(
+      "module t;\n"
+      "  generate\n"
+      "    case (WIDTH)\n"
+      "      1: begin\n"
+      "        assign a = b;\n"
+      "      end\n"
+      "    endcase\n"
+      "  endgenerate\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  bool found = false;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kGenerateCase) {
+      found = true;
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
 // --- Gate primitive tests ---
 
 TEST(Parser, GateAndInst) {

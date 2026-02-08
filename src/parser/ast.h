@@ -230,6 +230,7 @@ enum class ModuleItemKind : uint8_t {
   kAlwaysLatchBlock,
   kGenerateFor,
   kGenerateIf,
+  kGenerateCase,
   kModuleInst,
   kTypedef,
   kFunctionDecl,
@@ -278,6 +279,14 @@ struct FunctionArg {
   std::string_view name;
 };
 
+struct ModuleItem;
+
+struct GenerateCaseItem {
+  std::vector<Expr*> patterns;
+  bool is_default = false;
+  std::vector<ModuleItem*> body;
+};
+
 struct ModuleItem {
   ModuleItemKind kind;
   SourceLoc loc;
@@ -312,6 +321,7 @@ struct ModuleItem {
   Stmt* gen_step = nullptr;
   std::vector<ModuleItem*> gen_body;
   ModuleItem* gen_else = nullptr;
+  std::vector<GenerateCaseItem> gen_case_items;
 
   // Import
   ImportItem import_item;

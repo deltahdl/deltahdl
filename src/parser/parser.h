@@ -31,6 +31,7 @@ class Parser {
   void ParseGenerateRegion(std::vector<ModuleItem*>& items);
   ModuleItem* ParseGenerateFor();
   ModuleItem* ParseGenerateIf();
+  ModuleItem* ParseGenerateCase();
 
   // Top-level declarations (parser_toplevel.cpp)
   ModuleDecl* ParseInterfaceDecl();

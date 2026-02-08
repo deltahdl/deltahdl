@@ -268,6 +268,10 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
     items.push_back(ParseGenerateIf());
     return;
   }
+  if (Check(TokenKind::kKwCase)) {
+    items.push_back(ParseGenerateCase());
+    return;
+  }
   ParseTypedItemOrInst(items);
 }
 
