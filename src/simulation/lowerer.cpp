@@ -40,8 +40,8 @@ static SimCoroutine MakeContAssignCoroutine(const Expr* lhs, const Expr* rhs,
 
 // --- Schedule helper ---
 
-static void ScheduleProcess(Process* proc, Scheduler& sched) {
-  auto* event = new Event();
+static void ScheduleProcess(Process* proc, Scheduler& sched, Arena& arena) {
+  auto* event = arena.Create<Event>();
   event->callback = [proc]() { proc->Resume(); };
   sched.ScheduleEvent(SimTime{0}, Region::kActive, event);
 }
@@ -103,7 +103,7 @@ void Lowerer::LowerProcess(const RtlirProcess& proc) {
       return;  // Don't schedule at time 0.
   }
 
-  ScheduleProcess(p, ctx_.GetScheduler());
+  ScheduleProcess(p, ctx_.GetScheduler(), arena_);
 }
 
 // --- Continuous assignment lowering ---
@@ -115,7 +115,7 @@ void Lowerer::LowerContAssign(const RtlirContAssign& ca) {
   p->home_region = Region::kActive;
   p->coro = MakeContAssignCoroutine(ca.lhs, ca.rhs, ctx_, arena_).Release();
 
-  ScheduleProcess(p, ctx_.GetScheduler());
+  ScheduleProcess(p, ctx_.GetScheduler(), arena_);
 }
 
 // --- Design lowering ---

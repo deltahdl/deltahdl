@@ -180,15 +180,48 @@ jobs:
           name: build-ubuntu-24-04-x86-64-gcc
           path: build/
           retention-days: 1
-  e2e-test-coverage:
-    env:
-      LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
-    needs: integration-test-coverage
+  cache-sv-tests:
+    needs:
+      - integration-test-coverage
+      - integration-test-macos-26-arm64-clang
+      - integration-test-sanitize
+      - integration-test-ubuntu-24-04-x86-64-clang
+      - integration-test-ubuntu-24-04-x86-64-gcc
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - id: sv-tests-ref
+        name: Get sv-tests commit
+        run: >-
+          echo "sha=$(git rev-parse HEAD:third_party/sv-tests)"
+          >> "$GITHUB_OUTPUT"
+      - id: cache
+        name: Restore sv-tests cache
+        uses: actions/cache@v4
         with:
-          submodules: recursive
+          key: sv-tests-${{ steps.sv-tests-ref.outputs.sha }}
+          path: third_party/sv-tests
+      - if: steps.cache.outputs.cache-hit != 'true'
+        name: Checkout sv-tests
+        run: git submodule update --init --recursive third_party/sv-tests
+  e2e-test-coverage:
+    env:
+      LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
+    needs: cache-sv-tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - id: sv-tests-ref
+        name: Get sv-tests commit
+        run: >-
+          echo "sha=$(git rev-parse HEAD:third_party/sv-tests)"
+          >> "$GITHUB_OUTPUT"
+      - name: Restore sv-tests cache
+        uses: actions/cache/restore@v4
+        with:
+          fail-on-cache-miss: true
+          key: sv-tests-${{ steps.sv-tests-ref.outputs.sha }}
+          path: third_party/sv-tests
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -205,12 +238,21 @@ jobs:
           path: profraw/
           retention-days: 1
   e2e-test-macos-26-arm64-clang:
-    needs: integration-test-macos-26-arm64-clang
+    needs: cache-sv-tests
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
+      - id: sv-tests-ref
+        name: Get sv-tests commit
+        run: >-
+          echo "sha=$(git rev-parse HEAD:third_party/sv-tests)"
+          >> "$GITHUB_OUTPUT"
+      - name: Restore sv-tests cache
+        uses: actions/cache/restore@v4
         with:
-          submodules: recursive
+          fail-on-cache-miss: true
+          key: sv-tests-${{ steps.sv-tests-ref.outputs.sha }}
+          path: third_party/sv-tests
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -224,12 +266,21 @@ jobs:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-    needs: integration-test-sanitize
+    needs: cache-sv-tests
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - id: sv-tests-ref
+        name: Get sv-tests commit
+        run: >-
+          echo "sha=$(git rev-parse HEAD:third_party/sv-tests)"
+          >> "$GITHUB_OUTPUT"
+      - name: Restore sv-tests cache
+        uses: actions/cache/restore@v4
         with:
-          submodules: recursive
+          fail-on-cache-miss: true
+          key: sv-tests-${{ steps.sv-tests-ref.outputs.sha }}
+          path: third_party/sv-tests
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -240,12 +291,21 @@ jobs:
       - name: E2E tests
         run: python3 scripts/run_sv_tests.py
   e2e-test-ubuntu-24-04-x86-64-clang:
-    needs: integration-test-ubuntu-24-04-x86-64-clang
+    needs: cache-sv-tests
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - id: sv-tests-ref
+        name: Get sv-tests commit
+        run: >-
+          echo "sha=$(git rev-parse HEAD:third_party/sv-tests)"
+          >> "$GITHUB_OUTPUT"
+      - name: Restore sv-tests cache
+        uses: actions/cache/restore@v4
         with:
-          submodules: recursive
+          fail-on-cache-miss: true
+          key: sv-tests-${{ steps.sv-tests-ref.outputs.sha }}
+          path: third_party/sv-tests
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -256,12 +316,21 @@ jobs:
       - name: Run sv-tests
         run: python3 scripts/run_sv_tests.py
   e2e-test-ubuntu-24-04-x86-64-gcc:
-    needs: integration-test-ubuntu-24-04-x86-64-gcc
+    needs: cache-sv-tests
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - id: sv-tests-ref
+        name: Get sv-tests commit
+        run: >-
+          echo "sha=$(git rev-parse HEAD:third_party/sv-tests)"
+          >> "$GITHUB_OUTPUT"
+      - name: Restore sv-tests cache
+        uses: actions/cache/restore@v4
         with:
-          submodules: recursive
+          fail-on-cache-miss: true
+          key: sv-tests-${{ steps.sv-tests-ref.outputs.sha }}
+          path: third_party/sv-tests
       - name: Download build
         uses: actions/download-artifact@v4
         with:

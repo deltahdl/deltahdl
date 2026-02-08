@@ -97,6 +97,14 @@ struct Process {
   uint32_t id = 0;
   bool active = true;
 
+  ~Process() {
+    if (coro) coro.destroy();
+  }
+
+  Process() = default;
+  Process(const Process&) = delete;
+  Process& operator=(const Process&) = delete;
+
   bool Done() const { return !coro || coro.done(); }
 
   void Resume() {
