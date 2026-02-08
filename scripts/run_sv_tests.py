@@ -2,22 +2,12 @@
 """Run CHIPS Alliance sv-tests against deltahdl (advisory)."""
 
 import glob
-import os
 import subprocess
 import sys
 from pathlib import Path
 
-GREEN = "\033[32m"
-RED = "\033[31m"
-RESET = "\033[0m"
+from test_common import BINARY, RED, REPO_ROOT, RESET, print_result
 
-if (not sys.stdout.isatty() and not os.environ.get("CI")) or os.environ.get(
-    "NO_COLOR"
-):
-    GREEN = RED = RESET = ""
-
-REPO_ROOT = Path(__file__).resolve().parent.parent
-BINARY = REPO_ROOT / "build" / "src" / "deltahdl"
 TEST_DIR = REPO_ROOT / "third_party" / "sv-tests" / "tests"
 
 
@@ -52,12 +42,10 @@ def main():
         for path in tests:
             name = Path(path).name
             try:
-                if run_test(path):
-                    passed += 1
-                    print(f"  {GREEN}PASS{RESET}: {name}", flush=True)
-                else:
-                    failed += 1
-                    print(f"  {RED}FAIL{RESET}: {name}", flush=True)
+                ok = run_test(path)
+                print_result(ok, name)
+                passed += ok
+                failed += not ok
             except subprocess.TimeoutExpired:
                 failed += 1
                 print(f"  {RED}TIMEOUT{RESET}: {name}", flush=True)
