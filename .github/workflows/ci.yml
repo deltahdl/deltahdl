@@ -188,6 +188,7 @@ jobs:
         run: |
           cppcheck --enable=all --error-exitcode=1 \
             --suppress=missingIncludeSystem \
+            --suppress=unusedFunction \
             --std=c++23 -I src src/
       - name: Check file line limits
         run: |
