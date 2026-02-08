@@ -14,7 +14,7 @@ jobs:
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-          cmake --build build --parallel
+          cmake --build build --parallel --target deltahdl
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
@@ -39,7 +39,7 @@ jobs:
             -DCMAKE_CXX_COMPILER=clang++-18 \
             -DCMAKE_C_COMPILER=clang-18 \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-          cmake --build build --parallel
+          cmake --build build --parallel --target deltahdl
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
@@ -64,7 +64,7 @@ jobs:
             -DCMAKE_CXX_COMPILER=g++-14 \
             -DCMAKE_C_COMPILER=gcc-14 \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-          cmake --build build --parallel
+          cmake --build build --parallel --target deltahdl
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
@@ -519,8 +519,8 @@ jobs:
         with:
           name: build-macos-26-arm64-clang-${{ matrix.build_type }}
           path: build/
-      - name: Fix permissions
-        run: chmod +x build/test/test_*
+      - name: Build tests
+        run: cmake --build build --parallel
       - name: Unit tests
         run: ctest --test-dir build --output-on-failure
     strategy:
@@ -536,8 +536,12 @@ jobs:
         with:
           name: build-ubuntu-24-04-clang-${{ matrix.build_type }}
           path: build/
-      - name: Fix permissions
-        run: chmod +x build/test/test_*
+      - name: Install compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-18
+      - name: Build tests
+        run: cmake --build build --parallel
       - name: Unit tests
         run: ctest --test-dir build --output-on-failure
     strategy:
@@ -553,8 +557,12 @@ jobs:
         with:
           name: build-ubuntu-24-04-gcc-${{ matrix.build_type }}
           path: build/
-      - name: Fix permissions
-        run: chmod +x build/test/test_*
+      - name: Install compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-14
+      - name: Build tests
+        run: cmake --build build --parallel
       - name: Unit tests
         run: ctest --test-dir build --output-on-failure
     strategy:
