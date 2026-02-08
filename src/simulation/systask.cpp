@@ -13,6 +13,15 @@ static bool is_format_spec(char c) {
   return c == 'd' || c == 'h' || c == 'x' || c == 'b' || c == 's' || c == 't';
 }
 
+static std::string format_binary(unsigned long long num) {
+  if (num == 0) return "0";
+  std::string result;
+  for (auto tmp = num; tmp > 0; tmp >>= 1) {
+    result.insert(result.begin(), (tmp & 1) ? '1' : '0');
+  }
+  return result;
+}
+
 static std::string format_single_value(char spec, unsigned long long num) {
   char buf[128];
   switch (spec) {
@@ -23,14 +32,8 @@ static std::string format_single_value(char spec, unsigned long long num) {
     case 'x':
       std::snprintf(buf, sizeof(buf), "%llx", num);
       return buf;
-    case 'b': {
-      if (num == 0) return "0";
-      std::string result;
-      for (auto tmp = num; tmp > 0; tmp >>= 1) {
-        result.insert(result.begin(), (tmp & 1) ? '1' : '0');
-      }
-      return result;
-    }
+    case 'b':
+      return format_binary(num);
     default:
       std::snprintf(buf, sizeof(buf), "%llu", num);
       return buf;

@@ -139,15 +139,16 @@ bool Scheduler::iterate_reactive_set(TimeSlot& slot) {
 
   while (slot.any_nonempty_in(Region::PreObserved, Region::PrePostponed)) {
     execute_reactive_regions(slot);
-
-    // If active-side events were generated, restart active set
-    if (slot.any_nonempty_in(Region::PreActive, Region::PostNBA)) {
-      while (iterate_active_set(slot)) {
-      }
-    }
+    restart_active_set(slot);
   }
 
   return did_work;
+}
+
+void Scheduler::restart_active_set(TimeSlot& slot) {
+  if (!slot.any_nonempty_in(Region::PreActive, Region::PostNBA)) return;
+  while (iterate_active_set(slot)) {
+  }
 }
 
 void Scheduler::execute_reactive_regions(TimeSlot& slot) {

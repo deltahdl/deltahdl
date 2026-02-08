@@ -205,24 +205,31 @@ Token Lexer::lex_based_number(SourceLoc loc, uint32_t start) {
   return tok;
 }
 
+void Lexer::lex_fractional_part() {
+  if (at_end() || current() != '.') return;
+  if (!std::isdigit(static_cast<unsigned char>(peek_char()))) return;
+  advance();
+  while (!at_end() && (std::isdigit(static_cast<unsigned char>(current())) ||
+                       current() == '_')) {
+    advance();
+  }
+}
+
+void Lexer::lex_exponent_part() {
+  if (at_end()) return;
+  if (current() != 'e' && current() != 'E') return;
+  advance();
+  if (!at_end() && (current() == '+' || current() == '-')) {
+    advance();
+  }
+  while (!at_end() && std::isdigit(static_cast<unsigned char>(current()))) {
+    advance();
+  }
+}
+
 void Lexer::lex_real_suffix() {
-  if (!at_end() && current() == '.' &&
-      std::isdigit(static_cast<unsigned char>(peek_char()))) {
-    advance();
-    while (!at_end() && (std::isdigit(static_cast<unsigned char>(current())) ||
-                         current() == '_')) {
-      advance();
-    }
-  }
-  if (!at_end() && (current() == 'e' || current() == 'E')) {
-    advance();
-    if (!at_end() && (current() == '+' || current() == '-')) {
-      advance();
-    }
-    while (!at_end() && std::isdigit(static_cast<unsigned char>(current()))) {
-      advance();
-    }
-  }
+  lex_fractional_part();
+  lex_exponent_part();
 }
 
 Token Lexer::lex_number() {

@@ -38,6 +38,7 @@ class Preprocessor {
   void handle_endif();
   void handle_include(std::string_view filename, SourceLoc loc, int depth,
                       std::string& output);
+  bool try_expand_macro(std::string_view trimmed, std::string& output);
   std::string expand_macro(const MacroDef& macro, std::string_view args_text);
   std::string resolve_include(std::string_view filename);
 

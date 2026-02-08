@@ -36,6 +36,7 @@ class VcdWriter {
   };
 
   static std::string make_id_string(uint32_t id);
+  void write_initial_values();
   void write_scope_hierarchy();
   void write_signal_defs(const std::string& scope);
   void write_scalar_change(const Logic4Vec& value, const std::string& id_str);

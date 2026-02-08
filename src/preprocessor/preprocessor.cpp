@@ -131,19 +131,23 @@ bool Preprocessor::process_directive(std::string_view line, uint32_t file_id,
     return true;
   }
   // Check for macro invocation: `MACRO_NAME
-  if (is_active()) {
-    auto macro_name = trimmed.substr(1);
-    auto space_pos = macro_name.find_first_of(" \t(");
-    auto name = (space_pos != std::string_view::npos)
-                    ? macro_name.substr(0, space_pos)
-                    : macro_name;
-    const auto* def = macros_.lookup(name);
-    if (def != nullptr) {
-      output.append(expand_macro(*def, ""));
-      return true;
-    }
+  if (is_active() && try_expand_macro(trimmed, output)) {
+    return true;
   }
   return false;
+}
+
+bool Preprocessor::try_expand_macro(std::string_view trimmed,
+                                    std::string& output) {
+  auto macro_name = trimmed.substr(1);
+  auto space_pos = macro_name.find_first_of(" \t(");
+  auto name = (space_pos != std::string_view::npos)
+                  ? macro_name.substr(0, space_pos)
+                  : macro_name;
+  const auto* def = macros_.lookup(name);
+  if (def == nullptr) return false;
+  output.append(expand_macro(*def, ""));
+  return true;
 }
 
 bool Preprocessor::is_active() const {

@@ -43,21 +43,24 @@ void VcdWriter::write_header() {
   file_ << "$enddefinitions $end\n";
   file_ << "$dumpvars\n";
 
-  // Emit initial X for all signals
-  for (const auto& sig : signals_) {
-    if (sig.width == 1) {
-      file_ << 'x' << make_id_string(sig.id) << '\n';
-    } else {
-      file_ << 'b';
-      for (uint32_t j = 0; j < sig.width; ++j) {
-        file_ << 'x';
-      }
-      file_ << ' ' << make_id_string(sig.id) << '\n';
-    }
-  }
+  write_initial_values();
 
   file_ << "$end\n";
   header_written_ = true;
+}
+
+void VcdWriter::write_initial_values() {
+  for (const auto& sig : signals_) {
+    if (sig.width == 1) {
+      file_ << 'x' << make_id_string(sig.id) << '\n';
+      continue;
+    }
+    file_ << 'b';
+    for (uint32_t j = 0; j < sig.width; ++j) {
+      file_ << 'x';
+    }
+    file_ << ' ' << make_id_string(sig.id) << '\n';
+  }
 }
 
 // --- Timestamp and value change ---

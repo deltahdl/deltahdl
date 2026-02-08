@@ -47,6 +47,8 @@ class Lexer {
   Token lex_unbased_unsized(SourceLoc loc, uint32_t start);
   Token lex_based_number(SourceLoc loc, uint32_t start);
   void lex_real_suffix();
+  void lex_fractional_part();
+  void lex_exponent_part();
 
   // Operator sub-helpers
   Token lex_op_tilde(SourceLoc loc, uint32_t start);

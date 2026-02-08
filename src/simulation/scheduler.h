@@ -64,6 +64,7 @@ class Scheduler {
 
   bool iterate_active_set(TimeSlot& slot);
   bool iterate_reactive_set(TimeSlot& slot);
+  void restart_active_set(TimeSlot& slot);
 
   std::map<SimTime, TimeSlot> event_calendar_;
   SimTime current_time_{0};
