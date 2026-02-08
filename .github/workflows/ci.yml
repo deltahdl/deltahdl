@@ -1,0 +1,177 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-18 clang-tidy-18 clang-format-18 cppcheck
+          pip install lizard
+
+      - name: Check formatting
+        run: |
+          find src -name '*.cpp' -o -name '*.h' | \
+            xargs clang-format-18 --dry-run --Werror
+
+      - name: Run clang-tidy
+        run: |
+          cmake -B build -DCMAKE_CXX_COMPILER=clang++-18 \
+                -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          find src -name '*.cpp' | \
+            xargs clang-tidy-18 -p build --warnings-as-errors='*'
+
+      - name: Run cppcheck
+        run: |
+          cppcheck --enable=all --error-exitcode=1 \
+            --suppress=missingIncludeSystem \
+            --std=c++23 -I src src/
+
+      - name: Check file line limits
+        run: |
+          lizard -l cpp -T nloc=800 src/
+          # Also check raw line count
+          fail=0
+          for f in $(find src -name '*.cpp' -o -name '*.h'); do
+            lines=$(wc -l < "$f")
+            if [ "$lines" -gt 800 ]; then
+              echo "FAIL: $f has $lines lines (max 800)"
+              fail=1
+            fi
+          done
+          exit $fail
+
+  build:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        compiler: [gcc-14, clang-18]
+        build_type: [Debug, Release]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install compiler
+        run: |
+          sudo apt-get update
+          if [ "${{ matrix.compiler }}" = "gcc-14" ]; then
+            sudo apt-get install -y g++-14
+            echo "CXX=g++-14" >> "$GITHUB_ENV"
+            echo "CC=gcc-14" >> "$GITHUB_ENV"
+          else
+            sudo apt-get install -y clang-18
+            echo "CXX=clang++-18" >> "$GITHUB_ENV"
+            echo "CC=clang-18" >> "$GITHUB_ENV"
+          fi
+
+      - name: Configure
+        run: |
+          cmake -B build \
+            -DCMAKE_CXX_COMPILER=${{ env.CXX }} \
+            -DCMAKE_C_COMPILER=${{ env.CC }} \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Unit tests
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Integration tests
+        run: |
+          for sv in test/integration/*.sv; do
+            echo "--- Simulating $sv ---"
+            ./build/deltahdl "$sv"
+          done
+
+  coverage:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-18 llvm-18
+
+      - name: Configure with coverage
+        run: |
+          cmake -B build \
+            -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_C_COMPILER=clang-18 \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DDELTAHDL_COVERAGE=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Run tests
+        env:
+          LLVM_PROFILE_FILE: build/coverage/%p.profraw
+        run: |
+          ctest --test-dir build --output-on-failure
+          for sv in test/integration/*.sv; do
+            ./build/deltahdl "$sv"
+          done
+
+      - name: Generate coverage report
+        run: |
+          llvm-profdata-18 merge -sparse build/coverage/*.profraw \
+            -o build/coverage/merged.profdata
+          llvm-cov-18 export build/deltahdl \
+            -instr-profile=build/coverage/merged.profdata \
+            --format=lcov \
+            --ignore-filename-regex='test/|third_party/' \
+            > build/coverage/lcov.info
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: build/coverage/lcov.info
+          fail_ci_if_error: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  sanitizers:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Clang
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-18
+
+      - name: Configure with sanitizers
+        run: |
+          cmake -B build \
+            -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_C_COMPILER=clang-18 \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DDELTAHDL_SANITIZERS=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Run tests under sanitizers
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          ctest --test-dir build --output-on-failure
+          for sv in test/integration/*.sv; do
+            ./build/deltahdl "$sv"
+          done

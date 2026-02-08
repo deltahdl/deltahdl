@@ -1,0 +1,16 @@
+# Build
+build/
+cmake-build-*/
+
+# IDE / tooling
+.cache/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+compile_commands.json
+
+# OS
+.DS_Store
+Thumbs.db
