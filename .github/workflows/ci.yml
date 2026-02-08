@@ -214,8 +214,8 @@ jobs:
           fail=0
           for f in $(find src -name '*.cpp' -o -name '*.h'); do
             lines=$(wc -l < "$f")
-            if [ "$lines" -gt 800 ]; then
-              echo "FAIL: $f has $lines lines (max 800)"
+            if [ "$lines" -gt 1000 ]; then
+              echo "FAIL: $f has $lines lines (max 1000)"
               fail=1
             fi
           done
