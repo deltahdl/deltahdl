@@ -6,4 +6,4 @@ namespace delta {
 // This translation unit ensures the module compiles and links correctly.
 // Future extensions (process group management, stack tracking) live here.
 
-} // namespace delta
+}  // namespace delta

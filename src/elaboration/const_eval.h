@@ -12,4 +12,4 @@ struct Expr;
 /// Returns nullopt if the expression is not a compile-time constant.
 std::optional<int64_t> const_eval_int(const Expr* expr);
 
-} // namespace delta
+}  // namespace delta

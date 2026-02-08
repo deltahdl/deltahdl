@@ -17,4 +17,4 @@ void exec_stop();
 
 std::string format_args(const std::vector<std::string>& args);
 
-} // namespace delta
+}  // namespace delta

@@ -1,19 +1,19 @@
 #pragma once
 
-#include "synthesis/aig.h"
-
 #include <cstdint>
 #include <string>
+
+#include "synthesis/aig.h"
 
 namespace delta {
 
 // --- Output netlist formats ---
 
 enum class NetlistFormat : uint8_t {
-    Verilog, // Structural Verilog gate-level netlist
-    Blif,    // Berkeley Logic Interchange Format
-    Json,    // JSON netlist (Yosys-compatible)
-    Edif,    // Electronic Design Interchange Format
+  Verilog,  // Structural Verilog gate-level netlist
+  Blif,     // Berkeley Logic Interchange Format
+  Json,     // JSON netlist (Yosys-compatible)
+  Edif,     // Electronic Design Interchange Format
 };
 
 // --- Netlist writer ---
@@ -22,22 +22,23 @@ enum class NetlistFormat : uint8_t {
 // output formats for downstream place-and-route or formal verification.
 
 class NetlistWriter {
-  public:
-    /// Write the AIG to a file in the specified format.
-    void write(const AigGraph& graph, NetlistFormat fmt, const std::string& filename);
+ public:
+  /// Write the AIG to a file in the specified format.
+  void write(const AigGraph& graph, NetlistFormat fmt,
+             const std::string& filename);
 
-  private:
-    /// Emit structural Verilog (AND/NOT gates).
-    void write_verilog(const AigGraph& graph, const std::string& filename);
+ private:
+  /// Emit structural Verilog (AND/NOT gates).
+  void write_verilog(const AigGraph& graph, const std::string& filename);
 
-    /// Emit BLIF for academic/research tools.
-    void write_blif(const AigGraph& graph, const std::string& filename);
+  /// Emit BLIF for academic/research tools.
+  void write_blif(const AigGraph& graph, const std::string& filename);
 
-    /// Emit JSON netlist (Yosys-compatible schema).
-    void write_json(const AigGraph& graph, const std::string& filename);
+  /// Emit JSON netlist (Yosys-compatible schema).
+  void write_json(const AigGraph& graph, const std::string& filename);
 
-    /// Emit EDIF for vendor tool import.
-    void write_edif(const AigGraph& graph, const std::string& filename);
+  /// Emit EDIF for vendor tool import.
+  void write_edif(const AigGraph& graph, const std::string& filename);
 };
 
-} // namespace delta
+}  // namespace delta

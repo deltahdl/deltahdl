@@ -14,10 +14,10 @@ namespace delta {
 // This corresponds to ABC's "balance" command.
 
 class AigBalancer {
-  public:
-    /// Run AIG balancing on the graph.
-    /// Restructures associative cones for minimum depth.
-    void balance(AigGraph& graph);
+ public:
+  /// Run AIG balancing on the graph.
+  /// Restructures associative cones for minimum depth.
+  void balance(AigGraph& graph);
 };
 
-} // namespace delta
+}  // namespace delta

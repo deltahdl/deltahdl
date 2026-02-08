@@ -11,4 +11,4 @@ namespace delta {
 
 void vpi_init_stubs();
 
-} // namespace delta
+}  // namespace delta

@@ -128,24 +128,7 @@ jobs:
       - name: Check formatting
         run: |
           find src -name '*.cpp' -o -name '*.h' | \
-            xargs clang-format-18 --dry-run --Werror \
-              --style='{
-                BasedOnStyle: LLVM,
-                IndentWidth: 4,
-                ColumnLimit: 100,
-                AllowShortFunctionsOnASingleLine: Inline,
-                AllowShortIfStatementsOnASingleLine: Never,
-                AllowShortLoopsOnASingleLine: false,
-                AllowShortBlocksOnASingleLine: Empty,
-                BreakBeforeBraces: Attach,
-                PointerAlignment: Left,
-                ReferenceAlignment: Left,
-                SpaceAfterCStyleCast: false,
-                SpaceBeforeParens: ControlStatements,
-                IncludeBlocks: Regroup,
-                SortIncludes: CaseSensitive,
-                Standard: Latest
-              }'
+            xargs clang-format-18 --dry-run --Werror --style=google
       - name: Run clang-tidy
         run: |
           cmake -B build -DCMAKE_CXX_COMPILER=clang++-18 \

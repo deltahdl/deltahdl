@@ -16,4 +16,4 @@ uint32_t eval_type_width(const DataType& dtype);
 /// logic, reg, integer are 4-state.  bit, int, byte, etc. are 2-state.
 bool is_4state_type(DataTypeKind kind);
 
-} // namespace delta
+}  // namespace delta
