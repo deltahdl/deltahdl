@@ -25,13 +25,13 @@
 - [x] `resetall`
 - [x] `MacroTable` (hash-based define/undefine/lookup)
 - [x] `elsif`
-- [ ] Function-like macro expansion (parameter substitution)
+- [x] Function-like macro expansion (parameter substitution)
 - [ ] `default_nettype`
 - [ ] `celldefine`, `endcelldefine`
 - [ ] `unconnected_drive`, `nounconnected_drive`
 - [ ] `pragma`
 - [ ] `line` (source location override)
-- [ ] `__FILE__`, `__LINE__` predefined macros
+- [x] `__FILE__`, `__LINE__` predefined macros
 - [ ] `begin_keywords`, `end_keywords`
 - [ ] Apply `timescale` to simulation time precision
 
@@ -159,9 +159,9 @@
 - [ ] `$monitor` (print on change in Postponed region)
 - [x] `$time` (return current simulation time)
 - [ ] `$realtime` (return current time as real)
-- [ ] `$random`, `$urandom`, `$urandom_range`
+- [x] `$random`, `$urandom`, `$urandom_range`
 - [ ] `$readmemh`, `$readmemb` (load memory from file)
-- [ ] `$fatal`, `$error`, `$warning`, `$info` (severity tasks)
+- [x] `$fatal`, `$error`, `$warning`, `$info` (severity tasks)
 - [ ] `$dumpfile` (set VCD output file)
 - [ ] `$dumpvars` (enable VCD dumping)
 - [ ] `$dumpoff`, `$dumpon`, `$dumpall`
