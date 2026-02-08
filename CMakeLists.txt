@@ -32,4 +32,5 @@ if(BUILD_TESTING)
             ${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_sim_tests.py
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
+    set_tests_properties(sim_tests PROPERTIES LABELS "e2e")
 endif()

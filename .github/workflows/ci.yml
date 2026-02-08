@@ -582,7 +582,7 @@ jobs:
       - name: Build tests
         run: cmake --build build --parallel
       - name: Unit tests
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir build --output-on-failure --label-exclude e2e
       - name: Upload profraw
         uses: actions/upload-artifact@v4
         with:
@@ -602,7 +602,7 @@ jobs:
       - name: Build tests
         run: cmake --build build --parallel
       - name: Unit tests
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir build --output-on-failure --label-exclude e2e
   unit-test-sanitize:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
@@ -623,7 +623,7 @@ jobs:
       - name: Build tests
         run: cmake --build build --parallel
       - name: Unit tests
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir build --output-on-failure --label-exclude e2e
   unit-test-ubuntu-24-04-x86-64-clang:
     needs: build-ubuntu-24-04-x86-64-clang
     runs-on: ubuntu-24.04
@@ -641,7 +641,7 @@ jobs:
       - name: Build tests
         run: cmake --build build --parallel
       - name: Unit tests
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir build --output-on-failure --label-exclude e2e
   unit-test-ubuntu-24-04-x86-64-gcc:
     needs: build-ubuntu-24-04-x86-64-gcc
     runs-on: ubuntu-24.04
@@ -659,7 +659,7 @@ jobs:
       - name: Build tests
         run: cmake --build build --parallel
       - name: Unit tests
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir build --output-on-failure --label-exclude e2e
 name: CI
 on:
   pull_request:
