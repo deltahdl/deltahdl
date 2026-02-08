@@ -4,7 +4,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
 jobs:
   build:
-    needs: lint
+    needs: static-analysis
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -104,103 +104,6 @@ jobs:
           && github.event_name == 'push'
         name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
-  lint:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            clang-18 clang-tidy-18 clang-format-18 cppcheck
-          pip install lizard yamllint
-      - name: Lint YAML
-        run: |
-          EMPTY_LINES='empty-lines: {max: 0, max-start: 0, max-end: 1}'
-          KEY_ORDERING='key-ordering: enable'
-          NEWLINE_AT_EOF='new-line-at-end-of-file: enable'
-          TRUTHY='truthy: {allowed-values: ["true", "false", "on"]}'
-          RULES="$EMPTY_LINES, $KEY_ORDERING"
-          RULES="$RULES, $NEWLINE_AT_EOF, $TRUTHY"
-          yamllint --strict \
-            --config-data "{extends: default, rules: {$RULES}}" \
-            .github/workflows/*.yml
-      - name: Check formatting
-        run: |
-          find src -name '*.cpp' -o -name '*.h' | \
-            xargs clang-format-18 --dry-run --Werror --style=google
-      - name: Run clang-tidy
-        run: |
-          cmake -B build -DCMAKE_CXX_COMPILER=clang++-18 \
-                -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-          find src -name '*.cpp' | \
-            xargs clang-tidy-18 -p build \
-              --warnings-as-errors=\
-          'readability-function-size,'\
-          'readability-function-cognitive-complexity' \
-              --config='{
-                Checks: "-*,
-                  bugprone-*,
-                  -bugprone-easily-swappable-parameters,
-                  cppcoreguidelines-avoid-goto,
-                  cppcoreguidelines-init-variables,
-                  cppcoreguidelines-slicing,
-                  misc-redundant-expression,
-                  misc-unused-parameters,
-                  modernize-use-auto,
-                  modernize-use-nullptr,
-                  modernize-use-override,
-                  performance-*,
-                  readability-function-cognitive-complexity,
-                  readability-function-size,
-                  readability-identifier-naming,
-                  readability-redundant-smartptr-get,
-                  readability-simplify-boolean-expr",
-                HeaderFilterRegex: "src/.*\\.h$",
-                CheckOptions: {
-                  readability-function-size.NestingThreshold: 3,
-                  readability-function-size.ParameterThreshold: 5,
-                  readability-function-size.StatementThreshold: 50,
-                  readability-function-size.LineThreshold: 200,
-                  readability-function-cognitive-complexity.Threshold:
-                    15,
-                  readability-identifier-naming.ClassCase: CamelCase,
-                  readability-identifier-naming.FunctionCase:
-                    lower_case,
-                  readability-identifier-naming.VariableCase:
-                    lower_case,
-                  readability-identifier-naming.PrivateMemberCase:
-                    lower_case,
-                  readability-identifier-naming.PrivateMemberSuffix:
-                    "_",
-                  readability-identifier-naming.PublicMemberCase:
-                    lower_case,
-                  readability-identifier-naming.ConstantCase:
-                    CamelCase,
-                  readability-identifier-naming.ConstantPrefix: k,
-                  readability-identifier-naming.EnumConstantCase:
-                    CamelCase,
-                  readability-identifier-naming.NamespaceCase:
-                    lower_case
-                }
-              }'
-      - name: Run cppcheck
-        run: |
-          cppcheck --enable=all --error-exitcode=1 \
-            --suppress=missingIncludeSystem \
-            --std=c++23 -I src src/ test/
-      - name: Check file line limits
-        run: |
-          lizard -l cpp -T nloc=800 src/
-          fail=0
-          for f in $(find src -name '*.cpp' -o -name '*.h'); do
-            lines=$(wc -l < "$f")
-            if [ "$lines" -gt 800 ]; then
-              echo "FAIL: $f has $lines lines (max 800)"
-              fail=1
-            fi
-          done
-          exit $fail
   release:
     if: >-
       github.ref == 'refs/heads/main'
@@ -276,6 +179,109 @@ jobs:
           for sv in test/integration/*.sv; do
             ./build/src/deltahdl "$sv"
           done
+  static-analysis:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang-18 clang-tidy-18 clang-format-18 cppcheck
+          pip install lizard yamllint
+          wget -q https://github.com/pmd/pmd/releases/download/pmd_releases%2F7.21.0/pmd-dist-7.21.0-bin.zip
+          unzip -q pmd-dist-7.21.0-bin.zip
+          echo "$PWD/pmd-bin-7.21.0/bin" >> "$GITHUB_PATH"
+      - name: Lint YAML
+        run: |
+          EMPTY_LINES='empty-lines: {max: 0, max-start: 0, max-end: 1}'
+          KEY_ORDERING='key-ordering: enable'
+          NEWLINE_AT_EOF='new-line-at-end-of-file: enable'
+          TRUTHY='truthy: {allowed-values: ["true", "false", "on"]}'
+          RULES="$EMPTY_LINES, $KEY_ORDERING"
+          RULES="$RULES, $NEWLINE_AT_EOF, $TRUTHY"
+          yamllint --strict \
+            --config-data "{extends: default, rules: {$RULES}}" \
+            .github/workflows/*.yml
+      - name: Check formatting
+        run: |
+          find src -name '*.cpp' -o -name '*.h' | \
+            xargs clang-format-18 --dry-run --Werror --style=google
+      - name: Check file line limits
+        run: |
+          lizard -l cpp -T nloc=800 src/
+          fail=0
+          for f in $(find src -name '*.cpp' -o -name '*.h'); do
+            lines=$(wc -l < "$f")
+            if [ "$lines" -gt 800 ]; then
+              echo "FAIL: $f has $lines lines (max 800)"
+              fail=1
+            fi
+          done
+          exit $fail
+      - name: Detect copy-paste
+        run: |
+          pmd cpd --minimum-tokens 100 --language cpp --dir src/
+      - name: Run cppcheck
+        run: |
+          cppcheck --enable=all --error-exitcode=1 \
+            --suppress=missingIncludeSystem \
+            --std=c++23 -I src src/ test/
+      - name: Run clang-tidy
+        run: |
+          cmake -B build -DCMAKE_CXX_COMPILER=clang++-18 \
+                -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          find src -name '*.cpp' | \
+            xargs clang-tidy-18 -p build \
+              --warnings-as-errors=\
+          'readability-function-size,'\
+          'readability-function-cognitive-complexity' \
+              --config='{
+                Checks: "-*,
+                  bugprone-*,
+                  -bugprone-easily-swappable-parameters,
+                  cppcoreguidelines-avoid-goto,
+                  cppcoreguidelines-init-variables,
+                  cppcoreguidelines-slicing,
+                  misc-redundant-expression,
+                  misc-unused-parameters,
+                  modernize-use-auto,
+                  modernize-use-nullptr,
+                  modernize-use-override,
+                  performance-*,
+                  readability-function-cognitive-complexity,
+                  readability-function-size,
+                  readability-identifier-naming,
+                  readability-redundant-smartptr-get,
+                  readability-simplify-boolean-expr",
+                HeaderFilterRegex: "src/.*\\.h$",
+                CheckOptions: {
+                  readability-function-size.NestingThreshold: 3,
+                  readability-function-size.ParameterThreshold: 5,
+                  readability-function-size.StatementThreshold: 50,
+                  readability-function-size.LineThreshold: 200,
+                  readability-function-cognitive-complexity.Threshold:
+                    15,
+                  readability-identifier-naming.ClassCase: CamelCase,
+                  readability-identifier-naming.FunctionCase:
+                    lower_case,
+                  readability-identifier-naming.VariableCase:
+                    lower_case,
+                  readability-identifier-naming.PrivateMemberCase:
+                    lower_case,
+                  readability-identifier-naming.PrivateMemberSuffix:
+                    "_",
+                  readability-identifier-naming.PublicMemberCase:
+                    lower_case,
+                  readability-identifier-naming.ConstantCase:
+                    CamelCase,
+                  readability-identifier-naming.ConstantPrefix: k,
+                  readability-identifier-naming.EnumConstantCase:
+                    CamelCase,
+                  readability-identifier-naming.NamespaceCase:
+                    lower_case
+                }
+              }'
   test:
     needs: build
     runs-on: ubuntu-24.04
