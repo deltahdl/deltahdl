@@ -38,7 +38,8 @@ void Parser::Synchronize() {
       Consume();
       return;
     }
-    if (Check(TokenKind::kKwEndmodule) || Check(TokenKind::kKwEnd)) {
+    if (Check(TokenKind::kKwEndmodule) || Check(TokenKind::kKwEndpackage) ||
+        Check(TokenKind::kKwEnd)) {
       return;
     }
     Consume();
@@ -50,14 +51,19 @@ void Parser::Synchronize() {
 CompilationUnit* Parser::Parse() {
   auto* unit = arena_.Create<CompilationUnit>();
   while (!AtEnd()) {
-    if (!Check(TokenKind::kKwModule)) {
-      diag_.Error(CurrentLoc(), "expected module declaration");
+    if (Check(TokenKind::kKwModule)) {
+      auto* mod = ParseModuleDecl();
+      if (mod != nullptr) {
+        unit->modules.push_back(mod);
+      }
+    } else if (Check(TokenKind::kKwPackage)) {
+      auto* pkg = ParsePackageDecl();
+      if (pkg != nullptr) {
+        unit->packages.push_back(pkg);
+      }
+    } else {
+      diag_.Error(CurrentLoc(), "expected module or package declaration");
       Consume();
-      continue;
-    }
-    auto* mod = ParseModuleDecl();
-    if (mod != nullptr) {
-      unit->modules.push_back(mod);
     }
   }
   return unit;
@@ -95,6 +101,36 @@ ModuleDecl* Parser::ParseModuleDecl() {
   Expect(TokenKind::kKwEndmodule);
   mod->range.end = CurrentLoc();
   return mod;
+}
+
+PackageDecl* Parser::ParsePackageDecl() {
+  auto* pkg = arena_.Create<PackageDecl>();
+  pkg->range.start = CurrentLoc();
+  Expect(TokenKind::kKwPackage);
+  pkg->name = Expect(TokenKind::kIdentifier).text;
+  Expect(TokenKind::kSemicolon);
+  while (!Check(TokenKind::kKwEndpackage) && !AtEnd()) {
+    ParseModuleItem(pkg->items);
+  }
+  Expect(TokenKind::kKwEndpackage);
+  pkg->range.end = CurrentLoc();
+  return pkg;
+}
+
+ModuleItem* Parser::ParseImportDecl() {
+  auto* item = arena_.Create<ModuleItem>();
+  item->kind = ModuleItemKind::kImportDecl;
+  item->loc = CurrentLoc();
+  Expect(TokenKind::kKwImport);
+  item->import_item.package_name = Expect(TokenKind::kIdentifier).text;
+  Expect(TokenKind::kColonColon);
+  if (Match(TokenKind::kStar)) {
+    item->import_item.is_wildcard = true;
+  } else {
+    item->import_item.item_name = Expect(TokenKind::kIdentifier).text;
+  }
+  Expect(TokenKind::kSemicolon);
+  return item;
 }
 
 void Parser::ParseParamPortDecl(ModuleDecl& mod) {
@@ -205,13 +241,37 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
     items.push_back(ParseParamDecl());
     return;
   }
+  if (Check(TokenKind::kKwImport)) {
+    items.push_back(ParseImportDecl());
+    return;
+  }
+  if (Check(TokenKind::kKwGenerate)) {
+    ParseGenerateRegion(items);
+    return;
+  }
+  if (Check(TokenKind::kKwFor)) {
+    items.push_back(ParseGenerateFor());
+    return;
+  }
+  if (Check(TokenKind::kKwIf)) {
+    items.push_back(ParseGenerateIf());
+    return;
+  }
 
+  ParseTypedItemOrInst(items);
+}
+
+void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kKwEnum)) {
     auto dtype = ParseEnumType();
     ParseVarDeclList(items, dtype);
     return;
   }
-
+  if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
+    auto dtype = ParseStructOrUnionType();
+    ParseVarDeclList(items, dtype);
+    return;
+  }
   auto dtype = ParseDataType();
   if (dtype.kind != DataTypeKind::kImplicit) {
     ParseVarDeclList(items, dtype);
@@ -656,6 +716,10 @@ static std::optional<DataTypeKind> TokenToTypeKind(TokenKind tk) {
       return DataTypeKind::kInteger;
     case TokenKind::kKwReal:
       return DataTypeKind::kReal;
+    case TokenKind::kKwShortreal:
+      return DataTypeKind::kShortreal;
+    case TokenKind::kKwRealtime:
+      return DataTypeKind::kRealtime;
     case TokenKind::kKwTime:
       return DataTypeKind::kTime;
     case TokenKind::kKwString:
@@ -686,28 +750,6 @@ DataType Parser::ParseDataType() {
     Expect(TokenKind::kRBracket);
   }
   return dtype;
-}
-
-// --- Event lists ---
-
-std::vector<EventExpr> Parser::ParseEventList() {
-  std::vector<EventExpr> events;
-  events.push_back(ParseSingleEvent());
-  while (Match(TokenKind::kKwOr) || Match(TokenKind::kComma)) {
-    events.push_back(ParseSingleEvent());
-  }
-  return events;
-}
-
-EventExpr Parser::ParseSingleEvent() {
-  EventExpr ev;
-  if (Match(TokenKind::kKwPosedge)) {
-    ev.edge = Edge::kPosedge;
-  } else if (Match(TokenKind::kKwNegedge)) {
-    ev.edge = Edge::kNegedge;
-  }
-  ev.signal = ParseExpr();
-  return ev;
 }
 
 Stmt* Parser::ParseDelayStmt() {
