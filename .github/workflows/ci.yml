@@ -1,3 +1,4 @@
+---
 name: CI
 
 on:
@@ -22,8 +23,7 @@ jobs:
           pip install lizard yamllint
 
       - name: Lint YAML
-        run: |
-          yamllint --strict .github/workflows/*.yml
+        run: yamllint --strict .github/workflows/*.yml
 
       - name: Check formatting
         run: |
@@ -101,7 +101,6 @@ jobs:
       - name: Check file line limits
         run: |
           lizard -l cpp -T nloc=800 src/
-          # Also check raw line count
           fail=0
           for f in $(find src -name '*.cpp' -o -name '*.h'); do
             lines=$(wc -l < "$f")
@@ -113,6 +112,7 @@ jobs:
           exit $fail
 
   build:
+    needs: lint
     runs-on: ubuntu-24.04
     strategy:
       matrix:
@@ -136,15 +136,39 @@ jobs:
             echo "CC=clang-18" >> "$GITHUB_ENV"
           fi
 
-      - name: Configure
+      - name: Build
         run: |
           cmake -B build \
             -DCMAKE_CXX_COMPILER=${{ env.CXX }} \
             -DCMAKE_C_COMPILER=${{ env.CC }} \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          cmake --build build --parallel
 
-      - name: Build
-        run: cmake --build build --parallel
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.compiler }}-${{ matrix.build_type }}
+          path: build/
+          retention-days: 1
+
+  test:
+    needs: build
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        compiler: [gcc-14, clang-18]
+        build_type: [Debug, Release]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-${{ matrix.compiler }}-${{ matrix.build_type }}
+          path: build/
+
+      - name: Fix permissions
+        run: chmod +x build/src/deltahdl build/test/test_*
 
       - name: Unit tests
         run: ctest --test-dir build --output-on-failure
@@ -153,10 +177,11 @@ jobs:
         run: |
           for sv in test/integration/*.sv; do
             echo "--- Simulating $sv ---"
-            ./build/deltahdl "$sv"
+            ./build/src/deltahdl "$sv"
           done
 
   coverage:
+    needs: lint
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -168,16 +193,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang-18 llvm-18
 
-      - name: Configure with coverage
+      - name: Build with coverage
         run: |
           cmake -B build \
             -DCMAKE_CXX_COMPILER=clang++-18 \
             -DCMAKE_C_COMPILER=clang-18 \
             -DCMAKE_BUILD_TYPE=Debug \
             -DDELTAHDL_COVERAGE=ON
-
-      - name: Build
-        run: cmake --build build --parallel
+          cmake --build build --parallel
 
       - name: Run tests
         env:
@@ -185,14 +208,14 @@ jobs:
         run: |
           ctest --test-dir build --output-on-failure
           for sv in test/integration/*.sv; do
-            ./build/deltahdl "$sv"
+            ./build/src/deltahdl "$sv"
           done
 
       - name: Generate coverage report
         run: |
           llvm-profdata-18 merge -sparse build/coverage/*.profraw \
             -o build/coverage/merged.profdata
-          llvm-cov-18 export build/deltahdl \
+          llvm-cov-18 export build/src/deltahdl \
             -instr-profile=build/coverage/merged.profdata \
             --format=lcov \
             --ignore-filename-regex='test/|third_party/' \
@@ -206,7 +229,8 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
-  sanitizers:
+  sanitize:
+    needs: lint
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -218,23 +242,21 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang-18
 
-      - name: Configure with sanitizers
+      - name: Build with sanitizers
         run: |
           cmake -B build \
             -DCMAKE_CXX_COMPILER=clang++-18 \
             -DCMAKE_C_COMPILER=clang-18 \
             -DCMAKE_BUILD_TYPE=Debug \
             -DDELTAHDL_SANITIZERS=ON
+          cmake --build build --parallel
 
-      - name: Build
-        run: cmake --build build --parallel
-
-      - name: Run tests under sanitizers
+      - name: Run tests
         env:
           ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
         run: |
           ctest --test-dir build --output-on-failure
           for sv in test/integration/*.sv; do
-            ./build/deltahdl "$sv"
+            ./build/src/deltahdl "$sv"
           done
