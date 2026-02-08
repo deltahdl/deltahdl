@@ -532,38 +532,8 @@ jobs:
                     .PrivateMemberSuffix: "_",
                   readability-identifier-naming
                     .PublicMemberCase: lower_case,
-                  readability-identifier-naming.ConstantCase:
-                    CamelCase,
-                  readability-identifier-naming.ConstantPrefix:
-                    k,
-                  readability-identifier-naming
-                    .ConstexprVariableCase: CamelCase,
-                  readability-identifier-naming
-                    .ConstexprVariablePrefix: k,
-                  readability-identifier-naming
-                    .ClassConstantCase: CamelCase,
-                  readability-identifier-naming
-                    .ClassConstantPrefix: k,
-                  readability-identifier-naming
-                    .StaticConstantCase: CamelCase,
-                  readability-identifier-naming
-                    .StaticConstantPrefix: k,
-                  readability-identifier-naming
-                    .GlobalConstantCase: CamelCase,
-                  readability-identifier-naming
-                    .GlobalConstantPrefix: k,
-                  readability-identifier-naming
-                    .LocalConstantCase: CamelCase,
-                  readability-identifier-naming
-                    .LocalConstantPrefix: k,
                   readability-identifier-naming
                     .EnumConstantCase: CamelCase,
-                  readability-identifier-naming
-                    .EnumConstantPrefix: "",
-                  readability-identifier-naming
-                    .ScopedEnumConstantCase: CamelCase,
-                  readability-identifier-naming
-                    .ScopedEnumConstantPrefix: "",
                   readability-identifier-naming.NamespaceCase:
                     lower_case
                 }
