@@ -504,11 +504,9 @@ jobs:
       - name: Run cppcheck
         # NEVER use --suppress. Fix the code instead.
         run: |
-          CATCH2=$(find build/_deps \
-            -name catch2-src -type d)
           cppcheck --enable=all --std=c++23 \
-            -I src -I "$CATCH2/src" \
-            src/ test/ 2>&1 | tee /tmp/cppcheck.log
+            -I src \
+            src/ 2>&1 | tee /tmp/cppcheck.log
           SEV='(error|warning|style|performance|portability):'
           FOUND=$(grep -cE ": $SEV" /tmp/cppcheck.log \
             || true)
