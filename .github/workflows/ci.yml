@@ -501,6 +501,7 @@ jobs:
                   modernize-use-nullptr,
                   modernize-use-override,
                   performance-*,
+                  -performance-enum-size,
                   readability-function-cognitive-complexity,
                   readability-function-size,
                   readability-identifier-naming,
@@ -520,6 +521,8 @@ jobs:
                     .Threshold: 15,
                   readability-identifier-naming.ClassCase:
                     CamelCase,
+                  readability-identifier-naming.ClassIgnoredRegexp:
+                    "promise_type",
                   readability-identifier-naming.FunctionCase:
                     lower_case,
                   readability-identifier-naming.VariableCase:
@@ -530,10 +533,6 @@ jobs:
                     .PrivateMemberSuffix: "_",
                   readability-identifier-naming
                     .PublicMemberCase: lower_case,
-                  readability-identifier-naming.ConstantCase:
-                    CamelCase,
-                  readability-identifier-naming
-                    .ConstantPrefix: k,
                   readability-identifier-naming
                     .EnumConstantCase: CamelCase,
                   readability-identifier-naming.NamespaceCase:

@@ -21,11 +21,8 @@ uint32_t eval_type_width(const DataType& dtype) {
   // Built-in type widths per IEEE 1800-2023.
   switch (dtype.kind) {
     case DataTypeKind::Implicit:
-      return 1;
     case DataTypeKind::Logic:
-      return 1;
     case DataTypeKind::Reg:
-      return 1;
     case DataTypeKind::Bit:
       return 1;
     case DataTypeKind::Byte:
@@ -33,23 +30,16 @@ uint32_t eval_type_width(const DataType& dtype) {
     case DataTypeKind::Shortint:
       return 16;
     case DataTypeKind::Int:
-      return 32;
-    case DataTypeKind::Longint:
-      return 64;
     case DataTypeKind::Integer:
-      return 32;
-    case DataTypeKind::Real:
-      return 64;
     case DataTypeKind::Shortreal:
       return 32;
+    case DataTypeKind::Longint:
+    case DataTypeKind::Real:
     case DataTypeKind::Time:
-      return 64;
     case DataTypeKind::Realtime:
       return 64;
     case DataTypeKind::String:
-      return 0;
     case DataTypeKind::Void:
-      return 0;
     case DataTypeKind::Named:
       return 0;
   }

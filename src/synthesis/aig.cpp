@@ -98,7 +98,7 @@ uint64_t AigGraph::hash_key(uint32_t lit0, uint32_t lit1) {
 }
 
 uint32_t AigGraph::alloc_node() {
-  uint32_t id = static_cast<uint32_t>(nodes.size());
+  auto id = static_cast<uint32_t>(nodes.size());
   AigNode node{};
   node.id = id;
   nodes.push_back(node);
