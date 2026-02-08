@@ -24,7 +24,7 @@
 - [x] `timescale` (consumed, not yet applied)
 - [x] `resetall`
 - [x] `MacroTable` (hash-based define/undefine/lookup)
-- [ ] `elsif`
+- [x] `elsif`
 - [ ] Function-like macro expansion (parameter substitution)
 - [ ] `default_nettype`
 - [ ] `celldefine`, `endcelldefine`
@@ -116,7 +116,7 @@
 
 - [x] Create `Process` coroutine from each `initial` block
 - [x] Create `Process` coroutine from each `always`/`always_comb`/`always_ff`/`always_latch` block
-- [ ] Wrap `always` blocks in implicit infinite loop
+- [x] Wrap `always` blocks in implicit infinite loop
 - [x] Create `ContAssignProcess` from each continuous assignment
 - [ ] Create `Net` objects with driver lists and resolution functions
 - [x] Create `Variable` objects with storage
@@ -135,19 +135,19 @@
 - [x] `Process` struct (kind, coroutine handle, home region, sensitivity)
 - [x] Net resolution: wire/tri, wand/triand, wor/trior
 - [x] Variable storage with force/release support
-- [ ] `co_await delay(N)` (schedule wakeup at T+N, suspend)
+- [x] `co_await delay(N)` (schedule wakeup at T+N, suspend)
 - [ ] `co_await edge(signal, posedge/negedge)` (sensitivity list, suspend)
 - [ ] `co_await wait(expr)` (conditional suspend, re-evaluate on wake)
 - [ ] `co_await event_trigger(ev)` (named event wait)
 - [x] Blocking assignment execution (inline in Active region)
-- [ ] Nonblocking assignment scheduling (RHS in Active, LHS update in NBA)
-- [ ] `#0` delay (suspend to Inactive, resume in next Active iteration)
+- [x] Nonblocking assignment scheduling (RHS in Active, LHS update in NBA)
+- [x] `#0` delay (suspend to Inactive, resume in next Active iteration)
 - [ ] `fork`/`join`/`join_any`/`join_none` (child coroutine spawning)
 - [x] Expression evaluation engine (all §11 operators on `Logic4Vec`)
 - [ ] Net resolution: tri0, tri1, supply0, supply1, trireg, uwire
 - [ ] Strength resolution (§28.12, multi-driver strength comparison)
 - [ ] User-defined nettype resolution functions (§6.6.7)
-- [ ] `$finish` triggers `final` block execution
+- [x] `$finish` triggers `final` block execution
 
 ## 8. System Tasks
 
