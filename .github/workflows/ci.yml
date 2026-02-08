@@ -136,7 +136,7 @@ jobs:
           name: build-sanitize
           path: build/
           retention-days: 1
-  build-ubuntu-24-04-clang:
+  build-ubuntu-24-04-x86-64-clang:
     needs: static-analysis
     runs-on: ubuntu-24.04
     steps:
@@ -155,10 +155,10 @@ jobs:
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
-          name: build-ubuntu-24-04-clang
+          name: build-ubuntu-24-04-x86-64-clang
           path: build/
           retention-days: 1
-  build-ubuntu-24-04-gcc:
+  build-ubuntu-24-04-x86-64-gcc:
     needs: static-analysis
     runs-on: ubuntu-24.04
     steps:
@@ -177,7 +177,7 @@ jobs:
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
-          name: build-ubuntu-24-04-gcc
+          name: build-ubuntu-24-04-x86-64-gcc
           path: build/
           retention-days: 1
   e2e-test-coverage:
@@ -239,8 +239,8 @@ jobs:
         run: chmod +x build/src/deltahdl
       - name: E2E tests
         run: python3 scripts/run_sv_tests.py
-  e2e-test-ubuntu-24-04-clang:
-    needs: integration-test-ubuntu-24-04-clang
+  e2e-test-ubuntu-24-04-x86-64-clang:
+    needs: integration-test-ubuntu-24-04-x86-64-clang
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -249,14 +249,14 @@ jobs:
       - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-ubuntu-24-04-clang
+          name: build-ubuntu-24-04-x86-64-clang
           path: build/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: Run sv-tests
         run: python3 scripts/run_sv_tests.py
-  e2e-test-ubuntu-24-04-gcc:
-    needs: integration-test-ubuntu-24-04-gcc
+  e2e-test-ubuntu-24-04-x86-64-gcc:
+    needs: integration-test-ubuntu-24-04-x86-64-gcc
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -265,7 +265,7 @@ jobs:
       - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-ubuntu-24-04-gcc
+          name: build-ubuntu-24-04-x86-64-gcc
           path: build/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
@@ -336,15 +336,15 @@ jobs:
             echo "--- Simulating $sv ---"
             ./build/src/deltahdl "$sv"
           done
-  integration-test-ubuntu-24-04-clang:
-    needs: unit-test-ubuntu-24-04-clang
+  integration-test-ubuntu-24-04-x86-64-clang:
+    needs: unit-test-ubuntu-24-04-x86-64-clang
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-ubuntu-24-04-clang
+          name: build-ubuntu-24-04-x86-64-clang
           path: build/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
@@ -354,15 +354,15 @@ jobs:
             echo "--- Simulating $sv ---"
             ./build/src/deltahdl "$sv"
           done
-  integration-test-ubuntu-24-04-gcc:
-    needs: unit-test-ubuntu-24-04-gcc
+  integration-test-ubuntu-24-04-x86-64-gcc:
+    needs: unit-test-ubuntu-24-04-x86-64-gcc
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-ubuntu-24-04-gcc
+          name: build-ubuntu-24-04-x86-64-gcc
           path: build/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
@@ -380,8 +380,8 @@ jobs:
       - assert-coverage
       - e2e-test-macos-26-arm64-clang
       - e2e-test-sanitize
-      - e2e-test-ubuntu-24-04-clang
-      - e2e-test-ubuntu-24-04-gcc
+      - e2e-test-ubuntu-24-04-x86-64-clang
+      - e2e-test-ubuntu-24-04-x86-64-gcc
     permissions:
       contents: write
     runs-on: ubuntu-24.04
@@ -392,7 +392,7 @@ jobs:
       - name: Download Ubuntu build
         uses: actions/download-artifact@v4
         with:
-          name: build-ubuntu-24-04-gcc
+          name: build-ubuntu-24-04-x86-64-gcc
           path: ubuntu-build/
       - name: Download macOS build
         uses: actions/download-artifact@v4
@@ -561,15 +561,15 @@ jobs:
         run: cmake --build build --parallel
       - name: Unit tests
         run: ctest --test-dir build --output-on-failure
-  unit-test-ubuntu-24-04-clang:
-    needs: build-ubuntu-24-04-clang
+  unit-test-ubuntu-24-04-x86-64-clang:
+    needs: build-ubuntu-24-04-x86-64-clang
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-ubuntu-24-04-clang
+          name: build-ubuntu-24-04-x86-64-clang
           path: build/
       - name: Install compiler
         run: |
@@ -579,15 +579,15 @@ jobs:
         run: cmake --build build --parallel
       - name: Unit tests
         run: ctest --test-dir build --output-on-failure
-  unit-test-ubuntu-24-04-gcc:
-    needs: build-ubuntu-24-04-gcc
+  unit-test-ubuntu-24-04-x86-64-gcc:
+    needs: build-ubuntu-24-04-x86-64-gcc
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-ubuntu-24-04-gcc
+          name: build-ubuntu-24-04-x86-64-gcc
           path: build/
       - name: Install compiler
         run: |
