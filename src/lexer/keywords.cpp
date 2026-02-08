@@ -5,7 +5,7 @@
 namespace delta {
 
 static const std::unordered_map<std::string_view, TokenKind>& keyword_map() {
-  static const std::unordered_map<std::string_view, TokenKind> map = {
+  static const std::unordered_map<std::string_view, TokenKind> kMap = {
       {"module", TokenKind::KwModule},
       {"endmodule", TokenKind::KwEndmodule},
       {"input", TokenKind::KwInput},
@@ -118,13 +118,13 @@ static const std::unordered_map<std::string_view, TokenKind>& keyword_map() {
       {"unique0", TokenKind::KwUnique0},
       {"priority", TokenKind::KwPriority},
   };
-  return map;
+  return kMap;
 }
 
 std::optional<TokenKind> lookup_keyword(std::string_view text) {
-  const auto& map = keyword_map();
-  auto it = map.find(text);
-  if (it != map.end()) {
+  const auto& kMap = keyword_map();
+  auto it = kMap.find(text);
+  if (it != kMap.end()) {
     return it->second;
   }
   return std::nullopt;
