@@ -75,21 +75,19 @@ jobs:
       matrix:
         build_type: [Debug, Release]
   coverage:
-    needs:
-      - e2e-test-macos-26-arm64-clang
-      - e2e-test-ubuntu-24-04-clang
-      - e2e-test-ubuntu-24-04-gcc
-    permissions:
-      id-token: write
-      pages: write
+    env:
+      LLVM_PROFILE_FILE: build/coverage/%p.profraw
+    needs: static-analysis
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: Install tools
         run: |
           sudo apt-get update
           sudo apt-get install -y clang-18 llvm-18
-      - name: Build with coverage
+      - name: Build
         run: |
           cmake -B build \
             -DCMAKE_CXX_COMPILER=clang++-18 \
@@ -97,14 +95,16 @@ jobs:
             -DCMAKE_BUILD_TYPE=Debug \
             -DDELTAHDL_COVERAGE=ON
           cmake --build build --parallel
-      - env:
-          LLVM_PROFILE_FILE: build/coverage/%p.profraw
-        name: Run tests
+      - name: Unit tests
+        run: ctest --test-dir build --output-on-failure
+      - name: Integration tests
         run: |
-          ctest --test-dir build --output-on-failure
           for sv in test/integration/*.sv; do
+            echo "--- Simulating $sv ---"
             ./build/src/deltahdl "$sv"
           done
+      - name: E2E tests
+        run: python3 scripts/run_sv_tests.py
       - name: Generate coverage report
         run: |
           llvm-profdata-18 merge -sparse \
@@ -128,17 +128,32 @@ jobs:
               .lines.covered == .lines.count and
               .branches.covered == .branches.count' \
             || { echo "FAIL: coverage must be 100%"; exit 1; }
-      - if: >-
-          github.ref == 'refs/heads/main'
-          && github.event_name == 'push'
-        name: Upload coverage pages
+      - name: Upload coverage HTML
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: build/coverage/html
+          retention-days: 7
+  deploy-coverage:
+    if: >-
+      github.ref == 'refs/heads/main'
+      && github.event_name == 'push'
+    needs: coverage
+    permissions:
+      id-token: write
+      pages: write
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download coverage HTML
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-html
+          path: coverage-html/
+      - name: Upload pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: build/coverage/html
-      - if: >-
-          github.ref == 'refs/heads/main'
-          && github.event_name == 'push'
-        name: Deploy to GitHub Pages
+          path: coverage-html/
+      - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
   e2e-test-macos-26-arm64-clang:
     needs: integration-test-macos-26-arm64-clang
@@ -255,7 +270,12 @@ jobs:
     if: >-
       github.ref == 'refs/heads/main'
       && github.event_name == 'push'
-    needs: sanitize
+    needs:
+      - coverage
+      - e2e-test-macos-26-arm64-clang
+      - e2e-test-ubuntu-24-04-clang
+      - e2e-test-ubuntu-24-04-gcc
+      - sanitize
     permissions:
       contents: write
     runs-on: ubuntu-24.04
@@ -304,15 +324,20 @@ jobs:
           git tag -f latest
           git push origin latest --force
   sanitize:
-    needs: coverage
+    env:
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+    needs: static-analysis
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: Install Clang
         run: |
           sudo apt-get update
           sudo apt-get install -y clang-18
-      - name: Build with sanitizers
+      - name: Build
         run: |
           cmake -B build \
             -DCMAKE_CXX_COMPILER=clang++-18 \
@@ -320,15 +345,16 @@ jobs:
             -DCMAKE_BUILD_TYPE=Debug \
             -DDELTAHDL_SANITIZERS=ON
           cmake --build build --parallel
-      - env:
-          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
-          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-        name: Run tests
+      - name: Unit tests
+        run: ctest --test-dir build --output-on-failure
+      - name: Integration tests
         run: |
-          ctest --test-dir build --output-on-failure
           for sv in test/integration/*.sv; do
+            echo "--- Simulating $sv ---"
             ./build/src/deltahdl "$sv"
           done
+      - name: E2E tests
+        run: python3 scripts/run_sv_tests.py
   static-analysis:
     runs-on: ubuntu-24.04
     steps:
