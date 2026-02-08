@@ -1,4 +1,5 @@
 #include <charconv>
+#include <cstdlib>
 
 #include "parser/parser.h"
 
@@ -48,6 +49,18 @@ static uint64_t ParseIntText(std::string_view text) {
   uint64_t val = 0;
   std::from_chars(buf.data() + i, buf.data() + buf.size(), val, base);
   return val;
+}
+
+// Parse a SystemVerilog real or time literal text into a double value.
+// Handles: fixed "3.14", exponent "1e10", underscore "1_000.5".
+// For time literals (e.g., "100ns"), strtod stops at the suffix.
+static double ParseRealText(std::string_view text) {
+  std::string buf;
+  buf.reserve(text.size());
+  for (char c : text) {
+    if (c != '_') buf.push_back(c);
+  }
+  return std::strtod(buf.c_str(), nullptr);
 }
 
 // Pratt parser: binding powers for SystemVerilog operators (IEEE 1800-2023 §11)
@@ -189,6 +202,8 @@ Expr* Parser::MakeLiteral(ExprKind kind, const Token& tok) {
   lit->range.start = tok.loc;
   if (kind == ExprKind::kIntegerLiteral) {
     lit->int_val = ParseIntText(tok.text);
+  } else if (kind == ExprKind::kRealLiteral || kind == ExprKind::kTimeLiteral) {
+    lit->real_val = ParseRealText(tok.text);
   }
   return lit;
 }
@@ -203,6 +218,10 @@ Expr* Parser::ParsePrimaryExpr() {
 
   if (tok.kind == TokenKind::kRealLiteral) {
     return MakeLiteral(ExprKind::kRealLiteral, tok);
+  }
+
+  if (tok.kind == TokenKind::kTimeLiteral) {
+    return MakeLiteral(ExprKind::kTimeLiteral, tok);
   }
 
   if (tok.kind == TokenKind::kStringLiteral) {

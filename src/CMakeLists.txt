@@ -7,6 +7,7 @@ add_library(deltahdl_lib STATIC
     lexer/keywords.cpp
     lexer/lexer.cpp
     parser/parser.cpp
+    parser/parser_decl.cpp
     parser/expr_parser.cpp
     elaboration/elaborator.cpp
     elaboration/type_eval.cpp

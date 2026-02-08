@@ -6,15 +6,9 @@
 #include <vector>
 
 #include "common/types.h"
+#include "parser/ast.h"
 
 namespace delta {
-
-// Forward declarations from parser/ast.h
-struct Expr;
-struct Stmt;
-enum class Direction : uint8_t;
-enum class DataTypeKind : uint8_t;
-enum class AlwaysKind : uint8_t;
 
 // --- RTLIR node classification ---
 
@@ -79,6 +73,7 @@ struct RtlirContAssign {
 struct RtlirProcess {
   RtlirProcessKind kind = RtlirProcessKind::kInitial;
   Stmt* body = nullptr;
+  std::vector<EventExpr> sensitivity;
 };
 
 // --- Parameter declaration ---
@@ -110,6 +105,7 @@ struct RtlirModule {
   std::vector<RtlirProcess> processes;
   std::vector<RtlirModuleInst> children;
   std::vector<RtlirParamDecl> params;
+  std::vector<ModuleItem*> function_decls;
 };
 
 // --- Design (top-level container) ---

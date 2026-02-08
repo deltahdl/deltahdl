@@ -48,6 +48,7 @@ class Lexer {
   void LexRealSuffix();
   void LexFractionalPart();
   void LexExponentPart();
+  bool TryLexTimeSuffix();
 
   // Operator sub-helpers
   Token LexOpTilde(SourceLoc loc, uint32_t start);

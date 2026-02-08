@@ -10,6 +10,8 @@ SimContext::SimContext(Scheduler& sched, Arena& arena, DiagEngine& diag,
     : scheduler_(sched), arena_(arena), diag_(diag), rng_(seed) {}
 
 Variable* SimContext::FindVariable(std::string_view name) {
+  auto* local = FindLocalVariable(name);
+  if (local) return local;
   auto it = variables_.find(name);
   if (it != variables_.end()) return it->second;
   return nullptr;
@@ -23,6 +25,39 @@ Variable* SimContext::CreateVariable(std::string_view name, uint32_t width) {
     var->value.words[i].bval = ~uint64_t{0};
   }
   variables_[name] = var;
+  return var;
+}
+
+void SimContext::RegisterFunction(std::string_view name, ModuleItem* item) {
+  functions_[name] = item;
+}
+
+ModuleItem* SimContext::FindFunction(std::string_view name) {
+  auto it = functions_.find(name);
+  return (it != functions_.end()) ? it->second : nullptr;
+}
+
+void SimContext::PushScope() { scope_stack_.emplace_back(); }
+
+void SimContext::PopScope() {
+  if (!scope_stack_.empty()) scope_stack_.pop_back();
+}
+
+Variable* SimContext::FindLocalVariable(std::string_view name) {
+  for (auto it = scope_stack_.rbegin(); it != scope_stack_.rend(); ++it) {
+    auto found = it->find(name);
+    if (found != it->end()) return found->second;
+  }
+  return nullptr;
+}
+
+Variable* SimContext::CreateLocalVariable(std::string_view name,
+                                          uint32_t width) {
+  auto* var = arena_.Create<Variable>();
+  var->value = MakeLogic4VecVal(arena_, width, 0);
+  if (!scope_stack_.empty()) {
+    scope_stack_.back()[name] = var;
+  }
   return var;
 }
 

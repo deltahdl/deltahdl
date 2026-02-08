@@ -225,6 +225,31 @@ void Lexer::LexRealSuffix() {
   LexExponentPart();
 }
 
+bool Lexer::TryLexTimeSuffix() {
+  if (AtEnd()) return false;
+  uint32_t save = pos_;
+  // Two-character suffixes first: ms, us, ns, ps, fs.
+  if (pos_ + 1 < source_.size()) {
+    char c0 = source_[pos_];
+    char c1 = source_[pos_ + 1];
+    bool is_two_char =
+        (c0 == 'm' || c0 == 'u' || c0 == 'n' || c0 == 'p' || c0 == 'f') &&
+        c1 == 's';
+    if (is_two_char) {
+      Advance();
+      Advance();
+      return true;
+    }
+  }
+  // Single character: just 's'.
+  if (source_[pos_] == 's') {
+    Advance();
+    return true;
+  }
+  pos_ = save;
+  return false;
+}
+
 Token Lexer::LexNumber() {
   auto loc = MakeLoc();
   uint32_t start = pos_;
@@ -245,10 +270,17 @@ Token Lexer::LexNumber() {
   }
 
   // Check for real literal (decimal point or exponent)
+  uint32_t before_real = pos_;
   LexRealSuffix();
+  bool is_real = (pos_ != before_real);
+
+  // Check for time suffix (s, ms, us, ns, ps, fs).
+  bool is_time = TryLexTimeSuffix();
 
   Token tok;
-  tok.kind = TokenKind::kIntLiteral;
+  tok.kind = is_time   ? TokenKind::kTimeLiteral
+             : is_real ? TokenKind::kRealLiteral
+                       : TokenKind::kIntLiteral;
   tok.loc = loc;
   tok.text = source_.substr(start, pos_ - start);
   return tok;

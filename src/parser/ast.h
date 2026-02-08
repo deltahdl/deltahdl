@@ -21,6 +21,7 @@ struct ModuleItem;
 enum class ExprKind : uint8_t {
   kIntegerLiteral,
   kRealLiteral,
+  kTimeLiteral,
   kStringLiteral,
   kUnbasedUnsizedLiteral,
   kIdentifier,
@@ -42,6 +43,7 @@ struct Expr {
   // Literal values
   std::string_view text;
   uint64_t int_val = 0;
+  double real_val = 0.0;
 
   // Unary/binary
   TokenKind op = TokenKind::kEof;
@@ -178,6 +180,12 @@ enum class DataTypeKind : uint8_t {
   kString,
   kVoid,
   kNamed,
+  kEnum,
+};
+
+struct EnumMember {
+  std::string_view name;
+  Expr* value = nullptr;
 };
 
 struct DataType {
@@ -186,6 +194,7 @@ struct DataType {
   Expr* packed_dim_left = nullptr;
   Expr* packed_dim_right = nullptr;
   std::string_view type_name;
+  std::vector<EnumMember> enum_members;
 };
 
 struct PortDecl {
@@ -209,6 +218,9 @@ enum class ModuleItemKind : uint8_t {
   kAlwaysLatchBlock,
   kGenerateBlock,
   kModuleInst,
+  kTypedef,
+  kFunctionDecl,
+  kTaskDecl,
 };
 
 enum class AlwaysKind : uint8_t {
@@ -216,6 +228,12 @@ enum class AlwaysKind : uint8_t {
   kAlwaysComb,
   kAlwaysFF,
   kAlwaysLatch,
+};
+
+struct FunctionArg {
+  Direction direction = Direction::kNone;
+  DataType data_type;
+  std::string_view name;
 };
 
 struct ModuleItem {
@@ -242,6 +260,14 @@ struct ModuleItem {
   std::string_view inst_name;
   std::vector<Expr*> inst_params;
   std::vector<std::pair<std::string_view, Expr*>> inst_ports;
+
+  // Typedef
+  DataType typedef_type;
+
+  // Function/task
+  DataType return_type;
+  std::vector<FunctionArg> func_args;
+  std::vector<Stmt*> func_body_stmts;
 };
 
 // --- Top-level declarations ---

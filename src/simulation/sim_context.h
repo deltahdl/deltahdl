@@ -14,6 +14,7 @@
 namespace delta {
 
 class DiagEngine;
+struct ModuleItem;
 struct Process;
 
 class SimContext {
@@ -35,6 +36,14 @@ class SimContext {
   void RegisterFinalProcess(Process* proc);
   void RunFinalBlocks();
 
+  void RegisterFunction(std::string_view name, ModuleItem* item);
+  ModuleItem* FindFunction(std::string_view name);
+
+  void PushScope();
+  void PopScope();
+  Variable* FindLocalVariable(std::string_view name);
+  Variable* CreateLocalVariable(std::string_view name, uint32_t width);
+
   int32_t Random32();
   uint32_t Urandom32();
   uint32_t UrandomRange(uint32_t min_val, uint32_t max_val);
@@ -45,6 +54,8 @@ class SimContext {
   DiagEngine& diag_;
   std::mt19937 rng_;
   std::unordered_map<std::string_view, Variable*> variables_;
+  std::unordered_map<std::string_view, ModuleItem*> functions_;
+  std::vector<std::unordered_map<std::string_view, Variable*>> scope_stack_;
   std::vector<Process*> final_processes_;
   bool stop_requested_ = false;
 };

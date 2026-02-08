@@ -423,6 +423,48 @@ static Logic4Vec EvalTernary(const Expr* expr, SimContext& ctx, Arena& arena) {
   return EvalExpr(expr->false_expr, ctx, arena);
 }
 
+// --- Function call ---
+
+static void BindFunctionArgs(const ModuleItem* func, const Expr* expr,
+                             SimContext& ctx, Arena& arena) {
+  for (size_t i = 0; i < func->func_args.size() && i < expr->args.size(); ++i) {
+    auto arg_val = EvalExpr(expr->args[i], ctx, arena);
+    auto* var = ctx.CreateLocalVariable(func->func_args[i].name, arg_val.width);
+    var->value = arg_val;
+  }
+}
+
+static void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
+                             SimContext& ctx, Arena& arena) {
+  for (auto* stmt : func->func_body_stmts) {
+    if (stmt->kind == StmtKind::kReturn) {
+      if (stmt->expr) ret_var->value = EvalExpr(stmt->expr, ctx, arena);
+      return;
+    }
+    if (stmt->kind == StmtKind::kBlockingAssign && stmt->lhs) {
+      auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
+      auto* var = ctx.FindVariable(stmt->lhs->text);
+      if (var) var->value = rhs_val;
+    } else if (stmt->kind == StmtKind::kExprStmt) {
+      EvalExpr(stmt->expr, ctx, arena);
+    }
+  }
+}
+
+static Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx,
+                                  Arena& arena) {
+  auto* func = ctx.FindFunction(expr->callee);
+  if (!func) return MakeLogic4VecVal(arena, 1, 0);
+
+  ctx.PushScope();
+  BindFunctionArgs(func, expr, ctx, arena);
+  auto* ret_var = ctx.CreateLocalVariable(func->name, 32);
+  ExecFunctionBody(func, ret_var, ctx, arena);
+  auto result = ret_var->value;
+  ctx.PopScope();
+  return result;
+}
+
 // --- Main dispatch ---
 
 Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena) {
@@ -452,7 +494,7 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena) {
     case ExprKind::kSystemCall:
       return EvalSystemCall(expr, ctx, arena);
     case ExprKind::kCall:
-      return MakeLogic4VecVal(arena, 1, 0);
+      return EvalFunctionCall(expr, ctx, arena);
     default:
       return MakeLogic4Vec(arena, 1);
   }

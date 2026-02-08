@@ -213,6 +213,83 @@ TEST(Parser, DisableStatement) {
   EXPECT_NE(stmt->expr, nullptr);
 }
 
+TEST(Parser, TypedefEnum) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef enum { A, B, C } state_t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 1);
+  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kTypedef);
+  EXPECT_EQ(mod->items[0]->name, "state_t");
+  EXPECT_EQ(mod->items[0]->typedef_type.kind, DataTypeKind::kEnum);
+  ASSERT_EQ(mod->items[0]->typedef_type.enum_members.size(), 3);
+  EXPECT_EQ(mod->items[0]->typedef_type.enum_members[0].name, "A");
+  EXPECT_EQ(mod->items[0]->typedef_type.enum_members[1].name, "B");
+  EXPECT_EQ(mod->items[0]->typedef_type.enum_members[2].name, "C");
+}
+
+TEST(Parser, EnumWithValues) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef enum { IDLE=0, RUN=1, STOP=2 } cmd_t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto& members = r.cu->modules[0]->items[0]->typedef_type.enum_members;
+  ASSERT_EQ(members.size(), 3);
+  EXPECT_EQ(members[0].name, "IDLE");
+  EXPECT_NE(members[0].value, nullptr);
+  EXPECT_EQ(members[1].name, "RUN");
+  EXPECT_NE(members[1].value, nullptr);
+}
+
+TEST(Parser, InlineEnumVar) {
+  auto r = Parse(
+      "module t;\n"
+      "  enum { X, Y } my_var;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 1);
+  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(mod->items[0]->name, "my_var");
+  EXPECT_EQ(mod->items[0]->data_type.kind, DataTypeKind::kEnum);
+  ASSERT_EQ(mod->items[0]->data_type.enum_members.size(), 2);
+}
+
+TEST(Parser, FunctionDecl) {
+  auto r = Parse(
+      "module t;\n"
+      "  function int add(input int a, input int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 1);
+  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(mod->items[0]->name, "add");
+  ASSERT_EQ(mod->items[0]->func_args.size(), 2);
+  EXPECT_EQ(mod->items[0]->func_args[0].name, "a");
+  EXPECT_EQ(mod->items[0]->func_args[1].name, "b");
+}
+
+TEST(Parser, TaskDecl) {
+  auto r = Parse(
+      "module t;\n"
+      "  task my_task(input int x);\n"
+      "    $display(\"%d\", x);\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 1);
+  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_EQ(mod->items[0]->name, "my_task");
+  ASSERT_EQ(mod->items[0]->func_args.size(), 1);
+}
+
 TEST(Parser, MultipleModules) {
   auto r = Parse(
       "module a; endmodule\n"

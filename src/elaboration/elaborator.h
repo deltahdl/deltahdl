@@ -42,6 +42,9 @@ class Elaborator {
   /// Elaborate a single module item into RTLIR.
   void ElaborateItem(ModuleItem* item, RtlirModule* mod);
 
+  /// Elaborate a typedef item (e.g. enum constants).
+  void ElaborateTypedef(ModuleItem* item, RtlirModule* mod);
+
   /// Walk module items and populate nets, vars, assigns, processes.
   void ElaborateItems(const ModuleDecl* decl, RtlirModule* mod);
 

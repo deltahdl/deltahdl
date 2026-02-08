@@ -38,6 +38,8 @@ uint32_t EvalTypeWidth(const DataType& dtype) {
     case DataTypeKind::kTime:
     case DataTypeKind::kRealtime:
       return 64;
+    case DataTypeKind::kEnum:
+      return 32;  // default enum base type is int (32-bit)
     case DataTypeKind::kString:
     case DataTypeKind::kVoid:
     case DataTypeKind::kNamed:

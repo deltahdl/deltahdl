@@ -1,15 +1,63 @@
 #include "simulation/lowerer.h"
 
+#include <string_view>
+#include <unordered_set>
+#include <vector>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "elaboration/rtlir.h"
 #include "parser/ast.h"
+#include "simulation/awaiters.h"
 #include "simulation/eval.h"
 #include "simulation/process.h"
 #include "simulation/sim_context.h"
 #include "simulation/stmt_exec.h"
 
 namespace delta {
+
+// --- Signal collection for sensitivity inference ---
+
+static void CollectExprReads(const Expr* expr,
+                             std::unordered_set<std::string_view>& out) {
+  if (!expr) return;
+  if (expr->kind == ExprKind::kIdentifier) {
+    out.insert(expr->text);
+    return;
+  }
+  CollectExprReads(expr->lhs, out);
+  CollectExprReads(expr->rhs, out);
+  CollectExprReads(expr->condition, out);
+  CollectExprReads(expr->true_expr, out);
+  CollectExprReads(expr->false_expr, out);
+  CollectExprReads(expr->base, out);
+  CollectExprReads(expr->index, out);
+  for (auto* arg : expr->args) CollectExprReads(arg, out);
+  for (auto* elem : expr->elements) CollectExprReads(elem, out);
+}
+
+static void CollectStmtReads(const Stmt* stmt,
+                             std::unordered_set<std::string_view>& out) {
+  if (!stmt) return;
+  CollectExprReads(stmt->condition, out);
+  CollectExprReads(stmt->rhs, out);
+  CollectExprReads(stmt->expr, out);
+  CollectExprReads(stmt->for_cond, out);
+  for (auto* s : stmt->stmts) CollectStmtReads(s, out);
+  CollectStmtReads(stmt->then_branch, out);
+  CollectStmtReads(stmt->else_branch, out);
+  CollectStmtReads(stmt->for_body, out);
+  CollectStmtReads(stmt->for_init, out);
+  CollectStmtReads(stmt->for_step, out);
+  CollectStmtReads(stmt->body, out);
+  for (auto* s : stmt->fork_stmts) CollectStmtReads(s, out);
+}
+
+static std::vector<std::string_view> CollectReadSignals(const Stmt* body) {
+  std::unordered_set<std::string_view> set;
+  CollectStmtReads(body, set);
+  return {set.begin(), set.end()};
+}
 
 Lowerer::Lowerer(SimContext& ctx, Arena& arena, DiagEngine& diag)
     : ctx_(ctx), arena_(arena), diag_(diag) {}
@@ -29,9 +77,24 @@ static SimCoroutine MakeAlwaysCoroutine(const Stmt* body, SimContext& ctx,
   }
 }
 
+static SimCoroutine MakeAlwaysSensCoroutine(const Stmt* body,
+                                            const std::vector<EventExpr>& sens,
+                                            SimContext& ctx, Arena& arena) {
+  while (!ctx.StopRequested()) {
+    co_await EventAwaiter{ctx, sens};
+    auto result = co_await ExecStmt(body, ctx, arena);
+    if (result != StmtResult::kDone) break;
+  }
+}
+
 static SimCoroutine MakeAlwaysCombCoroutine(const Stmt* body, SimContext& ctx,
                                             Arena& arena) {
-  co_await ExecStmt(body, ctx, arena);
+  auto read_vars = CollectReadSignals(body);
+  while (!ctx.StopRequested()) {
+    co_await ExecStmt(body, ctx, arena);
+    if (read_vars.empty()) break;
+    co_await AnyChangeAwaiter{ctx, read_vars};
+  }
 }
 
 static SimCoroutine MakeContAssignCoroutine(const Expr* lhs, const Expr* rhs,
@@ -39,7 +102,10 @@ static SimCoroutine MakeContAssignCoroutine(const Expr* lhs, const Expr* rhs,
   auto val = EvalExpr(rhs, ctx, arena);
   if (lhs && lhs->kind == ExprKind::kIdentifier) {
     auto* var = ctx.FindVariable(lhs->text);
-    if (var) var->value = val;
+    if (var) {
+      var->value = val;
+      var->NotifyWatchers();
+    }
   }
   co_return;
 }
@@ -69,6 +135,11 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
     }
   }
 
+  // Register function declarations.
+  for (auto* func : mod->function_decls) {
+    ctx_.RegisterFunction(func->name, func);
+  }
+
   // Lower processes.
   for (const auto& proc : mod->processes) {
     LowerProcess(proc);
@@ -94,7 +165,13 @@ void Lowerer::LowerProcess(const RtlirProcess& proc) {
       break;
     case RtlirProcessKind::kAlways:
       p->kind = ProcessKind::kAlways;
-      p->coro = MakeAlwaysCoroutine(proc.body, ctx_, arena_).Release();
+      if (!proc.sensitivity.empty()) {
+        p->coro =
+            MakeAlwaysSensCoroutine(proc.body, proc.sensitivity, ctx_, arena_)
+                .Release();
+      } else {
+        p->coro = MakeAlwaysCoroutine(proc.body, ctx_, arena_).Release();
+      }
       break;
     case RtlirProcessKind::kAlwaysComb:
     case RtlirProcessKind::kAlwaysLatch:

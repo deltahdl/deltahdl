@@ -1,5 +1,7 @@
 #pragma once
 
+#include <unordered_set>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "lexer/lexer.h"
@@ -21,6 +23,13 @@ class Parser {
   void ParseModuleBody(ModuleDecl& mod);
   void ParseModuleItem(std::vector<ModuleItem*>& items);
   void ParseParamPortDecl(ModuleDecl& mod);
+
+  // Declarations (parser_decl.cpp)
+  ModuleItem* ParseTypedef();
+  DataType ParseEnumType();
+  ModuleItem* ParseFunctionDecl();
+  ModuleItem* ParseTaskDecl();
+  std::vector<FunctionArg> ParseFunctionArgs();
 
   // Declarations
   void ParseVarDeclList(std::vector<ModuleItem*>& items, const DataType& dtype);
@@ -86,6 +95,7 @@ class Parser {
   Lexer& lexer_;
   Arena& arena_;
   DiagEngine& diag_;
+  std::unordered_set<std::string_view> known_types_;
 };
 
 }  // namespace delta

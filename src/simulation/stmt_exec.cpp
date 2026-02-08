@@ -16,7 +16,10 @@ static StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
   auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
   if (stmt->lhs && stmt->lhs->kind == ExprKind::kIdentifier) {
     auto* var = ctx.FindVariable(stmt->lhs->text);
-    if (var) var->value = rhs_val;
+    if (var) {
+      var->value = rhs_val;
+      var->NotifyWatchers();
+    }
   }
   return StmtResult::kDone;
 }
@@ -38,6 +41,7 @@ static StmtResult ExecNonblockingAssignImpl(const Stmt* stmt, SimContext& ctx,
     if (var->has_pending_nba) {
       var->value = var->pending_nba;
       var->has_pending_nba = false;
+      var->NotifyWatchers();
     }
   };
   ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kNBA, event);
@@ -176,6 +180,19 @@ static ExecTask ExecDelay(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return StmtResult::kDone;
 }
 
+// --- Event control ---
+
+static ExecTask ExecEventControl(const Stmt* stmt, SimContext& ctx,
+                                 Arena& arena) {
+  if (!stmt->events.empty()) {
+    co_await EventAwaiter{ctx, stmt->events};
+  }
+  if (stmt->body) {
+    co_return co_await ExecStmt(stmt->body, ctx, arena);
+  }
+  co_return StmtResult::kDone;
+}
+
 // --- Fork (stub: sequential execution) ---
 
 static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
@@ -218,7 +235,7 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     case StmtKind::kDelay:
       return ExecDelay(stmt, ctx, arena);
     case StmtKind::kEventControl:
-      return ExecTask::Immediate(StmtResult::kSuspendEvent);
+      return ExecEventControl(stmt, ctx, arena);
     case StmtKind::kFork:
       return ExecFork(stmt, ctx, arena);
     case StmtKind::kTimingControl:

@@ -113,6 +113,48 @@ TEST(Lexer, HelloSv) {
   EXPECT_EQ(tokens[4].text, "$display");
 }
 
+TEST(Lexer, RealLiteralFixed) {
+  auto tokens = lex("3.14");
+  ASSERT_EQ(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kRealLiteral);
+  EXPECT_EQ(tokens[0].text, "3.14");
+}
+
+TEST(Lexer, RealLiteralExponent) {
+  auto tokens = lex("1e10");
+  ASSERT_EQ(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kRealLiteral);
+  EXPECT_EQ(tokens[0].text, "1e10");
+}
+
+TEST(Lexer, RealLiteralFixedExponent) {
+  auto tokens = lex("2.5e3");
+  ASSERT_EQ(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kRealLiteral);
+  EXPECT_EQ(tokens[0].text, "2.5e3");
+}
+
+TEST(Lexer, TimeLiteral) {
+  auto tokens = lex("100ns");
+  ASSERT_EQ(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kTimeLiteral);
+  EXPECT_EQ(tokens[0].text, "100ns");
+}
+
+TEST(Lexer, TimeLiteralMs) {
+  auto tokens = lex("10ms");
+  ASSERT_EQ(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kTimeLiteral);
+  EXPECT_EQ(tokens[0].text, "10ms");
+}
+
+TEST(Lexer, TimeLiteralRealBase) {
+  auto tokens = lex("1.5us");
+  ASSERT_EQ(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kTimeLiteral);
+  EXPECT_EQ(tokens[0].text, "1.5us");
+}
+
 TEST(Lexer, SourceLocations) {
   auto tokens = lex("a\nb c");
   EXPECT_EQ(tokens[0].loc.line, 1);

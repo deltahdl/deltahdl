@@ -390,3 +390,75 @@ TEST(Lowerer, UrandomRangeInBounds) {
   EXPECT_GE(var->value.ToUint64(), 50u);
   EXPECT_LE(var->value.ToUint64(), 100u);
 }
+
+TEST(Lowerer, PosedgeWakeup) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk;\n"
+      "  logic [31:0] count;\n"
+      "  initial begin\n"
+      "    clk = 0;\n"
+      "    count = 0;\n"
+      "    #1 clk = 1;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "  always @(posedge clk)\n"
+      "    count = count + 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* count = f.ctx.FindVariable("count");
+  ASSERT_NE(count, nullptr);
+  EXPECT_EQ(count->value.ToUint64(), 1u);
+}
+
+TEST(Lowerer, AlwaysCombRetrigger) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a, b;\n"
+      "  always_comb b = a + 1;\n"
+      "  initial begin\n"
+      "    a = 5;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* b = f.ctx.FindVariable("b");
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(b->value.ToUint64(), 6u);
+}
+
+TEST(Lowerer, FunctionCallReturnsValue) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  function int add(input int a, input int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "  logic [31:0] x;\n"
+      "  initial x = add(10, 32);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+}

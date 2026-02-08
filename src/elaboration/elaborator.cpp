@@ -155,6 +155,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       RtlirProcess proc;
       proc.kind = MapAlwaysKind(item->always_kind);
       proc.body = item->body;
+      proc.sensitivity = item->sensitivity;
       mod->processes.push_back(proc);
       break;
     }
@@ -171,6 +172,29 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kGenerateBlock:
       diag_.Warning(item->loc, "generate blocks are not yet elaborated");
       break;
+    case ModuleItemKind::kTypedef:
+      ElaborateTypedef(item, mod);
+      break;
+    case ModuleItemKind::kFunctionDecl:
+    case ModuleItemKind::kTaskDecl:
+      mod->function_decls.push_back(item);
+      break;
+  }
+}
+
+void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
+  if (item->typedef_type.kind != DataTypeKind::kEnum) return;
+  int64_t next_val = 0;
+  for (const auto& member : item->typedef_type.enum_members) {
+    if (member.value) {
+      next_val = ConstEvalInt(member.value).value_or(next_val);
+    }
+    RtlirVariable var;
+    var.name = member.name;
+    var.width = EvalTypeWidth(item->typedef_type);
+    var.is_4state = false;
+    mod->variables.push_back(var);
+    ++next_val;
   }
 }
 

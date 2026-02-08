@@ -172,6 +172,18 @@ static std::optional<AlwaysKind> TokenToAlwaysKind(TokenKind tk) {
 }
 
 void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
+  if (Check(TokenKind::kKwTypedef)) {
+    items.push_back(ParseTypedef());
+    return;
+  }
+  if (Check(TokenKind::kKwFunction)) {
+    items.push_back(ParseFunctionDecl());
+    return;
+  }
+  if (Check(TokenKind::kKwTask)) {
+    items.push_back(ParseTaskDecl());
+    return;
+  }
   if (Check(TokenKind::kKwAssign)) {
     items.push_back(ParseContinuousAssign());
     return;
@@ -194,6 +206,12 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
     return;
   }
 
+  if (Check(TokenKind::kKwEnum)) {
+    auto dtype = ParseEnumType();
+    ParseVarDeclList(items, dtype);
+    return;
+  }
+
   auto dtype = ParseDataType();
   if (dtype.kind != DataTypeKind::kImplicit) {
     ParseVarDeclList(items, dtype);
@@ -209,6 +227,13 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
 
 void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
   auto name_tok = Consume();
+  if (known_types_.count(name_tok.text) != 0) {
+    DataType dtype;
+    dtype.kind = DataTypeKind::kNamed;
+    dtype.type_name = name_tok.text;
+    ParseVarDeclList(items, dtype);
+    return;
+  }
   if (Check(TokenKind::kIdentifier) || Check(TokenKind::kHash)) {
     items.push_back(ParseModuleInst(name_tok));
     return;
