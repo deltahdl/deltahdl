@@ -8,43 +8,49 @@
 
 using namespace delta;
 
-static CompilationUnit* Parse(const std::string& src) {
-  static SourceManager mgr;
-  static Arena arena;
-  auto fid = mgr.AddFile("<test>", src);
-  DiagEngine diag(mgr);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, arena, diag);
-  return parser.Parse();
+struct ParseResult {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult Parse(const std::string& src) {
+  ParseResult result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
 }
 
 TEST(Parser, EmptyModule) {
-  const auto* cu = Parse("module empty; endmodule");
-  ASSERT_NE(cu, nullptr);
-  ASSERT_EQ(cu->modules.size(), 1);
-  EXPECT_EQ(cu->modules[0]->name, "empty");
-  EXPECT_TRUE(cu->modules[0]->items.empty());
+  auto r = Parse("module empty; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1);
+  EXPECT_EQ(r.cu->modules[0]->name, "empty");
+  EXPECT_TRUE(r.cu->modules[0]->items.empty());
 }
 
 TEST(Parser, ModuleWithInitialBlock) {
-  const auto* cu = Parse(
+  auto r = Parse(
       "module hello;\n"
       "  initial $display(\"Hello\");\n"
       "endmodule\n");
-  ASSERT_NE(cu, nullptr);
-  ASSERT_EQ(cu->modules.size(), 1);
-  ASSERT_EQ(cu->modules[0]->items.size(), 1);
-  EXPECT_EQ(cu->modules[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1);
+  ASSERT_EQ(r.cu->modules[0]->items.size(), 1);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
 }
 
 TEST(Parser, ModuleWithPorts) {
-  const auto* cu = Parse(
+  auto r = Parse(
       "module mux(input logic a, input logic b, input logic sel, output logic "
       "y);\n"
       "  assign y = sel ? b : a;\n"
       "endmodule\n");
-  ASSERT_NE(cu, nullptr);
-  auto* mod = cu->modules[0];
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->ports.size(), 4);
   EXPECT_EQ(mod->ports[0].direction, Direction::kInput);
   EXPECT_EQ(mod->ports[0].name, "a");
@@ -53,14 +59,14 @@ TEST(Parser, ModuleWithPorts) {
 }
 
 TEST(Parser, ContinuousAssignment) {
-  const auto* cu = Parse(
+  auto r = Parse(
       "module top;\n"
       "  logic a, b;\n"
       "  assign a = b;\n"
       "endmodule\n");
-  ASSERT_NE(cu, nullptr);
+  ASSERT_NE(r.cu, nullptr);
   bool found_assign = false;
-  for (auto* item : cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
       found_assign = true;
     }
@@ -69,15 +75,15 @@ TEST(Parser, ContinuousAssignment) {
 }
 
 TEST(Parser, AlwaysFFBlock) {
-  const auto* cu = Parse(
+  auto r = Parse(
       "module counter(input logic clk, rst);\n"
       "  logic [7:0] count;\n"
       "  always_ff @(posedge clk or posedge rst)\n"
       "    if (rst) count <= '0;\n"
       "    else count <= count + 1;\n"
       "endmodule\n");
-  ASSERT_NE(cu, nullptr);
-  auto* mod = cu->modules[0];
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
   bool found_ff = false;
   for (auto* item : mod->items) {
     if (item->kind == ModuleItemKind::kAlwaysBlock &&
@@ -89,22 +95,22 @@ TEST(Parser, AlwaysFFBlock) {
 }
 
 TEST(Parser, ExpressionPrecedence) {
-  const auto* cu = Parse(
+  auto r = Parse(
       "module expr;\n"
       "  logic a;\n"
       "  assign a = 1 + 2 * 3;\n"
       "endmodule\n");
-  ASSERT_NE(cu, nullptr);
+  ASSERT_NE(r.cu, nullptr);
 }
 
 TEST(Parser, MultipleModules) {
-  const auto* cu = Parse(
+  auto r = Parse(
       "module a; endmodule\n"
       "module b; endmodule\n"
       "module c; endmodule\n");
-  ASSERT_NE(cu, nullptr);
-  ASSERT_EQ(cu->modules.size(), 3);
-  EXPECT_EQ(cu->modules[0]->name, "a");
-  EXPECT_EQ(cu->modules[1]->name, "b");
-  EXPECT_EQ(cu->modules[2]->name, "c");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 3);
+  EXPECT_EQ(r.cu->modules[0]->name, "a");
+  EXPECT_EQ(r.cu->modules[1]->name, "b");
+  EXPECT_EQ(r.cu->modules[2]->name, "c");
 }

@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <type_traits>
 #include <vector>
 
 namespace delta {
@@ -18,6 +19,7 @@ class Arena {
   }
 
   ~Arena() {
+    DestroyAll();
     for (auto* block : blocks_) {
       std::free(block);
     }
@@ -44,7 +46,11 @@ class Arena {
   template <typename T, typename... Args>
   T* Create(Args&&... args) {
     void* mem = Allocate(sizeof(T), alignof(T));
-    return new (mem) T(std::forward<Args>(args)...);
+    T* obj = new (mem) T(std::forward<Args>(args)...);
+    if constexpr (!std::is_trivially_destructible_v<T>) {
+      dtors_.push_back({[](void* p) { static_cast<T*>(p)->~T(); }, obj});
+    }
+    return obj;
   }
 
   template <typename T>
@@ -64,6 +70,7 @@ class Arena {
   size_t TotalAllocated() const { return total_allocated_; }
 
   void Reset() {
+    DestroyAll();
     for (size_t i = 1; i < blocks_.size(); ++i) {
       std::free(blocks_[i]);
     }
@@ -76,6 +83,18 @@ class Arena {
   }
 
  private:
+  struct DtorEntry {
+    void (*fn)(void*);
+    void* ptr;
+  };
+
+  void DestroyAll() {
+    for (auto it = dtors_.rbegin(); it != dtors_.rend(); ++it) {
+      it->fn(it->ptr);
+    }
+    dtors_.clear();
+  }
+
   void Grow(size_t min_size = 0) {
     size_t alloc_size = std::max(block_size_, min_size);
     void* block = std::malloc(alloc_size);
@@ -89,6 +108,7 @@ class Arena {
   size_t remaining_ = 0;
   size_t total_allocated_ = 0;
   std::vector<void*> blocks_;
+  std::vector<DtorEntry> dtors_;
 };
 
 }  // namespace delta
