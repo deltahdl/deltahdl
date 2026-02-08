@@ -18,6 +18,12 @@ struct PreprocConfig {
   std::vector<std::pair<std::string, std::string>> defines;
 };
 
+struct CondState {
+  bool active;         // Is this branch currently active?
+  bool any_taken;      // Has any branch in this chain been taken?
+  bool parent_active;  // Was enclosing scope active at ifdef entry?
+};
+
 class Preprocessor {
  public:
   Preprocessor(SourceManager& src_mgr, DiagEngine& diag, PreprocConfig config);
@@ -32,6 +38,7 @@ class Preprocessor {
   void HandleDefine(std::string_view rest, SourceLoc loc);
   void HandleUndef(std::string_view rest, SourceLoc loc);
   void HandleIfdef(std::string_view rest, bool inverted);
+  void HandleElsif(std::string_view rest);
   void HandleElse();
   void HandleEndif();
   void HandleInclude(std::string_view filename, SourceLoc loc, int depth,
@@ -44,7 +51,7 @@ class Preprocessor {
   DiagEngine& diag_;
   PreprocConfig config_;
   MacroTable macros_;
-  std::vector<bool> cond_stack_;
+  std::vector<CondState> cond_stack_;
   int include_depth_ = 0;
   static constexpr int kMaxIncludeDepth = 15;
 };

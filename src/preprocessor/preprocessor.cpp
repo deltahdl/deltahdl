@@ -105,6 +105,10 @@ bool Preprocessor::ProcessDirective(std::string_view line, uint32_t file_id,
     HandleIfdef(AfterDirective(line, "ifndef"), true);
     return true;
   }
+  if (StartsWithDirective(line, "elsif")) {
+    HandleElsif(AfterDirective(line, "elsif"));
+    return true;
+  }
   if (StartsWithDirective(line, "else")) {
     HandleElse();
     return true;
@@ -146,7 +150,7 @@ bool Preprocessor::TryExpandMacro(std::string_view trimmed,
 
 bool Preprocessor::IsActive() const {
   return std::all_of(cond_stack_.begin(), cond_stack_.end(),
-                     [](bool active) { return active; });
+                     [](const CondState& s) { return s.active; });
 }
 
 void Preprocessor::HandleDefine(std::string_view rest, SourceLoc loc) {
@@ -172,13 +176,26 @@ void Preprocessor::HandleUndef(std::string_view rest, SourceLoc /*loc*/) {
 void Preprocessor::HandleIfdef(std::string_view rest, bool inverted) {
   auto name = Trim(rest);
   bool defined = macros_.IsDefined(name);
-  cond_stack_.push_back(inverted ? !defined : defined);
+  bool cond = inverted ? !defined : defined;
+  bool parent = IsActive();
+  bool active = parent && cond;
+  cond_stack_.push_back({active, active, parent});
+}
+
+void Preprocessor::HandleElsif(std::string_view rest) {
+  if (cond_stack_.empty()) return;
+  auto& top = cond_stack_.back();
+  auto name = Trim(rest);
+  bool defined = macros_.IsDefined(name);
+  top.active = top.parent_active && !top.any_taken && defined;
+  if (top.active) top.any_taken = true;
 }
 
 void Preprocessor::HandleElse() {
-  if (!cond_stack_.empty()) {
-    cond_stack_.back() = !cond_stack_.back();
-  }
+  if (cond_stack_.empty()) return;
+  auto& top = cond_stack_.back();
+  top.active = top.parent_active && !top.any_taken;
+  top.any_taken = true;
 }
 
 void Preprocessor::HandleEndif() {
