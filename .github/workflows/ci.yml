@@ -21,16 +21,16 @@ jobs:
         with:
           name: profraw-unit
           path: profraw/unit/
-      - name: Download integration profraw
-        uses: actions/download-artifact@v4
-        with:
-          name: profraw-integration
-          path: profraw/integration/
       - name: Download e2e profraw
         uses: actions/download-artifact@v4
         with:
           name: profraw-e2e
           path: profraw/e2e/
+      - name: Download integration profraw
+        uses: actions/download-artifact@v4
+        with:
+          name: profraw-integration
+          path: profraw/integration/
       - name: Install tools
         run: |
           sudo apt-get update
@@ -39,8 +39,8 @@ jobs:
         run: |
           llvm-profdata-18 merge -sparse \
             profraw/unit/*.profraw \
-            profraw/integration/*.profraw \
             profraw/e2e/*.profraw \
+            profraw/integration/*.profraw \
             -o merged.profdata
           llvm-cov-18 show build/src/deltahdl \
             -instr-profile=merged.profdata \
@@ -182,11 +182,11 @@ jobs:
           retention-days: 1
   cache-sv-tests:
     needs:
-      - integration-test-coverage
-      - integration-test-macos-26-arm64-clang
-      - integration-test-sanitize
-      - integration-test-ubuntu-24-04-x86-64-clang
-      - integration-test-ubuntu-24-04-x86-64-gcc
+      - unit-test-coverage
+      - unit-test-macos-26-arm64-clang
+      - unit-test-sanitize
+      - unit-test-ubuntu-24-04-x86-64-clang
+      - unit-test-ubuntu-24-04-x86-64-gcc
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -207,21 +207,10 @@ jobs:
   e2e-test-coverage:
     env:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
-    needs: cache-sv-tests
+    needs: integration-test-coverage
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - id: sv-tests-ref
-        name: Get sv-tests commit
-        run: >-
-          echo "sha=$(git rev-parse HEAD:third_party/sv-tests)"
-          >> "$GITHUB_OUTPUT"
-      - name: Restore sv-tests cache
-        uses: actions/cache/restore@v4
-        with:
-          fail-on-cache-miss: true
-          key: sv-tests-${{ steps.sv-tests-ref.outputs.sha }}
-          path: third_party/sv-tests
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -230,7 +219,7 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: E2E tests
-        run: python3 scripts/run_sv_tests.py
+        run: python3 scripts/run_sim_tests.py
       - name: Upload profraw
         uses: actions/upload-artifact@v4
         with:
@@ -238,21 +227,10 @@ jobs:
           path: profraw/
           retention-days: 1
   e2e-test-macos-26-arm64-clang:
-    needs: cache-sv-tests
+    needs: integration-test-macos-26-arm64-clang
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
-      - id: sv-tests-ref
-        name: Get sv-tests commit
-        run: >-
-          echo "sha=$(git rev-parse HEAD:third_party/sv-tests)"
-          >> "$GITHUB_OUTPUT"
-      - name: Restore sv-tests cache
-        uses: actions/cache/restore@v4
-        with:
-          fail-on-cache-miss: true
-          key: sv-tests-${{ steps.sv-tests-ref.outputs.sha }}
-          path: third_party/sv-tests
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -260,27 +238,16 @@ jobs:
           path: build/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
-      - name: Run sv-tests
-        run: python3 scripts/run_sv_tests.py
+      - name: E2E tests
+        run: python3 scripts/run_sim_tests.py
   e2e-test-sanitize:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-    needs: cache-sv-tests
+    needs: integration-test-sanitize
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - id: sv-tests-ref
-        name: Get sv-tests commit
-        run: >-
-          echo "sha=$(git rev-parse HEAD:third_party/sv-tests)"
-          >> "$GITHUB_OUTPUT"
-      - name: Restore sv-tests cache
-        uses: actions/cache/restore@v4
-        with:
-          fail-on-cache-miss: true
-          key: sv-tests-${{ steps.sv-tests-ref.outputs.sha }}
-          path: third_party/sv-tests
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -289,23 +256,12 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: E2E tests
-        run: python3 scripts/run_sv_tests.py
+        run: python3 scripts/run_sim_tests.py
   e2e-test-ubuntu-24-04-x86-64-clang:
-    needs: cache-sv-tests
+    needs: integration-test-ubuntu-24-04-x86-64-clang
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - id: sv-tests-ref
-        name: Get sv-tests commit
-        run: >-
-          echo "sha=$(git rev-parse HEAD:third_party/sv-tests)"
-          >> "$GITHUB_OUTPUT"
-      - name: Restore sv-tests cache
-        uses: actions/cache/restore@v4
-        with:
-          fail-on-cache-miss: true
-          key: sv-tests-${{ steps.sv-tests-ref.outputs.sha }}
-          path: third_party/sv-tests
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -313,9 +269,25 @@ jobs:
           path: build/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
-      - name: Run sv-tests
-        run: python3 scripts/run_sv_tests.py
+      - name: E2E tests
+        run: python3 scripts/run_sim_tests.py
   e2e-test-ubuntu-24-04-x86-64-gcc:
+    needs: integration-test-ubuntu-24-04-x86-64-gcc
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-ubuntu-24-04-x86-64-gcc
+          path: build/
+      - name: Fix permissions
+        run: chmod +x build/src/deltahdl
+      - name: E2E tests
+        run: python3 scripts/run_sim_tests.py
+  integration-test-coverage:
+    env:
+      LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
     needs: cache-sv-tests
     runs-on: ubuntu-24.04
     steps:
@@ -331,22 +303,6 @@ jobs:
           fail-on-cache-miss: true
           key: sv-tests-${{ steps.sv-tests-ref.outputs.sha }}
           path: third_party/sv-tests
-      - name: Download build
-        uses: actions/download-artifact@v4
-        with:
-          name: build-ubuntu-24-04-x86-64-gcc
-          path: build/
-      - name: Fix permissions
-        run: chmod +x build/src/deltahdl
-      - name: Run sv-tests
-        run: python3 scripts/run_sv_tests.py
-  integration-test-coverage:
-    env:
-      LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
-    needs: unit-test-coverage
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -355,11 +311,7 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: Integration tests
-        run: |
-          for sv in test/integration/*.sv; do
-            echo "--- Simulating $sv ---"
-            ./build/src/deltahdl "$sv"
-          done
+        run: python3 scripts/run_sv_tests.py
       - name: Upload profraw
         uses: actions/upload-artifact@v4
         with:
@@ -367,10 +319,21 @@ jobs:
           path: profraw/
           retention-days: 1
   integration-test-macos-26-arm64-clang:
-    needs: unit-test-macos-26-arm64-clang
+    needs: cache-sv-tests
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
+      - id: sv-tests-ref
+        name: Get sv-tests commit
+        run: >-
+          echo "sha=$(git rev-parse HEAD:third_party/sv-tests)"
+          >> "$GITHUB_OUTPUT"
+      - name: Restore sv-tests cache
+        uses: actions/cache/restore@v4
+        with:
+          fail-on-cache-miss: true
+          key: sv-tests-${{ steps.sv-tests-ref.outputs.sha }}
+          path: third_party/sv-tests
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -379,19 +342,26 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: Integration tests
-        run: |
-          for sv in test/integration/*.sv; do
-            echo "--- Simulating $sv ---"
-            ./build/src/deltahdl "$sv"
-          done
+        run: python3 scripts/run_sv_tests.py
   integration-test-sanitize:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-    needs: unit-test-sanitize
+    needs: cache-sv-tests
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - id: sv-tests-ref
+        name: Get sv-tests commit
+        run: >-
+          echo "sha=$(git rev-parse HEAD:third_party/sv-tests)"
+          >> "$GITHUB_OUTPUT"
+      - name: Restore sv-tests cache
+        uses: actions/cache/restore@v4
+        with:
+          fail-on-cache-miss: true
+          key: sv-tests-${{ steps.sv-tests-ref.outputs.sha }}
+          path: third_party/sv-tests
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -400,16 +370,23 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: Integration tests
-        run: |
-          for sv in test/integration/*.sv; do
-            echo "--- Simulating $sv ---"
-            ./build/src/deltahdl "$sv"
-          done
+        run: python3 scripts/run_sv_tests.py
   integration-test-ubuntu-24-04-x86-64-clang:
-    needs: unit-test-ubuntu-24-04-x86-64-clang
+    needs: cache-sv-tests
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - id: sv-tests-ref
+        name: Get sv-tests commit
+        run: >-
+          echo "sha=$(git rev-parse HEAD:third_party/sv-tests)"
+          >> "$GITHUB_OUTPUT"
+      - name: Restore sv-tests cache
+        uses: actions/cache/restore@v4
+        with:
+          fail-on-cache-miss: true
+          key: sv-tests-${{ steps.sv-tests-ref.outputs.sha }}
+          path: third_party/sv-tests
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -418,16 +395,23 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: Integration tests
-        run: |
-          for sv in test/integration/*.sv; do
-            echo "--- Simulating $sv ---"
-            ./build/src/deltahdl "$sv"
-          done
+        run: python3 scripts/run_sv_tests.py
   integration-test-ubuntu-24-04-x86-64-gcc:
-    needs: unit-test-ubuntu-24-04-x86-64-gcc
+    needs: cache-sv-tests
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - id: sv-tests-ref
+        name: Get sv-tests commit
+        run: >-
+          echo "sha=$(git rev-parse HEAD:third_party/sv-tests)"
+          >> "$GITHUB_OUTPUT"
+      - name: Restore sv-tests cache
+        uses: actions/cache/restore@v4
+        with:
+          fail-on-cache-miss: true
+          key: sv-tests-${{ steps.sv-tests-ref.outputs.sha }}
+          path: third_party/sv-tests
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -436,11 +420,7 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: Integration tests
-        run: |
-          for sv in test/integration/*.sv; do
-            echo "--- Simulating $sv ---"
-            ./build/src/deltahdl "$sv"
-          done
+        run: python3 scripts/run_sv_tests.py
   release:
     if: >-
       github.ref == 'refs/heads/main'
