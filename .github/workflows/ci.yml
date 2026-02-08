@@ -1,35 +1,109 @@
 ---
-name: CI
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
+  group: ${{ github.workflow }}-${{ github.ref }}
 jobs:
+  build:
+    needs: lint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install compiler
+        run: |
+          sudo apt-get update
+          if [ "${{ matrix.compiler }}" = "gcc-14" ]; then
+            sudo apt-get install -y g++-14
+            echo "CXX=g++-14" >> "$GITHUB_ENV"
+            echo "CC=gcc-14" >> "$GITHUB_ENV"
+          else
+            sudo apt-get install -y clang-18
+            echo "CXX=clang++-18" >> "$GITHUB_ENV"
+            echo "CC=clang-18" >> "$GITHUB_ENV"
+          fi
+      - name: Build
+        run: |
+          cmake -B build \
+            -DCMAKE_CXX_COMPILER=${{ env.CXX }} \
+            -DCMAKE_C_COMPILER=${{ env.CC }} \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          cmake --build build --parallel
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.compiler }}-${{ matrix.build_type }}
+          path: build/
+          retention-days: 1
+    strategy:
+      matrix:
+        build_type: [Debug, Release]
+        compiler: [gcc-14, clang-18]
+  coverage:
+    needs: test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-18 llvm-18
+      - name: Build with coverage
+        run: |
+          cmake -B build \
+            -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_C_COMPILER=clang-18 \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DDELTAHDL_COVERAGE=ON
+          cmake --build build --parallel
+      - env:
+          LLVM_PROFILE_FILE: build/coverage/%p.profraw
+        name: Run tests
+        run: |
+          ctest --test-dir build --output-on-failure
+          for sv in test/integration/*.sv; do
+            ./build/src/deltahdl "$sv"
+          done
+      - name: Generate coverage report
+        run: |
+          llvm-profdata-18 merge -sparse \
+            build/coverage/*.profraw \
+            -o build/coverage/merged.profdata
+          llvm-cov-18 export build/src/deltahdl \
+            -instr-profile=build/coverage/merged.profdata \
+            --format=lcov \
+            --ignore-filename-regex='test/|third_party/' \
+            > build/coverage/lcov.info
+      - env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        name: Upload to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          fail_ci_if_error: true
+          files: build/coverage/lcov.info
   lint:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
       - name: Install tools
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             clang-18 clang-tidy-18 clang-format-18 cppcheck
           pip install lizard yamllint
-
       - name: Lint YAML
         run: |
-          yamllint --strict -d '{
-            extends: default,
-            rules: {truthy: {allowed-values: ["true", "false", "on"]}}
-          }' .github/workflows/*.yml
-
+          EMPTY_LINES='empty-lines: {max: 0, max-start: 0, max-end: 1}'
+          KEY_ORDERING='key-ordering: enable'
+          NEWLINE_AT_EOF='new-line-at-end-of-file: enable'
+          TRUTHY='truthy: {allowed-values: ["true", "false", "on"]}'
+          RULES="$EMPTY_LINES, $KEY_ORDERING"
+          RULES="$RULES, $NEWLINE_AT_EOF, $TRUTHY"
+          yamllint --strict \
+            --config-data "{extends: default, rules: {$RULES}}" \
+            .github/workflows/*.yml
       - name: Check formatting
         run: |
           find src -name '*.cpp' -o -name '*.h' | \
@@ -51,7 +125,6 @@ jobs:
                 SortIncludes: CaseSensitive,
                 Standard: c++23
               }'
-
       - name: Run clang-tidy
         run: |
           cmake -B build -DCMAKE_CXX_COMPILER=clang++-18 \
@@ -85,26 +158,33 @@ jobs:
                   readability-function-size.ParameterThreshold: 5,
                   readability-function-size.StatementThreshold: 50,
                   readability-function-size.LineThreshold: 200,
-                  readability-function-cognitive-complexity.Threshold: 15,
+                  readability-function-cognitive-complexity.Threshold:
+                    15,
                   readability-identifier-naming.ClassCase: CamelCase,
-                  readability-identifier-naming.FunctionCase: lower_case,
-                  readability-identifier-naming.VariableCase: lower_case,
-                  readability-identifier-naming.PrivateMemberCase: lower_case,
-                  readability-identifier-naming.PrivateMemberSuffix: "_",
-                  readability-identifier-naming.PublicMemberCase: lower_case,
-                  readability-identifier-naming.ConstantCase: CamelCase,
+                  readability-identifier-naming.FunctionCase:
+                    lower_case,
+                  readability-identifier-naming.VariableCase:
+                    lower_case,
+                  readability-identifier-naming.PrivateMemberCase:
+                    lower_case,
+                  readability-identifier-naming.PrivateMemberSuffix:
+                    "_",
+                  readability-identifier-naming.PublicMemberCase:
+                    lower_case,
+                  readability-identifier-naming.ConstantCase:
+                    CamelCase,
                   readability-identifier-naming.ConstantPrefix: k,
-                  readability-identifier-naming.EnumConstantCase: CamelCase,
-                  readability-identifier-naming.NamespaceCase: lower_case
+                  readability-identifier-naming.EnumConstantCase:
+                    CamelCase,
+                  readability-identifier-naming.NamespaceCase:
+                    lower_case
                 }
               }'
-
       - name: Run cppcheck
         run: |
           cppcheck --enable=all --error-exitcode=1 \
             --suppress=missingIncludeSystem \
             --std=c++23 -I src src/
-
       - name: Check file line limits
         run: |
           lizard -l cpp -T nloc=800 src/
@@ -117,160 +197,11 @@ jobs:
             fi
           done
           exit $fail
-
-  build:
-    needs: lint
-    runs-on: ubuntu-24.04
-    strategy:
-      matrix:
-        compiler: [gcc-14, clang-18]
-        build_type: [Debug, Release]
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install compiler
-        run: |
-          sudo apt-get update
-          if [ "${{ matrix.compiler }}" = "gcc-14" ]; then
-            sudo apt-get install -y g++-14
-            echo "CXX=g++-14" >> "$GITHUB_ENV"
-            echo "CC=gcc-14" >> "$GITHUB_ENV"
-          else
-            sudo apt-get install -y clang-18
-            echo "CXX=clang++-18" >> "$GITHUB_ENV"
-            echo "CC=clang-18" >> "$GITHUB_ENV"
-          fi
-
-      - name: Build
-        run: |
-          cmake -B build \
-            -DCMAKE_CXX_COMPILER=${{ env.CXX }} \
-            -DCMAKE_C_COMPILER=${{ env.CC }} \
-            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-          cmake --build build --parallel
-
-      - name: Upload build
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-${{ matrix.compiler }}-${{ matrix.build_type }}
-          path: build/
-          retention-days: 1
-
-  test:
-    needs: build
-    runs-on: ubuntu-24.04
-    strategy:
-      matrix:
-        compiler: [gcc-14, clang-18]
-        build_type: [Debug, Release]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download build
-        uses: actions/download-artifact@v4
-        with:
-          name: build-${{ matrix.compiler }}-${{ matrix.build_type }}
-          path: build/
-
-      - name: Fix permissions
-        run: chmod +x build/src/deltahdl build/test/test_*
-
-      - name: Unit tests
-        run: ctest --test-dir build --output-on-failure
-
-      - name: Integration tests
-        run: |
-          for sv in test/integration/*.sv; do
-            echo "--- Simulating $sv ---"
-            ./build/src/deltahdl "$sv"
-          done
-
-  coverage:
-    needs: test
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang-18 llvm-18
-
-      - name: Build with coverage
-        run: |
-          cmake -B build \
-            -DCMAKE_CXX_COMPILER=clang++-18 \
-            -DCMAKE_C_COMPILER=clang-18 \
-            -DCMAKE_BUILD_TYPE=Debug \
-            -DDELTAHDL_COVERAGE=ON
-          cmake --build build --parallel
-
-      - name: Run tests
-        env:
-          LLVM_PROFILE_FILE: build/coverage/%p.profraw
-        run: |
-          ctest --test-dir build --output-on-failure
-          for sv in test/integration/*.sv; do
-            ./build/src/deltahdl "$sv"
-          done
-
-      - name: Generate coverage report
-        run: |
-          llvm-profdata-18 merge -sparse build/coverage/*.profraw \
-            -o build/coverage/merged.profdata
-          llvm-cov-18 export build/src/deltahdl \
-            -instr-profile=build/coverage/merged.profdata \
-            --format=lcov \
-            --ignore-filename-regex='test/|third_party/' \
-            > build/coverage/lcov.info
-
-      - name: Upload to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          files: build/coverage/lcov.info
-          fail_ci_if_error: true
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
-  sanitize:
-    needs: coverage
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install Clang
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang-18
-
-      - name: Build with sanitizers
-        run: |
-          cmake -B build \
-            -DCMAKE_CXX_COMPILER=clang++-18 \
-            -DCMAKE_C_COMPILER=clang-18 \
-            -DCMAKE_BUILD_TYPE=Debug \
-            -DDELTAHDL_SANITIZERS=ON
-          cmake --build build --parallel
-
-      - name: Run tests
-        env:
-          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
-          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-        run: |
-          ctest --test-dir build --output-on-failure
-          for sv in test/integration/*.sv; do
-            ./build/src/deltahdl "$sv"
-          done
-
   release:
+    if: >-
+      github.ref == 'refs/heads/main'
+      && github.event_name == 'push'
     needs: sanitize
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
       contents: write
     runs-on: ubuntu-24.04
@@ -279,38 +210,94 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
-
       - name: Install compiler
         run: |
           sudo apt-get update
           sudo apt-get install -y g++-14
-
       - id: version
         name: Generate version from UTC time
-        run: echo "version=$(date -u +%Y%m%d%H%M%S)" >> $GITHUB_OUTPUT
-
+        run: >-
+          echo "version=$(date -u +%Y%m%d%H%M%S)"
+          >> $GITHUB_OUTPUT
       - name: Build release binary
         run: |
           cmake -B build \
             -DCMAKE_CXX_COMPILER=g++-14 \
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build --parallel
-
       - name: Create tag
-        run: git tag "v${{ steps.version.outputs.version }}"
-
+        run: >-
+          git tag "v${{ steps.version.outputs.version }}"
       - name: Push tag
-        run: git push origin "v${{ steps.version.outputs.version }}"
-
-      - name: Create GitHub Release
-        env:
+        run: >-
+          git push origin
+          "v${{ steps.version.outputs.version }}"
+      - env:
           GH_TOKEN: ${{ github.token }}
+        name: Create GitHub Release
         run: |
-          gh release create "v${{ steps.version.outputs.version }}" \
+          gh release create \
+            "v${{ steps.version.outputs.version }}" \
             --generate-notes \
             build/src/deltahdl
-
       - name: Update latest tag
         run: |
           git tag -f latest
           git push origin latest --force
+  sanitize:
+    needs: coverage
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install Clang
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-18
+      - name: Build with sanitizers
+        run: |
+          cmake -B build \
+            -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_C_COMPILER=clang-18 \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DDELTAHDL_SANITIZERS=ON
+          cmake --build build --parallel
+      - env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        name: Run tests
+        run: |
+          ctest --test-dir build --output-on-failure
+          for sv in test/integration/*.sv; do
+            ./build/src/deltahdl "$sv"
+          done
+  test:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-${{ matrix.compiler }}-${{ matrix.build_type }}
+          path: build/
+      - name: Fix permissions
+        run: chmod +x build/src/deltahdl build/test/test_*
+      - name: Unit tests
+        run: ctest --test-dir build --output-on-failure
+      - name: Integration tests
+        run: |
+          for sv in test/integration/*.sv; do
+            echo "--- Simulating $sv ---"
+            ./build/src/deltahdl "$sv"
+          done
+    strategy:
+      matrix:
+        build_type: [Debug, Release]
+        compiler: [gcc-14, clang-18]
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
