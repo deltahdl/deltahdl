@@ -560,7 +560,7 @@ src/
 │   ├── types.cpp               # Logic operations (AND, OR, XOR, etc. on 4-value vecs)
 │   ├── source_loc.h            # SourceLoc, source manager
 │   └── diagnostic.h/.cpp       # Error/warning reporting
-├── preproc/
+├── preprocessor/
 │   ├── preprocessor.h/.cpp     # Directive processing, macro expansion
 │   └── macro_table.h/.cpp      # Macro storage and lookup
 ├── lexer/
@@ -571,19 +571,19 @@ src/
 │   ├── parser.h/.cpp           # Recursive-descent parser
 │   ├── expr_parser.cpp         # Pratt expression parser
 │   └── ast.h                   # AST node definitions
-├── elab/
+├── elaboration/
 │   ├── elaborator.h/.cpp       # Hierarchy expansion, parameter resolution
 │   ├── rtlir.h                 # Elaborated design IR nodes
 │   ├── type_eval.h/.cpp        # Type resolution and evaluation
 │   └── const_eval.h/.cpp       # Constant expression evaluator
-├── sim/
+├── simulation/
 │   ├── scheduler.h/.cpp        # Stratified event scheduler (§4.5 algorithm)
 │   ├── process.h/.cpp          # C++23 coroutine process model
 │   ├── net.h/.cpp              # Net objects, driver lists, resolution functions
 │   ├── variable.h/.cpp         # Variable storage
 │   ├── systask.h/.cpp          # Built-in $display, $finish, etc.
 │   └── vcd_writer.h/.cpp       # VCD waveform output
-├── synth/
+├── synthesis/
 │   ├── synth_lower.h/.cpp      # RTLIR → AIG synthesis lowering
 │   ├── aig.h/.cpp              # And-Inverter Graph data structure
 │   ├── aig_rewrite.h/.cpp      # AIG rewriting optimization pass

@@ -1,11 +1,11 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
-#include "elab/elaborator.h"
+#include "elaboration/elaborator.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include "preproc/preprocessor.h"
-#include "sim/scheduler.h"
+#include "preprocessor/preprocessor.h"
+#include "simulation/scheduler.h"
 
 #include <cstdlib>
 #include <fstream>

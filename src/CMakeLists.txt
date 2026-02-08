@@ -2,30 +2,30 @@ add_library(deltahdl_lib STATIC
     common/types.cpp
     common/diagnostic.cpp
     common/source_mgr.cpp
-    preproc/macro_table.cpp
-    preproc/preprocessor.cpp
+    preprocessor/macro_table.cpp
+    preprocessor/preprocessor.cpp
     lexer/keywords.cpp
     lexer/lexer.cpp
     parser/parser.cpp
     parser/expr_parser.cpp
-    elab/elaborator.cpp
-    elab/type_eval.cpp
-    elab/const_eval.cpp
-    sim/scheduler.cpp
-    sim/process.cpp
-    sim/net.cpp
-    sim/variable.cpp
-    sim/systask.cpp
-    sim/vcd_writer.cpp
-    synth/aig.cpp
-    synth/synth_lower.cpp
-    synth/aig_rewrite.cpp
-    synth/aig_refactor.cpp
-    synth/aig_balance.cpp
-    synth/lut_map.cpp
-    synth/cell_map.cpp
-    synth/liberty.cpp
-    synth/netlist_writer.cpp
+    elaboration/elaborator.cpp
+    elaboration/type_eval.cpp
+    elaboration/const_eval.cpp
+    simulation/scheduler.cpp
+    simulation/process.cpp
+    simulation/net.cpp
+    simulation/variable.cpp
+    simulation/systask.cpp
+    simulation/vcd_writer.cpp
+    synthesis/aig.cpp
+    synthesis/synth_lower.cpp
+    synthesis/aig_rewrite.cpp
+    synthesis/aig_refactor.cpp
+    synthesis/aig_balance.cpp
+    synthesis/lut_map.cpp
+    synthesis/cell_map.cpp
+    synthesis/liberty.cpp
+    synthesis/netlist_writer.cpp
     vpi/vpi_stub.cpp
 )
 
