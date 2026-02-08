@@ -89,23 +89,7 @@ ModuleDecl* Parser::ParseModuleDecl() {
   mod->name = name_tok.text;
   mod->range.start = loc;
 
-  if (Check(TokenKind::kHash)) {
-    Consume();
-    Expect(TokenKind::kLParen);
-    if (!Check(TokenKind::kRParen)) {
-      ParseParamPortDecl(*mod);
-      while (Match(TokenKind::kComma)) {
-        ParseParamPortDecl(*mod);
-      }
-    }
-    Expect(TokenKind::kRParen);
-  }
-
-  if (Check(TokenKind::kLParen)) {
-    ParsePortList(*mod);
-  }
-
-  Expect(TokenKind::kSemicolon);
+  ParseParamsPortsAndSemicolon(*mod);
   ParseModuleBody(*mod);
   Expect(TokenKind::kKwEndmodule);
   mod->range.end = CurrentLoc();
@@ -151,6 +135,24 @@ void Parser::ParseParamPortDecl(ModuleDecl& mod) {
     default_val = ParseExpr();
   }
   mod.params.push_back({name.text, default_val});
+}
+
+void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
+  if (Check(TokenKind::kHash)) {
+    Consume();
+    Expect(TokenKind::kLParen);
+    if (!Check(TokenKind::kRParen)) {
+      ParseParamPortDecl(decl);
+      while (Match(TokenKind::kComma)) {
+        ParseParamPortDecl(decl);
+      }
+    }
+    Expect(TokenKind::kRParen);
+  }
+  if (Check(TokenKind::kLParen)) {
+    ParsePortList(decl);
+  }
+  Expect(TokenKind::kSemicolon);
 }
 
 void Parser::ParsePortList(ModuleDecl& mod) {

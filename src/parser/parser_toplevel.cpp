@@ -116,24 +116,7 @@ ModuleDecl* Parser::ParseInterfaceDecl() {
   Expect(TokenKind::kKwInterface);
 
   decl->name = Expect(TokenKind::kIdentifier).text;
-
-  if (Check(TokenKind::kHash)) {
-    Consume();
-    Expect(TokenKind::kLParen);
-    if (!Check(TokenKind::kRParen)) {
-      ParseParamPortDecl(*decl);
-      while (Match(TokenKind::kComma)) {
-        ParseParamPortDecl(*decl);
-      }
-    }
-    Expect(TokenKind::kRParen);
-  }
-
-  if (Check(TokenKind::kLParen)) {
-    ParsePortList(*decl);
-  }
-
-  Expect(TokenKind::kSemicolon);
+  ParseParamsPortsAndSemicolon(*decl);
 
   while (!Check(TokenKind::kKwEndinterface) && !AtEnd()) {
     if (Check(TokenKind::kKwModport)) {
@@ -191,24 +174,7 @@ ModuleDecl* Parser::ParseProgramDecl() {
   Expect(TokenKind::kKwProgram);
 
   decl->name = Expect(TokenKind::kIdentifier).text;
-
-  if (Check(TokenKind::kHash)) {
-    Consume();
-    Expect(TokenKind::kLParen);
-    if (!Check(TokenKind::kRParen)) {
-      ParseParamPortDecl(*decl);
-      while (Match(TokenKind::kComma)) {
-        ParseParamPortDecl(*decl);
-      }
-    }
-    Expect(TokenKind::kRParen);
-  }
-
-  if (Check(TokenKind::kLParen)) {
-    ParsePortList(*decl);
-  }
-
-  Expect(TokenKind::kSemicolon);
+  ParseParamsPortsAndSemicolon(*decl);
 
   while (!Check(TokenKind::kKwEndprogram) && !AtEnd()) {
     ParseModuleItem(decl->items);

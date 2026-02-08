@@ -25,6 +25,7 @@ class Parser {
   void ParseModuleBody(ModuleDecl& mod);
   void ParseModuleItem(std::vector<ModuleItem*>& items);
   void ParseParamPortDecl(ModuleDecl& mod);
+  void ParseParamsPortsAndSemicolon(ModuleDecl& decl);
 
   // Generate blocks (parser_generate.cpp)
   void ParseGenerateRegion(std::vector<ModuleItem*>& items);
