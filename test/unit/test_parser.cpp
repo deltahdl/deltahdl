@@ -815,3 +815,29 @@ TEST(Parser, ClassPropertyQualifiers) {
   EXPECT_TRUE(cls->members[0]->is_rand);
   EXPECT_TRUE(cls->members[1]->is_local);
 }
+
+// --- Defparam tests ---
+
+TEST(Parser, DefparamSingle) {
+  auto r = Parse(
+      "module top;\n"
+      "  defparam u0.WIDTH = 8;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kDefparam);
+  ASSERT_EQ(item->defparam_assigns.size(), 1);
+  EXPECT_NE(item->defparam_assigns[0].first, nullptr);
+  EXPECT_NE(item->defparam_assigns[0].second, nullptr);
+}
+
+TEST(Parser, DefparamMultiple) {
+  auto r = Parse(
+      "module top;\n"
+      "  defparam u0.WIDTH = 8, u1.DEPTH = 16;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kDefparam);
+  EXPECT_EQ(item->defparam_assigns.size(), 2);
+}

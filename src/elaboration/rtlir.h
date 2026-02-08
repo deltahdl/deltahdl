@@ -84,6 +84,7 @@ struct RtlirParamDecl {
   Expr* default_value = nullptr;
   int64_t resolved_value = 0;
   bool is_resolved = false;
+  bool from_override = false;  // True when set via instance #(...) override.
 };
 
 // --- Port binding (for module instances) ---

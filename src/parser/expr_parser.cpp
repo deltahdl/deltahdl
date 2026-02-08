@@ -215,42 +215,27 @@ Expr* Parser::ParsePrimaryExpr() {
       tok.kind == TokenKind::kUnbasedUnsizedLiteral) {
     return MakeLiteral(ExprKind::kIntegerLiteral, tok);
   }
-
   if (tok.kind == TokenKind::kRealLiteral) {
     return MakeLiteral(ExprKind::kRealLiteral, tok);
   }
-
   if (tok.kind == TokenKind::kTimeLiteral) {
     return MakeLiteral(ExprKind::kTimeLiteral, tok);
   }
-
   if (tok.kind == TokenKind::kStringLiteral) {
     return MakeLiteral(ExprKind::kStringLiteral, tok);
   }
-
   if (tok.kind == TokenKind::kSystemIdentifier) {
     return ParseSystemCall();
   }
-
   if (tok.kind == TokenKind::kIdentifier) {
-    Consume();
-    auto* id = arena_.Create<Expr>();
-    id->kind = ExprKind::kIdentifier;
-    id->text = tok.text;
-    id->range.start = tok.loc;
-
-    if (Check(TokenKind::kLParen)) return ParseCallExpr(id);
-    if (Check(TokenKind::kLBracket)) return ParseSelectExpr(id);
-    return id;
+    return ParseIdentifierExpr();
   }
-
   if (tok.kind == TokenKind::kLParen) {
     Consume();
     auto* expr = ParseExpr();
     Expect(TokenKind::kRParen);
     return expr;
   }
-
   if (tok.kind == TokenKind::kLBrace) {
     return ParseConcatenation();
   }
@@ -261,6 +246,35 @@ Expr* Parser::ParsePrimaryExpr() {
   err->kind = ExprKind::kIntegerLiteral;
   err->range.start = tok.loc;
   return err;
+}
+
+Expr* Parser::ParseIdentifierExpr() {
+  auto tok = Consume();
+  auto* id = arena_.Create<Expr>();
+  id->kind = ExprKind::kIdentifier;
+  id->text = tok.text;
+  id->range.start = tok.loc;
+
+  // Member access chain: a.b.c
+  Expr* result = id;
+  while (Check(TokenKind::kDot)) {
+    Consume();
+    auto member_tok = Expect(TokenKind::kIdentifier);
+    auto* member_id = arena_.Create<Expr>();
+    member_id->kind = ExprKind::kIdentifier;
+    member_id->text = member_tok.text;
+    member_id->range.start = member_tok.loc;
+    auto* acc = arena_.Create<Expr>();
+    acc->kind = ExprKind::kMemberAccess;
+    acc->lhs = result;
+    acc->rhs = member_id;
+    acc->range.start = result->range.start;
+    result = acc;
+  }
+
+  if (Check(TokenKind::kLParen)) return ParseCallExpr(result);
+  if (Check(TokenKind::kLBracket)) return ParseSelectExpr(result);
+  return result;
 }
 
 Expr* Parser::ParseCallExpr(Expr* callee) {

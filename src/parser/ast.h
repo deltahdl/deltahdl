@@ -237,6 +237,7 @@ enum class ModuleItemKind : uint8_t {
   kTaskDecl,
   kImportDecl,
   kGateInst,
+  kDefparam,
 };
 
 // clang-format off
@@ -336,6 +337,9 @@ struct ModuleItem {
   DataType return_type;
   std::vector<FunctionArg> func_args;
   std::vector<Stmt*> func_body_stmts;
+
+  // Defparam: list of (hierarchical_path_expr, value_expr) pairs
+  std::vector<std::pair<Expr*, Expr*>> defparam_assigns;
 };
 
 // --- Top-level declarations ---

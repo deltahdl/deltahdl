@@ -163,3 +163,39 @@ TEST(Elaboration, WidthInference_Concatenation) {
   concat.elements = {&a, &b};
   EXPECT_EQ(InferExprWidth(&concat, typedefs), 64);  // 32 + 32
 }
+
+// --- Defparam tests ---
+
+TEST(Elaboration, Defparam_OverridesDefault) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter WIDTH = 4)();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child u0();\n"
+      "  defparam u0.WIDTH = 16;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->children.size(), 1);
+  auto* child = mod->children[0].resolved;
+  ASSERT_NE(child, nullptr);
+  ASSERT_EQ(child->params.size(), 1);
+  EXPECT_EQ(child->params[0].resolved_value, 16);
+  EXPECT_TRUE(child->params[0].is_resolved);
+}
+
+TEST(Elaboration, Defparam_NotFoundWarns) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter WIDTH = 4)();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child u0();\n"
+      "  defparam u0.BOGUS = 99;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_GT(f.diag.WarningCount(), 0u);
+}

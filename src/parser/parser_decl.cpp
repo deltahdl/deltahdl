@@ -2,6 +2,24 @@
 
 namespace delta {
 
+// --- Defparam parsing ---
+
+ModuleItem* Parser::ParseDefparam() {
+  auto* item = arena_.Create<ModuleItem>();
+  item->kind = ModuleItemKind::kDefparam;
+  item->loc = CurrentLoc();
+  Expect(TokenKind::kKwDefparam);
+
+  do {
+    Expr* path = ParseExpr();
+    Expect(TokenKind::kEq);
+    Expr* value = ParseExpr();
+    item->defparam_assigns.emplace_back(path, value);
+  } while (Match(TokenKind::kComma));
+  Expect(TokenKind::kSemicolon);
+  return item;
+}
+
 // --- Enum type parsing ---
 
 DataType Parser::ParseEnumType() {

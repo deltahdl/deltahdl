@@ -252,6 +252,10 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
     items.push_back(ParseParamDecl());
     return;
   }
+  if (Check(TokenKind::kKwDefparam)) {
+    items.push_back(ParseDefparam());
+    return;
+  }
   if (Check(TokenKind::kKwImport)) {
     items.push_back(ParseImportDecl());
     return;

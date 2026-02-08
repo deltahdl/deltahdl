@@ -20,6 +20,7 @@ struct RtlirModule;
 struct ModuleItem;
 struct Expr;
 struct RtlirModuleInst;
+struct RtlirParamDecl;
 
 /// Elaborator transforms a parsed AST (CompilationUnit) into the
 /// elaborated RTLIR representation.  Phase 1 supports single-module
@@ -77,6 +78,12 @@ class Elaborator {
   /// Elaborate a list of generate-body items, recursing into nested generates.
   void ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
                               RtlirModule* mod, const ScopeMap& scope);
+
+  /// Apply defparam overrides after hierarchy is built.
+  void ApplyDefparams(RtlirModule* top, const ModuleDecl* decl);
+
+  /// Resolve a hierarchical path to find the target module and param name.
+  RtlirParamDecl* ResolveDefparamPath(RtlirModule* root, const Expr* path_expr);
 
   /// Return a scoped name (prefixed during generate-for expansion).
   std::string_view ScopedName(std::string_view base);

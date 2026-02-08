@@ -46,6 +46,7 @@ class Parser {
   ModuleItem* ParseGateInst();
 
   // Declarations (parser_decl.cpp)
+  ModuleItem* ParseDefparam();
   ModuleItem* ParseTypedef();
   DataType ParseEnumType();
   DataType ParseStructOrUnionType();
@@ -95,6 +96,7 @@ class Parser {
   Expr* ParsePrimaryExpr();
   Expr* MakeLiteral(ExprKind kind, const Token& tok);
   Expr* ParseCallExpr(Expr* callee);
+  Expr* ParseIdentifierExpr();
   Expr* ParseSelectExpr(Expr* base);
   Expr* ParseSystemCall();
   Expr* ParseConcatenation();
