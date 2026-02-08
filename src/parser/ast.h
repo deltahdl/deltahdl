@@ -235,7 +235,29 @@ enum class ModuleItemKind : uint8_t {
   kFunctionDecl,
   kTaskDecl,
   kImportDecl,
+  kGateInst,
 };
+
+// clang-format off
+enum class GateKind : uint8_t {
+  // N-input gates
+  kAnd, kNand, kOr, kNor, kXor, kXnor,
+  // N-output gates
+  kBuf, kNot,
+  // Enable gates
+  kBufif0, kBufif1, kNotif0, kNotif1,
+  // Pass gates
+  kTran, kRtran,
+  // Pass enable gates
+  kTranif0, kTranif1, kRtranif0, kRtranif1,
+  // MOS switches
+  kNmos, kPmos, kRnmos, kRpmos,
+  // CMOS switches
+  kCmos, kRcmos,
+  // Pull gates
+  kPullup, kPulldown,
+};
+// clang-format on
 
 enum class AlwaysKind : uint8_t {
   kAlways,
@@ -294,6 +316,12 @@ struct ModuleItem {
   // Import
   ImportItem import_item;
 
+  // Gate instantiation
+  GateKind gate_kind = GateKind::kAnd;
+  std::string_view gate_inst_name;
+  std::vector<Expr*> gate_terminals;
+  Expr* gate_delay = nullptr;
+
   // Function/task
   DataType return_type;
   std::vector<FunctionArg> func_args;
@@ -302,12 +330,31 @@ struct ModuleItem {
 
 // --- Top-level declarations ---
 
+enum class ModuleDeclKind : uint8_t {
+  kModule,
+  kInterface,
+  kProgram,
+};
+
+struct ModportPort {
+  Direction direction = Direction::kNone;
+  std::string_view name;
+};
+
+struct ModportDecl {
+  std::string_view name;
+  std::vector<ModportPort> ports;
+  SourceLoc loc;
+};
+
 struct ModuleDecl {
+  ModuleDeclKind decl_kind = ModuleDeclKind::kModule;
   std::string_view name;
   SourceRange range;
   std::vector<PortDecl> ports;
   std::vector<ModuleItem*> items;
   std::vector<std::pair<std::string_view, Expr*>> params;
+  std::vector<ModportDecl*> modports;
 };
 
 struct PackageDecl {
@@ -316,9 +363,50 @@ struct PackageDecl {
   std::vector<ModuleItem*> items;
 };
 
+// --- Class declarations ---
+
+enum class ClassMemberKind : uint8_t {
+  kProperty,
+  kMethod,
+  kConstraint,
+};
+
+struct ClassMember {
+  ClassMemberKind kind = ClassMemberKind::kProperty;
+  SourceLoc loc;
+
+  // Qualifiers
+  bool is_static = false;
+  bool is_virtual = false;
+  bool is_local = false;
+  bool is_protected = false;
+  bool is_rand = false;
+  bool is_randc = false;
+
+  // Property fields
+  DataType data_type;
+  std::string_view name;
+  Expr* init_expr = nullptr;
+
+  // Method (reuses ModuleItem for function/task)
+  ModuleItem* method = nullptr;
+};
+
+struct ClassDecl {
+  std::string_view name;
+  SourceRange range;
+  bool is_virtual = false;
+  std::string_view base_class;
+  std::vector<ClassMember*> members;
+  std::vector<std::pair<std::string_view, Expr*>> params;
+};
+
 struct CompilationUnit {
   std::vector<ModuleDecl*> modules;
   std::vector<PackageDecl*> packages;
+  std::vector<ModuleDecl*> interfaces;
+  std::vector<ModuleDecl*> programs;
+  std::vector<ClassDecl*> classes;
 };
 
 }  // namespace delta

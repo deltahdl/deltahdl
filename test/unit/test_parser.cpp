@@ -496,3 +496,233 @@ TEST(Parser, GenerateRegion) {
   }
   EXPECT_TRUE(found_gen);
 }
+
+// --- Gate primitive tests ---
+
+TEST(Parser, GateAndInst) {
+  auto r = Parse("module t; and g1(out, a, b); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
+  EXPECT_EQ(item->gate_kind, GateKind::kAnd);
+  EXPECT_EQ(item->gate_inst_name, "g1");
+  EXPECT_EQ(item->gate_terminals.size(), 3);
+  EXPECT_EQ(item->gate_delay, nullptr);
+}
+
+TEST(Parser, GateNandWithDelay) {
+  auto r = Parse("module t; nand #(5) g2(out, a, b); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
+  EXPECT_EQ(item->gate_kind, GateKind::kNand);
+  EXPECT_EQ(item->gate_inst_name, "g2");
+  EXPECT_NE(item->gate_delay, nullptr);
+  EXPECT_EQ(item->gate_terminals.size(), 3);
+}
+
+TEST(Parser, GateBufMultiOutput) {
+  auto r = Parse("module t; buf (o1, o2, in); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
+  EXPECT_EQ(item->gate_kind, GateKind::kBuf);
+  EXPECT_TRUE(item->gate_inst_name.empty());
+  EXPECT_EQ(item->gate_terminals.size(), 3);
+}
+
+TEST(Parser, GateBufif0) {
+  auto r = Parse("module t; bufif0 b1(out, in, en); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
+  EXPECT_EQ(item->gate_kind, GateKind::kBufif0);
+  EXPECT_EQ(item->gate_terminals.size(), 3);
+}
+
+TEST(Parser, GateTran) {
+  auto r = Parse("module t; tran (a, b); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
+  EXPECT_EQ(item->gate_kind, GateKind::kTran);
+  EXPECT_EQ(item->gate_terminals.size(), 2);
+}
+
+TEST(Parser, GateNmos) {
+  auto r = Parse("module t; nmos (out, in, ctrl); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
+  EXPECT_EQ(item->gate_kind, GateKind::kNmos);
+  EXPECT_EQ(item->gate_terminals.size(), 3);
+}
+
+TEST(Parser, GateCmos) {
+  auto r = Parse("module t; cmos (out, in, nctrl, pctrl); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
+  EXPECT_EQ(item->gate_kind, GateKind::kCmos);
+  EXPECT_EQ(item->gate_terminals.size(), 4);
+}
+
+TEST(Parser, GatePullup) {
+  auto r = Parse("module t; pullup (o); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
+  EXPECT_EQ(item->gate_kind, GateKind::kPullup);
+  EXPECT_EQ(item->gate_terminals.size(), 1);
+}
+
+TEST(Parser, GateNoInstanceName) {
+  auto r = Parse("module t; and (out, a, b); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
+  EXPECT_EQ(item->gate_kind, GateKind::kAnd);
+  EXPECT_TRUE(item->gate_inst_name.empty());
+  EXPECT_EQ(item->gate_terminals.size(), 3);
+}
+
+// --- Interface/modport tests ---
+
+TEST(Parser, EmptyInterface) {
+  auto r = Parse("interface simple_bus; endinterface");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->interfaces.size(), 1);
+  EXPECT_EQ(r.cu->interfaces[0]->name, "simple_bus");
+  EXPECT_EQ(r.cu->interfaces[0]->decl_kind, ModuleDeclKind::kInterface);
+}
+
+TEST(Parser, InterfaceWithPorts) {
+  auto r = Parse(
+      "interface bus(input logic clk, input logic rst);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->interfaces.size(), 1);
+  EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 2);
+}
+
+TEST(Parser, InterfaceWithModport) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  logic [7:0] data;\n"
+      "  modport master(output data);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* iface = r.cu->interfaces[0];
+  EXPECT_EQ(iface->items.size(), 1);
+  ASSERT_EQ(iface->modports.size(), 1);
+  EXPECT_EQ(iface->modports[0]->name, "master");
+  ASSERT_EQ(iface->modports[0]->ports.size(), 1);
+  EXPECT_EQ(iface->modports[0]->ports[0].direction, Direction::kOutput);
+  EXPECT_EQ(iface->modports[0]->ports[0].name, "data");
+}
+
+TEST(Parser, ModportMultipleGroups) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  logic addr;\n"
+      "  logic data;\n"
+      "  modport slave(input addr, input data);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  EXPECT_EQ(mp->name, "slave");
+  ASSERT_EQ(mp->ports.size(), 2);
+  EXPECT_EQ(mp->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(mp->ports[1].direction, Direction::kInput);
+}
+
+// --- Program tests ---
+
+TEST(Parser, EmptyProgram) {
+  auto r = Parse("program test_prog; endprogram");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->programs.size(), 1);
+  EXPECT_EQ(r.cu->programs[0]->name, "test_prog");
+  EXPECT_EQ(r.cu->programs[0]->decl_kind, ModuleDeclKind::kProgram);
+}
+
+TEST(Parser, ProgramWithInitial) {
+  auto r = Parse(
+      "program test_prog;\n"
+      "  initial $display(\"hello\");\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->programs.size(), 1);
+  EXPECT_EQ(r.cu->programs[0]->items.size(), 1);
+  EXPECT_EQ(r.cu->programs[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
+}
+
+TEST(Parser, InterfaceAndModule) {
+  auto r = Parse(
+      "interface bus; endinterface\n"
+      "module top; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_EQ(r.cu->interfaces.size(), 1);
+  EXPECT_EQ(r.cu->modules.size(), 1);
+}
+
+// --- Class tests ---
+
+TEST(Parser, EmptyClass) {
+  auto r = Parse("class empty_cls; endclass");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1);
+  EXPECT_EQ(r.cu->classes[0]->name, "empty_cls");
+  EXPECT_FALSE(r.cu->classes[0]->is_virtual);
+}
+
+TEST(Parser, ClassWithProperty) {
+  auto r = Parse("class pkt; int data; endclass");
+  ASSERT_NE(r.cu, nullptr);
+  auto* cls = r.cu->classes[0];
+  ASSERT_EQ(cls->members.size(), 1);
+  EXPECT_EQ(cls->members[0]->kind, ClassMemberKind::kProperty);
+  EXPECT_EQ(cls->members[0]->name, "data");
+  EXPECT_EQ(cls->members[0]->data_type.kind, DataTypeKind::kInt);
+}
+
+TEST(Parser, ClassWithMethod) {
+  auto r = Parse(
+      "class pkt;\n"
+      "  function int get_data();\n"
+      "    return data;\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* cls = r.cu->classes[0];
+  ASSERT_EQ(cls->members.size(), 1);
+  EXPECT_EQ(cls->members[0]->kind, ClassMemberKind::kMethod);
+  EXPECT_NE(cls->members[0]->method, nullptr);
+}
+
+TEST(Parser, ClassExtends) {
+  auto r = Parse("class child extends parent; endclass");
+  ASSERT_NE(r.cu, nullptr);
+  auto* cls = r.cu->classes[0];
+  EXPECT_EQ(cls->name, "child");
+  EXPECT_EQ(cls->base_class, "parent");
+}
+
+TEST(Parser, VirtualClass) {
+  auto r = Parse("virtual class base; endclass");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.cu->classes[0]->is_virtual);
+}
+
+TEST(Parser, ClassPropertyQualifiers) {
+  auto r = Parse(
+      "class pkt;\n"
+      "  rand int data;\n"
+      "  local int secret;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* cls = r.cu->classes[0];
+  ASSERT_EQ(cls->members.size(), 2);
+  EXPECT_TRUE(cls->members[0]->is_rand);
+  EXPECT_TRUE(cls->members[1]->is_local);
+}

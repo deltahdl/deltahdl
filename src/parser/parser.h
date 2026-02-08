@@ -31,6 +31,18 @@ class Parser {
   ModuleItem* ParseGenerateFor();
   ModuleItem* ParseGenerateIf();
 
+  // Top-level declarations (parser_toplevel.cpp)
+  ModuleDecl* ParseInterfaceDecl();
+  ModuleDecl* ParseProgramDecl();
+  ModportDecl* ParseModportDecl();
+  ClassDecl* ParseClassDecl();
+  ClassMember* ParseClassMember();
+  ClassMember* ParseConstraintStub(ClassMember* member);
+
+  // Gate primitives (parser_toplevel.cpp)
+  bool IsAtGateKeyword();
+  ModuleItem* ParseGateInst();
+
   // Declarations (parser_decl.cpp)
   ModuleItem* ParseTypedef();
   DataType ParseEnumType();

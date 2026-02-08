@@ -177,6 +177,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       mod->function_decls.push_back(item);
       break;
     case ModuleItemKind::kImportDecl:
+    case ModuleItemKind::kGateInst:
       break;
   }
 }

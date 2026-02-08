@@ -39,7 +39,8 @@ void Parser::Synchronize() {
       return;
     }
     if (Check(TokenKind::kKwEndmodule) || Check(TokenKind::kKwEndpackage) ||
-        Check(TokenKind::kKwEnd)) {
+        Check(TokenKind::kKwEndinterface) || Check(TokenKind::kKwEndprogram) ||
+        Check(TokenKind::kKwEndclass) || Check(TokenKind::kKwEnd)) {
       return;
     }
     Consume();
@@ -52,19 +53,27 @@ CompilationUnit* Parser::Parse() {
   auto* unit = arena_.Create<CompilationUnit>();
   while (!AtEnd()) {
     if (Check(TokenKind::kKwModule)) {
-      auto* mod = ParseModuleDecl();
-      if (mod != nullptr) {
-        unit->modules.push_back(mod);
-      }
-    } else if (Check(TokenKind::kKwPackage)) {
-      auto* pkg = ParsePackageDecl();
-      if (pkg != nullptr) {
-        unit->packages.push_back(pkg);
-      }
-    } else {
-      diag_.Error(CurrentLoc(), "expected module or package declaration");
-      Consume();
+      unit->modules.push_back(ParseModuleDecl());
+      continue;
     }
+    if (Check(TokenKind::kKwPackage)) {
+      unit->packages.push_back(ParsePackageDecl());
+      continue;
+    }
+    if (Check(TokenKind::kKwInterface)) {
+      unit->interfaces.push_back(ParseInterfaceDecl());
+      continue;
+    }
+    if (Check(TokenKind::kKwProgram)) {
+      unit->programs.push_back(ParseProgramDecl());
+      continue;
+    }
+    if (Check(TokenKind::kKwClass) || Check(TokenKind::kKwVirtual)) {
+      unit->classes.push_back(ParseClassDecl());
+      continue;
+    }
+    diag_.Error(CurrentLoc(), "expected top-level declaration");
+    Consume();
   }
   return unit;
 }
@@ -257,11 +266,14 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
     items.push_back(ParseGenerateIf());
     return;
   }
-
   ParseTypedItemOrInst(items);
 }
 
 void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items) {
+  if (IsAtGateKeyword()) {
+    items.push_back(ParseGateInst());
+    return;
+  }
   if (Check(TokenKind::kKwEnum)) {
     auto dtype = ParseEnumType();
     ParseVarDeclList(items, dtype);
