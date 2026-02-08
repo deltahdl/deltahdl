@@ -438,7 +438,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             clang-18 clang-tidy-18 clang-format-18
-          pip install yamllint
+          pip install yamllint pylint mypy
+          npm install -g jscpd
           PMD=pmd-dist-7.21.0-bin.zip
           PMD_URL=https://github.com/pmd/pmd/releases
           wget -q "$PMD_URL/download/pmd_releases%2F7.21.0/$PMD"
@@ -457,13 +458,13 @@ jobs:
             .github/workflows/*.yml
       - name: Check formatting
         run: |
-          find src -name '*.cpp' -o -name '*.h' | \
+          find src test -name '*.cpp' -o -name '*.h' | \
             xargs clang-format-18 \
             --dry-run --Werror --style=google
       - name: Check file line limits
         run: |
           fail=0
-          for f in $(find src -name '*.cpp' -o -name '*.h')
+          for f in $(find src test -name '*.cpp' -o -name '*.h')
           do
             lines=$(wc -l < "$f")
             if [ "$lines" -gt 1000 ]; then
@@ -489,6 +490,16 @@ jobs:
           xargs clang-tidy-18 -p build
           --config-file=.clang-tidy
           --warnings-as-errors='*'
+      - name: Run pylint
+        run: >-
+          python3 -m pylint scripts/
+          --fail-on=C,R,W --fail-under=10.0
+      - name: Run mypy
+        run: python3 -m mypy scripts/
+      - name: Detect Python copy-paste
+        run: >-
+          jscpd --pattern "**/*.py" --threshold 0
+          --reporters console scripts/
   unit-test-coverage:
     env:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw

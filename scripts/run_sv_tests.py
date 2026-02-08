@@ -23,11 +23,13 @@ def run_test(path):
         [str(BINARY), "--lint-only", path],
         capture_output=True,
         timeout=30,
+        check=False,
     )
     return result.returncode == 0
 
 
 def main():
+    """Run all sv-tests and print a summary."""
     if not BINARY.exists():
         print(f"error: binary not found at {BINARY}", file=sys.stderr)
         return
