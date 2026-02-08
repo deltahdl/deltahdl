@@ -186,8 +186,6 @@ jobs:
   # fast no-op — no files are downloaded. On cold cache (new SHA,
   # ~daily) it clones once, saves to cache, and updates the variable.
   cache-sv-tests:
-    env:
-      GH_TOKEN: ${{ github.token }}
     needs:
       - unit-test-coverage
       - unit-test-macos-26-arm64-clang
@@ -196,8 +194,6 @@ jobs:
       - unit-test-ubuntu-24-04-x86-64-gcc
     outputs:
       sv-tests-sha: ${{ steps.sv-tests-ref.outputs.sha }}
-    permissions:
-      actions: write
     runs-on: ubuntu-24.04
     steps:
       - id: sv-tests-ref
@@ -223,7 +219,9 @@ jobs:
         with:
           key: sv-tests-${{ steps.sv-tests-ref.outputs.sha }}
           path: third_party/sv-tests
-      - if: >-
+      - env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        if: >-
           steps.sv-tests-ref.outputs.sha
           != vars.SV_TESTS_SHA
         name: Update SV_TESTS_SHA variable
