@@ -1,88 +1,84 @@
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
 #include "synthesis/aig.h"
 
 using namespace delta;
 
-TEST_CASE("AIG literal helpers", "[aig]") {
+TEST(Aig, LiteralHelpers) {
   for (uint32_t id = 0; id < 10; ++id) {
     auto lit = aig_lit(id, false);
-    REQUIRE(aig_var(lit) == id);
-    REQUIRE_FALSE(aig_is_compl(lit));
+    EXPECT_EQ(aig_var(lit), id);
+    EXPECT_FALSE(aig_is_compl(lit));
 
     auto lit_c = aig_lit(id, true);
-    REQUIRE(aig_var(lit_c) == id);
-    REQUIRE(aig_is_compl(lit_c));
+    EXPECT_EQ(aig_var(lit_c), id);
+    EXPECT_TRUE(aig_is_compl(lit_c));
   }
 }
 
-TEST_CASE("AIG add input", "[aig]") {
+TEST(Aig, AddInput) {
   AigGraph graph;
   auto a = graph.add_input();
   auto b = graph.add_input();
-  REQUIRE(graph.inputs.size() == 2);
-  REQUIRE(aig_var(a) != aig_var(b));
+  EXPECT_EQ(graph.inputs.size(), 2);
+  EXPECT_NE(aig_var(a), aig_var(b));
 }
 
-TEST_CASE("AIG add AND", "[aig]") {
+TEST(Aig, AddAnd) {
   AigGraph graph;
   auto a = graph.add_input();
   auto b = graph.add_input();
   auto c = graph.add_and(a, b);
-  REQUIRE(graph.node_count() > 2);
-  REQUIRE_FALSE(aig_is_compl(c));
+  EXPECT_GT(graph.node_count(), 2);
+  EXPECT_FALSE(aig_is_compl(c));
 }
 
-TEST_CASE("AIG NOT is complement", "[aig]") {
+TEST(Aig, NotIsComplement) {
   AigGraph graph;
   auto a = graph.add_input();
   auto not_a = graph.add_not(a);
-  REQUIRE(aig_var(not_a) == aig_var(a));
-  REQUIRE(aig_is_compl(not_a) != aig_is_compl(a));
+  EXPECT_EQ(aig_var(not_a), aig_var(a));
+  EXPECT_NE(aig_is_compl(not_a), aig_is_compl(a));
 }
 
-TEST_CASE("AIG OR via De Morgan", "[aig]") {
+TEST(Aig, OrViaDeMorgan) {
   AigGraph graph;
   auto a = graph.add_input();
   auto b = graph.add_input();
   auto c = graph.add_or(a, b);
-  // a | b = ~(~a & ~b)
-  // Should produce a valid literal
-  REQUIRE(aig_var(c) > 0);
+  EXPECT_GT(aig_var(c), 0);
 }
 
-TEST_CASE("AIG structural hashing deduplication", "[aig]") {
+TEST(Aig, StructuralHashingDeduplication) {
   AigGraph graph;
   auto a = graph.add_input();
   auto b = graph.add_input();
   auto c1 = graph.add_and(a, b);
   auto c2 = graph.add_and(a, b);
-  // Same AND should return the same node
-  REQUIRE(c1 == c2);
+  EXPECT_EQ(c1, c2);
 }
 
-TEST_CASE("AIG add output", "[aig]") {
+TEST(Aig, AddOutput) {
   AigGraph graph;
   auto a = graph.add_input();
   graph.add_output(a);
-  REQUIRE(graph.outputs.size() == 1);
-  REQUIRE(graph.outputs[0] == a);
+  ASSERT_EQ(graph.outputs.size(), 1);
+  EXPECT_EQ(graph.outputs[0], a);
 }
 
-TEST_CASE("AIG XOR construction", "[aig]") {
+TEST(Aig, XorConstruction) {
   AigGraph graph;
   auto a = graph.add_input();
   auto b = graph.add_input();
   auto x = graph.add_xor(a, b);
-  // XOR produces a valid literal
-  REQUIRE(aig_var(x) > 0);
+  EXPECT_GT(aig_var(x), 0);
 }
 
-TEST_CASE("AIG MUX construction", "[aig]") {
+TEST(Aig, MuxConstruction) {
   AigGraph graph;
   auto s = graph.add_input();
   auto a = graph.add_input();
   auto b = graph.add_input();
   auto m = graph.add_mux(s, a, b);
-  REQUIRE(aig_var(m) > 0);
+  EXPECT_GT(aig_var(m), 0);
 }

@@ -1,4 +1,4 @@
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -18,57 +18,57 @@ static CompilationUnit* parse(const std::string& src) {
   return parser.parse();
 }
 
-TEST_CASE("Parse empty module", "[parser]") {
+TEST(Parser, EmptyModule) {
   const auto* cu = parse("module empty; endmodule");
-  REQUIRE(cu != nullptr);
-  REQUIRE(cu->modules.size() == 1);
-  REQUIRE(cu->modules[0]->name == "empty");
-  REQUIRE(cu->modules[0]->items.empty());
+  ASSERT_NE(cu, nullptr);
+  ASSERT_EQ(cu->modules.size(), 1);
+  EXPECT_EQ(cu->modules[0]->name, "empty");
+  EXPECT_TRUE(cu->modules[0]->items.empty());
 }
 
-TEST_CASE("Parse module with initial block", "[parser]") {
+TEST(Parser, ModuleWithInitialBlock) {
   const auto* cu = parse(
       "module hello;\n"
       "  initial $display(\"Hello\");\n"
       "endmodule\n");
-  REQUIRE(cu != nullptr);
-  REQUIRE(cu->modules.size() == 1);
-  REQUIRE(cu->modules[0]->items.size() == 1);
-  REQUIRE(cu->modules[0]->items[0]->kind == ModuleItemKind::InitialBlock);
+  ASSERT_NE(cu, nullptr);
+  ASSERT_EQ(cu->modules.size(), 1);
+  ASSERT_EQ(cu->modules[0]->items.size(), 1);
+  EXPECT_EQ(cu->modules[0]->items[0]->kind, ModuleItemKind::InitialBlock);
 }
 
-TEST_CASE("Parse module with ports", "[parser]") {
+TEST(Parser, ModuleWithPorts) {
   const auto* cu = parse(
       "module mux(input logic a, input logic b, input logic sel, output logic "
       "y);\n"
       "  assign y = sel ? b : a;\n"
       "endmodule\n");
-  REQUIRE(cu != nullptr);
+  ASSERT_NE(cu, nullptr);
   auto* mod = cu->modules[0];
-  REQUIRE(mod->ports.size() == 4);
-  REQUIRE(mod->ports[0].direction == Direction::Input);
-  REQUIRE(mod->ports[0].name == "a");
-  REQUIRE(mod->ports[3].direction == Direction::Output);
-  REQUIRE(mod->ports[3].name == "y");
+  ASSERT_EQ(mod->ports.size(), 4);
+  EXPECT_EQ(mod->ports[0].direction, Direction::Input);
+  EXPECT_EQ(mod->ports[0].name, "a");
+  EXPECT_EQ(mod->ports[3].direction, Direction::Output);
+  EXPECT_EQ(mod->ports[3].name, "y");
 }
 
-TEST_CASE("Parse continuous assignment", "[parser]") {
+TEST(Parser, ContinuousAssignment) {
   const auto* cu = parse(
       "module top;\n"
       "  logic a, b;\n"
       "  assign a = b;\n"
       "endmodule\n");
-  REQUIRE(cu != nullptr);
+  ASSERT_NE(cu, nullptr);
   bool found_assign = false;
   for (auto* item : cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::ContAssign) {
       found_assign = true;
     }
   }
-  REQUIRE(found_assign);
+  EXPECT_TRUE(found_assign);
 }
 
-TEST_CASE("Parse always_ff block", "[parser]") {
+TEST(Parser, AlwaysFFBlock) {
   const auto* cu = parse(
       "module counter(input logic clk, rst);\n"
       "  logic [7:0] count;\n"
@@ -76,7 +76,7 @@ TEST_CASE("Parse always_ff block", "[parser]") {
       "    if (rst) count <= '0;\n"
       "    else count <= count + 1;\n"
       "endmodule\n");
-  REQUIRE(cu != nullptr);
+  ASSERT_NE(cu, nullptr);
   auto* mod = cu->modules[0];
   bool found_ff = false;
   for (auto* item : mod->items) {
@@ -85,28 +85,26 @@ TEST_CASE("Parse always_ff block", "[parser]") {
       found_ff = true;
     }
   }
-  REQUIRE(found_ff);
+  EXPECT_TRUE(found_ff);
 }
 
-TEST_CASE("Parse expression precedence", "[parser]") {
+TEST(Parser, ExpressionPrecedence) {
   const auto* cu = parse(
       "module expr;\n"
       "  logic a;\n"
       "  assign a = 1 + 2 * 3;\n"
       "endmodule\n");
-  REQUIRE(cu != nullptr);
-  // Should parse without errors — correctness of precedence
-  // is validated by the Pratt parser binding power table
+  ASSERT_NE(cu, nullptr);
 }
 
-TEST_CASE("Parse multiple modules", "[parser]") {
+TEST(Parser, MultipleModules) {
   const auto* cu = parse(
       "module a; endmodule\n"
       "module b; endmodule\n"
       "module c; endmodule\n");
-  REQUIRE(cu != nullptr);
-  REQUIRE(cu->modules.size() == 3);
-  REQUIRE(cu->modules[0]->name == "a");
-  REQUIRE(cu->modules[1]->name == "b");
-  REQUIRE(cu->modules[2]->name == "c");
+  ASSERT_NE(cu, nullptr);
+  ASSERT_EQ(cu->modules.size(), 3);
+  EXPECT_EQ(cu->modules[0]->name, "a");
+  EXPECT_EQ(cu->modules[1]->name, "b");
+  EXPECT_EQ(cu->modules[2]->name, "c");
 }

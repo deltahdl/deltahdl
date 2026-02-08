@@ -1,14 +1,14 @@
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
 #include "simulation/process.h"
 
 using namespace delta;
 
-TEST_CASE("SimCoroutine promise_type methods", "[process]") {
+TEST(Process, PromiseTypeMethods) {
   SimCoroutine::promise_type promise;
 
   auto coro = promise.get_return_object();
-  REQUIRE_FALSE(coro.done());
+  EXPECT_FALSE(coro.done());
 
   auto init = promise.initial_suspend();
   (void)init;
@@ -20,12 +20,12 @@ TEST_CASE("SimCoroutine promise_type methods", "[process]") {
   (void)fin;
 }
 
-TEST_CASE("SimCoroutine move semantics", "[process]") {
+TEST(Process, MoveSemantics) {
   SimCoroutine::promise_type promise;
   auto a = promise.get_return_object();
-  REQUIRE_FALSE(a.done());
+  EXPECT_FALSE(a.done());
 
   SimCoroutine b = std::move(a);
-  REQUIRE_FALSE(b.done());
-  REQUIRE(a.done());  // NOLINT — moved-from state check
+  EXPECT_FALSE(b.done());
+  EXPECT_TRUE(a.done());  // NOLINT -- moved-from state check
 }

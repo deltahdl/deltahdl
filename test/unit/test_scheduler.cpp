@@ -1,29 +1,29 @@
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
 #include "common/types.h"
 #include "simulation/scheduler.h"
 
 using namespace delta;
 
-TEST_CASE("Scheduler initial state", "[scheduler]") {
+TEST(Scheduler, InitialState) {
   Scheduler sched;
-  REQUIRE_FALSE(sched.has_events());
-  REQUIRE(sched.current_time().ticks == 0);
+  EXPECT_FALSE(sched.has_events());
+  EXPECT_EQ(sched.current_time().ticks, 0);
 }
 
-TEST_CASE("Scheduler schedule and run single event", "[scheduler]") {
+TEST(Scheduler, ScheduleAndRunSingleEvent) {
   Scheduler sched;
   bool executed = false;
   Event ev;
   ev.kind = EventKind::Evaluation;
   ev.callback = [&executed]() { executed = true; };
   sched.schedule_event({0}, Region::Active, &ev);
-  REQUIRE(sched.has_events());
+  EXPECT_TRUE(sched.has_events());
   sched.run();
-  REQUIRE(executed);
+  EXPECT_TRUE(executed);
 }
 
-TEST_CASE("Scheduler time ordering", "[scheduler]") {
+TEST(Scheduler, TimeOrdering) {
   Scheduler sched;
   std::vector<int> order;
 
@@ -39,12 +39,12 @@ TEST_CASE("Scheduler time ordering", "[scheduler]") {
   sched.schedule_event({5}, Region::Active, &ev1);
 
   sched.run();
-  REQUIRE(order.size() == 2);
-  REQUIRE(order[0] == 1);  // time 5 first
-  REQUIRE(order[1] == 2);  // time 10 second
+  ASSERT_EQ(order.size(), 2);
+  EXPECT_EQ(order[0], 1);  // time 5 first
+  EXPECT_EQ(order[1], 2);  // time 10 second
 }
 
-TEST_CASE("Scheduler region ordering within time slot", "[scheduler]") {
+TEST(Scheduler, RegionOrderingWithinTimeSlot) {
   Scheduler sched;
   std::vector<int> order;
 
@@ -61,7 +61,7 @@ TEST_CASE("Scheduler region ordering within time slot", "[scheduler]") {
   sched.schedule_event({0}, Region::Active, &ev_active);
 
   sched.run();
-  REQUIRE(order.size() == 2);
-  REQUIRE(order[0] == 1);  // Active first
-  REQUIRE(order[1] == 2);  // NBA second
+  ASSERT_EQ(order.size(), 2);
+  EXPECT_EQ(order[0], 1);  // Active first
+  EXPECT_EQ(order[1], 2);  // NBA second
 }

@@ -1,4 +1,4 @@
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -14,111 +14,111 @@ static std::vector<Token> lex(const std::string& src) {
   return lexer.lex_all();
 }
 
-TEST_CASE("Lex empty input", "[lexer]") {
+TEST(Lexer, EmptyInput) {
   auto tokens = lex("");
-  REQUIRE(tokens.size() == 1);
-  REQUIRE(tokens[0].is_eof());
+  ASSERT_EQ(tokens.size(), 1);
+  EXPECT_TRUE(tokens[0].is_eof());
 }
 
-TEST_CASE("Lex keywords", "[lexer]") {
+TEST(Lexer, Keywords) {
   auto tokens = lex("module endmodule");
-  REQUIRE(tokens.size() == 3);
-  REQUIRE(tokens[0].kind == TokenKind::KwModule);
-  REQUIRE(tokens[1].kind == TokenKind::KwEndmodule);
-  REQUIRE(tokens[2].is_eof());
+  ASSERT_EQ(tokens.size(), 3);
+  EXPECT_EQ(tokens[0].kind, TokenKind::KwModule);
+  EXPECT_EQ(tokens[1].kind, TokenKind::KwEndmodule);
+  EXPECT_TRUE(tokens[2].is_eof());
 }
 
-TEST_CASE("Lex identifiers", "[lexer]") {
+TEST(Lexer, Identifiers) {
   auto tokens = lex("foo bar_123 _baz");
-  REQUIRE(tokens.size() == 4);
-  REQUIRE(tokens[0].kind == TokenKind::Identifier);
-  REQUIRE(tokens[0].text == "foo");
-  REQUIRE(tokens[1].text == "bar_123");
-  REQUIRE(tokens[2].text == "_baz");
+  ASSERT_EQ(tokens.size(), 4);
+  EXPECT_EQ(tokens[0].kind, TokenKind::Identifier);
+  EXPECT_EQ(tokens[0].text, "foo");
+  EXPECT_EQ(tokens[1].text, "bar_123");
+  EXPECT_EQ(tokens[2].text, "_baz");
 }
 
-TEST_CASE("Lex integer literals", "[lexer]") {
+TEST(Lexer, IntegerLiterals) {
   auto tokens = lex("42 8'hFF 4'b1010");
-  REQUIRE(tokens.size() == 4);
-  REQUIRE(tokens[0].kind == TokenKind::IntLiteral);
-  REQUIRE(tokens[0].text == "42");
-  REQUIRE(tokens[1].kind == TokenKind::IntLiteral);
-  REQUIRE(tokens[1].text == "8'hFF");
-  REQUIRE(tokens[2].kind == TokenKind::IntLiteral);
-  REQUIRE(tokens[2].text == "4'b1010");
+  ASSERT_EQ(tokens.size(), 4);
+  EXPECT_EQ(tokens[0].kind, TokenKind::IntLiteral);
+  EXPECT_EQ(tokens[0].text, "42");
+  EXPECT_EQ(tokens[1].kind, TokenKind::IntLiteral);
+  EXPECT_EQ(tokens[1].text, "8'hFF");
+  EXPECT_EQ(tokens[2].kind, TokenKind::IntLiteral);
+  EXPECT_EQ(tokens[2].text, "4'b1010");
 }
 
-TEST_CASE("Lex string literals", "[lexer]") {
+TEST(Lexer, StringLiterals) {
   auto tokens = lex("\"Hello, World!\"");
-  REQUIRE(tokens.size() == 2);
-  REQUIRE(tokens[0].kind == TokenKind::StringLiteral);
-  REQUIRE(tokens[0].text == "\"Hello, World!\"");
+  ASSERT_EQ(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].kind, TokenKind::StringLiteral);
+  EXPECT_EQ(tokens[0].text, "\"Hello, World!\"");
 }
 
-TEST_CASE("Lex system identifiers", "[lexer]") {
+TEST(Lexer, SystemIdentifiers) {
   auto tokens = lex("$display $finish");
-  REQUIRE(tokens.size() == 3);
-  REQUIRE(tokens[0].kind == TokenKind::SystemIdentifier);
-  REQUIRE(tokens[0].text == "$display");
-  REQUIRE(tokens[1].text == "$finish");
+  ASSERT_EQ(tokens.size(), 3);
+  EXPECT_EQ(tokens[0].kind, TokenKind::SystemIdentifier);
+  EXPECT_EQ(tokens[0].text, "$display");
+  EXPECT_EQ(tokens[1].text, "$finish");
 }
 
-TEST_CASE("Lex operators", "[lexer]") {
+TEST(Lexer, Operators) {
   auto tokens = lex("+ - * / == != <= >= << >> && ||");
-  REQUIRE(tokens[0].kind == TokenKind::Plus);
-  REQUIRE(tokens[1].kind == TokenKind::Minus);
-  REQUIRE(tokens[2].kind == TokenKind::Star);
-  REQUIRE(tokens[3].kind == TokenKind::Slash);
-  REQUIRE(tokens[4].kind == TokenKind::EqEq);
-  REQUIRE(tokens[5].kind == TokenKind::BangEq);
-  REQUIRE(tokens[6].kind == TokenKind::LtEq);
-  REQUIRE(tokens[7].kind == TokenKind::GtEq);
-  REQUIRE(tokens[8].kind == TokenKind::LtLt);
-  REQUIRE(tokens[9].kind == TokenKind::GtGt);
-  REQUIRE(tokens[10].kind == TokenKind::AmpAmp);
-  REQUIRE(tokens[11].kind == TokenKind::PipePipe);
+  EXPECT_EQ(tokens[0].kind, TokenKind::Plus);
+  EXPECT_EQ(tokens[1].kind, TokenKind::Minus);
+  EXPECT_EQ(tokens[2].kind, TokenKind::Star);
+  EXPECT_EQ(tokens[3].kind, TokenKind::Slash);
+  EXPECT_EQ(tokens[4].kind, TokenKind::EqEq);
+  EXPECT_EQ(tokens[5].kind, TokenKind::BangEq);
+  EXPECT_EQ(tokens[6].kind, TokenKind::LtEq);
+  EXPECT_EQ(tokens[7].kind, TokenKind::GtEq);
+  EXPECT_EQ(tokens[8].kind, TokenKind::LtLt);
+  EXPECT_EQ(tokens[9].kind, TokenKind::GtGt);
+  EXPECT_EQ(tokens[10].kind, TokenKind::AmpAmp);
+  EXPECT_EQ(tokens[11].kind, TokenKind::PipePipe);
 }
 
-TEST_CASE("Lex punctuation", "[lexer]") {
+TEST(Lexer, Punctuation) {
   auto tokens = lex("( ) [ ] { } ; , . :");
-  REQUIRE(tokens[0].kind == TokenKind::LParen);
-  REQUIRE(tokens[1].kind == TokenKind::RParen);
-  REQUIRE(tokens[2].kind == TokenKind::LBracket);
-  REQUIRE(tokens[3].kind == TokenKind::RBracket);
-  REQUIRE(tokens[4].kind == TokenKind::LBrace);
-  REQUIRE(tokens[5].kind == TokenKind::RBrace);
-  REQUIRE(tokens[6].kind == TokenKind::Semicolon);
-  REQUIRE(tokens[7].kind == TokenKind::Comma);
-  REQUIRE(tokens[8].kind == TokenKind::Dot);
-  REQUIRE(tokens[9].kind == TokenKind::Colon);
+  EXPECT_EQ(tokens[0].kind, TokenKind::LParen);
+  EXPECT_EQ(tokens[1].kind, TokenKind::RParen);
+  EXPECT_EQ(tokens[2].kind, TokenKind::LBracket);
+  EXPECT_EQ(tokens[3].kind, TokenKind::RBracket);
+  EXPECT_EQ(tokens[4].kind, TokenKind::LBrace);
+  EXPECT_EQ(tokens[5].kind, TokenKind::RBrace);
+  EXPECT_EQ(tokens[6].kind, TokenKind::Semicolon);
+  EXPECT_EQ(tokens[7].kind, TokenKind::Comma);
+  EXPECT_EQ(tokens[8].kind, TokenKind::Dot);
+  EXPECT_EQ(tokens[9].kind, TokenKind::Colon);
 }
 
-TEST_CASE("Lex skips comments", "[lexer]") {
+TEST(Lexer, SkipsComments) {
   auto tokens = lex("a // comment\nb /* block */ c");
-  REQUIRE(tokens.size() == 4);
-  REQUIRE(tokens[0].text == "a");
-  REQUIRE(tokens[1].text == "b");
-  REQUIRE(tokens[2].text == "c");
+  ASSERT_EQ(tokens.size(), 4);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+  EXPECT_EQ(tokens[2].text, "c");
 }
 
-TEST_CASE("Lex hello.sv", "[lexer]") {
+TEST(Lexer, HelloSv) {
   auto tokens = lex(
       "module hello;\n  initial $display(\"Hello, DeltaHDL!\");\nendmodule\n");
-  REQUIRE(tokens[0].kind == TokenKind::KwModule);
-  REQUIRE(tokens[1].kind == TokenKind::Identifier);
-  REQUIRE(tokens[1].text == "hello");
-  REQUIRE(tokens[2].kind == TokenKind::Semicolon);
-  REQUIRE(tokens[3].kind == TokenKind::KwInitial);
-  REQUIRE(tokens[4].kind == TokenKind::SystemIdentifier);
-  REQUIRE(tokens[4].text == "$display");
+  EXPECT_EQ(tokens[0].kind, TokenKind::KwModule);
+  EXPECT_EQ(tokens[1].kind, TokenKind::Identifier);
+  EXPECT_EQ(tokens[1].text, "hello");
+  EXPECT_EQ(tokens[2].kind, TokenKind::Semicolon);
+  EXPECT_EQ(tokens[3].kind, TokenKind::KwInitial);
+  EXPECT_EQ(tokens[4].kind, TokenKind::SystemIdentifier);
+  EXPECT_EQ(tokens[4].text, "$display");
 }
 
-TEST_CASE("Lex source locations", "[lexer]") {
+TEST(Lexer, SourceLocations) {
   auto tokens = lex("a\nb c");
-  REQUIRE(tokens[0].loc.line == 1);
-  REQUIRE(tokens[0].loc.column == 1);
-  REQUIRE(tokens[1].loc.line == 2);
-  REQUIRE(tokens[1].loc.column == 1);
-  REQUIRE(tokens[2].loc.line == 2);
-  REQUIRE(tokens[2].loc.column == 3);
+  EXPECT_EQ(tokens[0].loc.line, 1);
+  EXPECT_EQ(tokens[0].loc.column, 1);
+  EXPECT_EQ(tokens[1].loc.line, 2);
+  EXPECT_EQ(tokens[1].loc.column, 1);
+  EXPECT_EQ(tokens[2].loc.line, 2);
+  EXPECT_EQ(tokens[2].loc.column, 3);
 }

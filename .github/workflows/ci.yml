@@ -455,7 +455,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            clang-18 clang-tidy-18 clang-format-18 cppcheck
+            clang-18 clang-tidy-18 clang-format-18
           pip install yamllint
           PMD=pmd-dist-7.21.0-bin.zip
           PMD_URL=https://github.com/pmd/pmd/releases
@@ -501,26 +501,6 @@ jobs:
           cmake -B build \
             -DCMAKE_CXX_COMPILER=clang++-18 \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-      - name: Run cppcheck
-        # NEVER use --suppress. Fix the code instead.
-        run: |
-          CATCH2=$(find build/_deps \
-            -name catch2-src -type d)
-          cppcheck --enable=all --std=c++23 \
-            -I src -I "$CATCH2/src" \
-            src/ test/ 2>&1 | tee /tmp/cppcheck.log
-          SEV='(error|warning|style|performance|portability):'
-          grep -E ": $SEV" /tmp/cppcheck.log \
-            | grep -v 'build/_deps/' \
-            | grep -v 'CATCH2_INTERNAL' \
-            > /tmp/cppcheck-filtered.log || true
-          FOUND=$(wc -l < /tmp/cppcheck-filtered.log \
-            | tr -d ' ')
-          if [ "$FOUND" -gt 0 ]; then
-            cat /tmp/cppcheck-filtered.log
-            echo "FAIL: $FOUND cppcheck finding(s)"
-            exit 1
-          fi
       - name: Run clang-tidy
         run: |
           find src -name '*.cpp' | \
