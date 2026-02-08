@@ -3,52 +3,85 @@ concurrency:
   cancel-in-progress: true
   group: ${{ github.workflow }}-${{ github.ref }}
 jobs:
-  build:
+  build-clang:
     needs: static-analysis
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
       - name: Install compiler
         run: |
           sudo apt-get update
-          if [ "${{ matrix.compiler }}" = "gcc-14" ]; then
-            sudo apt-get install -y g++-14
-            echo "CXX=g++-14" >> "$GITHUB_ENV"
-            echo "CC=gcc-14" >> "$GITHUB_ENV"
-          else
-            sudo apt-get install -y clang-18
-            echo "CXX=clang++-18" >> "$GITHUB_ENV"
-            echo "CC=clang-18" >> "$GITHUB_ENV"
-          fi
+          sudo apt-get install -y clang-18
       - name: Build
         run: |
           cmake -B build \
-            -DCMAKE_CXX_COMPILER=${{ env.CXX }} \
-            -DCMAKE_C_COMPILER=${{ env.CC }} \
+            -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_C_COMPILER=clang-18 \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
           cmake --build build --parallel
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
-          name: build-${{ matrix.compiler }}-${{ matrix.build_type }}
+          name: build-clang-${{ matrix.build_type }}
           path: build/
           retention-days: 1
     strategy:
       matrix:
         build_type: [Debug, Release]
-        compiler: [gcc-14, clang-18]
-  coverage:
-    needs: test
+  build-gcc:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-14
+      - name: Build
+        run: |
+          cmake -B build \
+            -DCMAKE_CXX_COMPILER=g++-14 \
+            -DCMAKE_C_COMPILER=gcc-14 \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          cmake --build build --parallel
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-gcc-${{ matrix.build_type }}
+          path: build/
+          retention-days: 1
+    strategy:
+      matrix:
+        build_type: [Debug, Release]
+  build-macos:
+    needs: static-analysis
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          cmake -B build \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          cmake --build build --parallel
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-macos-${{ matrix.build_type }}
+          path: build/
+          retention-days: 1
+    strategy:
+      matrix:
+        build_type: [Debug, Release]
+  coverage-linux:
+    needs: [integration-test-clang, integration-test-gcc]
     permissions:
       id-token: write
       pages: write
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
       - name: Install tools
         run: |
           sudo apt-get update
@@ -91,7 +124,7 @@ jobs:
             | jq -e '.data[0].totals |
               .lines.covered == .lines.count and
               .branches.covered == .branches.count' \
-            || { echo "FAIL: line and branch coverage must be 100%"; exit 1; }
+            || { echo "FAIL: coverage must be 100%"; exit 1; }
       - if: >-
           github.ref == 'refs/heads/main'
           && github.event_name == 'push'
@@ -104,11 +137,150 @@ jobs:
           && github.event_name == 'push'
         name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
-  release:
+  coverage-macos:
+    needs: integration-test-macos
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build with coverage
+        run: |
+          cmake -B build \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DDELTAHDL_COVERAGE=ON
+          cmake --build build --parallel
+      - env:
+          LLVM_PROFILE_FILE: build/coverage/%p.profraw
+        name: Run tests
+        run: |
+          ctest --test-dir build --output-on-failure
+          for sv in test/integration/*.sv; do
+            ./build/src/deltahdl "$sv"
+          done
+      - name: Generate coverage report
+        run: |
+          xcrun llvm-profdata merge -sparse \
+            build/coverage/*.profraw \
+            -o build/coverage/merged.profdata
+          xcrun llvm-cov show build/src/deltahdl \
+            -instr-profile=build/coverage/merged.profdata \
+            --ignore-filename-regex='test/|third_party/' \
+            --format=html \
+            -output-dir=build/coverage/html
+      - name: Enforce 100% coverage
+        run: |
+          xcrun llvm-cov report build/src/deltahdl \
+            -instr-profile=build/coverage/merged.profdata \
+            --ignore-filename-regex='test/|third_party/'
+          xcrun llvm-cov export build/src/deltahdl \
+            -instr-profile=build/coverage/merged.profdata \
+            --ignore-filename-regex='test/|third_party/' \
+            --summary-only \
+            | jq -e '.data[0].totals |
+              .lines.covered == .lines.count and
+              .branches.covered == .branches.count' \
+            || { echo "FAIL: coverage must be 100%"; exit 1; }
+  e2e-test-linux:
+    needs: [integration-test-clang, integration-test-gcc]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-gcc-Release
+          path: build/
+      - name: Fix permissions
+        run: chmod +x build/src/deltahdl
+      - name: Run sv-tests
+        run: python3 scripts/run_sv_tests.py
+  e2e-test-macos:
+    needs: integration-test-macos
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-macos-Release
+          path: build/
+      - name: Fix permissions
+        run: chmod +x build/src/deltahdl
+      - name: Run sv-tests
+        run: python3 scripts/run_sv_tests.py
+  integration-test-clang:
+    needs: unit-test-clang
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-clang-${{ matrix.build_type }}
+          path: build/
+      - name: Fix permissions
+        run: chmod +x build/src/deltahdl
+      - name: Integration tests
+        run: |
+          for sv in test/integration/*.sv; do
+            echo "--- Simulating $sv ---"
+            ./build/src/deltahdl "$sv"
+          done
+    strategy:
+      matrix:
+        build_type: [Debug, Release]
+  integration-test-gcc:
+    needs: unit-test-gcc
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-gcc-${{ matrix.build_type }}
+          path: build/
+      - name: Fix permissions
+        run: chmod +x build/src/deltahdl
+      - name: Integration tests
+        run: |
+          for sv in test/integration/*.sv; do
+            echo "--- Simulating $sv ---"
+            ./build/src/deltahdl "$sv"
+          done
+    strategy:
+      matrix:
+        build_type: [Debug, Release]
+  integration-test-macos:
+    needs: unit-test-macos
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-macos-${{ matrix.build_type }}
+          path: build/
+      - name: Fix permissions
+        run: chmod +x build/src/deltahdl
+      - name: Integration tests
+        run: |
+          for sv in test/integration/*.sv; do
+            echo "--- Simulating $sv ---"
+            ./build/src/deltahdl "$sv"
+          done
+    strategy:
+      matrix:
+        build_type: [Debug, Release]
+  release-linux:
     if: >-
       github.ref == 'refs/heads/main'
       && github.event_name == 'push'
-    needs: sanitize
+    needs: [sanitize-linux, sanitize-macos]
     permissions:
       contents: write
     runs-on: ubuntu-24.04
@@ -116,7 +288,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          submodules: recursive
       - name: Install compiler
         run: |
           sudo apt-get update
@@ -143,21 +314,45 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         name: Create GitHub Release
         run: |
+          cp build/src/deltahdl deltahdl-linux-amd64
           gh release create \
             "v${{ steps.version.outputs.version }}" \
             --generate-notes \
-            build/src/deltahdl
+            deltahdl-linux-amd64
       - name: Update latest tag
         run: |
           git tag -f latest
           git push origin latest --force
-  sanitize:
-    needs: coverage
+  release-macos:
+    if: >-
+      github.ref == 'refs/heads/main'
+      && github.event_name == 'push'
+    needs: release-linux
+    permissions:
+      contents: write
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build release binary
+        run: |
+          cmake -B build \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        name: Upload macOS binary
+        run: |
+          cp build/src/deltahdl deltahdl-macos-arm64
+          TAG=$(gh release list \
+            --limit 1 --json tagName \
+            -q '.[0].tagName')
+          gh release upload "$TAG" deltahdl-macos-arm64
+  sanitize-linux:
+    needs: coverage-linux
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
       - name: Install Clang
         run: |
           sudo apt-get update
@@ -167,6 +362,28 @@ jobs:
           cmake -B build \
             -DCMAKE_CXX_COMPILER=clang++-18 \
             -DCMAKE_C_COMPILER=clang-18 \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DDELTAHDL_SANITIZERS=ON
+          cmake --build build --parallel
+      - env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        name: Run tests
+        run: |
+          ctest --test-dir build --output-on-failure
+          for sv in test/integration/*.sv; do
+            ./build/src/deltahdl "$sv"
+          done
+  sanitize-macos:
+    needs: coverage-macos
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build with sanitizers
+        run: |
+          cmake -B build \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_C_COMPILER=clang \
             -DCMAKE_BUILD_TYPE=Debug \
             -DDELTAHDL_SANITIZERS=ON
           cmake --build build --parallel
@@ -196,23 +413,25 @@ jobs:
           echo "$PWD/pmd-bin-7.21.0/bin" >> "$GITHUB_PATH"
       - name: Lint YAML
         run: |
-          EMPTY_LINES='empty-lines: {max: 0, max-start: 0, max-end: 1}'
-          KEY_ORDERING='key-ordering: enable'
-          NEWLINE_AT_EOF='new-line-at-end-of-file: enable'
-          TRUTHY='truthy: {allowed-values: ["true", "false", "on"]}'
-          RULES="$EMPTY_LINES, $KEY_ORDERING"
-          RULES="$RULES, $NEWLINE_AT_EOF, $TRUTHY"
+          EMPTY='empty-lines: {max: 0, max-start: 0, max-end: 1}'
+          KEY='key-ordering: enable'
+          NL='new-line-at-end-of-file: enable'
+          TR='truthy: {allowed-values: ["true", "false", "on"]}'
+          RULES="$EMPTY, $KEY, $NL, $TR"
           yamllint --strict \
-            --config-data "{extends: default, rules: {$RULES}}" \
+            --config-data \
+            "{extends: default, rules: {$RULES}}" \
             .github/workflows/*.yml
       - name: Check formatting
         run: |
           find src -name '*.cpp' -o -name '*.h' | \
-            xargs clang-format-18 --dry-run --Werror --style=google
+            xargs clang-format-18 \
+            --dry-run --Werror --style=google
       - name: Check file line limits
         run: |
           fail=0
-          for f in $(find src -name '*.cpp' -o -name '*.h'); do
+          for f in $(find src -name '*.cpp' -o -name '*.h')
+          do
             lines=$(wc -l < "$f")
             if [ "$lines" -gt 1000 ]; then
               echo "FAIL: $f has $lines lines (max 1000)"
@@ -221,21 +440,27 @@ jobs:
           done
           exit $fail
       - name: Detect copy-paste
-        run: |
-          pmd cpd --minimum-tokens 100 --language cpp --dir src/
+        run: >-
+          pmd cpd
+          --minimum-tokens 100
+          --language cpp
+          --dir src/
       - name: Configure build
         run: |
-          cmake -B build -DCMAKE_CXX_COMPILER=clang++-18 \
+          cmake -B build \
+            -DCMAKE_CXX_COMPILER=clang++-18 \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
       - name: Run cppcheck
         # NEVER use --suppress. Fix the code instead.
         run: |
-          CATCH2=$(find build/_deps -name catch2-src -type d)
+          CATCH2=$(find build/_deps \
+            -name catch2-src -type d)
           cppcheck --enable=all --std=c++23 \
             -I src -I "$CATCH2/src" \
             src/ test/ 2>&1 | tee /tmp/cppcheck.log
           SEV='(error|warning|style|performance|portability):'
-          FOUND=$(grep -cE ": $SEV" /tmp/cppcheck.log || true)
+          FOUND=$(grep -cE ": $SEV" /tmp/cppcheck.log \
+            || true)
           if [ "$FOUND" -gt 0 ]; then
             grep -E ": $SEV" /tmp/cppcheck.log
             echo "FAIL: $FOUND cppcheck finding(s)"
@@ -268,56 +493,89 @@ jobs:
                   readability-simplify-boolean-expr",
                 HeaderFilterRegex: "src/.*\\.h$",
                 CheckOptions: {
-                  readability-function-size.NestingThreshold: 3,
-                  readability-function-size.ParameterThreshold: 5,
-                  readability-function-size.StatementThreshold: 50,
-                  readability-function-size.LineThreshold: 200,
-                  readability-function-cognitive-complexity.Threshold:
-                    15,
-                  readability-identifier-naming.ClassCase: CamelCase,
+                  readability-function-size.NestingThreshold:
+                    3,
+                  readability-function-size.ParameterThreshold:
+                    5,
+                  readability-function-size.StatementThreshold:
+                    50,
+                  readability-function-size.LineThreshold:
+                    200,
+                  readability-function-cognitive-complexity
+                    .Threshold: 15,
+                  readability-identifier-naming.ClassCase:
+                    CamelCase,
                   readability-identifier-naming.FunctionCase:
                     lower_case,
                   readability-identifier-naming.VariableCase:
                     lower_case,
-                  readability-identifier-naming.PrivateMemberCase:
-                    lower_case,
-                  readability-identifier-naming.PrivateMemberSuffix:
-                    "_",
-                  readability-identifier-naming.PublicMemberCase:
-                    lower_case,
+                  readability-identifier-naming
+                    .PrivateMemberCase: lower_case,
+                  readability-identifier-naming
+                    .PrivateMemberSuffix: "_",
+                  readability-identifier-naming
+                    .PublicMemberCase: lower_case,
                   readability-identifier-naming.ConstantCase:
                     CamelCase,
-                  readability-identifier-naming.ConstantPrefix: k,
-                  readability-identifier-naming.EnumConstantCase:
-                    CamelCase,
+                  readability-identifier-naming
+                    .ConstantPrefix: k,
+                  readability-identifier-naming
+                    .EnumConstantCase: CamelCase,
                   readability-identifier-naming.NamespaceCase:
                     lower_case
                 }
               }'
-  test:
-    needs: build
+  unit-test-clang:
+    needs: build-clang
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-${{ matrix.compiler }}-${{ matrix.build_type }}
+          name: build-clang-${{ matrix.build_type }}
           path: build/
       - name: Fix permissions
-        run: chmod +x build/src/deltahdl build/test/test_*
+        run: chmod +x build/test/test_*
       - name: Unit tests
         run: ctest --test-dir build --output-on-failure
-      - name: Integration tests
-        run: |
-          for sv in test/integration/*.sv; do
-            echo "--- Simulating $sv ---"
-            ./build/src/deltahdl "$sv"
-          done
     strategy:
       matrix:
         build_type: [Debug, Release]
-        compiler: [gcc-14, clang-18]
+  unit-test-gcc:
+    needs: build-gcc
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-gcc-${{ matrix.build_type }}
+          path: build/
+      - name: Fix permissions
+        run: chmod +x build/test/test_*
+      - name: Unit tests
+        run: ctest --test-dir build --output-on-failure
+    strategy:
+      matrix:
+        build_type: [Debug, Release]
+  unit-test-macos:
+    needs: build-macos
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-macos-${{ matrix.build_type }}
+          path: build/
+      - name: Fix permissions
+        run: chmod +x build/test/test_*
+      - name: Unit tests
+        run: ctest --test-dir build --output-on-failure
+    strategy:
+      matrix:
+        build_type: [Debug, Release]
 name: CI
 on:
   pull_request:
