@@ -30,8 +30,6 @@ def run_test(path):
 
 def main():
     """Run all sv-tests and print a summary."""
-    rc = 0
-
     if not BINARY.exists():
         print(f"error: binary not found at {BINARY}", file=sys.stderr)
         rc = 1
@@ -56,8 +54,7 @@ def main():
 
         total = passed + failed
         print(f"\nsv-tests summary: {passed}/{total} passed, {failed} failed")
-        if failed > 0:
-            rc = 1
+        rc = min(failed, 1)
 
     sys.exit(rc)
 
