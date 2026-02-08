@@ -57,6 +57,7 @@ class Parser {
   // Expressions (Pratt parser — in expr_parser.cpp)
   Expr* ParseExpr();
   Expr* ParseExprBp(int min_bp);
+  Expr* ParseInfixBp(Expr* lhs, int min_bp);
   Expr* ParsePrefixExpr();
   Expr* ParsePrimaryExpr();
   Expr* MakeLiteral(ExprKind kind, const Token& tok);

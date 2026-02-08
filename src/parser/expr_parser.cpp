@@ -124,7 +124,10 @@ Expr* Parser::ParseExpr() { return ParseExprBp(0); }
 
 Expr* Parser::ParseExprBp(int min_bp) {
   auto* lhs = ParsePrefixExpr();
+  return ParseInfixBp(lhs, min_bp);
+}
 
+Expr* Parser::ParseInfixBp(Expr* lhs, int min_bp) {
   while (true) {
     auto tok = CurrentToken();
     if (tok.IsEof()) {

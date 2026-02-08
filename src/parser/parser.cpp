@@ -587,7 +587,9 @@ Stmt* Parser::ParseDisableStmt() {
 Stmt* Parser::ParseAssignmentOrExprStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->range.start = CurrentLoc();
-  auto* lhs_expr = ParseExpr();
+  // Parse prefix/primary first — stop before infix operators so that
+  // '<=' is available for nonblocking assignment detection.
+  auto* lhs_expr = ParsePrefixExpr();
 
   if (Match(TokenKind::kEq)) {
     stmt->kind = StmtKind::kBlockingAssign;
@@ -598,8 +600,9 @@ Stmt* Parser::ParseAssignmentOrExprStmt() {
     stmt->lhs = lhs_expr;
     stmt->rhs = ParseExpr();
   } else {
+    // Not an assignment — complete the expression via infix parsing.
     stmt->kind = StmtKind::kExprStmt;
-    stmt->expr = lhs_expr;
+    stmt->expr = ParseInfixBp(lhs_expr, 0);
   }
   Expect(TokenKind::kSemicolon);
   return stmt;
