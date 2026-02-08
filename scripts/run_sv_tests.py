@@ -30,30 +30,36 @@ def run_test(path):
 
 def main():
     """Run all sv-tests and print a summary."""
+    rc = 0
+
     if not BINARY.exists():
         print(f"error: binary not found at {BINARY}", file=sys.stderr)
-        return
-
-    tests = collect_tests()
-    if not tests:
+        rc = 1
+    elif not (tests := collect_tests()):
         print(f"error: no .sv files found in {TEST_DIR}", file=sys.stderr)
-        return
-
-    passed = 0
-    failed = 0
-    for path in tests:
-        try:
-            if run_test(path):
-                passed += 1
-            else:
+        rc = 1
+    else:
+        passed = 0
+        failed = 0
+        for path in tests:
+            name = Path(path).name
+            try:
+                if run_test(path):
+                    passed += 1
+                    print(f"  PASS: {name}")
+                else:
+                    failed += 1
+                    print(f"  FAIL: {name}")
+            except subprocess.TimeoutExpired:
                 failed += 1
-                print(f"  FAIL: {Path(path).name}")
-        except subprocess.TimeoutExpired:
-            failed += 1
-            print(f"  TIMEOUT: {Path(path).name}")
+                print(f"  TIMEOUT: {name}")
 
-    total = passed + failed
-    print(f"\nsv-tests summary: {passed}/{total} passed, {failed} failed")
+        total = passed + failed
+        print(f"\nsv-tests summary: {passed}/{total} passed, {failed} failed")
+        if failed > 0:
+            rc = 1
+
+    sys.exit(rc)
 
 
 if __name__ == "__main__":
