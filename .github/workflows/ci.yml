@@ -189,7 +189,9 @@ jobs:
           sudo apt-get install -y \
             clang-18 clang-tidy-18 clang-format-18 cppcheck
           pip install lizard yamllint
-          wget -q https://github.com/pmd/pmd/releases/download/pmd_releases%2F7.21.0/pmd-dist-7.21.0-bin.zip
+          PMD=pmd-dist-7.21.0-bin.zip
+          PMD_URL=https://github.com/pmd/pmd/releases
+          wget -q "$PMD_URL/download/pmd_releases%2F7.21.0/$PMD"
           unzip -q pmd-dist-7.21.0-bin.zip
           echo "$PWD/pmd-bin-7.21.0/bin" >> "$GITHUB_PATH"
       - name: Lint YAML
