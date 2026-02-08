@@ -487,6 +487,7 @@ jobs:
         run: >-
           find src -name '*.cpp' |
           xargs clang-tidy-18 -p build
+          --config-file=.clang-tidy
           --warnings-as-errors='*'
   unit-test-coverage:
     env:
