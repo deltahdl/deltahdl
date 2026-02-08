@@ -202,6 +202,9 @@ jobs:
           https://github.com/chipsalliance/sv-tests.git
           HEAD | cut -f1)"
           >> "$GITHUB_OUTPUT"
+      # actions/cache@v4 bundles restore + save. The restore is needed
+      # to check for a hit; on miss the cloned files are saved at job
+      # end. actions/cache/restore would skip the save step entirely.
       - id: cache
         name: Restore sv-tests cache
         uses: actions/cache@v4
