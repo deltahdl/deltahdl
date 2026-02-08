@@ -74,7 +74,7 @@ jobs:
     strategy:
       matrix:
         build_type: [Debug, Release]
-  coverage-macos-26-arm64:
+  coverage-macos-26-arm64-clang:
     needs: e2e-test-macos-26-arm64-clang
     runs-on: macos-26
     steps:
@@ -118,7 +118,7 @@ jobs:
               .lines.covered == .lines.count and
               .branches.covered == .branches.count' \
             || { echo "FAIL: coverage must be 100%"; exit 1; }
-  coverage-ubuntu-24-04:
+  coverage-ubuntu-24-04-clang:
     needs:
       - e2e-test-ubuntu-24-04-clang
       - e2e-test-ubuntu-24-04-gcc
@@ -299,8 +299,8 @@ jobs:
       github.ref == 'refs/heads/main'
       && github.event_name == 'push'
     needs:
-      - sanitize-macos-26-arm64
-      - sanitize-ubuntu-24-04
+      - sanitize-macos-26-arm64-clang
+      - sanitize-ubuntu-24-04-clang
     permissions:
       contents: write
     runs-on: ubuntu-24.04
@@ -348,8 +348,8 @@ jobs:
         run: |
           git tag -f latest
           git push origin latest --force
-  sanitize-macos-26-arm64:
-    needs: coverage-macos-26-arm64
+  sanitize-macos-26-arm64-clang:
+    needs: coverage-macos-26-arm64-clang
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
@@ -370,8 +370,8 @@ jobs:
           for sv in test/integration/*.sv; do
             ./build/src/deltahdl "$sv"
           done
-  sanitize-ubuntu-24-04:
-    needs: coverage-ubuntu-24-04
+  sanitize-ubuntu-24-04-clang:
+    needs: coverage-ubuntu-24-04-clang
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
