@@ -8,7 +8,7 @@
 
 namespace delta {
 
-enum class TokenKind {
+enum class TokenKind : uint16_t {
   // Sentinel
   Eof = 0,
   Error,

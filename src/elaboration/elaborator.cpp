@@ -98,7 +98,6 @@ void Elaborator::elaborate_ports(const ModuleDecl* decl, RtlirModule* mod) {
 static ProcessKind map_always_kind(AlwaysKind ak) {
   switch (ak) {
     case AlwaysKind::Always:
-      return ProcessKind::AlwaysComb;
     case AlwaysKind::AlwaysComb:
       return ProcessKind::AlwaysComb;
     case AlwaysKind::AlwaysFF:

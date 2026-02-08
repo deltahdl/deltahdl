@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstddef>
-#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
@@ -30,17 +29,16 @@ class Arena {
   Arena& operator=(Arena&&) = default;
 
   void* allocate(size_t size, size_t align) {
-    uintptr_t cur = reinterpret_cast<uintptr_t>(ptr_);
-    uintptr_t aligned = (cur + align - 1) & ~(align - 1);
-    size_t bump = (aligned - cur) + size;
-    if (bump > remaining_) {
+    void* ptr = ptr_;
+    size_t space = remaining_;
+    if (!std::align(align, size, ptr, space)) {
       grow(size + align);
       return allocate(size, align);
     }
-    ptr_ = reinterpret_cast<char*>(aligned) + size;
-    remaining_ -= bump;
+    ptr_ = static_cast<char*>(ptr) + size;
+    remaining_ = space - size;
     total_allocated_ += size;
-    return reinterpret_cast<void*>(aligned);
+    return ptr;
   }
 
   template <typename T, typename... Args>

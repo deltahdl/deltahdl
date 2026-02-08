@@ -122,9 +122,9 @@ static const std::unordered_map<std::string_view, TokenKind>& keyword_map() {
 }
 
 std::optional<TokenKind> lookup_keyword(std::string_view text) {
-  const auto& kMap = keyword_map();
-  auto it = kMap.find(text);
-  if (it != kMap.end()) {
+  const auto& map = keyword_map();
+  auto it = map.find(text);
+  if (it != map.end()) {
     return it->second;
   }
   return std::nullopt;
