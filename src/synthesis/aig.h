@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <tuple>
 #include <unordered_map>
 #include <vector>
 
@@ -65,9 +64,6 @@ class AigGraph {
   /// Register a primary output literal.
   void add_output(uint32_t lit);
 
-  /// Register a latch: (current_state_lit, next_state_lit, init_value).
-  void add_latch(uint32_t current, uint32_t next, uint32_t init);
-
   /// Total number of AIG nodes (including constant node).
   size_t node_count() const;
 
@@ -75,7 +71,6 @@ class AigGraph {
   std::vector<AigNode> nodes;
   std::vector<uint32_t> inputs;
   std::vector<uint32_t> outputs;
-  std::vector<std::tuple<uint32_t, uint32_t, uint32_t>> latches;
 
  private:
   /// Pack two literals into a single 64-bit key for structural hashing.

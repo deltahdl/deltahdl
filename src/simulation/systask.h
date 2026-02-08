@@ -10,7 +10,6 @@ namespace delta {
 void exec_display(const std::vector<std::string>& args);
 void exec_write(const std::vector<std::string>& args);
 void exec_finish();
-void exec_stop();
 
 // --- Format string processing ---
 // Supports: %d (decimal), %h/%x (hex), %b (binary), %s (string), %t (time)

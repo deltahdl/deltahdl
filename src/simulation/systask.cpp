@@ -123,11 +123,4 @@ void exec_write(const std::vector<std::string>& args) {
 
 void exec_finish() { std::exit(0); }
 
-void exec_stop() {
-  // In a full simulator this would drop to an interactive prompt.
-  // For now, print a message and pause via stdin.
-  std::cout << "Simulation stopped. Press Enter to continue...\n";
-  std::cin.get();
-}
-
 }  // namespace delta

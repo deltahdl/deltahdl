@@ -188,8 +188,7 @@ jobs:
         run: |
           cppcheck --enable=all --error-exitcode=1 \
             --suppress=missingIncludeSystem \
-            --suppress=unusedFunction \
-            --std=c++23 -I src src/
+            --std=c++23 -I src src/ test/
       - name: Check file line limits
         run: |
           lizard -l cpp -T nloc=800 src/
