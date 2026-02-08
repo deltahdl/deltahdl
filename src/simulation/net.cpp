@@ -39,7 +39,13 @@ static Logic4Word resolve_wire_word(Logic4Word a, Logic4Word b) {
   return result;
 }
 
-Logic4Vec resolve_wire(const SmallVec<Driver*>& drivers) {
+// --- Common driver fold ---
+// Reduces all drivers into a single Logic4Vec using a word-level resolver.
+
+using WordResolver = Logic4Word (*)(Logic4Word, Logic4Word);
+
+static Logic4Vec resolve_drivers(const SmallVec<Driver*>& drivers,
+                                 WordResolver resolve_word) {
   if (drivers.empty()) {
     return {};
   }
@@ -52,10 +58,14 @@ Logic4Vec resolve_wire(const SmallVec<Driver*>& drivers) {
     const auto& other = drivers[i]->driven_value;
     uint32_t nwords = result.nwords;
     for (uint32_t w = 0; w < nwords; ++w) {
-      result.words[w] = resolve_wire_word(result.words[w], other.words[w]);
+      result.words[w] = resolve_word(result.words[w], other.words[w]);
     }
   }
   return result;
+}
+
+Logic4Vec resolve_wire(const SmallVec<Driver*>& drivers) {
+  return resolve_drivers(drivers, resolve_wire_word);
 }
 
 // --- Wired-AND resolution ---
@@ -73,22 +83,7 @@ static Logic4Word resolve_wand_word(Logic4Word a, Logic4Word b) {
 }
 
 Logic4Vec resolve_wand(const SmallVec<Driver*>& drivers) {
-  if (drivers.empty()) {
-    return {};
-  }
-  if (drivers.size() == 1) {
-    return drivers[0]->driven_value;
-  }
-
-  Logic4Vec result = drivers[0]->driven_value;
-  for (size_t i = 1; i < drivers.size(); ++i) {
-    const auto& other = drivers[i]->driven_value;
-    uint32_t nwords = result.nwords;
-    for (uint32_t w = 0; w < nwords; ++w) {
-      result.words[w] = resolve_wand_word(result.words[w], other.words[w]);
-    }
-  }
-  return result;
+  return resolve_drivers(drivers, resolve_wand_word);
 }
 
 // --- Wired-OR resolution ---
@@ -105,22 +100,7 @@ static Logic4Word resolve_wor_word(Logic4Word a, Logic4Word b) {
 }
 
 Logic4Vec resolve_wor(const SmallVec<Driver*>& drivers) {
-  if (drivers.empty()) {
-    return {};
-  }
-  if (drivers.size() == 1) {
-    return drivers[0]->driven_value;
-  }
-
-  Logic4Vec result = drivers[0]->driven_value;
-  for (size_t i = 1; i < drivers.size(); ++i) {
-    const auto& other = drivers[i]->driven_value;
-    uint32_t nwords = result.nwords;
-    for (uint32_t w = 0; w < nwords; ++w) {
-      result.words[w] = resolve_wor_word(result.words[w], other.words[w]);
-    }
-  }
-  return result;
+  return resolve_drivers(drivers, resolve_wor_word);
 }
 
 }  // namespace delta
