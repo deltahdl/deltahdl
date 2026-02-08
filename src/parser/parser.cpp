@@ -268,14 +268,14 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
     items.push_back(ParseGenerateIf());
     return;
   }
-  if (Check(TokenKind::kKwCase)) {
-    items.push_back(ParseGenerateCase());
-    return;
-  }
   ParseTypedItemOrInst(items);
 }
 
 void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items) {
+  if (Check(TokenKind::kKwCase)) {
+    items.push_back(ParseGenerateCase());
+    return;
+  }
   if (IsAtGateKeyword()) {
     items.push_back(ParseGateInst());
     return;
