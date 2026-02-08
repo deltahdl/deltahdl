@@ -44,13 +44,13 @@ def main():
             try:
                 if run_test(path):
                     passed += 1
-                    print(f"  PASS: {name}")
+                    print(f"  PASS: {name}", flush=True)
                 else:
                     failed += 1
-                    print(f"  FAIL: {name}")
+                    print(f"  FAIL: {name}", flush=True)
             except subprocess.TimeoutExpired:
                 failed += 1
-                print(f"  TIMEOUT: {name}")
+                print(f"  TIMEOUT: {name}", flush=True)
 
         total = passed + failed
         print(f"\nsv-tests summary: {passed}/{total} passed, {failed} failed")
