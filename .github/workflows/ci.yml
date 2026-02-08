@@ -478,7 +478,7 @@ jobs:
           --minimum-tokens 100
           --language cpp
           --dir src/
-      - name: Configure build
+      - name: Generate compile_commands.json
         run: |
           cmake -B build \
             -DCMAKE_CXX_COMPILER=clang++-18 \
