@@ -105,17 +105,14 @@ jobs:
           cmake -B build \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_C_COMPILER=clang \
-            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+            -DCMAKE_BUILD_TYPE=Release
           cmake --build build --parallel --target deltahdl
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
-          name: build-macos-26-arm64-clang-${{ matrix.build_type }}
+          name: build-macos-26-arm64-clang
           path: build/
           retention-days: 1
-    strategy:
-      matrix:
-        build_type: [Debug, Release]
   build-sanitize:
     needs: static-analysis
     runs-on: ubuntu-24.04
@@ -153,17 +150,14 @@ jobs:
           cmake -B build \
             -DCMAKE_CXX_COMPILER=clang++-18 \
             -DCMAKE_C_COMPILER=clang-18 \
-            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+            -DCMAKE_BUILD_TYPE=Release
           cmake --build build --parallel --target deltahdl
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
-          name: build-ubuntu-24-04-clang-${{ matrix.build_type }}
+          name: build-ubuntu-24-04-clang
           path: build/
           retention-days: 1
-    strategy:
-      matrix:
-        build_type: [Debug, Release]
   build-ubuntu-24-04-gcc:
     needs: static-analysis
     runs-on: ubuntu-24.04
@@ -178,17 +172,14 @@ jobs:
           cmake -B build \
             -DCMAKE_CXX_COMPILER=g++-14 \
             -DCMAKE_C_COMPILER=gcc-14 \
-            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+            -DCMAKE_BUILD_TYPE=Release
           cmake --build build --parallel --target deltahdl
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
-          name: build-ubuntu-24-04-gcc-${{ matrix.build_type }}
+          name: build-ubuntu-24-04-gcc
           path: build/
           retention-days: 1
-    strategy:
-      matrix:
-        build_type: [Debug, Release]
   e2e-test-coverage:
     env:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
@@ -223,7 +214,7 @@ jobs:
       - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-macos-26-arm64-clang-Release
+          name: build-macos-26-arm64-clang
           path: build/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
@@ -258,7 +249,7 @@ jobs:
       - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-ubuntu-24-04-clang-Release
+          name: build-ubuntu-24-04-clang
           path: build/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
@@ -274,7 +265,7 @@ jobs:
       - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-ubuntu-24-04-gcc-Release
+          name: build-ubuntu-24-04-gcc
           path: build/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
@@ -314,7 +305,7 @@ jobs:
       - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-macos-26-arm64-clang-${{ matrix.build_type }}
+          name: build-macos-26-arm64-clang
           path: build/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
@@ -324,9 +315,6 @@ jobs:
             echo "--- Simulating $sv ---"
             ./build/src/deltahdl "$sv"
           done
-    strategy:
-      matrix:
-        build_type: [Debug, Release]
   integration-test-sanitize:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
@@ -356,7 +344,7 @@ jobs:
       - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-ubuntu-24-04-clang-${{ matrix.build_type }}
+          name: build-ubuntu-24-04-clang
           path: build/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
@@ -366,9 +354,6 @@ jobs:
             echo "--- Simulating $sv ---"
             ./build/src/deltahdl "$sv"
           done
-    strategy:
-      matrix:
-        build_type: [Debug, Release]
   integration-test-ubuntu-24-04-gcc:
     needs: unit-test-ubuntu-24-04-gcc
     runs-on: ubuntu-24.04
@@ -377,7 +362,7 @@ jobs:
       - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-ubuntu-24-04-gcc-${{ matrix.build_type }}
+          name: build-ubuntu-24-04-gcc
           path: build/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
@@ -387,9 +372,6 @@ jobs:
             echo "--- Simulating $sv ---"
             ./build/src/deltahdl "$sv"
           done
-    strategy:
-      matrix:
-        build_type: [Debug, Release]
   release:
     if: >-
       github.ref == 'refs/heads/main'
@@ -410,12 +392,12 @@ jobs:
       - name: Download Ubuntu build
         uses: actions/download-artifact@v4
         with:
-          name: build-ubuntu-24-04-gcc-Release
+          name: build-ubuntu-24-04-gcc
           path: ubuntu-build/
       - name: Download macOS build
         uses: actions/download-artifact@v4
         with:
-          name: build-macos-26-arm64-clang-Release
+          name: build-macos-26-arm64-clang
           path: macos-build/
       - id: version
         name: Generate version from UTC time
@@ -592,15 +574,12 @@ jobs:
       - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-macos-26-arm64-clang-${{ matrix.build_type }}
+          name: build-macos-26-arm64-clang
           path: build/
       - name: Build tests
         run: cmake --build build --parallel
       - name: Unit tests
         run: ctest --test-dir build --output-on-failure
-    strategy:
-      matrix:
-        build_type: [Debug, Release]
   unit-test-sanitize:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
@@ -630,7 +609,7 @@ jobs:
       - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-ubuntu-24-04-clang-${{ matrix.build_type }}
+          name: build-ubuntu-24-04-clang
           path: build/
       - name: Install compiler
         run: |
@@ -640,9 +619,6 @@ jobs:
         run: cmake --build build --parallel
       - name: Unit tests
         run: ctest --test-dir build --output-on-failure
-    strategy:
-      matrix:
-        build_type: [Debug, Release]
   unit-test-ubuntu-24-04-gcc:
     needs: build-ubuntu-24-04-gcc
     runs-on: ubuntu-24.04
@@ -651,7 +627,7 @@ jobs:
       - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-ubuntu-24-04-gcc-${{ matrix.build_type }}
+          name: build-ubuntu-24-04-gcc
           path: build/
       - name: Install compiler
         run: |
@@ -661,9 +637,6 @@ jobs:
         run: cmake --build build --parallel
       - name: Unit tests
         run: ctest --test-dir build --output-on-failure
-    strategy:
-      matrix:
-        build_type: [Debug, Release]
 name: CI
 on:
   pull_request:
