@@ -2,7 +2,7 @@
 
 ## 1. Common Infrastructure
 
-- [x] Arena allocator (bump-pointer, per-phase bulk deallocation)
+- [x] Arena allocator (bump-pointer, per-phase bulk deallocation, destructor tracking)
 - [x] 4-value logic types (`Logic4Word`, `Logic4Vec`, dual-rail aval/bval)
 - [x] 2-state logic types (`Logic2Vec`)
 - [x] Logic operations (AND, OR, XOR, NOT on 4-value vectors)
@@ -60,21 +60,25 @@
 - [x] `always`, `always_comb`, `always_ff`, `always_latch` block parsing
 - [x] Continuous assignment (`assign`) parsing
 - [x] `if`/`else` statement parsing
-- [x] Variable and net declarations
-- [ ] `case`, `casex`, `casez` statement parsing
-- [ ] `for`, `while`, `forever`, `repeat`, `do`...`while` loop parsing
-- [ ] `begin`...`end` block parsing with optional labels
-- [ ] `fork`...`join`/`join_any`/`join_none` parsing
-- [ ] Nonblocking assignment (`<=`) parsing
-- [ ] `#delay` and `@(event)` timing control parsing
+- [x] Variable and net declarations (comma-separated lists)
+- [x] `case`, `casex`, `casez` statement parsing
+- [x] `for`, `while`, `forever`, `repeat` loop parsing
+- [x] `begin`...`end` block parsing
+- [x] `fork`...`join`/`join_any`/`join_none` parsing
+- [x] Nonblocking assignment (`<=`) parsing
+- [x] `#delay` and `@(event)` timing control parsing
+- [x] Bit-select and part-select expressions (`a[7:0]`)
+- [x] Concatenation (`{a, b}`) and replication (`{N{a}}`) expressions
+- [x] System task/function call parsing (`$display(...)`)
+- [x] Parameter and `localparam` declarations
+- [x] Module instantiation with port connections
+- [x] Parameter port list parsing (`#(parameter ...)`)
+- [x] `final` block parsing
+- [x] Null statement parsing
+- [ ] `do`...`while` loop parsing
 - [ ] `wait` statement parsing
-- [ ] Bit-select and part-select expressions (`a[7:0]`, `a[i+:4]`)
-- [ ] Concatenation (`{a, b}`) and replication (`{N{a}}`) expressions
-- [ ] System task/function call parsing (`$display(...)`)
 - [ ] `function` and `task` declarations
-- [ ] Parameter and `localparam` declarations
 - [ ] `generate` for/if/case blocks
-- [ ] Module instantiation with port connections
 - [ ] `interface`, `modport` declarations
 - [ ] `package`, `import` declarations
 - [ ] `class` declarations
@@ -91,17 +95,18 @@
 - [x] `RtlirProcess`, `RtlirContAssign` node definitions
 - [x] `type_eval` (bit-width computation, 4-state vs 2-state classification)
 - [x] `const_eval` (constant +, -, *, /, %, unary -, +, ~, !)
-- [ ] `elaborate_ports()` (create `RtlirPort` from AST port declarations)
-- [ ] `elaborate_items()` (create RTLIR nodes from AST module items)
-- [ ] Net and variable creation from declarations
-- [ ] Continuous assignment elaboration
-- [ ] Process elaboration (initial, always, always_comb, always_ff, always_latch)
-- [ ] Recursive module instantiation (hierarchy expansion)
-- [ ] Parameter override resolution (`#(...)` and `defparam`)
+- [x] `ElaboratePorts()` (create `RtlirPort` from AST port declarations)
+- [x] `ElaborateItems()` (create RTLIR nodes from AST module items)
+- [x] Net and variable creation from declarations
+- [x] Continuous assignment elaboration
+- [x] Process elaboration (initial, final, always, always_comb, always_ff, always_latch)
+- [x] Module instantiation elaboration (hierarchy expansion)
+- [x] Parameter override resolution (`#(...)`)
+- [x] Packed dimension evaluation
+- [ ] `defparam` resolution
 - [ ] `generate for`/`if`/`case` expansion at elaboration time
 - [ ] Port binding (implicit continuous assignments, bidirectional connections)
 - [ ] Typedef resolution
-- [ ] Packed dimension evaluation
 - [ ] Sensitivity list inference for `always_comb`/`always_latch` (§9.2.2)
 - [ ] Constant expression evaluation for bitwise ops, ternary, shifts
 - [ ] Width inference and implicit type promotion
@@ -229,9 +234,11 @@
 
 ## 15. Conformance Testing
 
-- [ ] Add CHIPS Alliance sv-tests as git submodule under `test/sv-tests/`
-- [ ] CI job to run sv-tests harness against `deltahdl` binary
-- [ ] Per-test result tracking
+- [x] CHIPS Alliance sv-tests as git submodule under `third_party/sv-tests/`
+- [x] CI jobs to run sv-tests harness (5 e2e jobs across platforms and sanitizers)
+- [x] Per-test result tracking (PASS/FAIL/TIMEOUT per test file)
+- [ ] Per-chapter result breakdown
+- [ ] JUnit XML or structured reporting format
 
 ## 16. VPI
 
