@@ -312,6 +312,9 @@ jobs:
         run: chmod +x build/src/deltahdl
       - name: E2E tests
         run: python3 scripts/run_sim_tests.py
+  # Each integration-test job runs on a fresh runner with an empty
+  # filesystem, so cache/restore is always needed to download sv-tests
+  # from persistent storage — even though cache-sv-tests already saved it.
   integration-test-coverage:
     env:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
