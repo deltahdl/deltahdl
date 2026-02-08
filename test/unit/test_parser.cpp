@@ -8,18 +8,18 @@
 
 using namespace delta;
 
-static CompilationUnit* parse(const std::string& src) {
+static CompilationUnit* Parse(const std::string& src) {
   static SourceManager mgr;
   static Arena arena;
-  auto fid = mgr.add_file("<test>", src);
+  auto fid = mgr.AddFile("<test>", src);
   DiagEngine diag(mgr);
-  Lexer lexer(mgr.file_content(fid), fid, diag);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
   Parser parser(lexer, arena, diag);
-  return parser.parse();
+  return parser.Parse();
 }
 
 TEST(Parser, EmptyModule) {
-  const auto* cu = parse("module empty; endmodule");
+  const auto* cu = Parse("module empty; endmodule");
   ASSERT_NE(cu, nullptr);
   ASSERT_EQ(cu->modules.size(), 1);
   EXPECT_EQ(cu->modules[0]->name, "empty");
@@ -27,18 +27,18 @@ TEST(Parser, EmptyModule) {
 }
 
 TEST(Parser, ModuleWithInitialBlock) {
-  const auto* cu = parse(
+  const auto* cu = Parse(
       "module hello;\n"
       "  initial $display(\"Hello\");\n"
       "endmodule\n");
   ASSERT_NE(cu, nullptr);
   ASSERT_EQ(cu->modules.size(), 1);
   ASSERT_EQ(cu->modules[0]->items.size(), 1);
-  EXPECT_EQ(cu->modules[0]->items[0]->kind, ModuleItemKind::InitialBlock);
+  EXPECT_EQ(cu->modules[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
 }
 
 TEST(Parser, ModuleWithPorts) {
-  const auto* cu = parse(
+  const auto* cu = Parse(
       "module mux(input logic a, input logic b, input logic sel, output logic "
       "y);\n"
       "  assign y = sel ? b : a;\n"
@@ -46,14 +46,14 @@ TEST(Parser, ModuleWithPorts) {
   ASSERT_NE(cu, nullptr);
   auto* mod = cu->modules[0];
   ASSERT_EQ(mod->ports.size(), 4);
-  EXPECT_EQ(mod->ports[0].direction, Direction::Input);
+  EXPECT_EQ(mod->ports[0].direction, Direction::kInput);
   EXPECT_EQ(mod->ports[0].name, "a");
-  EXPECT_EQ(mod->ports[3].direction, Direction::Output);
+  EXPECT_EQ(mod->ports[3].direction, Direction::kOutput);
   EXPECT_EQ(mod->ports[3].name, "y");
 }
 
 TEST(Parser, ContinuousAssignment) {
-  const auto* cu = parse(
+  const auto* cu = Parse(
       "module top;\n"
       "  logic a, b;\n"
       "  assign a = b;\n"
@@ -61,7 +61,7 @@ TEST(Parser, ContinuousAssignment) {
   ASSERT_NE(cu, nullptr);
   bool found_assign = false;
   for (auto* item : cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::ContAssign) {
+    if (item->kind == ModuleItemKind::kContAssign) {
       found_assign = true;
     }
   }
@@ -69,7 +69,7 @@ TEST(Parser, ContinuousAssignment) {
 }
 
 TEST(Parser, AlwaysFFBlock) {
-  const auto* cu = parse(
+  const auto* cu = Parse(
       "module counter(input logic clk, rst);\n"
       "  logic [7:0] count;\n"
       "  always_ff @(posedge clk or posedge rst)\n"
@@ -80,8 +80,8 @@ TEST(Parser, AlwaysFFBlock) {
   auto* mod = cu->modules[0];
   bool found_ff = false;
   for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::AlwaysBlock &&
-        item->always_kind == AlwaysKind::AlwaysFF) {
+    if (item->kind == ModuleItemKind::kAlwaysBlock &&
+        item->always_kind == AlwaysKind::kAlwaysFF) {
       found_ff = true;
     }
   }
@@ -89,7 +89,7 @@ TEST(Parser, AlwaysFFBlock) {
 }
 
 TEST(Parser, ExpressionPrecedence) {
-  const auto* cu = parse(
+  const auto* cu = Parse(
       "module expr;\n"
       "  logic a;\n"
       "  assign a = 1 + 2 * 3;\n"
@@ -98,7 +98,7 @@ TEST(Parser, ExpressionPrecedence) {
 }
 
 TEST(Parser, MultipleModules) {
-  const auto* cu = parse(
+  const auto* cu = Parse(
       "module a; endmodule\n"
       "module b; endmodule\n"
       "module c; endmodule\n");

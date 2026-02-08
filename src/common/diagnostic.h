@@ -11,14 +11,14 @@
 namespace delta {
 
 enum class DiagSeverity : uint8_t {
-  Note,
-  Warning,
-  Error,
-  Fatal,
+  kNote,
+  kWarning,
+  kError,
+  kFatal,
 };
 
 struct Diagnostic {
-  DiagSeverity severity = DiagSeverity::Error;
+  DiagSeverity severity = DiagSeverity::kError;
   SourceLoc loc;
   std::string message;
 };
@@ -27,15 +27,15 @@ class DiagEngine {
  public:
   explicit DiagEngine(const SourceManager& src_mgr) : src_mgr_(src_mgr) {}
 
-  void warning(SourceLoc loc, std::string msg);
-  void error(SourceLoc loc, std::string msg);
+  void Warning(SourceLoc loc, std::string msg);
+  void Error(SourceLoc loc, std::string msg);
 
-  bool has_errors() const { return error_count_ > 0; }
+  bool HasErrors() const { return error_count_ > 0; }
 
-  void set_warnings_as_errors(bool val) { warnings_as_errors_ = val; }
+  void SetWarningsAsErrors(bool val) { warnings_as_errors_ = val; }
 
  private:
-  void emit(DiagSeverity sev, SourceLoc loc, std::string msg);
+  void Emit(DiagSeverity sev, SourceLoc loc, std::string msg);
 
   const SourceManager& src_mgr_;
   std::vector<Diagnostic> diags_;

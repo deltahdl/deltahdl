@@ -27,24 +27,23 @@ class Elaborator {
 
   /// Elaborate the design rooted at the given top module.
   /// Returns nullptr on failure (diagnostics emitted via DiagEngine).
-  RtlirDesign* elaborate(std::string_view top_module_name);
+  RtlirDesign* Elaborate(std::string_view top_module_name);
 
  private:
   /// Find a module declaration by name in the compilation unit.
-  ModuleDecl* find_module(std::string_view name) const;
+  ModuleDecl* FindModule(std::string_view name) const;
 
   /// Elaborate a single module declaration into an RtlirModule.
-  RtlirModule* elaborate_module(const ModuleDecl* decl,
-                                const ParamList& params);
+  RtlirModule* ElaborateModule(const ModuleDecl* decl, const ParamList& params);
 
   /// Populate ports from module declaration port list.
-  void elaborate_ports(const ModuleDecl* decl, RtlirModule* mod);
+  void ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod);
 
   /// Elaborate a single module item into RTLIR.
-  void elaborate_item(ModuleItem* item, RtlirModule* mod);
+  void ElaborateItem(ModuleItem* item, RtlirModule* mod);
 
   /// Walk module items and populate nets, vars, assigns, processes.
-  void elaborate_items(const ModuleDecl* decl, RtlirModule* mod);
+  void ElaborateItems(const ModuleDecl* decl, RtlirModule* mod);
 
   Arena& arena_;
   DiagEngine& diag_;

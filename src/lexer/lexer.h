@@ -13,60 +13,60 @@ class Lexer {
  public:
   Lexer(std::string_view source, uint32_t file_id, DiagEngine& diag);
 
-  Token next();
-  Token peek();
+  Token Next();
+  Token Peek();
 
-  std::vector<Token> lex_all();
+  std::vector<Token> LexAll();
 
  private:
-  char current() const;
-  char peek_char() const;
-  void advance();
-  bool at_end() const;
-  SourceLoc make_loc() const;
+  char Current() const;
+  char PeekChar() const;
+  void Advance();
+  bool AtEnd() const;
+  SourceLoc MakeLoc() const;
 
   // Whitespace / comments
-  void skip_whitespace_and_comments();
-  void skip_line_comment();
-  void skip_block_comment();
+  void SkipWhitespaceAndComments();
+  void SkipLineComment();
+  void SkipBlockComment();
 
   // Token construction helpers
-  Token make_token(TokenKind kind, SourceLoc loc) const;
-  Token make_op(TokenKind kind, SourceLoc loc, uint32_t start);
+  Token MakeToken(TokenKind kind, SourceLoc loc) const;
+  Token MakeOp(TokenKind kind, SourceLoc loc, uint32_t start);
 
   // Primary lexing entry points
-  Token lex_identifier();
-  Token lex_number();
-  Token lex_string_literal();
-  Token lex_system_identifier();
-  Token lex_escaped_identifier();
-  Token lex_operator();
+  Token LexIdentifier();
+  Token LexNumber();
+  Token LexStringLiteral();
+  Token LexSystemIdentifier();
+  Token LexEscapedIdentifier();
+  Token LexOperator();
 
   // Number sub-helpers
-  Token lex_unbased_unsized(SourceLoc loc, uint32_t start);
-  Token lex_based_number(SourceLoc loc, uint32_t start);
-  void lex_real_suffix();
-  void lex_fractional_part();
-  void lex_exponent_part();
+  Token LexUnbasedUnsized(SourceLoc loc, uint32_t start);
+  Token LexBasedNumber(SourceLoc loc, uint32_t start);
+  void LexRealSuffix();
+  void LexFractionalPart();
+  void LexExponentPart();
 
   // Operator sub-helpers
-  Token lex_op_tilde(SourceLoc loc, uint32_t start);
-  Token lex_op_plus(SourceLoc loc, uint32_t start);
-  Token lex_op_minus(SourceLoc loc, uint32_t start);
-  Token lex_op_star(SourceLoc loc, uint32_t start);
-  Token lex_op_caret(SourceLoc loc, uint32_t start);
-  Token lex_op_amp(SourceLoc loc, uint32_t start);
-  Token lex_op_pipe(SourceLoc loc, uint32_t start);
-  Token lex_op_bang(SourceLoc loc, uint32_t start);
-  Token lex_op_eq(SourceLoc loc, uint32_t start);
-  Token lex_op_hash(SourceLoc loc, uint32_t start);
-  Token lex_op_dot(SourceLoc loc, uint32_t start);
-  Token lex_op_colon(SourceLoc loc, uint32_t start);
-  Token lex_op_at(SourceLoc loc, uint32_t start);
-  Token lex_op_slash(SourceLoc loc, uint32_t start);
-  Token lex_op_percent(SourceLoc loc, uint32_t start);
-  Token lex_angle_left(SourceLoc loc, uint32_t start);
-  Token lex_angle_right(SourceLoc loc, uint32_t start);
+  Token LexOpTilde(SourceLoc loc, uint32_t start);
+  Token LexOpPlus(SourceLoc loc, uint32_t start);
+  Token LexOpMinus(SourceLoc loc, uint32_t start);
+  Token LexOpStar(SourceLoc loc, uint32_t start);
+  Token LexOpCaret(SourceLoc loc, uint32_t start);
+  Token LexOpAmp(SourceLoc loc, uint32_t start);
+  Token LexOpPipe(SourceLoc loc, uint32_t start);
+  Token LexOpBang(SourceLoc loc, uint32_t start);
+  Token LexOpEq(SourceLoc loc, uint32_t start);
+  Token LexOpHash(SourceLoc loc, uint32_t start);
+  Token LexOpDot(SourceLoc loc, uint32_t start);
+  Token LexOpColon(SourceLoc loc, uint32_t start);
+  Token LexOpAt(SourceLoc loc, uint32_t start);
+  Token LexOpSlash(SourceLoc loc, uint32_t start);
+  Token LexOpPercent(SourceLoc loc, uint32_t start);
+  Token LexAngleLeft(SourceLoc loc, uint32_t start);
+  Token LexAngleRight(SourceLoc loc, uint32_t start);
 
   std::string_view source_;
   uint32_t pos_ = 0;

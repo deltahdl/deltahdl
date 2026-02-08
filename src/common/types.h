@@ -18,28 +18,28 @@ struct Logic4Word {
   uint64_t aval = 0;
   uint64_t bval = 0;
 
-  bool is_known() const { return bval == 0; }
-  bool is_zero() const { return aval == 0 && bval == 0; }
-  bool is_one() const { return aval == 1 && bval == 0; }
+  bool IsKnown() const { return bval == 0; }
+  bool IsZero() const { return aval == 0 && bval == 0; }
+  bool IsOne() const { return aval == 1 && bval == 0; }
 };
 
-Logic4Word logic4_and(Logic4Word a, Logic4Word b);
-Logic4Word logic4_or(Logic4Word a, Logic4Word b);
-Logic4Word logic4_xor(Logic4Word a, Logic4Word b);
-Logic4Word logic4_not(Logic4Word a);
+Logic4Word Logic4And(Logic4Word a, Logic4Word b);
+Logic4Word Logic4Or(Logic4Word a, Logic4Word b);
+Logic4Word Logic4Xor(Logic4Word a, Logic4Word b);
+Logic4Word Logic4Not(Logic4Word a);
 
 struct Logic4Vec {
   uint32_t width = 0;
   uint32_t nwords = 0;
   Logic4Word* words = nullptr;
 
-  bool is_known() const;
-  uint64_t to_uint64() const;
-  std::string to_string() const;
+  bool IsKnown() const;
+  uint64_t ToUint64() const;
+  std::string ToString() const;
 };
 
-Logic4Vec make_logic4_vec(class Arena& arena, uint32_t width);
-Logic4Vec make_logic4_vec_val(class Arena& arena, uint32_t width, uint64_t val);
+Logic4Vec MakeLogic4Vec(class Arena& arena, uint32_t width);
+Logic4Vec MakeLogic4VecVal(class Arena& arena, uint32_t width, uint64_t val);
 
 // --- Two-state logic (bit, int, byte, etc.) ---
 
@@ -48,20 +48,20 @@ struct Logic2Vec {
   uint32_t nwords = 0;
   uint64_t* words = nullptr;
 
-  uint64_t to_uint64() const;
+  uint64_t ToUint64() const;
 };
 
 // --- Signal strength (IEEE 1800-2023 §6.3.2) ---
 
 enum class Strength : uint8_t {
-  Highz = 0,
-  Small = 1,
-  Medium = 2,
-  Weak = 3,
-  Large = 4,
-  Pull = 5,
-  Strong = 6,
-  Supply = 7,
+  kHighz = 0,
+  kSmall = 1,
+  kMedium = 2,
+  kWeak = 3,
+  kLarge = 4,
+  kPull = 5,
+  kStrong = 6,
+  kSupply = 7,
 };
 
 struct StrengthVal {
@@ -86,43 +86,43 @@ struct SimTime {
 // --- Event scheduler regions (IEEE 1800-2023 §4.4) ---
 
 enum class Region : uint8_t {
-  Preponed,
-  PreActive,
-  Active,
-  Inactive,
-  PreNBA,
-  NBA,
-  PostNBA,
-  PreObserved,
-  Observed,
-  PostObserved,
-  Reactive,
-  ReInactive,
-  PreReNBA,
-  ReNBA,
-  PostReNBA,
-  PrePostponed,
-  Postponed,
-  COUNT
+  kPreponed,
+  kPreActive,
+  kActive,
+  kInactive,
+  kPreNBA,
+  kNBA,
+  kPostNBA,
+  kPreObserved,
+  kObserved,
+  kPostObserved,
+  kReactive,
+  kReInactive,
+  kPreReNBA,
+  kReNBA,
+  kPostReNBA,
+  kPrePostponed,
+  kPostponed,
+  kCOUNT
 };
 
-static constexpr size_t kRegionCount = static_cast<size_t>(Region::COUNT);
+static constexpr size_t kRegionCount = static_cast<size_t>(Region::kCOUNT);
 
 // --- Net types (IEEE 1800-2023 §6.5) ---
 
 enum class NetType : uint8_t {
-  Wire,
-  Tri,
-  Wand,
-  Triand,
-  Wor,
-  Trior,
-  Tri0,
-  Tri1,
-  Supply0,
-  Supply1,
-  Trireg,
-  Uwire,
+  kWire,
+  kTri,
+  kWand,
+  kTriand,
+  kWor,
+  kTrior,
+  kTri0,
+  kTri1,
+  kSupply0,
+  kSupply1,
+  kTrireg,
+  kUwire,
 };
 
 // --- SmallVec: inline storage for common small sizes ---
@@ -136,7 +136,7 @@ class SmallVec {
       return;
     }
     if (size_ == N) {
-      spill_to_heap();
+      SpillToHeap();
     }
     heap_.push_back(val);
     ++size_;
@@ -160,7 +160,7 @@ class SmallVec {
   const T* end() const { return data() + size_; }
 
  private:
-  void spill_to_heap() {
+  void SpillToHeap() {
     heap_.reserve(N * 2);
     for (size_t i = 0; i < N; ++i) {
       heap_.push_back(inline_[i]);

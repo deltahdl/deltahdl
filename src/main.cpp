@@ -36,13 +36,13 @@ struct CliOptions {
   bool show_help = false;
 };
 
-void print_version() {
+void PrintVersion() {
   std::cout << "deltahdl 0.1.0\n";
   std::cout << "SystemVerilog IEEE 1800-2023 simulator and synthesizer\n";
 }
 
-void print_help() {
-  print_version();
+void PrintHelp() {
+  PrintVersion();
   std::cout << "\nUsage: deltahdl [options] <source-files...>\n\n"
             << "Options:\n"
             << "  -o <name>            Set output name\n"
@@ -58,7 +58,7 @@ void print_help() {
             << "  --version / --help   Info\n";
 }
 
-void parse_define(std::string_view def, CliOptions& opts) {
+void ParseDefine(std::string_view def, CliOptions& opts) {
   auto eq = def.find('=');
   if (eq == std::string_view::npos) {
     opts.defines.emplace_back(std::string(def), "1");
@@ -68,8 +68,8 @@ void parse_define(std::string_view def, CliOptions& opts) {
                             std::string(def.substr(eq + 1)));
 }
 
-bool try_parse_valued_arg(std::string_view arg, int& i, int argc,
-                          const char* const argv[], CliOptions& opts) {
+bool TryParseValuedArg(std::string_view arg, int& i, int argc,
+                       const char* const argv[], CliOptions& opts) {
   if (arg == "--top" && i + 1 < argc) {
     opts.top_module = argv[++i];
     return true;
@@ -93,7 +93,7 @@ bool try_parse_valued_arg(std::string_view arg, int& i, int argc,
   return false;
 }
 
-bool try_parse_flag(std::string_view arg, CliOptions& opts) {
+bool TryParseFlag(std::string_view arg, CliOptions& opts) {
   if (arg == "--version") {
     opts.show_version = true;
     return true;
@@ -129,17 +129,17 @@ bool try_parse_flag(std::string_view arg, CliOptions& opts) {
   return false;
 }
 
-bool parse_args(int argc, char* argv[], CliOptions& opts) {
+bool ParseArgs(int argc, char* argv[], CliOptions& opts) {
   for (int i = 1; i < argc; ++i) {
     std::string_view arg = argv[i];
-    if (try_parse_flag(arg, opts)) {
+    if (TryParseFlag(arg, opts)) {
       continue;
     }
-    if (try_parse_valued_arg(arg, i, argc, argv, opts)) {
+    if (TryParseValuedArg(arg, i, argc, argv, opts)) {
       continue;
     }
     if (arg.starts_with("+define+")) {
-      parse_define(arg.substr(8), opts);
+      ParseDefine(arg.substr(8), opts);
       continue;
     }
     if (arg.starts_with("+incdir+")) {
@@ -155,7 +155,7 @@ bool parse_args(int argc, char* argv[], CliOptions& opts) {
   return true;
 }
 
-std::string read_file(const std::string& path) {
+std::string ReadFile(const std::string& path) {
   std::ifstream ifs(path);
   if (!ifs) {
     std::cerr << "error: cannot open file '" << path << "'\n";
@@ -166,9 +166,9 @@ std::string read_file(const std::string& path) {
   return ss.str();
 }
 
-std::string preprocess_sources(const CliOptions& opts,
-                               delta::SourceManager& src_mgr,
-                               delta::DiagEngine& diag) {
+std::string PreprocessSources(const CliOptions& opts,
+                              delta::SourceManager& src_mgr,
+                              delta::DiagEngine& diag) {
   delta::PreprocConfig pp_config;
   pp_config.include_dirs = opts.include_dirs;
   pp_config.defines = opts.defines;
@@ -176,73 +176,73 @@ std::string preprocess_sources(const CliOptions& opts,
 
   std::string combined;
   for (const auto& path : opts.source_files) {
-    auto content = read_file(path);
+    auto content = ReadFile(path);
     if (content.empty()) {
       return "";
     }
-    auto file_id = src_mgr.add_file(path, content);
-    combined += preproc.preprocess(file_id);
+    auto file_id = src_mgr.AddFile(path, content);
+    combined += preproc.Preprocess(file_id);
   }
   return combined;
 }
 
-delta::CompilationUnit* parse_source(const std::string& source,
-                                     delta::SourceManager& src_mgr,
-                                     delta::DiagEngine& diag,
-                                     delta::Arena& arena) {
-  auto file_id = src_mgr.add_file("<preprocessed>", source);
+delta::CompilationUnit* ParseSource(const std::string& source,
+                                    delta::SourceManager& src_mgr,
+                                    delta::DiagEngine& diag,
+                                    delta::Arena& arena) {
+  auto file_id = src_mgr.AddFile("<preprocessed>", source);
   delta::Lexer lexer(source, file_id, diag);
   delta::Parser parser(lexer, arena, diag);
-  return parser.parse();
+  return parser.Parse();
 }
 
-int run_simulation(const CliOptions& opts, delta::CompilationUnit* cu,
-                   delta::DiagEngine& diag, delta::Arena& arena) {
+int RunSimulation(const CliOptions& opts, delta::CompilationUnit* cu,
+                  delta::DiagEngine& diag, delta::Arena& arena) {
   delta::Elaborator elaborator(arena, diag, cu);
   auto top = opts.top_module;
   if (top.empty() && !cu->modules.empty()) {
     top = std::string(cu->modules.back()->name);
   }
-  const auto* design = elaborator.elaborate(top);
-  if (diag.has_errors() || design == nullptr) {
+  const auto* design = elaborator.Elaborate(top);
+  if (diag.HasErrors() || design == nullptr) {
     return 1;
   }
 
   delta::Scheduler scheduler;
-  scheduler.run();
-  return diag.has_errors() ? 1 : 0;
+  scheduler.Run();
+  return diag.HasErrors() ? 1 : 0;
 }
 
 }  // anonymous namespace
 
 int main(int argc, char* argv[]) {
   CliOptions opts;
-  if (!parse_args(argc, argv, opts)) {
+  if (!ParseArgs(argc, argv, opts)) {
     return 1;
   }
   if (opts.show_version) {
-    print_version();
+    PrintVersion();
     return 0;
   }
   if (opts.show_help || opts.source_files.empty()) {
-    print_help();
+    PrintHelp();
     return opts.show_help ? 0 : 1;
   }
 
   delta::SourceManager src_mgr;
   delta::DiagEngine diag(src_mgr);
   if (opts.werror) {
-    diag.set_warnings_as_errors(true);
+    diag.SetWarningsAsErrors(true);
   }
 
-  auto source = preprocess_sources(opts, src_mgr, diag);
-  if (source.empty() || diag.has_errors()) {
+  auto source = PreprocessSources(opts, src_mgr, diag);
+  if (source.empty() || diag.HasErrors()) {
     return 1;
   }
 
   delta::Arena ast_arena;
-  auto* cu = parse_source(source, src_mgr, diag, ast_arena);
-  if (diag.has_errors()) {
+  auto* cu = ParseSource(source, src_mgr, diag, ast_arena);
+  if (diag.HasErrors()) {
     return 1;
   }
 
@@ -252,5 +252,5 @@ int main(int argc, char* argv[]) {
   }
 
   delta::Arena elab_arena;
-  return run_simulation(opts, cu, diag, elab_arena);
+  return RunSimulation(opts, cu, diag, elab_arena);
 }

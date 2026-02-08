@@ -7,55 +7,55 @@ namespace delta {
 Parser::Parser(Lexer& lexer, Arena& arena, DiagEngine& diag)
     : lexer_(lexer), arena_(arena), diag_(diag) {}
 
-Token Parser::current_token() { return lexer_.peek(); }
-bool Parser::check(TokenKind kind) { return current_token().is(kind); }
-bool Parser::at_end() { return check(TokenKind::Eof); }
-SourceLoc Parser::current_loc() { return current_token().loc; }
+Token Parser::CurrentToken() { return lexer_.Peek(); }
+bool Parser::Check(TokenKind kind) { return CurrentToken().Is(kind); }
+bool Parser::AtEnd() { return Check(TokenKind::kEof); }
+SourceLoc Parser::CurrentLoc() { return CurrentToken().loc; }
 
-Token Parser::consume() { return lexer_.next(); }
+Token Parser::Consume() { return lexer_.Next(); }
 
-bool Parser::match(TokenKind kind) {
-  if (!check(kind)) {
+bool Parser::Match(TokenKind kind) {
+  if (!Check(kind)) {
     return false;
   }
-  consume();
+  Consume();
   return true;
 }
 
-Token Parser::expect(TokenKind kind) {
-  if (check(kind)) {
-    return consume();
+Token Parser::Expect(TokenKind kind) {
+  if (Check(kind)) {
+    return Consume();
   }
-  auto tok = current_token();
-  diag_.error(tok.loc, "expected " + std::string(token_kind_name(kind)) +
-                           ", got " + std::string(token_kind_name(tok.kind)));
+  auto tok = CurrentToken();
+  diag_.Error(tok.loc, "expected " + std::string(TokenKindName(kind)) +
+                           ", got " + std::string(TokenKindName(tok.kind)));
   return tok;
 }
 
-void Parser::synchronize() {
-  while (!at_end()) {
-    if (check(TokenKind::Semicolon)) {
-      consume();
+void Parser::Synchronize() {
+  while (!AtEnd()) {
+    if (Check(TokenKind::kSemicolon)) {
+      Consume();
       return;
     }
-    if (check(TokenKind::KwEndmodule) || check(TokenKind::KwEnd)) {
+    if (Check(TokenKind::kKwEndmodule) || Check(TokenKind::kKwEnd)) {
       return;
     }
-    consume();
+    Consume();
   }
 }
 
 // --- Top level ---
 
-CompilationUnit* Parser::parse() {
-  auto* unit = arena_.create<CompilationUnit>();
-  while (!at_end()) {
-    if (!check(TokenKind::KwModule)) {
-      diag_.error(current_loc(), "expected module declaration");
-      consume();
+CompilationUnit* Parser::Parse() {
+  auto* unit = arena_.Create<CompilationUnit>();
+  while (!AtEnd()) {
+    if (!Check(TokenKind::kKwModule)) {
+      diag_.Error(CurrentLoc(), "expected module declaration");
+      Consume();
       continue;
     }
-    auto* mod = parse_module_decl();
+    auto* mod = ParseModuleDecl();
     if (mod != nullptr) {
       unit->modules.push_back(mod);
     }
@@ -65,490 +65,490 @@ CompilationUnit* Parser::parse() {
 
 // --- Module parsing ---
 
-ModuleDecl* Parser::parse_module_decl() {
-  auto* mod = arena_.create<ModuleDecl>();
-  auto loc = current_loc();
-  expect(TokenKind::KwModule);
+ModuleDecl* Parser::ParseModuleDecl() {
+  auto* mod = arena_.Create<ModuleDecl>();
+  auto loc = CurrentLoc();
+  Expect(TokenKind::kKwModule);
 
-  auto name_tok = expect(TokenKind::Identifier);
+  auto name_tok = Expect(TokenKind::kIdentifier);
   mod->name = name_tok.text;
   mod->range.start = loc;
 
-  if (check(TokenKind::Hash)) {
+  if (Check(TokenKind::kHash)) {
     // Parameter port list: #(param_decls)
-    consume();
-    expect(TokenKind::LParen);
+    Consume();
+    Expect(TokenKind::kLParen);
     // Simplified: skip parameter parsing for now
-    while (!check(TokenKind::RParen) && !at_end()) {
-      consume();
+    while (!Check(TokenKind::kRParen) && !AtEnd()) {
+      Consume();
     }
-    expect(TokenKind::RParen);
+    Expect(TokenKind::kRParen);
   }
 
-  if (check(TokenKind::LParen)) {
-    parse_port_list(*mod);
+  if (Check(TokenKind::kLParen)) {
+    ParsePortList(*mod);
   }
 
-  expect(TokenKind::Semicolon);
-  parse_module_body(*mod);
-  expect(TokenKind::KwEndmodule);
-  mod->range.end = current_loc();
+  Expect(TokenKind::kSemicolon);
+  ParseModuleBody(*mod);
+  Expect(TokenKind::kKwEndmodule);
+  mod->range.end = CurrentLoc();
   return mod;
 }
 
-void Parser::parse_port_list(ModuleDecl& mod) {
-  expect(TokenKind::LParen);
-  if (check(TokenKind::RParen)) {
-    consume();
+void Parser::ParsePortList(ModuleDecl& mod) {
+  Expect(TokenKind::kLParen);
+  if (Check(TokenKind::kRParen)) {
+    Consume();
     return;
   }
-  mod.ports.push_back(parse_port_decl());
-  while (match(TokenKind::Comma)) {
-    mod.ports.push_back(parse_port_decl());
+  mod.ports.push_back(ParsePortDecl());
+  while (Match(TokenKind::kComma)) {
+    mod.ports.push_back(ParsePortDecl());
   }
-  expect(TokenKind::RParen);
+  Expect(TokenKind::kRParen);
 }
 
-PortDecl Parser::parse_port_decl() {
+PortDecl Parser::ParsePortDecl() {
   PortDecl port;
-  port.loc = current_loc();
+  port.loc = CurrentLoc();
 
-  if (check(TokenKind::KwInput)) {
-    port.direction = Direction::Input;
-    consume();
-  } else if (check(TokenKind::KwOutput)) {
-    port.direction = Direction::Output;
-    consume();
-  } else if (check(TokenKind::KwInout)) {
-    port.direction = Direction::Inout;
-    consume();
-  } else if (check(TokenKind::KwRef)) {
-    port.direction = Direction::Ref;
-    consume();
+  if (Check(TokenKind::kKwInput)) {
+    port.direction = Direction::kInput;
+    Consume();
+  } else if (Check(TokenKind::kKwOutput)) {
+    port.direction = Direction::kOutput;
+    Consume();
+  } else if (Check(TokenKind::kKwInout)) {
+    port.direction = Direction::kInout;
+    Consume();
+  } else if (Check(TokenKind::kKwRef)) {
+    port.direction = Direction::kRef;
+    Consume();
   }
 
-  port.data_type = parse_data_type();
+  port.data_type = ParseDataType();
 
-  auto name_tok = expect(TokenKind::Identifier);
+  auto name_tok = Expect(TokenKind::kIdentifier);
   port.name = name_tok.text;
 
-  if (match(TokenKind::Eq)) {
-    port.default_value = parse_expr();
+  if (Match(TokenKind::kEq)) {
+    port.default_value = ParseExpr();
   }
   return port;
 }
 
-void Parser::parse_module_body(ModuleDecl& mod) {
-  while (!check(TokenKind::KwEndmodule) && !at_end()) {
-    auto* item = parse_module_item();
+void Parser::ParseModuleBody(ModuleDecl& mod) {
+  while (!Check(TokenKind::kKwEndmodule) && !AtEnd()) {
+    auto* item = ParseModuleItem();
     if (item != nullptr) {
       mod.items.push_back(item);
     }
   }
 }
 
-ModuleItem* Parser::parse_module_item() {
-  if (check(TokenKind::KwAssign)) {
-    return parse_continuous_assign();
+ModuleItem* Parser::ParseModuleItem() {
+  if (Check(TokenKind::kKwAssign)) {
+    return ParseContinuousAssign();
   }
-  if (check(TokenKind::KwInitial)) {
-    return parse_initial_block();
+  if (Check(TokenKind::kKwInitial)) {
+    return ParseInitialBlock();
   }
-  if (check(TokenKind::KwFinal)) {
-    return parse_final_block();
+  if (Check(TokenKind::kKwFinal)) {
+    return ParseFinalBlock();
   }
-  if (check(TokenKind::KwAlways)) {
-    return parse_always_block(AlwaysKind::Always);
+  if (Check(TokenKind::kKwAlways)) {
+    return ParseAlwaysBlock(AlwaysKind::kAlways);
   }
-  if (check(TokenKind::KwAlwaysComb)) {
-    return parse_always_block(AlwaysKind::AlwaysComb);
+  if (Check(TokenKind::kKwAlwaysComb)) {
+    return ParseAlwaysBlock(AlwaysKind::kAlwaysComb);
   }
-  if (check(TokenKind::KwAlwaysFF)) {
-    return parse_always_block(AlwaysKind::AlwaysFF);
+  if (Check(TokenKind::kKwAlwaysFF)) {
+    return ParseAlwaysBlock(AlwaysKind::kAlwaysFF);
   }
-  if (check(TokenKind::KwAlwaysLatch)) {
-    return parse_always_block(AlwaysKind::AlwaysLatch);
+  if (Check(TokenKind::kKwAlwaysLatch)) {
+    return ParseAlwaysBlock(AlwaysKind::kAlwaysLatch);
   }
-  if (check(TokenKind::KwParameter) || check(TokenKind::KwLocalparam)) {
-    return parse_param_decl();
+  if (Check(TokenKind::kKwParameter) || Check(TokenKind::kKwLocalparam)) {
+    return ParseParamDecl();
   }
   // Try net/var declaration
-  auto dtype = parse_data_type();
-  if (dtype.kind != DataTypeKind::Implicit || check(TokenKind::Identifier)) {
-    return parse_net_or_var_decl(dtype);
+  auto dtype = ParseDataType();
+  if (dtype.kind != DataTypeKind::kImplicit || Check(TokenKind::kIdentifier)) {
+    return ParseNetOrVarDecl(dtype);
   }
-  diag_.error(current_loc(), "unexpected token in module body");
-  synchronize();
+  diag_.Error(CurrentLoc(), "unexpected token in module body");
+  Synchronize();
   return nullptr;
 }
 
-ModuleItem* Parser::parse_continuous_assign() {
-  auto* item = arena_.create<ModuleItem>();
-  item->kind = ModuleItemKind::ContAssign;
-  item->loc = current_loc();
-  expect(TokenKind::KwAssign);
-  item->assign_lhs = parse_expr();
-  expect(TokenKind::Eq);
-  item->assign_rhs = parse_expr();
-  expect(TokenKind::Semicolon);
+ModuleItem* Parser::ParseContinuousAssign() {
+  auto* item = arena_.Create<ModuleItem>();
+  item->kind = ModuleItemKind::kContAssign;
+  item->loc = CurrentLoc();
+  Expect(TokenKind::kKwAssign);
+  item->assign_lhs = ParseExpr();
+  Expect(TokenKind::kEq);
+  item->assign_rhs = ParseExpr();
+  Expect(TokenKind::kSemicolon);
   return item;
 }
 
-ModuleItem* Parser::parse_param_decl() {
-  auto* item = arena_.create<ModuleItem>();
-  item->kind = ModuleItemKind::ParamDecl;
-  item->loc = current_loc();
-  consume();  // parameter or localparam
-  item->data_type = parse_data_type();
-  auto name_tok = expect(TokenKind::Identifier);
+ModuleItem* Parser::ParseParamDecl() {
+  auto* item = arena_.Create<ModuleItem>();
+  item->kind = ModuleItemKind::kParamDecl;
+  item->loc = CurrentLoc();
+  Consume();  // parameter or localparam
+  item->data_type = ParseDataType();
+  auto name_tok = Expect(TokenKind::kIdentifier);
   item->name = name_tok.text;
-  if (match(TokenKind::Eq)) {
-    item->init_expr = parse_expr();
+  if (Match(TokenKind::kEq)) {
+    item->init_expr = ParseExpr();
   }
-  expect(TokenKind::Semicolon);
+  Expect(TokenKind::kSemicolon);
   return item;
 }
 
-ModuleItem* Parser::parse_always_block(AlwaysKind kind) {
-  auto* item = arena_.create<ModuleItem>();
-  item->kind = ModuleItemKind::AlwaysBlock;
+ModuleItem* Parser::ParseAlwaysBlock(AlwaysKind kind) {
+  auto* item = arena_.Create<ModuleItem>();
+  item->kind = ModuleItemKind::kAlwaysBlock;
   item->always_kind = kind;
-  item->loc = current_loc();
-  consume();  // always / always_comb / always_ff / always_latch
+  item->loc = CurrentLoc();
+  Consume();  // always / always_comb / always_ff / always_latch
 
-  if (check(TokenKind::At)) {
-    consume();
-    if (check(TokenKind::LParen)) {
-      consume();
-      item->sensitivity = parse_event_list();
-      expect(TokenKind::RParen);
-    } else if (check(TokenKind::Star)) {
-      consume();  // @*
+  if (Check(TokenKind::kAt)) {
+    Consume();
+    if (Check(TokenKind::kLParen)) {
+      Consume();
+      item->sensitivity = ParseEventList();
+      Expect(TokenKind::kRParen);
+    } else if (Check(TokenKind::kStar)) {
+      Consume();  // @*
     }
   }
 
-  item->body = parse_stmt();
+  item->body = ParseStmt();
   return item;
 }
 
-ModuleItem* Parser::parse_initial_block() {
-  auto* item = arena_.create<ModuleItem>();
-  item->kind = ModuleItemKind::InitialBlock;
-  item->loc = current_loc();
-  consume();  // initial
-  item->body = parse_stmt();
+ModuleItem* Parser::ParseInitialBlock() {
+  auto* item = arena_.Create<ModuleItem>();
+  item->kind = ModuleItemKind::kInitialBlock;
+  item->loc = CurrentLoc();
+  Consume();  // initial
+  item->body = ParseStmt();
   return item;
 }
 
-ModuleItem* Parser::parse_final_block() {
-  auto* item = arena_.create<ModuleItem>();
-  item->kind = ModuleItemKind::FinalBlock;
-  item->loc = current_loc();
-  consume();  // final
-  item->body = parse_stmt();
+ModuleItem* Parser::ParseFinalBlock() {
+  auto* item = arena_.Create<ModuleItem>();
+  item->kind = ModuleItemKind::kFinalBlock;
+  item->loc = CurrentLoc();
+  Consume();  // final
+  item->body = ParseStmt();
   return item;
 }
 
-ModuleItem* Parser::parse_net_or_var_decl(const DataType& dtype) {
-  auto* item = arena_.create<ModuleItem>();
-  item->kind = ModuleItemKind::VarDecl;
-  item->loc = current_loc();
+ModuleItem* Parser::ParseNetOrVarDecl(const DataType& dtype) {
+  auto* item = arena_.Create<ModuleItem>();
+  item->kind = ModuleItemKind::kVarDecl;
+  item->loc = CurrentLoc();
   item->data_type = dtype;
-  auto name_tok = expect(TokenKind::Identifier);
+  auto name_tok = Expect(TokenKind::kIdentifier);
   item->name = name_tok.text;
-  if (match(TokenKind::Eq)) {
-    item->init_expr = parse_expr();
+  if (Match(TokenKind::kEq)) {
+    item->init_expr = ParseExpr();
   }
-  expect(TokenKind::Semicolon);
+  Expect(TokenKind::kSemicolon);
   return item;
 }
 
 // --- Statements ---
 
-Stmt* Parser::parse_stmt() {
-  if (check(TokenKind::KwBegin)) {
-    return parse_block_stmt();
+Stmt* Parser::ParseStmt() {
+  if (Check(TokenKind::kKwBegin)) {
+    return ParseBlockStmt();
   }
-  if (check(TokenKind::KwIf)) {
-    return parse_if_stmt();
+  if (Check(TokenKind::kKwIf)) {
+    return ParseIfStmt();
   }
-  if (check(TokenKind::KwCase) || check(TokenKind::KwCasex) ||
-      check(TokenKind::KwCasez)) {
-    auto kind = current_token().kind;
-    return parse_case_stmt(kind);
+  if (Check(TokenKind::kKwCase) || Check(TokenKind::kKwCasex) ||
+      Check(TokenKind::kKwCasez)) {
+    auto kind = CurrentToken().kind;
+    return ParseCaseStmt(kind);
   }
-  if (check(TokenKind::KwFor)) {
-    return parse_for_stmt();
+  if (Check(TokenKind::kKwFor)) {
+    return ParseForStmt();
   }
-  if (check(TokenKind::KwWhile)) {
-    return parse_while_stmt();
+  if (Check(TokenKind::kKwWhile)) {
+    return ParseWhileStmt();
   }
-  if (check(TokenKind::KwForever)) {
-    return parse_forever_stmt();
+  if (Check(TokenKind::kKwForever)) {
+    return ParseForeverStmt();
   }
-  if (check(TokenKind::KwRepeat)) {
-    return parse_repeat_stmt();
+  if (Check(TokenKind::kKwRepeat)) {
+    return ParseRepeatStmt();
   }
-  if (check(TokenKind::KwFork)) {
-    return parse_fork_stmt();
+  if (Check(TokenKind::kKwFork)) {
+    return ParseForkStmt();
   }
-  if (check(TokenKind::Hash)) {
-    return parse_delay_stmt();
+  if (Check(TokenKind::kHash)) {
+    return ParseDelayStmt();
   }
-  if (check(TokenKind::At)) {
-    return parse_event_control_stmt();
+  if (Check(TokenKind::kAt)) {
+    return ParseEventControlStmt();
   }
-  return parse_assignment_or_expr_stmt();
+  return ParseAssignmentOrExprStmt();
 }
 
-Stmt* Parser::parse_block_stmt() {
-  auto* stmt = arena_.create<Stmt>();
-  stmt->kind = StmtKind::Block;
-  stmt->range.start = current_loc();
-  expect(TokenKind::KwBegin);
-  while (!check(TokenKind::KwEnd) && !at_end()) {
-    auto* s = parse_stmt();
+Stmt* Parser::ParseBlockStmt() {
+  auto* stmt = arena_.Create<Stmt>();
+  stmt->kind = StmtKind::kBlock;
+  stmt->range.start = CurrentLoc();
+  Expect(TokenKind::kKwBegin);
+  while (!Check(TokenKind::kKwEnd) && !AtEnd()) {
+    auto* s = ParseStmt();
     if (s != nullptr) {
       stmt->stmts.push_back(s);
     }
   }
-  expect(TokenKind::KwEnd);
-  stmt->range.end = current_loc();
+  Expect(TokenKind::kKwEnd);
+  stmt->range.end = CurrentLoc();
   return stmt;
 }
 
-Stmt* Parser::parse_if_stmt() {
-  auto* stmt = arena_.create<Stmt>();
-  stmt->kind = StmtKind::If;
-  stmt->range.start = current_loc();
-  expect(TokenKind::KwIf);
-  expect(TokenKind::LParen);
-  stmt->condition = parse_expr();
-  expect(TokenKind::RParen);
-  stmt->then_branch = parse_stmt();
-  if (match(TokenKind::KwElse)) {
-    stmt->else_branch = parse_stmt();
+Stmt* Parser::ParseIfStmt() {
+  auto* stmt = arena_.Create<Stmt>();
+  stmt->kind = StmtKind::kIf;
+  stmt->range.start = CurrentLoc();
+  Expect(TokenKind::kKwIf);
+  Expect(TokenKind::kLParen);
+  stmt->condition = ParseExpr();
+  Expect(TokenKind::kRParen);
+  stmt->then_branch = ParseStmt();
+  if (Match(TokenKind::kKwElse)) {
+    stmt->else_branch = ParseStmt();
   }
   return stmt;
 }
 
-Stmt* Parser::parse_case_stmt(TokenKind case_kind) {
-  auto* stmt = arena_.create<Stmt>();
-  stmt->kind = StmtKind::Case;
+Stmt* Parser::ParseCaseStmt(TokenKind case_kind) {
+  auto* stmt = arena_.Create<Stmt>();
+  stmt->kind = StmtKind::kCase;
   stmt->case_kind = case_kind;
-  stmt->range.start = current_loc();
-  consume();  // case/casex/casez
-  expect(TokenKind::LParen);
-  stmt->condition = parse_expr();
-  expect(TokenKind::RParen);
-  while (!check(TokenKind::KwEndcase) && !at_end()) {
-    stmt->case_items.push_back(parse_case_item());
+  stmt->range.start = CurrentLoc();
+  Consume();  // case/casex/casez
+  Expect(TokenKind::kLParen);
+  stmt->condition = ParseExpr();
+  Expect(TokenKind::kRParen);
+  while (!Check(TokenKind::kKwEndcase) && !AtEnd()) {
+    stmt->case_items.push_back(ParseCaseItem());
   }
-  expect(TokenKind::KwEndcase);
+  Expect(TokenKind::kKwEndcase);
   return stmt;
 }
 
-CaseItem Parser::parse_case_item() {
+CaseItem Parser::ParseCaseItem() {
   CaseItem item;
-  if (match(TokenKind::KwDefault)) {
+  if (Match(TokenKind::kKwDefault)) {
     item.is_default = true;
   } else {
-    item.patterns.push_back(parse_expr());
-    while (match(TokenKind::Comma)) {
-      item.patterns.push_back(parse_expr());
+    item.patterns.push_back(ParseExpr());
+    while (Match(TokenKind::kComma)) {
+      item.patterns.push_back(ParseExpr());
     }
   }
-  expect(TokenKind::Colon);
-  item.body = parse_stmt();
+  Expect(TokenKind::kColon);
+  item.body = ParseStmt();
   return item;
 }
 
-Stmt* Parser::parse_for_stmt() {
-  auto* stmt = arena_.create<Stmt>();
-  stmt->kind = StmtKind::For;
-  stmt->range.start = current_loc();
-  expect(TokenKind::KwFor);
-  expect(TokenKind::LParen);
-  stmt->for_init = parse_assignment_or_expr_stmt();
-  stmt->for_cond = parse_expr();
-  expect(TokenKind::Semicolon);
-  stmt->for_step = parse_assignment_or_expr_stmt();
-  expect(TokenKind::RParen);
-  stmt->for_body = parse_stmt();
+Stmt* Parser::ParseForStmt() {
+  auto* stmt = arena_.Create<Stmt>();
+  stmt->kind = StmtKind::kFor;
+  stmt->range.start = CurrentLoc();
+  Expect(TokenKind::kKwFor);
+  Expect(TokenKind::kLParen);
+  stmt->for_init = ParseAssignmentOrExprStmt();
+  stmt->for_cond = ParseExpr();
+  Expect(TokenKind::kSemicolon);
+  stmt->for_step = ParseAssignmentOrExprStmt();
+  Expect(TokenKind::kRParen);
+  stmt->for_body = ParseStmt();
   return stmt;
 }
 
-Stmt* Parser::parse_while_stmt() {
-  auto* stmt = arena_.create<Stmt>();
-  stmt->kind = StmtKind::While;
-  stmt->range.start = current_loc();
-  expect(TokenKind::KwWhile);
-  expect(TokenKind::LParen);
-  stmt->condition = parse_expr();
-  expect(TokenKind::RParen);
-  stmt->body = parse_stmt();
+Stmt* Parser::ParseWhileStmt() {
+  auto* stmt = arena_.Create<Stmt>();
+  stmt->kind = StmtKind::kWhile;
+  stmt->range.start = CurrentLoc();
+  Expect(TokenKind::kKwWhile);
+  Expect(TokenKind::kLParen);
+  stmt->condition = ParseExpr();
+  Expect(TokenKind::kRParen);
+  stmt->body = ParseStmt();
   return stmt;
 }
 
-Stmt* Parser::parse_forever_stmt() {
-  auto* stmt = arena_.create<Stmt>();
-  stmt->kind = StmtKind::Forever;
-  stmt->range.start = current_loc();
-  expect(TokenKind::KwForever);
-  stmt->body = parse_stmt();
+Stmt* Parser::ParseForeverStmt() {
+  auto* stmt = arena_.Create<Stmt>();
+  stmt->kind = StmtKind::kForever;
+  stmt->range.start = CurrentLoc();
+  Expect(TokenKind::kKwForever);
+  stmt->body = ParseStmt();
   return stmt;
 }
 
-Stmt* Parser::parse_repeat_stmt() {
-  auto* stmt = arena_.create<Stmt>();
-  stmt->kind = StmtKind::Repeat;
-  stmt->range.start = current_loc();
-  expect(TokenKind::KwRepeat);
-  expect(TokenKind::LParen);
-  stmt->condition = parse_expr();
-  expect(TokenKind::RParen);
-  stmt->body = parse_stmt();
+Stmt* Parser::ParseRepeatStmt() {
+  auto* stmt = arena_.Create<Stmt>();
+  stmt->kind = StmtKind::kRepeat;
+  stmt->range.start = CurrentLoc();
+  Expect(TokenKind::kKwRepeat);
+  Expect(TokenKind::kLParen);
+  stmt->condition = ParseExpr();
+  Expect(TokenKind::kRParen);
+  stmt->body = ParseStmt();
   return stmt;
 }
 
-Stmt* Parser::parse_fork_stmt() {
-  auto* stmt = arena_.create<Stmt>();
-  stmt->kind = StmtKind::Fork;
-  stmt->range.start = current_loc();
-  expect(TokenKind::KwFork);
-  while (!check(TokenKind::KwJoin) && !check(TokenKind::KwJoinAny) &&
-         !check(TokenKind::KwJoinNone) && !at_end()) {
-    auto* s = parse_stmt();
+Stmt* Parser::ParseForkStmt() {
+  auto* stmt = arena_.Create<Stmt>();
+  stmt->kind = StmtKind::kFork;
+  stmt->range.start = CurrentLoc();
+  Expect(TokenKind::kKwFork);
+  while (!Check(TokenKind::kKwJoin) && !Check(TokenKind::kKwJoinAny) &&
+         !Check(TokenKind::kKwJoinNone) && !AtEnd()) {
+    auto* s = ParseStmt();
     if (s != nullptr) {
       stmt->fork_stmts.push_back(s);
     }
   }
-  stmt->join_kind = current_token().kind;
-  consume();  // join / join_any / join_none
+  stmt->join_kind = CurrentToken().kind;
+  Consume();  // join / join_any / join_none
   return stmt;
 }
 
-Stmt* Parser::parse_assignment_or_expr_stmt() {
-  auto* stmt = arena_.create<Stmt>();
-  stmt->range.start = current_loc();
-  auto* lhs_expr = parse_expr();
+Stmt* Parser::ParseAssignmentOrExprStmt() {
+  auto* stmt = arena_.Create<Stmt>();
+  stmt->range.start = CurrentLoc();
+  auto* lhs_expr = ParseExpr();
 
-  if (match(TokenKind::Eq)) {
-    stmt->kind = StmtKind::BlockingAssign;
+  if (Match(TokenKind::kEq)) {
+    stmt->kind = StmtKind::kBlockingAssign;
     stmt->lhs = lhs_expr;
-    stmt->rhs = parse_expr();
-  } else if (match(TokenKind::LtEq)) {
-    stmt->kind = StmtKind::NonblockingAssign;
+    stmt->rhs = ParseExpr();
+  } else if (Match(TokenKind::kLtEq)) {
+    stmt->kind = StmtKind::kNonblockingAssign;
     stmt->lhs = lhs_expr;
-    stmt->rhs = parse_expr();
+    stmt->rhs = ParseExpr();
   } else {
-    stmt->kind = StmtKind::ExprStmt;
+    stmt->kind = StmtKind::kExprStmt;
     stmt->expr = lhs_expr;
   }
-  expect(TokenKind::Semicolon);
+  Expect(TokenKind::kSemicolon);
   return stmt;
 }
 
 // --- Types ---
 
-static std::optional<DataTypeKind> token_to_type_kind(TokenKind tk) {
+static std::optional<DataTypeKind> TokenToTypeKind(TokenKind tk) {
   switch (tk) {
-    case TokenKind::KwLogic:
-    case TokenKind::KwWire:
-      return DataTypeKind::Logic;
-    case TokenKind::KwReg:
-      return DataTypeKind::Reg;
-    case TokenKind::KwBit:
-      return DataTypeKind::Bit;
-    case TokenKind::KwByte:
-      return DataTypeKind::Byte;
-    case TokenKind::KwShortint:
-      return DataTypeKind::Shortint;
-    case TokenKind::KwInt:
-      return DataTypeKind::Int;
-    case TokenKind::KwLongint:
-      return DataTypeKind::Longint;
-    case TokenKind::KwInteger:
-      return DataTypeKind::Integer;
-    case TokenKind::KwReal:
-      return DataTypeKind::Real;
-    case TokenKind::KwTime:
-      return DataTypeKind::Time;
-    case TokenKind::KwString:
-      return DataTypeKind::String;
+    case TokenKind::kKwLogic:
+    case TokenKind::kKwWire:
+      return DataTypeKind::kLogic;
+    case TokenKind::kKwReg:
+      return DataTypeKind::kReg;
+    case TokenKind::kKwBit:
+      return DataTypeKind::kBit;
+    case TokenKind::kKwByte:
+      return DataTypeKind::kByte;
+    case TokenKind::kKwShortint:
+      return DataTypeKind::kShortint;
+    case TokenKind::kKwInt:
+      return DataTypeKind::kInt;
+    case TokenKind::kKwLongint:
+      return DataTypeKind::kLongint;
+    case TokenKind::kKwInteger:
+      return DataTypeKind::kInteger;
+    case TokenKind::kKwReal:
+      return DataTypeKind::kReal;
+    case TokenKind::kKwTime:
+      return DataTypeKind::kTime;
+    case TokenKind::kKwString:
+      return DataTypeKind::kString;
     default:
       return std::nullopt;
   }
 }
 
-DataType Parser::parse_data_type() {
+DataType Parser::ParseDataType() {
   DataType dtype;
-  auto kind = token_to_type_kind(current_token().kind);
+  auto kind = TokenToTypeKind(CurrentToken().kind);
   if (!kind) return dtype;
   dtype.kind = *kind;
-  consume();
+  Consume();
 
-  if (match(TokenKind::KwSigned)) {
+  if (Match(TokenKind::kKwSigned)) {
     dtype.is_signed = true;
-  } else if (match(TokenKind::KwUnsigned)) {
+  } else if (Match(TokenKind::kKwUnsigned)) {
     dtype.is_signed = false;
   }
 
-  if (check(TokenKind::LBracket)) {
-    consume();
-    dtype.packed_dim_left = parse_expr();
-    expect(TokenKind::Colon);
-    dtype.packed_dim_right = parse_expr();
-    expect(TokenKind::RBracket);
+  if (Check(TokenKind::kLBracket)) {
+    Consume();
+    dtype.packed_dim_left = ParseExpr();
+    Expect(TokenKind::kColon);
+    dtype.packed_dim_right = ParseExpr();
+    Expect(TokenKind::kRBracket);
   }
   return dtype;
 }
 
 // --- Event lists ---
 
-std::vector<EventExpr> Parser::parse_event_list() {
+std::vector<EventExpr> Parser::ParseEventList() {
   std::vector<EventExpr> events;
-  events.push_back(parse_single_event());
-  while (match(TokenKind::KwOr) || match(TokenKind::Comma)) {
-    events.push_back(parse_single_event());
+  events.push_back(ParseSingleEvent());
+  while (Match(TokenKind::kKwOr) || Match(TokenKind::kComma)) {
+    events.push_back(ParseSingleEvent());
   }
   return events;
 }
 
-EventExpr Parser::parse_single_event() {
+EventExpr Parser::ParseSingleEvent() {
   EventExpr ev;
-  if (match(TokenKind::KwPosedge)) {
-    ev.edge = Edge::Posedge;
-  } else if (match(TokenKind::KwNegedge)) {
-    ev.edge = Edge::Negedge;
+  if (Match(TokenKind::kKwPosedge)) {
+    ev.edge = Edge::kPosedge;
+  } else if (Match(TokenKind::kKwNegedge)) {
+    ev.edge = Edge::kNegedge;
   }
-  ev.signal = parse_expr();
+  ev.signal = ParseExpr();
   return ev;
 }
 
-Stmt* Parser::parse_delay_stmt() {
-  auto* stmt = arena_.create<Stmt>();
-  stmt->kind = StmtKind::Delay;
-  stmt->range.start = current_loc();
-  expect(TokenKind::Hash);
-  stmt->delay = parse_primary_expr();
-  stmt->body = parse_stmt();
+Stmt* Parser::ParseDelayStmt() {
+  auto* stmt = arena_.Create<Stmt>();
+  stmt->kind = StmtKind::kDelay;
+  stmt->range.start = CurrentLoc();
+  Expect(TokenKind::kHash);
+  stmt->delay = ParsePrimaryExpr();
+  stmt->body = ParseStmt();
   return stmt;
 }
 
-Stmt* Parser::parse_event_control_stmt() {
-  auto* stmt = arena_.create<Stmt>();
-  stmt->kind = StmtKind::EventControl;
-  stmt->range.start = current_loc();
-  expect(TokenKind::At);
-  if (match(TokenKind::Star)) {
+Stmt* Parser::ParseEventControlStmt() {
+  auto* stmt = arena_.Create<Stmt>();
+  stmt->kind = StmtKind::kEventControl;
+  stmt->range.start = CurrentLoc();
+  Expect(TokenKind::kAt);
+  if (Match(TokenKind::kStar)) {
     // @* — implicit sensitivity
   } else {
-    expect(TokenKind::LParen);
-    stmt->events = parse_event_list();
-    expect(TokenKind::RParen);
+    Expect(TokenKind::kLParen);
+    stmt->events = ParseEventList();
+    Expect(TokenKind::kRParen);
   }
-  stmt->body = parse_stmt();
+  stmt->body = ParseStmt();
   return stmt;
 }
 

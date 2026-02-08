@@ -4,125 +4,125 @@
 
 namespace delta {
 
-static const std::unordered_map<std::string_view, TokenKind>& keyword_map() {
+static const std::unordered_map<std::string_view, TokenKind>& KeywordMap() {
   static const std::unordered_map<std::string_view, TokenKind> kMap = {
-      {"module", TokenKind::KwModule},
-      {"endmodule", TokenKind::KwEndmodule},
-      {"input", TokenKind::KwInput},
-      {"output", TokenKind::KwOutput},
-      {"inout", TokenKind::KwInout},
-      {"ref", TokenKind::KwRef},
-      {"wire", TokenKind::KwWire},
-      {"reg", TokenKind::KwReg},
-      {"logic", TokenKind::KwLogic},
-      {"bit", TokenKind::KwBit},
-      {"byte", TokenKind::KwByte},
-      {"shortint", TokenKind::KwShortint},
-      {"int", TokenKind::KwInt},
-      {"longint", TokenKind::KwLongint},
-      {"integer", TokenKind::KwInteger},
-      {"real", TokenKind::KwReal},
-      {"shortreal", TokenKind::KwShortreal},
-      {"realtime", TokenKind::KwRealtime},
-      {"time", TokenKind::KwTime},
-      {"string", TokenKind::KwString},
-      {"chandle", TokenKind::KwChandle},
-      {"void", TokenKind::KwVoid},
-      {"enum", TokenKind::KwEnum},
-      {"struct", TokenKind::KwStruct},
-      {"union", TokenKind::KwUnion},
-      {"typedef", TokenKind::KwTypedef},
-      {"class", TokenKind::KwClass},
-      {"extends", TokenKind::KwExtends},
-      {"interface", TokenKind::KwInterface},
-      {"endinterface", TokenKind::KwEndinterface},
-      {"package", TokenKind::KwPackage},
-      {"endpackage", TokenKind::KwEndpackage},
-      {"program", TokenKind::KwProgram},
-      {"endprogram", TokenKind::KwEndprogram},
-      {"parameter", TokenKind::KwParameter},
-      {"localparam", TokenKind::KwLocalparam},
-      {"specparam", TokenKind::KwSpecparam},
-      {"assign", TokenKind::KwAssign},
-      {"deassign", TokenKind::KwDeassign},
-      {"always", TokenKind::KwAlways},
-      {"always_comb", TokenKind::KwAlwaysComb},
-      {"always_ff", TokenKind::KwAlwaysFF},
-      {"always_latch", TokenKind::KwAlwaysLatch},
-      {"initial", TokenKind::KwInitial},
-      {"final", TokenKind::KwFinal},
-      {"begin", TokenKind::KwBegin},
-      {"end", TokenKind::KwEnd},
-      {"fork", TokenKind::KwFork},
-      {"join", TokenKind::KwJoin},
-      {"join_any", TokenKind::KwJoinAny},
-      {"join_none", TokenKind::KwJoinNone},
-      {"if", TokenKind::KwIf},
-      {"else", TokenKind::KwElse},
-      {"case", TokenKind::KwCase},
-      {"casex", TokenKind::KwCasex},
-      {"casez", TokenKind::KwCasez},
-      {"endcase", TokenKind::KwEndcase},
-      {"for", TokenKind::KwFor},
-      {"forever", TokenKind::KwForever},
-      {"while", TokenKind::KwWhile},
-      {"do", TokenKind::KwDo},
-      {"repeat", TokenKind::KwRepeat},
-      {"break", TokenKind::KwBreak},
-      {"continue", TokenKind::KwContinue},
-      {"return", TokenKind::KwReturn},
-      {"function", TokenKind::KwFunction},
-      {"endfunction", TokenKind::KwEndfunction},
-      {"task", TokenKind::KwTask},
-      {"endtask", TokenKind::KwEndtask},
-      {"generate", TokenKind::KwGenerate},
-      {"endgenerate", TokenKind::KwEndgenerate},
-      {"genvar", TokenKind::KwGenvar},
-      {"posedge", TokenKind::KwPosedge},
-      {"negedge", TokenKind::KwNegedge},
-      {"edge", TokenKind::KwEdge},
-      {"or", TokenKind::KwOr},
-      {"and", TokenKind::KwAnd},
-      {"not", TokenKind::KwNot},
-      {"supply0", TokenKind::KwSupply0},
-      {"supply1", TokenKind::KwSupply1},
-      {"tri", TokenKind::KwTri},
-      {"triand", TokenKind::KwTriand},
-      {"trior", TokenKind::KwTrior},
-      {"tri0", TokenKind::KwTri0},
-      {"tri1", TokenKind::KwTri1},
-      {"trireg", TokenKind::KwTrireg},
-      {"wand", TokenKind::KwWand},
-      {"wor", TokenKind::KwWor},
-      {"uwire", TokenKind::KwUwire},
-      {"signed", TokenKind::KwSigned},
-      {"unsigned", TokenKind::KwUnsigned},
-      {"automatic", TokenKind::KwAutomatic},
-      {"static", TokenKind::KwStatic},
-      {"const", TokenKind::KwConst},
-      {"var", TokenKind::KwVar},
-      {"import", TokenKind::KwImport},
-      {"export", TokenKind::KwExport},
-      {"force", TokenKind::KwForce},
-      {"release", TokenKind::KwRelease},
-      {"wait", TokenKind::KwWait},
-      {"disable", TokenKind::KwDisable},
-      {"null", TokenKind::KwNull},
-      {"this", TokenKind::KwThis},
-      {"super", TokenKind::KwSuper},
-      {"new", TokenKind::KwNew},
-      {"packed", TokenKind::KwPacked},
-      {"tagged", TokenKind::KwTagged},
-      {"default", TokenKind::KwDefault},
-      {"unique", TokenKind::KwUnique},
-      {"unique0", TokenKind::KwUnique0},
-      {"priority", TokenKind::KwPriority},
+      {"module", TokenKind::kKwModule},
+      {"endmodule", TokenKind::kKwEndmodule},
+      {"input", TokenKind::kKwInput},
+      {"output", TokenKind::kKwOutput},
+      {"inout", TokenKind::kKwInout},
+      {"ref", TokenKind::kKwRef},
+      {"wire", TokenKind::kKwWire},
+      {"reg", TokenKind::kKwReg},
+      {"logic", TokenKind::kKwLogic},
+      {"bit", TokenKind::kKwBit},
+      {"byte", TokenKind::kKwByte},
+      {"shortint", TokenKind::kKwShortint},
+      {"int", TokenKind::kKwInt},
+      {"longint", TokenKind::kKwLongint},
+      {"integer", TokenKind::kKwInteger},
+      {"real", TokenKind::kKwReal},
+      {"shortreal", TokenKind::kKwShortreal},
+      {"realtime", TokenKind::kKwRealtime},
+      {"time", TokenKind::kKwTime},
+      {"string", TokenKind::kKwString},
+      {"chandle", TokenKind::kKwChandle},
+      {"void", TokenKind::kKwVoid},
+      {"enum", TokenKind::kKwEnum},
+      {"struct", TokenKind::kKwStruct},
+      {"union", TokenKind::kKwUnion},
+      {"typedef", TokenKind::kKwTypedef},
+      {"class", TokenKind::kKwClass},
+      {"extends", TokenKind::kKwExtends},
+      {"interface", TokenKind::kKwInterface},
+      {"endinterface", TokenKind::kKwEndinterface},
+      {"package", TokenKind::kKwPackage},
+      {"endpackage", TokenKind::kKwEndpackage},
+      {"program", TokenKind::kKwProgram},
+      {"endprogram", TokenKind::kKwEndprogram},
+      {"parameter", TokenKind::kKwParameter},
+      {"localparam", TokenKind::kKwLocalparam},
+      {"specparam", TokenKind::kKwSpecparam},
+      {"assign", TokenKind::kKwAssign},
+      {"deassign", TokenKind::kKwDeassign},
+      {"always", TokenKind::kKwAlways},
+      {"always_comb", TokenKind::kKwAlwaysComb},
+      {"always_ff", TokenKind::kKwAlwaysFF},
+      {"always_latch", TokenKind::kKwAlwaysLatch},
+      {"initial", TokenKind::kKwInitial},
+      {"final", TokenKind::kKwFinal},
+      {"begin", TokenKind::kKwBegin},
+      {"end", TokenKind::kKwEnd},
+      {"fork", TokenKind::kKwFork},
+      {"join", TokenKind::kKwJoin},
+      {"join_any", TokenKind::kKwJoinAny},
+      {"join_none", TokenKind::kKwJoinNone},
+      {"if", TokenKind::kKwIf},
+      {"else", TokenKind::kKwElse},
+      {"case", TokenKind::kKwCase},
+      {"casex", TokenKind::kKwCasex},
+      {"casez", TokenKind::kKwCasez},
+      {"endcase", TokenKind::kKwEndcase},
+      {"for", TokenKind::kKwFor},
+      {"forever", TokenKind::kKwForever},
+      {"while", TokenKind::kKwWhile},
+      {"do", TokenKind::kKwDo},
+      {"repeat", TokenKind::kKwRepeat},
+      {"break", TokenKind::kKwBreak},
+      {"continue", TokenKind::kKwContinue},
+      {"return", TokenKind::kKwReturn},
+      {"function", TokenKind::kKwFunction},
+      {"endfunction", TokenKind::kKwEndfunction},
+      {"task", TokenKind::kKwTask},
+      {"endtask", TokenKind::kKwEndtask},
+      {"generate", TokenKind::kKwGenerate},
+      {"endgenerate", TokenKind::kKwEndgenerate},
+      {"genvar", TokenKind::kKwGenvar},
+      {"posedge", TokenKind::kKwPosedge},
+      {"negedge", TokenKind::kKwNegedge},
+      {"edge", TokenKind::kKwEdge},
+      {"or", TokenKind::kKwOr},
+      {"and", TokenKind::kKwAnd},
+      {"not", TokenKind::kKwNot},
+      {"supply0", TokenKind::kKwSupply0},
+      {"supply1", TokenKind::kKwSupply1},
+      {"tri", TokenKind::kKwTri},
+      {"triand", TokenKind::kKwTriand},
+      {"trior", TokenKind::kKwTrior},
+      {"tri0", TokenKind::kKwTri0},
+      {"tri1", TokenKind::kKwTri1},
+      {"trireg", TokenKind::kKwTrireg},
+      {"wand", TokenKind::kKwWand},
+      {"wor", TokenKind::kKwWor},
+      {"uwire", TokenKind::kKwUwire},
+      {"signed", TokenKind::kKwSigned},
+      {"unsigned", TokenKind::kKwUnsigned},
+      {"automatic", TokenKind::kKwAutomatic},
+      {"static", TokenKind::kKwStatic},
+      {"const", TokenKind::kKwConst},
+      {"var", TokenKind::kKwVar},
+      {"import", TokenKind::kKwImport},
+      {"export", TokenKind::kKwExport},
+      {"force", TokenKind::kKwForce},
+      {"release", TokenKind::kKwRelease},
+      {"wait", TokenKind::kKwWait},
+      {"disable", TokenKind::kKwDisable},
+      {"null", TokenKind::kKwNull},
+      {"this", TokenKind::kKwThis},
+      {"super", TokenKind::kKwSuper},
+      {"new", TokenKind::kKwNew},
+      {"packed", TokenKind::kKwPacked},
+      {"tagged", TokenKind::kKwTagged},
+      {"default", TokenKind::kKwDefault},
+      {"unique", TokenKind::kKwUnique},
+      {"unique0", TokenKind::kKwUnique0},
+      {"priority", TokenKind::kKwPriority},
   };
   return kMap;
 }
 
-std::optional<TokenKind> lookup_keyword(std::string_view text) {
-  const auto& map = keyword_map();
+std::optional<TokenKind> LookupKeyword(std::string_view text) {
+  const auto& map = KeywordMap();
   auto it = map.find(text);
   if (it != map.end()) {
     return it->second;
@@ -130,53 +130,53 @@ std::optional<TokenKind> lookup_keyword(std::string_view text) {
   return std::nullopt;
 }
 
-std::string_view token_kind_name(TokenKind kind) {
+std::string_view TokenKindName(TokenKind kind) {
   switch (kind) {
-    case TokenKind::Eof:
+    case TokenKind::kEof:
       return "EOF";
-    case TokenKind::Error:
+    case TokenKind::kError:
       return "error";
-    case TokenKind::IntLiteral:
+    case TokenKind::kIntLiteral:
       return "integer literal";
-    case TokenKind::RealLiteral:
+    case TokenKind::kRealLiteral:
       return "real literal";
-    case TokenKind::TimeLiteral:
+    case TokenKind::kTimeLiteral:
       return "time literal";
-    case TokenKind::StringLiteral:
+    case TokenKind::kStringLiteral:
       return "string literal";
-    case TokenKind::UnbasedUnsizedLiteral:
+    case TokenKind::kUnbasedUnsizedLiteral:
       return "unbased unsized literal";
-    case TokenKind::Identifier:
+    case TokenKind::kIdentifier:
       return "identifier";
-    case TokenKind::EscapedIdentifier:
+    case TokenKind::kEscapedIdentifier:
       return "escaped identifier";
-    case TokenKind::SystemIdentifier:
+    case TokenKind::kSystemIdentifier:
       return "system identifier";
-    case TokenKind::Semicolon:
+    case TokenKind::kSemicolon:
       return "';'";
-    case TokenKind::LParen:
+    case TokenKind::kLParen:
       return "'('";
-    case TokenKind::RParen:
+    case TokenKind::kRParen:
       return "')'";
-    case TokenKind::LBracket:
+    case TokenKind::kLBracket:
       return "'['";
-    case TokenKind::RBracket:
+    case TokenKind::kRBracket:
       return "']'";
-    case TokenKind::LBrace:
+    case TokenKind::kLBrace:
       return "'{'";
-    case TokenKind::RBrace:
+    case TokenKind::kRBrace:
       return "'}'";
-    case TokenKind::Comma:
+    case TokenKind::kComma:
       return "','";
-    case TokenKind::Dot:
+    case TokenKind::kDot:
       return "'.'";
-    case TokenKind::Colon:
+    case TokenKind::kColon:
       return "':'";
-    case TokenKind::Hash:
+    case TokenKind::kHash:
       return "'#'";
-    case TokenKind::Eq:
+    case TokenKind::kEq:
       return "'='";
-    case TokenKind::LtEq:
+    case TokenKind::kLtEq:
       return "'<='";
     default:
       return "token";

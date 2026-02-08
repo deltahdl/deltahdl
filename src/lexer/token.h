@@ -10,212 +10,212 @@ namespace delta {
 
 enum class TokenKind : uint8_t {
   // Sentinel
-  Eof = 0,
-  Error,
+  kEof = 0,
+  kError,
 
   // Literals
-  IntLiteral,
-  RealLiteral,
-  TimeLiteral,
-  StringLiteral,
-  UnbasedUnsizedLiteral,  // '0, '1, 'x, 'z
+  kIntLiteral,
+  kRealLiteral,
+  kTimeLiteral,
+  kStringLiteral,
+  kUnbasedUnsizedLiteral,  // '0, '1, 'x, 'z
 
   // Identifiers
-  Identifier,
-  EscapedIdentifier,
-  SystemIdentifier,  // $display, $finish, etc.
+  kIdentifier,
+  kEscapedIdentifier,
+  kSystemIdentifier,  // $display, $finish, etc.
 
   // Operators and punctuation
-  Plus,            // +
-  Minus,           // -
-  Star,            // *
-  Slash,           // /
-  Percent,         // %
-  Power,           // **
-  Amp,             // &
-  Pipe,            // |
-  Caret,           // ^
-  Tilde,           // ~
-  TildeAmp,        // ~&
-  TildePipe,       // ~|
-  TildeCaret,      // ~^
-  CaretTilde,      // ^~
-  AmpAmp,          // &&
-  PipePipe,        // ||
-  Bang,            // !
-  Eq,              // =
-  EqEq,            // ==
-  BangEq,          // !=
-  EqEqEq,          // ===
-  BangEqEq,        // !==
-  EqEqQuestion,    // ==?
-  BangEqQuestion,  // !=?
-  Lt,              // <
-  Gt,              // >
-  LtEq,            // <=
-  GtEq,            // >=
-  LtLt,            // <<
-  GtGt,            // >>
-  LtLtLt,          // <<<
-  GtGtGt,          // >>>
-  PlusPlus,        // ++
-  MinusMinus,      // --
-  PlusEq,          // +=
-  MinusEq,         // -=
-  StarEq,          // *=
-  SlashEq,         // /=
-  PercentEq,       // %=
-  AmpEq,           // &=
-  PipeEq,          // |=
-  CaretEq,         // ^=
-  LtLtEq,          // <<=
-  GtGtEq,          // >>=
-  LtLtLtEq,        // <<<=
-  GtGtGtEq,        // >>>=
-  Question,        // ?
-  Colon,           // :
-  ColonColon,      // ::
-  Semicolon,       // ;
-  Comma,           // ,
-  Dot,             // .
-  DotStar,         // .*
-  LParen,          // (
-  RParen,          // )
-  LBracket,        // [
-  RBracket,        // ]
-  LBrace,          // {
-  RBrace,          // }
-  Hash,            // #
-  HashHash,        // ##
-  At,              // @
-  AtAt,            // @@
-  Arrow,           // ->
-  DashGtGt,        // ->>
-  EqGt,            // =>
-  StarGt,          // *>
-  AmpAmpAmp,       // &&&
-  PipeDashGt,      // |->
-  PipeEqGt,        // |=>
-  HashMinusHash,   // #-#
-  HashEqHash,      // #=#
+  kPlus,            // +
+  kMinus,           // -
+  kStar,            // *
+  kSlash,           // /
+  kPercent,         // %
+  kPower,           // **
+  kAmp,             // &
+  kPipe,            // |
+  kCaret,           // ^
+  kTilde,           // ~
+  kTildeAmp,        // ~&
+  kTildePipe,       // ~|
+  kTildeCaret,      // ~^
+  kCaretTilde,      // ^~
+  kAmpAmp,          // &&
+  kPipePipe,        // ||
+  kBang,            // !
+  kEq,              // =
+  kEqEq,            // ==
+  kBangEq,          // !=
+  kEqEqEq,          // ===
+  kBangEqEq,        // !==
+  kEqEqQuestion,    // ==?
+  kBangEqQuestion,  // !=?
+  kLt,              // <
+  kGt,              // >
+  kLtEq,            // <=
+  kGtEq,            // >=
+  kLtLt,            // <<
+  kGtGt,            // >>
+  kLtLtLt,          // <<<
+  kGtGtGt,          // >>>
+  kPlusPlus,        // ++
+  kMinusMinus,      // --
+  kPlusEq,          // +=
+  kMinusEq,         // -=
+  kStarEq,          // *=
+  kSlashEq,         // /=
+  kPercentEq,       // %=
+  kAmpEq,           // &=
+  kPipeEq,          // |=
+  kCaretEq,         // ^=
+  kLtLtEq,          // <<=
+  kGtGtEq,          // >>=
+  kLtLtLtEq,        // <<<=
+  kGtGtGtEq,        // >>>=
+  kQuestion,        // ?
+  kColon,           // :
+  kColonColon,      // ::
+  kSemicolon,       // ;
+  kComma,           // ,
+  kDot,             // .
+  kDotStar,         // .*
+  kLParen,          // (
+  kRParen,          // )
+  kLBracket,        // [
+  kRBracket,        // ]
+  kLBrace,          // {
+  kRBrace,          // }
+  kHash,            // #
+  kHashHash,        // ##
+  kAt,              // @
+  kAtAt,            // @@
+  kArrow,           // ->
+  kDashGtGt,        // ->>
+  kEqGt,            // =>
+  kStarGt,          // *>
+  kAmpAmpAmp,       // &&&
+  kPipeDashGt,      // |->
+  kPipeEqGt,        // |=>
+  kHashMinusHash,   // #-#
+  kHashEqHash,      // #=#
 
   // Keywords start here (mapped by keywords table)
-  KwModule,
-  KwEndmodule,
-  KwInput,
-  KwOutput,
-  KwInout,
-  KwRef,
-  KwWire,
-  KwReg,
-  KwLogic,
-  KwBit,
-  KwByte,
-  KwShortint,
-  KwInt,
-  KwLongint,
-  KwInteger,
-  KwReal,
-  KwShortreal,
-  KwRealtime,
-  KwTime,
-  KwString,
-  KwChandle,
-  KwVoid,
-  KwEnum,
-  KwStruct,
-  KwUnion,
-  KwTypedef,
-  KwClass,
-  KwExtends,
-  KwInterface,
-  KwEndinterface,
-  KwPackage,
-  KwEndpackage,
-  KwProgram,
-  KwEndprogram,
-  KwParameter,
-  KwLocalparam,
-  KwSpecparam,
-  KwAssign,
-  KwDeassign,
-  KwAlways,
-  KwAlwaysComb,
-  KwAlwaysFF,
-  KwAlwaysLatch,
-  KwInitial,
-  KwFinal,
-  KwBegin,
-  KwEnd,
-  KwFork,
-  KwJoin,
-  KwJoinAny,
-  KwJoinNone,
-  KwIf,
-  KwElse,
-  KwCase,
-  KwCasex,
-  KwCasez,
-  KwEndcase,
-  KwFor,
-  KwForever,
-  KwWhile,
-  KwDo,
-  KwRepeat,
-  KwBreak,
-  KwContinue,
-  KwReturn,
-  KwFunction,
-  KwEndfunction,
-  KwTask,
-  KwEndtask,
-  KwGenerate,
-  KwEndgenerate,
-  KwGenvar,
-  KwPosedge,
-  KwNegedge,
-  KwEdge,
-  KwOr,
-  KwAnd,
-  KwNot,
-  KwSupply0,
-  KwSupply1,
-  KwTri,
-  KwTriand,
-  KwTrior,
-  KwTri0,
-  KwTri1,
-  KwTrireg,
-  KwWand,
-  KwWor,
-  KwUwire,
-  KwSigned,
-  KwUnsigned,
-  KwAutomatic,
-  KwStatic,
-  KwConst,
-  KwVar,
-  KwImport,
-  KwExport,
-  KwForce,
-  KwRelease,
-  KwWait,
-  KwDisable,
-  KwNull,
-  KwThis,
-  KwSuper,
-  KwNew,
-  KwPacked,
-  KwTagged,
-  KwDefault,
-  KwUnique,
-  KwUnique0,
-  KwPriority,
+  kKwModule,
+  kKwEndmodule,
+  kKwInput,
+  kKwOutput,
+  kKwInout,
+  kKwRef,
+  kKwWire,
+  kKwReg,
+  kKwLogic,
+  kKwBit,
+  kKwByte,
+  kKwShortint,
+  kKwInt,
+  kKwLongint,
+  kKwInteger,
+  kKwReal,
+  kKwShortreal,
+  kKwRealtime,
+  kKwTime,
+  kKwString,
+  kKwChandle,
+  kKwVoid,
+  kKwEnum,
+  kKwStruct,
+  kKwUnion,
+  kKwTypedef,
+  kKwClass,
+  kKwExtends,
+  kKwInterface,
+  kKwEndinterface,
+  kKwPackage,
+  kKwEndpackage,
+  kKwProgram,
+  kKwEndprogram,
+  kKwParameter,
+  kKwLocalparam,
+  kKwSpecparam,
+  kKwAssign,
+  kKwDeassign,
+  kKwAlways,
+  kKwAlwaysComb,
+  kKwAlwaysFF,
+  kKwAlwaysLatch,
+  kKwInitial,
+  kKwFinal,
+  kKwBegin,
+  kKwEnd,
+  kKwFork,
+  kKwJoin,
+  kKwJoinAny,
+  kKwJoinNone,
+  kKwIf,
+  kKwElse,
+  kKwCase,
+  kKwCasex,
+  kKwCasez,
+  kKwEndcase,
+  kKwFor,
+  kKwForever,
+  kKwWhile,
+  kKwDo,
+  kKwRepeat,
+  kKwBreak,
+  kKwContinue,
+  kKwReturn,
+  kKwFunction,
+  kKwEndfunction,
+  kKwTask,
+  kKwEndtask,
+  kKwGenerate,
+  kKwEndgenerate,
+  kKwGenvar,
+  kKwPosedge,
+  kKwNegedge,
+  kKwEdge,
+  kKwOr,
+  kKwAnd,
+  kKwNot,
+  kKwSupply0,
+  kKwSupply1,
+  kKwTri,
+  kKwTriand,
+  kKwTrior,
+  kKwTri0,
+  kKwTri1,
+  kKwTrireg,
+  kKwWand,
+  kKwWor,
+  kKwUwire,
+  kKwSigned,
+  kKwUnsigned,
+  kKwAutomatic,
+  kKwStatic,
+  kKwConst,
+  kKwVar,
+  kKwImport,
+  kKwExport,
+  kKwForce,
+  kKwRelease,
+  kKwWait,
+  kKwDisable,
+  kKwNull,
+  kKwThis,
+  kKwSuper,
+  kKwNew,
+  kKwPacked,
+  kKwTagged,
+  kKwDefault,
+  kKwUnique,
+  kKwUnique0,
+  kKwPriority,
   // Add more keywords as needed (there are ~260 total)
 };
 
 struct Token {
-  TokenKind kind = TokenKind::Eof;
+  TokenKind kind = TokenKind::kEof;
   SourceLoc loc;
   std::string_view text;
 
@@ -225,10 +225,10 @@ struct Token {
   bool is_signed = false;
   uint8_t base = 10;  // 2, 8, 10, 16
 
-  bool is(TokenKind k) const { return kind == k; }
-  bool is_eof() const { return kind == TokenKind::Eof; }
+  bool Is(TokenKind k) const { return kind == k; }
+  bool IsEof() const { return kind == TokenKind::kEof; }
 };
 
-std::string_view token_kind_name(TokenKind kind);
+std::string_view TokenKindName(TokenKind kind);
 
 }  // namespace delta

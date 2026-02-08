@@ -98,7 +98,16 @@ CheckOptions:
   #   await_suspend     - awaitable protocol [expr.await]
   #   await_resume      - awaitable protocol [expr.await]
   readability-identifier-naming.FunctionIgnoredRegexp: 'main|get_return_object|initial_suspend|final_suspend|return_void|unhandled_exception|await_ready|await_suspend|await_resume'
-  readability-identifier-naming.MethodIgnoredRegexp: 'get_return_object|initial_suspend|final_suspend|return_void|unhandled_exception|await_ready|await_suspend|await_resume'
+  # SmallVec methods below are MANDATED by the C++ Container
+  # and Range concepts ([container.reqmts], [range.range]).
+  # Renaming them would break range-based for loops, STL
+  # algorithms, and structured bindings. Do NOT remove them.
+  #   push_back - Container [sequence.reqmts]
+  #   begin/end - Range [range.access]
+  #   size      - Container [container.reqmts]
+  #   empty     - Container [container.reqmts]
+  #   data      - ContiguousContainer [contiguous.container]
+  readability-identifier-naming.MethodIgnoredRegexp: 'get_return_object|initial_suspend|final_suspend|return_void|unhandled_exception|await_ready|await_suspend|await_resume|push_back|begin|end|size|empty|data'
 
   # -- Naming: variables and parameters (lower_case) -------
   # Google C++ Style: "Variable names are all lowercase,

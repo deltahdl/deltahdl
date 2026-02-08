@@ -11,7 +11,7 @@ struct SourceLoc {
   uint32_t line = 0;
   uint32_t column = 0;
 
-  bool is_valid() const { return file_id != 0 || line != 0; }
+  bool IsValid() const { return file_id != 0 || line != 0; }
 };
 
 struct SourceRange {

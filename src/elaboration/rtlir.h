@@ -19,24 +19,24 @@ enum class AlwaysKind : uint8_t;
 // --- RTLIR node classification ---
 
 enum class RtlirNodeKind : uint8_t {
-  Module,
-  Port,
-  Net,
-  Variable,
-  ContAssign,
-  Process,
-  ParamDecl,
-  ModuleInst,
+  kModule,
+  kPort,
+  kNet,
+  kVariable,
+  kContAssign,
+  kProcess,
+  kParamDecl,
+  kModuleInst,
 };
 
 // --- Process kind (elaborated from AST always kinds) ---
 
 enum class ProcessKind : uint8_t {
-  Initial,
-  AlwaysComb,
-  AlwaysFF,
-  AlwaysLatch,
-  Final,
+  kInitial,
+  kAlwaysComb,
+  kAlwaysFF,
+  kAlwaysLatch,
+  kFinal,
 };
 
 // --- Port ---
@@ -53,7 +53,7 @@ struct RtlirPort {
 
 struct RtlirNet {
   std::string_view name;
-  NetType net_type = NetType::Wire;
+  NetType net_type = NetType::kWire;
   uint32_t width = 1;
   std::vector<uint32_t> driver_indices;
 };
@@ -76,7 +76,7 @@ struct RtlirContAssign {
 // --- Process block ---
 
 struct RtlirProcess {
-  ProcessKind kind = ProcessKind::Initial;
+  ProcessKind kind = ProcessKind::kInitial;
   Stmt* body = nullptr;
 };
 

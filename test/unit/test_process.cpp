@@ -4,28 +4,26 @@
 
 using namespace delta;
 
-TEST(Process, PromiseTypeMethods) {
-  SimCoroutine::promise_type promise;
+namespace {
 
-  auto coro = promise.get_return_object();
-  EXPECT_FALSE(coro.done());
+// A real coroutine that produces a SimCoroutine.
+SimCoroutine MakeTestCoroutine() { co_return; }
 
-  auto init = promise.initial_suspend();
-  (void)init;
+}  // namespace
 
-  promise.return_void();
-  promise.unhandled_exception();
+TEST(Process, CoroutineLifecycle) {
+  SimCoroutine coro = MakeTestCoroutine();
+  EXPECT_FALSE(coro.Done());
 
-  auto fin = promise.final_suspend();
-  (void)fin;
+  coro.Resume();
+  EXPECT_TRUE(coro.Done());
 }
 
 TEST(Process, MoveSemantics) {
-  SimCoroutine::promise_type promise;
-  auto a = promise.get_return_object();
-  EXPECT_FALSE(a.done());
+  SimCoroutine a = MakeTestCoroutine();
+  EXPECT_FALSE(a.Done());
 
   SimCoroutine b = std::move(a);
-  EXPECT_FALSE(b.done());
-  EXPECT_TRUE(a.done());  // NOLINT -- moved-from state check
+  EXPECT_FALSE(b.Done());
+  EXPECT_TRUE(a.Done());  // NOLINT -- moved-from state check
 }

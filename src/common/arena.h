@@ -14,7 +14,7 @@ class Arena {
 
   explicit Arena(size_t block_size = kDefaultBlockSize)
       : block_size_(block_size) {
-    grow();
+    Grow();
   }
 
   ~Arena() {
@@ -28,12 +28,12 @@ class Arena {
   Arena(Arena&&) = default;
   Arena& operator=(Arena&&) = default;
 
-  void* allocate(size_t size, size_t align) {
+  void* Allocate(size_t size, size_t align) {
     void* ptr = ptr_;
     size_t space = remaining_;
     if (!std::align(align, size, ptr, space)) {
-      grow(size + align);
-      return allocate(size, align);
+      Grow(size + align);
+      return Allocate(size, align);
     }
     ptr_ = static_cast<char*>(ptr) + size;
     remaining_ = space - size;
@@ -42,28 +42,28 @@ class Arena {
   }
 
   template <typename T, typename... Args>
-  T* create(Args&&... args) {
-    void* mem = allocate(sizeof(T), alignof(T));
+  T* Create(Args&&... args) {
+    void* mem = Allocate(sizeof(T), alignof(T));
     return new (mem) T(std::forward<Args>(args)...);
   }
 
   template <typename T>
-  T* alloc_array(size_t count) {
-    void* mem = allocate(sizeof(T) * count, alignof(T));
+  T* AllocArray(size_t count) {
+    void* mem = Allocate(sizeof(T) * count, alignof(T));
     std::memset(mem, 0, sizeof(T) * count);
     return static_cast<T*>(mem);
   }
 
-  char* alloc_string(const char* str, size_t len) {
-    char* mem = static_cast<char*>(allocate(len + 1, 1));
+  char* AllocString(const char* str, size_t len) {
+    char* mem = static_cast<char*>(Allocate(len + 1, 1));
     std::memcpy(mem, str, len);
     mem[len] = '\0';
     return mem;
   }
 
-  size_t total_allocated() const { return total_allocated_; }
+  size_t TotalAllocated() const { return total_allocated_; }
 
-  void reset() {
+  void Reset() {
     for (size_t i = 1; i < blocks_.size(); ++i) {
       std::free(blocks_[i]);
     }
@@ -76,7 +76,7 @@ class Arena {
   }
 
  private:
-  void grow(size_t min_size = 0) {
+  void Grow(size_t min_size = 0) {
     size_t alloc_size = std::max(block_size_, min_size);
     void* block = std::malloc(alloc_size);
     blocks_.push_back(block);

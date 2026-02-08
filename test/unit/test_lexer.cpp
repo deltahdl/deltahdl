@@ -8,30 +8,30 @@ using namespace delta;
 
 static std::vector<Token> lex(const std::string& src) {
   static SourceManager mgr;
-  auto fid = mgr.add_file("<test>", src);
+  auto fid = mgr.AddFile("<test>", src);
   DiagEngine diag(mgr);
-  Lexer lexer(mgr.file_content(fid), fid, diag);
-  return lexer.lex_all();
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  return lexer.LexAll();
 }
 
 TEST(Lexer, EmptyInput) {
   auto tokens = lex("");
   ASSERT_EQ(tokens.size(), 1);
-  EXPECT_TRUE(tokens[0].is_eof());
+  EXPECT_TRUE(tokens[0].IsEof());
 }
 
 TEST(Lexer, Keywords) {
   auto tokens = lex("module endmodule");
   ASSERT_EQ(tokens.size(), 3);
-  EXPECT_EQ(tokens[0].kind, TokenKind::KwModule);
-  EXPECT_EQ(tokens[1].kind, TokenKind::KwEndmodule);
-  EXPECT_TRUE(tokens[2].is_eof());
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwModule);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kKwEndmodule);
+  EXPECT_TRUE(tokens[2].IsEof());
 }
 
 TEST(Lexer, Identifiers) {
   auto tokens = lex("foo bar_123 _baz");
   ASSERT_EQ(tokens.size(), 4);
-  EXPECT_EQ(tokens[0].kind, TokenKind::Identifier);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[0].text, "foo");
   EXPECT_EQ(tokens[1].text, "bar_123");
   EXPECT_EQ(tokens[2].text, "_baz");
@@ -40,57 +40,57 @@ TEST(Lexer, Identifiers) {
 TEST(Lexer, IntegerLiterals) {
   auto tokens = lex("42 8'hFF 4'b1010");
   ASSERT_EQ(tokens.size(), 4);
-  EXPECT_EQ(tokens[0].kind, TokenKind::IntLiteral);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
   EXPECT_EQ(tokens[0].text, "42");
-  EXPECT_EQ(tokens[1].kind, TokenKind::IntLiteral);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIntLiteral);
   EXPECT_EQ(tokens[1].text, "8'hFF");
-  EXPECT_EQ(tokens[2].kind, TokenKind::IntLiteral);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kIntLiteral);
   EXPECT_EQ(tokens[2].text, "4'b1010");
 }
 
 TEST(Lexer, StringLiterals) {
   auto tokens = lex("\"Hello, World!\"");
   ASSERT_EQ(tokens.size(), 2);
-  EXPECT_EQ(tokens[0].kind, TokenKind::StringLiteral);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
   EXPECT_EQ(tokens[0].text, "\"Hello, World!\"");
 }
 
 TEST(Lexer, SystemIdentifiers) {
   auto tokens = lex("$display $finish");
   ASSERT_EQ(tokens.size(), 3);
-  EXPECT_EQ(tokens[0].kind, TokenKind::SystemIdentifier);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
   EXPECT_EQ(tokens[0].text, "$display");
   EXPECT_EQ(tokens[1].text, "$finish");
 }
 
 TEST(Lexer, Operators) {
   auto tokens = lex("+ - * / == != <= >= << >> && ||");
-  EXPECT_EQ(tokens[0].kind, TokenKind::Plus);
-  EXPECT_EQ(tokens[1].kind, TokenKind::Minus);
-  EXPECT_EQ(tokens[2].kind, TokenKind::Star);
-  EXPECT_EQ(tokens[3].kind, TokenKind::Slash);
-  EXPECT_EQ(tokens[4].kind, TokenKind::EqEq);
-  EXPECT_EQ(tokens[5].kind, TokenKind::BangEq);
-  EXPECT_EQ(tokens[6].kind, TokenKind::LtEq);
-  EXPECT_EQ(tokens[7].kind, TokenKind::GtEq);
-  EXPECT_EQ(tokens[8].kind, TokenKind::LtLt);
-  EXPECT_EQ(tokens[9].kind, TokenKind::GtGt);
-  EXPECT_EQ(tokens[10].kind, TokenKind::AmpAmp);
-  EXPECT_EQ(tokens[11].kind, TokenKind::PipePipe);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kPlus);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kMinus);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kStar);
+  EXPECT_EQ(tokens[3].kind, TokenKind::kSlash);
+  EXPECT_EQ(tokens[4].kind, TokenKind::kEqEq);
+  EXPECT_EQ(tokens[5].kind, TokenKind::kBangEq);
+  EXPECT_EQ(tokens[6].kind, TokenKind::kLtEq);
+  EXPECT_EQ(tokens[7].kind, TokenKind::kGtEq);
+  EXPECT_EQ(tokens[8].kind, TokenKind::kLtLt);
+  EXPECT_EQ(tokens[9].kind, TokenKind::kGtGt);
+  EXPECT_EQ(tokens[10].kind, TokenKind::kAmpAmp);
+  EXPECT_EQ(tokens[11].kind, TokenKind::kPipePipe);
 }
 
 TEST(Lexer, Punctuation) {
   auto tokens = lex("( ) [ ] { } ; , . :");
-  EXPECT_EQ(tokens[0].kind, TokenKind::LParen);
-  EXPECT_EQ(tokens[1].kind, TokenKind::RParen);
-  EXPECT_EQ(tokens[2].kind, TokenKind::LBracket);
-  EXPECT_EQ(tokens[3].kind, TokenKind::RBracket);
-  EXPECT_EQ(tokens[4].kind, TokenKind::LBrace);
-  EXPECT_EQ(tokens[5].kind, TokenKind::RBrace);
-  EXPECT_EQ(tokens[6].kind, TokenKind::Semicolon);
-  EXPECT_EQ(tokens[7].kind, TokenKind::Comma);
-  EXPECT_EQ(tokens[8].kind, TokenKind::Dot);
-  EXPECT_EQ(tokens[9].kind, TokenKind::Colon);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kLParen);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kRParen);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kLBracket);
+  EXPECT_EQ(tokens[3].kind, TokenKind::kRBracket);
+  EXPECT_EQ(tokens[4].kind, TokenKind::kLBrace);
+  EXPECT_EQ(tokens[5].kind, TokenKind::kRBrace);
+  EXPECT_EQ(tokens[6].kind, TokenKind::kSemicolon);
+  EXPECT_EQ(tokens[7].kind, TokenKind::kComma);
+  EXPECT_EQ(tokens[8].kind, TokenKind::kDot);
+  EXPECT_EQ(tokens[9].kind, TokenKind::kColon);
 }
 
 TEST(Lexer, SkipsComments) {
@@ -104,12 +104,12 @@ TEST(Lexer, SkipsComments) {
 TEST(Lexer, HelloSv) {
   auto tokens = lex(
       "module hello;\n  initial $display(\"Hello, DeltaHDL!\");\nendmodule\n");
-  EXPECT_EQ(tokens[0].kind, TokenKind::KwModule);
-  EXPECT_EQ(tokens[1].kind, TokenKind::Identifier);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwModule);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[1].text, "hello");
-  EXPECT_EQ(tokens[2].kind, TokenKind::Semicolon);
-  EXPECT_EQ(tokens[3].kind, TokenKind::KwInitial);
-  EXPECT_EQ(tokens[4].kind, TokenKind::SystemIdentifier);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kSemicolon);
+  EXPECT_EQ(tokens[3].kind, TokenKind::kKwInitial);
+  EXPECT_EQ(tokens[4].kind, TokenKind::kSystemIdentifier);
   EXPECT_EQ(tokens[4].text, "$display");
 }
 

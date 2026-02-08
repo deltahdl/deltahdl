@@ -17,16 +17,16 @@ namespace delta {
 Elaborator::Elaborator(Arena& arena, DiagEngine& diag, CompilationUnit* unit)
     : arena_(arena), diag_(diag), unit_(unit) {}
 
-RtlirDesign* Elaborator::elaborate(std::string_view top_module_name) {
-  auto* mod_decl = find_module(top_module_name);
+RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
+  auto* mod_decl = FindModule(top_module_name);
   if (!mod_decl) {
-    diag_.error({}, std::format("top module '{}' not found", top_module_name));
+    diag_.Error({}, std::format("top module '{}' not found", top_module_name));
     return nullptr;
   }
 
-  auto* design = arena_.create<RtlirDesign>();
+  auto* design = arena_.Create<RtlirDesign>();
   ParamList empty_params;
-  auto* top = elaborate_module(mod_decl, empty_params);
+  auto* top = ElaborateModule(mod_decl, empty_params);
   if (!top) return nullptr;
 
   design->top_modules.push_back(top);
@@ -34,13 +34,13 @@ RtlirDesign* Elaborator::elaborate(std::string_view top_module_name) {
   return design;
 }
 
-ModuleDecl* Elaborator::find_module(std::string_view name) const {
+ModuleDecl* Elaborator::FindModule(std::string_view name) const {
   auto it = std::find_if(unit_->modules.begin(), unit_->modules.end(),
                          [name](auto* mod) { return mod->name == name; });
   return (it != unit_->modules.end()) ? *it : nullptr;
 }
 
-static std::optional<int64_t> find_param_override(
+static std::optional<int64_t> FindParamOverride(
     const Elaborator::ParamList& params, std::string_view name) {
   for (const auto& [oname, oval] : params) {
     if (oname == name) {
@@ -50,9 +50,9 @@ static std::optional<int64_t> find_param_override(
   return std::nullopt;
 }
 
-RtlirModule* Elaborator::elaborate_module(const ModuleDecl* decl,
-                                          const ParamList& params) {
-  auto* mod = arena_.create<RtlirModule>();
+RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
+                                         const ParamList& params) {
+  auto* mod = arena_.Create<RtlirModule>();
   mod->name = decl->name;
 
   for (const auto& [pname, pval] : decl->params) {
@@ -61,33 +61,33 @@ RtlirModule* Elaborator::elaborate_module(const ModuleDecl* decl,
     pd.default_value = pval;
     pd.is_resolved = false;
 
-    auto override_val = find_param_override(params, pname);
+    auto override_val = FindParamOverride(params, pname);
     if (override_val) {
       pd.resolved_value = *override_val;
       pd.is_resolved = true;
     }
     if (!pd.is_resolved && pval) {
-      pd.resolved_value = const_eval_int(pval).value_or(0);
-      pd.is_resolved = const_eval_int(pval).has_value();
+      pd.resolved_value = ConstEvalInt(pval).value_or(0);
+      pd.is_resolved = ConstEvalInt(pval).has_value();
     }
 
     mod->params.push_back(pd);
   }
 
-  elaborate_ports(decl, mod);
-  elaborate_items(decl, mod);
+  ElaboratePorts(decl, mod);
+  ElaborateItems(decl, mod);
   return mod;
 }
 
 // --- Port elaboration ---
 
-void Elaborator::elaborate_ports(const ModuleDecl* decl, RtlirModule* mod) {
+void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
   for (const auto& port : decl->ports) {
     RtlirPort rp;
     rp.name = port.name;
     rp.direction = port.direction;
     rp.type_kind = port.data_type.kind;
-    rp.width = eval_type_width(port.data_type);
+    rp.width = EvalTypeWidth(port.data_type);
     rp.is_signed = port.data_type.is_signed;
     mod->ports.push_back(rp);
   }
@@ -95,69 +95,69 @@ void Elaborator::elaborate_ports(const ModuleDecl* decl, RtlirModule* mod) {
 
 // --- Module item elaboration ---
 
-static ProcessKind map_always_kind(AlwaysKind ak) {
+static ProcessKind MapAlwaysKind(AlwaysKind ak) {
   switch (ak) {
-    case AlwaysKind::Always:
-    case AlwaysKind::AlwaysComb:
-      return ProcessKind::AlwaysComb;
-    case AlwaysKind::AlwaysFF:
-      return ProcessKind::AlwaysFF;
-    case AlwaysKind::AlwaysLatch:
-      return ProcessKind::AlwaysLatch;
+    case AlwaysKind::kAlways:
+    case AlwaysKind::kAlwaysComb:
+      return ProcessKind::kAlwaysComb;
+    case AlwaysKind::kAlwaysFF:
+      return ProcessKind::kAlwaysFF;
+    case AlwaysKind::kAlwaysLatch:
+      return ProcessKind::kAlwaysLatch;
   }
-  return ProcessKind::AlwaysComb;
+  return ProcessKind::kAlwaysComb;
 }
 
-void Elaborator::elaborate_item(ModuleItem* item, RtlirModule* mod) {
+void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
   switch (item->kind) {
-    case ModuleItemKind::NetDecl: {
+    case ModuleItemKind::kNetDecl: {
       RtlirNet net;
       net.name = item->name;
-      net.net_type = NetType::Wire;
-      net.width = eval_type_width(item->data_type);
+      net.net_type = NetType::kWire;
+      net.width = EvalTypeWidth(item->data_type);
       mod->nets.push_back(net);
       break;
     }
-    case ModuleItemKind::VarDecl: {
+    case ModuleItemKind::kVarDecl: {
       RtlirVariable var;
       var.name = item->name;
-      var.width = eval_type_width(item->data_type);
-      var.is_4state = is_4state_type(item->data_type.kind);
+      var.width = EvalTypeWidth(item->data_type);
+      var.is_4state = Is4stateType(item->data_type.kind);
       mod->variables.push_back(var);
       break;
     }
-    case ModuleItemKind::ContAssign: {
+    case ModuleItemKind::kContAssign: {
       RtlirContAssign ca;
       ca.lhs = item->assign_lhs;
       ca.rhs = item->assign_rhs;
       mod->assigns.push_back(ca);
       break;
     }
-    case ModuleItemKind::InitialBlock: {
+    case ModuleItemKind::kInitialBlock: {
       RtlirProcess proc;
-      proc.kind = ProcessKind::Initial;
+      proc.kind = ProcessKind::kInitial;
       proc.body = item->body;
       mod->processes.push_back(proc);
       break;
     }
-    case ModuleItemKind::FinalBlock: {
+    case ModuleItemKind::kFinalBlock: {
       RtlirProcess proc;
-      proc.kind = ProcessKind::Final;
+      proc.kind = ProcessKind::kFinal;
       proc.body = item->body;
       mod->processes.push_back(proc);
       break;
     }
-    case ModuleItemKind::AlwaysBlock:
-    case ModuleItemKind::AlwaysCombBlock:
-    case ModuleItemKind::AlwaysFFBlock:
-    case ModuleItemKind::AlwaysLatchBlock: {
+    case ModuleItemKind::kAlwaysBlock:
+    case ModuleItemKind::kAlwaysCombBlock:
+    case ModuleItemKind::kAlwaysFFBlock:
+    case ModuleItemKind::kAlwaysLatchBlock: {
       RtlirProcess proc;
-      proc.kind = map_always_kind(item->always_kind);
+      proc.kind = MapAlwaysKind(item->always_kind);
       proc.body = item->body;
       mod->processes.push_back(proc);
       break;
     }
-    case ModuleItemKind::ModuleInst: {
+    case ModuleItemKind::kModuleInst: {
       RtlirModuleInst inst;
       inst.module_name = item->inst_module;
       inst.inst_name = item->inst_name;
@@ -165,17 +165,17 @@ void Elaborator::elaborate_item(ModuleItem* item, RtlirModule* mod) {
       mod->children.push_back(inst);
       break;
     }
-    case ModuleItemKind::ParamDecl:
+    case ModuleItemKind::kParamDecl:
       break;
-    case ModuleItemKind::GenerateBlock:
-      diag_.warning(item->loc, "generate blocks are not yet elaborated");
+    case ModuleItemKind::kGenerateBlock:
+      diag_.Warning(item->loc, "generate blocks are not yet elaborated");
       break;
   }
 }
 
-void Elaborator::elaborate_items(const ModuleDecl* decl, RtlirModule* mod) {
+void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   for (auto* item : decl->items) {
-    elaborate_item(item, mod);
+    ElaborateItem(item, mod);
   }
 }
 

@@ -24,15 +24,15 @@ struct AigNode {
 // --- Literal helpers ---
 
 /// Construct a literal from a node id and complement flag.
-inline uint32_t aig_lit(uint32_t id, bool compl_flag) {
+inline uint32_t AigLit(uint32_t id, bool compl_flag) {
   return (id << 1) | static_cast<uint32_t>(compl_flag);
 }
 
 /// Extract the node id from a literal.
-inline uint32_t aig_var(uint32_t lit) { return lit >> 1; }
+inline uint32_t AigVar(uint32_t lit) { return lit >> 1; }
 
 /// Return true if the literal carries a complement.
-inline bool aig_is_compl(uint32_t lit) { return (lit & 1u) != 0; }
+inline bool AigIsCompl(uint32_t lit) { return (lit & 1u) != 0; }
 
 // --- AIG graph container ---
 
@@ -44,28 +44,28 @@ class AigGraph {
   AigGraph();
 
   /// Create a new primary input. Returns its literal.
-  uint32_t add_input();
+  uint32_t AddInput();
 
   /// Create a structurally-hashed AND node. Returns its literal.
-  uint32_t add_and(uint32_t lit0, uint32_t lit1);
+  uint32_t AddAnd(uint32_t lit0, uint32_t lit1);
 
   /// Negate a literal (flip complement bit).
-  uint32_t add_not(uint32_t lit) const;
+  uint32_t AddNot(uint32_t lit) const;
 
   /// OR via De Morgan: a | b = ~(~a & ~b).
-  uint32_t add_or(uint32_t a, uint32_t b);
+  uint32_t AddOr(uint32_t a, uint32_t b);
 
   /// XOR: a ^ b = (a & ~b) | (~a & b).
-  uint32_t add_xor(uint32_t a, uint32_t b);
+  uint32_t AddXor(uint32_t a, uint32_t b);
 
   /// MUX: sel ? a : b = (sel & a) | (~sel & b).
-  uint32_t add_mux(uint32_t sel, uint32_t a, uint32_t b);
+  uint32_t AddMux(uint32_t sel, uint32_t a, uint32_t b);
 
   /// Register a primary output literal.
-  void add_output(uint32_t lit);
+  void AddOutput(uint32_t lit);
 
   /// Total number of AIG nodes (including constant node).
-  size_t node_count() const;
+  size_t NodeCount() const;
 
   // Public data — kept accessible for pass algorithms.
   std::vector<AigNode> nodes;
@@ -74,10 +74,10 @@ class AigGraph {
 
  private:
   /// Pack two literals into a single 64-bit key for structural hashing.
-  static uint64_t hash_key(uint32_t lit0, uint32_t lit1);
+  static uint64_t HashKey(uint32_t lit0, uint32_t lit1);
 
   /// Allocate a fresh node and return its id.
-  uint32_t alloc_node();
+  uint32_t AllocNode();
 
   // Structural hash: maps (fanin0, fanin1) -> node id for dedup.
   std::unordered_map<uint64_t, uint32_t> strash_;

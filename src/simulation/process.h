@@ -25,9 +25,9 @@ struct SimCoroutine {
     std::exception_ptr exception = nullptr;
   };
 
-  using handle_type = std::coroutine_handle<promise_type>;
+  using HandleType = std::coroutine_handle<promise_type>;
 
-  explicit SimCoroutine(handle_type h) : handle(h) {}
+  explicit SimCoroutine(HandleType h) : handle(h) {}
 
   SimCoroutine(const SimCoroutine&) = delete;
   SimCoroutine& operator=(const SimCoroutine&) = delete;
@@ -38,27 +38,27 @@ struct SimCoroutine {
 
   SimCoroutine& operator=(SimCoroutine&& other) noexcept {
     if (this != &other) {
-      destroy();
+      Destroy();
       handle = other.handle;
       other.handle = nullptr;
     }
     return *this;
   }
 
-  ~SimCoroutine() { destroy(); }
+  ~SimCoroutine() { Destroy(); }
 
-  bool done() const { return !handle || handle.done(); }
+  bool Done() const { return !handle || handle.done(); }
 
-  void resume() {
+  void Resume() {
     if (handle && !handle.done()) {
       handle.resume();
     }
   }
 
-  handle_type handle = nullptr;
+  HandleType handle = nullptr;
 
  private:
-  void destroy() {
+  void Destroy() {
     if (handle) {
       handle.destroy();
       handle = nullptr;
@@ -73,27 +73,27 @@ using ProcessHandle = std::coroutine_handle<SimCoroutine::promise_type>;
 // --- Process kinds matching SystemVerilog constructs ---
 
 enum class ProcessKind : uint8_t {
-  Initial,
-  Always,
-  AlwaysComb,
-  AlwaysLatch,
-  AlwaysFF,
-  Final,
-  ContAssign,
+  kInitial,
+  kAlways,
+  kAlwaysComb,
+  kAlwaysLatch,
+  kAlwaysFF,
+  kFinal,
+  kContAssign,
 };
 
 // --- Process: a schedulable simulation process ---
 
 struct Process {
-  ProcessKind kind = ProcessKind::Initial;
+  ProcessKind kind = ProcessKind::kInitial;
   ProcessHandle coro = nullptr;
-  Region home_region = Region::Active;
+  Region home_region = Region::kActive;
   uint32_t id = 0;
   bool active = true;
 
-  bool done() const { return !coro || coro.done(); }
+  bool Done() const { return !coro || coro.done(); }
 
-  void resume() {
+  void Resume() {
     if (coro && !coro.done()) {
       coro.resume();
     }

@@ -5,106 +5,106 @@ namespace delta {
 // Pratt parser: binding powers for SystemVerilog operators (IEEE 1800-2023 §11)
 // Higher binding power = tighter binding
 
-static std::pair<int, int> infix_bp(TokenKind kind) {
+static std::pair<int, int> InfixBp(TokenKind kind) {
   switch (kind) {
-    case TokenKind::PipeDashGt:
-    case TokenKind::PipeEqGt:
+    case TokenKind::kPipeDashGt:
+    case TokenKind::kPipeEqGt:
       return {1, 2};
-    case TokenKind::PipePipe:
+    case TokenKind::kPipePipe:
       return {3, 4};
-    case TokenKind::AmpAmp:
+    case TokenKind::kAmpAmp:
       return {5, 6};
-    case TokenKind::Pipe:
+    case TokenKind::kPipe:
       return {7, 8};
-    case TokenKind::Caret:
-    case TokenKind::CaretTilde:
-    case TokenKind::TildeCaret:
+    case TokenKind::kCaret:
+    case TokenKind::kCaretTilde:
+    case TokenKind::kTildeCaret:
       return {9, 10};
-    case TokenKind::Amp:
+    case TokenKind::kAmp:
       return {11, 12};
-    case TokenKind::EqEq:
-    case TokenKind::BangEq:
-    case TokenKind::EqEqEq:
-    case TokenKind::BangEqEq:
-    case TokenKind::EqEqQuestion:
-    case TokenKind::BangEqQuestion:
+    case TokenKind::kEqEq:
+    case TokenKind::kBangEq:
+    case TokenKind::kEqEqEq:
+    case TokenKind::kBangEqEq:
+    case TokenKind::kEqEqQuestion:
+    case TokenKind::kBangEqQuestion:
       return {13, 14};
-    case TokenKind::Lt:
-    case TokenKind::Gt:
-    case TokenKind::LtEq:
-    case TokenKind::GtEq:
+    case TokenKind::kLt:
+    case TokenKind::kGt:
+    case TokenKind::kLtEq:
+    case TokenKind::kGtEq:
       return {15, 16};
-    case TokenKind::LtLt:
-    case TokenKind::GtGt:
-    case TokenKind::LtLtLt:
-    case TokenKind::GtGtGt:
+    case TokenKind::kLtLt:
+    case TokenKind::kGtGt:
+    case TokenKind::kLtLtLt:
+    case TokenKind::kGtGtGt:
       return {17, 18};
-    case TokenKind::Plus:
-    case TokenKind::Minus:
+    case TokenKind::kPlus:
+    case TokenKind::kMinus:
       return {19, 20};
-    case TokenKind::Star:
-    case TokenKind::Slash:
-    case TokenKind::Percent:
+    case TokenKind::kStar:
+    case TokenKind::kSlash:
+    case TokenKind::kPercent:
       return {21, 22};
-    case TokenKind::Power:
+    case TokenKind::kPower:
       return {24, 23};  // right-assoc
     default:
       return {-1, -1};
   }
 }
 
-static int prefix_bp(TokenKind kind) {
+static int PrefixBp(TokenKind kind) {
   switch (kind) {
-    case TokenKind::Plus:
-    case TokenKind::Minus:
-    case TokenKind::Bang:
-    case TokenKind::Tilde:
-    case TokenKind::Amp:
-    case TokenKind::TildeAmp:
-    case TokenKind::Pipe:
-    case TokenKind::TildePipe:
-    case TokenKind::Caret:
-    case TokenKind::TildeCaret:
-    case TokenKind::CaretTilde:
+    case TokenKind::kPlus:
+    case TokenKind::kMinus:
+    case TokenKind::kBang:
+    case TokenKind::kTilde:
+    case TokenKind::kAmp:
+    case TokenKind::kTildeAmp:
+    case TokenKind::kPipe:
+    case TokenKind::kTildePipe:
+    case TokenKind::kCaret:
+    case TokenKind::kTildeCaret:
+    case TokenKind::kCaretTilde:
       return 25;
     default:
       return -1;
   }
 }
 
-Expr* Parser::parse_expr() { return parse_expr_bp(0); }
+Expr* Parser::ParseExpr() { return ParseExprBp(0); }
 
-Expr* Parser::parse_expr_bp(int min_bp) {
-  auto* lhs = parse_prefix_expr();
+Expr* Parser::ParseExprBp(int min_bp) {
+  auto* lhs = ParsePrefixExpr();
 
   while (true) {
-    auto tok = current_token();
-    if (tok.is_eof()) {
+    auto tok = CurrentToken();
+    if (tok.IsEof()) {
       break;
     }
 
     // Ternary: expr ? expr : expr
-    if (tok.kind == TokenKind::Question && min_bp <= 1) {
-      consume();
-      auto* tern = arena_.create<Expr>();
-      tern->kind = ExprKind::Ternary;
+    if (tok.kind == TokenKind::kQuestion && min_bp <= 1) {
+      Consume();
+      auto* tern = arena_.Create<Expr>();
+      tern->kind = ExprKind::kTernary;
       tern->condition = lhs;
-      tern->true_expr = parse_expr_bp(0);
-      expect(TokenKind::Colon);
-      tern->false_expr = parse_expr_bp(0);
+      tern->true_expr = ParseExprBp(0);
+      Expect(TokenKind::kColon);
+      tern->false_expr = ParseExprBp(0);
       lhs = tern;
       continue;
     }
 
-    auto [lbp, rbp] = infix_bp(tok.kind);
+    auto [lbp, rbp] = InfixBp(tok.kind);
     if (lbp < 0 || lbp < min_bp) {
       break;
     }
 
-    auto op = consume();
-    auto* rhs = parse_expr_bp(rbp);
-    auto* bin = arena_.create<Expr>();
-    bin->kind = ExprKind::Binary;
+    auto op = Consume();
+    auto* rhs = ParseExprBp(rbp);
+    auto* bin = arena_.Create<Expr>();
+    bin->kind = ExprKind::kBinary;
     bin->op = op.kind;
     bin->lhs = lhs;
     bin->rhs = rhs;
@@ -114,157 +114,157 @@ Expr* Parser::parse_expr_bp(int min_bp) {
   return lhs;
 }
 
-Expr* Parser::parse_prefix_expr() {
-  auto tok = current_token();
-  int bp = prefix_bp(tok.kind);
+Expr* Parser::ParsePrefixExpr() {
+  auto tok = CurrentToken();
+  int bp = PrefixBp(tok.kind);
   if (bp >= 0) {
-    auto op = consume();
-    auto* operand = parse_expr_bp(bp);
-    auto* unary = arena_.create<Expr>();
-    unary->kind = ExprKind::Unary;
+    auto op = Consume();
+    auto* operand = ParseExprBp(bp);
+    auto* unary = arena_.Create<Expr>();
+    unary->kind = ExprKind::kUnary;
     unary->op = op.kind;
     unary->lhs = operand;
     unary->range.start = op.loc;
     return unary;
   }
-  return parse_primary_expr();
+  return ParsePrimaryExpr();
 }
 
-Expr* Parser::make_literal(ExprKind kind, const Token& tok) {
-  consume();
-  auto* lit = arena_.create<Expr>();
+Expr* Parser::MakeLiteral(ExprKind kind, const Token& tok) {
+  Consume();
+  auto* lit = arena_.Create<Expr>();
   lit->kind = kind;
   lit->text = tok.text;
   lit->range.start = tok.loc;
   return lit;
 }
 
-Expr* Parser::parse_primary_expr() {
-  auto tok = current_token();
+Expr* Parser::ParsePrimaryExpr() {
+  auto tok = CurrentToken();
 
-  if (tok.kind == TokenKind::IntLiteral ||
-      tok.kind == TokenKind::UnbasedUnsizedLiteral) {
-    return make_literal(ExprKind::IntegerLiteral, tok);
+  if (tok.kind == TokenKind::kIntLiteral ||
+      tok.kind == TokenKind::kUnbasedUnsizedLiteral) {
+    return MakeLiteral(ExprKind::kIntegerLiteral, tok);
   }
 
-  if (tok.kind == TokenKind::RealLiteral) {
-    return make_literal(ExprKind::RealLiteral, tok);
+  if (tok.kind == TokenKind::kRealLiteral) {
+    return MakeLiteral(ExprKind::kRealLiteral, tok);
   }
 
-  if (tok.kind == TokenKind::StringLiteral) {
-    return make_literal(ExprKind::StringLiteral, tok);
+  if (tok.kind == TokenKind::kStringLiteral) {
+    return MakeLiteral(ExprKind::kStringLiteral, tok);
   }
 
-  if (tok.kind == TokenKind::SystemIdentifier) {
-    return parse_system_call();
+  if (tok.kind == TokenKind::kSystemIdentifier) {
+    return ParseSystemCall();
   }
 
-  if (tok.kind == TokenKind::Identifier) {
-    consume();
-    auto* id = arena_.create<Expr>();
-    id->kind = ExprKind::Identifier;
+  if (tok.kind == TokenKind::kIdentifier) {
+    Consume();
+    auto* id = arena_.Create<Expr>();
+    id->kind = ExprKind::kIdentifier;
     id->text = tok.text;
     id->range.start = tok.loc;
 
-    if (check(TokenKind::LParen)) return parse_call_expr(id);
-    if (check(TokenKind::LBracket)) return parse_select_expr(id);
+    if (Check(TokenKind::kLParen)) return ParseCallExpr(id);
+    if (Check(TokenKind::kLBracket)) return ParseSelectExpr(id);
     return id;
   }
 
-  if (tok.kind == TokenKind::LParen) {
-    consume();
-    auto* expr = parse_expr();
-    expect(TokenKind::RParen);
+  if (tok.kind == TokenKind::kLParen) {
+    Consume();
+    auto* expr = ParseExpr();
+    Expect(TokenKind::kRParen);
     return expr;
   }
 
-  if (tok.kind == TokenKind::LBrace) {
-    return parse_concatenation();
+  if (tok.kind == TokenKind::kLBrace) {
+    return ParseConcatenation();
   }
 
-  diag_.error(tok.loc, "expected expression");
-  consume();
-  auto* err = arena_.create<Expr>();
-  err->kind = ExprKind::IntegerLiteral;
+  diag_.Error(tok.loc, "expected expression");
+  Consume();
+  auto* err = arena_.Create<Expr>();
+  err->kind = ExprKind::kIntegerLiteral;
   err->range.start = tok.loc;
   return err;
 }
 
-Expr* Parser::parse_call_expr(Expr* callee) {
-  expect(TokenKind::LParen);
-  auto* call = arena_.create<Expr>();
-  call->kind = ExprKind::Call;
+Expr* Parser::ParseCallExpr(Expr* callee) {
+  Expect(TokenKind::kLParen);
+  auto* call = arena_.Create<Expr>();
+  call->kind = ExprKind::kCall;
   call->callee = callee->text;
   call->range.start = callee->range.start;
-  if (!check(TokenKind::RParen)) {
-    call->args.push_back(parse_expr());
-    while (match(TokenKind::Comma)) {
-      call->args.push_back(parse_expr());
+  if (!Check(TokenKind::kRParen)) {
+    call->args.push_back(ParseExpr());
+    while (Match(TokenKind::kComma)) {
+      call->args.push_back(ParseExpr());
     }
   }
-  expect(TokenKind::RParen);
+  Expect(TokenKind::kRParen);
   return call;
 }
 
-Expr* Parser::parse_select_expr(Expr* base) {
-  consume();  // LBracket
-  auto* sel = arena_.create<Expr>();
-  sel->kind = ExprKind::Select;
+Expr* Parser::ParseSelectExpr(Expr* base) {
+  Consume();  // LBracket
+  auto* sel = arena_.Create<Expr>();
+  sel->kind = ExprKind::kSelect;
   sel->base = base;
-  sel->index = parse_expr();
-  if (match(TokenKind::Colon)) {
-    sel->index_end = parse_expr();
+  sel->index = ParseExpr();
+  if (Match(TokenKind::kColon)) {
+    sel->index_end = ParseExpr();
   }
-  expect(TokenKind::RBracket);
+  Expect(TokenKind::kRBracket);
   return sel;
 }
 
-Expr* Parser::parse_system_call() {
-  auto tok = consume();
-  auto* call = arena_.create<Expr>();
-  call->kind = ExprKind::SystemCall;
+Expr* Parser::ParseSystemCall() {
+  auto tok = Consume();
+  auto* call = arena_.Create<Expr>();
+  call->kind = ExprKind::kSystemCall;
   call->callee = tok.text;
   call->range.start = tok.loc;
-  if (!match(TokenKind::LParen)) return call;
-  if (!check(TokenKind::RParen)) {
-    call->args.push_back(parse_expr());
-    while (match(TokenKind::Comma)) {
-      call->args.push_back(parse_expr());
+  if (!Match(TokenKind::kLParen)) return call;
+  if (!Check(TokenKind::kRParen)) {
+    call->args.push_back(ParseExpr());
+    while (Match(TokenKind::kComma)) {
+      call->args.push_back(ParseExpr());
     }
   }
-  expect(TokenKind::RParen);
+  Expect(TokenKind::kRParen);
   return call;
 }
 
-Expr* Parser::parse_concatenation() {
-  auto loc = current_loc();
-  expect(TokenKind::LBrace);
-  auto* first = parse_expr();
+Expr* Parser::ParseConcatenation() {
+  auto loc = CurrentLoc();
+  Expect(TokenKind::kLBrace);
+  auto* first = ParseExpr();
 
   // Replication: {count{elements}}
-  if (check(TokenKind::LBrace)) {
-    consume();
-    auto* rep = arena_.create<Expr>();
-    rep->kind = ExprKind::Replicate;
+  if (Check(TokenKind::kLBrace)) {
+    Consume();
+    auto* rep = arena_.Create<Expr>();
+    rep->kind = ExprKind::kReplicate;
     rep->repeat_count = first;
     rep->range.start = loc;
-    rep->elements.push_back(parse_expr());
-    while (match(TokenKind::Comma)) {
-      rep->elements.push_back(parse_expr());
+    rep->elements.push_back(ParseExpr());
+    while (Match(TokenKind::kComma)) {
+      rep->elements.push_back(ParseExpr());
     }
-    expect(TokenKind::RBrace);
-    expect(TokenKind::RBrace);
+    Expect(TokenKind::kRBrace);
+    Expect(TokenKind::kRBrace);
     return rep;
   }
 
-  auto* cat = arena_.create<Expr>();
-  cat->kind = ExprKind::Concatenation;
+  auto* cat = arena_.Create<Expr>();
+  cat->kind = ExprKind::kConcatenation;
   cat->range.start = loc;
   cat->elements.push_back(first);
-  while (match(TokenKind::Comma)) {
-    cat->elements.push_back(parse_expr());
+  while (Match(TokenKind::kComma)) {
+    cat->elements.push_back(ParseExpr());
   }
-  expect(TokenKind::RBrace);
+  Expect(TokenKind::kRBrace);
   return cat;
 }
 

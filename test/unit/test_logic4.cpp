@@ -11,15 +11,15 @@ TEST(Types, Logic4WordBasicValues) {
   Logic4Word x_val = {0, 1};
   Logic4Word z_val = {1, 1};
 
-  EXPECT_TRUE(zero.is_known());
-  EXPECT_TRUE(one.is_known());
-  EXPECT_FALSE(x_val.is_known());
-  EXPECT_FALSE(z_val.is_known());
+  EXPECT_TRUE(zero.IsKnown());
+  EXPECT_TRUE(one.IsKnown());
+  EXPECT_FALSE(x_val.IsKnown());
+  EXPECT_FALSE(z_val.IsKnown());
 
-  EXPECT_TRUE(zero.is_zero());
-  EXPECT_TRUE(one.is_one());
-  EXPECT_FALSE(zero.is_one());
-  EXPECT_FALSE(one.is_zero());
+  EXPECT_TRUE(zero.IsZero());
+  EXPECT_TRUE(one.IsOne());
+  EXPECT_FALSE(zero.IsOne());
+  EXPECT_FALSE(one.IsZero());
 }
 
 TEST(Types, Logic4WordAnd) {
@@ -28,22 +28,22 @@ TEST(Types, Logic4WordAnd) {
   Logic4Word x_val = {0, 1};
 
   // 1 & 1 = 1
-  auto r1 = logic4_and(one, one);
+  auto r1 = Logic4And(one, one);
   EXPECT_EQ(r1.aval, 1);
   EXPECT_EQ(r1.bval, 0);
 
   // 1 & 0 = 0
-  auto r2 = logic4_and(one, zero);
+  auto r2 = Logic4And(one, zero);
   EXPECT_EQ(r2.aval, 0);
   EXPECT_EQ(r2.bval, 0);
 
   // 0 & x = 0
-  auto r3 = logic4_and(zero, x_val);
+  auto r3 = Logic4And(zero, x_val);
   EXPECT_EQ(r3.aval, 0);
   EXPECT_EQ(r3.bval, 0);
 
   // 1 & x = x
-  auto r4 = logic4_and(one, x_val);
+  auto r4 = Logic4And(one, x_val);
   EXPECT_NE(r4.bval, 0);
 }
 
@@ -53,17 +53,17 @@ TEST(Types, Logic4WordOr) {
   Logic4Word x_val = {0, 1};
 
   // 0 | 0 = 0
-  auto r1 = logic4_or(zero, zero);
+  auto r1 = Logic4Or(zero, zero);
   EXPECT_EQ(r1.aval, 0);
   EXPECT_EQ(r1.bval, 0);
 
   // 1 | 0 = 1
-  auto r2 = logic4_or(one, zero);
+  auto r2 = Logic4Or(one, zero);
   EXPECT_EQ(r2.aval, 1);
   EXPECT_EQ(r2.bval, 0);
 
   // 1 | x = 1
-  auto r3 = logic4_or(one, x_val);
+  auto r3 = Logic4Or(one, x_val);
   EXPECT_EQ(r3.aval, 1);
   EXPECT_EQ(r3.bval, 0);
 }
@@ -73,12 +73,12 @@ TEST(Types, Logic4WordXor) {
   Logic4Word one = {1, 0};
 
   // 1 ^ 0 = 1
-  auto r1 = logic4_xor(one, zero);
+  auto r1 = Logic4Xor(one, zero);
   EXPECT_EQ(r1.aval, 1);
   EXPECT_EQ(r1.bval, 0);
 
   // 1 ^ 1 = 0
-  auto r2 = logic4_xor(one, one);
+  auto r2 = Logic4Xor(one, one);
   EXPECT_EQ(r2.aval, 0);
   EXPECT_EQ(r2.bval, 0);
 }
@@ -88,48 +88,48 @@ TEST(Types, Logic4WordNot) {
   Logic4Word one = {1, 0};
   Logic4Word x_val = {0, 1};
 
-  auto r1 = logic4_not(zero);
+  auto r1 = Logic4Not(zero);
   EXPECT_EQ(r1.aval, ~uint64_t(0));  // all 64 bits flip: 0->1
   EXPECT_EQ(r1.bval, 0);
 
-  auto r2 = logic4_not(one);
+  auto r2 = Logic4Not(one);
   EXPECT_EQ(r2.aval, ~uint64_t(1));  // bit 0: 1->0, bits 1-63: 0->1
   EXPECT_EQ(r2.bval, 0);
 
-  auto r3 = logic4_not(x_val);
+  auto r3 = Logic4Not(x_val);
   EXPECT_NE(r3.bval, 0);
 }
 
 TEST(Types, Logic4VecCreationAndToString) {
   Arena arena;
-  auto vec = make_logic4_vec_val(arena, 8, 0xA5);
+  auto vec = MakeLogic4VecVal(arena, 8, 0xA5);
   EXPECT_EQ(vec.width, 8);
-  EXPECT_TRUE(vec.is_known());
-  EXPECT_EQ(vec.to_uint64(), 0xA5);
-  EXPECT_EQ(vec.to_string(), "10100101");
+  EXPECT_TRUE(vec.IsKnown());
+  EXPECT_EQ(vec.ToUint64(), 0xA5);
+  EXPECT_EQ(vec.ToString(), "10100101");
 }
 
 TEST(Arena, Allocation) {
   Arena arena;
-  const auto* p1 = arena.alloc_array<uint64_t>(10);
+  const auto* p1 = arena.AllocArray<uint64_t>(10);
   ASSERT_NE(p1, nullptr);
-  auto* p2 = arena.alloc_array<uint32_t>(100);
+  auto* p2 = arena.AllocArray<uint32_t>(100);
   ASSERT_NE(p2, nullptr);
   EXPECT_NE(p1, reinterpret_cast<const uint64_t*>(p2));
-  EXPECT_GT(arena.total_allocated(), 0);
+  EXPECT_GT(arena.TotalAllocated(), 0);
 }
 
 TEST(Arena, StringAllocation) {
   Arena arena;
   const char* src = "hello";
-  auto* s = arena.alloc_string(src, 5);
+  auto* s = arena.AllocString(src, 5);
   EXPECT_EQ(std::string_view(s), "hello");
 }
 
 TEST(Arena, Reset) {
   Arena arena;
-  arena.alloc_array<char>(1000);
-  EXPECT_EQ(arena.total_allocated(), 1000);
-  arena.reset();
-  EXPECT_EQ(arena.total_allocated(), 0);
+  arena.AllocArray<char>(1000);
+  EXPECT_EQ(arena.TotalAllocated(), 1000);
+  arena.Reset();
+  EXPECT_EQ(arena.TotalAllocated(), 0);
 }

@@ -6,19 +6,19 @@
 namespace delta {
 
 // Evaluate a binary arithmetic operation on two constant integers.
-static std::optional<int64_t> eval_binary(TokenKind op, int64_t lhs,
-                                          int64_t rhs) {
+static std::optional<int64_t> EvalBinary(TokenKind op, int64_t lhs,
+                                         int64_t rhs) {
   switch (op) {
-    case TokenKind::Plus:
+    case TokenKind::kPlus:
       return lhs + rhs;
-    case TokenKind::Minus:
+    case TokenKind::kMinus:
       return lhs - rhs;
-    case TokenKind::Star:
+    case TokenKind::kStar:
       return lhs * rhs;
-    case TokenKind::Slash:
+    case TokenKind::kSlash:
       if (rhs == 0) return std::nullopt;
       return lhs / rhs;
-    case TokenKind::Percent:
+    case TokenKind::kPercent:
       if (rhs == 0) return std::nullopt;
       return lhs % rhs;
     default:
@@ -27,39 +27,39 @@ static std::optional<int64_t> eval_binary(TokenKind op, int64_t lhs,
 }
 
 // Evaluate a unary operation on a constant integer.
-static std::optional<int64_t> eval_unary(TokenKind op, int64_t operand) {
+static std::optional<int64_t> EvalUnary(TokenKind op, int64_t operand) {
   switch (op) {
-    case TokenKind::Minus:
+    case TokenKind::kMinus:
       return -operand;
-    case TokenKind::Plus:
+    case TokenKind::kPlus:
       return operand;
-    case TokenKind::Tilde:
+    case TokenKind::kTilde:
       return ~operand;
-    case TokenKind::Bang:
+    case TokenKind::kBang:
       return operand == 0 ? 1 : 0;
     default:
       return std::nullopt;
   }
 }
 
-std::optional<int64_t> const_eval_int(const Expr* expr) {
+std::optional<int64_t> ConstEvalInt(const Expr* expr) {
   if (!expr) return std::nullopt;
 
   switch (expr->kind) {
-    case ExprKind::IntegerLiteral:
+    case ExprKind::kIntegerLiteral:
       return static_cast<int64_t>(expr->int_val);
 
-    case ExprKind::Unary: {
-      auto operand = const_eval_int(expr->lhs);
+    case ExprKind::kUnary: {
+      auto operand = ConstEvalInt(expr->lhs);
       if (!operand) return std::nullopt;
-      return eval_unary(expr->op, *operand);
+      return EvalUnary(expr->op, *operand);
     }
 
-    case ExprKind::Binary: {
-      auto lhs = const_eval_int(expr->lhs);
-      auto rhs = const_eval_int(expr->rhs);
+    case ExprKind::kBinary: {
+      auto lhs = ConstEvalInt(expr->lhs);
+      auto rhs = ConstEvalInt(expr->rhs);
       if (!lhs || !rhs) return std::nullopt;
-      return eval_binary(expr->op, *lhs, *rhs);
+      return EvalBinary(expr->op, *lhs, *rhs);
     }
 
     default:

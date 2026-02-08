@@ -7,6 +7,6 @@
 
 namespace delta {
 
-std::optional<TokenKind> lookup_keyword(std::string_view text);
+std::optional<TokenKind> LookupKeyword(std::string_view text);
 
 }  // namespace delta

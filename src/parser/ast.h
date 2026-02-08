@@ -19,20 +19,20 @@ struct ModuleItem;
 // --- Expressions ---
 
 enum class ExprKind : uint8_t {
-  IntegerLiteral,
-  RealLiteral,
-  StringLiteral,
-  UnbasedUnsizedLiteral,
-  Identifier,
-  SystemCall,
-  Unary,
-  Binary,
-  Ternary,
-  Concatenation,
-  Replicate,
-  Select,        // a[i] or a[i:j]
-  MemberAccess,  // a.b
-  Call,          // func(args)
+  kIntegerLiteral,
+  kRealLiteral,
+  kStringLiteral,
+  kUnbasedUnsizedLiteral,
+  kIdentifier,
+  kSystemCall,
+  kUnary,
+  kBinary,
+  kTernary,
+  kConcatenation,
+  kReplicate,
+  kSelect,        // a[i] or a[i:j]
+  kMemberAccess,  // a.b
+  kCall,          // func(args)
 };
 
 struct Expr {
@@ -44,7 +44,7 @@ struct Expr {
   uint64_t int_val = 0;
 
   // Unary/binary
-  TokenKind op = TokenKind::Eof;
+  TokenKind op = TokenKind::kEof;
   Expr* lhs = nullptr;
   Expr* rhs = nullptr;
 
@@ -70,37 +70,37 @@ struct Expr {
 // --- Statements ---
 
 enum class StmtKind : uint8_t {
-  Block,
-  If,
-  Case,
-  For,
-  While,
-  Forever,
-  Repeat,
-  DoWhile,
-  Break,
-  Continue,
-  Return,
-  BlockingAssign,
-  NonblockingAssign,
-  ExprStmt,
-  TimingControl,
-  Delay,
-  EventControl,
-  Wait,
-  Fork,
-  Disable,
-  Null,
+  kBlock,
+  kIf,
+  kCase,
+  kFor,
+  kWhile,
+  kForever,
+  kRepeat,
+  kDoWhile,
+  kBreak,
+  kContinue,
+  kReturn,
+  kBlockingAssign,
+  kNonblockingAssign,
+  kExprStmt,
+  kTimingControl,
+  kDelay,
+  kEventControl,
+  kWait,
+  kFork,
+  kDisable,
+  kNull,
 };
 
 enum class Edge : uint8_t {
-  None,
-  Posedge,
-  Negedge,
+  kNone,
+  kPosedge,
+  kNegedge,
 };
 
 struct EventExpr {
-  Edge edge = Edge::None;
+  Edge edge = Edge::kNone;
   Expr* signal = nullptr;
 };
 
@@ -135,14 +135,14 @@ struct Stmt {
 
   // Case
   std::vector<CaseItem> case_items;
-  TokenKind case_kind = TokenKind::KwCase;  // case/casex/casez
+  TokenKind case_kind = TokenKind::kKwCase;  // case/casex/casez
 
   // Timing
   std::vector<EventExpr> events;
 
   // Fork
   std::vector<Stmt*> fork_stmts;
-  TokenKind join_kind = TokenKind::KwJoin;
+  TokenKind join_kind = TokenKind::kKwJoin;
 
   // Expression statement
   Expr* expr = nullptr;
@@ -154,34 +154,34 @@ struct Stmt {
 // --- Declarations and module items ---
 
 enum class Direction : uint8_t {
-  None,
-  Input,
-  Output,
-  Inout,
-  Ref,
+  kNone,
+  kInput,
+  kOutput,
+  kInout,
+  kRef,
 };
 
 enum class DataTypeKind : uint8_t {
-  Implicit,
-  Logic,
-  Reg,
-  Bit,
-  Byte,
-  Shortint,
-  Int,
-  Longint,
-  Integer,
-  Real,
-  Shortreal,
-  Time,
-  Realtime,
-  String,
-  Void,
-  Named,
+  kImplicit,
+  kLogic,
+  kReg,
+  kBit,
+  kByte,
+  kShortint,
+  kInt,
+  kLongint,
+  kInteger,
+  kReal,
+  kShortreal,
+  kTime,
+  kRealtime,
+  kString,
+  kVoid,
+  kNamed,
 };
 
 struct DataType {
-  DataTypeKind kind = DataTypeKind::Implicit;
+  DataTypeKind kind = DataTypeKind::kImplicit;
   bool is_signed = false;
   Expr* packed_dim_left = nullptr;
   Expr* packed_dim_right = nullptr;
@@ -189,7 +189,7 @@ struct DataType {
 };
 
 struct PortDecl {
-  Direction direction = Direction::None;
+  Direction direction = Direction::kNone;
   DataType data_type;
   std::string_view name;
   Expr* default_value = nullptr;
@@ -197,25 +197,25 @@ struct PortDecl {
 };
 
 enum class ModuleItemKind : uint8_t {
-  NetDecl,
-  VarDecl,
-  ParamDecl,
-  ContAssign,
-  InitialBlock,
-  FinalBlock,
-  AlwaysBlock,
-  AlwaysCombBlock,
-  AlwaysFFBlock,
-  AlwaysLatchBlock,
-  GenerateBlock,
-  ModuleInst,
+  kNetDecl,
+  kVarDecl,
+  kParamDecl,
+  kContAssign,
+  kInitialBlock,
+  kFinalBlock,
+  kAlwaysBlock,
+  kAlwaysCombBlock,
+  kAlwaysFFBlock,
+  kAlwaysLatchBlock,
+  kGenerateBlock,
+  kModuleInst,
 };
 
 enum class AlwaysKind : uint8_t {
-  Always,
-  AlwaysComb,
-  AlwaysFF,
-  AlwaysLatch,
+  kAlways,
+  kAlwaysComb,
+  kAlwaysFF,
+  kAlwaysLatch,
 };
 
 struct ModuleItem {
@@ -233,7 +233,7 @@ struct ModuleItem {
   Expr* assign_rhs = nullptr;
 
   // Always/initial/final blocks
-  AlwaysKind always_kind = AlwaysKind::Always;
+  AlwaysKind always_kind = AlwaysKind::kAlways;
   Stmt* body = nullptr;
   std::vector<EventExpr> sensitivity;
 

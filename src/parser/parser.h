@@ -11,66 +11,66 @@ class Parser {
  public:
   Parser(Lexer& lexer, Arena& arena, DiagEngine& diag);
 
-  CompilationUnit* parse();
+  CompilationUnit* Parse();
 
  private:
   // Module parsing
-  ModuleDecl* parse_module_decl();
-  void parse_port_list(ModuleDecl& mod);
-  PortDecl parse_port_decl();
-  void parse_module_body(ModuleDecl& mod);
-  ModuleItem* parse_module_item();
+  ModuleDecl* ParseModuleDecl();
+  void ParsePortList(ModuleDecl& mod);
+  PortDecl ParsePortDecl();
+  void ParseModuleBody(ModuleDecl& mod);
+  ModuleItem* ParseModuleItem();
 
   // Declarations
-  ModuleItem* parse_net_or_var_decl(const DataType& dtype);
-  ModuleItem* parse_continuous_assign();
-  ModuleItem* parse_param_decl();
-  ModuleItem* parse_always_block(AlwaysKind kind);
-  ModuleItem* parse_initial_block();
-  ModuleItem* parse_final_block();
+  ModuleItem* ParseNetOrVarDecl(const DataType& dtype);
+  ModuleItem* ParseContinuousAssign();
+  ModuleItem* ParseParamDecl();
+  ModuleItem* ParseAlwaysBlock(AlwaysKind kind);
+  ModuleItem* ParseInitialBlock();
+  ModuleItem* ParseFinalBlock();
 
   // Statements
-  Stmt* parse_stmt();
-  Stmt* parse_block_stmt();
-  Stmt* parse_if_stmt();
-  Stmt* parse_case_stmt(TokenKind case_kind);
-  CaseItem parse_case_item();
-  Stmt* parse_for_stmt();
-  Stmt* parse_while_stmt();
-  Stmt* parse_forever_stmt();
-  Stmt* parse_repeat_stmt();
-  Stmt* parse_fork_stmt();
-  Stmt* parse_assignment_or_expr_stmt();
-  Stmt* parse_delay_stmt();
-  Stmt* parse_event_control_stmt();
+  Stmt* ParseStmt();
+  Stmt* ParseBlockStmt();
+  Stmt* ParseIfStmt();
+  Stmt* ParseCaseStmt(TokenKind case_kind);
+  CaseItem ParseCaseItem();
+  Stmt* ParseForStmt();
+  Stmt* ParseWhileStmt();
+  Stmt* ParseForeverStmt();
+  Stmt* ParseRepeatStmt();
+  Stmt* ParseForkStmt();
+  Stmt* ParseAssignmentOrExprStmt();
+  Stmt* ParseDelayStmt();
+  Stmt* ParseEventControlStmt();
 
   // Expressions (Pratt parser — in expr_parser.cpp)
-  Expr* parse_expr();
-  Expr* parse_expr_bp(int min_bp);
-  Expr* parse_prefix_expr();
-  Expr* parse_primary_expr();
-  Expr* make_literal(ExprKind kind, const Token& tok);
-  Expr* parse_call_expr(Expr* callee);
-  Expr* parse_select_expr(Expr* base);
-  Expr* parse_system_call();
-  Expr* parse_concatenation();
+  Expr* ParseExpr();
+  Expr* ParseExprBp(int min_bp);
+  Expr* ParsePrefixExpr();
+  Expr* ParsePrimaryExpr();
+  Expr* MakeLiteral(ExprKind kind, const Token& tok);
+  Expr* ParseCallExpr(Expr* callee);
+  Expr* ParseSelectExpr(Expr* base);
+  Expr* ParseSystemCall();
+  Expr* ParseConcatenation();
 
   // Types
-  DataType parse_data_type();
+  DataType ParseDataType();
 
   // Event lists
-  std::vector<EventExpr> parse_event_list();
-  EventExpr parse_single_event();
+  std::vector<EventExpr> ParseEventList();
+  EventExpr ParseSingleEvent();
 
   // Utilities
-  Token expect(TokenKind kind);
-  bool match(TokenKind kind);
-  Token consume();
-  Token current_token();
-  bool check(TokenKind kind);
-  bool at_end();
-  SourceLoc current_loc();
-  void synchronize();
+  Token Expect(TokenKind kind);
+  bool Match(TokenKind kind);
+  Token Consume();
+  Token CurrentToken();
+  bool Check(TokenKind kind);
+  bool AtEnd();
+  SourceLoc CurrentLoc();
+  void Synchronize();
 
   Lexer& lexer_;
   Arena& arena_;

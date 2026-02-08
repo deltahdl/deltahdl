@@ -9,22 +9,22 @@ namespace delta {
 Lexer::Lexer(std::string_view source, uint32_t file_id, DiagEngine& diag)
     : source_(source), file_id_(file_id), diag_(diag) {}
 
-char Lexer::current() const {
-  if (at_end()) {
+char Lexer::Current() const {
+  if (AtEnd()) {
     return '\0';
   }
   return source_[pos_];
 }
 
-char Lexer::peek_char() const {
+char Lexer::PeekChar() const {
   if (pos_ + 1 >= source_.size()) {
     return '\0';
   }
   return source_[pos_ + 1];
 }
 
-void Lexer::advance() {
-  if (at_end()) {
+void Lexer::Advance() {
+  if (AtEnd()) {
     return;
   }
   if (source_[pos_] == '\n') {
@@ -36,46 +36,46 @@ void Lexer::advance() {
   ++pos_;
 }
 
-bool Lexer::at_end() const { return pos_ >= source_.size(); }
+bool Lexer::AtEnd() const { return pos_ >= source_.size(); }
 
-SourceLoc Lexer::make_loc() const { return {file_id_, line_, column_}; }
+SourceLoc Lexer::MakeLoc() const { return {file_id_, line_, column_}; }
 
 // ---------------------------------------------------------------------------
 // Whitespace and comments
 // ---------------------------------------------------------------------------
 
-void Lexer::skip_line_comment() {
-  while (!at_end() && current() != '\n') {
-    advance();
+void Lexer::SkipLineComment() {
+  while (!AtEnd() && Current() != '\n') {
+    Advance();
   }
 }
 
-void Lexer::skip_block_comment() {
+void Lexer::SkipBlockComment() {
   // Caller has already consumed '/' and '*'.
-  while (!at_end()) {
-    if (current() == '*' && peek_char() == '/') {
-      advance();
-      advance();
+  while (!AtEnd()) {
+    if (Current() == '*' && PeekChar() == '/') {
+      Advance();
+      Advance();
       return;
     }
-    advance();
+    Advance();
   }
 }
 
-void Lexer::skip_whitespace_and_comments() {
-  while (!at_end()) {
-    if (std::isspace(static_cast<unsigned char>(current()))) {
-      advance();
+void Lexer::SkipWhitespaceAndComments() {
+  while (!AtEnd()) {
+    if (std::isspace(static_cast<unsigned char>(Current()))) {
+      Advance();
       continue;
     }
-    if (current() == '/' && peek_char() == '/') {
-      skip_line_comment();
+    if (Current() == '/' && PeekChar() == '/') {
+      SkipLineComment();
       continue;
     }
-    if (current() == '/' && peek_char() == '*') {
-      advance();  // skip '/'
-      advance();  // skip '*'
-      skip_block_comment();
+    if (Current() == '/' && PeekChar() == '*') {
+      Advance();  // skip '/'
+      Advance();  // skip '*'
+      SkipBlockComment();
       continue;
     }
     break;
@@ -86,14 +86,14 @@ void Lexer::skip_whitespace_and_comments() {
 // Token construction
 // ---------------------------------------------------------------------------
 
-Token Lexer::make_token(TokenKind kind, SourceLoc loc) const {
+Token Lexer::MakeToken(TokenKind kind, SourceLoc loc) const {
   Token tok;
   tok.kind = kind;
   tok.loc = loc;
   return tok;
 }
 
-Token Lexer::make_op(TokenKind kind, SourceLoc loc, uint32_t start) {
+Token Lexer::MakeOp(TokenKind kind, SourceLoc loc, uint32_t start) {
   Token tok;
   tok.kind = kind;
   tok.loc = loc;
@@ -105,40 +105,40 @@ Token Lexer::make_op(TokenKind kind, SourceLoc loc, uint32_t start) {
 // Top-level dispatch
 // ---------------------------------------------------------------------------
 
-Token Lexer::next() {
+Token Lexer::Next() {
   if (has_peeked_) {
     has_peeked_ = false;
     return peeked_;
   }
-  skip_whitespace_and_comments();
-  if (at_end()) {
-    return make_token(TokenKind::Eof, make_loc());
+  SkipWhitespaceAndComments();
+  if (AtEnd()) {
+    return MakeToken(TokenKind::kEof, MakeLoc());
   }
-  char c = current();
+  char c = Current();
   if (c == '$') {
-    return lex_system_identifier();
+    return LexSystemIdentifier();
   }
   if (c == '\\') {
-    return lex_escaped_identifier();
+    return LexEscapedIdentifier();
   }
   if (c == '"') {
-    return lex_string_literal();
+    return LexStringLiteral();
   }
   if (std::isalpha(static_cast<unsigned char>(c)) || c == '_') {
-    return lex_identifier();
+    return LexIdentifier();
   }
   if (std::isdigit(static_cast<unsigned char>(c))) {
-    return lex_number();
+    return LexNumber();
   }
-  if (c == '\'' && !std::isalpha(static_cast<unsigned char>(peek_char()))) {
-    return lex_number();
+  if (c == '\'' && !std::isalpha(static_cast<unsigned char>(PeekChar()))) {
+    return LexNumber();
   }
-  return lex_operator();
+  return LexOperator();
 }
 
-Token Lexer::peek() {
+Token Lexer::Peek() {
   if (!has_peeked_) {
-    peeked_ = next();
+    peeked_ = Next();
     has_peeked_ = true;
   }
   return peeked_;
@@ -148,17 +148,17 @@ Token Lexer::peek() {
 // Identifiers
 // ---------------------------------------------------------------------------
 
-Token Lexer::lex_identifier() {
-  auto loc = make_loc();
+Token Lexer::LexIdentifier() {
+  auto loc = MakeLoc();
   uint32_t start = pos_;
-  while (!at_end() && (std::isalnum(static_cast<unsigned char>(current())) ||
-                       current() == '_' || current() == '$')) {
-    advance();
+  while (!AtEnd() && (std::isalnum(static_cast<unsigned char>(Current())) ||
+                      Current() == '_' || Current() == '$')) {
+    Advance();
   }
   std::string_view text = source_.substr(start, pos_ - start);
-  auto kw = lookup_keyword(text);
+  auto kw = LookupKeyword(text);
   Token tok;
-  tok.kind = kw.value_or(TokenKind::Identifier);
+  tok.kind = kw.value_or(TokenKind::kIdentifier);
   tok.loc = loc;
   tok.text = text;
   return tok;
@@ -168,87 +168,87 @@ Token Lexer::lex_identifier() {
 // Numbers
 // ---------------------------------------------------------------------------
 
-Token Lexer::lex_unbased_unsized(SourceLoc loc, uint32_t start) {
-  advance();  // skip '
-  if (!at_end()) {
-    advance();  // value character
+Token Lexer::LexUnbasedUnsized(SourceLoc loc, uint32_t start) {
+  Advance();  // skip '
+  if (!AtEnd()) {
+    Advance();  // value character
   }
   Token tok;
-  tok.kind = TokenKind::UnbasedUnsizedLiteral;
+  tok.kind = TokenKind::kUnbasedUnsizedLiteral;
   tok.loc = loc;
   tok.text = source_.substr(start, pos_ - start);
   return tok;
 }
 
-Token Lexer::lex_based_number(SourceLoc loc, uint32_t start) {
-  advance();  // skip '
-  if (!at_end()) {
-    advance();  // base letter
+Token Lexer::LexBasedNumber(SourceLoc loc, uint32_t start) {
+  Advance();  // skip '
+  if (!AtEnd()) {
+    Advance();  // base letter
   }
-  while (!at_end() &&
-         (std::isxdigit(static_cast<unsigned char>(current())) ||
-          current() == '_' || current() == 'x' || current() == 'z' ||
-          current() == 'X' || current() == 'Z' || current() == '?')) {
-    advance();
+  while (!AtEnd() &&
+         (std::isxdigit(static_cast<unsigned char>(Current())) ||
+          Current() == '_' || Current() == 'x' || Current() == 'z' ||
+          Current() == 'X' || Current() == 'Z' || Current() == '?')) {
+    Advance();
   }
   Token tok;
-  tok.kind = TokenKind::IntLiteral;
+  tok.kind = TokenKind::kIntLiteral;
   tok.loc = loc;
   tok.text = source_.substr(start, pos_ - start);
   return tok;
 }
 
-void Lexer::lex_fractional_part() {
-  if (at_end() || current() != '.') return;
-  if (!std::isdigit(static_cast<unsigned char>(peek_char()))) return;
-  advance();
-  while (!at_end() && (std::isdigit(static_cast<unsigned char>(current())) ||
-                       current() == '_')) {
-    advance();
+void Lexer::LexFractionalPart() {
+  if (AtEnd() || Current() != '.') return;
+  if (!std::isdigit(static_cast<unsigned char>(PeekChar()))) return;
+  Advance();
+  while (!AtEnd() && (std::isdigit(static_cast<unsigned char>(Current())) ||
+                      Current() == '_')) {
+    Advance();
   }
 }
 
-void Lexer::lex_exponent_part() {
-  if (at_end()) return;
-  if (current() != 'e' && current() != 'E') return;
-  advance();
-  if (!at_end() && (current() == '+' || current() == '-')) {
-    advance();
+void Lexer::LexExponentPart() {
+  if (AtEnd()) return;
+  if (Current() != 'e' && Current() != 'E') return;
+  Advance();
+  if (!AtEnd() && (Current() == '+' || Current() == '-')) {
+    Advance();
   }
-  while (!at_end() && std::isdigit(static_cast<unsigned char>(current()))) {
-    advance();
+  while (!AtEnd() && std::isdigit(static_cast<unsigned char>(Current()))) {
+    Advance();
   }
 }
 
-void Lexer::lex_real_suffix() {
-  lex_fractional_part();
-  lex_exponent_part();
+void Lexer::LexRealSuffix() {
+  LexFractionalPart();
+  LexExponentPart();
 }
 
-Token Lexer::lex_number() {
-  auto loc = make_loc();
+Token Lexer::LexNumber() {
+  auto loc = MakeLoc();
   uint32_t start = pos_;
 
-  if (current() == '\'') {
-    return lex_unbased_unsized(loc, start);
+  if (Current() == '\'') {
+    return LexUnbasedUnsized(loc, start);
   }
 
   // Decimal digits
-  while (!at_end() && (std::isdigit(static_cast<unsigned char>(current())) ||
-                       current() == '_')) {
-    advance();
+  while (!AtEnd() && (std::isdigit(static_cast<unsigned char>(Current())) ||
+                      Current() == '_')) {
+    Advance();
   }
 
   // Check for base specifier: 'h, 'b, 'o, 'd
-  if (!at_end() && current() == '\'') {
-    return lex_based_number(loc, start);
+  if (!AtEnd() && Current() == '\'') {
+    return LexBasedNumber(loc, start);
   }
 
   // Check for real literal (decimal point or exponent)
-  lex_real_suffix();
+  LexRealSuffix();
 
   Token tok;
-  tok.kind = TokenKind::IntLiteral;
+  tok.kind = TokenKind::kIntLiteral;
   tok.loc = loc;
   tok.text = source_.substr(start, pos_ - start);
   return tok;
@@ -258,50 +258,50 @@ Token Lexer::lex_number() {
 // String / system / escaped identifiers
 // ---------------------------------------------------------------------------
 
-Token Lexer::lex_string_literal() {
-  auto loc = make_loc();
+Token Lexer::LexStringLiteral() {
+  auto loc = MakeLoc();
   uint32_t start = pos_;
-  advance();  // skip opening "
-  while (!at_end() && current() != '"') {
-    if (current() == '\\') {
-      advance();
+  Advance();  // skip opening "
+  while (!AtEnd() && Current() != '"') {
+    if (Current() == '\\') {
+      Advance();
     }
-    advance();
+    Advance();
   }
-  if (!at_end()) {
-    advance();  // skip closing "
+  if (!AtEnd()) {
+    Advance();  // skip closing "
   }
   Token tok;
-  tok.kind = TokenKind::StringLiteral;
+  tok.kind = TokenKind::kStringLiteral;
   tok.loc = loc;
   tok.text = source_.substr(start, pos_ - start);
   return tok;
 }
 
-Token Lexer::lex_system_identifier() {
-  auto loc = make_loc();
+Token Lexer::LexSystemIdentifier() {
+  auto loc = MakeLoc();
   uint32_t start = pos_;
-  advance();  // skip $
-  while (!at_end() && (std::isalnum(static_cast<unsigned char>(current())) ||
-                       current() == '_')) {
-    advance();
+  Advance();  // skip $
+  while (!AtEnd() && (std::isalnum(static_cast<unsigned char>(Current())) ||
+                      Current() == '_')) {
+    Advance();
   }
   Token tok;
-  tok.kind = TokenKind::SystemIdentifier;
+  tok.kind = TokenKind::kSystemIdentifier;
   tok.loc = loc;
   tok.text = source_.substr(start, pos_ - start);
   return tok;
 }
 
-Token Lexer::lex_escaped_identifier() {
-  auto loc = make_loc();
+Token Lexer::LexEscapedIdentifier() {
+  auto loc = MakeLoc();
   uint32_t start = pos_;
-  advance();  // skip backslash
-  while (!at_end() && !std::isspace(static_cast<unsigned char>(current()))) {
-    advance();
+  Advance();  // skip backslash
+  while (!AtEnd() && !std::isspace(static_cast<unsigned char>(Current()))) {
+    Advance();
   }
   Token tok;
-  tok.kind = TokenKind::EscapedIdentifier;
+  tok.kind = TokenKind::kEscapedIdentifier;
   tok.loc = loc;
   tok.text = source_.substr(start, pos_ - start);
   return tok;
@@ -311,327 +311,327 @@ Token Lexer::lex_escaped_identifier() {
 // Operator sub-helpers
 // ---------------------------------------------------------------------------
 
-Token Lexer::lex_op_tilde(SourceLoc loc, uint32_t start) {
-  if (!at_end() && current() == '&') {
-    advance();
-    return make_op(TokenKind::TildeAmp, loc, start);
+Token Lexer::LexOpTilde(SourceLoc loc, uint32_t start) {
+  if (!AtEnd() && Current() == '&') {
+    Advance();
+    return MakeOp(TokenKind::kTildeAmp, loc, start);
   }
-  if (!at_end() && current() == '|') {
-    advance();
-    return make_op(TokenKind::TildePipe, loc, start);
+  if (!AtEnd() && Current() == '|') {
+    Advance();
+    return MakeOp(TokenKind::kTildePipe, loc, start);
   }
-  if (!at_end() && current() == '^') {
-    advance();
-    return make_op(TokenKind::TildeCaret, loc, start);
+  if (!AtEnd() && Current() == '^') {
+    Advance();
+    return MakeOp(TokenKind::kTildeCaret, loc, start);
   }
-  return make_op(TokenKind::Tilde, loc, start);
+  return MakeOp(TokenKind::kTilde, loc, start);
 }
 
-Token Lexer::lex_op_plus(SourceLoc loc, uint32_t start) {
-  if (!at_end() && current() == '+') {
-    advance();
-    return make_op(TokenKind::PlusPlus, loc, start);
+Token Lexer::LexOpPlus(SourceLoc loc, uint32_t start) {
+  if (!AtEnd() && Current() == '+') {
+    Advance();
+    return MakeOp(TokenKind::kPlusPlus, loc, start);
   }
-  if (!at_end() && current() == '=') {
-    advance();
-    return make_op(TokenKind::PlusEq, loc, start);
+  if (!AtEnd() && Current() == '=') {
+    Advance();
+    return MakeOp(TokenKind::kPlusEq, loc, start);
   }
-  return make_op(TokenKind::Plus, loc, start);
+  return MakeOp(TokenKind::kPlus, loc, start);
 }
 
-Token Lexer::lex_op_minus(SourceLoc loc, uint32_t start) {
-  if (!at_end() && current() == '-') {
-    advance();
-    return make_op(TokenKind::MinusMinus, loc, start);
+Token Lexer::LexOpMinus(SourceLoc loc, uint32_t start) {
+  if (!AtEnd() && Current() == '-') {
+    Advance();
+    return MakeOp(TokenKind::kMinusMinus, loc, start);
   }
-  if (!at_end() && current() == '=') {
-    advance();
-    return make_op(TokenKind::MinusEq, loc, start);
+  if (!AtEnd() && Current() == '=') {
+    Advance();
+    return MakeOp(TokenKind::kMinusEq, loc, start);
   }
-  if (!at_end() && current() == '>') {
-    advance();
-    if (!at_end() && current() == '>') {
-      advance();
-      return make_op(TokenKind::DashGtGt, loc, start);
+  if (!AtEnd() && Current() == '>') {
+    Advance();
+    if (!AtEnd() && Current() == '>') {
+      Advance();
+      return MakeOp(TokenKind::kDashGtGt, loc, start);
     }
-    return make_op(TokenKind::Arrow, loc, start);
+    return MakeOp(TokenKind::kArrow, loc, start);
   }
-  return make_op(TokenKind::Minus, loc, start);
+  return MakeOp(TokenKind::kMinus, loc, start);
 }
 
-Token Lexer::lex_op_star(SourceLoc loc, uint32_t start) {
-  if (!at_end() && current() == '*') {
-    advance();
-    return make_op(TokenKind::Power, loc, start);
+Token Lexer::LexOpStar(SourceLoc loc, uint32_t start) {
+  if (!AtEnd() && Current() == '*') {
+    Advance();
+    return MakeOp(TokenKind::kPower, loc, start);
   }
-  if (!at_end() && current() == '=') {
-    advance();
-    return make_op(TokenKind::StarEq, loc, start);
+  if (!AtEnd() && Current() == '=') {
+    Advance();
+    return MakeOp(TokenKind::kStarEq, loc, start);
   }
-  if (!at_end() && current() == '>') {
-    advance();
-    return make_op(TokenKind::StarGt, loc, start);
+  if (!AtEnd() && Current() == '>') {
+    Advance();
+    return MakeOp(TokenKind::kStarGt, loc, start);
   }
-  return make_op(TokenKind::Star, loc, start);
+  return MakeOp(TokenKind::kStar, loc, start);
 }
 
-Token Lexer::lex_op_caret(SourceLoc loc, uint32_t start) {
-  if (!at_end() && current() == '~') {
-    advance();
-    return make_op(TokenKind::CaretTilde, loc, start);
+Token Lexer::LexOpCaret(SourceLoc loc, uint32_t start) {
+  if (!AtEnd() && Current() == '~') {
+    Advance();
+    return MakeOp(TokenKind::kCaretTilde, loc, start);
   }
-  if (!at_end() && current() == '=') {
-    advance();
-    return make_op(TokenKind::CaretEq, loc, start);
+  if (!AtEnd() && Current() == '=') {
+    Advance();
+    return MakeOp(TokenKind::kCaretEq, loc, start);
   }
-  return make_op(TokenKind::Caret, loc, start);
+  return MakeOp(TokenKind::kCaret, loc, start);
 }
 
-Token Lexer::lex_op_amp(SourceLoc loc, uint32_t start) {
-  if (!at_end() && current() == '&') {
-    advance();
-    if (!at_end() && current() == '&') {
-      advance();
-      return make_op(TokenKind::AmpAmpAmp, loc, start);
+Token Lexer::LexOpAmp(SourceLoc loc, uint32_t start) {
+  if (!AtEnd() && Current() == '&') {
+    Advance();
+    if (!AtEnd() && Current() == '&') {
+      Advance();
+      return MakeOp(TokenKind::kAmpAmpAmp, loc, start);
     }
-    return make_op(TokenKind::AmpAmp, loc, start);
+    return MakeOp(TokenKind::kAmpAmp, loc, start);
   }
-  if (!at_end() && current() == '=') {
-    advance();
-    return make_op(TokenKind::AmpEq, loc, start);
+  if (!AtEnd() && Current() == '=') {
+    Advance();
+    return MakeOp(TokenKind::kAmpEq, loc, start);
   }
-  return make_op(TokenKind::Amp, loc, start);
+  return MakeOp(TokenKind::kAmp, loc, start);
 }
 
-Token Lexer::lex_op_pipe(SourceLoc loc, uint32_t start) {
-  if (!at_end() && current() == '|') {
-    advance();
-    return make_op(TokenKind::PipePipe, loc, start);
+Token Lexer::LexOpPipe(SourceLoc loc, uint32_t start) {
+  if (!AtEnd() && Current() == '|') {
+    Advance();
+    return MakeOp(TokenKind::kPipePipe, loc, start);
   }
-  if (!at_end() && current() == '=') {
-    advance();
-    if (!at_end() && current() == '>') {
-      advance();
-      return make_op(TokenKind::PipeEqGt, loc, start);
+  if (!AtEnd() && Current() == '=') {
+    Advance();
+    if (!AtEnd() && Current() == '>') {
+      Advance();
+      return MakeOp(TokenKind::kPipeEqGt, loc, start);
     }
-    return make_op(TokenKind::PipeEq, loc, start);
+    return MakeOp(TokenKind::kPipeEq, loc, start);
   }
-  if (!at_end() && current() == '-' && peek_char() == '>') {
-    advance();
-    advance();
-    return make_op(TokenKind::PipeDashGt, loc, start);
+  if (!AtEnd() && Current() == '-' && PeekChar() == '>') {
+    Advance();
+    Advance();
+    return MakeOp(TokenKind::kPipeDashGt, loc, start);
   }
-  return make_op(TokenKind::Pipe, loc, start);
+  return MakeOp(TokenKind::kPipe, loc, start);
 }
 
-Token Lexer::lex_op_bang(SourceLoc loc, uint32_t start) {
-  if (!at_end() && current() == '=') {
-    advance();
-    if (!at_end() && current() == '=') {
-      advance();
-      return make_op(TokenKind::BangEqEq, loc, start);
+Token Lexer::LexOpBang(SourceLoc loc, uint32_t start) {
+  if (!AtEnd() && Current() == '=') {
+    Advance();
+    if (!AtEnd() && Current() == '=') {
+      Advance();
+      return MakeOp(TokenKind::kBangEqEq, loc, start);
     }
-    if (!at_end() && current() == '?') {
-      advance();
-      return make_op(TokenKind::BangEqQuestion, loc, start);
+    if (!AtEnd() && Current() == '?') {
+      Advance();
+      return MakeOp(TokenKind::kBangEqQuestion, loc, start);
     }
-    return make_op(TokenKind::BangEq, loc, start);
+    return MakeOp(TokenKind::kBangEq, loc, start);
   }
-  return make_op(TokenKind::Bang, loc, start);
+  return MakeOp(TokenKind::kBang, loc, start);
 }
 
-Token Lexer::lex_op_eq(SourceLoc loc, uint32_t start) {
-  if (!at_end() && current() == '=') {
-    advance();
-    if (!at_end() && current() == '=') {
-      advance();
-      return make_op(TokenKind::EqEqEq, loc, start);
+Token Lexer::LexOpEq(SourceLoc loc, uint32_t start) {
+  if (!AtEnd() && Current() == '=') {
+    Advance();
+    if (!AtEnd() && Current() == '=') {
+      Advance();
+      return MakeOp(TokenKind::kEqEqEq, loc, start);
     }
-    if (!at_end() && current() == '?') {
-      advance();
-      return make_op(TokenKind::EqEqQuestion, loc, start);
+    if (!AtEnd() && Current() == '?') {
+      Advance();
+      return MakeOp(TokenKind::kEqEqQuestion, loc, start);
     }
-    return make_op(TokenKind::EqEq, loc, start);
+    return MakeOp(TokenKind::kEqEq, loc, start);
   }
-  if (!at_end() && current() == '>') {
-    advance();
-    return make_op(TokenKind::EqGt, loc, start);
+  if (!AtEnd() && Current() == '>') {
+    Advance();
+    return MakeOp(TokenKind::kEqGt, loc, start);
   }
-  return make_op(TokenKind::Eq, loc, start);
+  return MakeOp(TokenKind::kEq, loc, start);
 }
 
-Token Lexer::lex_op_hash(SourceLoc loc, uint32_t start) {
-  if (!at_end() && current() == '#') {
-    advance();
-    return make_op(TokenKind::HashHash, loc, start);
+Token Lexer::LexOpHash(SourceLoc loc, uint32_t start) {
+  if (!AtEnd() && Current() == '#') {
+    Advance();
+    return MakeOp(TokenKind::kHashHash, loc, start);
   }
-  return make_op(TokenKind::Hash, loc, start);
+  return MakeOp(TokenKind::kHash, loc, start);
 }
 
-Token Lexer::lex_op_dot(SourceLoc loc, uint32_t start) {
-  if (!at_end() && current() == '*') {
-    advance();
-    return make_op(TokenKind::DotStar, loc, start);
+Token Lexer::LexOpDot(SourceLoc loc, uint32_t start) {
+  if (!AtEnd() && Current() == '*') {
+    Advance();
+    return MakeOp(TokenKind::kDotStar, loc, start);
   }
-  return make_op(TokenKind::Dot, loc, start);
+  return MakeOp(TokenKind::kDot, loc, start);
 }
 
-Token Lexer::lex_op_colon(SourceLoc loc, uint32_t start) {
-  if (!at_end() && current() == ':') {
-    advance();
-    return make_op(TokenKind::ColonColon, loc, start);
+Token Lexer::LexOpColon(SourceLoc loc, uint32_t start) {
+  if (!AtEnd() && Current() == ':') {
+    Advance();
+    return MakeOp(TokenKind::kColonColon, loc, start);
   }
-  return make_op(TokenKind::Colon, loc, start);
+  return MakeOp(TokenKind::kColon, loc, start);
 }
 
-Token Lexer::lex_op_at(SourceLoc loc, uint32_t start) {
-  if (!at_end() && current() == '@') {
-    advance();
-    return make_op(TokenKind::AtAt, loc, start);
+Token Lexer::LexOpAt(SourceLoc loc, uint32_t start) {
+  if (!AtEnd() && Current() == '@') {
+    Advance();
+    return MakeOp(TokenKind::kAtAt, loc, start);
   }
-  return make_op(TokenKind::At, loc, start);
+  return MakeOp(TokenKind::kAt, loc, start);
 }
 
-Token Lexer::lex_op_slash(SourceLoc loc, uint32_t start) {
-  if (!at_end() && current() == '=') {
-    advance();
-    return make_op(TokenKind::SlashEq, loc, start);
+Token Lexer::LexOpSlash(SourceLoc loc, uint32_t start) {
+  if (!AtEnd() && Current() == '=') {
+    Advance();
+    return MakeOp(TokenKind::kSlashEq, loc, start);
   }
-  return make_op(TokenKind::Slash, loc, start);
+  return MakeOp(TokenKind::kSlash, loc, start);
 }
 
-Token Lexer::lex_op_percent(SourceLoc loc, uint32_t start) {
-  if (!at_end() && current() == '=') {
-    advance();
-    return make_op(TokenKind::PercentEq, loc, start);
+Token Lexer::LexOpPercent(SourceLoc loc, uint32_t start) {
+  if (!AtEnd() && Current() == '=') {
+    Advance();
+    return MakeOp(TokenKind::kPercentEq, loc, start);
   }
-  return make_op(TokenKind::Percent, loc, start);
+  return MakeOp(TokenKind::kPercent, loc, start);
 }
 
-Token Lexer::lex_angle_left(SourceLoc loc, uint32_t start) {
-  if (at_end()) {
-    return make_op(TokenKind::Lt, loc, start);
+Token Lexer::LexAngleLeft(SourceLoc loc, uint32_t start) {
+  if (AtEnd()) {
+    return MakeOp(TokenKind::kLt, loc, start);
   }
-  if (current() == '=') {
-    advance();
-    return make_op(TokenKind::LtEq, loc, start);
+  if (Current() == '=') {
+    Advance();
+    return MakeOp(TokenKind::kLtEq, loc, start);
   }
-  if (current() != '<') {
-    return make_op(TokenKind::Lt, loc, start);
+  if (Current() != '<') {
+    return MakeOp(TokenKind::kLt, loc, start);
   }
-  advance();  // second <
-  if (!at_end() && current() == '<') {
-    advance();
-    if (!at_end() && current() == '=') {
-      advance();
-      return make_op(TokenKind::LtLtLtEq, loc, start);
+  Advance();  // second <
+  if (!AtEnd() && Current() == '<') {
+    Advance();
+    if (!AtEnd() && Current() == '=') {
+      Advance();
+      return MakeOp(TokenKind::kLtLtLtEq, loc, start);
     }
-    return make_op(TokenKind::LtLtLt, loc, start);
+    return MakeOp(TokenKind::kLtLtLt, loc, start);
   }
-  if (!at_end() && current() == '=') {
-    advance();
-    return make_op(TokenKind::LtLtEq, loc, start);
+  if (!AtEnd() && Current() == '=') {
+    Advance();
+    return MakeOp(TokenKind::kLtLtEq, loc, start);
   }
-  return make_op(TokenKind::LtLt, loc, start);
+  return MakeOp(TokenKind::kLtLt, loc, start);
 }
 
-Token Lexer::lex_angle_right(SourceLoc loc, uint32_t start) {
-  if (at_end()) {
-    return make_op(TokenKind::Gt, loc, start);
+Token Lexer::LexAngleRight(SourceLoc loc, uint32_t start) {
+  if (AtEnd()) {
+    return MakeOp(TokenKind::kGt, loc, start);
   }
-  if (current() == '=') {
-    advance();
-    return make_op(TokenKind::GtEq, loc, start);
+  if (Current() == '=') {
+    Advance();
+    return MakeOp(TokenKind::kGtEq, loc, start);
   }
-  if (current() != '>') {
-    return make_op(TokenKind::Gt, loc, start);
+  if (Current() != '>') {
+    return MakeOp(TokenKind::kGt, loc, start);
   }
-  advance();  // second >
-  if (!at_end() && current() == '>') {
-    advance();
-    if (!at_end() && current() == '=') {
-      advance();
-      return make_op(TokenKind::GtGtGtEq, loc, start);
+  Advance();  // second >
+  if (!AtEnd() && Current() == '>') {
+    Advance();
+    if (!AtEnd() && Current() == '=') {
+      Advance();
+      return MakeOp(TokenKind::kGtGtGtEq, loc, start);
     }
-    return make_op(TokenKind::GtGtGt, loc, start);
+    return MakeOp(TokenKind::kGtGtGt, loc, start);
   }
-  if (!at_end() && current() == '=') {
-    advance();
-    return make_op(TokenKind::GtGtEq, loc, start);
+  if (!AtEnd() && Current() == '=') {
+    Advance();
+    return MakeOp(TokenKind::kGtGtEq, loc, start);
   }
-  return make_op(TokenKind::GtGt, loc, start);
+  return MakeOp(TokenKind::kGtGt, loc, start);
 }
 
 // ---------------------------------------------------------------------------
 // Main operator dispatch
 // ---------------------------------------------------------------------------
 
-Token Lexer::lex_operator() {
-  auto loc = make_loc();
+Token Lexer::LexOperator() {
+  auto loc = MakeLoc();
   uint32_t start = pos_;
-  char c = current();
-  advance();
+  char c = Current();
+  Advance();
 
   switch (c) {
     case '(':
-      return make_op(TokenKind::LParen, loc, start);
+      return MakeOp(TokenKind::kLParen, loc, start);
     case ')':
-      return make_op(TokenKind::RParen, loc, start);
+      return MakeOp(TokenKind::kRParen, loc, start);
     case '[':
-      return make_op(TokenKind::LBracket, loc, start);
+      return MakeOp(TokenKind::kLBracket, loc, start);
     case ']':
-      return make_op(TokenKind::RBracket, loc, start);
+      return MakeOp(TokenKind::kRBracket, loc, start);
     case '{':
-      return make_op(TokenKind::LBrace, loc, start);
+      return MakeOp(TokenKind::kLBrace, loc, start);
     case '}':
-      return make_op(TokenKind::RBrace, loc, start);
+      return MakeOp(TokenKind::kRBrace, loc, start);
     case ';':
-      return make_op(TokenKind::Semicolon, loc, start);
+      return MakeOp(TokenKind::kSemicolon, loc, start);
     case ',':
-      return make_op(TokenKind::Comma, loc, start);
+      return MakeOp(TokenKind::kComma, loc, start);
     case '?':
-      return make_op(TokenKind::Question, loc, start);
+      return MakeOp(TokenKind::kQuestion, loc, start);
     case '~':
-      return lex_op_tilde(loc, start);
+      return LexOpTilde(loc, start);
     case '+':
-      return lex_op_plus(loc, start);
+      return LexOpPlus(loc, start);
     case '-':
-      return lex_op_minus(loc, start);
+      return LexOpMinus(loc, start);
     case '*':
-      return lex_op_star(loc, start);
+      return LexOpStar(loc, start);
     case '/':
-      return lex_op_slash(loc, start);
+      return LexOpSlash(loc, start);
     case '%':
-      return lex_op_percent(loc, start);
+      return LexOpPercent(loc, start);
     case '^':
-      return lex_op_caret(loc, start);
+      return LexOpCaret(loc, start);
     case '&':
-      return lex_op_amp(loc, start);
+      return LexOpAmp(loc, start);
     case '|':
-      return lex_op_pipe(loc, start);
+      return LexOpPipe(loc, start);
     case '!':
-      return lex_op_bang(loc, start);
+      return LexOpBang(loc, start);
     case '=':
-      return lex_op_eq(loc, start);
+      return LexOpEq(loc, start);
     case '#':
-      return lex_op_hash(loc, start);
+      return LexOpHash(loc, start);
     case '.':
-      return lex_op_dot(loc, start);
+      return LexOpDot(loc, start);
     case ':':
-      return lex_op_colon(loc, start);
+      return LexOpColon(loc, start);
     case '@':
-      return lex_op_at(loc, start);
+      return LexOpAt(loc, start);
     case '<':
-      return lex_angle_left(loc, start);
+      return LexAngleLeft(loc, start);
     case '>':
-      return lex_angle_right(loc, start);
+      return LexAngleRight(loc, start);
     default:
       break;
   }
 
-  diag_.error(loc, std::string("unexpected character '") + c + "'");
+  diag_.Error(loc, std::string("unexpected character '") + c + "'");
   Token tok;
-  tok.kind = TokenKind::Error;
+  tok.kind = TokenKind::kError;
   tok.loc = loc;
   tok.text = source_.substr(start, pos_ - start);
   return tok;
@@ -641,12 +641,12 @@ Token Lexer::lex_operator() {
 // Bulk lexing
 // ---------------------------------------------------------------------------
 
-std::vector<Token> Lexer::lex_all() {
+std::vector<Token> Lexer::LexAll() {
   std::vector<Token> tokens;
   while (true) {
-    auto tok = next();
+    auto tok = Next();
     tokens.push_back(tok);
-    if (tok.is_eof()) {
+    if (tok.IsEof()) {
       break;
     }
   }

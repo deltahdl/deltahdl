@@ -5,43 +5,43 @@
 
 namespace delta {
 
-static const char* severity_label(DiagSeverity sev) {
+static const char* SeverityLabel(DiagSeverity sev) {
   switch (sev) {
-    case DiagSeverity::Note:
+    case DiagSeverity::kNote:
       return "note";
-    case DiagSeverity::Warning:
+    case DiagSeverity::kWarning:
       return "warning";
-    case DiagSeverity::Error:
+    case DiagSeverity::kError:
       return "error";
-    case DiagSeverity::Fatal:
+    case DiagSeverity::kFatal:
       return "fatal error";
   }
   return "unknown";
 }
 
-void DiagEngine::warning(SourceLoc loc, std::string msg) {
+void DiagEngine::Warning(SourceLoc loc, std::string msg) {
   if (warnings_as_errors_) {
-    emit(DiagSeverity::Error, loc, std::move(msg));
+    Emit(DiagSeverity::kError, loc, std::move(msg));
     return;
   }
-  emit(DiagSeverity::Warning, loc, std::move(msg));
+  Emit(DiagSeverity::kWarning, loc, std::move(msg));
 }
 
-void DiagEngine::error(SourceLoc loc, std::string msg) {
-  emit(DiagSeverity::Error, loc, std::move(msg));
+void DiagEngine::Error(SourceLoc loc, std::string msg) {
+  Emit(DiagSeverity::kError, loc, std::move(msg));
 }
 
-void DiagEngine::emit(DiagSeverity sev, SourceLoc loc, std::string msg) {
-  if (sev == DiagSeverity::Error || sev == DiagSeverity::Fatal) {
+void DiagEngine::Emit(DiagSeverity sev, SourceLoc loc, std::string msg) {
+  if (sev == DiagSeverity::kError || sev == DiagSeverity::kFatal) {
     ++error_count_;
-  } else if (sev == DiagSeverity::Warning) {
+  } else if (sev == DiagSeverity::kWarning) {
     ++warning_count_;
   }
 
-  auto loc_str = src_mgr_.format_loc(loc);
-  std::cerr << std::format("{}: {}: {}\n", loc_str, severity_label(sev), msg);
+  auto loc_str = src_mgr_.FormatLoc(loc);
+  std::cerr << std::format("{}: {}: {}\n", loc_str, SeverityLabel(sev), msg);
 
-  auto line_text = src_mgr_.get_line_text(loc);
+  auto line_text = src_mgr_.GetLineText(loc);
   if (!line_text.empty()) {
     std::cerr << "  " << line_text << "\n";
     if (loc.column > 0) {
