@@ -21,8 +21,8 @@ Static analysis and code constraint enforcement.
 
 | Step | Tool | Purpose |
 |------|------|---------|
-| Format check | `clang-format --dry-run --Werror` | Enforce `.clang-format` style |
-| Static analysis | `clang-tidy` | Code constraints + bug detection |
+| Format check | `clang-format --dry-run --Werror --style='{...}'` | Enforce formatting via inline style |
+| Static analysis | `clang-tidy --config='{...}'` | Code constraints + bug detection via inline config |
 | Bug detection | `cppcheck --enable=all` | Supplementary static analysis |
 | File limits | `lizard -l cpp` + `wc -l` | Lines-per-file constraint |
 
@@ -97,19 +97,17 @@ Steps:
 2. Run all tests
 3. Fail the job on any sanitizer finding
 
-## Configuration Files
+## Configuration
 
-| File | Purpose |
-|------|---------|
-| `.clang-format` | Code formatting style |
-| `.clang-tidy` | Static analysis checks and code constraint thresholds |
-| `.github/workflows/ci.yml` | Single CI workflow with all four jobs |
+All tool configuration is inline in `.github/workflows/ci.yml`. There are no
+separate `.clang-format` or `.clang-tidy` config files — everything is passed
+explicitly on the command line so CI is the single source of truth.
 
 ## Adding New Checks
 
-To add a clang-tidy check: edit `.clang-tidy` and add the check name to the
-`Checks` list. To adjust a threshold: modify the corresponding
-`CheckOptions` entry.
+To add a clang-tidy check: edit the `--config='{...}'` block in the
+`Run clang-tidy` step of `ci.yml`. To adjust a threshold: modify the
+corresponding `CheckOptions` entry in that same block.
 
 To add a new CI job: add a new job to `.github/workflows/ci.yml` under the
 `jobs:` key. Keep it parallel with existing jobs unless it depends on their

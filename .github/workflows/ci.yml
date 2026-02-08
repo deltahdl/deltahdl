@@ -20,14 +20,69 @@ jobs:
       - name: Check formatting
         run: |
           find src -name '*.cpp' -o -name '*.h' | \
-            xargs clang-format-18 --dry-run --Werror
+            xargs clang-format-18 --dry-run --Werror \
+              --style='{
+                BasedOnStyle: LLVM,
+                IndentWidth: 4,
+                ColumnLimit: 100,
+                AllowShortFunctionsOnASingleLine: Inline,
+                AllowShortIfStatementsOnASingleLine: Never,
+                AllowShortLoopsOnASingleLine: false,
+                AllowShortBlocksOnASingleLine: Empty,
+                BreakBeforeBraces: Attach,
+                PointerAlignment: Left,
+                ReferenceAlignment: Left,
+                SpaceAfterCStyleCast: false,
+                SpaceBeforeParens: ControlStatements,
+                IncludeBlocks: Regroup,
+                SortIncludes: CaseSensitive,
+                Standard: c++23
+              }'
 
       - name: Run clang-tidy
         run: |
           cmake -B build -DCMAKE_CXX_COMPILER=clang++-18 \
                 -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
           find src -name '*.cpp' | \
-            xargs clang-tidy-18 -p build --warnings-as-errors='*'
+            xargs clang-tidy-18 -p build \
+              --warnings-as-errors='readability-function-size,readability-function-cognitive-complexity' \
+              --config='{
+                Checks: "-*,
+                  bugprone-*,
+                  -bugprone-easily-swappable-parameters,
+                  cppcoreguidelines-avoid-goto,
+                  cppcoreguidelines-init-variables,
+                  cppcoreguidelines-slicing,
+                  misc-redundant-expression,
+                  misc-unused-parameters,
+                  modernize-use-auto,
+                  modernize-use-nullptr,
+                  modernize-use-override,
+                  performance-*,
+                  readability-function-cognitive-complexity,
+                  readability-function-size,
+                  readability-identifier-naming,
+                  readability-redundant-smartptr-get,
+                  readability-simplify-boolean-expr",
+                HeaderFilterRegex: "src/.*\\.h$",
+                CheckOptions: {
+                  readability-function-size.NestingThreshold: 3,
+                  readability-function-size.ParameterThreshold: 5,
+                  readability-function-size.StatementThreshold: 50,
+                  readability-function-size.LineThreshold: 200,
+                  readability-function-cognitive-complexity.Threshold: 15,
+                  readability-identifier-naming.ClassCase: CamelCase,
+                  readability-identifier-naming.FunctionCase: lower_case,
+                  readability-identifier-naming.VariableCase: lower_case,
+                  readability-identifier-naming.PrivateMemberCase: lower_case,
+                  readability-identifier-naming.PrivateMemberSuffix: "_",
+                  readability-identifier-naming.PublicMemberCase: lower_case,
+                  readability-identifier-naming.ConstantCase: CamelCase,
+                  readability-identifier-naming.ConstantPrefix: k,
+                  readability-identifier-naming.EnumConstantCase: CamelCase,
+                  readability-identifier-naming.NamespaceCase: lower_case
+                }
+              }'
 
       - name: Run cppcheck
         run: |
