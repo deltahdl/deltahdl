@@ -224,6 +224,7 @@ jobs:
         run: |
           pmd cpd --minimum-tokens 100 --language cpp --dir src/
       - name: Run cppcheck
+        # NEVER use --suppress. Fix the code instead.
         run: |
           cppcheck --enable=all --error-exitcode=1 \
             --std=c++23 -I src src/ test/
