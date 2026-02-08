@@ -13,9 +13,7 @@ add_library(deltahdl_lib STATIC
     elaboration/const_eval.cpp
     simulation/scheduler.cpp
     simulation/process.cpp
-    simulation/net.cpp
     simulation/variable.cpp
-    simulation/systask.cpp
     synthesis/aig.cpp
 )
 

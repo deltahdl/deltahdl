@@ -21,7 +21,6 @@ class Lexer {
  private:
   char current() const;
   char peek_char() const;
-  char peek_char2() const;
   void advance();
   bool at_end() const;
   SourceLoc make_loc() const;

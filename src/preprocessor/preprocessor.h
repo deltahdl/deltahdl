@@ -24,8 +24,6 @@ class Preprocessor {
 
   std::string preprocess(uint32_t file_id);
 
-  const MacroTable& macro_table() const { return macros_; }
-
  private:
   std::string process_source(std::string_view src, uint32_t file_id, int depth);
   bool process_directive(std::string_view line, uint32_t file_id,

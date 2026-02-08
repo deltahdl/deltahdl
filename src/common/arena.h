@@ -64,7 +64,6 @@ class Arena {
   }
 
   size_t total_allocated() const { return total_allocated_; }
-  size_t block_count() const { return blocks_.size(); }
 
   void reset() {
     for (size_t i = 1; i < blocks_.size(); ++i) {

@@ -28,7 +28,6 @@ class Parser {
   ModuleItem* parse_always_block(AlwaysKind kind);
   ModuleItem* parse_initial_block();
   ModuleItem* parse_final_block();
-  ModuleItem* parse_module_instantiation();
 
   // Statements
   Stmt* parse_stmt();

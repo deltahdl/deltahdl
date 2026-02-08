@@ -18,8 +18,6 @@ class SourceManager {
   std::string format_loc(SourceLoc loc) const;
   std::string_view get_line_text(SourceLoc loc) const;
 
-  size_t file_count() const { return files_.size(); }
-
  private:
   struct FileEntry {
     std::string path;

@@ -19,10 +19,6 @@ static const char* severity_label(DiagSeverity sev) {
   return "unknown";
 }
 
-void DiagEngine::note(SourceLoc loc, std::string msg) {
-  emit(DiagSeverity::Note, loc, std::move(msg));
-}
-
 void DiagEngine::warning(SourceLoc loc, std::string msg) {
   if (warnings_as_errors_) {
     emit(DiagSeverity::Error, loc, std::move(msg));
@@ -33,10 +29,6 @@ void DiagEngine::warning(SourceLoc loc, std::string msg) {
 
 void DiagEngine::error(SourceLoc loc, std::string msg) {
   emit(DiagSeverity::Error, loc, std::move(msg));
-}
-
-void DiagEngine::fatal(SourceLoc loc, std::string msg) {
-  emit(DiagSeverity::Fatal, loc, std::move(msg));
 }
 
 void DiagEngine::emit(DiagSeverity sev, SourceLoc loc, std::string msg) {

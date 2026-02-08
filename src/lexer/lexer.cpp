@@ -23,13 +23,6 @@ char Lexer::peek_char() const {
   return source_[pos_ + 1];
 }
 
-char Lexer::peek_char2() const {
-  if (pos_ + 2 >= source_.size()) {
-    return '\0';
-  }
-  return source_[pos_ + 2];
-}
-
 void Lexer::advance() {
   if (at_end()) {
     return;

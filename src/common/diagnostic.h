@@ -27,16 +27,10 @@ class DiagEngine {
  public:
   explicit DiagEngine(const SourceManager& src_mgr) : src_mgr_(src_mgr) {}
 
-  void note(SourceLoc loc, std::string msg);
   void warning(SourceLoc loc, std::string msg);
   void error(SourceLoc loc, std::string msg);
-  void fatal(SourceLoc loc, std::string msg);
 
-  uint32_t error_count() const { return error_count_; }
-  uint32_t warning_count() const { return warning_count_; }
   bool has_errors() const { return error_count_ > 0; }
-
-  const std::vector<Diagnostic>& diagnostics() const { return diags_; }
 
   void set_warnings_as_errors(bool val) { warnings_as_errors_ = val; }
 

@@ -226,8 +226,6 @@ struct Token {
   uint8_t base = 10;  // 2, 8, 10, 16
 
   bool is(TokenKind k) const { return kind == k; }
-  bool is_not(TokenKind k) const { return kind != k; }
-  bool is_keyword() const { return kind >= TokenKind::KwModule; }
   bool is_eof() const { return kind == TokenKind::Eof; }
 };
 

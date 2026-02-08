@@ -36,15 +36,6 @@ void EventQueue::clear() {
 
 // --- TimeSlot ---
 
-bool TimeSlot::any_nonempty() const {
-  for (size_t i = 0; i < kRegionCount; ++i) {
-    if (!regions[i].empty()) {
-      return true;
-    }
-  }
-  return false;
-}
-
 bool TimeSlot::any_nonempty_in(Region first, Region last) const {
   auto lo = static_cast<size_t>(first);
   auto hi = static_cast<size_t>(last);

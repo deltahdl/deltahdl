@@ -263,15 +263,6 @@ ModuleItem* Parser::parse_net_or_var_decl(DataType dtype) {
   return item;
 }
 
-ModuleItem* Parser::parse_module_instantiation() {
-  auto* item = arena_.create<ModuleItem>();
-  item->kind = ModuleItemKind::ModuleInst;
-  item->loc = current_loc();
-  // Module instantiation is complex; stub for later phases
-  synchronize();
-  return item;
-}
-
 // --- Statements ---
 
 Stmt* Parser::parse_stmt() {

@@ -40,7 +40,6 @@ struct EventQueue {
 struct TimeSlot {
   std::array<EventQueue, kRegionCount> regions{};
 
-  bool any_nonempty() const;
   bool any_nonempty_in(Region first, Region last) const;
 };
 
