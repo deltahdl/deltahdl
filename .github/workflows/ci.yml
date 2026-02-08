@@ -41,6 +41,9 @@ jobs:
         compiler: [gcc-14, clang-18]
   coverage:
     needs: test
+    permissions:
+      id-token: write
+      pages: write
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -71,18 +74,36 @@ jobs:
           llvm-profdata-18 merge -sparse \
             build/coverage/*.profraw \
             -o build/coverage/merged.profdata
+          llvm-cov-18 show build/src/deltahdl \
+            -instr-profile=build/coverage/merged.profdata \
+            --ignore-filename-regex='test/|third_party/' \
+            --format=html \
+            -output-dir=build/coverage/html
+      - name: Enforce 100% coverage
+        run: |
+          llvm-cov-18 report build/src/deltahdl \
+            -instr-profile=build/coverage/merged.profdata \
+            --ignore-filename-regex='test/|third_party/'
           llvm-cov-18 export build/src/deltahdl \
             -instr-profile=build/coverage/merged.profdata \
-            --format=lcov \
             --ignore-filename-regex='test/|third_party/' \
-            > build/coverage/lcov.info
-      - env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        name: Upload to Codecov
-        uses: codecov/codecov-action@v4
+            --summary-only \
+            | jq -e '.data[0].totals |
+              .lines.covered == .lines.count and
+              .branches.covered == .branches.count' \
+            || { echo "FAIL: line and branch coverage must be 100%"; exit 1; }
+      - if: >-
+          github.ref == 'refs/heads/main'
+          && github.event_name == 'push'
+        name: Upload coverage pages
+        uses: actions/upload-pages-artifact@v3
         with:
-          fail_ci_if_error: true
-          files: build/coverage/lcov.info
+          path: build/coverage/html
+      - if: >-
+          github.ref == 'refs/heads/main'
+          && github.event_name == 'push'
+        name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
   lint:
     runs-on: ubuntu-24.04
     steps:
@@ -123,7 +144,7 @@ jobs:
                 SpaceBeforeParens: ControlStatements,
                 IncludeBlocks: Regroup,
                 SortIncludes: CaseSensitive,
-                Standard: c++23
+                Standard: Latest
               }'
       - name: Run clang-tidy
         run: |
