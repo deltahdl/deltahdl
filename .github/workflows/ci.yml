@@ -506,7 +506,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang-18
       - name: Build tests
-        run: cmake --build build --parallel
+        run: |
+          find build/_deps -name '*-update' -exec touch {} +
+          cmake --build build --parallel
       - name: Unit tests
         run: ctest --test-dir build --output-on-failure
       - name: Upload profraw
@@ -526,7 +528,9 @@ jobs:
           name: build-macos-26-arm64-clang
           path: build/
       - name: Build tests
-        run: cmake --build build --parallel
+        run: |
+          find build/_deps -name '*-update' -exec touch {} +
+          cmake --build build --parallel
       - name: Unit tests
         run: ctest --test-dir build --output-on-failure
   unit-test-sanitize:
@@ -547,7 +551,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang-18
       - name: Build tests
-        run: cmake --build build --parallel
+        run: |
+          find build/_deps -name '*-update' -exec touch {} +
+          cmake --build build --parallel
       - name: Unit tests
         run: ctest --test-dir build --output-on-failure
   unit-test-ubuntu-24-04-clang:
@@ -565,7 +571,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang-18
       - name: Build tests
-        run: cmake --build build --parallel
+        run: |
+          find build/_deps -name '*-update' -exec touch {} +
+          cmake --build build --parallel
       - name: Unit tests
         run: ctest --test-dir build --output-on-failure
   unit-test-ubuntu-24-04-gcc:
@@ -583,7 +591,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y g++-14
       - name: Build tests
-        run: cmake --build build --parallel
+        run: |
+          find build/_deps -name '*-update' -exec touch {} +
+          cmake --build build --parallel
       - name: Unit tests
         run: ctest --test-dir build --output-on-failure
 name: CI
