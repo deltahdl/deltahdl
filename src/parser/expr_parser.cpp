@@ -12,68 +12,68 @@ struct BpPair {
 
 static BpPair infix_bp(TokenKind kind) {
     switch (kind) {
-    case TokenKind::PipeDashGt:
-    case TokenKind::PipeEqGt:
-        return {1, 2};
-    case TokenKind::PipePipe:
-        return {3, 4};
-    case TokenKind::AmpAmp:
-        return {5, 6};
-    case TokenKind::Pipe:
-        return {7, 8};
-    case TokenKind::Caret:
-    case TokenKind::CaretTilde:
-    case TokenKind::TildeCaret:
-        return {9, 10};
-    case TokenKind::Amp:
-        return {11, 12};
-    case TokenKind::EqEq:
-    case TokenKind::BangEq:
-    case TokenKind::EqEqEq:
-    case TokenKind::BangEqEq:
-    case TokenKind::EqEqQuestion:
-    case TokenKind::BangEqQuestion:
-        return {13, 14};
-    case TokenKind::Lt:
-    case TokenKind::Gt:
-    case TokenKind::LtEq:
-    case TokenKind::GtEq:
-        return {15, 16};
-    case TokenKind::LtLt:
-    case TokenKind::GtGt:
-    case TokenKind::LtLtLt:
-    case TokenKind::GtGtGt:
-        return {17, 18};
-    case TokenKind::Plus:
-    case TokenKind::Minus:
-        return {19, 20};
-    case TokenKind::Star:
-    case TokenKind::Slash:
-    case TokenKind::Percent:
-        return {21, 22};
-    case TokenKind::Power:
-        return {24, 23}; // right-assoc
-    default:
-        return {-1, -1};
+        case TokenKind::PipeDashGt:
+        case TokenKind::PipeEqGt:
+            return {1, 2};
+        case TokenKind::PipePipe:
+            return {3, 4};
+        case TokenKind::AmpAmp:
+            return {5, 6};
+        case TokenKind::Pipe:
+            return {7, 8};
+        case TokenKind::Caret:
+        case TokenKind::CaretTilde:
+        case TokenKind::TildeCaret:
+            return {9, 10};
+        case TokenKind::Amp:
+            return {11, 12};
+        case TokenKind::EqEq:
+        case TokenKind::BangEq:
+        case TokenKind::EqEqEq:
+        case TokenKind::BangEqEq:
+        case TokenKind::EqEqQuestion:
+        case TokenKind::BangEqQuestion:
+            return {13, 14};
+        case TokenKind::Lt:
+        case TokenKind::Gt:
+        case TokenKind::LtEq:
+        case TokenKind::GtEq:
+            return {15, 16};
+        case TokenKind::LtLt:
+        case TokenKind::GtGt:
+        case TokenKind::LtLtLt:
+        case TokenKind::GtGtGt:
+            return {17, 18};
+        case TokenKind::Plus:
+        case TokenKind::Minus:
+            return {19, 20};
+        case TokenKind::Star:
+        case TokenKind::Slash:
+        case TokenKind::Percent:
+            return {21, 22};
+        case TokenKind::Power:
+            return {24, 23}; // right-assoc
+        default:
+            return {-1, -1};
     }
 }
 
 static int prefix_bp(TokenKind kind) {
     switch (kind) {
-    case TokenKind::Plus:
-    case TokenKind::Minus:
-    case TokenKind::Bang:
-    case TokenKind::Tilde:
-    case TokenKind::Amp:
-    case TokenKind::TildeAmp:
-    case TokenKind::Pipe:
-    case TokenKind::TildePipe:
-    case TokenKind::Caret:
-    case TokenKind::TildeCaret:
-    case TokenKind::CaretTilde:
-        return 25;
-    default:
-        return -1;
+        case TokenKind::Plus:
+        case TokenKind::Minus:
+        case TokenKind::Bang:
+        case TokenKind::Tilde:
+        case TokenKind::Amp:
+        case TokenKind::TildeAmp:
+        case TokenKind::Pipe:
+        case TokenKind::TildePipe:
+        case TokenKind::Caret:
+        case TokenKind::TildeCaret:
+        case TokenKind::CaretTilde:
+            return 25;
+        default:
+            return -1;
     }
 }
 
@@ -178,23 +178,10 @@ Expr* Parser::parse_primary_expr() {
         id->text = tok.text;
         id->range.start = tok.loc;
 
-        // Check for function call
-        if (check(TokenKind::LParen)) {
+        if (check(TokenKind::LParen))
             return parse_call_expr(id);
-        }
-        // Check for bit select
-        if (check(TokenKind::LBracket)) {
-            consume();
-            auto* sel = arena_.create<Expr>();
-            sel->kind = ExprKind::Select;
-            sel->base = id;
-            sel->index = parse_expr();
-            if (match(TokenKind::Colon)) {
-                sel->index_end = parse_expr();
-            }
-            expect(TokenKind::RBracket);
-            return sel;
-        }
+        if (check(TokenKind::LBracket))
+            return parse_select_expr(id);
         return id;
     }
 
@@ -233,22 +220,34 @@ Expr* Parser::parse_call_expr(Expr* callee) {
     return call;
 }
 
+Expr* Parser::parse_select_expr(Expr* base) {
+    consume(); // LBracket
+    auto* sel = arena_.create<Expr>();
+    sel->kind = ExprKind::Select;
+    sel->base = base;
+    sel->index = parse_expr();
+    if (match(TokenKind::Colon)) {
+        sel->index_end = parse_expr();
+    }
+    expect(TokenKind::RBracket);
+    return sel;
+}
+
 Expr* Parser::parse_system_call() {
     auto tok = consume();
     auto* call = arena_.create<Expr>();
     call->kind = ExprKind::SystemCall;
     call->callee = tok.text;
     call->range.start = tok.loc;
-    if (check(TokenKind::LParen)) {
-        consume();
-        if (!check(TokenKind::RParen)) {
+    if (!match(TokenKind::LParen))
+        return call;
+    if (!check(TokenKind::RParen)) {
+        call->args.push_back(parse_expr());
+        while (match(TokenKind::Comma)) {
             call->args.push_back(parse_expr());
-            while (match(TokenKind::Comma)) {
-                call->args.push_back(parse_expr());
-            }
         }
-        expect(TokenKind::RParen);
     }
+    expect(TokenKind::RParen);
     return call;
 }
 

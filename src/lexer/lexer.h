@@ -23,10 +23,19 @@ class Lexer {
     char peek_char() const;
     char peek_char2() const;
     void advance();
-    void skip_whitespace_and_comments();
     bool at_end() const;
     SourceLoc make_loc() const;
 
+    // Whitespace / comments
+    void skip_whitespace_and_comments();
+    void skip_line_comment();
+    void skip_block_comment();
+
+    // Token construction helpers
+    Token make_token(TokenKind kind, SourceLoc loc) const;
+    Token make_op(TokenKind kind, SourceLoc loc, uint32_t start);
+
+    // Primary lexing entry points
     Token lex_identifier();
     Token lex_number();
     Token lex_string_literal();
@@ -34,9 +43,29 @@ class Lexer {
     Token lex_escaped_identifier();
     Token lex_operator();
 
+    // Number sub-helpers
+    Token lex_unbased_unsized(SourceLoc loc, uint32_t start);
+    Token lex_based_number(SourceLoc loc, uint32_t start);
+    void lex_real_suffix();
+
+    // Operator sub-helpers
+    Token lex_op_tilde(SourceLoc loc, uint32_t start);
+    Token lex_op_plus(SourceLoc loc, uint32_t start);
+    Token lex_op_minus(SourceLoc loc, uint32_t start);
+    Token lex_op_star(SourceLoc loc, uint32_t start);
+    Token lex_op_caret(SourceLoc loc, uint32_t start);
+    Token lex_op_amp(SourceLoc loc, uint32_t start);
+    Token lex_op_pipe(SourceLoc loc, uint32_t start);
+    Token lex_op_bang(SourceLoc loc, uint32_t start);
+    Token lex_op_eq(SourceLoc loc, uint32_t start);
+    Token lex_op_hash(SourceLoc loc, uint32_t start);
+    Token lex_op_dot(SourceLoc loc, uint32_t start);
+    Token lex_op_colon(SourceLoc loc, uint32_t start);
+    Token lex_op_at(SourceLoc loc, uint32_t start);
+    Token lex_op_slash(SourceLoc loc, uint32_t start);
+    Token lex_op_percent(SourceLoc loc, uint32_t start);
     Token lex_angle_left(SourceLoc loc, uint32_t start);
     Token lex_angle_right(SourceLoc loc, uint32_t start);
-    Token make_token(TokenKind kind, SourceLoc loc) const;
 
     std::string_view source_;
     uint32_t pos_ = 0;

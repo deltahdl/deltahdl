@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string_view>
 #include <vector>
 
@@ -12,29 +13,34 @@ struct CompilationUnit;
 struct ModuleDecl;
 struct RtlirDesign;
 struct RtlirModule;
+struct ModuleItem;
 struct Expr;
 
 /// Elaborator transforms a parsed AST (CompilationUnit) into the
 /// elaborated RTLIR representation.  Phase 1 supports single-module
 /// designs without parameterized instantiation.
 class Elaborator {
-  public:
+   public:
+    using ParamList = std::vector<std::pair<std::string_view, int64_t>>;
+
     Elaborator(Arena& arena, DiagEngine& diag, CompilationUnit* unit);
 
     /// Elaborate the design rooted at the given top module.
     /// Returns nullptr on failure (diagnostics emitted via DiagEngine).
     RtlirDesign* elaborate(std::string_view top_module_name);
 
-  private:
+   private:
     /// Find a module declaration by name in the compilation unit.
     ModuleDecl* find_module(std::string_view name) const;
 
     /// Elaborate a single module declaration into an RtlirModule.
-    using ParamList = std::vector<std::pair<std::string_view, int64_t>>;
     RtlirModule* elaborate_module(ModuleDecl* decl, const ParamList& params);
 
     /// Populate ports from module declaration port list.
     void elaborate_ports(ModuleDecl* decl, RtlirModule* mod);
+
+    /// Elaborate a single module item into RTLIR.
+    void elaborate_item(ModuleItem* item, RtlirModule* mod);
 
     /// Walk module items and populate nets, vars, assigns, processes.
     void elaborate_items(ModuleDecl* decl, RtlirModule* mod);

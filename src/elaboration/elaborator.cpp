@@ -1,5 +1,8 @@
 #include "elaboration/elaborator.h"
 
+#include <format>
+#include <optional>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
@@ -7,8 +10,6 @@
 #include "elaboration/rtlir.h"
 #include "elaboration/type_eval.h"
 #include "parser/ast.h"
-
-#include <format>
 
 namespace delta {
 
@@ -41,33 +42,34 @@ ModuleDecl* Elaborator::find_module(std::string_view name) const {
     return nullptr;
 }
 
+static std::optional<int64_t> find_param_override(const Elaborator::ParamList& params,
+                                                  std::string_view name) {
+    for (const auto& [oname, oval] : params) {
+        if (oname == name) {
+            return oval;
+        }
+    }
+    return std::nullopt;
+}
+
 RtlirModule* Elaborator::elaborate_module(ModuleDecl* decl, const ParamList& params) {
     auto* mod = arena_.create<RtlirModule>();
     mod->name = decl->name;
 
-    // Resolve parameters: override defaults with supplied values.
     for (const auto& [pname, pval] : decl->params) {
         RtlirParamDecl pd;
         pd.name = pname;
         pd.default_value = pval;
         pd.is_resolved = false;
 
-        // Check for an override from the supplied param list.
-        for (const auto& [oname, oval] : params) {
-            if (oname == pname) {
-                pd.resolved_value = oval;
-                pd.is_resolved = true;
-                break;
-            }
+        auto override_val = find_param_override(params, pname);
+        if (override_val) {
+            pd.resolved_value = *override_val;
+            pd.is_resolved = true;
         }
-
-        // Fall back to evaluating the default expression.
         if (!pd.is_resolved && pval) {
-            auto val = const_eval_int(pval);
-            if (val) {
-                pd.resolved_value = *val;
-                pd.is_resolved = true;
-            }
+            pd.resolved_value = const_eval_int(pval).value_or(0);
+            pd.is_resolved = const_eval_int(pval).has_value();
         }
 
         mod->params.push_back(pd);
@@ -96,21 +98,20 @@ void Elaborator::elaborate_ports(ModuleDecl* decl, RtlirModule* mod) {
 
 static ProcessKind map_always_kind(AlwaysKind ak) {
     switch (ak) {
-    case AlwaysKind::Always:
-        return ProcessKind::AlwaysComb;
-    case AlwaysKind::AlwaysComb:
-        return ProcessKind::AlwaysComb;
-    case AlwaysKind::AlwaysFF:
-        return ProcessKind::AlwaysFF;
-    case AlwaysKind::AlwaysLatch:
-        return ProcessKind::AlwaysLatch;
+        case AlwaysKind::Always:
+            return ProcessKind::AlwaysComb;
+        case AlwaysKind::AlwaysComb:
+            return ProcessKind::AlwaysComb;
+        case AlwaysKind::AlwaysFF:
+            return ProcessKind::AlwaysFF;
+        case AlwaysKind::AlwaysLatch:
+            return ProcessKind::AlwaysLatch;
     }
     return ProcessKind::AlwaysComb;
 }
 
-void Elaborator::elaborate_items(ModuleDecl* decl, RtlirModule* mod) {
-    for (auto* item : decl->items) {
-        switch (item->kind) {
+void Elaborator::elaborate_item(ModuleItem* item, RtlirModule* mod) {
+    switch (item->kind) {
         case ModuleItemKind::NetDecl: {
             RtlirNet net;
             net.name = item->name;
@@ -162,20 +163,21 @@ void Elaborator::elaborate_items(ModuleDecl* decl, RtlirModule* mod) {
             RtlirModuleInst inst;
             inst.module_name = item->inst_module;
             inst.inst_name = item->inst_name;
-            inst.resolved = nullptr; // Phase 1: no recursive elaboration
+            inst.resolved = nullptr;
             mod->children.push_back(inst);
             break;
         }
-        case ModuleItemKind::ParamDecl: {
-            // Parameters are already collected from ModuleDecl::params.
+        case ModuleItemKind::ParamDecl:
             break;
-        }
-        case ModuleItemKind::GenerateBlock: {
-            // Phase 1: generate blocks not yet supported.
+        case ModuleItemKind::GenerateBlock:
             diag_.warning(item->loc, "generate blocks are not yet elaborated");
             break;
-        }
-        }
+    }
+}
+
+void Elaborator::elaborate_items(ModuleDecl* decl, RtlirModule* mod) {
+    for (auto* item : decl->items) {
+        elaborate_item(item, mod);
     }
 }
 

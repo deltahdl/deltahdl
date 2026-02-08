@@ -58,14 +58,14 @@ void Parser::synchronize() {
 CompilationUnit* Parser::parse() {
     auto* unit = arena_.create<CompilationUnit>();
     while (!at_end()) {
-        if (check(TokenKind::KwModule)) {
-            auto* mod = parse_module_decl();
-            if (mod != nullptr) {
-                unit->modules.push_back(mod);
-            }
-        } else {
+        if (!check(TokenKind::KwModule)) {
             diag_.error(current_loc(), "expected module declaration");
             consume();
+            continue;
+        }
+        auto* mod = parse_module_decl();
+        if (mod != nullptr) {
+            unit->modules.push_back(mod);
         }
     }
     return unit;
