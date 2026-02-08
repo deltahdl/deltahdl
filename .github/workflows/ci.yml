@@ -74,52 +74,9 @@ jobs:
     strategy:
       matrix:
         build_type: [Debug, Release]
-  coverage-macos-26-arm64-clang:
-    needs: e2e-test-macos-26-arm64-clang
-    runs-on: macos-26
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build with coverage
-        run: |
-          cmake -B build \
-            -DCMAKE_CXX_COMPILER=clang++ \
-            -DCMAKE_C_COMPILER=clang \
-            -DCMAKE_BUILD_TYPE=Debug \
-            -DDELTAHDL_COVERAGE=ON
-          cmake --build build --parallel
-      - env:
-          LLVM_PROFILE_FILE: build/coverage/%p.profraw
-        name: Run tests
-        run: |
-          ctest --test-dir build --output-on-failure
-          for sv in test/integration/*.sv; do
-            ./build/src/deltahdl "$sv"
-          done
-      - name: Generate coverage report
-        run: |
-          xcrun llvm-profdata merge -sparse \
-            build/coverage/*.profraw \
-            -o build/coverage/merged.profdata
-          xcrun llvm-cov show build/src/deltahdl \
-            -instr-profile=build/coverage/merged.profdata \
-            --ignore-filename-regex='test/|third_party/' \
-            --format=html \
-            -output-dir=build/coverage/html
-      - name: Enforce 100% coverage
-        run: |
-          xcrun llvm-cov report build/src/deltahdl \
-            -instr-profile=build/coverage/merged.profdata \
-            --ignore-filename-regex='test/|third_party/'
-          xcrun llvm-cov export build/src/deltahdl \
-            -instr-profile=build/coverage/merged.profdata \
-            --ignore-filename-regex='test/|third_party/' \
-            --summary-only \
-            | jq -e '.data[0].totals |
-              .lines.covered == .lines.count and
-              .branches.covered == .branches.count' \
-            || { echo "FAIL: coverage must be 100%"; exit 1; }
-  coverage-ubuntu-24-04-clang:
+  coverage:
     needs:
+      - e2e-test-macos-26-arm64-clang
       - e2e-test-ubuntu-24-04-clang
       - e2e-test-ubuntu-24-04-gcc
     permissions:
@@ -298,9 +255,7 @@ jobs:
     if: >-
       github.ref == 'refs/heads/main'
       && github.event_name == 'push'
-    needs:
-      - sanitize-macos-26-arm64-clang
-      - sanitize-ubuntu-24-04-clang
+    needs: sanitize
     permissions:
       contents: write
     runs-on: ubuntu-24.04
@@ -348,30 +303,8 @@ jobs:
         run: |
           git tag -f latest
           git push origin latest --force
-  sanitize-macos-26-arm64-clang:
-    needs: coverage-macos-26-arm64-clang
-    runs-on: macos-26
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build with sanitizers
-        run: |
-          cmake -B build \
-            -DCMAKE_CXX_COMPILER=clang++ \
-            -DCMAKE_C_COMPILER=clang \
-            -DCMAKE_BUILD_TYPE=Debug \
-            -DDELTAHDL_SANITIZERS=ON
-          cmake --build build --parallel
-      - env:
-          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
-          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-        name: Run tests
-        run: |
-          ctest --test-dir build --output-on-failure
-          for sv in test/integration/*.sv; do
-            ./build/src/deltahdl "$sv"
-          done
-  sanitize-ubuntu-24-04-clang:
-    needs: coverage-ubuntu-24-04-clang
+  sanitize:
+    needs: coverage
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
