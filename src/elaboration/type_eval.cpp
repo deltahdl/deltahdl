@@ -62,4 +62,22 @@ bool Is4stateType(DataTypeKind kind) {
   }
 }
 
+static const DataType* ResolveNamed(const DataType& dtype,
+                                    const TypedefMap& typedefs) {
+  if (dtype.kind != DataTypeKind::kNamed) return nullptr;
+  auto it = typedefs.find(dtype.type_name);
+  return (it != typedefs.end()) ? &it->second : nullptr;
+}
+
+uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs) {
+  const auto* resolved = ResolveNamed(dtype, typedefs);
+  return resolved ? EvalTypeWidth(*resolved, typedefs) : EvalTypeWidth(dtype);
+}
+
+bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs) {
+  const auto* resolved = ResolveNamed(dtype, typedefs);
+  return resolved ? Is4stateType(*resolved, typedefs)
+                  : Is4stateType(dtype.kind);
+}
+
 }  // namespace delta

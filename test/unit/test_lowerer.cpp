@@ -4,6 +4,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "elaboration/elaborator.h"
+#include "elaboration/rtlir.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
 #include "simulation/lowerer.h"
@@ -461,4 +462,231 @@ TEST(Lowerer, FunctionCallReturnsValue) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
+TEST(Elaborator, GenerateIfTrueBranch) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t #(parameter N = 1) ();\n"
+      "  logic [31:0] x;\n"
+      "  generate\n"
+      "    if (N > 0) begin\n"
+      "      assign x = 42;\n"
+      "    end else begin\n"
+      "      assign x = 0;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
+TEST(Elaborator, GenerateIfFalseBranch) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t #(parameter N = 0) ();\n"
+      "  logic [31:0] x;\n"
+      "  generate\n"
+      "    if (N > 0) begin\n"
+      "      assign x = 42;\n"
+      "    end else begin\n"
+      "      assign x = 99;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 99u);
+}
+
+TEST(Elaborator, GenerateCaseMatch) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t #(parameter MODE = 2) ();\n"
+      "  logic [31:0] x;\n"
+      "  generate\n"
+      "    case (MODE)\n"
+      "      1: begin assign x = 10; end\n"
+      "      2: begin assign x = 20; end\n"
+      "      3: begin assign x = 30; end\n"
+      "    endcase\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 20u);
+}
+
+TEST(Elaborator, GenerateCaseDefault) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t #(parameter MODE = 99) ();\n"
+      "  logic [31:0] x;\n"
+      "  generate\n"
+      "    case (MODE)\n"
+      "      1: begin assign x = 10; end\n"
+      "      2: begin assign x = 20; end\n"
+      "      default: begin assign x = 77; end\n"
+      "    endcase\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 77u);
+}
+
+TEST(Elaborator, GenerateForCreatesVars) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t #(parameter N = 3) ();\n"
+      "  generate\n"
+      "    for (i = 0; i < N; i = i + 1) begin\n"
+      "      logic [31:0] x;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  auto* mod = design->top_modules[0];
+  EXPECT_EQ(mod->variables.size(), 3u);
+  EXPECT_EQ(mod->variables[0].name, "i_0_x");
+  EXPECT_EQ(mod->variables[1].name, "i_1_x");
+  EXPECT_EQ(mod->variables[2].name, "i_2_x");
+}
+
+TEST(Elaborator, GenerateForZeroIterations) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t #(parameter N = 0) ();\n"
+      "  generate\n"
+      "    for (i = 0; i < N; i = i + 1) begin\n"
+      "      logic [31:0] x;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  auto* mod = design->top_modules[0];
+  EXPECT_EQ(mod->variables.size(), 0u);
+}
+
+TEST(Elaborator, GenerateForWithAssign) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t #(parameter N = 2) ();\n"
+      "  generate\n"
+      "    for (i = 0; i < N; i = i + 1) begin\n"
+      "      logic [31:0] w;\n"
+      "      assign w = 100;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->variables.size(), 2u);
+  EXPECT_EQ(mod->assigns.size(), 2u);
+  EXPECT_EQ(mod->variables[0].name, "i_0_w");
+  EXPECT_EQ(mod->variables[1].name, "i_1_w");
+}
+
+TEST(Elaborator, TypedefNamedResolution) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef logic [15:0] word_t;\n"
+      "  word_t data;\n"
+      "  initial data = 1234;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  auto* mod = design->top_modules[0];
+  bool found = false;
+  for (const auto& v : mod->variables) {
+    if (v.name == "data") {
+      EXPECT_EQ(v.width, 16u);
+      EXPECT_TRUE(v.is_4state);
+      found = true;
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+TEST(Elaborator, TypedefChain) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef logic [7:0] byte_t;\n"
+      "  typedef byte_t octet_t;\n"
+      "  octet_t val;\n"
+      "  initial val = 255;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  auto* mod = design->top_modules[0];
+  bool found = false;
+  for (const auto& v : mod->variables) {
+    if (v.name == "val") {
+      EXPECT_EQ(v.width, 8u);
+      found = true;
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+TEST(Elaborator, AlwaysCombSensitivityInferred) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a, b;\n"
+      "  always_comb b = a + 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->processes.empty());
+  const auto& proc = mod->processes[0];
+  EXPECT_EQ(proc.kind, RtlirProcessKind::kAlwaysComb);
+  EXPECT_FALSE(proc.sensitivity.empty());
+
+  bool found_a = false;
+  for (const auto& ev : proc.sensitivity) {
+    if (ev.signal && ev.signal->text == "a") found_a = true;
+  }
+  EXPECT_TRUE(found_a);
 }

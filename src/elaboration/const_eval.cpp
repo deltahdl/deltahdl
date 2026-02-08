@@ -114,35 +114,46 @@ static std::optional<int64_t> EvalUnary(TokenKind op, int64_t operand) {
   }
 }
 
-std::optional<int64_t> ConstEvalInt(const Expr* expr) {
+std::optional<int64_t> ConstEvalInt(const Expr* expr, const ScopeMap& scope) {
   if (!expr) return std::nullopt;
 
   switch (expr->kind) {
     case ExprKind::kIntegerLiteral:
       return static_cast<int64_t>(expr->int_val);
 
+    case ExprKind::kIdentifier: {
+      auto it = scope.find(expr->text);
+      if (it != scope.end()) return it->second;
+      return std::nullopt;
+    }
+
     case ExprKind::kUnary: {
-      auto operand = ConstEvalInt(expr->lhs);
+      auto operand = ConstEvalInt(expr->lhs, scope);
       if (!operand) return std::nullopt;
       return EvalUnary(expr->op, *operand);
     }
 
     case ExprKind::kBinary: {
-      auto lhs = ConstEvalInt(expr->lhs);
-      auto rhs = ConstEvalInt(expr->rhs);
+      auto lhs = ConstEvalInt(expr->lhs, scope);
+      auto rhs = ConstEvalInt(expr->rhs, scope);
       if (!lhs || !rhs) return std::nullopt;
       return EvalBinary(expr->op, *lhs, *rhs);
     }
 
     case ExprKind::kTernary: {
-      auto cond = ConstEvalInt(expr->condition);
+      auto cond = ConstEvalInt(expr->condition, scope);
       if (!cond) return std::nullopt;
-      return ConstEvalInt(*cond ? expr->true_expr : expr->false_expr);
+      return ConstEvalInt(*cond ? expr->true_expr : expr->false_expr, scope);
     }
 
     default:
       return std::nullopt;
   }
+}
+
+std::optional<int64_t> ConstEvalInt(const Expr* expr) {
+  static const ScopeMap kEmptyScope;
+  return ConstEvalInt(expr, kEmptyScope);
 }
 
 }  // namespace delta

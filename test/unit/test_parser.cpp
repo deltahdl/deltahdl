@@ -8,6 +8,18 @@
 
 using namespace delta;
 
+// These unit tests embed SystemVerilog source as inline C++ string literals
+// rather than loading external .sv files. This is intentional: each test is
+// fully self-contained with the input source and structural assertions in one
+// place, so a reader can understand what is being tested without
+// cross-referencing a second file. When a test fails, the input and expected
+// AST shape are visible together in the test output. Integration and
+// conformance testing uses external .sv files instead: the CHIPS Alliance
+// sv-tests suite validates broad language coverage, and the sim-tests under
+// test/e2e/ verify end-to-end simulation behavior against .expected output
+// files. This inline pattern is standard practice for compiler parser unit
+// tests (used by LLVM, Clang, rustc, etc.).
+
 struct ParseResult {
   SourceManager mgr;
   Arena arena;

@@ -4,6 +4,9 @@
 #include <string_view>
 #include <vector>
 
+#include "elaboration/const_eval.h"
+#include "elaboration/type_eval.h"
+
 namespace delta {
 
 // Forward declarations
@@ -48,9 +51,33 @@ class Elaborator {
   /// Walk module items and populate nets, vars, assigns, processes.
   void ElaborateItems(const ModuleDecl* decl, RtlirModule* mod);
 
+  /// Build a scope map from resolved module parameters.
+  static ScopeMap BuildParamScope(const RtlirModule* mod);
+
+  /// Expand a generate-if block using constant evaluation.
+  void ElaborateGenerateIf(ModuleItem* item, RtlirModule* mod,
+                           const ScopeMap& scope);
+
+  /// Expand a generate-case block using constant evaluation.
+  void ElaborateGenerateCase(ModuleItem* item, RtlirModule* mod,
+                             const ScopeMap& scope);
+
+  /// Expand a generate-for loop using constant evaluation.
+  void ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
+                            const ScopeMap& scope);
+
+  /// Elaborate a list of generate-body items, recursing into nested generates.
+  void ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
+                              RtlirModule* mod, const ScopeMap& scope);
+
+  /// Return a scoped name (prefixed during generate-for expansion).
+  std::string_view ScopedName(std::string_view base);
+
   Arena& arena_;
   DiagEngine& diag_;
   CompilationUnit* unit_;
+  std::string gen_prefix_;
+  TypedefMap typedefs_;
 };
 
 }  // namespace delta

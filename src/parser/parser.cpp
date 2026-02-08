@@ -574,7 +574,7 @@ Stmt* Parser::ParseForStmt() {
   stmt->for_init = ParseAssignmentOrExprStmt();
   stmt->for_cond = ParseExpr();
   Expect(TokenKind::kSemicolon);
-  stmt->for_step = ParseAssignmentOrExprStmt();
+  stmt->for_step = ParseAssignmentOrExprNoSemi();
   Expect(TokenKind::kRParen);
   stmt->for_body = ParseStmt();
   return stmt;
@@ -687,7 +687,7 @@ Stmt* Parser::ParseDisableStmt() {
   return stmt;
 }
 
-Stmt* Parser::ParseAssignmentOrExprStmt() {
+Stmt* Parser::ParseAssignmentOrExprNoSemi() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->range.start = CurrentLoc();
   // Parse prefix/primary first — stop before infix operators so that
@@ -707,6 +707,11 @@ Stmt* Parser::ParseAssignmentOrExprStmt() {
     stmt->kind = StmtKind::kExprStmt;
     stmt->expr = ParseInfixBp(lhs_expr, 0);
   }
+  return stmt;
+}
+
+Stmt* Parser::ParseAssignmentOrExprStmt() {
+  auto* stmt = ParseAssignmentOrExprNoSemi();
   Expect(TokenKind::kSemicolon);
   return stmt;
 }
@@ -749,6 +754,14 @@ static std::optional<DataTypeKind> TokenToTypeKind(TokenKind tk) {
 
 DataType Parser::ParseDataType() {
   DataType dtype;
+
+  if (CurrentToken().Is(TokenKind::kIdentifier) &&
+      known_types_.count(CurrentToken().text) != 0) {
+    dtype.kind = DataTypeKind::kNamed;
+    dtype.type_name = Consume().text;
+    return dtype;
+  }
+
   auto kind = TokenToTypeKind(CurrentToken().kind);
   if (!kind) return dtype;
   dtype.kind = *kind;

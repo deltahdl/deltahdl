@@ -9,6 +9,7 @@
 #include "common/source_loc.h"
 #include "elaboration/const_eval.h"
 #include "elaboration/rtlir.h"
+#include "elaboration/sensitivity.h"
 #include "elaboration/type_eval.h"
 #include "parser/ast.h"
 
@@ -87,7 +88,7 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
     rp.name = port.name;
     rp.direction = port.direction;
     rp.type_kind = port.data_type.kind;
-    rp.width = EvalTypeWidth(port.data_type);
+    rp.width = EvalTypeWidth(port.data_type, typedefs_);
     rp.is_signed = port.data_type.is_signed;
     mod->ports.push_back(rp);
   }
@@ -110,11 +111,16 @@ static RtlirProcessKind MapAlwaysKind(AlwaysKind ak) {
 }
 
 static void AddProcess(RtlirProcessKind kind, ModuleItem* item,
-                       RtlirModule* mod) {
+                       RtlirModule* mod, Arena& arena) {
   RtlirProcess proc;
   proc.kind = kind;
   proc.body = item->body;
   proc.sensitivity = item->sensitivity;
+  bool needs_infer = (kind == RtlirProcessKind::kAlwaysComb ||
+                      kind == RtlirProcessKind::kAlwaysLatch);
+  if (needs_infer && proc.sensitivity.empty()) {
+    proc.sensitivity = InferSensitivity(proc.body, arena);
+  }
   mod->processes.push_back(proc);
 }
 
@@ -122,17 +128,17 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
   switch (item->kind) {
     case ModuleItemKind::kNetDecl: {
       RtlirNet net;
-      net.name = item->name;
+      net.name = ScopedName(item->name);
       net.net_type = NetType::kWire;
-      net.width = EvalTypeWidth(item->data_type);
+      net.width = EvalTypeWidth(item->data_type, typedefs_);
       mod->nets.push_back(net);
       break;
     }
     case ModuleItemKind::kVarDecl: {
       RtlirVariable var;
-      var.name = item->name;
-      var.width = EvalTypeWidth(item->data_type);
-      var.is_4state = Is4stateType(item->data_type.kind);
+      var.name = ScopedName(item->name);
+      var.width = EvalTypeWidth(item->data_type, typedefs_);
+      var.is_4state = Is4stateType(item->data_type, typedefs_);
       mod->variables.push_back(var);
       break;
     }
@@ -144,16 +150,16 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       break;
     }
     case ModuleItemKind::kInitialBlock:
-      AddProcess(RtlirProcessKind::kInitial, item, mod);
+      AddProcess(RtlirProcessKind::kInitial, item, mod, arena_);
       break;
     case ModuleItemKind::kFinalBlock:
-      AddProcess(RtlirProcessKind::kFinal, item, mod);
+      AddProcess(RtlirProcessKind::kFinal, item, mod, arena_);
       break;
     case ModuleItemKind::kAlwaysBlock:
     case ModuleItemKind::kAlwaysCombBlock:
     case ModuleItemKind::kAlwaysFFBlock:
     case ModuleItemKind::kAlwaysLatchBlock:
-      AddProcess(MapAlwaysKind(item->always_kind), item, mod);
+      AddProcess(MapAlwaysKind(item->always_kind), item, mod, arena_);
       break;
     case ModuleItemKind::kModuleInst: {
       RtlirModuleInst inst;
@@ -165,10 +171,14 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     }
     case ModuleItemKind::kParamDecl:
       break;
-    case ModuleItemKind::kGenerateFor:
     case ModuleItemKind::kGenerateIf:
+      ElaborateGenerateIf(item, mod, BuildParamScope(mod));
+      break;
     case ModuleItemKind::kGenerateCase:
-      diag_.Warning(item->loc, "generate blocks are not yet elaborated");
+      ElaborateGenerateCase(item, mod, BuildParamScope(mod));
+      break;
+    case ModuleItemKind::kGenerateFor:
+      ElaborateGenerateFor(item, mod, BuildParamScope(mod));
       break;
     case ModuleItemKind::kTypedef:
       ElaborateTypedef(item, mod);
@@ -184,6 +194,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
 }
 
 void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
+  typedefs_[item->name] = item->typedef_type;
   if (item->typedef_type.kind != DataTypeKind::kEnum) return;
   int64_t next_val = 0;
   for (const auto& member : item->typedef_type.enum_members) {
@@ -192,7 +203,7 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
     }
     RtlirVariable var;
     var.name = member.name;
-    var.width = EvalTypeWidth(item->typedef_type);
+    var.width = EvalTypeWidth(item->typedef_type, typedefs_);
     var.is_4state = false;
     mod->variables.push_back(var);
     ++next_val;
@@ -203,6 +214,126 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   for (auto* item : decl->items) {
     ElaborateItem(item, mod);
   }
+}
+
+// --- Generate expansion ---
+
+ScopeMap Elaborator::BuildParamScope(const RtlirModule* mod) {
+  ScopeMap scope;
+  for (const auto& p : mod->params) {
+    if (p.is_resolved) {
+      scope[p.name] = p.resolved_value;
+    }
+  }
+  return scope;
+}
+
+void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
+                                        RtlirModule* mod,
+                                        const ScopeMap& scope) {
+  for (auto* item : items) {
+    switch (item->kind) {
+      case ModuleItemKind::kGenerateIf:
+        ElaborateGenerateIf(item, mod, scope);
+        break;
+      case ModuleItemKind::kGenerateCase:
+        ElaborateGenerateCase(item, mod, scope);
+        break;
+      case ModuleItemKind::kGenerateFor:
+        ElaborateGenerateFor(item, mod, scope);
+        break;
+      default:
+        ElaborateItem(item, mod);
+        break;
+    }
+  }
+}
+
+void Elaborator::ElaborateGenerateIf(ModuleItem* item, RtlirModule* mod,
+                                     const ScopeMap& scope) {
+  auto cond = ConstEvalInt(item->gen_cond, scope);
+  if (!cond) {
+    diag_.Warning(item->loc, "generate-if condition is not constant");
+    return;
+  }
+  if (*cond) {
+    ElaborateGenerateItems(item->gen_body, mod, scope);
+  } else if (item->gen_else) {
+    ElaborateGenerateItems(item->gen_else->gen_body, mod, scope);
+  }
+}
+
+static bool MatchesCasePattern(const std::vector<Expr*>& patterns,
+                               int64_t selector, const ScopeMap& scope) {
+  for (const auto* pat : patterns) {
+    auto val = ConstEvalInt(pat, scope);
+    if (val && *val == selector) return true;
+  }
+  return false;
+}
+
+void Elaborator::ElaborateGenerateCase(ModuleItem* item, RtlirModule* mod,
+                                       const ScopeMap& scope) {
+  auto selector = ConstEvalInt(item->gen_cond, scope);
+  if (!selector) {
+    diag_.Warning(item->loc, "generate-case selector is not constant");
+    return;
+  }
+  const std::vector<ModuleItem*>* default_body = nullptr;
+  for (const auto& ci : item->gen_case_items) {
+    if (ci.is_default) {
+      default_body = &ci.body;
+      continue;
+    }
+    if (MatchesCasePattern(ci.patterns, *selector, scope)) {
+      ElaborateGenerateItems(ci.body, mod, scope);
+      return;
+    }
+  }
+  if (default_body) {
+    ElaborateGenerateItems(*default_body, mod, scope);
+  }
+}
+
+std::string_view Elaborator::ScopedName(std::string_view base) {
+  if (gen_prefix_.empty()) return base;
+  std::string full = gen_prefix_ + std::string(base);
+  return {arena_.AllocString(full.c_str(), full.size()), full.size()};
+}
+
+static constexpr int64_t kMaxGenerateIterations = 65536;
+
+void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
+                                      const ScopeMap& scope) {
+  if (!item->gen_init || !item->gen_init->lhs) {
+    diag_.Warning(item->loc, "malformed generate-for initializer");
+    return;
+  }
+  auto genvar_name = item->gen_init->lhs->text;
+  auto init_val = ConstEvalInt(item->gen_init->rhs, scope);
+  if (!init_val) {
+    diag_.Warning(item->loc, "generate-for init is not constant");
+    return;
+  }
+
+  ScopeMap loop_scope = scope;
+  loop_scope[genvar_name] = *init_val;
+  std::string saved_prefix = gen_prefix_;
+
+  for (int64_t iter = 0; iter < kMaxGenerateIterations; ++iter) {
+    auto cond = ConstEvalInt(item->gen_cond, loop_scope);
+    if (!cond || !*cond) break;
+
+    gen_prefix_ = std::format("{}{}_{}_", saved_prefix, genvar_name,
+                              loop_scope[genvar_name]);
+    ElaborateGenerateItems(item->gen_body, mod, loop_scope);
+
+    auto next = ConstEvalInt(item->gen_step->rhs, loop_scope);
+    if (!next) break;
+    loop_scope[genvar_name] = *next;
+  }
+
+  gen_prefix_ = saved_prefix;
 }
 
 }  // namespace delta

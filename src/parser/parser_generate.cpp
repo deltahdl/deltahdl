@@ -19,7 +19,7 @@ ModuleItem* Parser::ParseGenerateFor() {
   item->gen_init = ParseAssignmentOrExprStmt();
   item->gen_cond = ParseExpr();
   Expect(TokenKind::kSemicolon);
-  item->gen_step = ParseAssignmentOrExprStmt();
+  item->gen_step = ParseAssignmentOrExprNoSemi();
   Expect(TokenKind::kRParen);
 
   Expect(TokenKind::kKwBegin);

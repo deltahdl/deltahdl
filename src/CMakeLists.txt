@@ -14,6 +14,7 @@ add_library(deltahdl_lib STATIC
     elaboration/elaborator.cpp
     elaboration/type_eval.cpp
     elaboration/const_eval.cpp
+    elaboration/sensitivity.cpp
     simulation/scheduler.cpp
     simulation/process.cpp
     simulation/variable.cpp

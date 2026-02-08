@@ -83,6 +83,7 @@ class Parser {
   Stmt* ParseWaitStmt();
   Stmt* ParseDisableStmt();
   Stmt* ParseAssignmentOrExprStmt();
+  Stmt* ParseAssignmentOrExprNoSemi();
   Stmt* ParseDelayStmt();
   Stmt* ParseEventControlStmt();
 

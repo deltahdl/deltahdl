@@ -93,3 +93,32 @@ TEST(ConstEval, Ternary) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("1 ? 42 : 99", f)), 42);
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("0 ? 42 : 99", f)), 99);
 }
+
+TEST(ConstEval, ScopedIdentifier) {
+  EvalFixture f;
+  ScopeMap scope = {{"WIDTH", 16}};
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("WIDTH", f), scope), 16);
+}
+
+TEST(ConstEval, ScopedExprWithParam) {
+  EvalFixture f;
+  ScopeMap scope = {{"WIDTH", 16}};
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("WIDTH > 8", f), scope), 1);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("WIDTH + 4", f), scope), 20);
+}
+
+TEST(ConstEval, ScopedUnresolved) {
+  EvalFixture f;
+  ScopeMap scope = {{"WIDTH", 16}};
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("UNKNOWN", f), scope), std::nullopt);
+}
+
+TEST(ConstEval, ScopedTernary) {
+  EvalFixture f;
+  ScopeMap scope_big = {{"WIDTH", 16}};
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("WIDTH > 8 ? WIDTH : 8", f), scope_big),
+            16);
+  ScopeMap scope_small = {{"WIDTH", 4}};
+  EXPECT_EQ(
+      ConstEvalInt(ParseExprFrom("WIDTH > 8 ? WIDTH : 8", f), scope_small), 8);
+}
