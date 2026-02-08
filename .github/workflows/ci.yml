@@ -535,7 +535,6 @@ jobs:
                   #    wrong. Research the Google C++ Style
                   #    Guide before touching this config.
                   # ════════════════════════════════════════
-
                   # ── Function complexity ────────────────
                   # Google C++ Style: keep functions short
                   # and focused. These are hard limits — do
@@ -552,7 +551,6 @@ jobs:
                     200,
                   readability-function-cognitive-complexity
                     .Threshold: 15,
-
                   # ── Naming: types ──────────────────────
                   # Google C++ Style §Naming: type names
                   # are CamelCase — classes structs enums
@@ -577,7 +575,6 @@ jobs:
                     .TypedefCase: CamelCase,
                   readability-identifier-naming
                     .TemplateParameterCase: CamelCase,
-
                   # ── Naming: enum constants ─────────────
                   # Google C++ Style §Enumerator_Names:
                   # "Enumerators ... should be named like
@@ -595,7 +592,6 @@ jobs:
                     .ScopedEnumConstantCase: CamelCase,
                   readability-identifier-naming
                     .ScopedEnumConstantPrefix: "k",
-
                   # ── Naming: functions and methods ──────
                   # Google C++ Style §Function_Names:
                   # "Regular functions have mixed case ...
@@ -626,7 +622,6 @@ jobs:
                   readability-identifier-naming
                     .MethodIgnoredRegexp:
                     "get_return_object|initial_suspend|final_suspend|return_void|unhandled_exception|await_ready|await_suspend|await_resume",
-
                   # ── Naming: variables and parameters ───
                   # Google C++ Style §Variable_Names:
                   # "Variable names are all lowercase with
@@ -635,7 +630,6 @@ jobs:
                     lower_case,
                   readability-identifier-naming
                     .ParameterCase: lower_case,
-
                   # ── Naming: class/struct members ───────
                   # Google C++ Style §Variable_Names:
                   # "Data members of classes ... have
@@ -651,7 +645,6 @@ jobs:
                     .ProtectedMemberSuffix: "_",
                   readability-identifier-naming
                     .PublicMemberCase: lower_case,
-
                   # ── Naming: constants ──────────────────
                   # Google C++ Style §Constant_Names:
                   # "Variables declared constexpr or const
@@ -691,7 +684,6 @@ jobs:
                     .LocalConstantCase: CamelCase,
                   readability-identifier-naming
                     .LocalConstantPrefix: "k",
-
                   # ── Naming: namespaces ─────────────────
                   # Google C++ Style §Namespace_Names:
                   # "Namespace names are all lower-case
