@@ -165,7 +165,8 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     }
     case ModuleItemKind::kParamDecl:
       break;
-    case ModuleItemKind::kGenerateBlock:
+    case ModuleItemKind::kGenerateFor:
+    case ModuleItemKind::kGenerateIf:
       diag_.Warning(item->loc, "generate blocks are not yet elaborated");
       break;
     case ModuleItemKind::kTypedef:
@@ -174,6 +175,8 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kFunctionDecl:
     case ModuleItemKind::kTaskDecl:
       mod->function_decls.push_back(item);
+      break;
+    case ModuleItemKind::kImportDecl:
       break;
   }
 }
