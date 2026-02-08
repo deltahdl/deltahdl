@@ -31,6 +31,39 @@ DataType Parser::ParseEnumType() {
   return dtype;
 }
 
+// --- Struct/union type parsing ---
+
+DataType Parser::ParseStructOrUnionType() {
+  DataType dtype;
+  dtype.kind = Check(TokenKind::kKwStruct) ? DataTypeKind::kStruct
+                                           : DataTypeKind::kUnion;
+  Consume();  // struct or union
+
+  if (Match(TokenKind::kKwPacked)) {
+    dtype.is_packed = true;
+    if (Match(TokenKind::kKwSigned)) {
+      dtype.is_signed = true;
+    } else {
+      Match(TokenKind::kKwUnsigned);
+    }
+  }
+
+  Expect(TokenKind::kLBrace);
+  while (!Check(TokenKind::kRBrace) && !AtEnd()) {
+    StructMember member;
+    auto member_type = ParseDataType();
+    member.type_kind = member_type.kind;
+    member.is_signed = member_type.is_signed;
+    member.packed_dim_left = member_type.packed_dim_left;
+    member.packed_dim_right = member_type.packed_dim_right;
+    member.name = Expect(TokenKind::kIdentifier).text;
+    Expect(TokenKind::kSemicolon);
+    dtype.struct_members.push_back(member);
+  }
+  Expect(TokenKind::kRBrace);
+  return dtype;
+}
+
 // --- Typedef parsing ---
 
 ModuleItem* Parser::ParseTypedef() {
@@ -41,6 +74,8 @@ ModuleItem* Parser::ParseTypedef() {
 
   if (Check(TokenKind::kKwEnum)) {
     item->typedef_type = ParseEnumType();
+  } else if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
+    item->typedef_type = ParseStructOrUnionType();
   } else {
     item->typedef_type = ParseDataType();
   }
@@ -142,6 +177,28 @@ ModuleItem* Parser::ParseTaskDecl() {
   }
   Expect(TokenKind::kKwEndtask);
   return item;
+}
+
+// --- Event lists ---
+
+std::vector<EventExpr> Parser::ParseEventList() {
+  std::vector<EventExpr> events;
+  events.push_back(ParseSingleEvent());
+  while (Match(TokenKind::kKwOr) || Match(TokenKind::kComma)) {
+    events.push_back(ParseSingleEvent());
+  }
+  return events;
+}
+
+EventExpr Parser::ParseSingleEvent() {
+  EventExpr ev;
+  if (Match(TokenKind::kKwPosedge)) {
+    ev.edge = Edge::kPosedge;
+  } else if (Match(TokenKind::kKwNegedge)) {
+    ev.edge = Edge::kNegedge;
+  }
+  ev.signal = ParseExpr();
+  return ev;
 }
 
 }  // namespace delta

@@ -16,17 +16,25 @@ class Parser {
   CompilationUnit* Parse();
 
  private:
-  // Module parsing
+  // Module/package parsing
   ModuleDecl* ParseModuleDecl();
+  PackageDecl* ParsePackageDecl();
+  ModuleItem* ParseImportDecl();
   void ParsePortList(ModuleDecl& mod);
   PortDecl ParsePortDecl();
   void ParseModuleBody(ModuleDecl& mod);
   void ParseModuleItem(std::vector<ModuleItem*>& items);
   void ParseParamPortDecl(ModuleDecl& mod);
 
+  // Generate blocks (parser_generate.cpp)
+  void ParseGenerateRegion(std::vector<ModuleItem*>& items);
+  ModuleItem* ParseGenerateFor();
+  ModuleItem* ParseGenerateIf();
+
   // Declarations (parser_decl.cpp)
   ModuleItem* ParseTypedef();
   DataType ParseEnumType();
+  DataType ParseStructOrUnionType();
   ModuleItem* ParseFunctionDecl();
   ModuleItem* ParseTaskDecl();
   std::vector<FunctionArg> ParseFunctionArgs();
@@ -38,6 +46,7 @@ class Parser {
   ModuleItem* ParseAlwaysBlock(AlwaysKind kind);
   ModuleItem* ParseInitialBlock();
   ModuleItem* ParseFinalBlock();
+  void ParseTypedItemOrInst(std::vector<ModuleItem*>& items);
   void ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items);
   ModuleItem* ParseModuleInst(const Token& module_tok);
   void ParsePortConnection(ModuleItem* item);

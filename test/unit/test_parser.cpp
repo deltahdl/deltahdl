@@ -301,3 +301,198 @@ TEST(Parser, MultipleModules) {
   EXPECT_EQ(r.cu->modules[1]->name, "b");
   EXPECT_EQ(r.cu->modules[2]->name, "c");
 }
+
+TEST(Parser, TypedefStruct) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct {\n"
+      "    logic [7:0] a;\n"
+      "    int b;\n"
+      "  } my_struct_t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 1);
+  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kTypedef);
+  EXPECT_EQ(mod->items[0]->name, "my_struct_t");
+  EXPECT_EQ(mod->items[0]->typedef_type.kind, DataTypeKind::kStruct);
+  auto& members = mod->items[0]->typedef_type.struct_members;
+  ASSERT_EQ(members.size(), 2);
+  EXPECT_EQ(members[0].name, "a");
+  EXPECT_EQ(members[0].type_kind, DataTypeKind::kLogic);
+  EXPECT_EQ(members[1].name, "b");
+  EXPECT_EQ(members[1].type_kind, DataTypeKind::kInt);
+}
+
+TEST(Parser, TypedefUnion) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef union {\n"
+      "    int i;\n"
+      "    real r;\n"
+      "  } my_union_t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
+  EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kUnion);
+  ASSERT_EQ(item->typedef_type.struct_members.size(), 2);
+}
+
+TEST(Parser, TypedefStructPacked) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct packed {\n"
+      "    logic [3:0] hi;\n"
+      "    logic [3:0] lo;\n"
+      "  } byte_t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kStruct);
+  EXPECT_TRUE(item->typedef_type.is_packed);
+  ASSERT_EQ(item->typedef_type.struct_members.size(), 2);
+}
+
+TEST(Parser, InlineStructVar) {
+  auto r = Parse(
+      "module t;\n"
+      "  struct { int x; int y; } point;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 1);
+  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(mod->items[0]->name, "point");
+  EXPECT_EQ(mod->items[0]->data_type.kind, DataTypeKind::kStruct);
+  ASSERT_EQ(mod->items[0]->data_type.struct_members.size(), 2);
+}
+
+TEST(Parser, EmptyPackage) {
+  auto r = Parse("package my_pkg; endpackage");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->packages.size(), 1);
+  EXPECT_EQ(r.cu->packages[0]->name, "my_pkg");
+  EXPECT_TRUE(r.cu->packages[0]->items.empty());
+}
+
+TEST(Parser, PackageWithParam) {
+  auto r = Parse(
+      "package my_pkg;\n"
+      "  parameter int WIDTH = 8;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->packages.size(), 1);
+  ASSERT_EQ(r.cu->packages[0]->items.size(), 1);
+  EXPECT_EQ(r.cu->packages[0]->items[0]->kind, ModuleItemKind::kParamDecl);
+}
+
+TEST(Parser, ImportSpecific) {
+  auto r = Parse(
+      "module t;\n"
+      "  import my_pkg::WIDTH;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 1);
+  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kImportDecl);
+  EXPECT_EQ(mod->items[0]->import_item.package_name, "my_pkg");
+  EXPECT_EQ(mod->items[0]->import_item.item_name, "WIDTH");
+  EXPECT_FALSE(mod->items[0]->import_item.is_wildcard);
+}
+
+TEST(Parser, ImportWildcard) {
+  auto r = Parse(
+      "module t;\n"
+      "  import my_pkg::*;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kImportDecl);
+  EXPECT_EQ(item->import_item.package_name, "my_pkg");
+  EXPECT_TRUE(item->import_item.is_wildcard);
+}
+
+TEST(Parser, PackageAndModule) {
+  auto r = Parse(
+      "package pkg; endpackage\n"
+      "module top; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->packages.size(), 1);
+  ASSERT_EQ(r.cu->modules.size(), 1);
+  EXPECT_EQ(r.cu->packages[0]->name, "pkg");
+  EXPECT_EQ(r.cu->modules[0]->name, "top");
+}
+
+TEST(Parser, GenerateFor) {
+  auto r = Parse(
+      "module t;\n"
+      "  genvar i;\n"
+      "  for (i = 0; i < 4; i = i + 1) begin\n"
+      "    assign a[i] = b[i];\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  bool found_gen = false;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kGenerateFor) {
+      found_gen = true;
+      EXPECT_NE(item->gen_init, nullptr);
+      EXPECT_NE(item->gen_cond, nullptr);
+      EXPECT_NE(item->gen_step, nullptr);
+      EXPECT_FALSE(item->gen_body.empty());
+    }
+  }
+  EXPECT_TRUE(found_gen);
+}
+
+TEST(Parser, GenerateIf) {
+  auto r = Parse(
+      "module t;\n"
+      "  if (WIDTH > 8) begin\n"
+      "    assign a = b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 1);
+  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kGenerateIf);
+  EXPECT_NE(mod->items[0]->gen_cond, nullptr);
+  EXPECT_FALSE(mod->items[0]->gen_body.empty());
+}
+
+TEST(Parser, GenerateIfElse) {
+  auto r = Parse(
+      "module t;\n"
+      "  if (WIDTH > 8) begin\n"
+      "    assign a = b;\n"
+      "  end else begin\n"
+      "    assign a = c;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kGenerateIf);
+  EXPECT_NE(item->gen_else, nullptr);
+}
+
+TEST(Parser, GenerateRegion) {
+  auto r = Parse(
+      "module t;\n"
+      "  generate\n"
+      "    if (WIDTH > 8) begin\n"
+      "      assign a = b;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  bool found_gen = false;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kGenerateIf) {
+      found_gen = true;
+    }
+  }
+  EXPECT_TRUE(found_gen);
+}

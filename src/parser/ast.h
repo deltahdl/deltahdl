@@ -181,6 +181,8 @@ enum class DataTypeKind : uint8_t {
   kVoid,
   kNamed,
   kEnum,
+  kStruct,
+  kUnion,
 };
 
 struct EnumMember {
@@ -188,13 +190,23 @@ struct EnumMember {
   Expr* value = nullptr;
 };
 
+struct StructMember {
+  DataTypeKind type_kind = DataTypeKind::kImplicit;
+  bool is_signed = false;
+  Expr* packed_dim_left = nullptr;
+  Expr* packed_dim_right = nullptr;
+  std::string_view name;
+};
+
 struct DataType {
   DataTypeKind kind = DataTypeKind::kImplicit;
   bool is_signed = false;
+  bool is_packed = false;
   Expr* packed_dim_left = nullptr;
   Expr* packed_dim_right = nullptr;
   std::string_view type_name;
   std::vector<EnumMember> enum_members;
+  std::vector<StructMember> struct_members;
 };
 
 struct PortDecl {
@@ -216,11 +228,13 @@ enum class ModuleItemKind : uint8_t {
   kAlwaysCombBlock,
   kAlwaysFFBlock,
   kAlwaysLatchBlock,
-  kGenerateBlock,
+  kGenerateFor,
+  kGenerateIf,
   kModuleInst,
   kTypedef,
   kFunctionDecl,
   kTaskDecl,
+  kImportDecl,
 };
 
 enum class AlwaysKind : uint8_t {
@@ -228,6 +242,12 @@ enum class AlwaysKind : uint8_t {
   kAlwaysComb,
   kAlwaysFF,
   kAlwaysLatch,
+};
+
+struct ImportItem {
+  std::string_view package_name;
+  std::string_view item_name;
+  bool is_wildcard = false;
 };
 
 struct FunctionArg {
@@ -264,6 +284,16 @@ struct ModuleItem {
   // Typedef
   DataType typedef_type;
 
+  // Generate
+  Stmt* gen_init = nullptr;
+  Expr* gen_cond = nullptr;
+  Stmt* gen_step = nullptr;
+  std::vector<ModuleItem*> gen_body;
+  ModuleItem* gen_else = nullptr;
+
+  // Import
+  ImportItem import_item;
+
   // Function/task
   DataType return_type;
   std::vector<FunctionArg> func_args;
@@ -280,8 +310,15 @@ struct ModuleDecl {
   std::vector<std::pair<std::string_view, Expr*>> params;
 };
 
+struct PackageDecl {
+  std::string_view name;
+  SourceRange range;
+  std::vector<ModuleItem*> items;
+};
+
 struct CompilationUnit {
   std::vector<ModuleDecl*> modules;
+  std::vector<PackageDecl*> packages;
 };
 
 }  // namespace delta
