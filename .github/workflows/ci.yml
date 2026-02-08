@@ -225,8 +225,7 @@ jobs:
           pmd cpd --minimum-tokens 100 --language cpp --dir src/
       - name: Run cppcheck
         run: |
-          cppcheck --error-exitcode=1 \
-            --enable=warning,style,performance,portability,unusedFunction \
+          cppcheck --enable=all --error-exitcode=1 \
             --std=c++23 -I src src/ test/
       - name: Run clang-tidy
         run: |
