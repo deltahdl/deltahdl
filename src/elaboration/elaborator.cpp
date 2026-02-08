@@ -109,6 +109,15 @@ static RtlirProcessKind MapAlwaysKind(AlwaysKind ak) {
   return RtlirProcessKind::kAlwaysComb;
 }
 
+static void AddProcess(RtlirProcessKind kind, ModuleItem* item,
+                       RtlirModule* mod) {
+  RtlirProcess proc;
+  proc.kind = kind;
+  proc.body = item->body;
+  proc.sensitivity = item->sensitivity;
+  mod->processes.push_back(proc);
+}
+
 void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
   switch (item->kind) {
     case ModuleItemKind::kNetDecl: {
@@ -134,31 +143,18 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       mod->assigns.push_back(ca);
       break;
     }
-    case ModuleItemKind::kInitialBlock: {
-      RtlirProcess proc;
-      proc.kind = RtlirProcessKind::kInitial;
-      proc.body = item->body;
-      mod->processes.push_back(proc);
+    case ModuleItemKind::kInitialBlock:
+      AddProcess(RtlirProcessKind::kInitial, item, mod);
       break;
-    }
-    case ModuleItemKind::kFinalBlock: {
-      RtlirProcess proc;
-      proc.kind = RtlirProcessKind::kFinal;
-      proc.body = item->body;
-      mod->processes.push_back(proc);
+    case ModuleItemKind::kFinalBlock:
+      AddProcess(RtlirProcessKind::kFinal, item, mod);
       break;
-    }
     case ModuleItemKind::kAlwaysBlock:
     case ModuleItemKind::kAlwaysCombBlock:
     case ModuleItemKind::kAlwaysFFBlock:
-    case ModuleItemKind::kAlwaysLatchBlock: {
-      RtlirProcess proc;
-      proc.kind = MapAlwaysKind(item->always_kind);
-      proc.body = item->body;
-      proc.sensitivity = item->sensitivity;
-      mod->processes.push_back(proc);
+    case ModuleItemKind::kAlwaysLatchBlock:
+      AddProcess(MapAlwaysKind(item->always_kind), item, mod);
       break;
-    }
     case ModuleItemKind::kModuleInst: {
       RtlirModuleInst inst;
       inst.module_name = item->inst_module;
