@@ -75,7 +75,7 @@ jobs:
       matrix:
         build_type: [Debug, Release]
   coverage-macos-26-arm64:
-    needs: e2e-test-macos-26-arm64
+    needs: e2e-test-macos-26-arm64-clang
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
@@ -119,7 +119,9 @@ jobs:
               .branches.covered == .branches.count' \
             || { echo "FAIL: coverage must be 100%"; exit 1; }
   coverage-ubuntu-24-04:
-    needs: e2e-test-ubuntu-24-04
+    needs:
+      - e2e-test-ubuntu-24-04-clang
+      - e2e-test-ubuntu-24-04-gcc
     permissions:
       id-token: write
       pages: write
@@ -181,7 +183,7 @@ jobs:
           && github.event_name == 'push'
         name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
-  e2e-test-macos-26-arm64:
+  e2e-test-macos-26-arm64-clang:
     needs: integration-test-macos-26-arm64-clang
     runs-on: macos-26
     steps:
@@ -197,10 +199,24 @@ jobs:
         run: chmod +x build/src/deltahdl
       - name: Run sv-tests
         run: python3 scripts/run_sv_tests.py
-  e2e-test-ubuntu-24-04:
-    needs:
-      - integration-test-ubuntu-24-04-clang
-      - integration-test-ubuntu-24-04-gcc
+  e2e-test-ubuntu-24-04-clang:
+    needs: integration-test-ubuntu-24-04-clang
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-ubuntu-24-04-clang-Release
+          path: build/
+      - name: Fix permissions
+        run: chmod +x build/src/deltahdl
+      - name: Run sv-tests
+        run: python3 scripts/run_sv_tests.py
+  e2e-test-ubuntu-24-04-gcc:
+    needs: integration-test-ubuntu-24-04-gcc
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
