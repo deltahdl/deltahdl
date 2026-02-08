@@ -34,6 +34,7 @@ class Preprocessor {
   std::string ProcessSource(std::string_view src, uint32_t file_id, int depth);
   bool ProcessDirective(std::string_view line, uint32_t file_id,
                         uint32_t line_num, int depth, std::string& output);
+  bool ProcessConditionalDirective(std::string_view line);
   bool IsActive() const;
   void HandleDefine(std::string_view rest, SourceLoc loc);
   void HandleUndef(std::string_view rest, SourceLoc loc);

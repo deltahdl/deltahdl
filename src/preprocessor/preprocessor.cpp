@@ -97,6 +97,26 @@ bool Preprocessor::ProcessDirective(std::string_view line, uint32_t file_id,
     HandleUndef(AfterDirective(line, "undef"), loc);
     return true;
   }
+  if (ProcessConditionalDirective(line)) return true;
+  if (StartsWithDirective(line, "include") && IsActive()) {
+    HandleInclude(AfterDirective(line, "include"), loc, depth, output);
+    return true;
+  }
+  if (StartsWithDirective(line, "timescale")) {
+    return true;  // consumed, handled later
+  }
+  if (StartsWithDirective(line, "resetall")) {
+    macros_.UndefineAll();
+    return true;
+  }
+  // Check for macro invocation: `MACRO_NAME
+  if (IsActive() && TryExpandMacro(trimmed, output)) {
+    return true;
+  }
+  return false;
+}
+
+bool Preprocessor::ProcessConditionalDirective(std::string_view line) {
   if (StartsWithDirective(line, "ifdef")) {
     HandleIfdef(AfterDirective(line, "ifdef"), false);
     return true;
@@ -115,21 +135,6 @@ bool Preprocessor::ProcessDirective(std::string_view line, uint32_t file_id,
   }
   if (StartsWithDirective(line, "endif")) {
     HandleEndif();
-    return true;
-  }
-  if (StartsWithDirective(line, "include") && IsActive()) {
-    HandleInclude(AfterDirective(line, "include"), loc, depth, output);
-    return true;
-  }
-  if (StartsWithDirective(line, "timescale")) {
-    return true;  // consumed, handled later
-  }
-  if (StartsWithDirective(line, "resetall")) {
-    macros_.UndefineAll();
-    return true;
-  }
-  // Check for macro invocation: `MACRO_NAME
-  if (IsActive() && TryExpandMacro(trimmed, output)) {
     return true;
   }
   return false;
