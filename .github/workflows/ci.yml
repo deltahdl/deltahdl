@@ -260,3 +260,50 @@ jobs:
           for sv in test/integration/*.sv; do
             ./build/src/deltahdl "$sv"
           done
+
+  release:
+    needs: sanitize
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Install compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-14
+
+      - id: version
+        name: Generate version from UTC time
+        run: echo "version=$(date -u +%Y%m%d%H%M%S)" >> $GITHUB_OUTPUT
+
+      - name: Build release binary
+        run: |
+          cmake -B build \
+            -DCMAKE_CXX_COMPILER=g++-14 \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel
+
+      - name: Create tag
+        run: git tag "v${{ steps.version.outputs.version }}"
+
+      - name: Push tag
+        run: git push origin "v${{ steps.version.outputs.version }}"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ steps.version.outputs.version }}" \
+            --generate-notes \
+            build/src/deltahdl
+
+      - name: Update latest tag
+        run: |
+          git tag -f latest
+          git push origin latest --force
