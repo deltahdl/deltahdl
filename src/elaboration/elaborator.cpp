@@ -96,6 +96,20 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
 
 // --- Module item elaboration ---
 
+static uint32_t LookupLhsWidth(const Expr* lhs, const RtlirModule* mod) {
+  if (!lhs || lhs->kind != ExprKind::kIdentifier) return 0;
+  for (const auto& v : mod->variables) {
+    if (v.name == lhs->text) return v.width;
+  }
+  for (const auto& n : mod->nets) {
+    if (n.name == lhs->text) return n.width;
+  }
+  for (const auto& p : mod->ports) {
+    if (p.name == lhs->text) return p.width;
+  }
+  return 0;
+}
+
 static RtlirProcessKind MapAlwaysKind(AlwaysKind ak) {
   switch (ak) {
     case AlwaysKind::kAlways:
@@ -146,6 +160,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       RtlirContAssign ca;
       ca.lhs = item->assign_lhs;
       ca.rhs = item->assign_rhs;
+      ca.width = LookupLhsWidth(ca.lhs, mod);
       mod->assigns.push_back(ca);
       break;
     }
@@ -161,14 +176,9 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kAlwaysLatchBlock:
       AddProcess(MapAlwaysKind(item->always_kind), item, mod, arena_);
       break;
-    case ModuleItemKind::kModuleInst: {
-      RtlirModuleInst inst;
-      inst.module_name = item->inst_module;
-      inst.inst_name = item->inst_name;
-      inst.resolved = nullptr;
-      mod->children.push_back(inst);
+    case ModuleItemKind::kModuleInst:
+      ElaborateModuleInst(item, mod);
       break;
-    }
     case ModuleItemKind::kParamDecl:
       break;
     case ModuleItemKind::kGenerateIf:
@@ -213,6 +223,52 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
 void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   for (auto* item : decl->items) {
     ElaborateItem(item, mod);
+  }
+}
+
+// --- Module instantiation ---
+
+void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
+  RtlirModuleInst inst;
+  inst.module_name = item->inst_module;
+  inst.inst_name = item->inst_name;
+
+  auto* child_decl = FindModule(item->inst_module);
+  if (!child_decl) {
+    diag_.Warning(item->loc,
+                  std::format("unknown module '{}'", item->inst_module));
+    mod->children.push_back(inst);
+    return;
+  }
+
+  ParamList child_params;
+  inst.resolved = ElaborateModule(child_decl, child_params);
+  BindPorts(inst, item);
+  mod->children.push_back(inst);
+}
+
+void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item) {
+  if (!inst.resolved) return;
+  const auto& child_ports = inst.resolved->ports;
+
+  for (const auto& [port_name, conn_expr] : item->inst_ports) {
+    RtlirPortBinding binding;
+    binding.port_name = port_name;
+    binding.connection = conn_expr;
+
+    auto it =
+        std::find_if(child_ports.begin(), child_ports.end(),
+                     [&](const RtlirPort& p) { return p.name == port_name; });
+    if (it == child_ports.end()) {
+      diag_.Warning(item->loc, std::format("port '{}' not found on module '{}'",
+                                           port_name, inst.module_name));
+      binding.direction = Direction::kInput;
+      binding.width = 1;
+    } else {
+      binding.direction = it->direction;
+      binding.width = it->width;
+    }
+    inst.port_bindings.push_back(binding);
   }
 }
 

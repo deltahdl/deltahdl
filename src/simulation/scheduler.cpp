@@ -2,7 +2,31 @@
 
 #include <cassert>
 
+#include "common/arena.h"
+
 namespace delta {
+
+// --- EventPool ---
+
+Event* EventPool::Acquire() {
+  if (free_list_) {
+    Event* event = free_list_;
+    free_list_ = event->next;
+    --free_count_;
+    event->next = nullptr;
+    return event;
+  }
+  return arena_.Create<Event>();
+}
+
+void EventPool::Release(Event* event) {
+  event->kind = EventKind::kEvaluation;
+  event->target = nullptr;
+  event->callback = nullptr;
+  event->next = free_list_;
+  free_list_ = event;
+  ++free_count_;
+}
 
 // --- EventQueue ---
 
@@ -166,6 +190,7 @@ void Scheduler::ExecuteRegion(EventQueue& queue) {
     if (event->callback) {
       event->callback();
     }
+    pool_.Release(event);
   }
 }
 

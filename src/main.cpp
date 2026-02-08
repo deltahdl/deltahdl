@@ -210,7 +210,7 @@ int RunSimulation(const CliOptions& opts, delta::CompilationUnit* cu,
     return 1;
   }
 
-  delta::Scheduler scheduler;
+  delta::Scheduler scheduler(arena);
   delta::SimContext sim_ctx(scheduler, arena, diag, opts.seed);
   delta::Lowerer lowerer(sim_ctx, arena, diag);
   lowerer.Lower(design);

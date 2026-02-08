@@ -31,6 +31,7 @@ class DiagEngine {
   void Error(SourceLoc loc, std::string msg);
 
   bool HasErrors() const { return error_count_ > 0; }
+  uint32_t WarningCount() const { return warning_count_; }
 
   void SetWarningsAsErrors(bool val) { warnings_as_errors_ = val; }
 

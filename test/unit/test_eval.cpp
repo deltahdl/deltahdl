@@ -13,7 +13,7 @@ using namespace delta;
 struct ExprFixture {
   SourceManager mgr;
   Arena arena;
-  Scheduler scheduler;
+  Scheduler scheduler{arena};
   DiagEngine diag{mgr};
   SimContext ctx{scheduler, arena, diag};
 };

@@ -81,6 +81,57 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
   return output;
 }
 
+bool Preprocessor::ProcessStateDirective(std::string_view line, SourceLoc loc) {
+  if (StartsWithDirective(line, "timescale")) {
+    HandleTimescale(AfterDirective(line, "timescale"), loc);
+    return true;
+  }
+  if (StartsWithDirective(line, "resetall")) {
+    macros_.UndefineAll();
+    default_net_type_ = NetType::kWire;
+    in_celldefine_ = false;
+    unconnected_drive_ = NetType::kWire;
+    return true;
+  }
+  if (StartsWithDirective(line, "default_nettype")) {
+    HandleDefaultNettype(AfterDirective(line, "default_nettype"), loc);
+    return true;
+  }
+  if (StartsWithDirective(line, "endcelldefine")) {
+    in_celldefine_ = false;
+    return true;
+  }
+  if (StartsWithDirective(line, "celldefine")) {
+    in_celldefine_ = true;
+    return true;
+  }
+  if (StartsWithDirective(line, "nounconnected_drive")) {
+    unconnected_drive_ = NetType::kWire;
+    return true;
+  }
+  if (StartsWithDirective(line, "unconnected_drive")) {
+    HandleUnconnectedDrive(AfterDirective(line, "unconnected_drive"), loc);
+    return true;
+  }
+  if (StartsWithDirective(line, "pragma")) {
+    // Implementation-defined per IEEE 22.10; consume silently.
+    return true;
+  }
+  if (StartsWithDirective(line, "line")) {
+    HandleLine(AfterDirective(line, "line"), loc);
+    return true;
+  }
+  if (StartsWithDirective(line, "begin_keywords")) {
+    diag_.Warning(loc, "`begin_keywords not fully supported; ignored");
+    return true;
+  }
+  if (StartsWithDirective(line, "end_keywords")) {
+    diag_.Warning(loc, "`end_keywords not fully supported; ignored");
+    return true;
+  }
+  return false;
+}
+
 bool Preprocessor::ProcessDirective(std::string_view line, uint32_t file_id,
                                     uint32_t line_num, int depth,
                                     std::string& output) {
@@ -102,13 +153,7 @@ bool Preprocessor::ProcessDirective(std::string_view line, uint32_t file_id,
     HandleInclude(AfterDirective(line, "include"), loc, depth, output);
     return true;
   }
-  if (StartsWithDirective(line, "timescale")) {
-    return true;  // consumed, handled later
-  }
-  if (StartsWithDirective(line, "resetall")) {
-    macros_.UndefineAll();
-    return true;
-  }
+  if (ProcessStateDirective(line, loc)) return true;
   // Check for macro invocation: `MACRO_NAME
   if (IsActive() && TryExpandMacro(trimmed, output, file_id, line_num)) {
     return true;
@@ -351,6 +396,137 @@ std::string Preprocessor::SubstituteParams(
     if (!replaced) result.append(token);
   }
   return result;
+}
+
+// --- Timescale parsing ---
+
+static bool ParseTimescaleComponent(std::string_view text, int& magnitude,
+                                    TimeUnit& unit) {
+  auto trimmed = Trim(text);
+  if (trimmed.empty()) return false;
+
+  // Extract leading digits for magnitude.
+  size_t i = 0;
+  while (i < trimmed.size() &&
+         std::isdigit(static_cast<unsigned char>(trimmed[i]))) {
+    ++i;
+  }
+  if (i == 0) return false;
+
+  int mag = 0;
+  for (size_t j = 0; j < i; ++j) {
+    mag = mag * 10 + (trimmed[j] - '0');
+  }
+  if (mag != 1 && mag != 10 && mag != 100) return false;
+  magnitude = mag;
+
+  auto unit_str = Trim(trimmed.substr(i));
+  return ParseTimeUnitStr(unit_str, unit);
+}
+
+void Preprocessor::HandleTimescale(std::string_view rest, SourceLoc loc) {
+  // Format: `timescale unit_mag unit / prec_mag precision
+  auto slash = rest.find('/');
+  if (slash == std::string_view::npos) {
+    diag_.Error(loc, "invalid `timescale format: missing '/'");
+    return;
+  }
+  auto unit_part = rest.substr(0, slash);
+  auto prec_part = rest.substr(slash + 1);
+
+  TimeScale ts;
+  if (!ParseTimescaleComponent(unit_part, ts.magnitude, ts.unit)) {
+    diag_.Error(loc, "invalid `timescale unit");
+    return;
+  }
+  if (!ParseTimescaleComponent(prec_part, ts.prec_magnitude, ts.precision)) {
+    diag_.Error(loc, "invalid `timescale precision");
+    return;
+  }
+
+  current_timescale_ = ts;
+  if (!has_timescale_ ||
+      static_cast<int>(ts.precision) < static_cast<int>(global_precision_)) {
+    global_precision_ = ts.precision;
+  }
+  has_timescale_ = true;
+}
+
+// --- default_nettype / unconnected_drive ---
+
+static bool ParseNetTypeName(std::string_view name, NetType& out) {
+  if (name == "wire") {
+    out = NetType::kWire;
+  } else if (name == "tri") {
+    out = NetType::kTri;
+  } else if (name == "wand") {
+    out = NetType::kWand;
+  } else if (name == "triand") {
+    out = NetType::kTriand;
+  } else if (name == "wor") {
+    out = NetType::kWor;
+  } else if (name == "trior") {
+    out = NetType::kTrior;
+  } else if (name == "tri0") {
+    out = NetType::kTri0;
+  } else if (name == "tri1") {
+    out = NetType::kTri1;
+  } else if (name == "uwire") {
+    out = NetType::kUwire;
+  } else {
+    return false;
+  }
+  return true;
+}
+
+void Preprocessor::HandleDefaultNettype(std::string_view rest, SourceLoc loc) {
+  auto name = Trim(rest);
+  if (name == "none") {
+    // `default_nettype none means no implicit nets.
+    // We use kWire as the "none" sentinel since it's the default;
+    // elaboration uses a separate flag. For now just track the value.
+    default_net_type_ = NetType::kWire;
+    return;
+  }
+  NetType nt = NetType::kWire;
+  if (!ParseNetTypeName(name, nt)) {
+    diag_.Error(loc, "invalid net type '" + std::string(name) + "'");
+    return;
+  }
+  default_net_type_ = nt;
+}
+
+void Preprocessor::HandleUnconnectedDrive(std::string_view rest,
+                                          SourceLoc loc) {
+  auto arg = Trim(rest);
+  if (arg == "pull0") {
+    unconnected_drive_ = NetType::kTri0;
+  } else if (arg == "pull1") {
+    unconnected_drive_ = NetType::kTri1;
+  } else {
+    diag_.Error(
+        loc, "invalid `unconnected_drive argument: '" + std::string(arg) + "'");
+  }
+}
+
+void Preprocessor::HandleLine(std::string_view rest, SourceLoc loc) {
+  // Format: number "filename" level
+  auto trimmed = Trim(rest);
+  size_t i = 0;
+  while (i < trimmed.size() &&
+         std::isdigit(static_cast<unsigned char>(trimmed[i]))) {
+    ++i;
+  }
+  if (i == 0) {
+    diag_.Warning(loc, "invalid `line directive: missing line number");
+    return;
+  }
+  uint32_t new_line = 0;
+  for (size_t j = 0; j < i; ++j) {
+    new_line = new_line * 10 + (trimmed[j] - '0');
+  }
+  line_offset_ = new_line;
+  has_line_override_ = true;
 }
 
 std::string Preprocessor::ResolveInclude(std::string_view filename) {

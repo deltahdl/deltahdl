@@ -5,7 +5,6 @@
 #include <string_view>
 #include <vector>
 
-#include "common/arena.h"
 #include "common/types.h"
 #include "parser/ast.h"
 #include "simulation/scheduler.h"
@@ -26,7 +25,7 @@ struct DelayAwaiter {
   void await_suspend(std::coroutine_handle<> h) {
     auto time = ctx.CurrentTime() + SimTime{delay_ticks};
     auto region = (delay_ticks == 0) ? Region::kInactive : Region::kActive;
-    auto* event = ctx.GetArena().Create<Event>();
+    auto* event = ctx.GetScheduler().GetEventPool().Acquire();
     event->callback = [h]() mutable { h.resume(); };
     ctx.GetScheduler().ScheduleEvent(time, region, event);
   }

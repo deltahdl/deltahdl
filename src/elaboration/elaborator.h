@@ -19,6 +19,7 @@ struct RtlirDesign;
 struct RtlirModule;
 struct ModuleItem;
 struct Expr;
+struct RtlirModuleInst;
 
 /// Elaborator transforms a parsed AST (CompilationUnit) into the
 /// elaborated RTLIR representation.  Phase 1 supports single-module
@@ -51,6 +52,12 @@ class Elaborator {
 
   /// Walk module items and populate nets, vars, assigns, processes.
   void ElaborateItems(const ModuleDecl* decl, RtlirModule* mod);
+
+  /// Elaborate a module instantiation (resolve child, bind ports).
+  void ElaborateModuleInst(ModuleItem* item, RtlirModule* mod);
+
+  /// Bind instance ports to continuous assignments.
+  void BindPorts(RtlirModuleInst& inst, const ModuleItem* item);
 
   /// Build a scope map from resolved module parameters.
   static ScopeMap BuildParamScope(const RtlirModule* mod);

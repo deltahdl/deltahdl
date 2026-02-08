@@ -7,6 +7,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "common/types.h"
 #include "preprocessor/macro_table.h"
 
 namespace delta {
@@ -35,6 +36,7 @@ class Preprocessor {
   bool ProcessDirective(std::string_view line, uint32_t file_id,
                         uint32_t line_num, int depth, std::string& output);
   bool ProcessConditionalDirective(std::string_view line);
+  bool ProcessStateDirective(std::string_view line, SourceLoc loc);
   bool IsActive() const;
   void HandleDefine(std::string_view rest, SourceLoc loc);
   void HandleUndef(std::string_view rest, SourceLoc loc);
@@ -44,6 +46,10 @@ class Preprocessor {
   void HandleEndif();
   void HandleInclude(std::string_view filename, SourceLoc loc, int depth,
                      std::string& output);
+  void HandleTimescale(std::string_view rest, SourceLoc loc);
+  void HandleDefaultNettype(std::string_view rest, SourceLoc loc);
+  void HandleUnconnectedDrive(std::string_view rest, SourceLoc loc);
+  void HandleLine(std::string_view rest, SourceLoc loc);
   bool TryExpandMacro(std::string_view trimmed, std::string& output,
                       uint32_t file_id, uint32_t line_num);
   std::string ExpandMacro(const MacroDef& macro, std::string_view args_text);
@@ -63,6 +69,25 @@ class Preprocessor {
   std::vector<CondState> cond_stack_;
   int include_depth_ = 0;
   static constexpr int kMaxIncludeDepth = 15;
+
+ public:
+  const TimeScale& CurrentTimescale() const { return current_timescale_; }
+  TimeUnit GlobalPrecision() const { return global_precision_; }
+  NetType DefaultNetType() const { return default_net_type_; }
+  bool InCelldefine() const { return in_celldefine_; }
+  NetType UnconnectedDrive() const { return unconnected_drive_; }
+  uint32_t LineOffset() const { return line_offset_; }
+  bool HasLineOverride() const { return has_line_override_; }
+
+ private:
+  TimeScale current_timescale_;
+  TimeUnit global_precision_ = TimeUnit::kNs;
+  bool has_timescale_ = false;
+  NetType default_net_type_ = NetType::kWire;
+  bool in_celldefine_ = false;
+  NetType unconnected_drive_ = NetType::kWire;  // kWire = no drive override
+  uint32_t line_offset_ = 0;  // Offset applied by `line directive.
+  bool has_line_override_ = false;
 };
 
 }  // namespace delta

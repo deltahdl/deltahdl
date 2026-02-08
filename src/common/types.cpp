@@ -99,4 +99,47 @@ uint64_t Logic2Vec::ToUint64() const {
   return words[0];
 }
 
+// --- Timescale ---
+
+bool ParseTimeUnitStr(std::string_view str, TimeUnit& out) {
+  if (str == "s") {
+    out = TimeUnit::kS;
+  } else if (str == "ms") {
+    out = TimeUnit::kMs;
+  } else if (str == "us") {
+    out = TimeUnit::kUs;
+  } else if (str == "ns") {
+    out = TimeUnit::kNs;
+  } else if (str == "ps") {
+    out = TimeUnit::kPs;
+  } else if (str == "fs") {
+    out = TimeUnit::kFs;
+  } else {
+    return false;
+  }
+  return true;
+}
+
+static uint64_t PowerOf10(int exp) {
+  uint64_t result = 1;
+  for (int i = 0; i < exp; ++i) result *= 10;
+  return result;
+}
+
+uint64_t DelayToTicks(uint64_t delay, const TimeScale& scale,
+                      TimeUnit global_precision) {
+  // The delay is in units of (magnitude * unit).
+  // Convert to ticks in global_precision.
+  // Exponent difference: unit_exp - precision_exp
+  int exp_diff =
+      static_cast<int>(scale.unit) - static_cast<int>(global_precision);
+  uint64_t ticks = delay * scale.magnitude;
+  if (exp_diff > 0) {
+    ticks *= PowerOf10(exp_diff);
+  } else if (exp_diff < 0) {
+    ticks /= PowerOf10(-exp_diff);
+  }
+  return ticks;
+}
+
 }  // namespace delta

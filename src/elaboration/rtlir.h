@@ -66,6 +66,7 @@ struct RtlirVariable {
 struct RtlirContAssign {
   Expr* lhs = nullptr;
   Expr* rhs = nullptr;
+  uint32_t width = 0;
 };
 
 // --- Process block ---
@@ -85,12 +86,22 @@ struct RtlirParamDecl {
   bool is_resolved = false;
 };
 
+// --- Port binding (for module instances) ---
+
+struct RtlirPortBinding {
+  std::string_view port_name;
+  Direction direction;
+  Expr* connection = nullptr;
+  uint32_t width = 1;
+};
+
 // --- Module instance (child) ---
 
 struct RtlirModuleInst {
   std::string_view module_name;
   std::string_view inst_name;
   struct RtlirModule* resolved = nullptr;
+  std::vector<RtlirPortBinding> port_bindings;
 };
 
 // --- Module ---

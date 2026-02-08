@@ -83,6 +83,32 @@ struct SimTime {
   SimTime operator+(const SimTime& o) const { return {ticks + o.ticks}; }
 };
 
+// --- Timescale (IEEE 1800-2023 §22.7) ---
+
+enum class TimeUnit : int8_t {
+  kS = 0,
+  kMs = -3,
+  kUs = -6,
+  kNs = -9,
+  kPs = -12,
+  kFs = -15,
+};
+
+struct TimeScale {
+  TimeUnit unit = TimeUnit::kNs;
+  int magnitude = 1;  // 1, 10, or 100
+  TimeUnit precision = TimeUnit::kNs;
+  int prec_magnitude = 1;
+};
+
+/// Convert a delay value to ticks at a given timescale/precision.
+uint64_t DelayToTicks(uint64_t delay, const TimeScale& scale,
+                      TimeUnit global_precision);
+
+/// Parse a time unit string (e.g. "ns") to TimeUnit.
+/// Returns false if the string is not a valid unit.
+bool ParseTimeUnitStr(std::string_view str, TimeUnit& out);
+
 // --- Event scheduler regions (IEEE 1800-2023 §4.4) ---
 
 enum class Region : uint8_t {

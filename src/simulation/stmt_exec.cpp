@@ -36,7 +36,7 @@ static StmtResult ExecNonblockingAssignImpl(const Stmt* stmt, SimContext& ctx,
   var->pending_nba = rhs_val;
   var->has_pending_nba = true;
 
-  auto* event = arena.Create<Event>();
+  auto* event = ctx.GetScheduler().GetEventPool().Acquire();
   event->callback = [var]() {
     if (var->has_pending_nba) {
       var->value = var->pending_nba;

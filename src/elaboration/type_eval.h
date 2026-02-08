@@ -27,4 +27,15 @@ bool Is4stateType(DataTypeKind kind);
 /// Overload that resolves kNamed types via the typedef map.
 bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs);
 
+// Forward declarations
+struct Expr;
+
+/// Infer the self-determined width of an expression (IEEE §11.6).
+/// Returns 0 for expressions that can't be sized.
+uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs);
+
+/// Apply context-determined width: propagate assignment LHS width to RHS.
+uint32_t ContextWidth(const Expr* expr, uint32_t ctx_width,
+                      const TypedefMap& typedefs);
+
 }  // namespace delta
