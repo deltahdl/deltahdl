@@ -507,7 +507,7 @@ jobs:
           sudo apt-get install -y clang-18
       - name: Build tests
         run: |
-          find build/_deps -name '*-update' -exec touch {} +
+          cmake -B build -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
           cmake --build build --parallel
       - name: Unit tests
         run: ctest --test-dir build --output-on-failure
@@ -529,7 +529,7 @@ jobs:
           path: build/
       - name: Build tests
         run: |
-          find build/_deps -name '*-update' -exec touch {} +
+          cmake -B build -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
           cmake --build build --parallel
       - name: Unit tests
         run: ctest --test-dir build --output-on-failure
@@ -552,7 +552,7 @@ jobs:
           sudo apt-get install -y clang-18
       - name: Build tests
         run: |
-          find build/_deps -name '*-update' -exec touch {} +
+          cmake -B build -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
           cmake --build build --parallel
       - name: Unit tests
         run: ctest --test-dir build --output-on-failure
@@ -572,7 +572,7 @@ jobs:
           sudo apt-get install -y clang-18
       - name: Build tests
         run: |
-          find build/_deps -name '*-update' -exec touch {} +
+          cmake -B build -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
           cmake --build build --parallel
       - name: Unit tests
         run: ctest --test-dir build --output-on-failure
@@ -592,7 +592,7 @@ jobs:
           sudo apt-get install -y g++-14
       - name: Build tests
         run: |
-          find build/_deps -name '*-update' -exec touch {} +
+          cmake -B build -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
           cmake --build build --parallel
       - name: Unit tests
         run: ctest --test-dir build --output-on-failure
