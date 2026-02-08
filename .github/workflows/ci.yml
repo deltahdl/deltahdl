@@ -3,6 +3,98 @@ concurrency:
   cancel-in-progress: true
   group: ${{ github.workflow }}-${{ github.ref }}
 jobs:
+  assert-coverage:
+    needs: e2e-test-coverage
+    permissions:
+      id-token: write
+      pages: write
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-coverage
+          path: build/
+      - name: Download unit profraw
+        uses: actions/download-artifact@v4
+        with:
+          name: profraw-unit
+          path: profraw/unit/
+      - name: Download integration profraw
+        uses: actions/download-artifact@v4
+        with:
+          name: profraw-integration
+          path: profraw/integration/
+      - name: Download e2e profraw
+        uses: actions/download-artifact@v4
+        with:
+          name: profraw-e2e
+          path: profraw/e2e/
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm-18
+      - name: Generate coverage report
+        run: |
+          llvm-profdata-18 merge -sparse \
+            profraw/unit/*.profraw \
+            profraw/integration/*.profraw \
+            profraw/e2e/*.profraw \
+            -o merged.profdata
+          llvm-cov-18 show build/src/deltahdl \
+            -instr-profile=merged.profdata \
+            --ignore-filename-regex='test/|third_party/' \
+            --format=html \
+            -output-dir=coverage-html
+      - name: Enforce 100% coverage
+        run: |
+          llvm-cov-18 report build/src/deltahdl \
+            -instr-profile=merged.profdata \
+            --ignore-filename-regex='test/|third_party/'
+          llvm-cov-18 export build/src/deltahdl \
+            -instr-profile=merged.profdata \
+            --ignore-filename-regex='test/|third_party/' \
+            --summary-only \
+            | jq -e '.data[0].totals |
+              .lines.covered == .lines.count and
+              .branches.covered == .branches.count' \
+            || { echo "FAIL: coverage must be 100%"; exit 1; }
+      - if: >-
+          github.ref == 'refs/heads/main'
+          && github.event_name == 'push'
+        name: Upload pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: coverage-html/
+      - if: >-
+          github.ref == 'refs/heads/main'
+          && github.event_name == 'push'
+        name: Publish to GitHub Pages
+        uses: actions/deploy-pages@v4
+  build-coverage:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Clang
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-18
+      - name: Build
+        run: |
+          cmake -B build \
+            -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_C_COMPILER=clang-18 \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DDELTAHDL_COVERAGE=ON
+          cmake --build build --parallel --target deltahdl
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-coverage
+          path: build/
+          retention-days: 1
   build-macos-26-arm64-clang:
     needs: static-analysis
     runs-on: macos-26
@@ -24,6 +116,29 @@ jobs:
     strategy:
       matrix:
         build_type: [Debug, Release]
+  build-sanitize:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Clang
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-18
+      - name: Build
+        run: |
+          cmake -B build \
+            -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_C_COMPILER=clang-18 \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DDELTAHDL_SANITIZERS=ON
+          cmake --build build --parallel --target deltahdl
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-sanitize
+          path: build/
+          retention-days: 1
   build-ubuntu-24-04-clang:
     needs: static-analysis
     runs-on: ubuntu-24.04
@@ -74,87 +189,30 @@ jobs:
     strategy:
       matrix:
         build_type: [Debug, Release]
-  coverage:
+  e2e-test-coverage:
     env:
-      LLVM_PROFILE_FILE: build/coverage/%p.profraw
-    needs: static-analysis
+      LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
+    needs: integration-test-coverage
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - name: Install tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang-18 llvm-18
-      - name: Build
-        run: |
-          cmake -B build \
-            -DCMAKE_CXX_COMPILER=clang++-18 \
-            -DCMAKE_C_COMPILER=clang-18 \
-            -DCMAKE_BUILD_TYPE=Debug \
-            -DDELTAHDL_COVERAGE=ON
-          cmake --build build --parallel
-      - name: Unit tests
-        run: ctest --test-dir build --output-on-failure
-      - name: Integration tests
-        run: |
-          for sv in test/integration/*.sv; do
-            echo "--- Simulating $sv ---"
-            ./build/src/deltahdl "$sv"
-          done
-      - name: E2E tests
-        run: python3 scripts/run_sv_tests.py
-      - name: Generate coverage report
-        run: |
-          llvm-profdata-18 merge -sparse \
-            build/coverage/*.profraw \
-            -o build/coverage/merged.profdata
-          llvm-cov-18 show build/src/deltahdl \
-            -instr-profile=build/coverage/merged.profdata \
-            --ignore-filename-regex='test/|third_party/' \
-            --format=html \
-            -output-dir=build/coverage/html
-      - name: Enforce 100% coverage
-        run: |
-          llvm-cov-18 report build/src/deltahdl \
-            -instr-profile=build/coverage/merged.profdata \
-            --ignore-filename-regex='test/|third_party/'
-          llvm-cov-18 export build/src/deltahdl \
-            -instr-profile=build/coverage/merged.profdata \
-            --ignore-filename-regex='test/|third_party/' \
-            --summary-only \
-            | jq -e '.data[0].totals |
-              .lines.covered == .lines.count and
-              .branches.covered == .branches.count' \
-            || { echo "FAIL: coverage must be 100%"; exit 1; }
-      - name: Upload coverage HTML
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-html
-          path: build/coverage/html
-          retention-days: 7
-  deploy-coverage:
-    if: >-
-      github.ref == 'refs/heads/main'
-      && github.event_name == 'push'
-    needs: coverage
-    permissions:
-      id-token: write
-      pages: write
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Download coverage HTML
+      - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: coverage-html
-          path: coverage-html/
-      - name: Upload pages artifact
-        uses: actions/upload-pages-artifact@v3
+          name: build-coverage
+          path: build/
+      - name: Fix permissions
+        run: chmod +x build/src/deltahdl
+      - name: E2E tests
+        run: python3 scripts/run_sv_tests.py
+      - name: Upload profraw
+        uses: actions/upload-artifact@v4
         with:
-          path: coverage-html/
-      - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v4
+          name: profraw-e2e
+          path: profraw/
+          retention-days: 1
   e2e-test-macos-26-arm64-clang:
     needs: integration-test-macos-26-arm64-clang
     runs-on: macos-26
@@ -170,6 +228,25 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: Run sv-tests
+        run: python3 scripts/run_sv_tests.py
+  e2e-test-sanitize:
+    env:
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+    needs: integration-test-sanitize
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-sanitize
+          path: build/
+      - name: Fix permissions
+        run: chmod +x build/src/deltahdl
+      - name: E2E tests
         run: python3 scripts/run_sv_tests.py
   e2e-test-ubuntu-24-04-clang:
     needs: integration-test-ubuntu-24-04-clang
@@ -203,6 +280,32 @@ jobs:
         run: chmod +x build/src/deltahdl
       - name: Run sv-tests
         run: python3 scripts/run_sv_tests.py
+  integration-test-coverage:
+    env:
+      LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
+    needs: unit-test-coverage
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-coverage
+          path: build/
+      - name: Fix permissions
+        run: chmod +x build/src/deltahdl
+      - name: Integration tests
+        run: |
+          for sv in test/integration/*.sv; do
+            echo "--- Simulating $sv ---"
+            ./build/src/deltahdl "$sv"
+          done
+      - name: Upload profraw
+        uses: actions/upload-artifact@v4
+        with:
+          name: profraw-integration
+          path: profraw/
+          retention-days: 1
   integration-test-macos-26-arm64-clang:
     needs: unit-test-macos-26-arm64-clang
     runs-on: macos-26
@@ -224,6 +327,27 @@ jobs:
     strategy:
       matrix:
         build_type: [Debug, Release]
+  integration-test-sanitize:
+    env:
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+    needs: unit-test-sanitize
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-sanitize
+          path: build/
+      - name: Fix permissions
+        run: chmod +x build/src/deltahdl
+      - name: Integration tests
+        run: |
+          for sv in test/integration/*.sv; do
+            echo "--- Simulating $sv ---"
+            ./build/src/deltahdl "$sv"
+          done
   integration-test-ubuntu-24-04-clang:
     needs: unit-test-ubuntu-24-04-clang
     runs-on: ubuntu-24.04
@@ -271,11 +395,11 @@ jobs:
       github.ref == 'refs/heads/main'
       && github.event_name == 'push'
     needs:
-      - coverage
+      - assert-coverage
       - e2e-test-macos-26-arm64-clang
+      - e2e-test-sanitize
       - e2e-test-ubuntu-24-04-clang
       - e2e-test-ubuntu-24-04-gcc
-      - sanitize
     permissions:
       contents: write
     runs-on: ubuntu-24.04
@@ -323,38 +447,6 @@ jobs:
         run: |
           git tag -f latest
           git push origin latest --force
-  sanitize:
-    env:
-      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
-      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-    needs: static-analysis
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - name: Install Clang
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang-18
-      - name: Build
-        run: |
-          cmake -B build \
-            -DCMAKE_CXX_COMPILER=clang++-18 \
-            -DCMAKE_C_COMPILER=clang-18 \
-            -DCMAKE_BUILD_TYPE=Debug \
-            -DDELTAHDL_SANITIZERS=ON
-          cmake --build build --parallel
-      - name: Unit tests
-        run: ctest --test-dir build --output-on-failure
-      - name: Integration tests
-        run: |
-          for sv in test/integration/*.sv; do
-            echo "--- Simulating $sv ---"
-            ./build/src/deltahdl "$sv"
-          done
-      - name: E2E tests
-        run: python3 scripts/run_sv_tests.py
   static-analysis:
     runs-on: ubuntu-24.04
     steps:
@@ -484,6 +576,32 @@ jobs:
                     lower_case
                 }
               }'
+  unit-test-coverage:
+    env:
+      LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
+    needs: build-coverage
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-coverage
+          path: build/
+      - name: Install Clang
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-18
+      - name: Build tests
+        run: cmake --build build --parallel
+      - name: Unit tests
+        run: ctest --test-dir build --output-on-failure
+      - name: Upload profraw
+        uses: actions/upload-artifact@v4
+        with:
+          name: profraw-unit
+          path: profraw/
+          retention-days: 1
   unit-test-macos-26-arm64-clang:
     needs: build-macos-26-arm64-clang
     runs-on: macos-26
@@ -501,6 +619,27 @@ jobs:
     strategy:
       matrix:
         build_type: [Debug, Release]
+  unit-test-sanitize:
+    env:
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+    needs: build-sanitize
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-sanitize
+          path: build/
+      - name: Install Clang
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-18
+      - name: Build tests
+        run: cmake --build build --parallel
+      - name: Unit tests
+        run: ctest --test-dir build --output-on-failure
   unit-test-ubuntu-24-04-clang:
     needs: build-ubuntu-24-04-clang
     runs-on: ubuntu-24.04
