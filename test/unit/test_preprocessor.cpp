@@ -102,6 +102,57 @@ TEST(Preprocessor, NestedIfdefInsideElsif) {
   EXPECT_EQ(result.find("line_a"), std::string::npos);
 }
 
+TEST(Preprocessor, BasicFunctionLikeMacro) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define ADD(a, b) a + b\n"
+      "`ADD(3, 4)\n",
+      f);
+  EXPECT_NE(result.find("3 + 4"), std::string::npos);
+}
+
+TEST(Preprocessor, MultiParamMacro) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define MUX(sel, a, b) (sel ? a : b)\n"
+      "`MUX(s, x, y)\n",
+      f);
+  EXPECT_NE(result.find("(s ? x : y)"), std::string::npos);
+}
+
+TEST(Preprocessor, NestedParensInArgs) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define CALL(f, x) f(x)\n"
+      "`CALL(foo, (a+b))\n",
+      f);
+  EXPECT_NE(result.find("foo((a+b))"), std::string::npos);
+}
+
+TEST(Preprocessor, ObjectLikeNotConfusedWithFunctionLike) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define FOO (1+2)\n"
+      "`FOO\n",
+      f);
+  EXPECT_NE(result.find("(1+2)"), std::string::npos);
+}
+
+TEST(Preprocessor, FileExpansion) {
+  PreprocFixture f;
+  auto result = Preprocess("`__FILE__\n", f);
+  EXPECT_NE(result.find("\"<test>\""), std::string::npos);
+}
+
+TEST(Preprocessor, LineExpansion) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "line1\n"
+      "`__LINE__\n",
+      f);
+  EXPECT_NE(result.find('2'), std::string::npos);
+}
+
 TEST(Preprocessor, IfdefElseRegression) {
   PreprocFixture f;
   PreprocConfig cfg;

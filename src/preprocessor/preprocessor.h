@@ -44,9 +44,17 @@ class Preprocessor {
   void HandleEndif();
   void HandleInclude(std::string_view filename, SourceLoc loc, int depth,
                      std::string& output);
-  bool TryExpandMacro(std::string_view trimmed, std::string& output);
+  bool TryExpandMacro(std::string_view trimmed, std::string& output,
+                      uint32_t file_id, uint32_t line_num);
   std::string ExpandMacro(const MacroDef& macro, std::string_view args_text);
   std::string ResolveInclude(std::string_view filename);
+
+  static std::vector<std::string> ParseMacroParams(std::string_view params);
+  static std::string_view ExtractBalancedArgs(std::string_view text);
+  static std::vector<std::string_view> SplitMacroArgs(std::string_view args);
+  static std::string SubstituteParams(
+      std::string_view body, const std::vector<std::string>& params,
+      const std::vector<std::string_view>& args);
 
   SourceManager& src_mgr_;
   DiagEngine& diag_;

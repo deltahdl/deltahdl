@@ -110,7 +110,7 @@ bool Preprocessor::ProcessDirective(std::string_view line, uint32_t file_id,
     return true;
   }
   // Check for macro invocation: `MACRO_NAME
-  if (IsActive() && TryExpandMacro(trimmed, output)) {
+  if (IsActive() && TryExpandMacro(trimmed, output, file_id, line_num)) {
     return true;
   }
   return false;
@@ -140,16 +140,37 @@ bool Preprocessor::ProcessConditionalDirective(std::string_view line) {
   return false;
 }
 
-bool Preprocessor::TryExpandMacro(std::string_view trimmed,
-                                  std::string& output) {
+bool Preprocessor::TryExpandMacro(std::string_view trimmed, std::string& output,
+                                  uint32_t file_id, uint32_t line_num) {
   auto macro_name = trimmed.substr(1);
   auto space_pos = macro_name.find_first_of(" \t(");
   auto name = (space_pos != std::string_view::npos)
                   ? macro_name.substr(0, space_pos)
                   : macro_name;
+
+  // Predefined macros (IEEE 1800-2023 §22.13).
+  if (name == "__FILE__") {
+    output.append("\"");
+    output.append(src_mgr_.FilePath(file_id));
+    output.append("\"");
+    return true;
+  }
+  if (name == "__LINE__") {
+    output.append(std::to_string(line_num));
+    return true;
+  }
+
   const auto* def = macros_.Lookup(name);
   if (def == nullptr) return false;
-  output.append(ExpandMacro(*def, ""));
+
+  std::string_view args_text;
+  if (def->is_function_like) {
+    auto after_name = macro_name.substr(name.size());
+    auto balanced = ExtractBalancedArgs(after_name);
+    if (balanced.empty()) return false;
+    args_text = balanced.substr(1, balanced.size() - 2);
+  }
+  output.append(ExpandMacro(*def, args_text));
   return true;
 }
 
@@ -158,16 +179,34 @@ bool Preprocessor::IsActive() const {
                      [](const CondState& s) { return s.active; });
 }
 
+static bool IsIdentChar(char c) {
+  return std::isalnum(static_cast<unsigned char>(c)) || c == '_';
+}
+
 void Preprocessor::HandleDefine(std::string_view rest, SourceLoc loc) {
   if (!IsActive()) return;
-  auto space = rest.find_first_of(" \t");
+
+  // Find where the macro name ends.
+  size_t name_end = 0;
+  while (name_end < rest.size() && IsIdentChar(rest[name_end])) ++name_end;
+
   MacroDef def;
   def.def_loc = loc;
-  if (space == std::string_view::npos) {
-    def.name = std::string(rest);
+  if (name_end == 0) return;
+
+  def.name = std::string(rest.substr(0, name_end));
+  auto after_name = rest.substr(name_end);
+
+  // Function-like: `( immediately after name, NO space (IEEE §22.5.1).
+  if (!after_name.empty() && after_name[0] == '(') {
+    auto close = after_name.find(')');
+    if (close != std::string_view::npos) {
+      def.is_function_like = true;
+      def.params = ParseMacroParams(after_name.substr(1, close - 1));
+      def.body = std::string(Trim(after_name.substr(close + 1)));
+    }
   } else {
-    def.name = std::string(rest.substr(0, space));
-    def.body = std::string(Trim(rest.substr(space)));
+    def.body = std::string(Trim(after_name));
   }
   macros_.Define(std::move(def));
 }
@@ -234,8 +273,84 @@ void Preprocessor::HandleInclude(std::string_view filename_raw, SourceLoc loc,
 }
 
 std::string Preprocessor::ExpandMacro(const MacroDef& macro,
-                                      std::string_view /*args_text*/) {
-  return macro.body;
+                                      std::string_view args_text) {
+  if (!macro.is_function_like) return macro.body;
+  auto args = SplitMacroArgs(args_text);
+  return SubstituteParams(macro.body, macro.params, args);
+}
+
+// --- Macro helper functions ---
+
+std::vector<std::string> Preprocessor::ParseMacroParams(
+    std::string_view param_list) {
+  std::vector<std::string> params;
+  size_t pos = 0;
+  while (pos < param_list.size()) {
+    auto comma = param_list.find(',', pos);
+    if (comma == std::string_view::npos) comma = param_list.size();
+    auto token = Trim(param_list.substr(pos, comma - pos));
+    if (!token.empty()) {
+      params.emplace_back(token);
+    }
+    pos = comma + 1;
+  }
+  return params;
+}
+
+std::string_view Preprocessor::ExtractBalancedArgs(std::string_view text) {
+  auto open = text.find('(');
+  if (open == std::string_view::npos) return {};
+  int depth = 0;
+  for (size_t i = open; i < text.size(); ++i) {
+    if (text[i] == '(') ++depth;
+    if (text[i] == ')') --depth;
+    if (depth == 0) return text.substr(open, i - open + 1);
+  }
+  return {};
+}
+
+std::vector<std::string_view> Preprocessor::SplitMacroArgs(
+    std::string_view args_text) {
+  std::vector<std::string_view> args;
+  int depth = 0;
+  size_t start = 0;
+  for (size_t i = 0; i < args_text.size(); ++i) {
+    if (args_text[i] == '(') ++depth;
+    if (args_text[i] == ')') --depth;
+    if (args_text[i] == ',' && depth == 0) {
+      args.push_back(Trim(args_text.substr(start, i - start)));
+      start = i + 1;
+    }
+  }
+  args.push_back(Trim(args_text.substr(start)));
+  return args;
+}
+
+std::string Preprocessor::SubstituteParams(
+    std::string_view body, const std::vector<std::string>& params,
+    const std::vector<std::string_view>& args) {
+  std::string result;
+  result.reserve(body.size());
+  size_t i = 0;
+  while (i < body.size()) {
+    if (!IsIdentChar(body[i])) {
+      result += body[i++];
+      continue;
+    }
+    size_t start = i;
+    while (i < body.size() && IsIdentChar(body[i])) ++i;
+    auto token = body.substr(start, i - start);
+    bool replaced = false;
+    for (size_t p = 0; p < params.size() && p < args.size(); ++p) {
+      if (token == params[p]) {
+        result.append(args[p]);
+        replaced = true;
+        break;
+      }
+    }
+    if (!replaced) result.append(token);
+  }
+  return result;
 }
 
 std::string Preprocessor::ResolveInclude(std::string_view filename) {
