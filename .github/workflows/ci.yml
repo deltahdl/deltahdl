@@ -187,6 +187,8 @@ jobs:
       - unit-test-sanitize
       - unit-test-ubuntu-24-04-x86-64-clang
       - unit-test-ubuntu-24-04-x86-64-gcc
+    outputs:
+      sv-tests-sha: ${{ steps.sv-tests-ref.outputs.sha }}
     runs-on: ubuntu-24.04
     steps:
       - id: sv-tests-ref
@@ -296,18 +298,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - id: sv-tests-ref
-        name: Get latest sv-tests commit
-        run: >-
-          echo "sha=$(git ls-remote
-          https://github.com/chipsalliance/sv-tests.git
-          HEAD | cut -f1)"
-          >> "$GITHUB_OUTPUT"
       - name: Restore sv-tests cache
         uses: actions/cache/restore@v4
         with:
           fail-on-cache-miss: true
-          key: sv-tests-${{ steps.sv-tests-ref.outputs.sha }}
+          key: sv-tests-${{ needs.cache-sv-tests.outputs.sv-tests-sha }}
           path: third_party/sv-tests
       - name: Download build
         uses: actions/download-artifact@v4
@@ -329,18 +324,11 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
-      - id: sv-tests-ref
-        name: Get latest sv-tests commit
-        run: >-
-          echo "sha=$(git ls-remote
-          https://github.com/chipsalliance/sv-tests.git
-          HEAD | cut -f1)"
-          >> "$GITHUB_OUTPUT"
       - name: Restore sv-tests cache
         uses: actions/cache/restore@v4
         with:
           fail-on-cache-miss: true
-          key: sv-tests-${{ steps.sv-tests-ref.outputs.sha }}
+          key: sv-tests-${{ needs.cache-sv-tests.outputs.sv-tests-sha }}
           path: third_party/sv-tests
       - name: Download build
         uses: actions/download-artifact@v4
@@ -359,18 +347,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - id: sv-tests-ref
-        name: Get latest sv-tests commit
-        run: >-
-          echo "sha=$(git ls-remote
-          https://github.com/chipsalliance/sv-tests.git
-          HEAD | cut -f1)"
-          >> "$GITHUB_OUTPUT"
       - name: Restore sv-tests cache
         uses: actions/cache/restore@v4
         with:
           fail-on-cache-miss: true
-          key: sv-tests-${{ steps.sv-tests-ref.outputs.sha }}
+          key: sv-tests-${{ needs.cache-sv-tests.outputs.sv-tests-sha }}
           path: third_party/sv-tests
       - name: Download build
         uses: actions/download-artifact@v4
@@ -386,18 +367,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - id: sv-tests-ref
-        name: Get latest sv-tests commit
-        run: >-
-          echo "sha=$(git ls-remote
-          https://github.com/chipsalliance/sv-tests.git
-          HEAD | cut -f1)"
-          >> "$GITHUB_OUTPUT"
       - name: Restore sv-tests cache
         uses: actions/cache/restore@v4
         with:
           fail-on-cache-miss: true
-          key: sv-tests-${{ steps.sv-tests-ref.outputs.sha }}
+          key: sv-tests-${{ needs.cache-sv-tests.outputs.sv-tests-sha }}
           path: third_party/sv-tests
       - name: Download build
         uses: actions/download-artifact@v4
@@ -413,18 +387,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - id: sv-tests-ref
-        name: Get latest sv-tests commit
-        run: >-
-          echo "sha=$(git ls-remote
-          https://github.com/chipsalliance/sv-tests.git
-          HEAD | cut -f1)"
-          >> "$GITHUB_OUTPUT"
       - name: Restore sv-tests cache
         uses: actions/cache/restore@v4
         with:
           fail-on-cache-miss: true
-          key: sv-tests-${{ steps.sv-tests-ref.outputs.sha }}
+          key: sv-tests-${{ needs.cache-sv-tests.outputs.sv-tests-sha }}
           path: third_party/sv-tests
       - name: Download build
         uses: actions/download-artifact@v4
