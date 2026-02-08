@@ -95,17 +95,18 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
 
 // --- Module item elaboration ---
 
-static ProcessKind MapAlwaysKind(AlwaysKind ak) {
+static RtlirProcessKind MapAlwaysKind(AlwaysKind ak) {
   switch (ak) {
     case AlwaysKind::kAlways:
+      return RtlirProcessKind::kAlways;
     case AlwaysKind::kAlwaysComb:
-      return ProcessKind::kAlwaysComb;
+      return RtlirProcessKind::kAlwaysComb;
     case AlwaysKind::kAlwaysFF:
-      return ProcessKind::kAlwaysFF;
+      return RtlirProcessKind::kAlwaysFF;
     case AlwaysKind::kAlwaysLatch:
-      return ProcessKind::kAlwaysLatch;
+      return RtlirProcessKind::kAlwaysLatch;
   }
-  return ProcessKind::kAlwaysComb;
+  return RtlirProcessKind::kAlwaysComb;
 }
 
 void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
@@ -135,14 +136,14 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     }
     case ModuleItemKind::kInitialBlock: {
       RtlirProcess proc;
-      proc.kind = ProcessKind::kInitial;
+      proc.kind = RtlirProcessKind::kInitial;
       proc.body = item->body;
       mod->processes.push_back(proc);
       break;
     }
     case ModuleItemKind::kFinalBlock: {
       RtlirProcess proc;
-      proc.kind = ProcessKind::kFinal;
+      proc.kind = RtlirProcessKind::kFinal;
       proc.body = item->body;
       mod->processes.push_back(proc);
       break;

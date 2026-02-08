@@ -103,6 +103,116 @@ TEST(Parser, ExpressionPrecedence) {
   ASSERT_NE(r.cu, nullptr);
 }
 
+// Helper to extract the first statement from an initial block.
+static Stmt* FirstInitialStmt(ParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) {
+      if (item->body && item->body->kind == StmtKind::kBlock) {
+        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+      }
+      return item->body;
+    }
+  }
+  return nullptr;
+}
+
+TEST(Parser, DoWhileStatement) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    do x = x + 1; while (x < 10);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDoWhile);
+  EXPECT_NE(stmt->body, nullptr);
+  EXPECT_NE(stmt->condition, nullptr);
+}
+
+TEST(Parser, BreakStatement) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    break;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBreak);
+}
+
+TEST(Parser, ContinueStatement) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    continue;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kContinue);
+}
+
+TEST(Parser, ReturnStatement) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    return;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kReturn);
+}
+
+TEST(Parser, ReturnWithValue) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    return 42;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kReturn);
+  EXPECT_NE(stmt->expr, nullptr);
+}
+
+TEST(Parser, WaitStatement) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    wait (ready) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kWait);
+  EXPECT_NE(stmt->condition, nullptr);
+  EXPECT_NE(stmt->body, nullptr);
+}
+
+TEST(Parser, DisableStatement) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    disable blk;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDisable);
+  EXPECT_NE(stmt->expr, nullptr);
+}
+
 TEST(Parser, MultipleModules) {
   auto r = Parse(
       "module a; endmodule\n"

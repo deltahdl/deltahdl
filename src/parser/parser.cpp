@@ -359,39 +359,45 @@ Stmt* Parser::ParseStmt() {
     stmt->kind = StmtKind::kNull;
     return stmt;
   }
-  if (Check(TokenKind::kKwBegin)) {
-    return ParseBlockStmt();
+
+  switch (CurrentToken().kind) {
+    case TokenKind::kKwBegin:
+      return ParseBlockStmt();
+    case TokenKind::kKwIf:
+      return ParseIfStmt();
+    case TokenKind::kKwCase:
+    case TokenKind::kKwCasex:
+    case TokenKind::kKwCasez:
+      return ParseCaseStmt(CurrentToken().kind);
+    case TokenKind::kKwFor:
+      return ParseForStmt();
+    case TokenKind::kKwWhile:
+      return ParseWhileStmt();
+    case TokenKind::kKwForever:
+      return ParseForeverStmt();
+    case TokenKind::kKwRepeat:
+      return ParseRepeatStmt();
+    case TokenKind::kKwFork:
+      return ParseForkStmt();
+    case TokenKind::kKwDo:
+      return ParseDoWhileStmt();
+    case TokenKind::kKwBreak:
+      return ParseSimpleKeywordStmt(StmtKind::kBreak);
+    case TokenKind::kKwContinue:
+      return ParseSimpleKeywordStmt(StmtKind::kContinue);
+    case TokenKind::kKwReturn:
+      return ParseReturnStmt();
+    case TokenKind::kKwWait:
+      return ParseWaitStmt();
+    case TokenKind::kKwDisable:
+      return ParseDisableStmt();
+    case TokenKind::kHash:
+      return ParseDelayStmt();
+    case TokenKind::kAt:
+      return ParseEventControlStmt();
+    default:
+      return ParseAssignmentOrExprStmt();
   }
-  if (Check(TokenKind::kKwIf)) {
-    return ParseIfStmt();
-  }
-  if (Check(TokenKind::kKwCase) || Check(TokenKind::kKwCasex) ||
-      Check(TokenKind::kKwCasez)) {
-    auto kind = CurrentToken().kind;
-    return ParseCaseStmt(kind);
-  }
-  if (Check(TokenKind::kKwFor)) {
-    return ParseForStmt();
-  }
-  if (Check(TokenKind::kKwWhile)) {
-    return ParseWhileStmt();
-  }
-  if (Check(TokenKind::kKwForever)) {
-    return ParseForeverStmt();
-  }
-  if (Check(TokenKind::kKwRepeat)) {
-    return ParseRepeatStmt();
-  }
-  if (Check(TokenKind::kKwFork)) {
-    return ParseForkStmt();
-  }
-  if (Check(TokenKind::kHash)) {
-    return ParseDelayStmt();
-  }
-  if (Check(TokenKind::kAt)) {
-    return ParseEventControlStmt();
-  }
-  return ParseAssignmentOrExprStmt();
 }
 
 Stmt* Parser::ParseBlockStmt() {
@@ -518,6 +524,63 @@ Stmt* Parser::ParseForkStmt() {
   }
   stmt->join_kind = CurrentToken().kind;
   Consume();  // join / join_any / join_none
+  return stmt;
+}
+
+Stmt* Parser::ParseSimpleKeywordStmt(StmtKind kind) {
+  auto* stmt = arena_.Create<Stmt>();
+  stmt->kind = kind;
+  stmt->range.start = CurrentLoc();
+  Consume();
+  Expect(TokenKind::kSemicolon);
+  return stmt;
+}
+
+Stmt* Parser::ParseReturnStmt() {
+  auto* stmt = arena_.Create<Stmt>();
+  stmt->kind = StmtKind::kReturn;
+  stmt->range.start = CurrentLoc();
+  Consume();
+  if (!Check(TokenKind::kSemicolon)) {
+    stmt->expr = ParseExpr();
+  }
+  Expect(TokenKind::kSemicolon);
+  return stmt;
+}
+
+Stmt* Parser::ParseDoWhileStmt() {
+  auto* stmt = arena_.Create<Stmt>();
+  stmt->kind = StmtKind::kDoWhile;
+  stmt->range.start = CurrentLoc();
+  Expect(TokenKind::kKwDo);
+  stmt->body = ParseStmt();
+  Expect(TokenKind::kKwWhile);
+  Expect(TokenKind::kLParen);
+  stmt->condition = ParseExpr();
+  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kSemicolon);
+  return stmt;
+}
+
+Stmt* Parser::ParseWaitStmt() {
+  auto* stmt = arena_.Create<Stmt>();
+  stmt->kind = StmtKind::kWait;
+  stmt->range.start = CurrentLoc();
+  Expect(TokenKind::kKwWait);
+  Expect(TokenKind::kLParen);
+  stmt->condition = ParseExpr();
+  Expect(TokenKind::kRParen);
+  stmt->body = ParseStmt();
+  return stmt;
+}
+
+Stmt* Parser::ParseDisableStmt() {
+  auto* stmt = arena_.Create<Stmt>();
+  stmt->kind = StmtKind::kDisable;
+  stmt->range.start = CurrentLoc();
+  Expect(TokenKind::kKwDisable);
+  stmt->expr = ParseExpr();
+  Expect(TokenKind::kSemicolon);
   return stmt;
 }
 

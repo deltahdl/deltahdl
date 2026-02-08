@@ -14,6 +14,10 @@ add_library(deltahdl_lib STATIC
     simulation/scheduler.cpp
     simulation/process.cpp
     simulation/variable.cpp
+    simulation/sim_context.cpp
+    simulation/eval.cpp
+    simulation/stmt_exec.cpp
+    simulation/lowerer.cpp
     synthesis/aig.cpp
 )
 

@@ -55,6 +55,12 @@ struct SimCoroutine {
     }
   }
 
+  HandleType Release() noexcept {
+    auto h = handle;
+    handle = nullptr;
+    return h;
+  }
+
   HandleType handle = nullptr;
 
  private:

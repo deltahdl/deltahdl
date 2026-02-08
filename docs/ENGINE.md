@@ -75,8 +75,9 @@
 - [x] Parameter port list parsing (`#(parameter ...)`)
 - [x] `final` block parsing
 - [x] Null statement parsing
-- [ ] `do`...`while` loop parsing
-- [ ] `wait` statement parsing
+- [x] `do`...`while` loop parsing
+- [x] `break`, `continue`, `return` statement parsing
+- [x] `wait` statement parsing
 - [ ] `function` and `task` declarations
 - [ ] `generate` for/if/case blocks
 - [ ] `interface`, `modport` declarations
@@ -85,7 +86,7 @@
 - [ ] `typedef`, `enum`, `struct`, `union` type declarations
 - [ ] `program` block parsing
 - [ ] Gate primitive instantiation
-- [ ] `disable` statement
+- [x] `disable` statement
 
 ## 5. Elaboration
 
@@ -108,21 +109,21 @@
 - [ ] Port binding (implicit continuous assignments, bidirectional connections)
 - [ ] Typedef resolution
 - [ ] Sensitivity list inference for `always_comb`/`always_latch` (§9.2.2)
-- [ ] Constant expression evaluation for bitwise ops, ternary, shifts
+- [x] Constant expression evaluation for bitwise ops, ternary, shifts
 - [ ] Width inference and implicit type promotion
 
 ## 6. Simulation Lowering
 
-- [ ] Create `Process` coroutine from each `initial` block
-- [ ] Create `Process` coroutine from each `always`/`always_comb`/`always_ff`/`always_latch` block
+- [x] Create `Process` coroutine from each `initial` block
+- [x] Create `Process` coroutine from each `always`/`always_comb`/`always_ff`/`always_latch` block
 - [ ] Wrap `always` blocks in implicit infinite loop
-- [ ] Create `ContAssignProcess` from each continuous assignment
+- [x] Create `ContAssignProcess` from each continuous assignment
 - [ ] Create `Net` objects with driver lists and resolution functions
-- [ ] Create `Variable` objects with storage
+- [x] Create `Variable` objects with storage
 - [ ] Build sensitivity map (signal -> list of sensitive processes)
-- [ ] Schedule time-zero initialization events into Active region
+- [x] Schedule time-zero initialization events into Active region
 - [ ] Auto-trigger `always_comb`/`always_latch` at time zero (§9.2)
-- [ ] Connect lowered design to scheduler event calendar
+- [x] Connect lowered design to scheduler event calendar
 
 ## 7. Simulation Execution
 
@@ -138,11 +139,11 @@
 - [ ] `co_await edge(signal, posedge/negedge)` (sensitivity list, suspend)
 - [ ] `co_await wait(expr)` (conditional suspend, re-evaluate on wake)
 - [ ] `co_await event_trigger(ev)` (named event wait)
-- [ ] Blocking assignment execution (inline in Active region)
+- [x] Blocking assignment execution (inline in Active region)
 - [ ] Nonblocking assignment scheduling (RHS in Active, LHS update in NBA)
 - [ ] `#0` delay (suspend to Inactive, resume in next Active iteration)
 - [ ] `fork`/`join`/`join_any`/`join_none` (child coroutine spawning)
-- [ ] Expression evaluation engine (all §11 operators on `Logic4Vec`)
+- [x] Expression evaluation engine (all §11 operators on `Logic4Vec`)
 - [ ] Net resolution: tri0, tri1, supply0, supply1, trireg, uwire
 - [ ] Strength resolution (§28.12, multi-driver strength comparison)
 - [ ] User-defined nettype resolution functions (§6.6.7)
@@ -156,7 +157,7 @@
 - [x] `$stop` (pause simulation)
 - [ ] `$strobe` (print in Postponed region)
 - [ ] `$monitor` (print on change in Postponed region)
-- [ ] `$time` (return current simulation time)
+- [x] `$time` (return current simulation time)
 - [ ] `$realtime` (return current time as real)
 - [ ] `$random`, `$urandom`, `$urandom_range`
 - [ ] `$readmemh`, `$readmemb` (load memory from file)

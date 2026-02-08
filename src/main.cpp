@@ -13,7 +13,9 @@
 #include "lexer/lexer.h"
 #include "parser/parser.h"
 #include "preprocessor/preprocessor.h"
+#include "simulation/lowerer.h"
 #include "simulation/scheduler.h"
+#include "simulation/sim_context.h"
 
 namespace {
 
@@ -209,6 +211,9 @@ int RunSimulation(const CliOptions& opts, delta::CompilationUnit* cu,
   }
 
   delta::Scheduler scheduler;
+  delta::SimContext sim_ctx(scheduler, arena, diag);
+  delta::Lowerer lowerer(sim_ctx, arena, diag);
+  lowerer.Lower(design);
   scheduler.Run();
   return diag.HasErrors() ? 1 : 0;
 }

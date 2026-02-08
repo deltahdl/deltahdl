@@ -45,6 +45,11 @@ class Parser {
   Stmt* ParseForeverStmt();
   Stmt* ParseRepeatStmt();
   Stmt* ParseForkStmt();
+  Stmt* ParseDoWhileStmt();
+  Stmt* ParseSimpleKeywordStmt(StmtKind kind);
+  Stmt* ParseReturnStmt();
+  Stmt* ParseWaitStmt();
+  Stmt* ParseDisableStmt();
   Stmt* ParseAssignmentOrExprStmt();
   Stmt* ParseDelayStmt();
   Stmt* ParseEventControlStmt();

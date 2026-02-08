@@ -1,6 +1,54 @@
+#include <charconv>
+
 #include "parser/parser.h"
 
 namespace delta {
+
+// Parse a SystemVerilog integer literal text into a uint64_t value.
+// Handles: decimal "42", based "8'hFF", underscore "1_000".
+static uint64_t ParseIntText(std::string_view text) {
+  // Strip underscores into a local buffer.
+  std::string buf;
+  buf.reserve(text.size());
+  for (char c : text) {
+    if (c != '_') buf.push_back(c);
+  }
+
+  // Find tick for based literals (e.g., 8'hFF).
+  auto tick = buf.find('\'');
+  if (tick == std::string::npos) {
+    uint64_t val = 0;
+    std::from_chars(buf.data(), buf.data() + buf.size(), val, 10);
+    return val;
+  }
+
+  // Skip optional 's' after tick, then parse base letter.
+  size_t i = tick + 1;
+  if (i < buf.size() && (buf[i] == 's' || buf[i] == 'S')) ++i;
+  int base = 10;
+  if (i < buf.size()) {
+    switch (buf[i]) {
+      case 'h':
+      case 'H':
+        base = 16;
+        break;
+      case 'b':
+      case 'B':
+        base = 2;
+        break;
+      case 'o':
+      case 'O':
+        base = 8;
+        break;
+      default:
+        break;
+    }
+    ++i;
+  }
+  uint64_t val = 0;
+  std::from_chars(buf.data() + i, buf.data() + buf.size(), val, base);
+  return val;
+}
 
 // Pratt parser: binding powers for SystemVerilog operators (IEEE 1800-2023 §11)
 // Higher binding power = tighter binding
@@ -136,6 +184,9 @@ Expr* Parser::MakeLiteral(ExprKind kind, const Token& tok) {
   lit->kind = kind;
   lit->text = tok.text;
   lit->range.start = tok.loc;
+  if (kind == ExprKind::kIntegerLiteral) {
+    lit->int_val = ParseIntText(tok.text);
+  }
   return lit;
 }
 

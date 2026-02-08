@@ -31,8 +31,9 @@ enum class RtlirNodeKind : uint8_t {
 
 // --- Process kind (elaborated from AST always kinds) ---
 
-enum class ProcessKind : uint8_t {
+enum class RtlirProcessKind : uint8_t {
   kInitial,
+  kAlways,
   kAlwaysComb,
   kAlwaysFF,
   kAlwaysLatch,
@@ -76,7 +77,7 @@ struct RtlirContAssign {
 // --- Process block ---
 
 struct RtlirProcess {
-  ProcessKind kind = ProcessKind::kInitial;
+  RtlirProcessKind kind = RtlirProcessKind::kInitial;
   Stmt* body = nullptr;
 };
 
