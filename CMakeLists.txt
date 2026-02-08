@@ -26,4 +26,10 @@ add_subdirectory(src)
 include(CTest)
 if(BUILD_TESTING)
     add_subdirectory(test)
+    add_test(
+        NAME sim_tests
+        COMMAND ${CMAKE_COMMAND} -E env python3
+            ${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_sim_tests.py
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    )
 endif()
