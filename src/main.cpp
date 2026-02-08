@@ -215,6 +215,7 @@ int RunSimulation(const CliOptions& opts, delta::CompilationUnit* cu,
   delta::Lowerer lowerer(sim_ctx, arena, diag);
   lowerer.Lower(design);
   scheduler.Run();
+  sim_ctx.RunFinalBlocks();
   return diag.HasErrors() ? 1 : 0;
 }
 

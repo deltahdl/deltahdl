@@ -1,6 +1,7 @@
 #include "simulation/sim_context.h"
 
 #include "common/diagnostic.h"
+#include "simulation/process.h"
 
 namespace delta {
 
@@ -22,6 +23,16 @@ Variable* SimContext::CreateVariable(std::string_view name, uint32_t width) {
   }
   variables_[name] = var;
   return var;
+}
+
+void SimContext::RegisterFinalProcess(Process* proc) {
+  final_processes_.push_back(proc);
+}
+
+void SimContext::RunFinalBlocks() {
+  for (auto* proc : final_processes_) {
+    proc->Resume();
+  }
 }
 
 }  // namespace delta

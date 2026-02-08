@@ -2,6 +2,7 @@
 
 #include <string_view>
 #include <unordered_map>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/types.h"
@@ -11,6 +12,7 @@
 namespace delta {
 
 class DiagEngine;
+struct Process;
 
 class SimContext {
  public:
@@ -27,11 +29,15 @@ class SimContext {
   void RequestStop() { stop_requested_ = true; }
   bool StopRequested() const { return stop_requested_; }
 
+  void RegisterFinalProcess(Process* proc);
+  void RunFinalBlocks();
+
  private:
   Scheduler& scheduler_;
   Arena& arena_;
   DiagEngine& diag_;
   std::unordered_map<std::string_view, Variable*> variables_;
+  std::vector<Process*> final_processes_;
   bool stop_requested_ = false;
 };
 

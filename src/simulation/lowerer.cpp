@@ -18,14 +18,20 @@ Lowerer::Lowerer(SimContext& ctx, Arena& arena, DiagEngine& diag)
 
 static SimCoroutine MakeInitialCoroutine(const Stmt* body, SimContext& ctx,
                                          Arena& arena) {
-  ExecStmt(body, ctx, arena);
-  co_return;
+  co_await ExecStmt(body, ctx, arena);
+}
+
+static SimCoroutine MakeAlwaysCoroutine(const Stmt* body, SimContext& ctx,
+                                        Arena& arena) {
+  while (!ctx.StopRequested()) {
+    auto result = co_await ExecStmt(body, ctx, arena);
+    if (result != StmtResult::kDone) break;
+  }
 }
 
 static SimCoroutine MakeAlwaysCombCoroutine(const Stmt* body, SimContext& ctx,
                                             Arena& arena) {
-  ExecStmt(body, ctx, arena);
-  co_return;
+  co_await ExecStmt(body, ctx, arena);
 }
 
 static SimCoroutine MakeContAssignCoroutine(const Expr* lhs, const Expr* rhs,
@@ -87,6 +93,9 @@ void Lowerer::LowerProcess(const RtlirProcess& proc) {
       p->coro = MakeInitialCoroutine(proc.body, ctx_, arena_).Release();
       break;
     case RtlirProcessKind::kAlways:
+      p->kind = ProcessKind::kAlways;
+      p->coro = MakeAlwaysCoroutine(proc.body, ctx_, arena_).Release();
+      break;
     case RtlirProcessKind::kAlwaysComb:
     case RtlirProcessKind::kAlwaysLatch:
       p->kind = ProcessKind::kAlwaysComb;
@@ -98,8 +107,8 @@ void Lowerer::LowerProcess(const RtlirProcess& proc) {
       break;
     case RtlirProcessKind::kFinal:
       p->kind = ProcessKind::kFinal;
-      // Final blocks run at simulation end, not at time 0.
       p->coro = MakeInitialCoroutine(proc.body, ctx_, arena_).Release();
+      ctx_.RegisterFinalProcess(p);
       return;  // Don't schedule at time 0.
   }
 
