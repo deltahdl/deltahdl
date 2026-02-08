@@ -1,8 +1,8 @@
-#include <catch2/catch_test_macros.hpp>
-
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
+
+#include <catch2/catch_test_macros.hpp>
 
 using namespace delta;
 

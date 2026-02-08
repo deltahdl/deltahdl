@@ -20,7 +20,7 @@ struct Expr;
 /// elaborated RTLIR representation.  Phase 1 supports single-module
 /// designs without parameterized instantiation.
 class Elaborator {
-   public:
+  public:
     using ParamList = std::vector<std::pair<std::string_view, int64_t>>;
 
     Elaborator(Arena& arena, DiagEngine& diag, CompilationUnit* unit);
@@ -29,7 +29,7 @@ class Elaborator {
     /// Returns nullptr on failure (diagnostics emitted via DiagEngine).
     RtlirDesign* elaborate(std::string_view top_module_name);
 
-   private:
+  private:
     /// Find a module declaration by name in the compilation unit.
     ModuleDecl* find_module(std::string_view name) const;
 

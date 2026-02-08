@@ -1,6 +1,6 @@
-#include <catch2/catch_test_macros.hpp>
-
 #include "synthesis/aig.h"
+
+#include <catch2/catch_test_macros.hpp>
 
 using namespace delta;
 

@@ -8,12 +8,12 @@
 namespace delta {
 
 class Parser {
-   public:
+  public:
     Parser(Lexer& lexer, Arena& arena, DiagEngine& diag);
 
     CompilationUnit* parse();
 
-   private:
+  private:
     // Module parsing
     ModuleDecl* parse_module_decl();
     void parse_port_list(ModuleDecl& mod);

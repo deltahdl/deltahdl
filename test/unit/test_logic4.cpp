@@ -1,7 +1,7 @@
-#include <catch2/catch_test_macros.hpp>
-
 #include "common/arena.h"
 #include "common/types.h"
+
+#include <catch2/catch_test_macros.hpp>
 
 using namespace delta;
 

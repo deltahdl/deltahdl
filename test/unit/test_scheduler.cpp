@@ -1,7 +1,7 @@
-#include <catch2/catch_test_macros.hpp>
-
 #include "common/types.h"
 #include "simulation/scheduler.h"
+
+#include <catch2/catch_test_macros.hpp>
 
 using namespace delta;
 

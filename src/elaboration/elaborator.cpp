@@ -1,8 +1,5 @@
 #include "elaboration/elaborator.h"
 
-#include <format>
-#include <optional>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
@@ -10,6 +7,9 @@
 #include "elaboration/rtlir.h"
 #include "elaboration/type_eval.h"
 #include "parser/ast.h"
+
+#include <format>
+#include <optional>
 
 namespace delta {
 
@@ -98,80 +98,80 @@ void Elaborator::elaborate_ports(ModuleDecl* decl, RtlirModule* mod) {
 
 static ProcessKind map_always_kind(AlwaysKind ak) {
     switch (ak) {
-        case AlwaysKind::Always:
-            return ProcessKind::AlwaysComb;
-        case AlwaysKind::AlwaysComb:
-            return ProcessKind::AlwaysComb;
-        case AlwaysKind::AlwaysFF:
-            return ProcessKind::AlwaysFF;
-        case AlwaysKind::AlwaysLatch:
-            return ProcessKind::AlwaysLatch;
+    case AlwaysKind::Always:
+        return ProcessKind::AlwaysComb;
+    case AlwaysKind::AlwaysComb:
+        return ProcessKind::AlwaysComb;
+    case AlwaysKind::AlwaysFF:
+        return ProcessKind::AlwaysFF;
+    case AlwaysKind::AlwaysLatch:
+        return ProcessKind::AlwaysLatch;
     }
     return ProcessKind::AlwaysComb;
 }
 
 void Elaborator::elaborate_item(ModuleItem* item, RtlirModule* mod) {
     switch (item->kind) {
-        case ModuleItemKind::NetDecl: {
-            RtlirNet net;
-            net.name = item->name;
-            net.net_type = NetType::Wire;
-            net.width = eval_type_width(item->data_type);
-            mod->nets.push_back(net);
-            break;
-        }
-        case ModuleItemKind::VarDecl: {
-            RtlirVariable var;
-            var.name = item->name;
-            var.width = eval_type_width(item->data_type);
-            var.is_4state = is_4state_type(item->data_type.kind);
-            mod->variables.push_back(var);
-            break;
-        }
-        case ModuleItemKind::ContAssign: {
-            RtlirContAssign ca;
-            ca.lhs = item->assign_lhs;
-            ca.rhs = item->assign_rhs;
-            mod->assigns.push_back(ca);
-            break;
-        }
-        case ModuleItemKind::InitialBlock: {
-            RtlirProcess proc;
-            proc.kind = ProcessKind::Initial;
-            proc.body = item->body;
-            mod->processes.push_back(proc);
-            break;
-        }
-        case ModuleItemKind::FinalBlock: {
-            RtlirProcess proc;
-            proc.kind = ProcessKind::Final;
-            proc.body = item->body;
-            mod->processes.push_back(proc);
-            break;
-        }
-        case ModuleItemKind::AlwaysBlock:
-        case ModuleItemKind::AlwaysCombBlock:
-        case ModuleItemKind::AlwaysFFBlock:
-        case ModuleItemKind::AlwaysLatchBlock: {
-            RtlirProcess proc;
-            proc.kind = map_always_kind(item->always_kind);
-            proc.body = item->body;
-            mod->processes.push_back(proc);
-            break;
-        }
-        case ModuleItemKind::ModuleInst: {
-            RtlirModuleInst inst;
-            inst.module_name = item->inst_module;
-            inst.inst_name = item->inst_name;
-            inst.resolved = nullptr;
-            mod->children.push_back(inst);
-            break;
-        }
-        case ModuleItemKind::ParamDecl:
-            break;
-        case ModuleItemKind::GenerateBlock:
-            diag_.warning(item->loc, "generate blocks are not yet elaborated");
-            break;
+    case ModuleItemKind::NetDecl: {
+        RtlirNet net;
+        net.name = item->name;
+        net.net_type = NetType::Wire;
+        net.width = eval_type_width(item->data_type);
+        mod->nets.push_back(net);
+        break;
+    }
+    case ModuleItemKind::VarDecl: {
+        RtlirVariable var;
+        var.name = item->name;
+        var.width = eval_type_width(item->data_type);
+        var.is_4state = is_4state_type(item->data_type.kind);
+        mod->variables.push_back(var);
+        break;
+    }
+    case ModuleItemKind::ContAssign: {
+        RtlirContAssign ca;
+        ca.lhs = item->assign_lhs;
+        ca.rhs = item->assign_rhs;
+        mod->assigns.push_back(ca);
+        break;
+    }
+    case ModuleItemKind::InitialBlock: {
+        RtlirProcess proc;
+        proc.kind = ProcessKind::Initial;
+        proc.body = item->body;
+        mod->processes.push_back(proc);
+        break;
+    }
+    case ModuleItemKind::FinalBlock: {
+        RtlirProcess proc;
+        proc.kind = ProcessKind::Final;
+        proc.body = item->body;
+        mod->processes.push_back(proc);
+        break;
+    }
+    case ModuleItemKind::AlwaysBlock:
+    case ModuleItemKind::AlwaysCombBlock:
+    case ModuleItemKind::AlwaysFFBlock:
+    case ModuleItemKind::AlwaysLatchBlock: {
+        RtlirProcess proc;
+        proc.kind = map_always_kind(item->always_kind);
+        proc.body = item->body;
+        mod->processes.push_back(proc);
+        break;
+    }
+    case ModuleItemKind::ModuleInst: {
+        RtlirModuleInst inst;
+        inst.module_name = item->inst_module;
+        inst.inst_name = item->inst_name;
+        inst.resolved = nullptr;
+        mod->children.push_back(inst);
+        break;
+    }
+    case ModuleItemKind::ParamDecl:
+        break;
+    case ModuleItemKind::GenerateBlock:
+        diag_.warning(item->loc, "generate blocks are not yet elaborated");
+        break;
     }
 }
 
