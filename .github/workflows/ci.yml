@@ -1,7 +1,7 @@
 ---
 name: CI
 
-on:
+on:  # yamllint disable-line rule:truthy
   push:
     branches: [main]
   pull_request:
@@ -19,7 +19,8 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-18 clang-tidy-18 clang-format-18 cppcheck
+          sudo apt-get install -y \
+            clang-18 clang-tidy-18 clang-format-18 cppcheck
           pip install lizard yamllint
 
       - name: Lint YAML
@@ -53,7 +54,9 @@ jobs:
                 -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
           find src -name '*.cpp' | \
             xargs clang-tidy-18 -p build \
-              --warnings-as-errors='readability-function-size,readability-function-cognitive-complexity' \
+              --warnings-as-errors=\
+          'readability-function-size,'\
+          'readability-function-cognitive-complexity' \
               --config='{
                 Checks: "-*,
                   bugprone-*,
