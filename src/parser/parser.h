@@ -19,15 +19,20 @@ class Parser {
   void ParsePortList(ModuleDecl& mod);
   PortDecl ParsePortDecl();
   void ParseModuleBody(ModuleDecl& mod);
-  ModuleItem* ParseModuleItem();
+  void ParseModuleItem(std::vector<ModuleItem*>& items);
+  void ParseParamPortDecl(ModuleDecl& mod);
 
   // Declarations
-  ModuleItem* ParseNetOrVarDecl(const DataType& dtype);
+  void ParseVarDeclList(std::vector<ModuleItem*>& items, const DataType& dtype);
   ModuleItem* ParseContinuousAssign();
   ModuleItem* ParseParamDecl();
   ModuleItem* ParseAlwaysBlock(AlwaysKind kind);
   ModuleItem* ParseInitialBlock();
   ModuleItem* ParseFinalBlock();
+  void ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items);
+  ModuleItem* ParseModuleInst(const Token& module_tok);
+  void ParsePortConnection(ModuleItem* item);
+  void ParseParenList(std::vector<Expr*>& out);
 
   // Statements
   Stmt* ParseStmt();
