@@ -246,6 +246,32 @@ static std::string FormatDisplay(const std::string& fmt,
   return out;
 }
 
+// --- PRNG system calls ---
+
+static Logic4Vec EvalPrngCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                              std::string_view name) {
+  if (name == "$random") {
+    return MakeLogic4VecVal(arena, 32, ctx.Random32());
+  }
+  if (name == "$urandom") {
+    return MakeLogic4VecVal(arena, 32, ctx.Urandom32());
+  }
+  if (name == "$urandom_range") {
+    uint32_t max_val = 0;
+    uint32_t min_val = 0;
+    if (!expr->args.empty()) {
+      max_val =
+          static_cast<uint32_t>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
+    }
+    if (expr->args.size() > 1) {
+      min_val =
+          static_cast<uint32_t>(EvalExpr(expr->args[1], ctx, arena).ToUint64());
+    }
+    return MakeLogic4VecVal(arena, 32, ctx.UrandomRange(min_val, max_val));
+  }
+  return MakeLogic4VecVal(arena, 1, 0);
+}
+
 // --- System call evaluation ---
 
 static std::string ExtractFormatString(const Expr* first_arg) {
@@ -272,6 +298,32 @@ static void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->callee == "$display") std::cout << "\n";
 }
 
+static void ExecSeverityTask(const Expr* expr, SimContext& ctx, Arena& arena,
+                             const char* prefix, std::ostream& os) {
+  std::string fmt;
+  std::vector<Logic4Vec> arg_vals;
+  size_t start_idx = 0;
+
+  // $fatal's first arg may be a numeric finish_number — skip it.
+  if (std::string_view(prefix) == "FATAL" && !expr->args.empty()) {
+    if (expr->args[0]->kind != ExprKind::kStringLiteral) {
+      EvalExpr(expr->args[0], ctx, arena);
+      start_idx = 1;
+    }
+  }
+
+  for (size_t i = start_idx; i < expr->args.size(); ++i) {
+    auto val = EvalExpr(expr->args[i], ctx, arena);
+    if (i == start_idx && expr->args[i]->kind == ExprKind::kStringLiteral) {
+      fmt = ExtractFormatString(expr->args[i]);
+    } else {
+      arg_vals.push_back(val);
+    }
+  }
+  std::string msg = fmt.empty() ? "" : FormatDisplay(fmt, arg_vals);
+  os << prefix << ": " << msg << "\n";
+}
+
 static Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
   auto name = expr->callee;
@@ -290,7 +342,25 @@ static Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx,
     return MakeLogic4VecVal(arena, 64, ctx.CurrentTime().ticks);
   }
 
-  return MakeLogic4VecVal(arena, 1, 0);
+  if (name == "$fatal") {
+    ExecSeverityTask(expr, ctx, arena, "FATAL", std::cerr);
+    ctx.RequestStop();
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
+  if (name == "$error") {
+    ExecSeverityTask(expr, ctx, arena, "ERROR", std::cerr);
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
+  if (name == "$warning") {
+    ExecSeverityTask(expr, ctx, arena, "WARNING", std::cout);
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
+  if (name == "$info") {
+    ExecSeverityTask(expr, ctx, arena, "INFO", std::cout);
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
+
+  return EvalPrngCall(expr, ctx, arena, name);
 }
 
 // --- Concatenation ---

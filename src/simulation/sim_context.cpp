@@ -5,8 +5,9 @@
 
 namespace delta {
 
-SimContext::SimContext(Scheduler& sched, Arena& arena, DiagEngine& diag)
-    : scheduler_(sched), arena_(arena), diag_(diag) {}
+SimContext::SimContext(Scheduler& sched, Arena& arena, DiagEngine& diag,
+                       uint32_t seed)
+    : scheduler_(sched), arena_(arena), diag_(diag), rng_(seed) {}
 
 Variable* SimContext::FindVariable(std::string_view name) {
   auto it = variables_.find(name);
@@ -33,6 +34,16 @@ void SimContext::RunFinalBlocks() {
   for (auto* proc : final_processes_) {
     proc->Resume();
   }
+}
+
+int32_t SimContext::Random32() { return static_cast<int32_t>(rng_()); }
+
+uint32_t SimContext::Urandom32() { return static_cast<uint32_t>(rng_()); }
+
+uint32_t SimContext::UrandomRange(uint32_t min_val, uint32_t max_val) {
+  if (min_val > max_val) std::swap(min_val, max_val);
+  std::uniform_int_distribution<uint32_t> dist(min_val, max_val);
+  return dist(rng_);
 }
 
 }  // namespace delta

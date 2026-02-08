@@ -211,7 +211,7 @@ int RunSimulation(const CliOptions& opts, delta::CompilationUnit* cu,
   }
 
   delta::Scheduler scheduler;
-  delta::SimContext sim_ctx(scheduler, arena, diag);
+  delta::SimContext sim_ctx(scheduler, arena, diag, opts.seed);
   delta::Lowerer lowerer(sim_ctx, arena, diag);
   lowerer.Lower(design);
   scheduler.Run();

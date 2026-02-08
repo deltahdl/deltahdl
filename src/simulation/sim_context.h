@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+#include <random>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
@@ -16,7 +18,8 @@ struct Process;
 
 class SimContext {
  public:
-  SimContext(Scheduler& sched, Arena& arena, DiagEngine& diag);
+  SimContext(Scheduler& sched, Arena& arena, DiagEngine& diag,
+             uint32_t seed = 0);
 
   Variable* FindVariable(std::string_view name);
   Variable* CreateVariable(std::string_view name, uint32_t width);
@@ -32,10 +35,15 @@ class SimContext {
   void RegisterFinalProcess(Process* proc);
   void RunFinalBlocks();
 
+  int32_t Random32();
+  uint32_t Urandom32();
+  uint32_t UrandomRange(uint32_t min_val, uint32_t max_val);
+
  private:
   Scheduler& scheduler_;
   Arena& arena_;
   DiagEngine& diag_;
+  std::mt19937 rng_;
   std::unordered_map<std::string_view, Variable*> variables_;
   std::vector<Process*> final_processes_;
   bool stop_requested_ = false;
