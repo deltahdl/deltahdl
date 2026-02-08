@@ -189,11 +189,12 @@ jobs:
       - unit-test-ubuntu-24-04-x86-64-gcc
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
       - id: sv-tests-ref
-        name: Get sv-tests commit
+        name: Get latest sv-tests commit
         run: >-
-          echo "sha=$(git rev-parse HEAD:third_party/sv-tests)"
+          echo "sha=$(git ls-remote
+          https://github.com/chipsalliance/sv-tests.git
+          HEAD | cut -f1)"
           >> "$GITHUB_OUTPUT"
       - id: cache
         name: Restore sv-tests cache
@@ -202,8 +203,11 @@ jobs:
           key: sv-tests-${{ steps.sv-tests-ref.outputs.sha }}
           path: third_party/sv-tests
       - if: steps.cache.outputs.cache-hit != 'true'
-        name: Checkout sv-tests
-        run: git submodule update --init --recursive third_party/sv-tests
+        name: Clone sv-tests
+        run: >-
+          git clone --depth 1
+          https://github.com/chipsalliance/sv-tests.git
+          third_party/sv-tests
   e2e-test-coverage:
     env:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
@@ -293,9 +297,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: sv-tests-ref
-        name: Get sv-tests commit
+        name: Get latest sv-tests commit
         run: >-
-          echo "sha=$(git rev-parse HEAD:third_party/sv-tests)"
+          echo "sha=$(git ls-remote
+          https://github.com/chipsalliance/sv-tests.git
+          HEAD | cut -f1)"
           >> "$GITHUB_OUTPUT"
       - name: Restore sv-tests cache
         uses: actions/cache/restore@v4
@@ -324,9 +330,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: sv-tests-ref
-        name: Get sv-tests commit
+        name: Get latest sv-tests commit
         run: >-
-          echo "sha=$(git rev-parse HEAD:third_party/sv-tests)"
+          echo "sha=$(git ls-remote
+          https://github.com/chipsalliance/sv-tests.git
+          HEAD | cut -f1)"
           >> "$GITHUB_OUTPUT"
       - name: Restore sv-tests cache
         uses: actions/cache/restore@v4
@@ -352,9 +360,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: sv-tests-ref
-        name: Get sv-tests commit
+        name: Get latest sv-tests commit
         run: >-
-          echo "sha=$(git rev-parse HEAD:third_party/sv-tests)"
+          echo "sha=$(git ls-remote
+          https://github.com/chipsalliance/sv-tests.git
+          HEAD | cut -f1)"
           >> "$GITHUB_OUTPUT"
       - name: Restore sv-tests cache
         uses: actions/cache/restore@v4
@@ -377,9 +387,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: sv-tests-ref
-        name: Get sv-tests commit
+        name: Get latest sv-tests commit
         run: >-
-          echo "sha=$(git rev-parse HEAD:third_party/sv-tests)"
+          echo "sha=$(git ls-remote
+          https://github.com/chipsalliance/sv-tests.git
+          HEAD | cut -f1)"
           >> "$GITHUB_OUTPUT"
       - name: Restore sv-tests cache
         uses: actions/cache/restore@v4
@@ -402,9 +414,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: sv-tests-ref
-        name: Get sv-tests commit
+        name: Get latest sv-tests commit
         run: >-
-          echo "sha=$(git rev-parse HEAD:third_party/sv-tests)"
+          echo "sha=$(git ls-remote
+          https://github.com/chipsalliance/sv-tests.git
+          HEAD | cut -f1)"
           >> "$GITHUB_OUTPUT"
       - name: Restore sv-tests cache
         uses: actions/cache/restore@v4
