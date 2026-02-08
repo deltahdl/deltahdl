@@ -69,7 +69,7 @@ void parse_define(std::string_view def, CliOptions& opts) {
 }
 
 bool try_parse_valued_arg(std::string_view arg, int& i, int argc,
-                          char* const argv[], CliOptions& opts) {
+                          const char* const argv[], CliOptions& opts) {
   if (arg == "--top" && i + 1 < argc) {
     opts.top_module = argv[++i];
     return true;

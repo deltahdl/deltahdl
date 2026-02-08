@@ -34,7 +34,8 @@ class Elaborator {
   ModuleDecl* find_module(std::string_view name) const;
 
   /// Elaborate a single module declaration into an RtlirModule.
-  RtlirModule* elaborate_module(ModuleDecl* decl, const ParamList& params);
+  RtlirModule* elaborate_module(const ModuleDecl* decl,
+                                const ParamList& params);
 
   /// Populate ports from module declaration port list.
   void elaborate_ports(const ModuleDecl* decl, RtlirModule* mod);

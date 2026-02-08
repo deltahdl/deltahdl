@@ -504,14 +504,20 @@ jobs:
       - name: Run cppcheck
         # NEVER use --suppress. Fix the code instead.
         run: |
+          CATCH2=$(find build/_deps \
+            -name catch2-src -type d)
           cppcheck --enable=all --std=c++23 \
-            -I src \
-            src/ 2>&1 | tee /tmp/cppcheck.log
+            -I src -I "$CATCH2/src" \
+            src/ test/ 2>&1 | tee /tmp/cppcheck.log
           SEV='(error|warning|style|performance|portability):'
-          FOUND=$(grep -cE ": $SEV" /tmp/cppcheck.log \
-            || true)
+          grep -E ": $SEV" /tmp/cppcheck.log \
+            | grep -v 'build/_deps/' \
+            | grep -v 'CATCH2_INTERNAL' \
+            > /tmp/cppcheck-filtered.log || true
+          FOUND=$(wc -l < /tmp/cppcheck-filtered.log \
+            | tr -d ' ')
           if [ "$FOUND" -gt 0 ]; then
-            grep -E ": $SEV" /tmp/cppcheck.log
+            cat /tmp/cppcheck-filtered.log
             echo "FAIL: $FOUND cppcheck finding(s)"
             exit 1
           fi

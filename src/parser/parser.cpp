@@ -249,7 +249,7 @@ ModuleItem* Parser::parse_final_block() {
   return item;
 }
 
-ModuleItem* Parser::parse_net_or_var_decl(DataType dtype) {
+ModuleItem* Parser::parse_net_or_var_decl(const DataType& dtype) {
   auto* item = arena_.create<ModuleItem>();
   item->kind = ModuleItemKind::VarDecl;
   item->loc = current_loc();

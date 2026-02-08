@@ -50,7 +50,7 @@ static std::optional<int64_t> find_param_override(
   return std::nullopt;
 }
 
-RtlirModule* Elaborator::elaborate_module(ModuleDecl* decl,
+RtlirModule* Elaborator::elaborate_module(const ModuleDecl* decl,
                                           const ParamList& params) {
   auto* mod = arena_.create<RtlirModule>();
   mod->name = decl->name;

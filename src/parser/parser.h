@@ -22,7 +22,7 @@ class Parser {
   ModuleItem* parse_module_item();
 
   // Declarations
-  ModuleItem* parse_net_or_var_decl(DataType dtype);
+  ModuleItem* parse_net_or_var_decl(const DataType& dtype);
   ModuleItem* parse_continuous_assign();
   ModuleItem* parse_param_decl();
   ModuleItem* parse_always_block(AlwaysKind kind);
