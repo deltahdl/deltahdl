@@ -1,5 +1,7 @@
 #include "parser/parser.h"
 
+#include <optional>
+
 namespace delta {
 
 Parser::Parser(Lexer& lexer, Arena& arena, DiagEngine& diag)
@@ -349,21 +351,25 @@ Stmt* Parser::parse_case_stmt(TokenKind case_kind) {
   stmt->condition = parse_expr();
   expect(TokenKind::RParen);
   while (!check(TokenKind::KwEndcase) && !at_end()) {
-    CaseItem item;
-    if (match(TokenKind::KwDefault)) {
-      item.is_default = true;
-    } else {
-      item.patterns.push_back(parse_expr());
-      while (match(TokenKind::Comma)) {
-        item.patterns.push_back(parse_expr());
-      }
-    }
-    expect(TokenKind::Colon);
-    item.body = parse_stmt();
-    stmt->case_items.push_back(std::move(item));
+    stmt->case_items.push_back(parse_case_item());
   }
   expect(TokenKind::KwEndcase);
   return stmt;
+}
+
+CaseItem Parser::parse_case_item() {
+  CaseItem item;
+  if (match(TokenKind::KwDefault)) {
+    item.is_default = true;
+  } else {
+    item.patterns.push_back(parse_expr());
+    while (match(TokenKind::Comma)) {
+      item.patterns.push_back(parse_expr());
+    }
+  }
+  expect(TokenKind::Colon);
+  item.body = parse_stmt();
+  return item;
 }
 
 Stmt* Parser::parse_for_stmt() {
@@ -454,60 +460,42 @@ Stmt* Parser::parse_assignment_or_expr_stmt() {
 
 // --- Types ---
 
+static std::optional<DataTypeKind> token_to_type_kind(TokenKind tk) {
+  switch (tk) {
+    case TokenKind::KwLogic:
+    case TokenKind::KwWire:
+      return DataTypeKind::Logic;
+    case TokenKind::KwReg:
+      return DataTypeKind::Reg;
+    case TokenKind::KwBit:
+      return DataTypeKind::Bit;
+    case TokenKind::KwByte:
+      return DataTypeKind::Byte;
+    case TokenKind::KwShortint:
+      return DataTypeKind::Shortint;
+    case TokenKind::KwInt:
+      return DataTypeKind::Int;
+    case TokenKind::KwLongint:
+      return DataTypeKind::Longint;
+    case TokenKind::KwInteger:
+      return DataTypeKind::Integer;
+    case TokenKind::KwReal:
+      return DataTypeKind::Real;
+    case TokenKind::KwTime:
+      return DataTypeKind::Time;
+    case TokenKind::KwString:
+      return DataTypeKind::String;
+    default:
+      return std::nullopt;
+  }
+}
+
 DataType Parser::parse_data_type() {
   DataType dtype;
-  switch (current_token().kind) {
-    case TokenKind::KwLogic:
-      dtype.kind = DataTypeKind::Logic;
-      consume();
-      break;
-    case TokenKind::KwReg:
-      dtype.kind = DataTypeKind::Reg;
-      consume();
-      break;
-    case TokenKind::KwBit:
-      dtype.kind = DataTypeKind::Bit;
-      consume();
-      break;
-    case TokenKind::KwByte:
-      dtype.kind = DataTypeKind::Byte;
-      consume();
-      break;
-    case TokenKind::KwShortint:
-      dtype.kind = DataTypeKind::Shortint;
-      consume();
-      break;
-    case TokenKind::KwInt:
-      dtype.kind = DataTypeKind::Int;
-      consume();
-      break;
-    case TokenKind::KwLongint:
-      dtype.kind = DataTypeKind::Longint;
-      consume();
-      break;
-    case TokenKind::KwInteger:
-      dtype.kind = DataTypeKind::Integer;
-      consume();
-      break;
-    case TokenKind::KwReal:
-      dtype.kind = DataTypeKind::Real;
-      consume();
-      break;
-    case TokenKind::KwTime:
-      dtype.kind = DataTypeKind::Time;
-      consume();
-      break;
-    case TokenKind::KwString:
-      dtype.kind = DataTypeKind::String;
-      consume();
-      break;
-    case TokenKind::KwWire:
-      dtype.kind = DataTypeKind::Logic;
-      consume();
-      break;
-    default:
-      return dtype;  // Implicit
-  }
+  auto kind = token_to_type_kind(current_token().kind);
+  if (!kind) return dtype;
+  dtype.kind = *kind;
+  consume();
 
   if (match(TokenKind::KwSigned)) {
     dtype.is_signed = true;

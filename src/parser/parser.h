@@ -35,6 +35,7 @@ class Parser {
   Stmt* parse_block_stmt();
   Stmt* parse_if_stmt();
   Stmt* parse_case_stmt(TokenKind case_kind);
+  CaseItem parse_case_item();
   Stmt* parse_for_stmt();
   Stmt* parse_while_stmt();
   Stmt* parse_forever_stmt();
@@ -49,6 +50,7 @@ class Parser {
   Expr* parse_expr_bp(int min_bp);
   Expr* parse_prefix_expr();
   Expr* parse_primary_expr();
+  Expr* make_literal(ExprKind kind, const Token& tok);
   Expr* parse_call_expr(Expr* callee);
   Expr* parse_select_expr(Expr* base);
   Expr* parse_system_call();

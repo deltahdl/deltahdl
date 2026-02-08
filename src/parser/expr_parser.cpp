@@ -135,35 +135,29 @@ Expr* Parser::parse_prefix_expr() {
   return parse_primary_expr();
 }
 
+Expr* Parser::make_literal(ExprKind kind, const Token& tok) {
+  consume();
+  auto* lit = arena_.create<Expr>();
+  lit->kind = kind;
+  lit->text = tok.text;
+  lit->range.start = tok.loc;
+  return lit;
+}
+
 Expr* Parser::parse_primary_expr() {
   auto tok = current_token();
 
   if (tok.kind == TokenKind::IntLiteral ||
       tok.kind == TokenKind::UnbasedUnsizedLiteral) {
-    consume();
-    auto* lit = arena_.create<Expr>();
-    lit->kind = ExprKind::IntegerLiteral;
-    lit->text = tok.text;
-    lit->range.start = tok.loc;
-    return lit;
+    return make_literal(ExprKind::IntegerLiteral, tok);
   }
 
   if (tok.kind == TokenKind::RealLiteral) {
-    consume();
-    auto* lit = arena_.create<Expr>();
-    lit->kind = ExprKind::RealLiteral;
-    lit->text = tok.text;
-    lit->range.start = tok.loc;
-    return lit;
+    return make_literal(ExprKind::RealLiteral, tok);
   }
 
   if (tok.kind == TokenKind::StringLiteral) {
-    consume();
-    auto* lit = arena_.create<Expr>();
-    lit->kind = ExprKind::StringLiteral;
-    lit->text = tok.text;
-    lit->range.start = tok.loc;
-    return lit;
+    return make_literal(ExprKind::StringLiteral, tok);
   }
 
   if (tok.kind == TokenKind::SystemIdentifier) {

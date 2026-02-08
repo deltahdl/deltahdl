@@ -71,10 +71,9 @@ std::string Preprocessor::process_source(std::string_view src, uint32_t file_id,
     std::string_view line = src.substr(pos, eol - pos);
     ++line_num;
 
-    if (!process_directive(line, file_id, line_num, depth, output)) {
-      if (is_active()) {
-        output.append(line);
-      }
+    bool handled = process_directive(line, file_id, line_num, depth, output);
+    if (!handled && is_active()) {
+      output.append(line);
     }
     output.push_back('\n');
     pos = eol + 1;
@@ -86,21 +85,16 @@ bool Preprocessor::process_directive(std::string_view line, uint32_t file_id,
                                      uint32_t line_num, int depth,
                                      std::string& output) {
   auto trimmed = trim(line);
-  if (trimmed.empty() || trimmed[0] != '`') {
-    return false;
-  }
+  if (trimmed.empty()) return false;
+  if (trimmed[0] != '`') return false;
   SourceLoc loc = {file_id, line_num, 1};
 
   if (starts_with_directive(line, "define")) {
-    if (is_active()) {
-      handle_define(after_directive(line, "define"), loc);
-    }
+    handle_define(after_directive(line, "define"), loc);
     return true;
   }
   if (starts_with_directive(line, "undef")) {
-    if (is_active()) {
-      handle_undef(after_directive(line, "undef"), loc);
-    }
+    handle_undef(after_directive(line, "undef"), loc);
     return true;
   }
   if (starts_with_directive(line, "ifdef")) {
@@ -160,6 +154,7 @@ bool Preprocessor::is_active() const {
 }
 
 void Preprocessor::handle_define(std::string_view rest, SourceLoc loc) {
+  if (!is_active()) return;
   auto space = rest.find_first_of(" \t");
   MacroDef def;
   def.def_loc = loc;
@@ -173,6 +168,7 @@ void Preprocessor::handle_define(std::string_view rest, SourceLoc loc) {
 }
 
 void Preprocessor::handle_undef(std::string_view rest, SourceLoc /*loc*/) {
+  if (!is_active()) return;
   auto name = trim(rest);
   macros_.undefine(name);
 }
