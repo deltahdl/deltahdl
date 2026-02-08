@@ -505,9 +505,7 @@ jobs:
         run: |
           find src -name '*.cpp' | \
             xargs clang-tidy-18 -p build \
-              --warnings-as-errors=\
-          'readability-function-size,'\
-          'readability-function-cognitive-complexity' \
+              --warnings-as-errors='*' \
               --config='{
                 Checks: "-*,
                   bugprone-*,
