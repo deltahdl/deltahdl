@@ -132,30 +132,54 @@ std::optional<TokenKind> lookup_keyword(std::string_view text) {
 
 std::string_view token_kind_name(TokenKind kind) {
     switch (kind) {
-    case TokenKind::Eof: return "EOF";
-    case TokenKind::Error: return "error";
-    case TokenKind::IntLiteral: return "integer literal";
-    case TokenKind::RealLiteral: return "real literal";
-    case TokenKind::TimeLiteral: return "time literal";
-    case TokenKind::StringLiteral: return "string literal";
-    case TokenKind::UnbasedUnsizedLiteral: return "unbased unsized literal";
-    case TokenKind::Identifier: return "identifier";
-    case TokenKind::EscapedIdentifier: return "escaped identifier";
-    case TokenKind::SystemIdentifier: return "system identifier";
-    case TokenKind::Semicolon: return "';'";
-    case TokenKind::LParen: return "'('";
-    case TokenKind::RParen: return "')'";
-    case TokenKind::LBracket: return "'['";
-    case TokenKind::RBracket: return "']'";
-    case TokenKind::LBrace: return "'{'";
-    case TokenKind::RBrace: return "'}'";
-    case TokenKind::Comma: return "','";
-    case TokenKind::Dot: return "'.'";
-    case TokenKind::Colon: return "':'";
-    case TokenKind::Hash: return "'#'";
-    case TokenKind::Eq: return "'='";
-    case TokenKind::LtEq: return "'<='";
-    default: return "token";
+    case TokenKind::Eof:
+        return "EOF";
+    case TokenKind::Error:
+        return "error";
+    case TokenKind::IntLiteral:
+        return "integer literal";
+    case TokenKind::RealLiteral:
+        return "real literal";
+    case TokenKind::TimeLiteral:
+        return "time literal";
+    case TokenKind::StringLiteral:
+        return "string literal";
+    case TokenKind::UnbasedUnsizedLiteral:
+        return "unbased unsized literal";
+    case TokenKind::Identifier:
+        return "identifier";
+    case TokenKind::EscapedIdentifier:
+        return "escaped identifier";
+    case TokenKind::SystemIdentifier:
+        return "system identifier";
+    case TokenKind::Semicolon:
+        return "';'";
+    case TokenKind::LParen:
+        return "'('";
+    case TokenKind::RParen:
+        return "')'";
+    case TokenKind::LBracket:
+        return "'['";
+    case TokenKind::RBracket:
+        return "']'";
+    case TokenKind::LBrace:
+        return "'{'";
+    case TokenKind::RBrace:
+        return "'}'";
+    case TokenKind::Comma:
+        return "','";
+    case TokenKind::Dot:
+        return "'.'";
+    case TokenKind::Colon:
+        return "':'";
+    case TokenKind::Hash:
+        return "'#'";
+    case TokenKind::Eq:
+        return "'='";
+    case TokenKind::LtEq:
+        return "'<='";
+    default:
+        return "token";
     }
 }
 

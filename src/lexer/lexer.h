@@ -10,7 +10,7 @@
 namespace delta {
 
 class Lexer {
-public:
+  public:
     Lexer(std::string_view source, uint32_t file_id, DiagEngine& diag);
 
     Token next();
@@ -18,7 +18,7 @@ public:
 
     std::vector<Token> lex_all();
 
-private:
+  private:
     char current() const;
     char peek_char() const;
     char peek_char2() const;

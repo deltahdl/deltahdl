@@ -2,8 +2,7 @@
 
 namespace delta {
 
-void NetlistWriter::write(
-    const AigGraph& graph, NetlistFormat fmt, const std::string& filename) {
+void NetlistWriter::write(const AigGraph& graph, NetlistFormat fmt, const std::string& filename) {
     switch (fmt) {
     case NetlistFormat::Verilog:
         write_verilog(graph, filename);
@@ -20,8 +19,7 @@ void NetlistWriter::write(
     }
 }
 
-void NetlistWriter::write_verilog(
-    const AigGraph& /*graph*/, const std::string& /*filename*/) {
+void NetlistWriter::write_verilog(const AigGraph& /*graph*/, const std::string& /*filename*/) {
     // TODO: Implement Verilog netlist output.
     //
     // Output format:
@@ -36,8 +34,7 @@ void NetlistWriter::write_verilog(
     // Inverters on edges are emitted inline.
 }
 
-void NetlistWriter::write_blif(
-    const AigGraph& /*graph*/, const std::string& /*filename*/) {
+void NetlistWriter::write_blif(const AigGraph& /*graph*/, const std::string& /*filename*/) {
     // TODO: Implement BLIF netlist output.
     //
     // Output format:
@@ -52,8 +49,7 @@ void NetlistWriter::write_blif(
     // Inverters are handled by the complement convention in BLIF.
 }
 
-void NetlistWriter::write_json(
-    const AigGraph& /*graph*/, const std::string& /*filename*/) {
+void NetlistWriter::write_json(const AigGraph& /*graph*/, const std::string& /*filename*/) {
     // TODO: Implement JSON netlist output.
     //
     // Uses the Yosys JSON netlist schema for interoperability.
@@ -62,8 +58,7 @@ void NetlistWriter::write_json(
     // AIG AND nodes map to "$and" cells, inverters to "$not" cells.
 }
 
-void NetlistWriter::write_edif(
-    const AigGraph& /*graph*/, const std::string& /*filename*/) {
+void NetlistWriter::write_edif(const AigGraph& /*graph*/, const std::string& /*filename*/) {
     // TODO: Implement EDIF netlist output.
     //
     // EDIF 2.0.0 S-expression format:

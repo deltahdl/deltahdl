@@ -15,7 +15,7 @@ struct CellLibrary;
 // and delay.
 
 class CellMapper {
-public:
+  public:
     /// Map the AIG onto standard cells from the given library.
     void map(AigGraph& graph, const CellLibrary& lib);
 };

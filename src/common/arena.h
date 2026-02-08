@@ -10,13 +10,10 @@
 namespace delta {
 
 class Arena {
-public:
+  public:
     static constexpr size_t kDefaultBlockSize = 64UL * 1024UL;
 
-    explicit Arena(size_t block_size = kDefaultBlockSize)
-        : block_size_(block_size) {
-        grow();
-    }
+    explicit Arena(size_t block_size = kDefaultBlockSize) : block_size_(block_size) { grow(); }
 
     ~Arena() {
         for (auto* block : blocks_) {
@@ -43,14 +40,12 @@ public:
         return reinterpret_cast<void*>(aligned);
     }
 
-    template <typename T, typename... Args>
-    T* create(Args&&... args) {
+    template <typename T, typename... Args> T* create(Args&&... args) {
         void* mem = allocate(sizeof(T), alignof(T));
         return new (mem) T(std::forward<Args>(args)...);
     }
 
-    template <typename T>
-    T* alloc_array(size_t count) {
+    template <typename T> T* alloc_array(size_t count) {
         void* mem = allocate(sizeof(T) * count, alignof(T));
         std::memset(mem, 0, sizeof(T) * count);
         return static_cast<T*>(mem);
@@ -78,7 +73,7 @@ public:
         total_allocated_ = 0;
     }
 
-private:
+  private:
     void grow(size_t min_size = 0) {
         size_t alloc_size = std::max(block_size_, min_size);
         void* block = std::malloc(alloc_size);

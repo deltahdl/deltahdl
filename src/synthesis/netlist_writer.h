@@ -10,10 +10,10 @@ namespace delta {
 // --- Output netlist formats ---
 
 enum class NetlistFormat : uint8_t {
-    Verilog,  // Structural Verilog gate-level netlist
-    Blif,     // Berkeley Logic Interchange Format
-    Json,     // JSON netlist (Yosys-compatible)
-    Edif,     // Electronic Design Interchange Format
+    Verilog, // Structural Verilog gate-level netlist
+    Blif,    // Berkeley Logic Interchange Format
+    Json,    // JSON netlist (Yosys-compatible)
+    Edif,    // Electronic Design Interchange Format
 };
 
 // --- Netlist writer ---
@@ -22,11 +22,11 @@ enum class NetlistFormat : uint8_t {
 // output formats for downstream place-and-route or formal verification.
 
 class NetlistWriter {
-public:
+  public:
     /// Write the AIG to a file in the specified format.
     void write(const AigGraph& graph, NetlistFormat fmt, const std::string& filename);
 
-private:
+  private:
     /// Emit structural Verilog (AND/NOT gates).
     void write_verilog(const AigGraph& graph, const std::string& filename);
 

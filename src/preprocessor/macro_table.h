@@ -19,7 +19,7 @@ struct MacroDef {
 };
 
 class MacroTable {
-public:
+  public:
     void define(MacroDef macro);
     void undefine(std::string_view name);
     void undefine_all();
@@ -27,7 +27,7 @@ public:
     const MacroDef* lookup(std::string_view name) const;
     bool is_defined(std::string_view name) const;
 
-private:
+  private:
     std::unordered_map<std::string, MacroDef> macros_;
 };
 

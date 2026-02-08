@@ -9,7 +9,7 @@
 namespace delta {
 
 class SourceManager {
-public:
+  public:
     uint32_t add_file(std::string path, std::string content);
 
     std::string_view file_path(uint32_t file_id) const;
@@ -20,7 +20,7 @@ public:
 
     size_t file_count() const { return files_.size(); }
 
-private:
+  private:
     struct FileEntry {
         std::string path;
         std::string content;

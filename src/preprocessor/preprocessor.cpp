@@ -79,8 +79,8 @@ std::string Preprocessor::process_source(std::string_view src, uint32_t file_id,
     return output;
 }
 
-bool Preprocessor::process_directive(
-    std::string_view line, uint32_t file_id, uint32_t line_num, int depth, std::string& output) {
+bool Preprocessor::process_directive(std::string_view line, uint32_t file_id, uint32_t line_num,
+                                     int depth, std::string& output) {
     auto trimmed = trim(line);
     if (trimmed.empty() || trimmed[0] != '`') {
         return false;
@@ -130,7 +130,8 @@ bool Preprocessor::process_directive(
     if (is_active()) {
         auto macro_name = trimmed.substr(1);
         auto space_pos = macro_name.find_first_of(" \t(");
-        auto name = (space_pos != std::string_view::npos) ? macro_name.substr(0, space_pos) : macro_name;
+        auto name =
+            (space_pos != std::string_view::npos) ? macro_name.substr(0, space_pos) : macro_name;
         const auto* def = macros_.lookup(name);
         if (def != nullptr) {
             output.append(expand_macro(*def, ""));
@@ -185,8 +186,8 @@ void Preprocessor::handle_endif() {
     }
 }
 
-void Preprocessor::handle_include(
-    std::string_view filename_raw, SourceLoc loc, int depth, std::string& output) {
+void Preprocessor::handle_include(std::string_view filename_raw, SourceLoc loc, int depth,
+                                  std::string& output) {
     // Strip quotes: "file.sv" or <file.sv>
     auto fn = trim(filename_raw);
     if (fn.size() >= 2 && (fn.front() == '"' || fn.front() == '<')) {

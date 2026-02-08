@@ -1,4 +1,5 @@
 #include "common/types.h"
+
 #include "common/arena.h"
 
 #include <sstream>

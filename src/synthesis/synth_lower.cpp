@@ -6,8 +6,7 @@
 
 namespace delta {
 
-SynthLowering::SynthLowering(Arena& arena, DiagEngine& diag)
-    : arena_(arena), diag_(diag) {}
+SynthLowering::SynthLowering(Arena& arena, DiagEngine& diag) : arena_(arena), diag_(diag) {}
 
 AigGraph* SynthLowering::lower(const RtlirModule* module) {
     auto* graph = arena_.create<AigGraph>();
@@ -34,8 +33,7 @@ AigGraph* SynthLowering::lower(const RtlirModule* module) {
     return graph;
 }
 
-void SynthLowering::lower_cont_assign(
-    const RtlirContAssign& /*assign*/, AigGraph& /*graph*/) {
+void SynthLowering::lower_cont_assign(const RtlirContAssign& /*assign*/, AigGraph& /*graph*/) {
     // TODO: Walk the RHS expression tree and build AIG nodes.
     // Each bit of a multi-bit assignment produces a separate AIG output.
     // Expression opcodes map as follows:
@@ -46,8 +44,7 @@ void SynthLowering::lower_cont_assign(
     //   - ternary ?:   -> add_mux
 }
 
-void SynthLowering::lower_always_comb(
-    const RtlirProcess& /*proc*/, AigGraph& /*graph*/) {
+void SynthLowering::lower_always_comb(const RtlirProcess& /*proc*/, AigGraph& /*graph*/) {
     // TODO: Flatten the combinational process body into dataflow form,
     // then lower each resulting assignment as if it were a cont_assign.
     // Must handle if/case as MUX chains.

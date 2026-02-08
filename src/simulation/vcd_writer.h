@@ -13,7 +13,7 @@ namespace delta {
 // --- VCD waveform output (IEEE 1800-2023 section 21) ---
 
 class VcdWriter {
-public:
+  public:
     VcdWriter(std::string filename, std::string timescale);
     ~VcdWriter();
 
@@ -26,7 +26,7 @@ public:
     void write_value_change(uint32_t signal_id, const Logic4Vec& value);
     void close();
 
-private:
+  private:
     struct SignalEntry {
         std::string scope;
         std::string name;

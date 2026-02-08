@@ -19,17 +19,17 @@ struct PreprocConfig {
 };
 
 class Preprocessor {
-public:
+  public:
     Preprocessor(SourceManager& src_mgr, DiagEngine& diag, PreprocConfig config);
 
     std::string preprocess(uint32_t file_id);
 
     const MacroTable& macro_table() const { return macros_; }
 
-private:
+  private:
     std::string process_source(std::string_view src, uint32_t file_id, int depth);
-    bool process_directive(
-        std::string_view line, uint32_t file_id, uint32_t line_num, int depth, std::string& output);
+    bool process_directive(std::string_view line, uint32_t file_id, uint32_t line_num, int depth,
+                           std::string& output);
     bool is_active() const;
     void handle_define(std::string_view rest, SourceLoc loc);
     void handle_undef(std::string_view rest, SourceLoc loc);

@@ -47,7 +47,7 @@ struct TimeSlot {
 // --- Stratified event scheduler (IEEE 1800-2023 section 4.5) ---
 
 class Scheduler {
-public:
+  public:
     Scheduler() = default;
 
     SimTime current_time() const { return current_time_; }
@@ -56,7 +56,7 @@ public:
     void schedule_event(SimTime time, Region region, Event* event);
     void run();
 
-private:
+  private:
     void execute_time_slot(TimeSlot& slot);
     void execute_active_regions(TimeSlot& slot);
     void execute_reactive_regions(TimeSlot& slot);

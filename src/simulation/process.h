@@ -32,9 +32,7 @@ struct SimCoroutine {
     SimCoroutine(const SimCoroutine&) = delete;
     SimCoroutine& operator=(const SimCoroutine&) = delete;
 
-    SimCoroutine(SimCoroutine&& other) noexcept : handle(other.handle) {
-        other.handle = nullptr;
-    }
+    SimCoroutine(SimCoroutine&& other) noexcept : handle(other.handle) { other.handle = nullptr; }
 
     SimCoroutine& operator=(SimCoroutine&& other) noexcept {
         if (this != &other) {
@@ -57,7 +55,7 @@ struct SimCoroutine {
 
     handle_type handle = nullptr;
 
-private:
+  private:
     void destroy() {
         if (handle) {
             handle.destroy();

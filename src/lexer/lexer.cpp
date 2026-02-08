@@ -1,4 +1,5 @@
 #include "lexer/lexer.h"
+
 #include "lexer/keywords.h"
 
 #include <cctype>
@@ -183,7 +184,8 @@ Token Lexer::lex_number() {
     // Check for real literal (decimal point or exponent)
     if (!at_end() && current() == '.' && std::isdigit(static_cast<unsigned char>(peek_char()))) {
         advance();
-        while (!at_end() && (std::isdigit(static_cast<unsigned char>(current())) || current() == '_')) {
+        while (!at_end() &&
+               (std::isdigit(static_cast<unsigned char>(current())) || current() == '_')) {
             advance();
         }
     }
@@ -279,62 +281,129 @@ Token Lexer::lex_operator() {
     };
 
     switch (c) {
-    case '(': return one(TokenKind::LParen);
-    case ')': return one(TokenKind::RParen);
-    case '[': return one(TokenKind::LBracket);
-    case ']': return one(TokenKind::RBracket);
-    case '{': return one(TokenKind::LBrace);
-    case '}': return one(TokenKind::RBrace);
-    case ';': return one(TokenKind::Semicolon);
-    case ',': return one(TokenKind::Comma);
-    case '?': return one(TokenKind::Question);
+    case '(':
+        return one(TokenKind::LParen);
+    case ')':
+        return one(TokenKind::RParen);
+    case '[':
+        return one(TokenKind::LBracket);
+    case ']':
+        return one(TokenKind::RBracket);
+    case '{':
+        return one(TokenKind::LBrace);
+    case '}':
+        return one(TokenKind::RBrace);
+    case ';':
+        return one(TokenKind::Semicolon);
+    case ',':
+        return one(TokenKind::Comma);
+    case '?':
+        return one(TokenKind::Question);
     case '~':
-        if (!at_end() && current() == '&') { advance(); return one(TokenKind::TildeAmp); }
-        if (!at_end() && current() == '|') { advance(); return one(TokenKind::TildePipe); }
-        if (!at_end() && current() == '^') { advance(); return one(TokenKind::TildeCaret); }
+        if (!at_end() && current() == '&') {
+            advance();
+            return one(TokenKind::TildeAmp);
+        }
+        if (!at_end() && current() == '|') {
+            advance();
+            return one(TokenKind::TildePipe);
+        }
+        if (!at_end() && current() == '^') {
+            advance();
+            return one(TokenKind::TildeCaret);
+        }
         return one(TokenKind::Tilde);
-    case '@': return try2('@', TokenKind::AtAt, TokenKind::At);
+    case '@':
+        return try2('@', TokenKind::AtAt, TokenKind::At);
     case '.':
-        if (!at_end() && current() == '*') { advance(); return one(TokenKind::DotStar); }
+        if (!at_end() && current() == '*') {
+            advance();
+            return one(TokenKind::DotStar);
+        }
         return one(TokenKind::Dot);
-    case ':': return try2(':', TokenKind::ColonColon, TokenKind::Colon);
+    case ':':
+        return try2(':', TokenKind::ColonColon, TokenKind::Colon);
     case '+':
-        if (!at_end() && current() == '+') { advance(); return one(TokenKind::PlusPlus); }
-        if (!at_end() && current() == '=') { advance(); return one(TokenKind::PlusEq); }
+        if (!at_end() && current() == '+') {
+            advance();
+            return one(TokenKind::PlusPlus);
+        }
+        if (!at_end() && current() == '=') {
+            advance();
+            return one(TokenKind::PlusEq);
+        }
         return one(TokenKind::Plus);
     case '-':
-        if (!at_end() && current() == '-') { advance(); return one(TokenKind::MinusMinus); }
-        if (!at_end() && current() == '=') { advance(); return one(TokenKind::MinusEq); }
+        if (!at_end() && current() == '-') {
+            advance();
+            return one(TokenKind::MinusMinus);
+        }
+        if (!at_end() && current() == '=') {
+            advance();
+            return one(TokenKind::MinusEq);
+        }
         if (!at_end() && current() == '>') {
             advance();
-            if (!at_end() && current() == '>') { advance(); return one(TokenKind::DashGtGt); }
+            if (!at_end() && current() == '>') {
+                advance();
+                return one(TokenKind::DashGtGt);
+            }
             return one(TokenKind::Arrow);
         }
         return one(TokenKind::Minus);
     case '*':
-        if (!at_end() && current() == '*') { advance(); return one(TokenKind::Power); }
-        if (!at_end() && current() == '=') { advance(); return one(TokenKind::StarEq); }
-        if (!at_end() && current() == '>') { advance(); return one(TokenKind::StarGt); }
+        if (!at_end() && current() == '*') {
+            advance();
+            return one(TokenKind::Power);
+        }
+        if (!at_end() && current() == '=') {
+            advance();
+            return one(TokenKind::StarEq);
+        }
+        if (!at_end() && current() == '>') {
+            advance();
+            return one(TokenKind::StarGt);
+        }
         return one(TokenKind::Star);
-    case '/': return try2('=', TokenKind::SlashEq, TokenKind::Slash);
-    case '%': return try2('=', TokenKind::PercentEq, TokenKind::Percent);
+    case '/':
+        return try2('=', TokenKind::SlashEq, TokenKind::Slash);
+    case '%':
+        return try2('=', TokenKind::PercentEq, TokenKind::Percent);
     case '^':
-        if (!at_end() && current() == '~') { advance(); return one(TokenKind::CaretTilde); }
-        if (!at_end() && current() == '=') { advance(); return one(TokenKind::CaretEq); }
+        if (!at_end() && current() == '~') {
+            advance();
+            return one(TokenKind::CaretTilde);
+        }
+        if (!at_end() && current() == '=') {
+            advance();
+            return one(TokenKind::CaretEq);
+        }
         return one(TokenKind::Caret);
     case '&':
         if (!at_end() && current() == '&') {
             advance();
-            if (!at_end() && current() == '&') { advance(); return one(TokenKind::AmpAmpAmp); }
+            if (!at_end() && current() == '&') {
+                advance();
+                return one(TokenKind::AmpAmpAmp);
+            }
             return one(TokenKind::AmpAmp);
         }
-        if (!at_end() && current() == '=') { advance(); return one(TokenKind::AmpEq); }
-        return one(TokenKind::Amp);
-    case '|':
-        if (!at_end() && current() == '|') { advance(); return one(TokenKind::PipePipe); }
         if (!at_end() && current() == '=') {
             advance();
-            if (!at_end() && current() == '>') { advance(); return one(TokenKind::PipeEqGt); }
+            return one(TokenKind::AmpEq);
+        }
+        return one(TokenKind::Amp);
+    case '|':
+        if (!at_end() && current() == '|') {
+            advance();
+            return one(TokenKind::PipePipe);
+        }
+        if (!at_end() && current() == '=') {
+            advance();
+            if (!at_end() && current() == '>') {
+                advance();
+                return one(TokenKind::PipeEqGt);
+            }
             return one(TokenKind::PipeEq);
         }
         if (!at_end() && current() == '-' && peek_char() == '>') {
@@ -346,24 +415,43 @@ Token Lexer::lex_operator() {
     case '!':
         if (!at_end() && current() == '=') {
             advance();
-            if (!at_end() && current() == '=') { advance(); return one(TokenKind::BangEqEq); }
-            if (!at_end() && current() == '?') { advance(); return one(TokenKind::BangEqQuestion); }
+            if (!at_end() && current() == '=') {
+                advance();
+                return one(TokenKind::BangEqEq);
+            }
+            if (!at_end() && current() == '?') {
+                advance();
+                return one(TokenKind::BangEqQuestion);
+            }
             return one(TokenKind::BangEq);
         }
         return one(TokenKind::Bang);
     case '=':
         if (!at_end() && current() == '=') {
             advance();
-            if (!at_end() && current() == '=') { advance(); return one(TokenKind::EqEqEq); }
-            if (!at_end() && current() == '?') { advance(); return one(TokenKind::EqEqQuestion); }
+            if (!at_end() && current() == '=') {
+                advance();
+                return one(TokenKind::EqEqEq);
+            }
+            if (!at_end() && current() == '?') {
+                advance();
+                return one(TokenKind::EqEqQuestion);
+            }
             return one(TokenKind::EqEq);
         }
-        if (!at_end() && current() == '>') { advance(); return one(TokenKind::EqGt); }
+        if (!at_end() && current() == '>') {
+            advance();
+            return one(TokenKind::EqGt);
+        }
         return one(TokenKind::Eq);
     case '#':
-        if (!at_end() && current() == '#') { advance(); return one(TokenKind::HashHash); }
+        if (!at_end() && current() == '#') {
+            advance();
+            return one(TokenKind::HashHash);
+        }
         return one(TokenKind::Hash);
-    default: break;
+    default:
+        break;
     }
 
     // Handle < and > with their shift variants
@@ -403,10 +491,16 @@ Token Lexer::lex_angle_left(SourceLoc loc, uint32_t start) {
     advance(); // second <
     if (!at_end() && current() == '<') {
         advance();
-        if (!at_end() && current() == '=') { advance(); return one(TokenKind::LtLtLtEq); }
+        if (!at_end() && current() == '=') {
+            advance();
+            return one(TokenKind::LtLtLtEq);
+        }
         return one(TokenKind::LtLtLt);
     }
-    if (!at_end() && current() == '=') { advance(); return one(TokenKind::LtLtEq); }
+    if (!at_end() && current() == '=') {
+        advance();
+        return one(TokenKind::LtLtEq);
+    }
     return one(TokenKind::LtLt);
 }
 
@@ -431,10 +525,16 @@ Token Lexer::lex_angle_right(SourceLoc loc, uint32_t start) {
     advance(); // second >
     if (!at_end() && current() == '>') {
         advance();
-        if (!at_end() && current() == '=') { advance(); return one(TokenKind::GtGtGtEq); }
+        if (!at_end() && current() == '=') {
+            advance();
+            return one(TokenKind::GtGtGtEq);
+        }
         return one(TokenKind::GtGtGt);
     }
-    if (!at_end() && current() == '=') { advance(); return one(TokenKind::GtGtEq); }
+    if (!at_end() && current() == '=') {
+        advance();
+        return one(TokenKind::GtGtEq);
+    }
     return one(TokenKind::GtGt);
 }
 

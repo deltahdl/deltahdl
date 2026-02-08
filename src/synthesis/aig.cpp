@@ -40,7 +40,7 @@ uint32_t AigGraph::add_and(uint32_t lit0, uint32_t lit1) {
         return lit0;
     }
     if (aig_var(lit0) == aig_var(lit1)) {
-        return kConstFalse;  // a & ~a = 0
+        return kConstFalse; // a & ~a = 0
     }
 
     // Canonicalize: smaller literal first.

@@ -19,14 +19,14 @@ struct RtlirProcess;
 // for technology-independent optimization passes.
 
 class SynthLowering {
-public:
+  public:
     SynthLowering(Arena& arena, DiagEngine& diag);
 
     /// Lower an RTLIR module to an And-Inverter Graph.
     /// Caller owns the returned graph (allocated via the arena).
     AigGraph* lower(const RtlirModule* module);
 
-private:
+  private:
     /// Lower a continuous assignment into the current AIG.
     void lower_cont_assign(const RtlirContAssign& assign, AigGraph& graph);
 

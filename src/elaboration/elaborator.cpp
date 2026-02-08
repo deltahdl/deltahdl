@@ -25,7 +25,8 @@ RtlirDesign* Elaborator::elaborate(std::string_view top_module_name) {
     auto* design = arena_.create<RtlirDesign>();
     ParamList empty_params;
     auto* top = elaborate_module(mod_decl, empty_params);
-    if (!top) return nullptr;
+    if (!top)
+        return nullptr;
 
     design->top_modules.push_back(top);
     design->all_modules[top->name] = top;
@@ -34,7 +35,8 @@ RtlirDesign* Elaborator::elaborate(std::string_view top_module_name) {
 
 ModuleDecl* Elaborator::find_module(std::string_view name) const {
     for (auto* mod : unit_->modules) {
-        if (mod->name == name) return mod;
+        if (mod->name == name)
+            return mod;
     }
     return nullptr;
 }
@@ -94,10 +96,14 @@ void Elaborator::elaborate_ports(ModuleDecl* decl, RtlirModule* mod) {
 
 static ProcessKind map_always_kind(AlwaysKind ak) {
     switch (ak) {
-    case AlwaysKind::Always:      return ProcessKind::AlwaysComb;
-    case AlwaysKind::AlwaysComb:  return ProcessKind::AlwaysComb;
-    case AlwaysKind::AlwaysFF:    return ProcessKind::AlwaysFF;
-    case AlwaysKind::AlwaysLatch: return ProcessKind::AlwaysLatch;
+    case AlwaysKind::Always:
+        return ProcessKind::AlwaysComb;
+    case AlwaysKind::AlwaysComb:
+        return ProcessKind::AlwaysComb;
+    case AlwaysKind::AlwaysFF:
+        return ProcessKind::AlwaysFF;
+    case AlwaysKind::AlwaysLatch:
+        return ProcessKind::AlwaysLatch;
     }
     return ProcessKind::AlwaysComb;
 }

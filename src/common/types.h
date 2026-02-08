@@ -127,9 +127,8 @@ enum class NetType : uint8_t {
 
 // --- SmallVec: inline storage for common small sizes ---
 
-template <typename T, size_t N = 4>
-class SmallVec {
-public:
+template <typename T, size_t N = 4> class SmallVec {
+  public:
     void push_back(const T& val) {
         if (size_ < N) {
             inline_[size_++] = val;
@@ -142,13 +141,9 @@ public:
         ++size_;
     }
 
-    T& operator[](size_t i) {
-        return (size_ <= N) ? inline_[i] : heap_[i];
-    }
+    T& operator[](size_t i) { return (size_ <= N) ? inline_[i] : heap_[i]; }
 
-    const T& operator[](size_t i) const {
-        return (size_ <= N) ? inline_[i] : heap_[i];
-    }
+    const T& operator[](size_t i) const { return (size_ <= N) ? inline_[i] : heap_[i]; }
 
     size_t size() const { return size_; }
     bool empty() const { return size_ == 0; }
@@ -161,7 +156,7 @@ public:
     const T* begin() const { return data(); }
     const T* end() const { return data() + size_; }
 
-private:
+  private:
     void spill_to_heap() {
         heap_.reserve(N * 2);
         for (size_t i = 0; i < N; ++i) {

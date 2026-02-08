@@ -7,10 +7,14 @@ namespace delta {
 
 static const char* severity_label(DiagSeverity sev) {
     switch (sev) {
-    case DiagSeverity::Note: return "note";
-    case DiagSeverity::Warning: return "warning";
-    case DiagSeverity::Error: return "error";
-    case DiagSeverity::Fatal: return "fatal error";
+    case DiagSeverity::Note:
+        return "note";
+    case DiagSeverity::Warning:
+        return "warning";
+    case DiagSeverity::Error:
+        return "error";
+    case DiagSeverity::Fatal:
+        return "fatal error";
     }
     return "unknown";
 }

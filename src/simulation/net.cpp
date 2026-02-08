@@ -65,8 +65,10 @@ static Logic4Word resolve_wand_word(Logic4Word a, Logic4Word b) {
     uint64_t b_z = b.aval & b.bval;
 
     // If one side is Z, take the other
-    if (a_z == ~uint64_t(0)) return b;
-    if (b_z == ~uint64_t(0)) return a;
+    if (a_z == ~uint64_t(0))
+        return b;
+    if (b_z == ~uint64_t(0))
+        return a;
 
     return logic4_and(a, b);
 }
@@ -97,8 +99,10 @@ static Logic4Word resolve_wor_word(Logic4Word a, Logic4Word b) {
     uint64_t a_z = a.aval & a.bval;
     uint64_t b_z = b.aval & b.bval;
 
-    if (a_z == ~uint64_t(0)) return b;
-    if (b_z == ~uint64_t(0)) return a;
+    if (a_z == ~uint64_t(0))
+        return b;
+    if (b_z == ~uint64_t(0))
+        return a;
 
     return logic4_or(a, b);
 }

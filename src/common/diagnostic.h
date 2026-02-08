@@ -24,7 +24,7 @@ struct Diagnostic {
 };
 
 class DiagEngine {
-public:
+  public:
     explicit DiagEngine(const SourceManager& src_mgr) : src_mgr_(src_mgr) {}
 
     void note(SourceLoc loc, std::string msg);
@@ -40,7 +40,7 @@ public:
 
     void set_warnings_as_errors(bool val) { warnings_as_errors_ = val; }
 
-private:
+  private:
     void emit(DiagSeverity sev, SourceLoc loc, std::string msg);
 
     const SourceManager& src_mgr_;

@@ -14,7 +14,7 @@ namespace delta {
 // This corresponds to ABC's "refactor" command.
 
 class AigRefactor {
-public:
+  public:
     /// Run one pass of AIG refactoring on the graph.
     void refactor(AigGraph& graph);
 };

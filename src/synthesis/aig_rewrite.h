@@ -16,7 +16,7 @@ namespace delta {
 // the subgraph if a smaller implementation exists.
 
 class AigRewriter {
-public:
+  public:
     /// Run one pass of AIG rewriting on the graph.
     /// May be called repeatedly until convergence.
     void rewrite(AigGraph& graph);

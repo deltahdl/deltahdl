@@ -10,8 +10,7 @@ namespace delta {
 // --- Format helpers (defined before use) ---
 
 static bool is_format_spec(char c) {
-    return c == 'd' || c == 'h' || c == 'x' ||
-           c == 'b' || c == 's' || c == 't';
+    return c == 'd' || c == 'h' || c == 'x' || c == 'b' || c == 's' || c == 't';
 }
 
 static std::string format_single_value(char spec, unsigned long long num) {
@@ -25,7 +24,8 @@ static std::string format_single_value(char spec, unsigned long long num) {
         std::snprintf(buf, sizeof(buf), "%llx", num);
         return buf;
     case 'b': {
-        if (num == 0) return "0";
+        if (num == 0)
+            return "0";
         std::string result;
         for (auto tmp = num; tmp > 0; tmp >>= 1) {
             result.insert(result.begin(), (tmp & 1) ? '1' : '0');
@@ -58,8 +58,8 @@ static std::string apply_format(char spec, const std::string& val) {
 }
 
 static bool try_format_escape(const std::string& fmt, size_t& i,
-                              const std::vector<std::string>& args,
-                              size_t& arg_idx, std::string& result) {
+                              const std::vector<std::string>& args, size_t& arg_idx,
+                              std::string& result) {
     if (fmt[i] != '%') {
         return false;
     }

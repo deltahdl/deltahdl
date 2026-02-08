@@ -15,8 +15,8 @@ namespace delta {
 
 struct CellPin {
     std::string name;
-    std::string direction;    // "input", "output", "inout"
-    std::string function;     // Boolean function string (e.g., "A & B")
+    std::string direction; // "input", "output", "inout"
+    std::string function;  // Boolean function string (e.g., "A & B")
     double max_transition = 0.0;
     double capacitance = 0.0;
 };
@@ -35,7 +35,7 @@ struct CellLibrary {
 // --- Liberty file parser ---
 
 class LibertyParser {
-public:
+  public:
     /// Parse a Liberty (.lib) file and return the cell library.
     CellLibrary parse(std::string_view filename);
 };

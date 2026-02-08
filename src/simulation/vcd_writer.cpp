@@ -9,8 +9,7 @@ namespace delta {
 // --- Construction / destruction ---
 
 VcdWriter::VcdWriter(std::string filename, std::string timescale)
-    : filename_(std::move(filename))
-    , timescale_(std::move(timescale)) {
+    : filename_(std::move(filename)), timescale_(std::move(timescale)) {
     file_.open(filename_, std::ios::out | std::ios::trunc);
 }
 
@@ -126,9 +125,8 @@ void VcdWriter::write_signal_defs(const std::string& scope) {
         if (sig.scope != scope) {
             continue;
         }
-        file_ << "$var wire " << sig.width << ' '
-               << make_id_string(sig.id) << ' '
-               << sig.name << " $end\n";
+        file_ << "$var wire " << sig.width << ' ' << make_id_string(sig.id) << ' ' << sig.name
+              << " $end\n";
     }
 }
 
@@ -145,9 +143,12 @@ static char logic4_bit_char(const Logic4Vec& value, uint32_t bit) {
     uint64_t a = (value.words[word_idx].aval >> bit_idx) & 1;
     uint64_t b = (value.words[word_idx].bval >> bit_idx) & 1;
 
-    if (b == 0 && a == 0) return '0';
-    if (b == 0 && a == 1) return '1';
-    if (b == 1 && a == 0) return 'x';
+    if (b == 0 && a == 0)
+        return '0';
+    if (b == 0 && a == 1)
+        return '1';
+    if (b == 1 && a == 0)
+        return 'x';
     return 'z';
 }
 

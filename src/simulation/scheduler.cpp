@@ -113,9 +113,7 @@ bool Scheduler::iterate_active_set(TimeSlot& slot) {
 }
 
 void Scheduler::execute_active_regions(TimeSlot& slot) {
-    auto exec = [&](Region r) {
-        execute_region(slot.regions[static_cast<size_t>(r)]);
-    };
+    auto exec = [&](Region r) { execute_region(slot.regions[static_cast<size_t>(r)]); };
 
     exec(Region::PreActive);
     exec(Region::Active);
@@ -150,9 +148,7 @@ bool Scheduler::iterate_reactive_set(TimeSlot& slot) {
 }
 
 void Scheduler::execute_reactive_regions(TimeSlot& slot) {
-    auto exec = [&](Region r) {
-        execute_region(slot.regions[static_cast<size_t>(r)]);
-    };
+    auto exec = [&](Region r) { execute_region(slot.regions[static_cast<size_t>(r)]); };
 
     exec(Region::PreObserved);
     exec(Region::Observed);

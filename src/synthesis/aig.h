@@ -18,8 +18,8 @@ namespace delta {
 
 struct AigNode {
     uint32_t id = 0;
-    uint32_t fanin0 = 0;  // literal: LSB is complement flag
-    uint32_t fanin1 = 0;  // literal: LSB is complement flag
+    uint32_t fanin0 = 0; // literal: LSB is complement flag
+    uint32_t fanin1 = 0; // literal: LSB is complement flag
 };
 
 // --- Literal helpers ---
@@ -42,9 +42,9 @@ inline bool aig_is_compl(uint32_t lit) {
 // --- AIG graph container ---
 
 class AigGraph {
-public:
+  public:
     static constexpr uint32_t kConstFalse = 0;
-    static constexpr uint32_t kConstTrue  = 1;
+    static constexpr uint32_t kConstTrue = 1;
 
     AigGraph();
 
@@ -81,7 +81,7 @@ public:
     std::vector<uint32_t> outputs;
     std::vector<std::tuple<uint32_t, uint32_t, uint32_t>> latches;
 
-private:
+  private:
     /// Pack two literals into a single 64-bit key for structural hashing.
     static uint64_t hash_key(uint32_t lit0, uint32_t lit1);
 

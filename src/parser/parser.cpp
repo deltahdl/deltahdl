@@ -5,12 +5,22 @@ namespace delta {
 Parser::Parser(Lexer& lexer, Arena& arena, DiagEngine& diag)
     : lexer_(lexer), arena_(arena), diag_(diag) {}
 
-Token Parser::current_token() { return lexer_.peek(); }
-bool Parser::check(TokenKind kind) { return current_token().is(kind); }
-bool Parser::at_end() { return check(TokenKind::Eof); }
-SourceLoc Parser::current_loc() { return current_token().loc; }
+Token Parser::current_token() {
+    return lexer_.peek();
+}
+bool Parser::check(TokenKind kind) {
+    return current_token().is(kind);
+}
+bool Parser::at_end() {
+    return check(TokenKind::Eof);
+}
+SourceLoc Parser::current_loc() {
+    return current_token().loc;
+}
 
-Token Parser::consume() { return lexer_.next(); }
+Token Parser::consume() {
+    return lexer_.next();
+}
 
 bool Parser::match(TokenKind kind) {
     if (!check(kind)) {
@@ -25,9 +35,8 @@ Token Parser::expect(TokenKind kind) {
         return consume();
     }
     auto tok = current_token();
-    diag_.error(tok.loc,
-        "expected " + std::string(token_kind_name(kind)) +
-        ", got " + std::string(token_kind_name(tok.kind)));
+    diag_.error(tok.loc, "expected " + std::string(token_kind_name(kind)) + ", got " +
+                             std::string(token_kind_name(tok.kind)));
     return tok;
 }
 
@@ -112,10 +121,19 @@ PortDecl Parser::parse_port_decl() {
     PortDecl port;
     port.loc = current_loc();
 
-    if (check(TokenKind::KwInput)) { port.direction = Direction::Input; consume(); }
-    else if (check(TokenKind::KwOutput)) { port.direction = Direction::Output; consume(); }
-    else if (check(TokenKind::KwInout)) { port.direction = Direction::Inout; consume(); }
-    else if (check(TokenKind::KwRef)) { port.direction = Direction::Ref; consume(); }
+    if (check(TokenKind::KwInput)) {
+        port.direction = Direction::Input;
+        consume();
+    } else if (check(TokenKind::KwOutput)) {
+        port.direction = Direction::Output;
+        consume();
+    } else if (check(TokenKind::KwInout)) {
+        port.direction = Direction::Inout;
+        consume();
+    } else if (check(TokenKind::KwRef)) {
+        port.direction = Direction::Ref;
+        consume();
+    }
 
     port.data_type = parse_data_type();
 
@@ -448,19 +466,56 @@ Stmt* Parser::parse_assignment_or_expr_stmt() {
 DataType Parser::parse_data_type() {
     DataType dtype;
     switch (current_token().kind) {
-    case TokenKind::KwLogic: dtype.kind = DataTypeKind::Logic; consume(); break;
-    case TokenKind::KwReg: dtype.kind = DataTypeKind::Reg; consume(); break;
-    case TokenKind::KwBit: dtype.kind = DataTypeKind::Bit; consume(); break;
-    case TokenKind::KwByte: dtype.kind = DataTypeKind::Byte; consume(); break;
-    case TokenKind::KwShortint: dtype.kind = DataTypeKind::Shortint; consume(); break;
-    case TokenKind::KwInt: dtype.kind = DataTypeKind::Int; consume(); break;
-    case TokenKind::KwLongint: dtype.kind = DataTypeKind::Longint; consume(); break;
-    case TokenKind::KwInteger: dtype.kind = DataTypeKind::Integer; consume(); break;
-    case TokenKind::KwReal: dtype.kind = DataTypeKind::Real; consume(); break;
-    case TokenKind::KwTime: dtype.kind = DataTypeKind::Time; consume(); break;
-    case TokenKind::KwString: dtype.kind = DataTypeKind::String; consume(); break;
-    case TokenKind::KwWire: dtype.kind = DataTypeKind::Logic; consume(); break;
-    default: return dtype; // Implicit
+    case TokenKind::KwLogic:
+        dtype.kind = DataTypeKind::Logic;
+        consume();
+        break;
+    case TokenKind::KwReg:
+        dtype.kind = DataTypeKind::Reg;
+        consume();
+        break;
+    case TokenKind::KwBit:
+        dtype.kind = DataTypeKind::Bit;
+        consume();
+        break;
+    case TokenKind::KwByte:
+        dtype.kind = DataTypeKind::Byte;
+        consume();
+        break;
+    case TokenKind::KwShortint:
+        dtype.kind = DataTypeKind::Shortint;
+        consume();
+        break;
+    case TokenKind::KwInt:
+        dtype.kind = DataTypeKind::Int;
+        consume();
+        break;
+    case TokenKind::KwLongint:
+        dtype.kind = DataTypeKind::Longint;
+        consume();
+        break;
+    case TokenKind::KwInteger:
+        dtype.kind = DataTypeKind::Integer;
+        consume();
+        break;
+    case TokenKind::KwReal:
+        dtype.kind = DataTypeKind::Real;
+        consume();
+        break;
+    case TokenKind::KwTime:
+        dtype.kind = DataTypeKind::Time;
+        consume();
+        break;
+    case TokenKind::KwString:
+        dtype.kind = DataTypeKind::String;
+        consume();
+        break;
+    case TokenKind::KwWire:
+        dtype.kind = DataTypeKind::Logic;
+        consume();
+        break;
+    default:
+        return dtype; // Implicit
     }
 
     if (match(TokenKind::KwSigned)) {
