@@ -15,6 +15,7 @@ namespace delta {
 struct Expr;
 struct Stmt;
 struct ModuleItem;
+struct SpecifyItem;
 
 // --- Expressions ---
 
@@ -495,6 +496,9 @@ struct ModuleItem {
   bool dpi_is_pure = false;     // pure function (no side effects)
   bool dpi_is_context = false;  // context function (needs sim context)
   bool dpi_is_task = false;     // true for task, false for function
+
+  // Specify block body (§30, §31)
+  std::vector<SpecifyItem*> specify_items;
 };
 
 // --- Top-level declarations ---
@@ -581,6 +585,82 @@ struct ClassDecl {
   std::vector<std::pair<std::string_view, Expr*>> params;
 };
 
+// --- Specify block items (§30, §31) ---
+
+enum class SpecifyPathKind : uint8_t {
+  kParallel,  // (a => b)
+  kFull,      // (a *> b)
+};
+
+enum class SpecifyEdge : uint8_t {
+  kNone,
+  kPosedge,
+  kNegedge,
+};
+
+struct SpecifyPathDecl {
+  SpecifyPathKind path_kind = SpecifyPathKind::kParallel;
+  SpecifyEdge edge = SpecifyEdge::kNone;
+  std::vector<std::string_view> src_ports;
+  std::vector<std::string_view> dst_ports;
+  std::vector<Expr*> delays;  // 1, 2, 3, 6, or 12 delay values
+  Expr* condition = nullptr;  // if (cond) path or ifnone path
+  bool is_ifnone = false;     // ifnone conditional path
+  SourceLoc loc;
+};
+
+enum class TimingCheckKind : uint8_t {
+  kSetup,
+  kHold,
+  kSetuphold,
+  kRecovery,
+  kRemoval,
+  kRecrem,
+  kWidth,
+  kPeriod,
+  kSkew,
+  kNochange,
+};
+
+struct TimingCheckDecl {
+  TimingCheckKind check_kind = TimingCheckKind::kSetup;
+  SpecifyEdge ref_edge = SpecifyEdge::kNone;
+  std::string_view ref_signal;
+  SpecifyEdge data_edge = SpecifyEdge::kNone;
+  std::string_view data_signal;
+  std::vector<Expr*> limits;  // Timing limit expressions
+  std::string_view notifier;  // Optional notifier variable
+  SourceLoc loc;
+};
+
+enum class SpecifyItemKind : uint8_t {
+  kPathDecl,
+  kTimingCheck,
+  kPulsestyle,
+  kShowcancelled,
+  kSpecparam,
+};
+
+struct SpecifyItem {
+  SpecifyItemKind kind = SpecifyItemKind::kPathDecl;
+  SourceLoc loc;
+
+  // Path declaration
+  SpecifyPathDecl path;
+
+  // Timing check
+  TimingCheckDecl timing_check;
+
+  // Pulsestyle / showcancelled
+  bool is_ondetect = false;         // pulsestyle_ondetect vs onevent
+  bool is_noshowcancelled = false;  // noshowcancelled vs showcancelled
+  std::vector<std::string_view> signal_list;  // Affected signals
+
+  // Specparam inside specify
+  std::string_view param_name;
+  Expr* param_value = nullptr;
+};
+
 // --- User-Defined Primitives (§29) ---
 
 struct UdpTableRow {
@@ -600,9 +680,30 @@ struct UdpDecl {
 
 // --- Configuration declarations (§33) ---
 
+enum class ConfigRuleKind : uint8_t {
+  kDefault,   // default liblist ...
+  kInstance,  // instance path liblist/use ...
+  kCell,      // cell [lib.] id liblist/use ...
+};
+
+struct ConfigRule {
+  ConfigRuleKind kind = ConfigRuleKind::kDefault;
+  std::string_view inst_path;             // Instance hierarchical path
+  std::string_view cell_lib;              // Cell library (optional)
+  std::string_view cell_name;             // Cell identifier
+  std::vector<std::string_view> liblist;  // liblist libraries
+  std::string_view use_lib;               // use clause: library
+  std::string_view use_cell;              // use clause: cell
+  bool use_config = false;                // :config suffix
+  std::vector<std::pair<std::string_view, Expr*>> use_params;  // use #(.N(v))
+};
+
 struct ConfigDecl {
   std::string_view name;
   SourceRange range;
+  std::vector<std::pair<std::string_view, std::string_view>> design_cells;
+  std::vector<ConfigRule*> rules;
+  std::vector<std::pair<std::string_view, Expr*>> local_params;
 };
 
 struct CompilationUnit {

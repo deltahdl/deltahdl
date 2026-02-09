@@ -2,18 +2,23 @@
 
 namespace delta {
 
+// Determine if a system identifier is a timing check keyword.
+static bool IsTimingCheckName(std::string_view name) {
+  return name == "$setup" || name == "$hold" || name == "$setuphold" ||
+         name == "$recovery" || name == "$removal" || name == "$recrem" ||
+         name == "$width" || name == "$period" || name == "$skew" ||
+         name == "$nochange";
+}
+
 // Parse: specify ... endspecify
-// Skip specify block contents (path delays, timing checks) for now.
-// We consume tokens between specify/endspecify balanced.
 ModuleItem* Parser::ParseSpecifyBlock() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kSpecifyBlock;
   item->loc = CurrentLoc();
   Expect(TokenKind::kKwSpecify);
 
-  // Skip body until endspecify
   while (!Check(TokenKind::kKwEndspecify) && !AtEnd()) {
-    Consume();
+    ParseSpecifyItem(item->specify_items);
   }
   Expect(TokenKind::kKwEndspecify);
   return item;
@@ -38,6 +43,286 @@ ModuleItem* Parser::ParseSpecparamDecl() {
   item->name = Expect(TokenKind::kIdentifier).text;
   Expect(TokenKind::kEq);
   item->init_expr = ParseExpr();
+  Expect(TokenKind::kSemicolon);
+  return item;
+}
+
+// Dispatch a single specify block item.
+void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
+  // pulsestyle_onevent / pulsestyle_ondetect
+  if (Check(TokenKind::kKwPulsestyleOnevent) ||
+      Check(TokenKind::kKwPulsestyleOndetect)) {
+    items.push_back(ParsePulsestyleDecl());
+    return;
+  }
+  // showcancelled / noshowcancelled
+  if (Check(TokenKind::kKwShowcancelled) ||
+      Check(TokenKind::kKwNoshowcancelled)) {
+    items.push_back(ParseShowcancelledDecl());
+    return;
+  }
+  // specparam inside specify block
+  if (Check(TokenKind::kKwSpecparam)) {
+    items.push_back(ParseSpecparamInSpecify());
+    return;
+  }
+  // Timing checks: $setup, $hold, etc.
+  if (Check(TokenKind::kSystemIdentifier)) {
+    auto name = CurrentToken().text;
+    if (IsTimingCheckName(name)) {
+      items.push_back(ParseTimingCheck());
+      return;
+    }
+  }
+  // ifnone path
+  if (Check(TokenKind::kKwIfnone)) {
+    items.push_back(ParseIfnonePathDecl());
+    return;
+  }
+  // Conditional path: if (...) (path)
+  if (Check(TokenKind::kKwIf)) {
+    Consume();
+    Expect(TokenKind::kLParen);
+    auto* cond = ParseExpr();
+    Expect(TokenKind::kRParen);
+    items.push_back(ParseConditionalPathDecl(cond));
+    return;
+  }
+  // Simple path declaration: ( ... => ... ) = delay ;
+  if (Check(TokenKind::kLParen)) {
+    items.push_back(ParseSpecifyPathDecl());
+    return;
+  }
+  // Unknown token inside specify - skip to avoid infinite loop.
+  Consume();
+}
+
+// Parse edge qualifier: posedge | negedge | (nothing)
+SpecifyEdge Parser::ParseSpecifyEdge() {
+  if (Check(TokenKind::kKwPosedge)) {
+    Consume();
+    return SpecifyEdge::kPosedge;
+  }
+  if (Check(TokenKind::kKwNegedge)) {
+    Consume();
+    return SpecifyEdge::kNegedge;
+  }
+  return SpecifyEdge::kNone;
+}
+
+// Parse port list inside path: a or a, b, c
+void Parser::ParsePathPorts(std::vector<std::string_view>& ports) {
+  ports.push_back(Expect(TokenKind::kIdentifier).text);
+  while (Match(TokenKind::kComma)) {
+    ports.push_back(Expect(TokenKind::kIdentifier).text);
+  }
+}
+
+// Parse delay values: expr or (expr, expr, ...) after '='
+void Parser::ParsePathDelays(std::vector<Expr*>& delays) {
+  if (Match(TokenKind::kLParen)) {
+    delays.push_back(ParseExpr());
+    while (Match(TokenKind::kComma)) {
+      delays.push_back(ParseExpr());
+    }
+    Expect(TokenKind::kRParen);
+  } else {
+    delays.push_back(ParseExpr());
+  }
+}
+
+// Parse: ( [edge] src_ports =>|*> dst_ports ) = delay ;
+SpecifyItem* Parser::ParseSpecifyPathDecl() {
+  auto* item = arena_.Create<SpecifyItem>();
+  item->kind = SpecifyItemKind::kPathDecl;
+  item->loc = CurrentLoc();
+
+  Expect(TokenKind::kLParen);
+  item->path.edge = ParseSpecifyEdge();
+  ParsePathPorts(item->path.src_ports);
+
+  // => (parallel) or *> (full)
+  if (Match(TokenKind::kEqGt)) {
+    item->path.path_kind = SpecifyPathKind::kParallel;
+  } else if (Match(TokenKind::kStarGt)) {
+    item->path.path_kind = SpecifyPathKind::kFull;
+  } else {
+    // Try to recover
+    Consume();
+  }
+
+  ParsePathPorts(item->path.dst_ports);
+  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kEq);
+  ParsePathDelays(item->path.delays);
+  Expect(TokenKind::kSemicolon);
+  return item;
+}
+
+// Parse: if (cond) ( path ) = delay ;
+SpecifyItem* Parser::ParseConditionalPathDecl(Expr* cond) {
+  auto* item = ParseSpecifyPathDecl();
+  item->path.condition = cond;
+  return item;
+}
+
+// Parse: ifnone ( path ) = delay ;
+SpecifyItem* Parser::ParseIfnonePathDecl() {
+  Expect(TokenKind::kKwIfnone);
+  auto* item = ParseSpecifyPathDecl();
+  item->path.is_ifnone = true;
+  return item;
+}
+
+// Map system identifier name to TimingCheckKind.
+TimingCheckKind Parser::ParseTimingCheckKind(std::string_view name) {
+  if (name == "$setup") return TimingCheckKind::kSetup;
+  if (name == "$hold") return TimingCheckKind::kHold;
+  if (name == "$setuphold") return TimingCheckKind::kSetuphold;
+  if (name == "$recovery") return TimingCheckKind::kRecovery;
+  if (name == "$removal") return TimingCheckKind::kRemoval;
+  if (name == "$recrem") return TimingCheckKind::kRecrem;
+  if (name == "$width") return TimingCheckKind::kWidth;
+  if (name == "$period") return TimingCheckKind::kPeriod;
+  if (name == "$skew") return TimingCheckKind::kSkew;
+  if (name == "$nochange") return TimingCheckKind::kNochange;
+  return TimingCheckKind::kSetup;
+}
+
+// Checks that require a data signal (two reference signals).
+static bool NeedsDataSignal(TimingCheckKind kind) {
+  switch (kind) {
+    case TimingCheckKind::kSetup:
+    case TimingCheckKind::kHold:
+    case TimingCheckKind::kSetuphold:
+    case TimingCheckKind::kRecovery:
+    case TimingCheckKind::kRemoval:
+    case TimingCheckKind::kRecrem:
+    case TimingCheckKind::kSkew:
+    case TimingCheckKind::kNochange:
+      return true;
+    case TimingCheckKind::kWidth:
+    case TimingCheckKind::kPeriod:
+      return false;
+  }
+  return false;
+}
+
+// Peek at the token after the current one and check if it's ',' or ')'.
+bool Parser::CheckNextIsCommaOrRParen() {
+  auto saved = lexer_.SavePos();
+  Consume();  // Skip current token.
+  bool result = Check(TokenKind::kComma) || Check(TokenKind::kRParen);
+  lexer_.RestorePos(saved);
+  return result;
+}
+
+// Parse: $setup(data, posedge clk, limit [, notifier]) ;
+// and similar timing checks.
+SpecifyItem* Parser::ParseTimingCheck() {
+  auto* item = arena_.Create<SpecifyItem>();
+  item->kind = SpecifyItemKind::kTimingCheck;
+  item->loc = CurrentLoc();
+
+  auto name = CurrentToken().text;
+  item->timing_check.check_kind = ParseTimingCheckKind(name);
+  Consume();  // system identifier
+
+  Expect(TokenKind::kLParen);
+
+  // First signal argument (with optional edge)
+  item->timing_check.ref_edge = ParseSpecifyEdge();
+  item->timing_check.ref_signal = Expect(TokenKind::kIdentifier).text;
+  Expect(TokenKind::kComma);
+
+  // Second signal argument (with optional edge) or limit
+  bool has_data_signal = NeedsDataSignal(item->timing_check.check_kind);
+  if (has_data_signal) {
+    item->timing_check.data_edge = ParseSpecifyEdge();
+    item->timing_check.data_signal = Expect(TokenKind::kIdentifier).text;
+    Expect(TokenKind::kComma);
+  }
+
+  // Timing limit(s)
+  item->timing_check.limits.push_back(ParseExpr());
+  // Additional limits or optional notifier identifier.
+  while (Match(TokenKind::kComma)) {
+    if (Check(TokenKind::kRParen)) break;
+    // Use lookahead: if identifier followed by ')' or ',', it's a notifier.
+    if (Check(TokenKind::kIdentifier)) {
+      auto saved = lexer_.SavePos();
+      auto tok = CurrentToken();
+      Consume();
+      if (Check(TokenKind::kRParen) || Check(TokenKind::kComma)) {
+        item->timing_check.notifier = tok.text;
+        // Skip any remaining optional args after the notifier.
+        while (Match(TokenKind::kComma)) {
+          if (Check(TokenKind::kRParen)) break;
+          Consume();
+        }
+        break;
+      }
+      lexer_.RestorePos(saved);
+    }
+    item->timing_check.limits.push_back(ParseExpr());
+  }
+
+  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kSemicolon);
+  return item;
+}
+
+// Parse: pulsestyle_onevent signal_list ;
+// Parse: pulsestyle_ondetect signal_list ;
+SpecifyItem* Parser::ParsePulsestyleDecl() {
+  auto* item = arena_.Create<SpecifyItem>();
+  item->kind = SpecifyItemKind::kPulsestyle;
+  item->loc = CurrentLoc();
+
+  if (Check(TokenKind::kKwPulsestyleOndetect)) {
+    item->is_ondetect = true;
+  }
+  Consume();  // pulsestyle keyword
+
+  // Signal list
+  item->signal_list.push_back(Expect(TokenKind::kIdentifier).text);
+  while (Match(TokenKind::kComma)) {
+    item->signal_list.push_back(Expect(TokenKind::kIdentifier).text);
+  }
+  Expect(TokenKind::kSemicolon);
+  return item;
+}
+
+// Parse: showcancelled signal_list ;
+// Parse: noshowcancelled signal_list ;
+SpecifyItem* Parser::ParseShowcancelledDecl() {
+  auto* item = arena_.Create<SpecifyItem>();
+  item->kind = SpecifyItemKind::kShowcancelled;
+  item->loc = CurrentLoc();
+
+  if (Check(TokenKind::kKwNoshowcancelled)) {
+    item->is_noshowcancelled = true;
+  }
+  Consume();  // showcancelled/noshowcancelled keyword
+
+  item->signal_list.push_back(Expect(TokenKind::kIdentifier).text);
+  while (Match(TokenKind::kComma)) {
+    item->signal_list.push_back(Expect(TokenKind::kIdentifier).text);
+  }
+  Expect(TokenKind::kSemicolon);
+  return item;
+}
+
+// Parse: specparam name = expr ;  (inside specify block)
+SpecifyItem* Parser::ParseSpecparamInSpecify() {
+  auto* item = arena_.Create<SpecifyItem>();
+  item->kind = SpecifyItemKind::kSpecparam;
+  item->loc = CurrentLoc();
+  Expect(TokenKind::kKwSpecparam);
+
+  item->param_name = Expect(TokenKind::kIdentifier).text;
+  Expect(TokenKind::kEq);
+  item->param_value = ParseExpr();
   Expect(TokenKind::kSemicolon);
   return item;
 }

@@ -57,6 +57,20 @@ static bool CheckClockEdge(Variable* clk_var, Edge edge) {
   return prev != cur;  // Edge::kNone means any change.
 }
 
+// Sample all input signals for a clocking block.
+static void SampleBlockInputs(ClockingManager* mgr, const std::string& name,
+                              const std::vector<ClockingSignal>& signals,
+                              SimContext& ctx) {
+  for (const auto& sig : signals) {
+    bool is_input = (sig.direction == ClockingDir::kInput ||
+                     sig.direction == ClockingDir::kInout);
+    if (!is_input) continue;
+    auto* var = ctx.FindVariable(sig.signal_name);
+    if (!var) continue;
+    mgr->SampleInput(name, sig.signal_name, var->value.ToUint64());
+  }
+}
+
 // Re-registrable clock watcher that samples inputs on the correct edge.
 static void RegisterClockWatcher(ClockingManager* mgr, Variable* clk_var,
                                  const ClockingBlock& block, SimContext& ctx,
@@ -71,17 +85,8 @@ static void RegisterClockWatcher(ClockingManager* mgr, Variable* clk_var,
           if (blk) RegisterClockWatcher(mgr, clk_var, *blk, ctx, sched);
           return;
         }
-        for (const auto& sig : signals) {
-          bool is_input = (sig.direction == ClockingDir::kInput ||
-                           sig.direction == ClockingDir::kInout);
-          if (!is_input) continue;
-          auto* var = ctx.FindVariable(sig.signal_name);
-          if (!var) continue;
-          mgr->SampleInput(block_name, sig.signal_name, var->value.ToUint64());
-        }
-        // Trigger the clocking block event variable (S14.8).
+        SampleBlockInputs(mgr, block_name, signals, ctx);
         mgr->NotifyBlockEvent(block_name);
-        // Invoke registered edge callbacks.
         mgr->InvokeEdgeCallbacks(block_name);
         auto* blk = mgr->Find(block_name);
         if (blk) RegisterClockWatcher(mgr, clk_var, *blk, ctx, sched);

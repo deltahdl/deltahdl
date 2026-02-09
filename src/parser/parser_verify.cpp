@@ -10,20 +10,15 @@ ModuleDecl* Parser::ParseCheckerDecl() {
   decl->range.start = CurrentLoc();
   Expect(TokenKind::kKwChecker);
   decl->name = Expect(TokenKind::kIdentifier).text;
-
-  // Optional port list: (port1, port2, ...)
-  if (Match(TokenKind::kLParen)) {
-    if (!Check(TokenKind::kRParen)) {
-      ParsePortList(*decl);
-    }
-    Expect(TokenKind::kRParen);
-  }
-  Expect(TokenKind::kSemicolon);
+  ParseParamsPortsAndSemicolon(*decl);
 
   // Checker body — reuse module item parsing.
+  auto* prev_module = current_module_;
+  current_module_ = decl;
   while (!Check(TokenKind::kKwEndchecker) && !AtEnd()) {
     ParseModuleItem(decl->items);
   }
+  current_module_ = prev_module;
   Expect(TokenKind::kKwEndchecker);
   if (Match(TokenKind::kColon)) ExpectIdentifier();
   decl->range.end = CurrentLoc();

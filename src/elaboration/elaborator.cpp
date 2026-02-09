@@ -40,7 +40,24 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
 ModuleDecl* Elaborator::FindModule(std::string_view name) const {
   auto it = std::find_if(unit_->modules.begin(), unit_->modules.end(),
                          [name](auto* mod) { return mod->name == name; });
-  return (it != unit_->modules.end()) ? *it : nullptr;
+  if (it != unit_->modules.end()) return *it;
+
+  // §24: Programs can be instantiated like modules.
+  auto pit = std::find_if(unit_->programs.begin(), unit_->programs.end(),
+                          [name](auto* p) { return p->name == name; });
+  if (pit != unit_->programs.end()) return *pit;
+
+  // §25: Interfaces can be instantiated.
+  auto iit = std::find_if(unit_->interfaces.begin(), unit_->interfaces.end(),
+                          [name](auto* i) { return i->name == name; });
+  if (iit != unit_->interfaces.end()) return *iit;
+
+  // §17: Checkers can be instantiated.
+  auto cit = std::find_if(unit_->checkers.begin(), unit_->checkers.end(),
+                          [name](auto* c) { return c->name == name; });
+  if (cit != unit_->checkers.end()) return *cit;
+
+  return nullptr;
 }
 
 static std::optional<int64_t> FindParamOverride(

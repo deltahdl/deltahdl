@@ -77,9 +77,26 @@ class Parser {
   // Specify blocks (parser_specify.cpp — §30/§31)
   ModuleItem* ParseSpecifyBlock();
   ModuleItem* ParseSpecparamDecl();
+  void ParseSpecifyItem(std::vector<SpecifyItem*>& items);
+  SpecifyItem* ParseSpecifyPathDecl();
+  SpecifyItem* ParseConditionalPathDecl(Expr* cond);
+  SpecifyItem* ParseIfnonePathDecl();
+  SpecifyItem* ParseTimingCheck();
+  SpecifyItem* ParsePulsestyleDecl();
+  SpecifyItem* ParseShowcancelledDecl();
+  SpecifyItem* ParseSpecparamInSpecify();
+  void ParsePathPorts(std::vector<std::string_view>& ports);
+  void ParsePathDelays(std::vector<Expr*>& delays);
+  SpecifyEdge ParseSpecifyEdge();
+  TimingCheckKind ParseTimingCheckKind(std::string_view name);
+  bool CheckNextIsCommaOrRParen();
 
   // Configuration (parser_config.cpp — §33)
   ConfigDecl* ParseConfigDecl();
+  void ParseDesignStatement(ConfigDecl* decl);
+  ConfigRule* ParseConfigRule();
+  void ParseLiblistClause(ConfigRule* rule);
+  void ParseUseClause(ConfigRule* rule);
 
   // Declarations (parser_decl.cpp)
   ModuleItem* ParseDefparam();
