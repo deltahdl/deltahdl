@@ -63,7 +63,12 @@ CheckOptions:
   readability-identifier-naming.StructIgnoredRegexp: promise_type
   readability-identifier-naming.EnumCase: CamelCase
   readability-identifier-naming.TypeAliasCase: CamelCase
+  # VPI type aliases are MANDATED by IEEE Std 1800-2023 §36.6.
+  # The standard specifies exact type names (vpiHandle,
+  # s_vpi_value, etc.) for VPI compatibility.
+  readability-identifier-naming.TypeAliasIgnoredRegexp: 'vpiHandle|s_vpi_value|s_vpi_time|s_cb_data|s_vpi_systf_data|s_vpi_vecval'
   readability-identifier-naming.TypedefCase: CamelCase
+  readability-identifier-naming.TypedefIgnoredRegexp: 'vpiHandle|s_vpi_value|s_vpi_time|s_cb_data|s_vpi_systf_data|s_vpi_vecval'
   readability-identifier-naming.TemplateParameterCase: CamelCase
 
   # -- Naming: enum constants (kCamelCase) -----------------
@@ -98,7 +103,11 @@ CheckOptions:
   #   await_ready       - awaitable protocol [expr.await]
   #   await_suspend     - awaitable protocol [expr.await]
   #   await_resume      - awaitable protocol [expr.await]
-  readability-identifier-naming.FunctionIgnoredRegexp: 'main|get_return_object|initial_suspend|final_suspend|return_void|return_value|unhandled_exception|await_ready|await_suspend|await_resume'
+  # VPI C API functions are MANDATED by IEEE Std 1800-2023
+  # §36.7-§36.34. The standard specifies exact function names
+  # (snake_case) that must be provided for VPI compatibility.
+  # This is the same category as C++ standard names above.
+  readability-identifier-naming.FunctionIgnoredRegexp: 'main|get_return_object|initial_suspend|final_suspend|return_void|return_value|unhandled_exception|await_ready|await_suspend|await_resume|vpi_register_systf|vpi_handle_by_name|vpi_iterate|vpi_scan|vpi_get_value|vpi_put_value|vpi_register_cb|vpi_get|vpi_get_str|vpi_free_object'
   # SmallVec methods below are MANDATED by the C++ Container
   # and Range concepts ([container.reqmts], [range.range]).
   # Renaming them would break range-based for loops, STL

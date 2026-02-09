@@ -1,14 +1,31 @@
 #!/usr/bin/env python3
 """Run CHIPS Alliance sv-tests against deltahdl (advisory)."""
 
+import argparse
 import glob
 import subprocess
 import sys
+import time
+from collections import defaultdict
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 from test_common import BINARY, RED, REPO_ROOT, RESET, print_result
 
 TEST_DIR = REPO_ROOT / "third_party" / "sv-tests" / "tests"
+
+
+def parse_args():
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Run CHIPS Alliance sv-tests against deltahdl."
+    )
+    parser.add_argument(
+        "--junit-xml",
+        metavar="FILE",
+        help="Write JUnit XML results to FILE.",
+    )
+    return parser.parse_args()
 
 
 def collect_tests():
@@ -18,43 +35,138 @@ def collect_tests():
 
 
 def run_test(path):
-    """Run deltahdl --lint-only on a single .sv file. Returns True on pass."""
+    """Run deltahdl --lint-only on a single .sv file.
+
+    Returns (passed, stderr) tuple.
+    """
     result = subprocess.run(
         [str(BINARY), "--lint-only", path],
         capture_output=True,
         timeout=30,
         check=False,
+        text=True,
     )
-    return result.returncode == 0
+    return result.returncode == 0, result.stderr
+
+
+def chapter_from_path(path):
+    """Extract the chapter directory name (e.g. 'chapter-5') from a path."""
+    return Path(path).parent.name
+
+
+def print_chapter_breakdown(results):
+    """Print per-chapter pass/fail summary grouped by chapter directory."""
+    chapters = defaultdict(lambda: {"passed": 0, "failed": 0})
+    for r in results:
+        bucket = chapters[r["chapter"]]
+        if r["status"] == "pass":
+            bucket["passed"] += 1
+        else:
+            bucket["failed"] += 1
+
+    print("\nPer-chapter breakdown:")
+    for chapter in sorted(chapters):
+        counts = chapters[chapter]
+        total = counts["passed"] + counts["failed"]
+        print(f"  {chapter}: {counts['passed']}/{total} passed")
+
+
+def write_junit_xml(results, elapsed, filepath):
+    """Write JUnit XML report to the given filepath."""
+    total = len(results)
+    failures = sum(1 for r in results if r["status"] == "fail")
+    errors = sum(1 for r in results if r["status"] == "timeout")
+
+    suite = ET.Element(
+        "testsuite",
+        name="sv-tests",
+        tests=str(total),
+        failures=str(failures),
+        errors=str(errors),
+        time=f"{elapsed:.3f}",
+    )
+
+    for r in results:
+        tc = ET.SubElement(
+            suite,
+            "testcase",
+            name=r["name"],
+            classname=r["chapter"],
+            time=f"{r['time']:.3f}",
+        )
+        if r["status"] == "fail":
+            ET.SubElement(
+                tc,
+                "failure",
+                message=f"{r['name']} failed lint",
+            ).text = r.get("stderr", "")
+        elif r["status"] == "timeout":
+            ET.SubElement(
+                tc,
+                "error",
+                message=f"{r['name']} timed out",
+            ).text = "Process exceeded 30s timeout."
+
+    tree = ET.ElementTree(suite)
+    ET.indent(tree, space="  ")
+    tree.write(filepath, xml_declaration=True, encoding="unicode")
 
 
 def main():
     """Run all sv-tests and print a summary."""
+    args = parse_args()
+
     if not BINARY.exists():
         print(f"error: binary not found at {BINARY}", file=sys.stderr)
-        rc = 1
-    elif not (tests := collect_tests()):
+        sys.exit(1)
+
+    tests = collect_tests()
+    if not tests:
         print(f"error: no .sv files found in {TEST_DIR}", file=sys.stderr)
-        rc = 1
-    else:
-        passed = 0
-        failed = 0
-        for path in tests:
-            name = Path(path).name
-            try:
-                ok = run_test(path)
-                print_result(ok, name)
-                passed += ok
-                failed += not ok
-            except subprocess.TimeoutExpired:
-                failed += 1
-                print(f"  {RED}TIMEOUT{RESET}: {name}", flush=True)
+        sys.exit(1)
 
-        total = passed + failed
-        print(f"\nsv-tests summary: {passed}/{total} passed, {failed} failed")
-        rc = min(failed, 1)
+    results = []
+    passed = 0
+    failed = 0
+    suite_start = time.monotonic()
 
-    sys.exit(rc)
+    for path in tests:
+        name = Path(path).name
+        chapter = chapter_from_path(path)
+        t0 = time.monotonic()
+        stderr = ""
+        try:
+            ok, stderr = run_test(path)
+            dt = time.monotonic() - t0
+            print_result(ok, name)
+            status = "pass" if ok else "fail"
+            passed += ok
+            failed += not ok
+        except subprocess.TimeoutExpired:
+            dt = time.monotonic() - t0
+            status = "timeout"
+            failed += 1
+            print(f"  {RED}TIMEOUT{RESET}: {name}", flush=True)
+
+        results.append({
+            "name": name,
+            "chapter": chapter,
+            "status": status,
+            "time": dt,
+            "stderr": stderr,
+        })
+
+    total = passed + failed
+    print(f"\nsv-tests summary: {passed}/{total} passed, {failed} failed")
+
+    print_chapter_breakdown(results)
+
+    if args.junit_xml:
+        elapsed = time.monotonic() - suite_start
+        write_junit_xml(results, elapsed, args.junit_xml)
+        print(f"\nJUnit XML written to {args.junit_xml}")
+
+    sys.exit(min(failed, 1))
 
 
 if __name__ == "__main__":

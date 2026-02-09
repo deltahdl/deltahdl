@@ -25,7 +25,14 @@ add_library(deltahdl_lib STATIC
     simulation/stmt_exec.cpp
     simulation/lowerer.cpp
     simulation/vcd_writer.cpp
+    simulation/adv_sim.cpp
+    simulation/vpi.cpp
     synthesis/aig.cpp
+    synthesis/synth_lower.cpp
+    synthesis/aig_opt.cpp
+    synthesis/lut_map.cpp
+    synthesis/netlist_writer.cpp
+    synthesis/adv_synth.cpp
 )
 
 target_include_directories(deltahdl_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

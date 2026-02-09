@@ -64,6 +64,10 @@ class AigGraph {
   /// Register a primary output literal.
   void AddOutput(uint32_t lit);
 
+  /// Register a latch: next-state literal feeds back as a new input.
+  /// Returns the current-state literal (a primary input).
+  uint32_t AddLatch(uint32_t next_state);
+
   /// Total number of AIG nodes (including constant node).
   size_t NodeCount() const;
 
@@ -71,6 +75,9 @@ class AigGraph {
   std::vector<AigNode> nodes;
   std::vector<uint32_t> inputs;
   std::vector<uint32_t> outputs;
+
+  /// Latches: each entry is {current_state_input_id, next_state_literal}.
+  std::vector<std::pair<uint32_t, uint32_t>> latches;
 
  private:
   /// Pack two literals into a single 64-bit key for structural hashing.

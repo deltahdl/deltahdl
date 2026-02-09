@@ -87,6 +87,12 @@ uint32_t AigGraph::AddMux(uint32_t sel, uint32_t a, uint32_t b) {
 
 void AigGraph::AddOutput(uint32_t lit) { outputs.push_back(lit); }
 
+uint32_t AigGraph::AddLatch(uint32_t next_state) {
+  uint32_t state_lit = AddInput();
+  latches.emplace_back(AigVar(state_lit), next_state);
+  return state_lit;
+}
+
 size_t AigGraph::NodeCount() const { return nodes.size(); }
 
 // ---------------------------------------------------------------------------
