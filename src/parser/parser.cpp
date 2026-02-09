@@ -781,6 +781,26 @@ Stmt* Parser::ParseAssignmentOrExprStmt() {
 
 // --- Types ---
 
+static bool IsNetTypeToken(TokenKind tk) {
+  switch (tk) {
+    case TokenKind::kKwWire:
+    case TokenKind::kKwTri:
+    case TokenKind::kKwTriand:
+    case TokenKind::kKwTrior:
+    case TokenKind::kKwTri0:
+    case TokenKind::kKwTri1:
+    case TokenKind::kKwTrireg:
+    case TokenKind::kKwWand:
+    case TokenKind::kKwWor:
+    case TokenKind::kKwSupply0:
+    case TokenKind::kKwSupply1:
+    case TokenKind::kKwUwire:
+      return true;
+    default:
+      return false;
+  }
+}
+
 static std::optional<DataTypeKind> TokenToTypeKind(TokenKind tk) {
   switch (tk) {
     case TokenKind::kKwLogic:
@@ -812,6 +832,20 @@ static std::optional<DataTypeKind> TokenToTypeKind(TokenKind tk) {
       return DataTypeKind::kString;
     case TokenKind::kKwEvent:
       return DataTypeKind::kEvent;
+    case TokenKind::kKwChandle:
+      return DataTypeKind::kChandle;
+    case TokenKind::kKwTri:
+    case TokenKind::kKwTriand:
+    case TokenKind::kKwTrior:
+    case TokenKind::kKwTri0:
+    case TokenKind::kKwTri1:
+    case TokenKind::kKwTrireg:
+    case TokenKind::kKwWand:
+    case TokenKind::kKwWor:
+    case TokenKind::kKwSupply0:
+    case TokenKind::kKwSupply1:
+    case TokenKind::kKwUwire:
+      return DataTypeKind::kLogic;
     default:
       return std::nullopt;
   }
@@ -819,6 +853,10 @@ static std::optional<DataTypeKind> TokenToTypeKind(TokenKind tk) {
 
 DataType Parser::ParseDataType() {
   DataType dtype;
+
+  if (Match(TokenKind::kKwConst)) {
+    dtype.is_const = true;
+  }
 
   if (CurrentToken().Is(TokenKind::kIdentifier) &&
       known_types_.count(CurrentToken().text) != 0) {
@@ -831,7 +869,7 @@ DataType Parser::ParseDataType() {
   auto kind = TokenToTypeKind(tok_kind);
   if (!kind) return dtype;
   dtype.kind = *kind;
-  dtype.is_net = (tok_kind == TokenKind::kKwWire);
+  dtype.is_net = IsNetTypeToken(tok_kind);
   Consume();
 
   if (Match(TokenKind::kKwSigned)) {

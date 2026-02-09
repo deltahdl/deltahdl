@@ -131,16 +131,7 @@ Token Lexer::Next() {
     return LexNumber();
   }
   if (c == '\'') {
-    if (PeekChar() == '{') {
-      auto loc = MakeLoc();
-      uint32_t start = pos_;
-      Advance();  // skip '
-      Advance();  // skip {
-      return MakeOp(TokenKind::kApostropheLBrace, loc, start);
-    }
-    if (!std::isalpha(static_cast<unsigned char>(PeekChar()))) {
-      return LexNumber();
-    }
+    return LexApostrophe();
   }
   return LexOperator();
 }
@@ -346,6 +337,36 @@ Token Lexer::LexEscapedIdentifier() {
   tok.loc = loc;
   tok.text = source_.substr(start, pos_ - start);
   return tok;
+}
+
+// ---------------------------------------------------------------------------
+// Apostrophe dispatch (§5.7 unbased unsized, §5.10 assignment pattern, §6.24
+// cast)
+// ---------------------------------------------------------------------------
+
+Token Lexer::LexApostrophe() {
+  char next = PeekChar();
+  if (next == '{') {
+    auto loc = MakeLoc();
+    uint32_t start = pos_;
+    Advance();  // skip '
+    Advance();  // skip {
+    return MakeOp(TokenKind::kApostropheLBrace, loc, start);
+  }
+  if (next == '0' || next == '1' || next == 'x' || next == 'X' || next == 'z' ||
+      next == 'Z') {
+    return LexNumber();
+  }
+  if (next == '(') {
+    auto loc = MakeLoc();
+    uint32_t start = pos_;
+    Advance();  // skip '
+    return MakeOp(TokenKind::kApostrophe, loc, start);
+  }
+  // Base specifier after decimal digits is handled by LexNumber, but a bare
+  // apostrophe followed by an alpha (e.g., 'h in based literal) falls here
+  // when no preceding digits.  Treat as operator fallthrough.
+  return LexOperator();
 }
 
 // ---------------------------------------------------------------------------

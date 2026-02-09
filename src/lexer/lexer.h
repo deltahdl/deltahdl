@@ -40,6 +40,7 @@ class Lexer {
   Token LexStringLiteral();
   Token LexSystemIdentifier();
   Token LexEscapedIdentifier();
+  Token LexApostrophe();
   Token LexOperator();
 
   // Number sub-helpers

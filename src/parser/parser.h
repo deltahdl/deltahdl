@@ -103,6 +103,7 @@ class Parser {
   Expr* ParseSystemCall();
   Expr* ParseConcatenation();
   Expr* ParseAssignmentPattern();
+  Expr* ParseCastExpr();
 
   // Attributes (§5.12)
   std::vector<Attribute> ParseAttributes();

@@ -98,6 +98,7 @@ enum class TokenKind : uint16_t {
   kPipeEqGt,          // |=>
   kHashMinusHash,     // #-#
   kHashEqHash,        // #=#
+  kApostrophe,        // '   (cast operator §6.24)
   kApostropheLBrace,  // '{  (assignment pattern prefix)
   kAttrStart,         // (*  (attribute instance start)
   kAttrEnd,           // *)  (attribute instance end)

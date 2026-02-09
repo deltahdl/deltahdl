@@ -49,6 +49,7 @@ uint32_t EvalTypeWidth(const DataType& dtype) {
     case DataTypeKind::kVoid:
     case DataTypeKind::kNamed:
     case DataTypeKind::kEvent:
+    case DataTypeKind::kChandle:
       return 0;
   }
   return 1;
@@ -150,6 +151,7 @@ uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs) {
     case ExprKind::kMemberAccess:
     case ExprKind::kCall:
     case ExprKind::kAssignmentPattern:
+    case ExprKind::kCast:
       return 0;
   }
   return 0;

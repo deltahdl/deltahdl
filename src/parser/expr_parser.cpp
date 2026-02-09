@@ -5,6 +5,27 @@
 
 namespace delta {
 
+static bool IsCastTypeToken(TokenKind kind) {
+  switch (kind) {
+    case TokenKind::kKwInt:
+    case TokenKind::kKwLogic:
+    case TokenKind::kKwBit:
+    case TokenKind::kKwByte:
+    case TokenKind::kKwShortint:
+    case TokenKind::kKwLongint:
+    case TokenKind::kKwInteger:
+    case TokenKind::kKwReal:
+    case TokenKind::kKwShortreal:
+    case TokenKind::kKwReg:
+    case TokenKind::kKwSigned:
+    case TokenKind::kKwUnsigned:
+    case TokenKind::kKwString:
+      return true;
+    default:
+      return false;
+  }
+}
+
 // Parse a SystemVerilog integer literal text into a uint64_t value.
 // Handles: decimal "42", based "8'hFF", underscore "1_000".
 static uint64_t ParseIntText(std::string_view text) {
@@ -242,6 +263,9 @@ Expr* Parser::ParsePrimaryExpr() {
   if (tok.kind == TokenKind::kApostropheLBrace) {
     return ParseAssignmentPattern();
   }
+  if (IsCastTypeToken(tok.kind)) {
+    return ParseCastExpr();
+  }
 
   diag_.Error(tok.loc, "expected expression");
   Consume();
@@ -357,6 +381,19 @@ Expr* Parser::ParseConcatenation() {
   }
   Expect(TokenKind::kRBrace);
   return cat;
+}
+
+Expr* Parser::ParseCastExpr() {
+  auto type_tok = Consume();
+  Expect(TokenKind::kApostrophe);
+  Expect(TokenKind::kLParen);
+  auto* cast = arena_.Create<Expr>();
+  cast->kind = ExprKind::kCast;
+  cast->text = type_tok.text;
+  cast->range.start = type_tok.loc;
+  cast->lhs = ParseExpr();
+  Expect(TokenKind::kRParen);
+  return cast;
 }
 
 Expr* Parser::ParseAssignmentPattern() {

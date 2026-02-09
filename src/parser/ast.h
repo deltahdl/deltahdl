@@ -35,6 +35,7 @@ enum class ExprKind : uint8_t {
   kMemberAccess,       // a.b
   kCall,               // func(args)
   kAssignmentPattern,  // '{expr, ...}  (§5.10/§5.11)
+  kCast,               // type'(expr)   (§6.24)
 };
 
 struct Expr {
@@ -195,6 +196,7 @@ enum class DataTypeKind : uint8_t {
   kStruct,
   kUnion,
   kEvent,
+  kChandle,
 };
 
 struct EnumMember {
@@ -214,6 +216,7 @@ struct DataType {
   DataTypeKind kind = DataTypeKind::kImplicit;
   bool is_signed = false;
   bool is_packed = false;
+  bool is_const = false;
   bool is_net = false;  // True for wire/tri/wand/wor/supply/uwire types.
   Expr* packed_dim_left = nullptr;
   Expr* packed_dim_right = nullptr;
@@ -305,6 +308,10 @@ struct ModuleItem {
   ModuleItemKind kind;
   SourceLoc loc;
   std::vector<Attribute> attrs;
+
+  // Lifetime qualifiers (§6.21)
+  bool is_automatic = false;
+  bool is_static = false;
 
   // Declarations
   DataType data_type;

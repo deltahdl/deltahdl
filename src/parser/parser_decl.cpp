@@ -164,8 +164,10 @@ ModuleItem* Parser::ParseFunctionDecl() {
   Expect(TokenKind::kKwFunction);
 
   // Optional lifetime: automatic or static.
-  if (Check(TokenKind::kKwAutomatic) || Check(TokenKind::kKwStatic)) {
-    Consume();
+  if (Match(TokenKind::kKwAutomatic)) {
+    item->is_automatic = true;
+  } else if (Match(TokenKind::kKwStatic)) {
+    item->is_static = true;
   }
 
   // Return type (may be void or a data type).
@@ -198,8 +200,10 @@ ModuleItem* Parser::ParseTaskDecl() {
   item->loc = CurrentLoc();
   Expect(TokenKind::kKwTask);
 
-  if (Check(TokenKind::kKwAutomatic) || Check(TokenKind::kKwStatic)) {
-    Consume();
+  if (Match(TokenKind::kKwAutomatic)) {
+    item->is_automatic = true;
+  } else if (Match(TokenKind::kKwStatic)) {
+    item->is_static = true;
   }
 
   item->name = Expect(TokenKind::kIdentifier).text;
