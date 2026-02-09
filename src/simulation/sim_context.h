@@ -1,7 +1,9 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdio>
 #include <random>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
@@ -72,6 +74,15 @@ class SimContext {
   uint32_t Urandom32();
   uint32_t UrandomRange(uint32_t min_val, uint32_t max_val);
 
+  // Plus-args (§20.11)
+  void AddPlusArg(std::string arg);
+  const std::vector<std::string>& GetPlusArgs() const { return plus_args_; }
+
+  // File descriptor management (§21.3)
+  int OpenFile(std::string_view filename, std::string_view mode);
+  void CloseFile(int fd);
+  FILE* GetFileHandle(int fd);
+
  private:
   Scheduler& scheduler_;
   Arena& arena_;
@@ -88,6 +99,9 @@ class SimContext {
   DpiContext* dpi_context_ = nullptr;
   Process* current_process_ = nullptr;
   bool stop_requested_ = false;
+  std::vector<std::string> plus_args_;
+  std::unordered_map<int, FILE*> file_descriptors_;
+  int next_fd_ = 3;  // Start after stdin/stdout/stderr.
 };
 
 }  // namespace delta

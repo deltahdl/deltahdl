@@ -53,7 +53,14 @@ class Parser {
 
   // Gate primitives (parser_toplevel.cpp)
   bool IsAtGateKeyword();
-  ModuleItem* ParseGateInst();
+  void ParseGateInst(std::vector<ModuleItem*>& items);
+  ModuleItem* ParseOneGateInstance(GateKind kind, SourceLoc loc);
+  uint8_t ParseStrength0();
+  uint8_t ParseStrength1();
+  Expr* ParseGateDelay();
+
+  // User-defined primitives (parser_toplevel.cpp)
+  UdpDecl* ParseUdpDecl();
 
   // Declarations (parser_decl.cpp)
   ModuleItem* ParseDefparam();

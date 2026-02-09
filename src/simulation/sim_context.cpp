@@ -118,4 +118,30 @@ uint32_t SimContext::UrandomRange(uint32_t min_val, uint32_t max_val) {
   return dist(rng_);
 }
 
+void SimContext::AddPlusArg(std::string arg) {
+  plus_args_.push_back(std::move(arg));
+}
+
+int SimContext::OpenFile(std::string_view filename, std::string_view mode) {
+  std::string fname(filename);
+  std::string fmode(mode);
+  FILE* fp = std::fopen(fname.c_str(), fmode.c_str());
+  if (!fp) return 0;
+  int fd = next_fd_++;
+  file_descriptors_[fd] = fp;
+  return fd;
+}
+
+void SimContext::CloseFile(int fd) {
+  auto it = file_descriptors_.find(fd);
+  if (it == file_descriptors_.end()) return;
+  std::fclose(it->second);
+  file_descriptors_.erase(it);
+}
+
+FILE* SimContext::GetFileHandle(int fd) {
+  auto it = file_descriptors_.find(fd);
+  return (it != file_descriptors_.end()) ? it->second : nullptr;
+}
+
 }  // namespace delta

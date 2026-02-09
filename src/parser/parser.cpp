@@ -122,6 +122,10 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
     unit->classes.push_back(ParseClassDecl());
     return;
   }
+  if (Check(TokenKind::kKwPrimitive)) {
+    unit->udps.push_back(ParseUdpDecl());
+    return;
+  }
   diag_.Error(CurrentLoc(), "expected top-level declaration");
   Consume();
 }
@@ -499,7 +503,7 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items) {
     return;
   }
   if (IsAtGateKeyword()) {
-    items.push_back(ParseGateInst());
+    ParseGateInst(items);
     return;
   }
   if (Check(TokenKind::kKwEnum)) {

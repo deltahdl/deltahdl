@@ -72,26 +72,39 @@ bool Parser::IsAtGateKeyword() {
   }
 }
 
-ModuleItem* Parser::ParseGateInst() {
+// clang-format off
+uint8_t Parser::ParseStrength0() {
+  auto k = Consume().kind;
+  switch (k) {
+    case TokenKind::kKwHighz0:  return 1;
+    case TokenKind::kKwWeak0:   return 2;
+    case TokenKind::kKwPull0:   return 3;
+    case TokenKind::kKwStrong0: return 4;
+    case TokenKind::kKwSupply0: return 5;
+    default:                    return 0;
+  }
+}
+
+uint8_t Parser::ParseStrength1() {
+  auto k = Consume().kind;
+  switch (k) {
+    case TokenKind::kKwHighz1:  return 1;
+    case TokenKind::kKwWeak1:   return 2;
+    case TokenKind::kKwPull1:   return 3;
+    case TokenKind::kKwStrong1: return 4;
+    case TokenKind::kKwSupply1: return 5;
+    default:                    return 0;
+  }
+}
+// clang-format on
+
+ModuleItem* Parser::ParseOneGateInstance(GateKind kind, SourceLoc loc) {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kGateInst;
-  item->loc = CurrentLoc();
-  item->gate_kind = TokenToGateKind(CurrentToken().kind);
-  Consume();  // gate keyword
+  item->loc = loc;
+  item->gate_kind = kind;
 
-  // Optional delay: #(expr) or #number.
-  if (Check(TokenKind::kHash)) {
-    Consume();
-    if (Match(TokenKind::kLParen)) {
-      item->gate_delay = ParseExpr();
-      Expect(TokenKind::kRParen);
-    } else {
-      item->gate_delay = ParsePrimaryExpr();
-    }
-  }
-
-  // Optional instance name (identifier not followed by nothing meaningful
-  // except '(' or '[').
+  // Optional instance name.
   if (Check(TokenKind::kIdentifier)) {
     item->gate_inst_name = Consume().text;
   }
@@ -103,8 +116,162 @@ ModuleItem* Parser::ParseGateInst() {
     item->gate_terminals.push_back(ParseExpr());
   }
   Expect(TokenKind::kRParen);
-  Expect(TokenKind::kSemicolon);
   return item;
+}
+
+static bool IsStrength0Token(TokenKind k) {
+  switch (k) {
+    case TokenKind::kKwSupply0:
+    case TokenKind::kKwStrong0:
+    case TokenKind::kKwPull0:
+    case TokenKind::kKwWeak0:
+    case TokenKind::kKwHighz0:
+      return true;
+    default:
+      return false;
+  }
+}
+
+static bool IsStrength1Token(TokenKind k) {
+  switch (k) {
+    case TokenKind::kKwSupply1:
+    case TokenKind::kKwStrong1:
+    case TokenKind::kKwPull1:
+    case TokenKind::kKwWeak1:
+    case TokenKind::kKwHighz1:
+      return true;
+    default:
+      return false;
+  }
+}
+
+Expr* Parser::ParseGateDelay() {
+  if (!Check(TokenKind::kHash)) return nullptr;
+  Consume();
+  if (Match(TokenKind::kLParen)) {
+    auto* e = ParseExpr();
+    Expect(TokenKind::kRParen);
+    return e;
+  }
+  return ParsePrimaryExpr();
+}
+
+void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
+  auto loc = CurrentLoc();
+  auto gate_kind = TokenToGateKind(CurrentToken().kind);
+  Consume();  // gate keyword
+
+  // Optional strength: (strength0, strength1) or vice versa.
+  // Peek inside '(' to check for strength keywords before consuming.
+  uint8_t str0 = 0;
+  uint8_t str1 = 0;
+  bool has_strength = false;
+  if (Check(TokenKind::kLParen)) {
+    Consume();  // tentatively consume '('
+    auto tk = CurrentToken().kind;
+    has_strength = IsStrength0Token(tk) || IsStrength1Token(tk);
+    if (!has_strength) {
+      // Not strength — already consumed '(', parse unnamed instance inline.
+      auto* item = arena_.Create<ModuleItem>();
+      item->kind = ModuleItemKind::kGateInst;
+      item->loc = loc;
+      item->gate_kind = gate_kind;
+      item->gate_terminals.push_back(ParseExpr());
+      while (Match(TokenKind::kComma)) {
+        item->gate_terminals.push_back(ParseExpr());
+      }
+      Expect(TokenKind::kRParen);
+      items.push_back(item);
+      while (Match(TokenKind::kComma)) {
+        items.push_back(ParseOneGateInstance(gate_kind, loc));
+      }
+      Expect(TokenKind::kSemicolon);
+      return;
+    }
+    // Parse strength spec.
+    if (IsStrength0Token(tk)) {
+      str0 = ParseStrength0();
+      Expect(TokenKind::kComma);
+      str1 = ParseStrength1();
+    } else {
+      str1 = ParseStrength1();
+      Expect(TokenKind::kComma);
+      str0 = ParseStrength0();
+    }
+    Expect(TokenKind::kRParen);
+  }
+
+  Expr* delay = ParseGateDelay();
+
+  // Parse comma-separated instances.
+  auto* first = ParseOneGateInstance(gate_kind, loc);
+  first->drive_strength0 = str0;
+  first->drive_strength1 = str1;
+  first->gate_delay = delay;
+  items.push_back(first);
+
+  while (Match(TokenKind::kComma)) {
+    auto* next = ParseOneGateInstance(gate_kind, loc);
+    next->drive_strength0 = str0;
+    next->drive_strength1 = str1;
+    next->gate_delay = delay;
+    items.push_back(next);
+  }
+  Expect(TokenKind::kSemicolon);
+}
+
+// --- UDP declaration (§29) ---
+
+static char UdpCharFromToken(const Token& tok) {
+  if (tok.kind == TokenKind::kStar) return '*';
+  if (tok.kind == TokenKind::kMinus) return '-';
+  if (tok.kind == TokenKind::kQuestion) return '?';
+  if (!tok.text.empty()) return tok.text[0];
+  return '?';
+}
+
+UdpDecl* Parser::ParseUdpDecl() {
+  auto* udp = arena_.Create<UdpDecl>();
+  udp->range.start = CurrentLoc();
+  Expect(TokenKind::kKwPrimitive);
+  udp->name = Expect(TokenKind::kIdentifier).text;
+
+  // Port list: (output [reg] out_name, input in1, in2, ...)
+  Expect(TokenKind::kLParen);
+  Expect(TokenKind::kKwOutput);
+  if (Match(TokenKind::kKwReg)) {
+    udp->is_sequential = true;
+  }
+  udp->output_name = Expect(TokenKind::kIdentifier).text;
+  while (Match(TokenKind::kComma)) {
+    Expect(TokenKind::kKwInput);
+    udp->input_names.push_back(Expect(TokenKind::kIdentifier).text);
+  }
+  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kSemicolon);
+
+  // Table block.
+  Expect(TokenKind::kKwTable);
+  while (!Check(TokenKind::kKwEndtable) && !AtEnd()) {
+    UdpTableRow row;
+    // Read input entries until ':'
+    while (!Check(TokenKind::kColon) && !AtEnd()) {
+      row.inputs.push_back(UdpCharFromToken(Consume()));
+    }
+    Expect(TokenKind::kColon);
+    if (udp->is_sequential) {
+      // Sequential: inputs : current_state : output
+      row.current_state = UdpCharFromToken(Consume());
+      Expect(TokenKind::kColon);
+    }
+    row.output = UdpCharFromToken(Consume());
+    Expect(TokenKind::kSemicolon);
+    udp->table.push_back(row);
+  }
+  Expect(TokenKind::kKwEndtable);
+  Expect(TokenKind::kKwEndprimitive);
+  udp->range.end = CurrentLoc();
+  return udp;
 }
 
 // --- Interface declaration ---

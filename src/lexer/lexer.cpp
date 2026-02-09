@@ -740,4 +740,16 @@ std::vector<Token> Lexer::LexAll() {
   return tokens;
 }
 
+Lexer::SavedPos Lexer::SavePos() const {
+  return {pos_, line_, column_, has_peeked_, peeked_};
+}
+
+void Lexer::RestorePos(const SavedPos& saved) {
+  pos_ = saved.pos;
+  line_ = saved.line;
+  column_ = saved.column;
+  has_peeked_ = saved.has_peeked;
+  peeked_ = saved.peeked;
+}
+
 }  // namespace delta

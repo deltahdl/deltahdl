@@ -422,6 +422,11 @@ struct ModuleItem {
   std::vector<Expr*> gate_terminals;
   Expr* gate_delay = nullptr;
 
+  // Gate drive strengths (§28.7)
+  // 0=none, 1=highz, 2=weak, 3=pull, 4=strong, 5=supply
+  uint8_t drive_strength0 = 0;
+  uint8_t drive_strength1 = 0;
+
   // Function/task
   DataType return_type;
   std::vector<FunctionArg> func_args;
@@ -511,12 +516,30 @@ struct ClassDecl {
   std::vector<std::pair<std::string_view, Expr*>> params;
 };
 
+// --- User-Defined Primitives (§29) ---
+
+struct UdpTableRow {
+  std::vector<char> inputs;  // '0','1','x','?','b','r','f','p','n','*'
+  char current_state = 0;    // For sequential UDPs (0 if combinational)
+  char output = '0';         // '0','1','x','-'
+};
+
+struct UdpDecl {
+  std::string_view name;
+  SourceRange range;
+  std::string_view output_name;
+  std::vector<std::string_view> input_names;
+  bool is_sequential = false;
+  std::vector<UdpTableRow> table;
+};
+
 struct CompilationUnit {
   std::vector<ModuleDecl*> modules;
   std::vector<PackageDecl*> packages;
   std::vector<ModuleDecl*> interfaces;
   std::vector<ModuleDecl*> programs;
   std::vector<ClassDecl*> classes;
+  std::vector<UdpDecl*> udps;
 };
 
 }  // namespace delta

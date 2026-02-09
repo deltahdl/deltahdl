@@ -23,6 +23,7 @@ add_library(deltahdl_lib STATIC
     simulation/variable.cpp
     simulation/sim_context.cpp
     simulation/eval.cpp
+    simulation/eval_systask.cpp
     simulation/stmt_exec.cpp
     simulation/lowerer.cpp
     simulation/vcd_writer.cpp

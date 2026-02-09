@@ -18,6 +18,17 @@ class Lexer {
 
   std::vector<Token> LexAll();
 
+  // Save/restore lexer position for backtracking (used by parser).
+  struct SavedPos {
+    uint32_t pos;
+    uint32_t line;
+    uint32_t column;
+    bool has_peeked;
+    Token peeked;
+  };
+  SavedPos SavePos() const;
+  void RestorePos(const SavedPos& saved);
+
  private:
   char Current() const;
   char PeekChar() const;

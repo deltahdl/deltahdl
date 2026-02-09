@@ -224,8 +224,8 @@ static std::string FormatArg(const Logic4Vec& val, char spec) {
   }
 }
 
-static std::string FormatDisplay(const std::string& fmt,
-                                 const std::vector<Logic4Vec>& vals) {
+std::string FormatDisplay(const std::string& fmt,
+                          const std::vector<Logic4Vec>& vals) {
   std::string out;
   size_t vi = 0;
   for (size_t i = 0; i < fmt.size(); ++i) {
@@ -277,7 +277,7 @@ static Logic4Vec EvalPrngCall(const Expr* expr, SimContext& ctx, Arena& arena,
 
 // --- System call evaluation ---
 
-static std::string ExtractFormatString(const Expr* first_arg) {
+std::string ExtractFormatString(const Expr* first_arg) {
   auto text = first_arg->text;
   if (text.size() >= 2 && text.front() == '"') {
     return std::string(text.substr(1, text.size() - 2));
@@ -360,12 +360,21 @@ static Logic4Vec EvalMiscSysCall(const Expr* expr, SimContext& ctx,
   if (name == "$strobe" || name == "$monitor") {
     return EvalDeferredPrint(expr, ctx, arena);
   }
-  if (name == "$readmemh" || name == "$readmemb") {
-    std::cerr << "WARNING: " << name << " not yet implemented\n";
-    return MakeLogic4VecVal(arena, 1, 0);
-  }
   if (name.starts_with("$dump")) {
     return EvalVcdSysCall(ctx, arena, name);
+  }
+  // §20 utility system calls.
+  if (name == "$clog2" || name == "$bits" || name == "$unsigned" ||
+      name == "$signed" || name == "$countones" || name == "$onehot" ||
+      name == "$onehot0" || name == "$isunknown" || name == "$test$plusargs" ||
+      name == "$value$plusargs" || name == "$typename" || name == "$sformatf") {
+    return EvalUtilitySysCall(expr, ctx, arena, name);
+  }
+  // §21 I/O system calls.
+  if (name == "$fopen" || name == "$fclose" || name == "$fwrite" ||
+      name == "$fdisplay" || name == "$readmemh" || name == "$readmemb" ||
+      name == "$writememh" || name == "$writememb" || name == "$sscanf") {
+    return EvalIOSysCall(expr, ctx, arena, name);
   }
   return EvalPrngCall(expr, ctx, arena, name);
 }
