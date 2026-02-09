@@ -6,42 +6,12 @@ namespace delta {
 // §16.3 Immediate assertions
 // =============================================================================
 
-// Parse: assert [#0] (expr) [pass_stmt] [else fail_stmt] ;
-Stmt* Parser::ParseImmediateAssert() {
+// Shared logic for immediate assert/assume (§16.3).
+Stmt* Parser::ParseImmediateAssertLike(StmtKind kind, TokenKind keyword) {
   auto* stmt = arena_.Create<Stmt>();
-  stmt->kind = StmtKind::kAssertImmediate;
+  stmt->kind = kind;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwAssert);
-
-  // Optional deferred: #0
-  if (Match(TokenKind::kHash)) {
-    Expect(TokenKind::kIntLiteral);  // must be 0
-    stmt->is_deferred = true;
-  }
-
-  Expect(TokenKind::kLParen);
-  stmt->assert_expr = ParseExpr();
-  Expect(TokenKind::kRParen);
-
-  if (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwElse)) {
-    stmt->assert_pass_stmt = ParseStmt();
-  }
-  if (Match(TokenKind::kKwElse)) {
-    stmt->assert_fail_stmt = ParseStmt();
-  }
-  if (!stmt->assert_pass_stmt && !stmt->assert_fail_stmt) {
-    Expect(TokenKind::kSemicolon);
-  }
-
-  return stmt;
-}
-
-// Parse: assume [#0] (expr) [pass_stmt] [else fail_stmt] ;
-Stmt* Parser::ParseImmediateAssume() {
-  auto* stmt = arena_.Create<Stmt>();
-  stmt->kind = StmtKind::kAssumeImmediate;
-  stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwAssume);
+  Expect(keyword);
 
   if (Match(TokenKind::kHash)) {
     Expect(TokenKind::kIntLiteral);
@@ -63,6 +33,16 @@ Stmt* Parser::ParseImmediateAssume() {
   }
 
   return stmt;
+}
+
+Stmt* Parser::ParseImmediateAssert() {
+  return ParseImmediateAssertLike(StmtKind::kAssertImmediate,
+                                  TokenKind::kKwAssert);
+}
+
+Stmt* Parser::ParseImmediateAssume() {
+  return ParseImmediateAssertLike(StmtKind::kAssumeImmediate,
+                                  TokenKind::kKwAssume);
 }
 
 // Parse: cover [#0] (expr) [pass_stmt] ;
@@ -117,12 +97,13 @@ static Expr* SkipPropertySpec(Arena& arena, Lexer& lexer, SourceLoc loc) {
   return expr;
 }
 
-// Parse: assert property ( property_spec ) [pass_stmt] [else fail_stmt] ;
-ModuleItem* Parser::ParseAssertProperty() {
+// Shared logic for assert/assume property (§16.5).
+ModuleItem* Parser::ParsePropertyAssertLike(ModuleItemKind kind,
+                                            TokenKind keyword) {
   auto* item = arena_.Create<ModuleItem>();
-  item->kind = ModuleItemKind::kAssertProperty;
+  item->kind = kind;
   item->loc = CurrentLoc();
-  Expect(TokenKind::kKwAssert);
+  Expect(keyword);
   Expect(TokenKind::kKwProperty);
   Expect(TokenKind::kLParen);
   item->assert_expr = SkipPropertySpec(arena_, lexer_, CurrentLoc());
@@ -140,27 +121,14 @@ ModuleItem* Parser::ParseAssertProperty() {
   return item;
 }
 
-// Parse: assume property ( property_spec ) [pass_stmt] [else fail_stmt] ;
-ModuleItem* Parser::ParseAssumeProperty() {
-  auto* item = arena_.Create<ModuleItem>();
-  item->kind = ModuleItemKind::kAssumeProperty;
-  item->loc = CurrentLoc();
-  Expect(TokenKind::kKwAssume);
-  Expect(TokenKind::kKwProperty);
-  Expect(TokenKind::kLParen);
-  item->assert_expr = SkipPropertySpec(arena_, lexer_, CurrentLoc());
-  Expect(TokenKind::kRParen);
+ModuleItem* Parser::ParseAssertProperty() {
+  return ParsePropertyAssertLike(ModuleItemKind::kAssertProperty,
+                                 TokenKind::kKwAssert);
+}
 
-  if (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwElse)) {
-    item->assert_pass_stmt = ParseStmt();
-  }
-  if (Match(TokenKind::kKwElse)) {
-    item->assert_fail_stmt = ParseStmt();
-  }
-  if (!item->assert_pass_stmt && !item->assert_fail_stmt) {
-    Expect(TokenKind::kSemicolon);
-  }
-  return item;
+ModuleItem* Parser::ParseAssumeProperty() {
+  return ParsePropertyAssertLike(ModuleItemKind::kAssumeProperty,
+                                 TokenKind::kKwAssume);
 }
 
 // Parse: cover property ( property_spec ) [pass_stmt] ;

@@ -106,6 +106,7 @@ class Parser {
   DataType ParseEnumBody(const DataType& base);
   DataType ParseStructOrUnionType();
   DataType ParseStructOrUnionBody(TokenKind kw);
+  void ParseStructMembers(DataType& dtype);
   ModuleItem* ParseFunctionDecl();
   ModuleItem* ParseTaskDecl();
   std::vector<FunctionArg> ParseFunctionArgs();
@@ -166,9 +167,11 @@ class Parser {
   // Assertions (parser_assert.cpp — §16)
   Stmt* ParseImmediateAssert();
   Stmt* ParseImmediateAssume();
+  Stmt* ParseImmediateAssertLike(StmtKind kind, TokenKind keyword);
   Stmt* ParseImmediateCover();
   ModuleItem* ParseAssertProperty();
   ModuleItem* ParseAssumeProperty();
+  ModuleItem* ParsePropertyAssertLike(ModuleItemKind kind, TokenKind keyword);
   ModuleItem* ParseCoverProperty();
   ModuleItem* ParsePropertyDecl();
   ModuleItem* ParseSequenceDecl();

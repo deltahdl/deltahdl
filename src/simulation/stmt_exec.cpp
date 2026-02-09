@@ -64,8 +64,9 @@ static StmtResult ExecExprStmtImpl(const Stmt* stmt, SimContext& ctx,
 
 // --- Force / Release (IEEE §10.6.2) ---
 
-static StmtResult ExecForceImpl(const Stmt* stmt, SimContext& ctx,
-                                Arena& arena) {
+// Shared logic for force and procedural assign (IEEE §10.6).
+static StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
+                                        Arena& arena) {
   if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier) {
     return StmtResult::kDone;
   }
@@ -79,35 +80,8 @@ static StmtResult ExecForceImpl(const Stmt* stmt, SimContext& ctx,
   return StmtResult::kDone;
 }
 
-static StmtResult ExecReleaseImpl(const Stmt* stmt, SimContext& ctx) {
-  if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier) {
-    return StmtResult::kDone;
-  }
-  auto* var = ctx.FindVariable(stmt->lhs->text);
-  if (!var) return StmtResult::kDone;
-
-  var->is_forced = false;
-  return StmtResult::kDone;
-}
-
-// --- Procedural continuous assign / deassign (IEEE §10.6.1) ---
-
-static StmtResult ExecProceduralAssignImpl(const Stmt* stmt, SimContext& ctx,
-                                           Arena& arena) {
-  if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier) {
-    return StmtResult::kDone;
-  }
-  auto* var = ctx.FindVariable(stmt->lhs->text);
-  if (!var) return StmtResult::kDone;
-
-  auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
-  var->is_forced = true;
-  var->forced_value = rhs_val;
-  var->value = rhs_val;
-  return StmtResult::kDone;
-}
-
-static StmtResult ExecDeassignImpl(const Stmt* stmt, SimContext& ctx) {
+// Shared logic for release and deassign (IEEE §10.6).
+static StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx) {
   if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier) {
     return StmtResult::kDone;
   }
@@ -189,10 +163,13 @@ static bool BitIsXZ(const Logic4Vec& v, uint32_t bit) {
   return (v.words[wi].bval >> bi) & 1;  // bval=1 means X or Z
 }
 
-static bool CasexMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
+using BitPredicate = bool (*)(const Logic4Vec&, uint32_t);
+
+static bool CaseDontCareMatch(const Logic4Vec& sel, const Logic4Vec& pat,
+                              BitPredicate skip_bit) {
   uint32_t width = (sel.width > pat.width) ? sel.width : pat.width;
   for (uint32_t i = 0; i < width; ++i) {
-    if (BitIsXZ(sel, i) || BitIsXZ(pat, i)) continue;
+    if (skip_bit(sel, i) || skip_bit(pat, i)) continue;
     uint32_t swi = i / 64, sbi = i % 64;
     uint32_t pwi = i / 64, pbi = i % 64;
     bool sa = (swi < sel.nwords) && ((sel.words[swi].aval >> sbi) & 1);
@@ -202,17 +179,12 @@ static bool CasexMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
   return true;
 }
 
+static bool CasexMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
+  return CaseDontCareMatch(sel, pat, BitIsXZ);
+}
+
 static bool CasezMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
-  uint32_t width = (sel.width > pat.width) ? sel.width : pat.width;
-  for (uint32_t i = 0; i < width; ++i) {
-    if (BitIsZ(sel, i) || BitIsZ(pat, i)) continue;
-    uint32_t swi = i / 64, sbi = i % 64;
-    uint32_t pwi = i / 64, pbi = i % 64;
-    bool sa = (swi < sel.nwords) && ((sel.words[swi].aval >> sbi) & 1);
-    bool pa = (pwi < pat.nwords) && ((pat.words[pwi].aval >> pbi) & 1);
-    if (sa != pa) return false;
-  }
-  return true;
+  return CaseDontCareMatch(sel, pat, BitIsZ);
 }
 
 // Case-inside uses value matching (exact for known bits).
@@ -560,13 +532,11 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     case StmtKind::kCoverImmediate:
       return ExecImmediateAssert(stmt, ctx, arena);
     case StmtKind::kForce:
-      return ExecTask::Immediate(ExecForceImpl(stmt, ctx, arena));
-    case StmtKind::kRelease:
-      return ExecTask::Immediate(ExecReleaseImpl(stmt, ctx));
     case StmtKind::kAssign:
-      return ExecTask::Immediate(ExecProceduralAssignImpl(stmt, ctx, arena));
+      return ExecTask::Immediate(ExecForceOrAssignImpl(stmt, ctx, arena));
+    case StmtKind::kRelease:
     case StmtKind::kDeassign:
-      return ExecTask::Immediate(ExecDeassignImpl(stmt, ctx));
+      return ExecTask::Immediate(ExecReleaseOrDeassignImpl(stmt, ctx));
     case StmtKind::kRandcase:
       return ExecRandcase(stmt, ctx, arena);
     default:

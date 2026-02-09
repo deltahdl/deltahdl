@@ -90,23 +90,7 @@ DataType Parser::ParseStructOrUnionType() {
     }
   }
 
-  Expect(TokenKind::kLBrace);
-  while (!Check(TokenKind::kRBrace) && !AtEnd()) {
-    StructMember member;
-    auto member_type = ParseDataType();
-    member.type_kind = member_type.kind;
-    member.is_signed = member_type.is_signed;
-    member.packed_dim_left = member_type.packed_dim_left;
-    member.packed_dim_right = member_type.packed_dim_right;
-    member.name = Expect(TokenKind::kIdentifier).text;
-    ParseUnpackedDims(member.unpacked_dims);
-    if (Match(TokenKind::kEq)) {
-      member.init_expr = ParseExpr();
-    }
-    Expect(TokenKind::kSemicolon);
-    dtype.struct_members.push_back(member);
-  }
-  Expect(TokenKind::kRBrace);
+  ParseStructMembers(dtype);
   return dtype;
 }
 
@@ -114,6 +98,11 @@ DataType Parser::ParseStructOrUnionBody(TokenKind kw) {
   DataType dtype;
   dtype.kind = (kw == TokenKind::kKwStruct) ? DataTypeKind::kStruct
                                             : DataTypeKind::kUnion;
+  ParseStructMembers(dtype);
+  return dtype;
+}
+
+void Parser::ParseStructMembers(DataType& dtype) {
   Expect(TokenKind::kLBrace);
   while (!Check(TokenKind::kRBrace) && !AtEnd()) {
     StructMember member;
@@ -131,7 +120,6 @@ DataType Parser::ParseStructOrUnionBody(TokenKind kw) {
     dtype.struct_members.push_back(member);
   }
   Expect(TokenKind::kRBrace);
-  return dtype;
 }
 
 // --- Typedef parsing ---
