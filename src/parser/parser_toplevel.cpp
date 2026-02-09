@@ -288,6 +288,8 @@ ModuleDecl* Parser::ParseInterfaceDecl() {
   decl->name = Expect(TokenKind::kIdentifier).text;
   ParseParamsPortsAndSemicolon(*decl);
 
+  auto* prev_module = current_module_;
+  current_module_ = decl;
   while (!Check(TokenKind::kKwEndinterface) && !AtEnd()) {
     if (Check(TokenKind::kKwModport)) {
       ParseModportDecl(decl->modports);
@@ -295,6 +297,7 @@ ModuleDecl* Parser::ParseInterfaceDecl() {
       ParseModuleItem(decl->items);
     }
   }
+  current_module_ = prev_module;
   Expect(TokenKind::kKwEndinterface);
   if (Match(TokenKind::kColon)) ExpectIdentifier();
   decl->range.end = CurrentLoc();
@@ -370,9 +373,12 @@ ModuleDecl* Parser::ParseProgramDecl() {
   decl->name = Expect(TokenKind::kIdentifier).text;
   ParseParamsPortsAndSemicolon(*decl);
 
+  auto* prev_module = current_module_;
+  current_module_ = decl;
   while (!Check(TokenKind::kKwEndprogram) && !AtEnd()) {
     ParseModuleItem(decl->items);
   }
+  current_module_ = prev_module;
   Expect(TokenKind::kKwEndprogram);
   if (Match(TokenKind::kColon)) ExpectIdentifier();
   decl->range.end = CurrentLoc();

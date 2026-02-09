@@ -268,7 +268,8 @@ Expr* Parser::ParsePrimaryExpr() {
   if (tok.kind == TokenKind::kSystemIdentifier) {
     return ParseSystemCall();
   }
-  if (tok.kind == TokenKind::kIdentifier) {
+  if (tok.kind == TokenKind::kIdentifier ||
+      tok.kind == TokenKind::kEscapedIdentifier) {
     return ParseIdentifierExpr();
   }
   if (tok.kind == TokenKind::kLParen) {
@@ -306,7 +307,7 @@ Expr* Parser::ParseIdentifierExpr() {
   Expr* result = id;
   while (Check(TokenKind::kDot)) {
     Consume();
-    auto member_tok = Expect(TokenKind::kIdentifier);
+    auto member_tok = ExpectIdentifier();
     auto* member_id = arena_.Create<Expr>();
     member_id->kind = ExprKind::kIdentifier;
     member_id->text = member_tok.text;

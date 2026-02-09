@@ -22,6 +22,18 @@ class VcdWriter;
 struct ModuleItem;
 struct Process;
 
+// §6.19: Enum member information for built-in enum methods.
+struct EnumMemberInfo {
+  std::string_view name;
+  uint64_t value = 0;
+};
+
+// §6.19: Enum type descriptor for method dispatch.
+struct EnumTypeInfo {
+  std::string_view type_name;
+  std::vector<EnumMemberInfo> members;
+};
+
 class SimContext {
  public:
   SimContext(Scheduler& sched, Arena& arena, DiagEngine& diag,
@@ -78,6 +90,13 @@ class SimContext {
   uint32_t Urandom32();
   uint32_t UrandomRange(uint32_t min_val, uint32_t max_val);
 
+  // §6.19: Enum type registration and lookup.
+  void RegisterEnumType(std::string_view name, const EnumTypeInfo& info);
+  const EnumTypeInfo* FindEnumType(std::string_view name) const;
+  void SetVariableEnumType(std::string_view var_name,
+                           std::string_view type_name);
+  const EnumTypeInfo* GetVariableEnumType(std::string_view var_name) const;
+
   // Plus-args (§20.11)
   void AddPlusArg(std::string arg);
   const std::vector<std::string>& GetPlusArgs() const { return plus_args_; }
@@ -110,6 +129,9 @@ class SimContext {
   std::vector<std::string> plus_args_;
   std::unordered_map<int, FILE*> file_descriptors_;
   int next_fd_ = 3;  // Start after stdin/stdout/stderr.
+  // §6.19: Enum type info and variable-to-enum-type mapping.
+  std::unordered_map<std::string_view, EnumTypeInfo> enum_types_;
+  std::unordered_map<std::string_view, std::string_view> var_enum_types_;
 };
 
 }  // namespace delta

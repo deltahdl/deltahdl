@@ -30,6 +30,10 @@ Logic4Vec EvalMathSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
 Logic4Vec EvalFileIOSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                             std::string_view name);
 
+// §6.19 Enum method dispatch (eval_enum.cpp).
+bool TryEvalEnumMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                           Logic4Vec& out);
+
 // Extended expression evaluators (eval_expr.cpp).
 Logic4Vec EvalReplicate(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalPostfixUnary(const Expr* expr, SimContext& ctx, Arena& arena);

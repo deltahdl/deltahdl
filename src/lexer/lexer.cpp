@@ -189,8 +189,12 @@ Token Lexer::LexUnbasedUnsized(SourceLoc loc, uint32_t start) {
 
 Token Lexer::LexBasedNumber(SourceLoc loc, uint32_t start) {
   Advance();  // skip '
+  // Optional signed specifier: 's' or 'S'.
+  if (!AtEnd() && (Current() == 's' || Current() == 'S')) {
+    Advance();
+  }
   if (!AtEnd()) {
-    Advance();  // base letter
+    Advance();  // base letter (h/d/b/o)
   }
   while (!AtEnd() &&
          (std::isxdigit(static_cast<unsigned char>(Current())) ||
@@ -351,6 +355,11 @@ Token Lexer::LexEscapedIdentifier() {
 // cast)
 // ---------------------------------------------------------------------------
 
+static bool IsBaseSpecifier(char c) {
+  return c == 'h' || c == 'H' || c == 'd' || c == 'D' || c == 'b' || c == 'B' ||
+         c == 'o' || c == 'O';
+}
+
 Token Lexer::LexApostrophe() {
   char next = PeekChar();
   if (next == '{') {
@@ -370,9 +379,16 @@ Token Lexer::LexApostrophe() {
     Advance();  // skip '
     return MakeOp(TokenKind::kApostrophe, loc, start);
   }
-  // Base specifier after decimal digits is handled by LexNumber, but a bare
-  // apostrophe followed by an alpha (e.g., 'h in based literal) falls here
-  // when no preceding digits.  Treat as operator fallthrough.
+  // Unsized based literals: 'h, 'd, 'b, 'o (optionally with 's' for signed).
+  if (IsBaseSpecifier(next)) {
+    return LexBasedNumber(MakeLoc(), pos_);
+  }
+  if (next == 's' || next == 'S') {
+    // Check for signed base: 'sh, 'sd, etc.
+    if (pos_ + 2 < source_.size() && IsBaseSpecifier(source_[pos_ + 2])) {
+      return LexBasedNumber(MakeLoc(), pos_);
+    }
+  }
   return LexOperator();
 }
 

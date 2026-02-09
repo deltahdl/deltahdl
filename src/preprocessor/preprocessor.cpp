@@ -504,6 +504,11 @@ std::string Preprocessor::SubstituteParams(
   result.reserve(body.size());
   size_t i = 0;
   while (i < body.size()) {
+    // Handle `` (double backtick) concatenation (IEEE §22.5.1).
+    if (i + 1 < body.size() && body[i] == '`' && body[i + 1] == '`') {
+      i += 2;  // Skip both backticks — concatenate adjacent tokens.
+      continue;
+    }
     if (!IsIdentChar(body[i])) {
       result += body[i++];
       continue;

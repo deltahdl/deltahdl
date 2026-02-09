@@ -799,6 +799,12 @@ static Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
 // §13: Dispatch function calls with lifetime and void support.
 static Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx,
                                   Arena& arena) {
+  // §6.19: Try enum method dispatch first (e.g., my_enum.first()).
+  Logic4Vec enum_result;
+  if (TryEvalEnumMethodCall(expr, ctx, arena, enum_result)) {
+    return enum_result;
+  }
+
   auto* func = ctx.FindFunction(expr->callee);
   if (!func) return EvalDpiCall(expr, ctx, arena);
 

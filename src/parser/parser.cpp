@@ -1,6 +1,9 @@
 #include "parser/parser.h"
 
+#include <cctype>
 #include <optional>
+
+#include "common/types.h"
 
 namespace delta {
 
@@ -363,7 +366,7 @@ void Parser::ParsePortList(ModuleDecl& mod) {
     return;
   }
   // Detect non-ANSI style: first token is an identifier (no direction).
-  if (Check(TokenKind::kIdentifier)) {
+  if (CheckIdentifier()) {
     ParseNonAnsiPortList(mod);
     return;
   }
@@ -379,7 +382,7 @@ void Parser::ParseNonAnsiPortList(ModuleDecl& mod) {
   do {
     PortDecl port;
     port.loc = CurrentLoc();
-    port.name = Expect(TokenKind::kIdentifier).text;
+    port.name = ExpectIdentifier().text;
     mod.ports.push_back(port);
   } while (Match(TokenKind::kComma));
   Expect(TokenKind::kRParen);
@@ -405,7 +408,7 @@ PortDecl Parser::ParsePortDecl() {
 
   port.data_type = ParseDataType();
 
-  auto name_tok = Expect(TokenKind::kIdentifier);
+  auto name_tok = ExpectIdentifier();
   port.name = name_tok.text;
 
   if (Match(TokenKind::kEq)) {
@@ -420,6 +423,8 @@ static bool HasNonAnsiPorts(const ModuleDecl& mod) {
 }
 
 void Parser::ParseModuleBody(ModuleDecl& mod) {
+  auto* prev_module = current_module_;
+  current_module_ = &mod;
   bool non_ansi = HasNonAnsiPorts(mod);
   while (!Check(TokenKind::kKwEndmodule) && !AtEnd()) {
     if (non_ansi && IsPortDirection(CurrentToken().kind)) {
@@ -428,6 +433,7 @@ void Parser::ParseModuleBody(ModuleDecl& mod) {
     }
     ParseModuleItem(mod.items);
   }
+  current_module_ = prev_module;
 }
 
 void Parser::ParseNonAnsiPortDecls(ModuleDecl& mod) {
@@ -490,11 +496,41 @@ void Parser::ParseGenvarDecl(std::vector<ModuleItem*>& items) {
   Expect(TokenKind::kSemicolon);
 }
 
-void Parser::ParseTimeunitDecl() {
-  Consume();  // timeunit or timeprecision keyword
-  Consume();  // time literal (e.g. 1ns)
+static bool TryParseTimeUnit(std::string_view text, TimeUnit& out) {
+  // Extract the unit suffix from a time literal like "1ns", "100us".
+  size_t i = 0;
+  while (
+      i < text.size() &&
+      (std::isdigit(static_cast<unsigned char>(text[i])) || text[i] == '.')) {
+    ++i;
+  }
+  auto suffix = text.substr(i);
+  return ParseTimeUnitStr(suffix, out);
+}
+
+void Parser::ParseTimeunitDecl(ModuleDecl* mod) {
+  bool is_unit = Check(TokenKind::kKwTimeunit);
+  Consume();             // timeunit or timeprecision keyword
+  auto tok = Consume();  // time literal (e.g. 1ns)
+  if (mod != nullptr) {
+    TimeUnit unit = TimeUnit::kNs;
+    TryParseTimeUnit(tok.text, unit);
+    if (is_unit) {
+      mod->time_unit = unit;
+      mod->has_timeunit = true;
+    } else {
+      mod->time_prec = unit;
+      mod->has_timeprecision = true;
+    }
+  }
   if (Match(TokenKind::kSlash)) {
-    Consume();  // second time literal
+    auto prec_tok = Consume();  // second time literal
+    if (mod != nullptr && is_unit) {
+      TimeUnit prec = TimeUnit::kNs;
+      TryParseTimeUnit(prec_tok.text, prec);
+      mod->time_prec = prec;
+      mod->has_timeprecision = true;
+    }
   }
   Expect(TokenKind::kSemicolon);
 }
@@ -560,7 +596,7 @@ bool Parser::TryParseKeywordItem(std::vector<ModuleItem*>& items) {
     return true;
   }
   if (Check(TokenKind::kKwTimeunit) || Check(TokenKind::kKwTimeprecision)) {
-    ParseTimeunitDecl();
+    ParseTimeunitDecl(current_module_);
     return true;
   }
   if (Check(TokenKind::kKwSpecify)) {
@@ -673,7 +709,7 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items) {
     ParseVarDeclList(items, dtype);
     return;
   }
-  if (!Check(TokenKind::kIdentifier)) {
+  if (!CheckIdentifier()) {
     diag_.Error(CurrentLoc(), "unexpected token in module body");
     Synchronize();
     return;
@@ -685,7 +721,7 @@ void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
   auto name_tok = Consume();
   if (Check(TokenKind::kColonColon)) {
     Consume();  // '::'
-    auto type_tok = Expect(TokenKind::kIdentifier);
+    auto type_tok = ExpectIdentifier();
     DataType dtype;
     dtype.kind = DataTypeKind::kNamed;
     dtype.scope_name = name_tok.text;
@@ -700,7 +736,7 @@ void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
     ParseVarDeclList(items, dtype);
     return;
   }
-  if (Check(TokenKind::kIdentifier) || Check(TokenKind::kHash)) {
+  if (CheckIdentifier() || Check(TokenKind::kHash)) {
     items.push_back(ParseModuleInst(name_tok));
     return;
   }
@@ -757,7 +793,7 @@ void Parser::ParseVarDeclList(std::vector<ModuleItem*>& items,
         dtype.is_net ? ModuleItemKind::kNetDecl : ModuleItemKind::kVarDecl;
     item->loc = CurrentLoc();
     item->data_type = dtype;
-    item->name = Expect(TokenKind::kIdentifier).text;
+    item->name = ExpectIdentifier().text;
     ParseUnpackedDims(item->unpacked_dims);
     if (Match(TokenKind::kEq)) {
       item->init_expr = ParseExpr();
@@ -834,15 +870,15 @@ ModuleItem* Parser::ParseContinuousAssign() {
   item->kind = ModuleItemKind::kContAssign;
   item->loc = CurrentLoc();
   Expect(TokenKind::kKwAssign);
-  // Optional delay: assign #(delay) or assign #delay
+  // Optional delay: assign #(delay) or assign #delay (§10.3.3)
   if (Check(TokenKind::kHash)) {
     Consume();
     if (Check(TokenKind::kLParen)) {
       Consume();
-      ParseMinTypMaxExpr();  // consume but don't store (TODO: store delay)
+      item->assign_delay = ParseMinTypMaxExpr();
       Expect(TokenKind::kRParen);
     } else {
-      ParsePrimaryExpr();  // consume simple delay
+      item->assign_delay = ParsePrimaryExpr();
     }
   }
   item->assign_lhs = ParseExpr();
@@ -939,6 +975,8 @@ Token Parser::ExpectIdentifier() {
   return tok;
 }
 
-bool Parser::CheckIdentifier() { return Check(TokenKind::kIdentifier); }
+bool Parser::CheckIdentifier() {
+  return Check(TokenKind::kIdentifier) || Check(TokenKind::kEscapedIdentifier);
+}
 
 }  // namespace delta

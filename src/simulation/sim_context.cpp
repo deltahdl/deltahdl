@@ -139,6 +139,28 @@ void SimContext::AddPlusArg(std::string arg) {
   plus_args_.push_back(std::move(arg));
 }
 
+void SimContext::RegisterEnumType(std::string_view name,
+                                  const EnumTypeInfo& info) {
+  enum_types_[name] = info;
+}
+
+const EnumTypeInfo* SimContext::FindEnumType(std::string_view name) const {
+  auto it = enum_types_.find(name);
+  return (it != enum_types_.end()) ? &it->second : nullptr;
+}
+
+void SimContext::SetVariableEnumType(std::string_view var_name,
+                                     std::string_view type_name) {
+  var_enum_types_[var_name] = type_name;
+}
+
+const EnumTypeInfo* SimContext::GetVariableEnumType(
+    std::string_view var_name) const {
+  auto it = var_enum_types_.find(var_name);
+  if (it == var_enum_types_.end()) return nullptr;
+  return FindEnumType(it->second);
+}
+
 int SimContext::OpenFile(std::string_view filename, std::string_view mode) {
   std::string fname(filename);
   std::string fmode(mode);

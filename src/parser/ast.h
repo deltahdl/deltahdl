@@ -426,6 +426,7 @@ struct ModuleItem {
   // Continuous assignment
   Expr* assign_lhs = nullptr;
   Expr* assign_rhs = nullptr;
+  Expr* assign_delay = nullptr;  // Optional delay: assign #5 out = in (§10.3.3)
 
   // Always/initial/final blocks
   AlwaysKind always_kind = AlwaysKind::kAlways;
@@ -528,6 +529,12 @@ struct ModuleDecl {
   std::vector<ModuleItem*> items;
   std::vector<std::pair<std::string_view, Expr*>> params;
   std::vector<ModportDecl*> modports;
+
+  // Timeunit/timeprecision (§3.14)
+  TimeUnit time_unit = TimeUnit::kNs;
+  TimeUnit time_prec = TimeUnit::kNs;
+  bool has_timeunit = false;
+  bool has_timeprecision = false;
 };
 
 struct PackageDecl {

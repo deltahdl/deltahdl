@@ -36,7 +36,7 @@ class Parser {
   bool TryParseKeywordItem(std::vector<ModuleItem*>& items);
   bool TryParseVerificationItem(std::vector<ModuleItem*>& items);
   void ParseGenvarDecl(std::vector<ModuleItem*>& items);
-  void ParseTimeunitDecl();
+  void ParseTimeunitDecl(ModuleDecl* mod = nullptr);
   bool TryParseClockingOrVerification(std::vector<ModuleItem*>& items);
   void ParseParamPortDecl(ModuleDecl& mod);
   void ParseParamsPortsAndSemicolon(ModuleDecl& decl);
@@ -209,6 +209,7 @@ class Parser {
   Arena& arena_;
   DiagEngine& diag_;
   std::unordered_set<std::string_view> known_types_;
+  ModuleDecl* current_module_ = nullptr;  // Set during module body parsing
 };
 
 }  // namespace delta
