@@ -348,3 +348,37 @@ TEST(StrengthResolution, MultiBitMixed) {
   // Bits 4-7: strong 0 (from B) beats weak 1 (from A) → 0.
   EXPECT_EQ(var->value.ToUint64(), 0x0Fu);
 }
+
+TEST(NetResolution, Tri0ResolvesToZero) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 8);
+  Net net;
+  net.type = NetType::kTri0;
+  net.resolved = var;
+  // Single driver with z → resolves to 0 for tri0.
+  auto drv = MakeLogic4Vec(arena, 8);
+  drv.words[0].aval = ~uint64_t{0};  // All z.
+  drv.words[0].bval = ~uint64_t{0};
+  net.drivers.push_back(drv);
+  net.Resolve(arena);
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0u);
+  EXPECT_EQ(var->value.words[0].bval & 0xFF, 0u);
+}
+
+TEST(NetResolution, Tri1ResolvesToOne) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 8);
+  Net net;
+  net.type = NetType::kTri1;
+  net.resolved = var;
+  // Single driver with z → resolves to 1 for tri1.
+  auto drv = MakeLogic4Vec(arena, 8);
+  drv.words[0].aval = ~uint64_t{0};
+  drv.words[0].bval = ~uint64_t{0};
+  net.drivers.push_back(drv);
+  net.Resolve(arena);
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0xFFu);
+  EXPECT_EQ(var->value.words[0].bval & 0xFF, 0u);
+}

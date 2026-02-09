@@ -199,3 +199,136 @@ TEST(Elaboration, Defparam_NotFoundWarns) {
   ASSERT_NE(design, nullptr);
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
+
+// --- Generate tests ---
+
+TEST(Elaborator, GenerateForCreatesVars) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t #(parameter N = 3) ();\n"
+      "  generate\n"
+      "    for (i = 0; i < N; i = i + 1) begin\n"
+      "      logic [31:0] x;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  auto* mod = design->top_modules[0];
+  EXPECT_EQ(mod->variables.size(), 3u);
+  EXPECT_EQ(mod->variables[0].name, "i_0_x");
+  EXPECT_EQ(mod->variables[1].name, "i_1_x");
+  EXPECT_EQ(mod->variables[2].name, "i_2_x");
+}
+
+TEST(Elaborator, GenerateForZeroIterations) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t #(parameter N = 0) ();\n"
+      "  generate\n"
+      "    for (i = 0; i < N; i = i + 1) begin\n"
+      "      logic [31:0] x;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  auto* mod = design->top_modules[0];
+  EXPECT_EQ(mod->variables.size(), 0u);
+}
+
+TEST(Elaborator, GenerateForWithAssign) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t #(parameter N = 2) ();\n"
+      "  generate\n"
+      "    for (i = 0; i < N; i = i + 1) begin\n"
+      "      logic [31:0] w;\n"
+      "      assign w = 100;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->variables.size(), 2u);
+  EXPECT_EQ(mod->assigns.size(), 2u);
+  EXPECT_EQ(mod->variables[0].name, "i_0_w");
+  EXPECT_EQ(mod->variables[1].name, "i_1_w");
+}
+
+// --- Typedef tests ---
+
+TEST(Elaborator, TypedefNamedResolution) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef logic [15:0] word_t;\n"
+      "  word_t data;\n"
+      "  initial data = 1234;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  auto* mod = design->top_modules[0];
+  bool found = false;
+  for (const auto& v : mod->variables) {
+    if (v.name == "data") {
+      EXPECT_EQ(v.width, 16u);
+      EXPECT_TRUE(v.is_4state);
+      found = true;
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+TEST(Elaborator, TypedefChain) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef logic [7:0] byte_t;\n"
+      "  typedef byte_t octet_t;\n"
+      "  octet_t val;\n"
+      "  initial val = 255;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  auto* mod = design->top_modules[0];
+  bool found = false;
+  for (const auto& v : mod->variables) {
+    if (v.name == "val") {
+      EXPECT_EQ(v.width, 8u);
+      found = true;
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+// --- Sensitivity inference ---
+
+TEST(Elaborator, AlwaysCombSensitivityInferred) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a, b;\n"
+      "  always_comb b = a + 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->processes.empty());
+  const auto& proc = mod->processes[0];
+  EXPECT_EQ(proc.kind, RtlirProcessKind::kAlwaysComb);
+  EXPECT_FALSE(proc.sensitivity.empty());
+
+  bool found_a = false;
+  for (const auto& ev : proc.sensitivity) {
+    if (ev.signal && ev.signal->text == "a") found_a = true;
+  }
+  EXPECT_TRUE(found_a);
+}
