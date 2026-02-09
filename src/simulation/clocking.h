@@ -9,11 +9,13 @@
 #include <vector>
 
 #include "common/types.h"
+#include "parser/ast.h"
 
 namespace delta {
 
 class Scheduler;
 class SimContext;
+struct Variable;
 
 // =============================================================================
 // Clocking signal direction
@@ -36,15 +38,17 @@ struct ClockingSignal {
 };
 
 // =============================================================================
-// ClockingBlock: a named clocking block with default skews
+// ClockingBlock: a named clocking block with default skews (S14)
 // =============================================================================
 
 struct ClockingBlock {
   std::string_view name;
   std::string_view clock_signal;
+  Edge clock_edge = Edge::kPosedge;
   SimTime default_input_skew{0};
   SimTime default_output_skew{0};
   std::vector<ClockingSignal> signals;
+  bool is_global = false;
 };
 
 // =============================================================================
@@ -69,6 +73,25 @@ class ClockingManager {
                    uint64_t value);
   uint32_t Count() const { return static_cast<uint32_t>(blocks_.size()); }
 
+  // S14.12: Default clocking block.
+  void SetDefaultClocking(std::string_view name) { default_clocking_ = name; }
+  std::string_view GetDefaultClocking() const { return default_clocking_; }
+
+  // S14.13: Global clocking block.
+  void SetGlobalClocking(std::string_view name) { global_clocking_ = name; }
+  std::string_view GetGlobalClocking() const { return global_clocking_; }
+
+  // S14.8: Associate a named-event Variable with a clocking block.
+  void SetBlockEventVar(std::string_view block_name, Variable* var);
+
+  // Register a callback invoked on each clock edge of the given block.
+  void RegisterEdgeCallback(std::string_view block_name, SimContext& ctx,
+                            Scheduler& sched, std::function<void()> cb);
+
+  // Notify event variable and invoke edge callbacks (used by watcher).
+  void NotifyBlockEvent(std::string_view block_name);
+  void InvokeEdgeCallbacks(std::string_view block_name);
+
  private:
   using SampleKey = std::pair<std::string, std::string>;
   struct PairHash {
@@ -85,6 +108,11 @@ class ClockingManager {
   std::vector<ClockingBlock> blocks_;
   std::unordered_map<std::string_view, size_t> name_index_;
   std::unordered_map<SampleKey, uint64_t, PairHash> sampled_values_;
+  std::string_view default_clocking_;
+  std::string_view global_clocking_;
+  std::unordered_map<std::string_view, Variable*> block_event_vars_;
+  std::unordered_map<std::string, std::vector<std::function<void()>>>
+      edge_callbacks_;
 };
 
 }  // namespace delta

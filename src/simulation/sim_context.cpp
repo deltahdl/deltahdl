@@ -183,4 +183,70 @@ FILE* SimContext::GetFileHandle(int fd) {
   return (it != file_descriptors_.end()) ? it->second : nullptr;
 }
 
+SemaphoreObject* SimContext::CreateSemaphore(std::string_view name,
+                                             int32_t keys) {
+  auto* sem = arena_.Create<SemaphoreObject>(keys);
+  semaphores_[name] = sem;
+  return sem;
+}
+
+SemaphoreObject* SimContext::FindSemaphore(std::string_view name) {
+  auto it = semaphores_.find(name);
+  return (it != semaphores_.end()) ? it->second : nullptr;
+}
+
+MailboxObject* SimContext::CreateMailbox(std::string_view name, int32_t bound) {
+  auto* mb = arena_.Create<MailboxObject>(bound);
+  mailboxes_[name] = mb;
+  return mb;
+}
+
+MailboxObject* SimContext::FindMailbox(std::string_view name) {
+  auto it = mailboxes_.find(name);
+  return (it != mailboxes_.end()) ? it->second : nullptr;
+}
+
+void SimContext::SetEventTriggered(std::string_view name) {
+  event_triggered_[name] = scheduler_.CurrentTime().ticks;
+}
+
+bool SimContext::IsEventTriggered(std::string_view name) const {
+  auto it = event_triggered_.find(name);
+  if (it == event_triggered_.end()) return false;
+  return it->second == scheduler_.CurrentTime().ticks;
+}
+
+// --- §8: Class type and object management ---
+
+void SimContext::RegisterClassType(std::string_view name, ClassTypeInfo* info) {
+  class_types_[name] = info;
+}
+
+ClassTypeInfo* SimContext::FindClassType(std::string_view name) {
+  auto it = class_types_.find(name);
+  return (it != class_types_.end()) ? it->second : nullptr;
+}
+
+uint64_t SimContext::AllocateClassObject(ClassObject* obj) {
+  uint64_t id = next_handle_id_++;
+  class_objects_[id] = obj;
+  return id;
+}
+
+ClassObject* SimContext::GetClassObject(uint64_t handle) const {
+  if (handle == kNullClassHandle) return nullptr;
+  auto it = class_objects_.find(handle);
+  return (it != class_objects_.end()) ? it->second : nullptr;
+}
+
+void SimContext::PushThis(ClassObject* obj) { this_stack_.push_back(obj); }
+
+void SimContext::PopThis() {
+  if (!this_stack_.empty()) this_stack_.pop_back();
+}
+
+ClassObject* SimContext::CurrentThis() const {
+  return this_stack_.empty() ? nullptr : this_stack_.back();
+}
+
 }  // namespace delta

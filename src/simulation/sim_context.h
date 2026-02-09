@@ -10,8 +10,10 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "simulation/class_object.h"
 #include "simulation/net.h"
 #include "simulation/scheduler.h"
+#include "simulation/sync_objects.h"
 #include "simulation/variable.h"
 
 namespace delta {
@@ -106,6 +108,35 @@ class SimContext {
   void CloseFile(int fd);
   FILE* GetFileHandle(int fd);
 
+  // §15.3: Semaphore object management.
+  SemaphoreObject* CreateSemaphore(std::string_view name, int32_t keys);
+  SemaphoreObject* FindSemaphore(std::string_view name);
+
+  // §15.4: Mailbox object management.
+  MailboxObject* CreateMailbox(std::string_view name, int32_t bound);
+  MailboxObject* FindMailbox(std::string_view name);
+
+  // §15.5.2: Event triggered state management.
+  void SetEventTriggered(std::string_view name);
+  bool IsEventTriggered(std::string_view name) const;
+
+  // §8: Class type registry and object management.
+  void RegisterClassType(std::string_view name, ClassTypeInfo* info);
+  ClassTypeInfo* FindClassType(std::string_view name);
+
+  // Allocate a new class object, returning its handle ID (>0).
+  uint64_t AllocateClassObject(ClassObject* obj);
+  ClassObject* GetClassObject(uint64_t handle) const;
+
+  // §8.11: `this` pointer management for method calls.
+  void PushThis(ClassObject* obj);
+  void PopThis();
+  ClassObject* CurrentThis() const;
+
+  // §14: Clocking manager access.
+  void SetClockingManager(class ClockingManager* mgr) { clocking_mgr_ = mgr; }
+  class ClockingManager* GetClockingManager() { return clocking_mgr_; }
+
  private:
   Scheduler& scheduler_;
   Arena& arena_;
@@ -132,6 +163,21 @@ class SimContext {
   // §6.19: Enum type info and variable-to-enum-type mapping.
   std::unordered_map<std::string_view, EnumTypeInfo> enum_types_;
   std::unordered_map<std::string_view, std::string_view> var_enum_types_;
+  // §15.3: Semaphore objects.
+  std::unordered_map<std::string_view, SemaphoreObject*> semaphores_;
+  // §15.4: Mailbox objects.
+  std::unordered_map<std::string_view, MailboxObject*> mailboxes_;
+  // §15.5.2: Event triggered timestamps (ticks when last triggered).
+  std::unordered_map<std::string_view, uint64_t> event_triggered_;
+  // §8: Class type registry.
+  std::unordered_map<std::string_view, ClassTypeInfo*> class_types_;
+  // §8: Object heap — maps handle ID to ClassObject.
+  std::unordered_map<uint64_t, ClassObject*> class_objects_;
+  uint64_t next_handle_id_ = 1;
+  // §8.11: Stack of `this` pointers for nested method calls.
+  std::vector<ClassObject*> this_stack_;
+  // §14: Clocking manager.
+  class ClockingManager* clocking_mgr_ = nullptr;
 };
 
 }  // namespace delta

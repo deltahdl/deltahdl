@@ -415,7 +415,11 @@ static StmtResult ExecEventTriggerImpl(const Stmt* stmt, SimContext& ctx) {
     return StmtResult::kDone;
   }
   auto* var = ctx.FindVariable(stmt->expr->text);
-  if (var) var->NotifyWatchers();
+  if (var) {
+    // §15.5.2: Set sticky triggered state for this timeslot.
+    ctx.SetEventTriggered(stmt->expr->text);
+    var->NotifyWatchers();
+  }
   return StmtResult::kDone;
 }
 
