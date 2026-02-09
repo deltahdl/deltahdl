@@ -1,5 +1,7 @@
 #include "parser/parser.h"
 
+#include <optional>
+
 namespace delta {
 
 // --- Defparam parsing ---
@@ -357,6 +359,122 @@ void Parser::ParseOldStylePortDecls(ModuleItem* item, TokenKind end_kw) {
     item->func_args.push_back(arg);
   }
   (void)end_kw;
+}
+
+// --- Types ---
+
+static bool IsNetTypeToken(TokenKind tk) {
+  switch (tk) {
+    case TokenKind::kKwWire:
+    case TokenKind::kKwTri:
+    case TokenKind::kKwTriand:
+    case TokenKind::kKwTrior:
+    case TokenKind::kKwTri0:
+    case TokenKind::kKwTri1:
+    case TokenKind::kKwTrireg:
+    case TokenKind::kKwWand:
+    case TokenKind::kKwWor:
+    case TokenKind::kKwSupply0:
+    case TokenKind::kKwSupply1:
+    case TokenKind::kKwUwire:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// clang-format off
+static std::optional<DataTypeKind> TokenToTypeKind(TokenKind tk) {
+  switch (tk) {
+    case TokenKind::kKwLogic:    return DataTypeKind::kLogic;
+    case TokenKind::kKwReg:      return DataTypeKind::kReg;
+    case TokenKind::kKwBit:      return DataTypeKind::kBit;
+    case TokenKind::kKwByte:     return DataTypeKind::kByte;
+    case TokenKind::kKwShortint: return DataTypeKind::kShortint;
+    case TokenKind::kKwInt:      return DataTypeKind::kInt;
+    case TokenKind::kKwLongint:  return DataTypeKind::kLongint;
+    case TokenKind::kKwInteger:  return DataTypeKind::kInteger;
+    case TokenKind::kKwReal:     return DataTypeKind::kReal;
+    case TokenKind::kKwShortreal:return DataTypeKind::kShortreal;
+    case TokenKind::kKwRealtime: return DataTypeKind::kRealtime;
+    case TokenKind::kKwTime:     return DataTypeKind::kTime;
+    case TokenKind::kKwString:   return DataTypeKind::kString;
+    case TokenKind::kKwEvent:    return DataTypeKind::kEvent;
+    case TokenKind::kKwVoid:     return DataTypeKind::kVoid;
+    case TokenKind::kKwChandle:  return DataTypeKind::kChandle;
+    case TokenKind::kKwWire:     return DataTypeKind::kWire;
+    case TokenKind::kKwTri:      return DataTypeKind::kTri;
+    case TokenKind::kKwTriand:   return DataTypeKind::kTriand;
+    case TokenKind::kKwTrior:    return DataTypeKind::kTrior;
+    case TokenKind::kKwTri0:     return DataTypeKind::kTri0;
+    case TokenKind::kKwTri1:     return DataTypeKind::kTri1;
+    case TokenKind::kKwTrireg:   return DataTypeKind::kTrireg;
+    case TokenKind::kKwWand:     return DataTypeKind::kWand;
+    case TokenKind::kKwWor:      return DataTypeKind::kWor;
+    case TokenKind::kKwSupply0:  return DataTypeKind::kSupply0;
+    case TokenKind::kKwSupply1:  return DataTypeKind::kSupply1;
+    case TokenKind::kKwUwire:    return DataTypeKind::kUwire;
+    default:                     return std::nullopt;
+  }
+}
+// clang-format on
+
+DataType Parser::ParseDataType() {
+  DataType dtype;
+
+  if (Match(TokenKind::kKwConst)) {
+    dtype.is_const = true;
+  }
+
+  // Virtual interface type: virtual [interface] type_name [.modport] (§25.9)
+  if (Check(TokenKind::kKwVirtual)) {
+    Consume();
+    dtype.kind = DataTypeKind::kVirtualInterface;
+    Match(TokenKind::kKwInterface);  // optional 'interface' keyword
+    dtype.type_name = Expect(TokenKind::kIdentifier).text;
+    if (Match(TokenKind::kDot)) {
+      dtype.modport_name = Expect(TokenKind::kIdentifier).text;
+    }
+    return dtype;
+  }
+
+  if (CurrentToken().Is(TokenKind::kIdentifier) &&
+      known_types_.count(CurrentToken().text) != 0) {
+    dtype.kind = DataTypeKind::kNamed;
+    dtype.type_name = Consume().text;
+    return dtype;
+  }
+
+  auto tok_kind = CurrentToken().kind;
+  auto kind = TokenToTypeKind(tok_kind);
+  if (!kind) return dtype;
+  dtype.kind = *kind;
+  dtype.is_net = IsNetTypeToken(tok_kind);
+  Consume();
+
+  // vectored/scalared qualifiers (§6.6.9) — net types only
+  if (dtype.is_net) {
+    if (Match(TokenKind::kKwVectored)) {
+      dtype.is_vectored = true;
+    } else if (Match(TokenKind::kKwScalared)) {
+      dtype.is_scalared = true;
+    }
+  }
+
+  if (Match(TokenKind::kKwSigned)) {
+    dtype.is_signed = true;
+  } else if (Match(TokenKind::kKwUnsigned)) {
+    dtype.is_signed = false;
+  }
+
+  if (Check(TokenKind::kLBracket)) {
+    Consume();
+    dtype.packed_dim_left = ParseExpr();
+    Expect(TokenKind::kColon);
+    dtype.packed_dim_right = ParseExpr();
+    Expect(TokenKind::kRBracket);
+  }
+  return dtype;
 }
 
 }  // namespace delta

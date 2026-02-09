@@ -340,6 +340,8 @@ enum class ModuleItemKind : uint8_t {
   kCoverProperty,   // cover property (§16.5)
   kClockingBlock,   // Clocking block (§14)
   kCovergroupDecl,  // covergroup ... endgroup (§19)
+  kSpecifyBlock,    // specify ... endspecify (§30)
+  kSpecparam,       // specparam declarations (§30.2)
 };
 
 // clang-format off
@@ -581,6 +583,13 @@ struct UdpDecl {
   std::vector<UdpTableRow> table;
 };
 
+// --- Configuration declarations (§33) ---
+
+struct ConfigDecl {
+  std::string_view name;
+  SourceRange range;
+};
+
 struct CompilationUnit {
   std::vector<ModuleDecl*> modules;
   std::vector<PackageDecl*> packages;
@@ -589,6 +598,7 @@ struct CompilationUnit {
   std::vector<ClassDecl*> classes;
   std::vector<UdpDecl*> udps;
   std::vector<ModuleDecl*> checkers;  // checker ... endchecker (§17)
+  std::vector<ConfigDecl*> configs;   // config ... endconfig (§33)
 };
 
 }  // namespace delta

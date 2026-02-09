@@ -72,6 +72,13 @@ class Parser {
   void ParseCovergroupDecl(std::vector<ModuleItem*>& items);
   void SkipCovergroupItem();
 
+  // Specify blocks (parser_specify.cpp — §30/§31)
+  ModuleItem* ParseSpecifyBlock();
+  ModuleItem* ParseSpecparamDecl();
+
+  // Configuration (parser_config.cpp — §33)
+  ConfigDecl* ParseConfigDecl();
+
   // Declarations (parser_decl.cpp)
   ModuleItem* ParseDefparam();
   ModuleItem* ParseTypedef();

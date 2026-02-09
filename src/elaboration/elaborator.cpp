@@ -335,6 +335,8 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kCoverProperty:
     case ModuleItemKind::kClockingBlock:
     case ModuleItemKind::kCovergroupDecl:
+    case ModuleItemKind::kSpecifyBlock:
+    case ModuleItemKind::kSpecparam:
       break;
   }
 }
