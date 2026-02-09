@@ -10,6 +10,7 @@
 
 namespace delta {
 
+class Scheduler;
 class SimContext;
 
 // =============================================================================
@@ -65,6 +66,7 @@ struct AssertionEntry {
 class AssertionMonitor {
  public:
   void AddProperty(SvaProperty prop);
+  void Attach(SimContext& ctx, Scheduler& sched);
   AssertionResult Evaluate(std::string_view prop_name, uint64_t current_val);
   void Tick(SimContext& ctx);
   uint32_t PropertyCount() const {

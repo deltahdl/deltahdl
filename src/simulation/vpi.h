@@ -1,9 +1,14 @@
 #pragma once
 
 #include <cstdint>
+#include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace delta {
+
+class SimContext;
+struct Variable;
 
 // --- VPI object type constants (IEEE 1800-2023 Section 36.12) ---
 
@@ -34,9 +39,23 @@ constexpr int kCbValueChange = 1;
 constexpr int kCbReadWriteSynch = 2;
 constexpr int kCbEndOfSimulation = 3;
 
-// --- VPI opaque handle ---
+// --- VPI property constants (IEEE 1800-2023 Section 36.13) ---
 
-struct VpiObject;
+constexpr int kVpiType = 1;
+constexpr int kVpiName = 2;
+constexpr int kVpiFullName = 3;
+
+// --- VPI object definition ---
+
+struct VpiObject {
+  int type = 0;
+  std::string_view name;
+  Variable* var = nullptr;
+  // Iterator state.
+  std::vector<VpiObject*> children;
+  size_t scan_index = 0;
+};
+
 using VpiHandle = VpiObject*;
 
 // --- VPI value struct (IEEE 1800-2023 Section 36.18) ---
@@ -97,6 +116,9 @@ struct VpiSystfData {
 class VpiContext {
  public:
   VpiContext() = default;
+  ~VpiContext();
+
+  void Attach(SimContext& sim_ctx);
 
   VpiHandle RegisterSystf(VpiSystfData* data);
   VpiHandle HandleByName(const char* name, VpiHandle scope);
@@ -105,6 +127,7 @@ class VpiContext {
   void GetValue(VpiHandle obj, VpiValue* value);
   void PutValue(VpiHandle obj, VpiValue* value, VpiTime* time, int flags);
   VpiHandle RegisterCb(VpiCbData* data);
+  void RegisterCbValueChange(const VpiCbData& data);
   int Get(int property, VpiHandle obj);
   const char* GetStr(int property, VpiHandle obj);
   int FreeObject(VpiHandle obj);
@@ -118,6 +141,8 @@ class VpiContext {
  private:
   std::vector<VpiSystfData> systfs_;
   std::vector<VpiCbData> callbacks_;
+  std::unordered_map<std::string_view, VpiObject*> object_map_;
+  std::vector<VpiObject*> all_objects_;
 };
 
 // --- Global VPI context access ---
@@ -167,6 +192,10 @@ using s_vpi_vecval = delta::VpiVectorVal;
 #define cbValueChange 1
 #define cbReadWriteSynch 2
 #define cbEndOfSimulation 3
+
+#define vpiType 1
+#define vpiName 2
+#define vpiFullName 3
 
 #define vpiSysTask 1
 #define vpiSysFunc 2

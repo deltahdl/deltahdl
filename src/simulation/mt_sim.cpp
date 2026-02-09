@@ -3,8 +3,12 @@
 #include <algorithm>
 #include <cstdint>
 #include <string_view>
+#include <thread>
 #include <utility>
 #include <vector>
+
+#include "simulation/compiled_sim.h"
+#include "simulation/sim_context.h"
 
 namespace delta {
 
@@ -85,6 +89,38 @@ MtScheduler::MtScheduler(uint32_t num_threads) : num_threads_(num_threads) {}
 
 void MtScheduler::SetPartitions(std::vector<SimPartition> partitions) {
   partitions_ = std::move(partitions);
+}
+
+void MtScheduler::RunTimestep(SimContext& ctx,
+                              const std::vector<CompiledProcess>& processes) {
+  if (partitions_.empty()) return;
+
+  auto execute_partition = [&ctx, &processes](const SimPartition& part) {
+    for (uint32_t pid : part.process_ids) {
+      for (const auto& proc : processes) {
+        if (proc.Id() == pid) {
+          proc.Execute(ctx);
+          break;
+        }
+      }
+    }
+  };
+
+  if (partitions_.size() == 1 || num_threads_ <= 1) {
+    for (const auto& part : partitions_) {
+      execute_partition(part);
+    }
+    return;
+  }
+
+  // Multi-threaded: launch one thread per partition.
+  std::vector<std::jthread> threads;
+  threads.reserve(partitions_.size());
+  for (const auto& part : partitions_) {
+    threads.emplace_back(
+        [&execute_partition, &part]() { execute_partition(part); });
+  }
+  // jthreads auto-join on destruction.
 }
 
 }  // namespace delta

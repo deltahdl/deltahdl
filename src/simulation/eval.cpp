@@ -3,10 +3,12 @@
 #include <cstdio>
 #include <iostream>
 #include <string>
+#include <vector>
 
 #include "common/arena.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
+#include "simulation/dpi.h"
 #include "simulation/sim_context.h"
 #include "simulation/vcd_writer.h"
 
@@ -473,6 +475,20 @@ static void BindFunctionArgs(const ModuleItem* func, const Expr* expr,
   }
 }
 
+static void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
+                                SimContext& ctx) {
+  for (size_t i = 0; i < func->func_args.size() && i < expr->args.size(); ++i) {
+    auto dir = func->func_args[i].direction;
+    if (dir != Direction::kOutput && dir != Direction::kInout) continue;
+    auto* local = ctx.FindLocalVariable(func->func_args[i].name);
+    if (!local) continue;
+    // Write back to caller's variable (the call-site arg must be an lvalue).
+    if (expr->args[i]->kind != ExprKind::kIdentifier) continue;
+    auto* target = ctx.FindVariable(expr->args[i]->text);
+    if (target) target->value = local->value;
+  }
+}
+
 static void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
                              SimContext& ctx, Arena& arena) {
   for (auto* stmt : func->func_body_stmts) {
@@ -490,15 +506,30 @@ static void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
   }
 }
 
+static Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
+  auto* dpi = ctx.GetDpiContext();
+  if (!dpi || !dpi->HasImport(expr->callee)) {
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
+  std::vector<uint64_t> args;
+  args.reserve(expr->args.size());
+  for (auto* arg : expr->args) {
+    args.push_back(EvalExpr(arg, ctx, arena).ToUint64());
+  }
+  uint64_t result = dpi->Call(expr->callee, args);
+  return MakeLogic4VecVal(arena, 32, result);
+}
+
 static Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx,
                                   Arena& arena) {
   auto* func = ctx.FindFunction(expr->callee);
-  if (!func) return MakeLogic4VecVal(arena, 1, 0);
+  if (!func) return EvalDpiCall(expr, ctx, arena);
 
   ctx.PushScope();
   BindFunctionArgs(func, expr, ctx, arena);
   auto* ret_var = ctx.CreateLocalVariable(func->name, 32);
   ExecFunctionBody(func, ret_var, ctx, arena);
+  WritebackOutputArgs(func, expr, ctx);
   auto result = ret_var->value;
   ctx.PopScope();
   return result;

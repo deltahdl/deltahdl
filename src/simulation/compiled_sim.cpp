@@ -4,8 +4,71 @@
 #include <utility>
 
 #include "parser/ast.h"
+#include "simulation/eval.h"
+#include "simulation/sim_context.h"
 
 namespace delta {
+
+using CompiledFn = CompiledProcess::CompiledFn;
+
+static CompiledFn CompileStmt(const Stmt* stmt);
+
+static CompiledFn CompileBlock(const Stmt* stmt) {
+  std::vector<CompiledFn> steps;
+  for (auto* s : stmt->stmts) {
+    auto fn = CompileStmt(s);
+    if (fn) steps.push_back(std::move(fn));
+  }
+  return [fns = std::move(steps)](SimContext& ctx) {
+    for (auto& fn : fns) {
+      fn(ctx);
+    }
+  };
+}
+
+static CompiledFn CompileBlockingAssign(const Stmt* stmt) {
+  return [stmt](SimContext& ctx) {
+    auto& arena = ctx.GetArena();
+    auto val = EvalExpr(stmt->rhs, ctx, arena);
+    if (!stmt->lhs) return;
+    auto* var = ctx.FindVariable(stmt->lhs->text);
+    if (var) var->value = val;
+  };
+}
+
+static CompiledFn CompileIf(const Stmt* stmt) {
+  auto then_fn = stmt->then_branch ? CompileStmt(stmt->then_branch) : nullptr;
+  auto else_fn = stmt->else_branch ? CompileStmt(stmt->else_branch) : nullptr;
+  return [stmt, then_fn = std::move(then_fn),
+          else_fn = std::move(else_fn)](SimContext& ctx) {
+    auto cond = EvalExpr(stmt->condition, ctx, ctx.GetArena());
+    if (cond.ToUint64() != 0) {
+      if (then_fn) then_fn(ctx);
+    } else {
+      if (else_fn) else_fn(ctx);
+    }
+  };
+}
+
+static CompiledFn CompileExprStmt(const Stmt* stmt) {
+  return [stmt](SimContext& ctx) { EvalExpr(stmt->expr, ctx, ctx.GetArena()); };
+}
+
+static CompiledFn CompileStmt(const Stmt* stmt) {
+  if (!stmt) return nullptr;
+  switch (stmt->kind) {
+    case StmtKind::kBlock:
+      return CompileBlock(stmt);
+    case StmtKind::kBlockingAssign:
+      return CompileBlockingAssign(stmt);
+    case StmtKind::kIf:
+      return CompileIf(stmt);
+    case StmtKind::kExprStmt:
+      return CompileExprStmt(stmt);
+    default:
+      return nullptr;
+  }
+}
 
 // =============================================================================
 // CompiledProcess
@@ -31,9 +94,9 @@ CompiledProcess ProcessCompiler::Compile(uint32_t id, const Stmt* body) {
   if (!IsCompilable(body)) {
     return CompiledProcess(id, nullptr);
   }
-  // Stub: return a valid but no-op compiled process.
-  // Full code generation would translate the AST to direct C++ calls.
-  return CompiledProcess(id, [](SimContext& /*ctx*/) {});
+  auto fn = CompileStmt(body);
+  if (!fn) return CompiledProcess(id, nullptr);
+  return CompiledProcess(id, std::move(fn));
 }
 
 bool ProcessCompiler::HasTimingControl(const Stmt* stmt) {

@@ -1,8 +1,12 @@
 #include "simulation/assertion.h"
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 #include <utility>
+
+#include "simulation/scheduler.h"
+#include "simulation/sim_context.h"
 
 namespace delta {
 
@@ -14,6 +18,31 @@ void AssertionMonitor::AddProperty(SvaProperty prop) {
   AssertionEntry entry;
   entry.property = std::move(prop);
   entries_.push_back(std::move(entry));
+}
+
+static void RegisterAssertionWatcher(AssertionMonitor* monitor, Variable* var,
+                                     const std::string& prop_name,
+                                     Scheduler& sched) {
+  var->AddWatcher([monitor, var, prop_name, &sched]() {
+    auto* ev = sched.GetEventPool().Acquire();
+    uint64_t val = var->value.ToUint64();
+    ev->callback = [monitor, prop_name, val]() {
+      monitor->Evaluate(prop_name, val);
+    };
+    sched.ScheduleEvent(sched.CurrentTime(), Region::kObserved, ev);
+    // Re-register: watchers are one-shot.
+    RegisterAssertionWatcher(monitor, var, prop_name, sched);
+  });
+}
+
+void AssertionMonitor::Attach(SimContext& ctx, Scheduler& sched) {
+  for (auto& entry : entries_) {
+    auto* var = ctx.FindVariable(entry.property.signal_name);
+    if (!var) continue;
+    std::string prop_name(entry.property.name);
+    RegisterAssertionWatcher(this, var, prop_name, sched);
+  }
+  sched.SetPostTimestepCallback([this, &ctx]() { Tick(ctx); });
 }
 
 AssertionResult AssertionMonitor::Evaluate(std::string_view prop_name,

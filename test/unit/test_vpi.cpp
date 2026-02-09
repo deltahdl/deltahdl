@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include "common/arena.h"
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
+#include "simulation/sim_context.h"
 #include "simulation/vpi.h"
 
 namespace delta {
@@ -241,6 +245,120 @@ TEST(VpiContextTest, SetAndGetContext) {
   EXPECT_STREQ(custom.RegisteredSystfs()[0].tfname, "$custom");
 
   SetGlobalVpiContext(nullptr);
+}
+
+// =============================================================================
+// VPI with SimContext integration
+// =============================================================================
+
+class VpiSimTest : public ::testing::Test {
+ protected:
+  void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
+  void TearDown() override { SetGlobalVpiContext(nullptr); }
+
+  SourceManager mgr_;
+  Arena arena_;
+  Scheduler scheduler_{arena_};
+  DiagEngine diag_{mgr_};
+  SimContext sim_ctx_{scheduler_, arena_, diag_};
+  VpiContext vpi_ctx_;
+};
+
+TEST_F(VpiSimTest, HandleByNameResolvesVariable) {
+  auto* var = sim_ctx_.CreateVariable("clk", 1);
+  var->value = MakeLogic4VecVal(arena_, 1, 1);
+
+  vpi_ctx_.Attach(sim_ctx_);
+
+  vpiHandle h = vpi_handle_by_name("clk", nullptr);
+  ASSERT_NE(h, nullptr);
+}
+
+TEST_F(VpiSimTest, GetValueReadsVariable) {
+  auto* var = sim_ctx_.CreateVariable("x", 32);
+  var->value = MakeLogic4VecVal(arena_, 32, 42);
+
+  vpi_ctx_.Attach(sim_ctx_);
+
+  vpiHandle h = vpi_handle_by_name("x", nullptr);
+  ASSERT_NE(h, nullptr);
+
+  s_vpi_value val = {};
+  val.format = vpiIntVal;
+  vpi_get_value(h, &val);
+  EXPECT_EQ(val.value.integer, 42);
+}
+
+TEST_F(VpiSimTest, PutValueWritesVariable) {
+  auto* var = sim_ctx_.CreateVariable("x", 32);
+  var->value = MakeLogic4VecVal(arena_, 32, 0);
+
+  vpi_ctx_.Attach(sim_ctx_);
+
+  vpiHandle h = vpi_handle_by_name("x", nullptr);
+  ASSERT_NE(h, nullptr);
+
+  s_vpi_value val = {};
+  val.format = vpiIntVal;
+  val.value.integer = 99;
+  vpi_put_value(h, &val, nullptr, 0);
+
+  EXPECT_EQ(var->value.ToUint64(), 99u);
+}
+
+TEST_F(VpiSimTest, IterateAndScanVariables) {
+  sim_ctx_.CreateVariable("a", 8);
+  sim_ctx_.CreateVariable("b", 8);
+  sim_ctx_.CreateVariable("c", 8);
+
+  vpi_ctx_.Attach(sim_ctx_);
+
+  vpiHandle iter = vpi_iterate(vpiReg, nullptr);
+  ASSERT_NE(iter, nullptr);
+
+  int count = 0;
+  while (vpi_scan(iter) != nullptr) {
+    ++count;
+  }
+  EXPECT_EQ(count, 3);
+}
+
+TEST_F(VpiSimTest, GetReturnsTypeAndGetStrReturnsName) {
+  sim_ctx_.CreateVariable("my_sig", 8);
+  vpi_ctx_.Attach(sim_ctx_);
+
+  vpiHandle h = vpi_handle_by_name("my_sig", nullptr);
+  ASSERT_NE(h, nullptr);
+
+  EXPECT_EQ(vpi_get(vpiType, h), vpiReg);
+
+  const char* name = vpi_get_str(vpiName, h);
+  ASSERT_NE(name, nullptr);
+  EXPECT_STREQ(name, "my_sig");
+}
+
+TEST_F(VpiSimTest, CbValueChangeFires) {
+  auto* var = sim_ctx_.CreateVariable("sig", 1);
+  var->value = MakeLogic4VecVal(arena_, 1, 0);
+
+  vpi_ctx_.Attach(sim_ctx_);
+
+  vpiHandle h = vpi_handle_by_name("sig", nullptr);
+  ASSERT_NE(h, nullptr);
+
+  bool fired = false;
+  // Register a cbValueChange callback by storing a flag in user_data.
+  s_cb_data cb = {};
+  cb.reason = cbValueChange;
+  cb.obj = h;
+  cb.user_data = &fired;
+  vpi_ctx_.RegisterCbValueChange(cb);
+
+  // Change the variable's value, which should trigger the watcher.
+  var->value = MakeLogic4VecVal(arena_, 1, 1);
+  var->NotifyWatchers();
+
+  EXPECT_TRUE(fired);
 }
 
 }  // namespace

@@ -15,6 +15,7 @@
 namespace delta {
 
 class DiagEngine;
+class DpiContext;
 class VcdWriter;
 struct ModuleItem;
 struct Process;
@@ -56,6 +57,9 @@ class SimContext {
   void SetVcdWriter(VcdWriter* vcd) { vcd_writer_ = vcd; }
   VcdWriter* GetVcdWriter() { return vcd_writer_; }
 
+  void SetDpiContext(DpiContext* dpi) { dpi_context_ = dpi; }
+  DpiContext* GetDpiContext() { return dpi_context_; }
+
   const std::unordered_map<std::string_view, Variable*>& GetVariables() const {
     return variables_;
   }
@@ -77,6 +81,7 @@ class SimContext {
   std::unordered_map<std::string_view, std::vector<Process*>> sensitivity_map_;
   static const std::vector<Process*> kEmptyProcessList;
   VcdWriter* vcd_writer_ = nullptr;
+  DpiContext* dpi_context_ = nullptr;
   bool stop_requested_ = false;
 };
 

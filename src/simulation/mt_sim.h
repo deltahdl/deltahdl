@@ -6,6 +6,8 @@
 
 namespace delta {
 
+class CompiledProcess;
+class SimContext;
 struct Process;
 
 // =============================================================================
@@ -56,6 +58,8 @@ class MtScheduler {
   explicit MtScheduler(uint32_t num_threads);
 
   void SetPartitions(std::vector<SimPartition> partitions);
+  void RunTimestep(SimContext& ctx,
+                   const std::vector<CompiledProcess>& processes);
   uint32_t NumPartitions() const {
     return static_cast<uint32_t>(partitions_.size());
   }
