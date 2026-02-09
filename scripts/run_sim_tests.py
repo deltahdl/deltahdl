@@ -4,7 +4,7 @@
 import subprocess
 import sys
 
-from test_common import BINARY, REPO_ROOT, print_result
+from test_common import BINARY, REPO_ROOT, check_binary, print_result
 
 TEST_DIR = REPO_ROOT / "test" / "integration"
 
@@ -41,9 +41,7 @@ def run_test(sv_path, expected_path):
 
 def main():
     """Run all simulation integration tests and print a summary."""
-    if not BINARY.exists():
-        print(f"error: binary not found at {BINARY}", file=sys.stderr)
-        sys.exit(1)
+    check_binary()
 
     tests = collect_tests()
     if not tests:

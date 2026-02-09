@@ -16,6 +16,13 @@ RED = "" if _NO_COLOR else "\033[31m"
 RESET = "" if _NO_COLOR else "\033[0m"
 
 
+def check_binary():
+    """Exit with an error if the deltahdl binary is not found."""
+    if not BINARY.exists():
+        print(f"error: binary not found at {BINARY}", file=sys.stderr)
+        sys.exit(1)
+
+
 def print_result(passed, name):
     """Print a colored PASS/FAIL line for a single test."""
     if passed:

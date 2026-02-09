@@ -10,7 +10,7 @@ from collections import defaultdict
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-from test_common import BINARY, RED, REPO_ROOT, RESET, print_result
+from test_common import BINARY, RED, REPO_ROOT, RESET, check_binary, print_result
 
 TEST_DIR = REPO_ROOT / "third_party" / "sv-tests" / "tests"
 
@@ -112,13 +112,39 @@ def write_junit_xml(results, elapsed, filepath):
     tree.write(filepath, xml_declaration=True, encoding="unicode")
 
 
+def execute_single_test(path):
+    """Run one sv-test and return (result_dict, passed_flag)."""
+    name = Path(path).name
+    chapter = chapter_from_path(path)
+    t0 = time.monotonic()
+    stderr = ""
+    try:
+        ok, stderr = run_test(path)
+        dt = time.monotonic() - t0
+        print_result(ok, name)
+        status = "pass" if ok else "fail"
+        ok_int = int(ok)
+    except subprocess.TimeoutExpired:
+        dt = time.monotonic() - t0
+        status = "timeout"
+        ok_int = 0
+        print(f"  {RED}TIMEOUT{RESET}: {name}", flush=True)
+
+    result = {
+        "name": name,
+        "chapter": chapter,
+        "status": status,
+        "time": dt,
+        "stderr": stderr,
+    }
+    return result, ok_int
+
+
 def main():
     """Run all sv-tests and print a summary."""
     args = parse_args()
 
-    if not BINARY.exists():
-        print(f"error: binary not found at {BINARY}", file=sys.stderr)
-        sys.exit(1)
+    check_binary()
 
     tests = collect_tests()
     if not tests:
@@ -127,37 +153,15 @@ def main():
 
     results = []
     passed = 0
-    failed = 0
     suite_start = time.monotonic()
 
     for path in tests:
-        name = Path(path).name
-        chapter = chapter_from_path(path)
-        t0 = time.monotonic()
-        stderr = ""
-        try:
-            ok, stderr = run_test(path)
-            dt = time.monotonic() - t0
-            print_result(ok, name)
-            status = "pass" if ok else "fail"
-            passed += ok
-            failed += not ok
-        except subprocess.TimeoutExpired:
-            dt = time.monotonic() - t0
-            status = "timeout"
-            failed += 1
-            print(f"  {RED}TIMEOUT{RESET}: {name}", flush=True)
+        result, ok = execute_single_test(path)
+        results.append(result)
+        passed += ok
 
-        results.append({
-            "name": name,
-            "chapter": chapter,
-            "status": status,
-            "time": dt,
-            "stderr": stderr,
-        })
-
-    total = passed + failed
-    print(f"\nsv-tests summary: {passed}/{total} passed, {failed} failed")
+    failed = len(results) - passed
+    print(f"\nsv-tests summary: {passed}/{len(results)} passed, {failed} failed")
 
     print_chapter_breakdown(results)
 
