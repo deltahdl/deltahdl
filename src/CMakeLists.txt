@@ -42,9 +42,12 @@ add_library(deltahdl_lib STATIC
     simulation/sv_callable.cpp
     simulation/clocking.cpp
     simulation/assertion.cpp
+    simulation/sva_engine.cpp
+    simulation/coverage.cpp
     simulation/dpi.cpp
     simulation/compiled_sim.cpp
     simulation/mt_sim.cpp
+    simulation/constraint_solver.cpp
     synthesis/aig.cpp
     synthesis/synth_lower.cpp
     synthesis/aig_opt.cpp

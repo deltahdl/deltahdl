@@ -137,6 +137,10 @@ class SimContext {
   void SetClockingManager(class ClockingManager* mgr) { clocking_mgr_ = mgr; }
   class ClockingManager* GetClockingManager() { return clocking_mgr_; }
 
+  // §19: Coverage database access.
+  void SetCoverageDB(class CoverageDB* db) { coverage_db_ = db; }
+  class CoverageDB* GetCoverageDB() { return coverage_db_; }
+
  private:
   Scheduler& scheduler_;
   Arena& arena_;
@@ -178,6 +182,8 @@ class SimContext {
   std::vector<ClassObject*> this_stack_;
   // §14: Clocking manager.
   class ClockingManager* clocking_mgr_ = nullptr;
+  // §19: Coverage database.
+  class CoverageDB* coverage_db_ = nullptr;
 };
 
 }  // namespace delta
