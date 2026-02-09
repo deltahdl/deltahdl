@@ -1,4 +1,4 @@
-#include <cstring>
+#include <algorithm>
 
 #include "parser/parser.h"
 
@@ -83,7 +83,7 @@ ConfigRule* Parser::ParseConfigRule() {
     }
     // Store in arena so string_view remains valid.
     auto* buf = static_cast<char*>(arena_.Allocate(path.size(), 1));
-    std::memcpy(buf, path.data(), path.size());
+    std::copy_n(path.data(), path.size(), buf);
     rule->inst_path = std::string_view(buf, path.size());
     if (Check(TokenKind::kKwLiblist)) {
       ParseLiblistClause(rule);

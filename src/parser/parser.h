@@ -90,6 +90,8 @@ class Parser {
   SpecifyEdge ParseSpecifyEdge();
   TimingCheckKind ParseTimingCheckKind(std::string_view name);
   bool CheckNextIsCommaOrRParen();
+  void ParseTimingCheckTrailingArgs(TimingCheckDecl& tc);
+  void SkipRemainingCommaArgs();
 
   // Configuration (parser_config.cpp — §33)
   ConfigDecl* ParseConfigDecl();
@@ -162,6 +164,8 @@ class Parser {
   ModuleItem* ParseClockingDecl();
   void ParseClockingItem(ModuleItem* item);
   void ParseClockingSkew(Edge& edge, Expr*& delay);
+  Direction ParseClockingDirection(Edge& in_edge, Expr*& in_delay,
+                                   Edge& out_edge, Expr*& out_delay);
   Stmt* ParseWaitOrderStmt();
 
   // Assertions (parser_assert.cpp — §16)

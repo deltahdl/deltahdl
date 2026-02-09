@@ -217,6 +217,27 @@ bool Parser::CheckNextIsCommaOrRParen() {
   return result;
 }
 
+// Parse additional limits and optional notifier after the first timing limit.
+void Parser::ParseTimingCheckTrailingArgs(TimingCheckDecl& tc) {
+  while (Match(TokenKind::kComma)) {
+    if (Check(TokenKind::kRParen)) break;
+    if (Check(TokenKind::kIdentifier) && CheckNextIsCommaOrRParen()) {
+      tc.notifier = Consume().text;
+      SkipRemainingCommaArgs();
+      break;
+    }
+    tc.limits.push_back(ParseExpr());
+  }
+}
+
+// Skip remaining comma-separated arguments until ')'.
+void Parser::SkipRemainingCommaArgs() {
+  while (Match(TokenKind::kComma)) {
+    if (Check(TokenKind::kRParen)) break;
+    Consume();
+  }
+}
+
 // Parse: $setup(data, posedge clk, limit [, notifier]) ;
 // and similar timing checks.
 SpecifyItem* Parser::ParseTimingCheck() {
@@ -243,30 +264,9 @@ SpecifyItem* Parser::ParseTimingCheck() {
     Expect(TokenKind::kComma);
   }
 
-  // Timing limit(s)
+  // Timing limit(s) and optional notifier.
   item->timing_check.limits.push_back(ParseExpr());
-  // Additional limits or optional notifier identifier.
-  while (Match(TokenKind::kComma)) {
-    if (Check(TokenKind::kRParen)) break;
-    // Use lookahead: if identifier followed by ')' or ',', it's a notifier.
-    if (Check(TokenKind::kIdentifier)) {
-      auto saved = lexer_.SavePos();
-      auto tok = CurrentToken();
-      Consume();
-      if (Check(TokenKind::kRParen) || Check(TokenKind::kComma)) {
-        item->timing_check.notifier = tok.text;
-        // Skip any remaining optional args after the notifier.
-        while (Match(TokenKind::kComma)) {
-          if (Check(TokenKind::kRParen)) break;
-          Consume();
-        }
-        break;
-      }
-      lexer_.RestorePos(saved);
-    }
-    item->timing_check.limits.push_back(ParseExpr());
-  }
-
+  ParseTimingCheckTrailingArgs(item->timing_check);
   Expect(TokenKind::kRParen);
   Expect(TokenKind::kSemicolon);
   return item;

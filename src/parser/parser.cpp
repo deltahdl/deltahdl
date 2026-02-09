@@ -536,6 +536,14 @@ void Parser::ParseTimeunitDecl(ModuleDecl* mod) {
 }
 
 bool Parser::TryParseClockingOrVerification(std::vector<ModuleItem*>& items) {
+  if (Check(TokenKind::kKwSpecify)) {
+    items.push_back(ParseSpecifyBlock());
+    return true;
+  }
+  if (Check(TokenKind::kKwSpecparam)) {
+    items.push_back(ParseSpecparamDecl());
+    return true;
+  }
   if (Check(TokenKind::kKwClocking)) {
     items.push_back(ParseClockingDecl());
     return true;
@@ -597,14 +605,6 @@ bool Parser::TryParseKeywordItem(std::vector<ModuleItem*>& items) {
   }
   if (Check(TokenKind::kKwTimeunit) || Check(TokenKind::kKwTimeprecision)) {
     ParseTimeunitDecl(current_module_);
-    return true;
-  }
-  if (Check(TokenKind::kKwSpecify)) {
-    items.push_back(ParseSpecifyBlock());
-    return true;
-  }
-  if (Check(TokenKind::kKwSpecparam)) {
-    items.push_back(ParseSpecparamDecl());
     return true;
   }
   return TryParseClockingOrVerification(items);

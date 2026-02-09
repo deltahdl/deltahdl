@@ -66,6 +66,27 @@ ModuleItem* Parser::ParseClockingDecl() {
   return item;
 }
 
+// Parse clocking_direction: input/output/inout with optional skews.
+Direction Parser::ParseClockingDirection(Edge& in_edge, Expr*& in_delay,
+                                         Edge& out_edge, Expr*& out_delay) {
+  if (Match(TokenKind::kKwInput)) {
+    ParseClockingSkew(in_edge, in_delay);
+    if (Match(TokenKind::kKwOutput)) {
+      ParseClockingSkew(out_edge, out_delay);
+      return Direction::kInout;
+    }
+    return Direction::kInput;
+  }
+  if (Match(TokenKind::kKwOutput)) {
+    ParseClockingSkew(in_edge, in_delay);
+    return Direction::kOutput;
+  }
+  if (Match(TokenKind::kKwInout)) return Direction::kInout;
+  diag_.Error(CurrentLoc(), "expected clocking direction");
+  Synchronize();
+  return Direction::kNone;
+}
+
 // Parse one clocking_item:
 //   default default_skew ;
 //   | clocking_direction list_of_clocking_decl_assign ;
@@ -82,41 +103,21 @@ void Parser::ParseClockingItem(ModuleItem* item) {
   }
 
   // Parse clocking_direction and optional skews.
-  Direction dir = Direction::kNone;
   Edge in_edge = Edge::kNone;
   Expr* in_delay = nullptr;
   Edge out_edge = Edge::kNone;
   Expr* out_delay = nullptr;
-
-  if (Match(TokenKind::kKwInput)) {
-    dir = Direction::kInput;
-    ParseClockingSkew(in_edge, in_delay);
-    // Check for combined: input [skew] output [skew]
-    if (Match(TokenKind::kKwOutput)) {
-      dir = Direction::kInout;  // Combined input+output
-      ParseClockingSkew(out_edge, out_delay);
-    }
-  } else if (Match(TokenKind::kKwOutput)) {
-    dir = Direction::kOutput;
-    ParseClockingSkew(in_edge, in_delay);
-  } else if (Match(TokenKind::kKwInout)) {
-    dir = Direction::kInout;
-  } else {
-    diag_.Error(CurrentLoc(), "expected clocking direction");
-    Synchronize();
-    return;
-  }
+  Direction dir =
+      ParseClockingDirection(in_edge, in_delay, out_edge, out_delay);
+  if (dir == Direction::kNone) return;
 
   // list_of_clocking_decl_assign: signal [= expr] {, signal [= expr]}
   do {
     ClockingSignalDecl sig;
     sig.direction = dir;
-    if (dir == Direction::kOutput) {
-      sig.skew_edge = in_edge;
-      sig.skew_delay = in_delay;
-    } else {
-      sig.skew_edge = in_edge;
-      sig.skew_delay = in_delay;
+    sig.skew_edge = in_edge;
+    sig.skew_delay = in_delay;
+    if (dir != Direction::kOutput) {
       sig.out_skew_edge = out_edge;
       sig.out_skew_delay = out_delay;
     }
