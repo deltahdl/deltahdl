@@ -376,7 +376,7 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportDefaultArgs) {
 
 TEST_F(AnnexHParseTest, AnnexHDpiImportBitLogicArgs) {
   // DPI functions can take bit and logic vector arguments corresponding to
-  // svBitVecVal and svLogicVecVal on the C side.
+  // SvBitVecVal and SvLogicVecVal on the C side.
   auto* unit = Parse(
       "module m;\n"
       "  import \"DPI-C\" function void send_bits(\n"

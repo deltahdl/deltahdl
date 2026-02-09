@@ -163,6 +163,23 @@ static void GetValueOctStr(VpiHandle obj, VpiValue* value,
   value->value.str = pool.back().c_str();
 }
 
+static int ScalarFromBits(uint64_t aval, uint64_t bval) {
+  if (!bval) return aval ? kVpi1 : kVpi0;
+  return aval ? kVpiZ : kVpiX;
+}
+
+static void GetValueStringVal(VpiHandle obj, VpiValue* value,
+                              std::vector<std::string>& pool) {
+  uint64_t val = obj->var->value.ToUint64();
+  std::string s;
+  for (int i = 56; i >= 0; i -= 8) {
+    auto ch = static_cast<char>((val >> i) & 0xFF);
+    if (ch != 0) s += ch;
+  }
+  pool.push_back(std::move(s));
+  value->value.str = pool.back().c_str();
+}
+
 void VpiContext::GetValue(VpiHandle obj, VpiValue* value) {
   if (!obj || !value || !obj->var) return;
   switch (value->format) {
@@ -172,16 +189,10 @@ void VpiContext::GetValue(VpiHandle obj, VpiValue* value) {
     case kVpiRealVal:
       value->value.real = static_cast<double>(obj->var->value.ToUint64());
       break;
-    case kVpiScalarVal: {
-      uint64_t aval = obj->var->value.words[0].aval & 1;
-      uint64_t bval = obj->var->value.words[0].bval & 1;
-      if (!bval) {
-        value->value.scalar = aval ? kVpi1 : kVpi0;
-      } else {
-        value->value.scalar = aval ? kVpiZ : kVpiX;
-      }
+    case kVpiScalarVal:
+      value->value.scalar = ScalarFromBits(obj->var->value.words[0].aval & 1,
+                                           obj->var->value.words[0].bval & 1);
       break;
-    }
     case kVpiBinStrVal:
       GetValueBinStr(obj, value, str_pool_);
       break;
@@ -191,19 +202,10 @@ void VpiContext::GetValue(VpiHandle obj, VpiValue* value) {
     case kVpiOctStrVal:
       GetValueOctStr(obj, value, str_pool_);
       break;
-    case kVpiStringVal: {
-      uint64_t val = obj->var->value.ToUint64();
-      std::string s;
-      for (int i = 56; i >= 0; i -= 8) {
-        auto ch = static_cast<char>((val >> i) & 0xFF);
-        if (ch != 0) s += ch;
-      }
-      str_pool_.push_back(std::move(s));
-      value->value.str = str_pool_.back().c_str();
+    case kVpiStringVal:
+      GetValueStringVal(obj, value, str_pool_);
       break;
-    }
     case kVpiTimeVal:
-      // Store as 64-bit time split into high/low.
       value->value.integer = static_cast<int>(obj->var->value.ToUint64());
       break;
     default:
@@ -401,7 +403,7 @@ vpiHandle vpi_register_systf(s_vpi_systf_data* data) {
   return delta::GetGlobalVpiContext().RegisterSystf(data);
 }
 
-vpiHandle vpi_handle(int type, vpiHandle ref) {
+vpiHandle VpiHandleC(int type, vpiHandle ref) {
   return delta::GetGlobalVpiContext().Handle(type, ref);
 }
 
@@ -409,11 +411,11 @@ vpiHandle vpi_handle_by_name(const char* name, vpiHandle scope) {
   return delta::GetGlobalVpiContext().HandleByName(name, scope);
 }
 
-vpiHandle vpi_handle_by_index(vpiHandle parent, int index) {
+vpiHandle VpiHandleByIndexC(vpiHandle parent, int index) {
   return delta::GetGlobalVpiContext().HandleByIndex(index, parent);
 }
 
-vpiHandle vpi_handle_multi(int type, vpiHandle ref1, vpiHandle ref2) {
+vpiHandle VpiHandleMultiC(int type, vpiHandle ref1, vpiHandle ref2) {
   return delta::GetGlobalVpiContext().HandleMulti(type, ref1, ref2);
 }
 
@@ -439,7 +441,7 @@ vpiHandle vpi_register_cb(s_cb_data* data) {
   return delta::GetGlobalVpiContext().RegisterCb(data);
 }
 
-int vpi_remove_cb(vpiHandle cb_handle) {
+int VpiRemoveCbC(vpiHandle cb_handle) {
   return delta::GetGlobalVpiContext().RemoveCb(cb_handle);
 }
 
@@ -455,7 +457,7 @@ int vpi_free_object(vpiHandle obj) {
   return delta::GetGlobalVpiContext().FreeObject(obj);
 }
 
-int vpi_control(int operation, ...) {
+int VpiControlC(int operation, ...) {
   va_list args;
   va_start(args, operation);
   int diag_level = va_arg(args, int);
@@ -463,10 +465,10 @@ int vpi_control(int operation, ...) {
   return delta::GetGlobalVpiContext().Control(operation, diag_level);
 }
 
-int vpi_chk_error(s_vpi_error_info* info) {
+int VpiChkErrorC(SVpiErrorInfo* info) {
   return delta::GetGlobalVpiContext().ChkError(info) ? 1 : 0;
 }
 
-void vpi_get_vlog_info(s_vpi_vlog_info* info) {
+void vpi_get_vlog_info(SVpiVlogInfo* info) {
   delta::GetGlobalVpiContext().GetVlogInfo(info);
 }

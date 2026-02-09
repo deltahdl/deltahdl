@@ -60,6 +60,8 @@ class Parser {
   // Gate primitives (parser_toplevel.cpp)
   bool IsAtGateKeyword();
   void ParseGateInst(std::vector<ModuleItem*>& items);
+  void ParseInlineGateTerminals(GateKind kind, SourceLoc loc,
+                                std::vector<ModuleItem*>& items);
   ModuleItem* ParseOneGateInstance(GateKind kind, SourceLoc loc);
   uint8_t ParseStrength0();
   uint8_t ParseStrength1();

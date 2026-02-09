@@ -31,27 +31,27 @@ class VpiCompleteTest : public ::testing::Test {
 };
 
 // =============================================================================
-// §36.8: vpi_handle — obtain a handle by type relationship
+// §36.8: VpiHandleC — obtain a handle by type relationship
 // =============================================================================
 
 TEST_F(VpiCompleteTest, HandleReturnsParentModule) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   auto* port = vpi_ctx_.CreatePort("clk", kVpiInput, mod);
 
-  vpiHandle result = vpi_handle(vpiModule, port);
+  vpiHandle result = VpiHandleC(vpiModule, port);
   ASSERT_NE(result, nullptr);
   EXPECT_EQ(result, mod);
 }
 
 TEST_F(VpiCompleteTest, HandleReturnsNullptrForNullRef) {
-  vpiHandle result = vpi_handle(vpiModule, nullptr);
+  vpiHandle result = VpiHandleC(vpiModule, nullptr);
   EXPECT_EQ(result, nullptr);
 }
 
 TEST_F(VpiCompleteTest, HandleReturnsNullptrForNoMatch) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   // Module has no net children, so asking for vpiNet should fail.
-  vpiHandle result = vpi_handle(vpiNet, mod);
+  vpiHandle result = VpiHandleC(vpiNet, mod);
   EXPECT_EQ(result, nullptr);
 }
 
@@ -72,7 +72,7 @@ TEST_F(VpiCompleteTest, HandleByNameNullReturnsNullptr) {
 }
 
 // =============================================================================
-// §36.10: vpi_handle_by_index — index-based child lookup
+// §36.10: VpiHandleByIndexC — index-based child lookup
 // =============================================================================
 
 TEST_F(VpiCompleteTest, HandleByIndexReturnCorrectChild) {
@@ -80,19 +80,19 @@ TEST_F(VpiCompleteTest, HandleByIndexReturnCorrectChild) {
   vpi_ctx_.CreatePort("a", kVpiInput, mod);
   auto* port_b = vpi_ctx_.CreatePort("b", kVpiOutput, mod);
 
-  vpiHandle result = vpi_handle_by_index(mod, 1);
+  vpiHandle result = VpiHandleByIndexC(mod, 1);
   ASSERT_NE(result, nullptr);
   EXPECT_EQ(result, port_b);
 }
 
 TEST_F(VpiCompleteTest, HandleByIndexNullParentReturnsNullptr) {
-  vpiHandle result = vpi_handle_by_index(nullptr, 0);
+  vpiHandle result = VpiHandleByIndexC(nullptr, 0);
   EXPECT_EQ(result, nullptr);
 }
 
 TEST_F(VpiCompleteTest, HandleByIndexOutOfRangeReturnsNullptr) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
-  vpiHandle result = vpi_handle_by_index(mod, 99);
+  vpiHandle result = VpiHandleByIndexC(mod, 99);
   EXPECT_EQ(result, nullptr);
 }
 
@@ -476,14 +476,14 @@ TEST_F(VpiCompleteTest, RemoveCbMarksRemoved) {
   vpiHandle h = vpi_register_cb(&cb);
   ASSERT_NE(h, nullptr);
 
-  int result = vpi_remove_cb(h);
+  int result = VpiRemoveCbC(h);
   EXPECT_EQ(result, 1);
   // After removal the callback reason is set to -1.
   EXPECT_EQ(vpi_ctx_.RegisteredCallbacks()[0].reason, -1);
 }
 
 TEST_F(VpiCompleteTest, RemoveCbNullReturnsZero) {
-  EXPECT_EQ(vpi_remove_cb(nullptr), 0);
+  EXPECT_EQ(VpiRemoveCbC(nullptr), 0);
 }
 
 TEST_F(VpiCompleteTest, CbValueChangeWithWatcherFires) {
@@ -511,7 +511,7 @@ TEST_F(VpiCompleteTest, CbValueChangeWithWatcherFires) {
 // =============================================================================
 
 TEST_F(VpiCompleteTest, GetVlogInfoReturnsProductAndVersion) {
-  s_vpi_vlog_info info = {};
+  SVpiVlogInfo info = {};
   vpi_get_vlog_info(&info);
   ASSERT_NE(info.product, nullptr);
   ASSERT_NE(info.version, nullptr);
@@ -526,30 +526,30 @@ TEST_F(VpiCompleteTest, GetVlogInfoNullDoesNotCrash) {
 }
 
 // =============================================================================
-// §36.34: vpi_control — simulation control
+// §36.34: VpiControlC — simulation control
 // =============================================================================
 
 TEST_F(VpiCompleteTest, ControlFinish) {
   EXPECT_FALSE(vpi_ctx_.FinishRequested());
-  int result = vpi_control(vpiFinish, 0);
+  int result = VpiControlC(vpiFinish, 0);
   EXPECT_EQ(result, 1);
   EXPECT_TRUE(vpi_ctx_.FinishRequested());
 }
 
 TEST_F(VpiCompleteTest, ControlStop) {
   EXPECT_FALSE(vpi_ctx_.StopRequested());
-  int result = vpi_control(vpiStop, 0);
+  int result = VpiControlC(vpiStop, 0);
   EXPECT_EQ(result, 1);
   EXPECT_TRUE(vpi_ctx_.StopRequested());
 }
 
 TEST_F(VpiCompleteTest, ControlUnknownOpReturnsZero) {
-  int result = vpi_control(999, 0);
+  int result = VpiControlC(999, 0);
   EXPECT_EQ(result, 0);
 }
 
 // =============================================================================
-// §36.23: vpi_handle_multi — multi-reference handle
+// §36.23: VpiHandleMultiC — multi-reference handle
 // =============================================================================
 
 TEST_F(VpiCompleteTest, HandleMultiCombinesChildren) {
@@ -559,29 +559,29 @@ TEST_F(VpiCompleteTest, HandleMultiCombinesChildren) {
   auto* mod2 = vpi_ctx_.CreateModule("m2", "m2");
   vpi_ctx_.CreatePort("p2", kVpiOutput, mod2);
 
-  vpiHandle h = vpi_handle_multi(vpiPort, mod1, mod2);
+  vpiHandle h = VpiHandleMultiC(vpiPort, mod1, mod2);
   ASSERT_NE(h, nullptr);
   EXPECT_EQ(static_cast<int>(h->children.size()), 2);
 }
 
 TEST_F(VpiCompleteTest, HandleMultiBothNullReturnsNull) {
-  vpiHandle h = vpi_handle_multi(vpiPort, nullptr, nullptr);
+  vpiHandle h = VpiHandleMultiC(vpiPort, nullptr, nullptr);
   EXPECT_EQ(h, nullptr);
 }
 
 // =============================================================================
-// §36.33: vpi_chk_error — error checking
+// §36.33: VpiChkErrorC — error checking
 // =============================================================================
 
 TEST_F(VpiCompleteTest, ChkErrorNoErrorReturnsZero) {
-  s_vpi_error_info info = {};
-  int result = vpi_chk_error(&info);
+  SVpiErrorInfo info = {};
+  int result = VpiChkErrorC(&info);
   EXPECT_EQ(result, 0);
   EXPECT_EQ(info.level, 0);
 }
 
 TEST_F(VpiCompleteTest, ChkErrorNullDoesNotCrash) {
-  int result = vpi_chk_error(nullptr);
+  int result = VpiChkErrorC(nullptr);
   // No error pending, so returns 0.
   EXPECT_EQ(result, 0);
 }

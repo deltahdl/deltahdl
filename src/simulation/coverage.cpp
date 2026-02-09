@@ -24,29 +24,35 @@ static bool MatchesBin(const CoverBin& bin, int64_t value) {
   return MatchesBinValues(bin, value);
 }
 
+// Find the sample value for a named coverpoint, or return false if absent.
+static bool FindSampleValue(
+    const std::vector<std::pair<std::string, int64_t>>& vals,
+    const std::string& cp_name, int64_t& out) {
+  for (const auto& [name, val] : vals) {
+    if (name == cp_name) {
+      out = val;
+      return true;
+    }
+  }
+  return false;
+}
+
+// Check if a value appears in a set of integers.
+static bool IsInValueSet(const std::vector<int64_t>& set, int64_t val) {
+  for (int64_t v : set) {
+    if (v == val) return true;
+  }
+  return false;
+}
+
 static bool MatchesCrossBin(
     const CrossBin& cbin, const std::vector<std::string>& cp_names,
     const std::vector<std::pair<std::string, int64_t>>& vals) {
   if (cbin.value_sets.size() != cp_names.size()) return false;
   for (size_t i = 0; i < cp_names.size(); ++i) {
     int64_t sample_val = 0;
-    bool found = false;
-    for (const auto& [name, val] : vals) {
-      if (name == cp_names[i]) {
-        sample_val = val;
-        found = true;
-        break;
-      }
-    }
-    if (!found) return false;
-    bool in_set = false;
-    for (int64_t v : cbin.value_sets[i]) {
-      if (v == sample_val) {
-        in_set = true;
-        break;
-      }
-    }
-    if (!in_set) return false;
+    if (!FindSampleValue(vals, cp_names[i], sample_val)) return false;
+    if (!IsInValueSet(cbin.value_sets[i], sample_val)) return false;
   }
   return true;
 }

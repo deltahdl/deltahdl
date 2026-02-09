@@ -77,43 +77,50 @@ static Logic4Vec EnumName(const EnumTypeInfo& info, uint64_t current,
   return MakeLogic4VecVal(arena, 8, 0);
 }
 
+// Parse the optional count argument for next()/prev(), defaulting to 1.
+static uint32_t ParseStepCount(const Expr* call_expr, SimContext& ctx,
+                               Arena& arena) {
+  if (call_expr->args.empty()) return 1;
+  return static_cast<uint32_t>(
+      EvalExpr(call_expr->args[0], ctx, arena).ToUint64());
+}
+
 // Dispatch an enum method call. Returns true if dispatched.
+// Uses a struct to bundle context and stay within the 5-argument limit.
+struct EnumMethodArgs {
+  const EnumTypeInfo& info;
+  uint64_t current;
+  const Expr* call_expr;
+  SimContext& ctx;
+  Arena& arena;
+};
+
 static bool DispatchEnumMethod(std::string_view method,
-                               const EnumTypeInfo& info, uint64_t current,
-                               const Expr* call_expr, SimContext& ctx,
-                               Arena& arena, Logic4Vec& out) {
+                               const EnumMethodArgs& args, Logic4Vec& out) {
   if (method == "first") {
-    out = EnumFirst(info, arena);
+    out = EnumFirst(args.info, args.arena);
     return true;
   }
   if (method == "last") {
-    out = EnumLast(info, arena);
+    out = EnumLast(args.info, args.arena);
     return true;
   }
   if (method == "next") {
-    uint32_t count = 1;
-    if (!call_expr->args.empty()) {
-      count = static_cast<uint32_t>(
-          EvalExpr(call_expr->args[0], ctx, arena).ToUint64());
-    }
-    out = EnumNext(info, current, count, arena);
+    uint32_t count = ParseStepCount(args.call_expr, args.ctx, args.arena);
+    out = EnumNext(args.info, args.current, count, args.arena);
     return true;
   }
   if (method == "prev") {
-    uint32_t count = 1;
-    if (!call_expr->args.empty()) {
-      count = static_cast<uint32_t>(
-          EvalExpr(call_expr->args[0], ctx, arena).ToUint64());
-    }
-    out = EnumPrev(info, current, count, arena);
+    uint32_t count = ParseStepCount(args.call_expr, args.ctx, args.arena);
+    out = EnumPrev(args.info, args.current, count, args.arena);
     return true;
   }
   if (method == "num") {
-    out = EnumNum(info, arena);
+    out = EnumNum(args.info, args.arena);
     return true;
   }
   if (method == "name") {
-    out = EnumName(info, current, arena);
+    out = EnumName(args.info, args.current, args.arena);
     return true;
   }
   return false;
@@ -139,7 +146,8 @@ bool TryEvalEnumMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   auto* var = ctx.FindVariable(var_name);
   uint64_t current = var ? var->value.ToUint64() : 0;
 
-  return DispatchEnumMethod(method_name, *info, current, expr, ctx, arena, out);
+  EnumMethodArgs args{*info, current, expr, ctx, arena};
+  return DispatchEnumMethod(method_name, args, out);
 }
 
 }  // namespace delta

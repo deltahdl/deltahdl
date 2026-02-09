@@ -98,6 +98,25 @@ uint8_t Parser::ParseStrength1() {
 }
 // clang-format on
 
+// Parse gate terminals when '(' was already consumed (no strength spec).
+void Parser::ParseInlineGateTerminals(GateKind kind, SourceLoc loc,
+                                      std::vector<ModuleItem*>& items) {
+  auto* item = arena_.Create<ModuleItem>();
+  item->kind = ModuleItemKind::kGateInst;
+  item->loc = loc;
+  item->gate_kind = kind;
+  item->gate_terminals.push_back(ParseExpr());
+  while (Match(TokenKind::kComma)) {
+    item->gate_terminals.push_back(ParseExpr());
+  }
+  Expect(TokenKind::kRParen);
+  items.push_back(item);
+  while (Match(TokenKind::kComma)) {
+    items.push_back(ParseOneGateInstance(kind, loc));
+  }
+  Expect(TokenKind::kSemicolon);
+}
+
 ModuleItem* Parser::ParseOneGateInstance(GateKind kind, SourceLoc loc) {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kGateInst;
@@ -172,20 +191,7 @@ void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
     has_strength = IsStrength0Token(tk) || IsStrength1Token(tk);
     if (!has_strength) {
       // Not strength — already consumed '(', parse unnamed instance inline.
-      auto* item = arena_.Create<ModuleItem>();
-      item->kind = ModuleItemKind::kGateInst;
-      item->loc = loc;
-      item->gate_kind = gate_kind;
-      item->gate_terminals.push_back(ParseExpr());
-      while (Match(TokenKind::kComma)) {
-        item->gate_terminals.push_back(ParseExpr());
-      }
-      Expect(TokenKind::kRParen);
-      items.push_back(item);
-      while (Match(TokenKind::kComma)) {
-        items.push_back(ParseOneGateInstance(gate_kind, loc));
-      }
-      Expect(TokenKind::kSemicolon);
+      ParseInlineGateTerminals(gate_kind, loc, items);
       return;
     }
     // Parse strength spec.

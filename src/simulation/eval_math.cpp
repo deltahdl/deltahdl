@@ -237,12 +237,11 @@ static Logic4Vec EvalDistGeneric(const Expr* /*expr*/, SimContext& ctx,
 }
 
 // ============================================================================
-// Public dispatch: EvalMathSysCall
+// Category dispatchers
 // ============================================================================
 
-Logic4Vec EvalMathSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
-                          std::string_view name) {
-  // Basic math
+static Logic4Vec EvalBasicMath(const Expr* expr, SimContext& ctx, Arena& arena,
+                               std::string_view name) {
   if (name == "$ln") return EvalLn(expr, ctx, arena);
   if (name == "$log10") return EvalLog10(expr, ctx, arena);
   if (name == "$exp") return EvalExp(expr, ctx, arena);
@@ -250,7 +249,11 @@ Logic4Vec EvalMathSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   if (name == "$pow") return EvalPow(expr, ctx, arena);
   if (name == "$floor") return EvalFloor(expr, ctx, arena);
   if (name == "$ceil") return EvalCeil(expr, ctx, arena);
-  // Trigonometric
+  return MakeLogic4VecVal(arena, 1, 0);
+}
+
+static Logic4Vec EvalTrigSysCall(const Expr* expr, SimContext& ctx,
+                                 Arena& arena, std::string_view name) {
   if (name == "$sin") return EvalSin(expr, ctx, arena);
   if (name == "$cos") return EvalCos(expr, ctx, arena);
   if (name == "$tan") return EvalTan(expr, ctx, arena);
@@ -258,7 +261,11 @@ Logic4Vec EvalMathSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   if (name == "$acos") return EvalAcos(expr, ctx, arena);
   if (name == "$atan") return EvalAtan(expr, ctx, arena);
   if (name == "$atan2") return EvalAtan2(expr, ctx, arena);
-  // Hyperbolic
+  return MakeLogic4VecVal(arena, 1, 0);
+}
+
+static Logic4Vec EvalHyperbolicSysCall(const Expr* expr, SimContext& ctx,
+                                       Arena& arena, std::string_view name) {
   if (name == "$hypot") return EvalHypot(expr, ctx, arena);
   if (name == "$sinh") return EvalSinh(expr, ctx, arena);
   if (name == "$cosh") return EvalCosh(expr, ctx, arena);
@@ -266,17 +273,45 @@ Logic4Vec EvalMathSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   if (name == "$asinh") return EvalAsinh(expr, ctx, arena);
   if (name == "$acosh") return EvalAcosh(expr, ctx, arena);
   if (name == "$atanh") return EvalAtanh(expr, ctx, arena);
-  // Distribution functions
+  return MakeLogic4VecVal(arena, 1, 0);
+}
+
+static Logic4Vec EvalDistSysCall(const Expr* expr, SimContext& ctx,
+                                 Arena& arena, std::string_view name) {
   if (name == "$dist_uniform") return EvalDistUniform(expr, ctx, arena);
   if (name == "$dist_normal") return EvalDistNormal(expr, ctx, arena);
-  if (name == "$dist_exponential") {
-    return EvalDistExponential(expr, ctx, arena);
-  }
+  if (name == "$dist_exponential") return EvalDistExponential(expr, ctx, arena);
   if (name == "$dist_poisson") return EvalDistPoisson(expr, ctx, arena);
-  if (name == "$dist_chi_square" || name == "$dist_t" ||
-      name == "$dist_erlang") {
-    return EvalDistGeneric(expr, ctx, arena);
-  }
+  return EvalDistGeneric(expr, ctx, arena);
+}
+
+// ============================================================================
+// Public dispatch: EvalMathSysCall
+// ============================================================================
+
+static bool IsBasicMathCall(std::string_view n) {
+  return n == "$ln" || n == "$log10" || n == "$exp" || n == "$sqrt" ||
+         n == "$pow" || n == "$floor" || n == "$ceil";
+}
+
+static bool IsTrigCall(std::string_view n) {
+  return n == "$sin" || n == "$cos" || n == "$tan" || n == "$asin" ||
+         n == "$acos" || n == "$atan" || n == "$atan2";
+}
+
+static bool IsHyperbolicCall(std::string_view n) {
+  return n == "$hypot" || n == "$sinh" || n == "$cosh" || n == "$tanh" ||
+         n == "$asinh" || n == "$acosh" || n == "$atanh";
+}
+
+Logic4Vec EvalMathSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                          std::string_view name) {
+  if (IsBasicMathCall(name)) return EvalBasicMath(expr, ctx, arena, name);
+  if (IsTrigCall(name)) return EvalTrigSysCall(expr, ctx, arena, name);
+  if (IsHyperbolicCall(name))
+    return EvalHyperbolicSysCall(expr, ctx, arena, name);
+  if (name.starts_with("$dist_"))
+    return EvalDistSysCall(expr, ctx, arena, name);
   return MakeLogic4VecVal(arena, 1, 0);
 }
 

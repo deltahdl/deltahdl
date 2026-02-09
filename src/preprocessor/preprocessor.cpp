@@ -497,6 +497,20 @@ std::vector<std::string_view> Preprocessor::SplitMacroArgs(
   return args;
 }
 
+// Replace an identifier token with its parameter argument if it matches.
+static void SubstituteToken(std::string_view token,
+                            const std::vector<std::string>& params,
+                            const std::vector<std::string_view>& args,
+                            std::string& result) {
+  for (size_t p = 0; p < params.size() && p < args.size(); ++p) {
+    if (token == params[p]) {
+      result.append(args[p]);
+      return;
+    }
+  }
+  result.append(token);
+}
+
 std::string Preprocessor::SubstituteParams(
     std::string_view body, const std::vector<std::string>& params,
     const std::vector<std::string_view>& args) {
@@ -515,16 +529,7 @@ std::string Preprocessor::SubstituteParams(
     }
     size_t start = i;
     while (i < body.size() && IsIdentChar(body[i])) ++i;
-    auto token = body.substr(start, i - start);
-    bool replaced = false;
-    for (size_t p = 0; p < params.size() && p < args.size(); ++p) {
-      if (token == params[p]) {
-        result.append(args[p]);
-        replaced = true;
-        break;
-      }
-    }
-    if (!replaced) result.append(token);
+    SubstituteToken(body.substr(start, i - start), params, args, result);
   }
   return result;
 }

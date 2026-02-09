@@ -40,21 +40,21 @@ DpiArgValue DpiArgValue::FromString(std::string v) {
   return a;
 }
 
-DpiArgValue DpiArgValue::FromChandle(svChandle v) {
+DpiArgValue DpiArgValue::FromChandle(SvChandle v) {
   DpiArgValue a;
   a.type = DataTypeKind::kChandle;
   a.data.chandle_val = v;
   return a;
 }
 
-DpiArgValue DpiArgValue::FromBit(svBit v) {
+DpiArgValue DpiArgValue::FromBit(SvBit v) {
   DpiArgValue a;
   a.type = DataTypeKind::kBit;
   a.data.bit_val = v;
   return a;
 }
 
-DpiArgValue DpiArgValue::FromLogic(svLogic v) {
+DpiArgValue DpiArgValue::FromLogic(SvLogic v) {
   DpiArgValue a;
   a.type = DataTypeKind::kLogic;
   a.data.logic_val = v;
@@ -65,9 +65,9 @@ int32_t DpiArgValue::AsInt() const { return data.int_val; }
 int64_t DpiArgValue::AsLongint() const { return data.longint_val; }
 double DpiArgValue::AsReal() const { return data.real_val; }
 const std::string& DpiArgValue::AsString() const { return string_val; }
-svChandle DpiArgValue::AsChandle() const { return data.chandle_val; }
-svBit DpiArgValue::AsBit() const { return data.bit_val; }
-svLogic DpiArgValue::AsLogic() const { return data.logic_val; }
+SvChandle DpiArgValue::AsChandle() const { return data.chandle_val; }
+SvBit DpiArgValue::AsBit() const { return data.bit_val; }
+SvLogic DpiArgValue::AsLogic() const { return data.logic_val; }
 
 // =============================================================================
 // DpiRuntime: import management
@@ -158,13 +158,13 @@ const DpiScope* DpiRuntime::GetScope() const { return current_scope_; }
 // DpiRuntime: open array support
 // =============================================================================
 
-uint32_t DpiRuntime::SvLow(const svOpenArrayHandle& /*h*/) { return 0; }
+uint32_t DpiRuntime::SvLow(const SvOpenArrayHandle& /*h*/) { return 0; }
 
-uint32_t DpiRuntime::SvHigh(const svOpenArrayHandle& h) {
+uint32_t DpiRuntime::SvHigh(const SvOpenArrayHandle& h) {
   return h.size > 0 ? h.size - 1 : 0;
 }
 
-uint32_t DpiRuntime::SvSize(const svOpenArrayHandle& h) { return h.size; }
+uint32_t DpiRuntime::SvSize(const SvOpenArrayHandle& h) { return h.size; }
 
 // =============================================================================
 // AssertionApi

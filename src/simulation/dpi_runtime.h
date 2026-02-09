@@ -18,25 +18,25 @@ namespace delta {
 // =============================================================================
 
 // Two-state scalar types.
-using svBit = uint8_t;
-using svScalar = uint8_t;
+using SvBit = uint8_t;
+using SvScalar = uint8_t;
 
 // Four-state scalar types.
-using svLogic = uint8_t;
+using SvLogic = uint8_t;
 
 // Packed array element types.
-using svBitVecVal = uint32_t;
+using SvBitVecVal = uint32_t;
 
-struct svLogicVecVal {
+struct SvLogicVecVal {
   uint32_t aval = 0;
   uint32_t bval = 0;
 };
 
 // Chandle: opaque pointer to C data.
-using svChandle = void*;
+using SvChandle = void*;
 
 // Open array handle (S35.5.6).
-struct svOpenArrayHandle {
+struct SvOpenArrayHandle {
   void* data = nullptr;
   uint32_t size = 0;
   uint32_t elem_width = 0;
@@ -62,9 +62,9 @@ struct DpiArgValue {
     int32_t int_val;
     int64_t longint_val;
     double real_val;
-    svChandle chandle_val;
-    svBit bit_val;
-    svLogic logic_val;
+    SvChandle chandle_val;
+    SvBit bit_val;
+    SvLogic logic_val;
   } data = {};
   std::string string_val;
 
@@ -72,17 +72,17 @@ struct DpiArgValue {
   static DpiArgValue FromLongint(int64_t v);
   static DpiArgValue FromReal(double v);
   static DpiArgValue FromString(std::string v);
-  static DpiArgValue FromChandle(svChandle v);
-  static DpiArgValue FromBit(svBit v);
-  static DpiArgValue FromLogic(svLogic v);
+  static DpiArgValue FromChandle(SvChandle v);
+  static DpiArgValue FromBit(SvBit v);
+  static DpiArgValue FromLogic(SvLogic v);
 
   int32_t AsInt() const;
   int64_t AsLongint() const;
   double AsReal() const;
   const std::string& AsString() const;
-  svChandle AsChandle() const;
-  svBit AsBit() const;
-  svLogic AsLogic() const;
+  SvChandle AsChandle() const;
+  SvBit AsBit() const;
+  SvLogic AsLogic() const;
 };
 
 // =============================================================================
@@ -146,9 +146,9 @@ class DpiRuntime {
   const DpiScope* GetScope() const;
 
   // Open array support (S35.5.6).
-  static uint32_t SvLow(const svOpenArrayHandle& h);
-  static uint32_t SvHigh(const svOpenArrayHandle& h);
-  static uint32_t SvSize(const svOpenArrayHandle& h);
+  static uint32_t SvLow(const SvOpenArrayHandle& h);
+  static uint32_t SvHigh(const SvOpenArrayHandle& h);
+  static uint32_t SvSize(const SvOpenArrayHandle& h);
 
  private:
   std::vector<DpiRtFunction> imports_;
@@ -285,7 +285,7 @@ struct DataReadValue {
   double real_val = 0.0;
   std::string str_val;
   uint32_t scalar_val = 0;
-  std::vector<svLogicVecVal> vector_val;
+  std::vector<SvLogicVecVal> vector_val;
 };
 
 // Value change callback.

@@ -113,51 +113,62 @@ int64_t ConstraintSolver::DistributionSample(
   return weights.back().value;
 }
 
+// Evaluate a range constraint: lo <= var <= hi.
+static bool EvalRange(int64_t val, int64_t lo, int64_t hi) {
+  return val >= lo && val <= hi;
+}
+
+// Evaluate a set-membership constraint: var inside {v1, v2, ...}.
+static bool EvalSetMembership(int64_t val,
+                              const std::vector<int64_t>& set_values) {
+  for (int64_t v : set_values) {
+    if (val == v) return true;
+  }
+  return false;
+}
+
+// Evaluate a comparison constraint against the variable's current value.
+static bool EvalComparison(ConstraintKind kind, int64_t val, int64_t target) {
+  switch (kind) {
+    case ConstraintKind::kEqual:
+      return val == target;
+    case ConstraintKind::kNotEqual:
+      return val != target;
+    case ConstraintKind::kLessThan:
+      return val < target;
+    case ConstraintKind::kGreaterThan:
+      return val > target;
+    case ConstraintKind::kLessEqual:
+      return val <= target;
+    case ConstraintKind::kGreaterEqual:
+      return val >= target;
+    default:
+      return true;
+  }
+}
+
 // Evaluate a single constraint against current values.
 bool ConstraintSolver::EvalConstraint(const ConstraintExpr& expr) const {
   switch (expr.kind) {
     case ConstraintKind::kRange: {
       auto it = values_.find(expr.var_name);
       if (it == values_.end()) return true;
-      return it->second >= expr.lo && it->second <= expr.hi;
+      return EvalRange(it->second, expr.lo, expr.hi);
     }
     case ConstraintKind::kSetMembership: {
       auto it = values_.find(expr.var_name);
       if (it == values_.end()) return true;
-      for (int64_t v : expr.set_values) {
-        if (it->second == v) return true;
-      }
-      return false;
+      return EvalSetMembership(it->second, expr.set_values);
     }
-    case ConstraintKind::kEqual: {
-      auto it = values_.find(expr.var_name);
-      if (it == values_.end()) return true;
-      return it->second == expr.lo;
-    }
-    case ConstraintKind::kNotEqual: {
-      auto it = values_.find(expr.var_name);
-      if (it == values_.end()) return true;
-      return it->second != expr.lo;
-    }
-    case ConstraintKind::kLessThan: {
-      auto it = values_.find(expr.var_name);
-      if (it == values_.end()) return true;
-      return it->second < expr.lo;
-    }
-    case ConstraintKind::kGreaterThan: {
-      auto it = values_.find(expr.var_name);
-      if (it == values_.end()) return true;
-      return it->second > expr.lo;
-    }
-    case ConstraintKind::kLessEqual: {
-      auto it = values_.find(expr.var_name);
-      if (it == values_.end()) return true;
-      return it->second <= expr.lo;
-    }
+    case ConstraintKind::kEqual:
+    case ConstraintKind::kNotEqual:
+    case ConstraintKind::kLessThan:
+    case ConstraintKind::kGreaterThan:
+    case ConstraintKind::kLessEqual:
     case ConstraintKind::kGreaterEqual: {
       auto it = values_.find(expr.var_name);
       if (it == values_.end()) return true;
-      return it->second >= expr.lo;
+      return EvalComparison(expr.kind, it->second, expr.lo);
     }
     case ConstraintKind::kImplication:
       return EvalImplication(expr);
@@ -166,9 +177,8 @@ bool ConstraintSolver::EvalConstraint(const ConstraintExpr& expr) const {
     case ConstraintKind::kUnique:
       return EvalUnique(expr);
     case ConstraintKind::kDist:
-      return true;  // Dist is applied during generation, not as hard check.
     case ConstraintKind::kSoft:
-      // §18.5.13: Soft constraints are best-effort, never block.
+      // Dist is applied during generation; soft constraints are best-effort.
       return true;
     case ConstraintKind::kCustom:
       return expr.eval_fn ? expr.eval_fn(values_) : true;

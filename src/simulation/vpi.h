@@ -272,8 +272,8 @@ using s_vpi_time = delta::VpiTime;
 using s_cb_data = delta::VpiCbData;
 using s_vpi_systf_data = delta::VpiSystfData;
 using s_vpi_vecval = delta::VpiVectorVal;
-using s_vpi_error_info = delta::VpiErrorInfo;
-using s_vpi_vlog_info = delta::VpiVlogInfo;
+using SVpiErrorInfo = delta::VpiErrorInfo;
+using SVpiVlogInfo = delta::VpiVlogInfo;
 
 // VPI constants [IEEE 1800-2023 §36.12, §36.17, §36.18, §36.20].
 // Defined as macros per IEEE convention (vpi_user.h uses #define).
@@ -337,20 +337,20 @@ using s_vpi_vlog_info = delta::VpiVlogInfo;
 
 // VPI C API function declarations [IEEE 1800-2023 §36.7-§36.34].
 vpiHandle vpi_register_systf(s_vpi_systf_data* data);
-vpiHandle vpi_handle(int type, vpiHandle ref);
+vpiHandle VpiHandleC(int type, vpiHandle ref);
 vpiHandle vpi_handle_by_name(const char* name, vpiHandle scope);
-vpiHandle vpi_handle_by_index(vpiHandle parent, int index);
-vpiHandle vpi_handle_multi(int type, vpiHandle ref1, vpiHandle ref2);
+vpiHandle VpiHandleByIndexC(vpiHandle parent, int index);
+vpiHandle VpiHandleMultiC(int type, vpiHandle ref1, vpiHandle ref2);
 vpiHandle vpi_iterate(int type, vpiHandle ref);
 vpiHandle vpi_scan(vpiHandle iterator);
 void vpi_get_value(vpiHandle obj, s_vpi_value* value);
 vpiHandle vpi_put_value(vpiHandle obj, s_vpi_value* value, s_vpi_time* time,
                         int flags);
 vpiHandle vpi_register_cb(s_cb_data* data);
-int vpi_remove_cb(vpiHandle cb_handle);
+int VpiRemoveCbC(vpiHandle cb_handle);
 int vpi_get(int property, vpiHandle obj);
 const char* vpi_get_str(int property, vpiHandle obj);
 int vpi_free_object(vpiHandle obj);
-int vpi_control(int operation, ...);
-int vpi_chk_error(s_vpi_error_info* info);
-void vpi_get_vlog_info(s_vpi_vlog_info* info);
+int VpiControlC(int operation, ...);
+int VpiChkErrorC(SVpiErrorInfo* info);
+void vpi_get_vlog_info(SVpiVlogInfo* info);

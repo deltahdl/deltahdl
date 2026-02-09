@@ -165,10 +165,10 @@ TEST(DpiRuntime, CallMissingExportReturnsZero) {
 // svdpi.h type mapping (S35.5)
 // =============================================================================
 
-TEST(DpiRuntime, SvBitVecValSize) { EXPECT_EQ(sizeof(svBitVecVal), 4u); }
+TEST(DpiRuntime, SvBitVecValSize) { EXPECT_EQ(sizeof(SvBitVecVal), 4u); }
 
 TEST(DpiRuntime, SvLogicVecValLayout) {
-  svLogicVecVal v;
+  SvLogicVecVal v;
   v.aval = 0xDEADBEEF;
   v.bval = 0;
   EXPECT_EQ(v.aval, 0xDEADBEEFu);
@@ -226,7 +226,7 @@ TEST(DpiRuntime, SetAndGetScope) {
 // =============================================================================
 
 TEST(DpiRuntime, OpenArrayHandleOperations) {
-  svOpenArrayHandle h;
+  SvOpenArrayHandle h;
   h.data = nullptr;
   h.size = 10;
   h.elem_width = 32;
@@ -237,7 +237,7 @@ TEST(DpiRuntime, OpenArrayHandleOperations) {
 }
 
 TEST(DpiRuntime, OpenArrayEmptyHandle) {
-  svOpenArrayHandle h;
+  SvOpenArrayHandle h;
   h.data = nullptr;
   h.size = 0;
   h.elem_width = 0;

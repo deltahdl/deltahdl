@@ -383,40 +383,55 @@ static std::string FormatArg(const Logic4Vec& val, char spec) {
   }
 }
 
+// Append a literal (non-format) character, handling backslash escapes.
+static void AppendLiteralChar(const std::string& fmt, size_t& i,
+                              std::string& out) {
+  if (fmt[i] == '\\' && i + 1 < fmt.size()) {
+    out += (fmt[i + 1] == 'n') ? '\n' : fmt[i + 1];
+    ++i;
+  } else {
+    out += fmt[i];
+  }
+}
+
+// Process a single format specifier starting at '%'.
+// Advances i past the specifier and returns true if an arg was consumed.
+static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
+                              const std::vector<Logic4Vec>& vals, size_t& vi,
+                              std::string& out) {
+  // Handle %m (hierarchical name -- no arg consumed).
+  if (fmt[i + 1] == 'm') {
+    out += "<module>";
+    ++i;
+    return false;
+  }
+  // Handle %% (literal percent).
+  if (fmt[i + 1] == '%') {
+    out += '%';
+    ++i;
+    return false;
+  }
+  // Skip optional '0' width modifier (e.g. %0d).
+  size_t j = i + 1;
+  while (j < fmt.size() && (fmt[j] >= '0' && fmt[j] <= '9')) ++j;
+  char spec = (j < fmt.size()) ? fmt[j] : 'd';
+  if (vi < vals.size()) {
+    out += FormatArg(vals[vi++], spec);
+  }
+  i = j;
+  return true;
+}
+
 std::string FormatDisplay(const std::string& fmt,
                           const std::vector<Logic4Vec>& vals) {
   std::string out;
   size_t vi = 0;
   for (size_t i = 0; i < fmt.size(); ++i) {
     if (fmt[i] != '%' || i + 1 >= fmt.size()) {
-      if (fmt[i] == '\\' && i + 1 < fmt.size()) {
-        out += (fmt[i + 1] == 'n') ? '\n' : fmt[i + 1];
-        ++i;
-      } else {
-        out += fmt[i];
-      }
+      AppendLiteralChar(fmt, i, out);
       continue;
     }
-    // Handle %m (hierarchical name -- no arg consumed).
-    if (fmt[i + 1] == 'm') {
-      out += "<module>";
-      ++i;
-      continue;
-    }
-    // Handle %% (literal percent).
-    if (fmt[i + 1] == '%') {
-      out += '%';
-      ++i;
-      continue;
-    }
-    // Skip optional '0' width modifier (e.g. %0d).
-    size_t j = i + 1;
-    while (j < fmt.size() && (fmt[j] >= '0' && fmt[j] <= '9')) ++j;
-    char spec = (j < fmt.size()) ? fmt[j] : 'd';
-    if (vi < vals.size()) {
-      out += FormatArg(vals[vi++], spec);
-    }
-    i = j;
+    ProcessFormatSpec(fmt, i, vals, vi, out);
   }
   return out;
 }
@@ -562,6 +577,24 @@ static Logic4Vec EvalSystemCommand(const Expr* expr, Arena& arena) {
   return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(ret));
 }
 
+static bool IsUtilitySysCall(std::string_view n) {
+  return n == "$clog2" || n == "$bits" || n == "$unsigned" || n == "$signed" ||
+         n == "$countones" || n == "$onehot" || n == "$onehot0" ||
+         n == "$isunknown" || n == "$test$plusargs" || n == "$value$plusargs" ||
+         n == "$typename" || n == "$sformatf";
+}
+
+static bool IsIOSysCall(std::string_view n) {
+  return n == "$fopen" || n == "$fclose" || n == "$fwrite" ||
+         n == "$fdisplay" || n == "$readmemh" || n == "$readmemb" ||
+         n == "$writememh" || n == "$writememb" || n == "$sscanf";
+}
+
+static bool IsNoOpSysCall(std::string_view n) {
+  return n == "$monitoron" || n == "$monitoroff" || n == "$printtimescale" ||
+         n == "$timeformat";
+}
+
 static Logic4Vec EvalMiscSysCall(const Expr* expr, SimContext& ctx,
                                  Arena& arena, std::string_view name) {
   if (name == "$time" || name == "$stime" || name == "$realtime") {
@@ -570,39 +603,18 @@ static Logic4Vec EvalMiscSysCall(const Expr* expr, SimContext& ctx,
   if (name == "$strobe" || name == "$monitor") {
     return EvalDeferredPrint(expr, ctx, arena);
   }
-  if (name == "$monitoron" || name == "$monitoroff") {
-    return MakeLogic4VecVal(arena, 1, 0);
-  }
-  if (name == "$printtimescale" || name == "$timeformat") {
-    return MakeLogic4VecVal(arena, 1, 0);
-  }
+  if (IsNoOpSysCall(name)) return MakeLogic4VecVal(arena, 1, 0);
   if (name == "$system") return EvalSystemCommand(expr, arena);
   if (name == "$stacktrace") {
     std::cerr << "stacktrace not available\n";
     return MakeLogic4VecVal(arena, 1, 0);
   }
-  if (name.starts_with("$dump")) {
-    return EvalVcdSysCall(ctx, arena, name);
-  }
-  if (IsMathSysCall(name)) {
-    return EvalMathSysCall(expr, ctx, arena, name);
-  }
-  // §20 utility system calls.
-  if (name == "$clog2" || name == "$bits" || name == "$unsigned" ||
-      name == "$signed" || name == "$countones" || name == "$onehot" ||
-      name == "$onehot0" || name == "$isunknown" || name == "$test$plusargs" ||
-      name == "$value$plusargs" || name == "$typename" || name == "$sformatf") {
-    return EvalUtilitySysCall(expr, ctx, arena, name);
-  }
-  // §21 I/O system calls (original set).
-  if (name == "$fopen" || name == "$fclose" || name == "$fwrite" ||
-      name == "$fdisplay" || name == "$readmemh" || name == "$readmemb" ||
-      name == "$writememh" || name == "$writememb" || name == "$sscanf") {
-    return EvalIOSysCall(expr, ctx, arena, name);
-  }
-  if (IsExtFileIOSysCall(name)) {
+  if (name.starts_with("$dump")) return EvalVcdSysCall(ctx, arena, name);
+  if (IsMathSysCall(name)) return EvalMathSysCall(expr, ctx, arena, name);
+  if (IsUtilitySysCall(name)) return EvalUtilitySysCall(expr, ctx, arena, name);
+  if (IsIOSysCall(name)) return EvalIOSysCall(expr, ctx, arena, name);
+  if (IsExtFileIOSysCall(name))
     return EvalFileIOSysCall(expr, ctx, arena, name);
-  }
   return EvalPrngCall(expr, ctx, arena, name);
 }
 
@@ -715,34 +727,39 @@ static int ResolveArgIndex(const ModuleItem* func, const Expr* expr,
   return -1;
 }
 
+// §13.5.2: Try to pass by reference. Returns true if aliased successfully.
+static bool TryBindRefArg(const Expr* expr, int arg_index,
+                          std::string_view param_name, SimContext& ctx) {
+  if (arg_index < 0) return false;
+  auto* call_arg = expr->args[static_cast<size_t>(arg_index)];
+  if (call_arg->kind != ExprKind::kIdentifier) return false;
+  auto* target = ctx.FindVariable(call_arg->text);
+  if (!target) return false;
+  ctx.AliasLocalVariable(param_name, target);
+  return true;
+}
+
+// §13.5.3: Evaluate call-site arg, use default value, or X.
+static Logic4Vec ResolveArgValue(const FunctionArg& param, const Expr* expr,
+                                 int arg_index, SimContext& ctx, Arena& arena) {
+  if (arg_index >= 0) {
+    return EvalExpr(expr->args[static_cast<size_t>(arg_index)], ctx, arena);
+  }
+  if (param.default_value) return EvalExpr(param.default_value, ctx, arena);
+  return MakeLogic4Vec(arena, 32);
+}
+
 // §13.5: Bind function arguments with named, default, and ref support.
 static void BindFunctionArgs(const ModuleItem* func, const Expr* expr,
                              SimContext& ctx, Arena& arena) {
   for (size_t i = 0; i < func->func_args.size(); ++i) {
     int ai = ResolveArgIndex(func, expr, i);
     auto dir = func->func_args[i].direction;
-
-    // §13.5.2: Pass by reference — alias the caller's variable.
-    if (dir == Direction::kRef && ai >= 0) {
-      auto* call_arg = expr->args[static_cast<size_t>(ai)];
-      if (call_arg->kind == ExprKind::kIdentifier) {
-        auto* target = ctx.FindVariable(call_arg->text);
-        if (target) {
-          ctx.AliasLocalVariable(func->func_args[i].name, target);
-          continue;
-        }
-      }
+    if (dir == Direction::kRef &&
+        TryBindRefArg(expr, ai, func->func_args[i].name, ctx)) {
+      continue;
     }
-
-    // §13.5.3: Evaluate call-site arg, use default value, or X.
-    Logic4Vec val;
-    if (ai >= 0) {
-      val = EvalExpr(expr->args[static_cast<size_t>(ai)], ctx, arena);
-    } else if (func->func_args[i].default_value) {
-      val = EvalExpr(func->func_args[i].default_value, ctx, arena);
-    } else {
-      val = MakeLogic4Vec(arena, 32);
-    }
+    auto val = ResolveArgValue(func->func_args[i], expr, ai, ctx, arena);
     auto* var = ctx.CreateLocalVariable(func->func_args[i].name, val.width);
     var->value = val;
   }
