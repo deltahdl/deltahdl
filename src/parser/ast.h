@@ -66,6 +66,11 @@ struct Expr {
   Expr* base = nullptr;
   Expr* index = nullptr;
   Expr* index_end = nullptr;
+  bool is_part_select_plus = false;   // [base +: width] (§7.4.5)
+  bool is_part_select_minus = false;  // [base -: width] (§7.4.5)
+
+  // Array method with-clause (§7.12)
+  Expr* with_expr = nullptr;
 
   // Concatenation / replicate / assignment pattern
   std::vector<Expr*> elements;
@@ -211,6 +216,8 @@ struct StructMember {
   Expr* packed_dim_left = nullptr;
   Expr* packed_dim_right = nullptr;
   std::string_view name;
+  Expr* init_expr = nullptr;         // Default member value (§7.2.2)
+  std::vector<Expr*> unpacked_dims;  // Unpacked dims on member (§7.4)
 };
 
 struct DataType {
@@ -218,7 +225,9 @@ struct DataType {
   bool is_signed = false;
   bool is_packed = false;
   bool is_const = false;
-  bool is_net = false;  // True for wire/tri/wand/wor/supply/uwire types.
+  bool is_net = false;     // True for wire/tri/wand/wor/supply/uwire types.
+  bool is_tagged = false;  // union tagged (§7.3.2)
+  bool is_soft = false;    // union soft (§7.3.1)
   Expr* packed_dim_left = nullptr;
   Expr* packed_dim_right = nullptr;
   std::string_view type_name;

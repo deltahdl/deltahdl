@@ -100,6 +100,9 @@ enum class TokenKind : uint16_t {
   kHashEqHash,        // #=#
   kApostrophe,        // '   (cast operator §6.24)
   kApostropheLBrace,  // '{  (assignment pattern prefix)
+  kDollar,            // $   (queue dimension / last index)
+  kPlusColon,         // +:  (indexed part-select up)
+  kMinusColon,        // -:  (indexed part-select down)
   kAttrStart,         // (*  (attribute instance start)
   kAttrEnd,           // *)  (attribute instance end)
 

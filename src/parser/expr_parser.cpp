@@ -303,9 +303,9 @@ Expr* Parser::ParseIdentifierExpr() {
     result = acc;
   }
 
-  if (Check(TokenKind::kLParen)) return ParseCallExpr(result);
+  if (Check(TokenKind::kLParen)) return ParseWithClause(ParseCallExpr(result));
   if (Check(TokenKind::kLBracket)) return ParseSelectExpr(result);
-  return result;
+  return ParseWithClause(result);
 }
 
 Expr* Parser::ParseCallExpr(Expr* callee) {
@@ -325,13 +325,27 @@ Expr* Parser::ParseCallExpr(Expr* callee) {
   return call;
 }
 
+Expr* Parser::ParseWithClause(Expr* expr) {
+  if (!Match(TokenKind::kKwWith)) return expr;
+  Expect(TokenKind::kLParen);
+  expr->with_expr = ParseExpr();
+  Expect(TokenKind::kRParen);
+  return expr;
+}
+
 Expr* Parser::ParseSelectExpr(Expr* base) {
   Consume();  // LBracket
   auto* sel = arena_.Create<Expr>();
   sel->kind = ExprKind::kSelect;
   sel->base = base;
   sel->index = ParseExpr();
-  if (Match(TokenKind::kColon)) {
+  if (Match(TokenKind::kPlusColon)) {
+    sel->is_part_select_plus = true;
+    sel->index_end = ParseExpr();
+  } else if (Match(TokenKind::kMinusColon)) {
+    sel->is_part_select_minus = true;
+    sel->index_end = ParseExpr();
+  } else if (Match(TokenKind::kColon)) {
     sel->index_end = ParseExpr();
   }
   Expect(TokenKind::kRBracket);

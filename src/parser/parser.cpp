@@ -390,6 +390,40 @@ void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
   items.push_back(item);
 }
 
+void Parser::ParseUnpackedDims(std::vector<Expr*>& dims) {
+  while (Check(TokenKind::kLBracket)) {
+    Consume();
+    if (Match(TokenKind::kRBracket)) {
+      dims.push_back(nullptr);  // dynamic array []
+      continue;
+    }
+    if (Match(TokenKind::kDollar)) {
+      // Queue: [$] or [$:N]
+      auto* dim = arena_.Create<Expr>();
+      dim->kind = ExprKind::kIdentifier;
+      dim->text = "$";
+      if (Match(TokenKind::kColon)) {
+        dim->rhs = ParseExpr();
+      }
+      dims.push_back(dim);
+      Expect(TokenKind::kRBracket);
+      continue;
+    }
+    if (Match(TokenKind::kStar)) {
+      // Associative: [*]
+      auto* dim = arena_.Create<Expr>();
+      dim->kind = ExprKind::kIdentifier;
+      dim->text = "*";
+      dims.push_back(dim);
+      Expect(TokenKind::kRBracket);
+      continue;
+    }
+    auto* expr = ParseExpr();
+    dims.push_back(expr);
+    Expect(TokenKind::kRBracket);
+  }
+}
+
 void Parser::ParseVarDeclList(std::vector<ModuleItem*>& items,
                               const DataType& dtype) {
   do {
@@ -399,6 +433,7 @@ void Parser::ParseVarDeclList(std::vector<ModuleItem*>& items,
     item->loc = CurrentLoc();
     item->data_type = dtype;
     item->name = Expect(TokenKind::kIdentifier).text;
+    ParseUnpackedDims(item->unpacked_dims);
     if (Match(TokenKind::kEq)) {
       item->init_expr = ParseExpr();
     }
@@ -847,6 +882,8 @@ static std::optional<DataTypeKind> TokenToTypeKind(TokenKind tk) {
       return DataTypeKind::kString;
     case TokenKind::kKwEvent:
       return DataTypeKind::kEvent;
+    case TokenKind::kKwVoid:
+      return DataTypeKind::kVoid;
     case TokenKind::kKwChandle:
       return DataTypeKind::kChandle;
     case TokenKind::kKwTri:

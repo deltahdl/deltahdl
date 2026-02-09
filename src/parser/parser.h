@@ -67,6 +67,7 @@ class Parser {
   void ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items);
   ModuleItem* ParseModuleInst(const Token& module_tok);
   void ParsePortConnection(ModuleItem* item);
+  void ParseUnpackedDims(std::vector<Expr*>& dims);
   void ParseParenList(std::vector<Expr*>& out);
 
   // Statements
@@ -105,6 +106,7 @@ class Parser {
   Expr* ParseAssignmentPattern();
   Expr* ParseCastExpr();
   Expr* ParseTypeRefExpr();
+  Expr* ParseWithClause(Expr* expr);
 
   // Attributes (§5.12)
   std::vector<Attribute> ParseAttributes();

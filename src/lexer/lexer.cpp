@@ -116,7 +116,14 @@ Token Lexer::Next() {
   }
   char c = Current();
   if (c == '$') {
-    return LexSystemIdentifier();
+    char next = PeekChar();
+    if (std::isalpha(static_cast<unsigned char>(next)) || next == '_') {
+      return LexSystemIdentifier();
+    }
+    auto loc = MakeLoc();
+    uint32_t start = pos_;
+    Advance();
+    return MakeOp(TokenKind::kDollar, loc, start);
   }
   if (c == '\\') {
     return LexEscapedIdentifier();
@@ -398,6 +405,10 @@ Token Lexer::LexOpPlus(SourceLoc loc, uint32_t start) {
     Advance();
     return MakeOp(TokenKind::kPlusEq, loc, start);
   }
+  if (!AtEnd() && Current() == ':') {
+    Advance();
+    return MakeOp(TokenKind::kPlusColon, loc, start);
+  }
   return MakeOp(TokenKind::kPlus, loc, start);
 }
 
@@ -409,6 +420,10 @@ Token Lexer::LexOpMinus(SourceLoc loc, uint32_t start) {
   if (!AtEnd() && Current() == '=') {
     Advance();
     return MakeOp(TokenKind::kMinusEq, loc, start);
+  }
+  if (!AtEnd() && Current() == ':') {
+    Advance();
+    return MakeOp(TokenKind::kMinusColon, loc, start);
   }
   if (!AtEnd() && Current() == '>') {
     Advance();

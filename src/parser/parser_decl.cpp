@@ -57,6 +57,12 @@ DataType Parser::ParseStructOrUnionType() {
                                            : DataTypeKind::kUnion;
   Consume();  // struct or union
 
+  // Union qualifiers: tagged, soft (§7.3)
+  if (dtype.kind == DataTypeKind::kUnion) {
+    if (Match(TokenKind::kKwTagged)) dtype.is_tagged = true;
+    if (Match(TokenKind::kKwSoft)) dtype.is_soft = true;
+  }
+
   if (Match(TokenKind::kKwPacked)) {
     dtype.is_packed = true;
     if (Match(TokenKind::kKwSigned)) {
@@ -75,6 +81,10 @@ DataType Parser::ParseStructOrUnionType() {
     member.packed_dim_left = member_type.packed_dim_left;
     member.packed_dim_right = member_type.packed_dim_right;
     member.name = Expect(TokenKind::kIdentifier).text;
+    ParseUnpackedDims(member.unpacked_dims);
+    if (Match(TokenKind::kEq)) {
+      member.init_expr = ParseExpr();
+    }
     Expect(TokenKind::kSemicolon);
     dtype.struct_members.push_back(member);
   }
