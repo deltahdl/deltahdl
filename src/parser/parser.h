@@ -102,6 +102,12 @@ class Parser {
   Expr* ParseSelectExpr(Expr* base);
   Expr* ParseSystemCall();
   Expr* ParseConcatenation();
+  Expr* ParseAssignmentPattern();
+
+  // Attributes (§5.12)
+  std::vector<Attribute> ParseAttributes();
+  static void AttachAttrs(std::vector<ModuleItem*>& items, size_t before,
+                          const std::vector<Attribute>& attrs);
 
   // Types
   DataType ParseDataType();

@@ -239,6 +239,9 @@ Expr* Parser::ParsePrimaryExpr() {
   if (tok.kind == TokenKind::kLBrace) {
     return ParseConcatenation();
   }
+  if (tok.kind == TokenKind::kApostropheLBrace) {
+    return ParseAssignmentPattern();
+  }
 
   diag_.Error(tok.loc, "expected expression");
   Consume();
@@ -282,6 +285,7 @@ Expr* Parser::ParseCallExpr(Expr* callee) {
   auto* call = arena_.Create<Expr>();
   call->kind = ExprKind::kCall;
   call->callee = callee->text;
+  call->lhs = callee;
   call->range.start = callee->range.start;
   if (!Check(TokenKind::kRParen)) {
     call->args.push_back(ParseExpr());
@@ -353,6 +357,63 @@ Expr* Parser::ParseConcatenation() {
   }
   Expect(TokenKind::kRBrace);
   return cat;
+}
+
+Expr* Parser::ParseAssignmentPattern() {
+  auto loc = CurrentLoc();
+  Expect(TokenKind::kApostropheLBrace);
+  auto* pat = arena_.Create<Expr>();
+  pat->kind = ExprKind::kAssignmentPattern;
+  pat->range.start = loc;
+
+  if (Check(TokenKind::kRBrace)) {
+    Consume();
+    return pat;
+  }
+
+  // Detect named vs positional: if first token is identifier or "default"
+  // followed by ':', it's a named pattern.
+  bool named = false;
+  auto first = CurrentToken();
+  bool is_key = first.kind == TokenKind::kIdentifier ||
+                first.kind == TokenKind::kKwDefault;
+  if (is_key) {
+    // Peek past the identifier/keyword to check for ':'
+    Consume();
+    if (Check(TokenKind::kColon)) {
+      named = true;
+      pat->pattern_keys.push_back(first.text);
+      Consume();  // skip ':'
+      pat->elements.push_back(ParseExpr());
+    } else {
+      // Not named — push back and parse as positional expression.
+      // We already consumed the identifier, so build an Expr for it.
+      auto* id = arena_.Create<Expr>();
+      id->kind = ExprKind::kIdentifier;
+      id->text = first.text;
+      id->range.start = first.loc;
+      Expr* expr = id;
+      // Continue parsing the rest of the expression (infix operators etc.)
+      expr = ParseInfixBp(expr, 0);
+      pat->elements.push_back(expr);
+    }
+  } else {
+    pat->elements.push_back(ParseExpr());
+  }
+
+  while (Match(TokenKind::kComma)) {
+    if (named) {
+      auto key_tok = Consume();
+      pat->pattern_keys.push_back(key_tok.text);
+      Expect(TokenKind::kColon);
+      pat->elements.push_back(ParseExpr());
+    } else {
+      pat->elements.push_back(ParseExpr());
+    }
+  }
+
+  Expect(TokenKind::kRBrace);
+  return pat;
 }
 
 }  // namespace delta

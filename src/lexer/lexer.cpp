@@ -130,8 +130,17 @@ Token Lexer::Next() {
   if (std::isdigit(static_cast<unsigned char>(c))) {
     return LexNumber();
   }
-  if (c == '\'' && !std::isalpha(static_cast<unsigned char>(PeekChar()))) {
-    return LexNumber();
+  if (c == '\'') {
+    if (PeekChar() == '{') {
+      auto loc = MakeLoc();
+      uint32_t start = pos_;
+      Advance();  // skip '
+      Advance();  // skip {
+      return MakeOp(TokenKind::kApostropheLBrace, loc, start);
+    }
+    if (!std::isalpha(static_cast<unsigned char>(PeekChar()))) {
+      return LexNumber();
+    }
   }
   return LexOperator();
 }
@@ -606,6 +615,11 @@ Token Lexer::LexOperator() {
 
   switch (c) {
     case '(':
+      if (!AtEnd() && Current() == '*' && PeekChar() != ')') {
+        Advance();  // skip *
+        in_attribute_ = true;
+        return MakeOp(TokenKind::kAttrStart, loc, start);
+      }
       return MakeOp(TokenKind::kLParen, loc, start);
     case ')':
       return MakeOp(TokenKind::kRParen, loc, start);
@@ -630,6 +644,11 @@ Token Lexer::LexOperator() {
     case '-':
       return LexOpMinus(loc, start);
     case '*':
+      if (in_attribute_ && !AtEnd() && Current() == ')') {
+        Advance();  // skip )
+        in_attribute_ = false;
+        return MakeOp(TokenKind::kAttrEnd, loc, start);
+      }
       return LexOpStar(loc, start);
     case '/':
       return LexOpSlash(loc, start);

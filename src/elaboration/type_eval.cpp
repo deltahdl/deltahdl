@@ -149,6 +149,7 @@ uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs) {
     case ExprKind::kSelect:
     case ExprKind::kMemberAccess:
     case ExprKind::kCall:
+    case ExprKind::kAssignmentPattern:
       return 0;
   }
   return 0;

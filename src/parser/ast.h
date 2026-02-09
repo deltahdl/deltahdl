@@ -31,9 +31,10 @@ enum class ExprKind : uint8_t {
   kTernary,
   kConcatenation,
   kReplicate,
-  kSelect,        // a[i] or a[i:j]
-  kMemberAccess,  // a.b
-  kCall,          // func(args)
+  kSelect,             // a[i] or a[i:j]
+  kMemberAccess,       // a.b
+  kCall,               // func(args)
+  kAssignmentPattern,  // '{expr, ...}  (§5.10/§5.11)
 };
 
 struct Expr {
@@ -64,9 +65,17 @@ struct Expr {
   Expr* index = nullptr;
   Expr* index_end = nullptr;
 
-  // Concatenation / replicate
+  // Concatenation / replicate / assignment pattern
   std::vector<Expr*> elements;
   Expr* repeat_count = nullptr;
+  std::vector<std::string_view> pattern_keys;  // For named assignment patterns
+};
+
+// --- Attributes (§5.12) ---
+
+struct Attribute {
+  std::string_view name;
+  Expr* value = nullptr;  // nullptr if no '= expr'
 };
 
 // --- Statements ---
@@ -116,6 +125,7 @@ struct CaseItem {
 struct Stmt {
   StmtKind kind;
   SourceRange range;
+  std::vector<Attribute> attrs;
 
   // Block
   std::vector<Stmt*> stmts;
@@ -294,6 +304,7 @@ struct GenerateCaseItem {
 struct ModuleItem {
   ModuleItemKind kind;
   SourceLoc loc;
+  std::vector<Attribute> attrs;
 
   // Declarations
   DataType data_type;

@@ -165,6 +165,43 @@ TEST(Lexer, SourceLocations) {
   EXPECT_EQ(tokens[2].loc.column, 3);
 }
 
+// --- §5.10/5.11: Assignment pattern token ---
+
+TEST(Lexer, ApostropheLBrace) {
+  auto tokens = lex("'{0, 1}");
+  ASSERT_GE(tokens.size(), 5);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kApostropheLBrace);
+  EXPECT_EQ(tokens[0].text, "'{");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIntLiteral);
+}
+
+TEST(Lexer, ApostropheLBraceNested) {
+  auto tokens = lex("'{'{1, 2}, '{3, 4}}");
+  EXPECT_EQ(tokens[0].kind, TokenKind::kApostropheLBrace);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kApostropheLBrace);
+}
+
+// --- §5.12: Attribute tokens ---
+
+TEST(Lexer, AttrStart) {
+  auto tokens = lex("(* full_case *)");
+  ASSERT_GE(tokens.size(), 4);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kAttrStart);
+  EXPECT_EQ(tokens[0].text, "(*");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].text, "full_case");
+  EXPECT_EQ(tokens[2].kind, TokenKind::kAttrEnd);
+  EXPECT_EQ(tokens[2].text, "*)");
+}
+
+TEST(Lexer, AttrDoesNotConfuseMultiply) {
+  // (a * b) should NOT produce kAttrStart.
+  auto tokens = lex("(a * b)");
+  EXPECT_EQ(tokens[0].kind, TokenKind::kLParen);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kStar);
+}
+
 TEST(Lexer, AllAnnexBKeywords) {
   // Every IEEE 1800-2023 Annex B keyword must lex as a keyword, not
   // kIdentifier.  If this test fails, a keyword is missing from the

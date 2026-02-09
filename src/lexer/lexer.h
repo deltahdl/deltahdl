@@ -76,6 +76,7 @@ class Lexer {
   uint32_t file_id_;
   DiagEngine& diag_;
   bool has_peeked_ = false;
+  bool in_attribute_ = false;
   Token peeked_;
 };
 

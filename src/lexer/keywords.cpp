@@ -316,6 +316,12 @@ std::string_view TokenKindName(TokenKind kind) {
       return "'='";
     case TokenKind::kLtEq:
       return "'<='";
+    case TokenKind::kApostropheLBrace:
+      return "'{";
+    case TokenKind::kAttrStart:
+      return "'(*'";
+    case TokenKind::kAttrEnd:
+      return "'*)'";
     default:
       return "token";
   }

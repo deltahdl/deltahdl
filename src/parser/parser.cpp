@@ -47,6 +47,33 @@ void Parser::Synchronize() {
   }
 }
 
+// --- Attributes (§5.12) ---
+
+std::vector<Attribute> Parser::ParseAttributes() {
+  std::vector<Attribute> attrs;
+  while (Check(TokenKind::kAttrStart)) {
+    Consume();  // skip (*
+    do {
+      Attribute attr;
+      attr.name = Expect(TokenKind::kIdentifier).text;
+      if (Match(TokenKind::kEq)) {
+        attr.value = ParseExpr();
+      }
+      attrs.push_back(attr);
+    } while (Match(TokenKind::kComma));
+    Expect(TokenKind::kAttrEnd);
+  }
+  return attrs;
+}
+
+void Parser::AttachAttrs(std::vector<ModuleItem*>& items, size_t before,
+                         const std::vector<Attribute>& attrs) {
+  if (attrs.empty()) return;
+  for (size_t i = before; i < items.size(); ++i) {
+    items[i]->attrs = attrs;
+  }
+}
+
 // --- Top level ---
 
 CompilationUnit* Parser::Parse() {
@@ -256,32 +283,45 @@ bool Parser::TryParseKeywordItem(std::vector<ModuleItem*>& items) {
 }
 
 void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
-  if (TryParseKeywordItem(items)) return;
+  auto attrs = ParseAttributes();
+  size_t before = items.size();
+
+  if (TryParseKeywordItem(items)) {
+    AttachAttrs(items, before, attrs);
+    return;
+  }
   if (Check(TokenKind::kKwParameter) || Check(TokenKind::kKwLocalparam)) {
     items.push_back(ParseParamDecl());
+    AttachAttrs(items, before, attrs);
     return;
   }
   if (Check(TokenKind::kKwDefparam)) {
     items.push_back(ParseDefparam());
+    AttachAttrs(items, before, attrs);
     return;
   }
   if (Check(TokenKind::kKwImport)) {
     items.push_back(ParseImportDecl());
+    AttachAttrs(items, before, attrs);
     return;
   }
   if (Check(TokenKind::kKwGenerate)) {
     ParseGenerateRegion(items);
+    AttachAttrs(items, before, attrs);
     return;
   }
   if (Check(TokenKind::kKwFor)) {
     items.push_back(ParseGenerateFor());
+    AttachAttrs(items, before, attrs);
     return;
   }
   if (Check(TokenKind::kKwIf)) {
     items.push_back(ParseGenerateIf());
+    AttachAttrs(items, before, attrs);
     return;
   }
   ParseTypedItemOrInst(items);
+  AttachAttrs(items, before, attrs);
 }
 
 void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items) {
