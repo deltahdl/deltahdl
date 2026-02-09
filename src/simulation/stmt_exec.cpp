@@ -1,9 +1,13 @@
 #include "simulation/stmt_exec.h"
 
+#include <unordered_set>
+
 #include "common/arena.h"
+#include "elaboration/sensitivity.h"
 #include "parser/ast.h"
 #include "simulation/awaiters.h"
 #include "simulation/eval.h"
+#include "simulation/process.h"
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
 
@@ -193,11 +197,61 @@ static ExecTask ExecEventControl(const Stmt* stmt, SimContext& ctx,
   co_return StmtResult::kDone;
 }
 
-// --- Fork (stub: sequential execution) ---
+// --- Wait (IEEE §9.4.3) ---
+
+static ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  std::unordered_set<std::string_view> reads;
+  CollectExprReads(stmt->condition, reads);
+  std::vector<std::string_view> read_vars(reads.begin(), reads.end());
+  while (!ctx.StopRequested()) {
+    auto cond = EvalExpr(stmt->condition, ctx, arena);
+    if (cond.ToUint64() != 0) break;
+    if (read_vars.empty()) co_return StmtResult::kDone;
+    co_await AnyChangeAwaiter{ctx, read_vars};
+  }
+  if (stmt->body) {
+    co_return co_await ExecStmt(stmt->body, ctx, arena);
+  }
+  co_return StmtResult::kDone;
+}
+
+// --- Fork/join (IEEE §9.3.2) ---
+
+static SimCoroutine ForkChildCoroutine(const Stmt* body, SimContext& ctx,
+                                       Arena& arena, ForkJoinState* state) {
+  co_await ExecStmt(body, ctx, arena);
+  state->remaining--;
+  bool should_resume =
+      state->join_any ? !state->resumed : (state->remaining == 0);
+  if (should_resume && state->parent) {
+    state->resumed = true;
+    state->parent.resume();
+  }
+}
+
+static void SpawnForkChildren(const Stmt* stmt, SimContext& ctx, Arena& arena,
+                              ForkJoinState* state) {
+  for (auto* s : stmt->fork_stmts) {
+    auto* p = arena.Create<Process>();
+    p->kind = ProcessKind::kInitial;
+    p->coro = ForkChildCoroutine(s, ctx, arena, state).Release();
+    auto* event = ctx.GetScheduler().GetEventPool().Acquire();
+    event->callback = [p]() { p->Resume(); };
+    ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kActive, event);
+  }
+}
 
 static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
-  for (auto* s : stmt->fork_stmts) {
-    co_await ExecStmt(s, ctx, arena);
+  if (stmt->fork_stmts.empty()) co_return StmtResult::kDone;
+
+  auto* state = arena.Create<ForkJoinState>();
+  state->remaining = static_cast<uint32_t>(stmt->fork_stmts.size());
+  state->join_any = (stmt->join_kind == TokenKind::kKwJoinAny);
+
+  SpawnForkChildren(stmt, ctx, arena, state);
+
+  if (stmt->join_kind != TokenKind::kKwJoinNone) {
+    co_await ForkJoinAwaiter{state};
   }
   co_return StmtResult::kDone;
 }
@@ -238,8 +292,9 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       return ExecEventControl(stmt, ctx, arena);
     case StmtKind::kFork:
       return ExecFork(stmt, ctx, arena);
-    case StmtKind::kTimingControl:
     case StmtKind::kWait:
+      return ExecWait(stmt, ctx, arena);
+    case StmtKind::kTimingControl:
     case StmtKind::kDisable:
       return ExecTask::Immediate(StmtResult::kDone);
     case StmtKind::kBreak:

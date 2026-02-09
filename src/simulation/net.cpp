@@ -76,12 +76,43 @@ Logic4Word ResolveWorWord(Logic4Word a, Logic4Word b) {
   return {res_aval, res_bval};
 }
 
+// --- Per-word resolution dispatch ---
+
+static Logic4Word ResolveWord(Logic4Word a, Logic4Word b, NetType type) {
+  switch (type) {
+    case NetType::kWand:
+    case NetType::kTriand:
+      return ResolveWandWord(a, b);
+    case NetType::kWor:
+    case NetType::kTrior:
+      return ResolveWorWord(a, b);
+    default:
+      return ResolveWireWord(a, b);
+  }
+}
+
+// Fix up z bits for tri0/tri1: replace z with 0 or 1.
+static void FixupTriPull(Logic4Vec& result, NetType type) {
+  if (type != NetType::kTri0 && type != NetType::kTri1) return;
+  for (uint32_t w = 0; w < result.nwords; ++w) {
+    uint64_t z_bits = result.words[w].aval & result.words[w].bval;
+    if (z_bits == 0) continue;
+    result.words[w].bval &= ~z_bits;  // Clear bval → known.
+    if (type == NetType::kTri1) {
+      result.words[w].aval |= z_bits;  // Set aval → 1.
+    } else {
+      result.words[w].aval &= ~z_bits;  // Clear aval → 0.
+    }
+  }
+}
+
 // --- Net::Resolve ---
 
 void Net::Resolve(Arena& arena) {
   if (!resolved || drivers.empty()) return;
   if (drivers.size() == 1) {
     resolved->value = drivers[0];
+    FixupTriPull(resolved->value, type);
     resolved->NotifyWatchers();
     return;
   }
@@ -91,30 +122,12 @@ void Net::Resolve(Arena& arena) {
   for (size_t i = 1; i < drivers.size(); ++i) {
     auto combined = MakeLogic4Vec(arena, result.width);
     for (uint32_t w = 0; w < result.nwords; ++w) {
-      switch (type) {
-        case NetType::kWire:
-        case NetType::kTri:
-          combined.words[w] =
-              ResolveWireWord(result.words[w], drivers[i].words[w]);
-          break;
-        case NetType::kWand:
-        case NetType::kTriand:
-          combined.words[w] =
-              ResolveWandWord(result.words[w], drivers[i].words[w]);
-          break;
-        case NetType::kWor:
-        case NetType::kTrior:
-          combined.words[w] =
-              ResolveWorWord(result.words[w], drivers[i].words[w]);
-          break;
-        default:
-          combined.words[w] =
-              ResolveWireWord(result.words[w], drivers[i].words[w]);
-          break;
-      }
+      combined.words[w] =
+          ResolveWord(result.words[w], drivers[i].words[w], type);
     }
     result = combined;
   }
+  FixupTriPull(result, type);
   resolved->value = result;
   resolved->NotifyWatchers();
 }

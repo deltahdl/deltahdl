@@ -87,4 +87,24 @@ struct AnyChangeAwaiter {
   void await_resume() const noexcept {}
 };
 
+// Shared state for fork/join synchronization.
+struct ForkJoinState {
+  uint32_t remaining = 0;
+  std::coroutine_handle<> parent;
+  bool join_any = false;
+  bool resumed = false;
+};
+
+// Awaiter for fork/join and fork/join_any. Suspends the parent coroutine
+// until all (join) or any (join_any) children complete.
+struct ForkJoinAwaiter {
+  ForkJoinState* state;
+
+  bool await_ready() const noexcept { return state->remaining == 0; }
+
+  void await_suspend(std::coroutine_handle<> h) noexcept { state->parent = h; }
+
+  void await_resume() const noexcept {}
+};
+
 }  // namespace delta

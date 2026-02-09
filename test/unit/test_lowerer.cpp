@@ -8,8 +8,10 @@
 #include "lexer/lexer.h"
 #include "parser/parser.h"
 #include "simulation/lowerer.h"
+#include "simulation/net.h"
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
+#include "simulation/variable.h"
 
 using namespace delta;
 
@@ -746,6 +748,152 @@ TEST(Lowerer, SensitivityMapEmpty) {
   // Initial blocks don't contribute to sensitivity map.
   const auto& procs = f.ctx.GetSensitiveProcesses("x");
   EXPECT_TRUE(procs.empty());
+}
+
+TEST(Lowerer, WaitConditionTrue) {
+  // wait(expr) when condition is immediately true.
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    x = 1;\n"
+      "    wait (x) x = 42;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
+TEST(Lowerer, WaitConditionDeferred) {
+  // wait(expr) when condition is initially false, becomes true later.
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] flag, result;\n"
+      "  initial begin\n"
+      "    flag = 0;\n"
+      "    #5 flag = 1;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    wait (flag) result = 99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 99u);
+}
+
+TEST(Lowerer, ForkJoinNone) {
+  // fork/join_none: parent continues immediately.
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a, b;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      a = 10;\n"
+      "      b = 20;\n"
+      "    join_none\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* a = f.ctx.FindVariable("a");
+  auto* b = f.ctx.FindVariable("b");
+  ASSERT_NE(a, nullptr);
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(a->value.ToUint64(), 10u);
+  EXPECT_EQ(b->value.ToUint64(), 20u);
+}
+
+TEST(Lowerer, ForkJoin) {
+  // fork/join: parent waits for all children to complete.
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a, b, done;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      a = 10;\n"
+      "      begin #2 b = 20; end\n"
+      "    join\n"
+      "    done = 1;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* a = f.ctx.FindVariable("a");
+  auto* b = f.ctx.FindVariable("b");
+  auto* done = f.ctx.FindVariable("done");
+  ASSERT_NE(a, nullptr);
+  ASSERT_NE(b, nullptr);
+  ASSERT_NE(done, nullptr);
+  EXPECT_EQ(a->value.ToUint64(), 10u);
+  EXPECT_EQ(b->value.ToUint64(), 20u);
+  EXPECT_EQ(done->value.ToUint64(), 1u);
+}
+
+TEST(NetResolution, Tri0ResolvesToZero) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 8);
+  Net net;
+  net.type = NetType::kTri0;
+  net.resolved = var;
+  // Single driver with z → resolves to 0 for tri0.
+  auto drv = MakeLogic4Vec(arena, 8);
+  drv.words[0].aval = ~uint64_t{0};  // All z.
+  drv.words[0].bval = ~uint64_t{0};
+  net.drivers.push_back(drv);
+  net.Resolve(arena);
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0u);
+  EXPECT_EQ(var->value.words[0].bval & 0xFF, 0u);
+}
+
+TEST(NetResolution, Tri1ResolvesToOne) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 8);
+  Net net;
+  net.type = NetType::kTri1;
+  net.resolved = var;
+  // Single driver with z → resolves to 1 for tri1.
+  auto drv = MakeLogic4Vec(arena, 8);
+  drv.words[0].aval = ~uint64_t{0};
+  drv.words[0].bval = ~uint64_t{0};
+  net.drivers.push_back(drv);
+  net.Resolve(arena);
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0xFFu);
+  EXPECT_EQ(var->value.words[0].bval & 0xFF, 0u);
 }
 
 TEST(Lowerer, NetCreatedFromDecl) {
