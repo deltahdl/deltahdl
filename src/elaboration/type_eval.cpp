@@ -85,6 +85,23 @@ bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs) {
                   : Is4stateType(dtype.kind);
 }
 
+// --- Type compatibility (IEEE §6.22) ---
+
+bool TypesMatch(const DataType& a, const DataType& b) {
+  if (a.kind != b.kind) return false;
+  if (a.is_signed != b.is_signed) return false;
+  if (a.kind == DataTypeKind::kNamed) return a.type_name == b.type_name;
+  return true;
+}
+
+bool TypesEquivalent(const DataType& a, const DataType& b) {
+  if (TypesMatch(a, b)) return true;
+  // Packed types with same width/signing are equivalent (§6.22.2c).
+  uint32_t wa = EvalTypeWidth(a);
+  uint32_t wb = EvalTypeWidth(b);
+  return wa == wb && wa > 0 && a.is_signed == b.is_signed;
+}
+
 // --- Width inference (IEEE §11.6) ---
 
 static bool IsComparisonOp(TokenKind op) {
@@ -152,6 +169,7 @@ uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs) {
     case ExprKind::kCall:
     case ExprKind::kAssignmentPattern:
     case ExprKind::kCast:
+    case ExprKind::kTypeRef:
       return 0;
   }
   return 0;

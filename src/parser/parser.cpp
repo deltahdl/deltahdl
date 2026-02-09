@@ -358,6 +358,16 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items) {
 
 void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
   auto name_tok = Consume();
+  if (Check(TokenKind::kColonColon)) {
+    Consume();  // '::'
+    auto type_tok = Expect(TokenKind::kIdentifier);
+    DataType dtype;
+    dtype.kind = DataTypeKind::kNamed;
+    dtype.scope_name = name_tok.text;
+    dtype.type_name = type_tok.text;
+    ParseVarDeclList(items, dtype);
+    return;
+  }
   if (known_types_.count(name_tok.text) != 0) {
     DataType dtype;
     dtype.kind = DataTypeKind::kNamed;
@@ -458,7 +468,12 @@ ModuleItem* Parser::ParseParamDecl() {
   item->kind = ModuleItemKind::kParamDecl;
   item->loc = CurrentLoc();
   Consume();  // parameter or localparam
-  item->data_type = ParseDataType();
+  // Handle "parameter type T = ..." (type parameter).
+  if (Match(TokenKind::kKwType)) {
+    item->data_type.kind = DataTypeKind::kVoid;  // Marker for type params.
+  } else {
+    item->data_type = ParseDataType();
+  }
   auto name_tok = Expect(TokenKind::kIdentifier);
   item->name = name_tok.text;
   if (Match(TokenKind::kEq)) {

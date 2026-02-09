@@ -3,6 +3,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "elaboration/type_eval.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
 
@@ -350,4 +351,150 @@ TEST(ParserSection6, SignedCast) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kCast);
   EXPECT_EQ(rhs->text, "signed");
+}
+
+TEST(ParserSection6, ConstCast) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = const'(y);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kCast);
+  EXPECT_EQ(rhs->text, "const");
+}
+
+// =========================================================================
+// §6.15: Class
+// =========================================================================
+
+TEST(ParserSection6, ClassVarDecl) {
+  // Class declared at top-level, then used as a type inside a module.
+  auto r = Parse(
+      "class MyClass;\n"
+      "  int x;\n"
+      "endclass\n"
+      "module t;\n"
+      "  MyClass obj;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_FALSE(r.cu->classes.empty());
+  EXPECT_EQ(r.cu->classes[0]->name, "MyClass");
+  ASSERT_FALSE(r.cu->modules.empty());
+  auto& items = r.cu->modules[0]->items;
+  ModuleItem* var_item = nullptr;
+  for (auto* it : items) {
+    if (it->kind == ModuleItemKind::kVarDecl && it->name == "obj") {
+      var_item = it;
+      break;
+    }
+  }
+  ASSERT_NE(var_item, nullptr);
+  EXPECT_EQ(var_item->data_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(var_item->data_type.type_name, "MyClass");
+}
+
+// =========================================================================
+// §6.22: Type compatibility
+// =========================================================================
+
+TEST(ParserSection6, TypesMatchBuiltin) {
+  // Two identical built-in types should match.
+  DataType a;
+  a.kind = DataTypeKind::kInt;
+  DataType b;
+  b.kind = DataTypeKind::kInt;
+  EXPECT_TRUE(TypesMatch(a, b));
+}
+
+TEST(ParserSection6, TypesMatchDifferent) {
+  DataType a;
+  a.kind = DataTypeKind::kInt;
+  DataType b;
+  b.kind = DataTypeKind::kReal;
+  EXPECT_FALSE(TypesMatch(a, b));
+}
+
+TEST(ParserSection6, TypesMatchSignedness) {
+  // Same kind but different signedness should not match.
+  DataType a;
+  a.kind = DataTypeKind::kLogic;
+  a.is_signed = true;
+  DataType b;
+  b.kind = DataTypeKind::kLogic;
+  b.is_signed = false;
+  EXPECT_FALSE(TypesMatch(a, b));
+}
+
+TEST(ParserSection6, TypesEquivalentPackedSameWidth) {
+  // bit [7:0] and logic [7:0] are equivalent (same width, same signing).
+  DataType a;
+  a.kind = DataTypeKind::kBit;
+  DataType b;
+  b.kind = DataTypeKind::kLogic;
+  // Both default unsigned, same base width (1 bit without dims).
+  EXPECT_TRUE(TypesEquivalent(a, b));
+}
+
+// =========================================================================
+// §6.23: Type operator
+// =========================================================================
+
+TEST(ParserSection6, TypeOperatorExpr) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = type(y);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTypeRef);
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(rhs->lhs->text, "y");
+}
+
+TEST(ParserSection6, TypeOperatorInDataType) {
+  auto r = Parse(
+      "module t;\n"
+      "  parameter type T = type(int);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
+  // The init_expr should be a type reference.
+  ASSERT_NE(item->init_expr, nullptr);
+  EXPECT_EQ(item->init_expr->kind, ExprKind::kTypeRef);
+}
+
+// =========================================================================
+// §6.25: Parameterized data types
+// =========================================================================
+
+TEST(ParserSection6, ScopeResolutionType) {
+  auto r = Parse(
+      "module t;\n"
+      "  import pkg::mytype;\n"
+      "  pkg::mytype x;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  // Find the variable declaration.
+  auto& items = r.cu->modules[0]->items;
+  ModuleItem* var_item = nullptr;
+  for (auto* it : items) {
+    if (it->kind == ModuleItemKind::kVarDecl && it->name == "x") {
+      var_item = it;
+      break;
+    }
+  }
+  ASSERT_NE(var_item, nullptr);
+  EXPECT_EQ(var_item->data_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(var_item->data_type.scope_name, "pkg");
+  EXPECT_EQ(var_item->data_type.type_name, "mytype");
 }

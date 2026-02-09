@@ -20,6 +20,7 @@ static bool IsCastTypeToken(TokenKind kind) {
     case TokenKind::kKwSigned:
     case TokenKind::kKwUnsigned:
     case TokenKind::kKwString:
+    case TokenKind::kKwConst:
       return true;
     default:
       return false;
@@ -263,6 +264,9 @@ Expr* Parser::ParsePrimaryExpr() {
   if (tok.kind == TokenKind::kApostropheLBrace) {
     return ParseAssignmentPattern();
   }
+  if (tok.kind == TokenKind::kKwType) {
+    return ParseTypeRefExpr();
+  }
   if (IsCastTypeToken(tok.kind)) {
     return ParseCastExpr();
   }
@@ -451,6 +455,18 @@ Expr* Parser::ParseAssignmentPattern() {
 
   Expect(TokenKind::kRBrace);
   return pat;
+}
+
+Expr* Parser::ParseTypeRefExpr() {
+  auto loc = CurrentLoc();
+  Consume();  // 'type'
+  Expect(TokenKind::kLParen);
+  auto* ref = arena_.Create<Expr>();
+  ref->kind = ExprKind::kTypeRef;
+  ref->range.start = loc;
+  ref->lhs = ParseExpr();
+  Expect(TokenKind::kRParen);
+  return ref;
 }
 
 }  // namespace delta

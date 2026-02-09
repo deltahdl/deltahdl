@@ -195,6 +195,7 @@ ClassDecl* Parser::ParseClassDecl() {
   }
   Expect(TokenKind::kKwClass);
   decl->name = Expect(TokenKind::kIdentifier).text;
+  known_types_.insert(decl->name);
 
   // Optional extends.
   if (Match(TokenKind::kKwExtends)) {

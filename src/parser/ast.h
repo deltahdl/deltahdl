@@ -36,6 +36,7 @@ enum class ExprKind : uint8_t {
   kCall,               // func(args)
   kAssignmentPattern,  // '{expr, ...}  (§5.10/§5.11)
   kCast,               // type'(expr)   (§6.24)
+  kTypeRef,            // type(expr)    (§6.23)
 };
 
 struct Expr {
@@ -221,6 +222,7 @@ struct DataType {
   Expr* packed_dim_left = nullptr;
   Expr* packed_dim_right = nullptr;
   std::string_view type_name;
+  std::string_view scope_name;  // Package/class scope prefix (§6.25)
   std::vector<EnumMember> enum_members;
   std::vector<StructMember> struct_members;
 };

@@ -30,6 +30,12 @@ bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs);
 // Forward declarations
 struct Expr;
 
+/// Return true if two types match (IEEE §6.22.1).
+bool TypesMatch(const DataType& a, const DataType& b);
+
+/// Return true if two types are equivalent (IEEE §6.22.2).
+bool TypesEquivalent(const DataType& a, const DataType& b);
+
 /// Infer the self-determined width of an expression (IEEE §11.6).
 /// Returns 0 for expressions that can't be sized.
 uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs);
