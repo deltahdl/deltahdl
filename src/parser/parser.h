@@ -49,6 +49,7 @@ class Parser {
   // Declarations (parser_decl.cpp)
   ModuleItem* ParseDefparam();
   ModuleItem* ParseTypedef();
+  ModuleItem* ParseNettypeDecl();
   DataType ParseEnumType();
   DataType ParseStructOrUnionType();
   ModuleItem* ParseFunctionDecl();

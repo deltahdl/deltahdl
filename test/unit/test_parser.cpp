@@ -841,3 +841,100 @@ TEST(Parser, DefparamMultiple) {
   EXPECT_EQ(item->kind, ModuleItemKind::kDefparam);
   EXPECT_EQ(item->defparam_assigns.size(), 2);
 }
+
+// --- Named event tests ---
+
+TEST(Parser, EventDeclaration) {
+  auto r = Parse(
+      "module t;\n"
+      "  event ev;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kEvent);
+  EXPECT_EQ(item->name, "ev");
+}
+
+TEST(Parser, EventTrigger) {
+  auto r = Parse(
+      "module t;\n"
+      "  event ev;\n"
+      "  initial ->ev;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[1];
+  EXPECT_EQ(item->kind, ModuleItemKind::kInitialBlock);
+  EXPECT_EQ(item->body->kind, StmtKind::kEventTrigger);
+  EXPECT_NE(item->body->expr, nullptr);
+  EXPECT_EQ(item->body->expr->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(item->body->expr->text, "ev");
+}
+
+TEST(Parser, EventWaitWithParens) {
+  auto r = Parse(
+      "module t;\n"
+      "  event ev;\n"
+      "  initial @(ev) ;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[1];
+  auto* stmt = item->body;
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  ASSERT_EQ(stmt->events.size(), 1);
+  EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
+  EXPECT_EQ(stmt->events[0].signal->text, "ev");
+}
+
+TEST(Parser, EventWaitBareIdentifier) {
+  auto r = Parse(
+      "module t;\n"
+      "  event ev;\n"
+      "  initial @ev ;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[1];
+  auto* stmt = item->body;
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  ASSERT_EQ(stmt->events.size(), 1);
+  EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
+  EXPECT_EQ(stmt->events[0].signal->text, "ev");
+}
+
+// --- User-defined nettype tests ---
+
+TEST(Parser, NettypeDeclaration) {
+  auto r = Parse(
+      "module t;\n"
+      "  nettype logic [7:0] mynet;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
+  EXPECT_EQ(item->name, "mynet");
+}
+
+TEST(Parser, NettypeWithResolutionFunction) {
+  auto r = Parse(
+      "module t;\n"
+      "  nettype logic [7:0] mynet with resolve_fn;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
+  EXPECT_EQ(item->name, "mynet");
+}
+
+TEST(Parser, NettypeUsedInDecl) {
+  auto r = Parse(
+      "module t;\n"
+      "  nettype logic [7:0] mynet;\n"
+      "  mynet x;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  // nettype registers as known type, so 'mynet x;' parses as a VarDecl.
+  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
+  auto* item = r.cu->modules[0]->items[1];
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(item->name, "x");
+}

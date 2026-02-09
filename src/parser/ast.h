@@ -92,6 +92,7 @@ enum class StmtKind : uint8_t {
   kWait,
   kFork,
   kDisable,
+  kEventTrigger,
   kNull,
 };
 
@@ -183,6 +184,7 @@ enum class DataTypeKind : uint8_t {
   kEnum,
   kStruct,
   kUnion,
+  kEvent,
 };
 
 struct EnumMember {

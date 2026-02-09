@@ -17,6 +17,7 @@ struct Variable {
   Logic4Vec forced_value{};
   Logic4Vec pending_nba{};
   bool has_pending_nba = false;
+  bool is_event = false;
 
   std::vector<std::function<void()>> watchers;
 

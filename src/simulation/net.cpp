@@ -106,10 +106,90 @@ static void FixupTriPull(Logic4Vec& result, NetType type) {
   }
 }
 
+// --- Strength-aware per-bit resolution (IEEE §28.12.1) ---
+
+struct BitVal {
+  uint8_t val;  // 0, 1, 2=x, 3=z
+};
+
+static BitVal GetBitVal(const Logic4Vec& vec, uint32_t bit) {
+  uint32_t word = bit / 64;
+  uint64_t mask = uint64_t{1} << (bit % 64);
+  if (word >= vec.nwords) return {3};  // z
+  bool a = (vec.words[word].aval & mask) != 0;
+  bool b = (vec.words[word].bval & mask) != 0;
+  if (!b && !a) return {0};
+  if (!b && a) return {1};
+  if (b && !a) return {2};  // x
+  return {3};               // z
+}
+
+static void SetBit(Logic4Vec& vec, uint32_t bit, uint8_t val) {
+  uint32_t word = bit / 64;
+  uint64_t mask = uint64_t{1} << (bit % 64);
+  if (word >= vec.nwords) return;
+  if (val == 0) {
+    vec.words[word].aval &= ~mask;
+    vec.words[word].bval &= ~mask;
+  } else if (val == 1) {
+    vec.words[word].aval |= mask;
+    vec.words[word].bval &= ~mask;
+  } else if (val == 2) {  // x
+    vec.words[word].aval &= ~mask;
+    vec.words[word].bval |= mask;
+  } else {  // z
+    vec.words[word].aval |= mask;
+    vec.words[word].bval |= mask;
+  }
+}
+
+static uint8_t EffectiveStrength(uint8_t val, DriverStrength ds) {
+  auto s0 = static_cast<uint8_t>(ds.s0);
+  auto s1 = static_cast<uint8_t>(ds.s1);
+  if (val == 0) return s0;
+  if (val == 1) return s1;
+  if (val == 2) return (s0 > s1) ? s0 : s1;  // x: max
+  return 0;                                  // z: no strength
+}
+
+static void ResolveStrengthBit(const std::vector<Logic4Vec>& drivers,
+                               const std::vector<DriverStrength>& strengths,
+                               Logic4Vec& result, uint32_t bit) {
+  uint8_t max_str = 0;
+  uint8_t max_val = 3;  // z
+  bool conflict = false;
+  for (size_t d = 0; d < drivers.size(); ++d) {
+    auto bv = GetBitVal(drivers[d], bit);
+    if (bv.val == 3) continue;  // z: no contribution
+    uint8_t str = EffectiveStrength(bv.val, strengths[d]);
+    if (str > max_str) {
+      max_str = str;
+      max_val = bv.val;
+      conflict = false;
+    } else if (str == max_str && bv.val != max_val) {
+      conflict = true;
+    }
+  }
+  SetBit(result, bit, conflict ? 2 : max_val);
+}
+
 // --- Net::Resolve ---
 
 void Net::Resolve(Arena& arena) {
   if (!resolved || drivers.empty()) return;
+
+  // Strength-aware path.
+  if (!driver_strengths.empty()) {
+    auto result = MakeLogic4Vec(arena, resolved->value.width);
+    for (uint32_t b = 0; b < result.width; ++b) {
+      ResolveStrengthBit(drivers, driver_strengths, result, b);
+    }
+    FixupTriPull(result, type);
+    resolved->value = result;
+    resolved->NotifyWatchers();
+    return;
+  }
+
   if (drivers.size() == 1) {
     resolved->value = drivers[0];
     FixupTriPull(resolved->value, type);

@@ -156,6 +156,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       var.name = ScopedName(item->name);
       var.width = EvalTypeWidth(item->data_type, typedefs_);
       var.is_4state = Is4stateType(item->data_type, typedefs_);
+      var.is_event = (item->data_type.kind == DataTypeKind::kEvent);
       mod->variables.push_back(var);
       break;
     }

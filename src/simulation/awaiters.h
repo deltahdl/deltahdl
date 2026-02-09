@@ -67,6 +67,24 @@ struct EventAwaiter {
   }
 };
 
+// Awaiter for named event wait (@ev). Suspends the coroutine until the
+// event variable is triggered via ->ev (NotifyWatchers). No edge check;
+// resumes unconditionally on trigger.
+struct NamedEventAwaiter {
+  SimContext& ctx;
+  std::string_view event_name;
+
+  bool await_ready() const noexcept { return false; }
+
+  void await_suspend(std::coroutine_handle<> h) {
+    auto* var = ctx.FindVariable(event_name);
+    if (!var) return;
+    var->AddWatcher([h]() mutable { h.resume(); });
+  }
+
+  void await_resume() const noexcept {}
+};
+
 // Awaiter that watches a set of variables and resumes on any value change.
 // Used for always_comb sensitivity inference.
 struct AnyChangeAwaiter {

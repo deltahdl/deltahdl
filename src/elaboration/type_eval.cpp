@@ -48,6 +48,7 @@ uint32_t EvalTypeWidth(const DataType& dtype) {
     case DataTypeKind::kString:
     case DataTypeKind::kVoid:
     case DataTypeKind::kNamed:
+    case DataTypeKind::kEvent:
       return 0;
   }
   return 1;

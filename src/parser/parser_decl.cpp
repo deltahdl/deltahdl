@@ -104,6 +104,25 @@ ModuleItem* Parser::ParseTypedef() {
   return item;
 }
 
+// --- Nettype declaration (§6.6.7 stub) ---
+
+ModuleItem* Parser::ParseNettypeDecl() {
+  auto* item = arena_.Create<ModuleItem>();
+  item->kind = ModuleItemKind::kTypedef;
+  item->loc = CurrentLoc();
+  Expect(TokenKind::kKwNettype);
+  item->typedef_type = ParseDataType();
+  item->name = Expect(TokenKind::kIdentifier).text;
+  // Optional "with resolve_fn" clause — consume but ignore.
+  if (Check(TokenKind::kKwWith)) {
+    Consume();
+    Consume();  // resolution function identifier
+  }
+  known_types_.insert(item->name);
+  Expect(TokenKind::kSemicolon);
+  return item;
+}
+
 // --- Function argument list ---
 
 std::vector<FunctionArg> Parser::ParseFunctionArgs() {

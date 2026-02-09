@@ -186,15 +186,39 @@ static ExecTask ExecDelay(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 
 // --- Event control ---
 
+static bool IsNamedEvent(const Stmt* stmt, SimContext& ctx) {
+  if (stmt->events.size() != 1) return false;
+  const auto& ev = stmt->events[0];
+  if (ev.edge != Edge::kNone) return false;
+  if (!ev.signal || ev.signal->kind != ExprKind::kIdentifier) return false;
+  auto* var = ctx.FindVariable(ev.signal->text);
+  return var && var->is_event;
+}
+
 static ExecTask ExecEventControl(const Stmt* stmt, SimContext& ctx,
                                  Arena& arena) {
   if (!stmt->events.empty()) {
-    co_await EventAwaiter{ctx, stmt->events};
+    if (IsNamedEvent(stmt, ctx)) {
+      co_await NamedEventAwaiter{ctx, stmt->events[0].signal->text};
+    } else {
+      co_await EventAwaiter{ctx, stmt->events};
+    }
   }
   if (stmt->body) {
     co_return co_await ExecStmt(stmt->body, ctx, arena);
   }
   co_return StmtResult::kDone;
+}
+
+// --- Event trigger (->ev) ---
+
+static StmtResult ExecEventTriggerImpl(const Stmt* stmt, SimContext& ctx) {
+  if (!stmt->expr || stmt->expr->kind != ExprKind::kIdentifier) {
+    return StmtResult::kDone;
+  }
+  auto* var = ctx.FindVariable(stmt->expr->text);
+  if (var) var->NotifyWatchers();
+  return StmtResult::kDone;
 }
 
 // --- Wait (IEEE §9.4.3) ---
@@ -294,6 +318,8 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       return ExecFork(stmt, ctx, arena);
     case StmtKind::kWait:
       return ExecWait(stmt, ctx, arena);
+    case StmtKind::kEventTrigger:
+      return ExecTask::Immediate(ExecEventTriggerImpl(stmt, ctx));
     case StmtKind::kTimingControl:
     case StmtKind::kDisable:
       return ExecTask::Immediate(StmtResult::kDone);

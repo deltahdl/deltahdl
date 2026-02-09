@@ -59,6 +59,7 @@ struct RtlirVariable {
   std::string_view name;
   uint32_t width = 1;
   bool is_4state = true;
+  bool is_event = false;
 };
 
 // --- Continuous assignment ---

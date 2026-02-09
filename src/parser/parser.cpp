@@ -223,6 +223,10 @@ bool Parser::TryParseKeywordItem(std::vector<ModuleItem*>& items) {
     items.push_back(ParseTypedef());
     return true;
   }
+  if (Check(TokenKind::kKwNettype)) {
+    items.push_back(ParseNettypeDecl());
+    return true;
+  }
   if (Check(TokenKind::kKwFunction)) {
     items.push_back(ParseFunctionDecl());
     return true;
@@ -508,6 +512,15 @@ Stmt* Parser::ParseStmt() {
       return ParseDelayStmt();
     case TokenKind::kAt:
       return ParseEventControlStmt();
+    case TokenKind::kArrow: {
+      auto* s = arena_.Create<Stmt>();
+      s->kind = StmtKind::kEventTrigger;
+      s->range.start = CurrentLoc();
+      Consume();
+      s->expr = ParseExpr();
+      Expect(TokenKind::kSemicolon);
+      return s;
+    }
     default:
       return ParseAssignmentOrExprStmt();
   }
@@ -757,6 +770,8 @@ static std::optional<DataTypeKind> TokenToTypeKind(TokenKind tk) {
       return DataTypeKind::kTime;
     case TokenKind::kKwString:
       return DataTypeKind::kString;
+    case TokenKind::kKwEvent:
+      return DataTypeKind::kEvent;
     default:
       return std::nullopt;
   }
@@ -812,10 +827,15 @@ Stmt* Parser::ParseEventControlStmt() {
   Expect(TokenKind::kAt);
   if (Match(TokenKind::kStar)) {
     // @* — implicit sensitivity
-  } else {
-    Expect(TokenKind::kLParen);
+  } else if (Check(TokenKind::kLParen)) {
+    Consume();
     stmt->events = ParseEventList();
     Expect(TokenKind::kRParen);
+  } else {
+    // @ev — named event or bare signal shorthand.
+    EventExpr ev;
+    ev.signal = ParseExpr();
+    stmt->events.push_back(ev);
   }
   stmt->body = ParseStmt();
   return stmt;
