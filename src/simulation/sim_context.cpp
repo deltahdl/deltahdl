@@ -64,6 +64,17 @@ void SimContext::PopScope() {
   if (!scope_stack_.empty()) scope_stack_.pop_back();
 }
 
+void SimContext::PushStaticScope(std::string_view func_name) {
+  scope_stack_.push_back(static_frames_[func_name]);
+}
+
+void SimContext::PopStaticScope(std::string_view func_name) {
+  if (!scope_stack_.empty()) {
+    static_frames_[func_name] = scope_stack_.back();
+    scope_stack_.pop_back();
+  }
+}
+
 Variable* SimContext::FindLocalVariable(std::string_view name) {
   for (auto it = scope_stack_.rbegin(); it != scope_stack_.rend(); ++it) {
     auto found = it->find(name);
@@ -80,6 +91,12 @@ Variable* SimContext::CreateLocalVariable(std::string_view name,
     scope_stack_.back()[name] = var;
   }
   return var;
+}
+
+void SimContext::AliasLocalVariable(std::string_view name, Variable* var) {
+  if (!scope_stack_.empty()) {
+    scope_stack_.back()[name] = var;
+  }
 }
 
 void SimContext::RegisterFinalProcess(Process* proc) {

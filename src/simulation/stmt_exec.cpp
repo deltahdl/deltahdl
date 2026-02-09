@@ -1,8 +1,11 @@
 #include "simulation/stmt_exec.h"
 
+#include <cstdint>
+#include <string_view>
 #include <unordered_set>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
 #include "elaboration/sensitivity.h"
 #include "parser/ast.h"
 #include "simulation/awaiters.h"
@@ -59,6 +62,82 @@ static StmtResult ExecExprStmtImpl(const Stmt* stmt, SimContext& ctx,
   return StmtResult::kDone;
 }
 
+// --- Force / Release (IEEE §10.6.2) ---
+
+static StmtResult ExecForceImpl(const Stmt* stmt, SimContext& ctx,
+                                Arena& arena) {
+  if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier) {
+    return StmtResult::kDone;
+  }
+  auto* var = ctx.FindVariable(stmt->lhs->text);
+  if (!var) return StmtResult::kDone;
+
+  auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
+  var->is_forced = true;
+  var->forced_value = rhs_val;
+  var->value = rhs_val;
+  return StmtResult::kDone;
+}
+
+static StmtResult ExecReleaseImpl(const Stmt* stmt, SimContext& ctx) {
+  if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier) {
+    return StmtResult::kDone;
+  }
+  auto* var = ctx.FindVariable(stmt->lhs->text);
+  if (!var) return StmtResult::kDone;
+
+  var->is_forced = false;
+  return StmtResult::kDone;
+}
+
+// --- Procedural continuous assign / deassign (IEEE §10.6.1) ---
+
+static StmtResult ExecProceduralAssignImpl(const Stmt* stmt, SimContext& ctx,
+                                           Arena& arena) {
+  if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier) {
+    return StmtResult::kDone;
+  }
+  auto* var = ctx.FindVariable(stmt->lhs->text);
+  if (!var) return StmtResult::kDone;
+
+  auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
+  var->is_forced = true;
+  var->forced_value = rhs_val;
+  var->value = rhs_val;
+  return StmtResult::kDone;
+}
+
+static StmtResult ExecDeassignImpl(const Stmt* stmt, SimContext& ctx) {
+  if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier) {
+    return StmtResult::kDone;
+  }
+  auto* var = ctx.FindVariable(stmt->lhs->text);
+  if (!var) return StmtResult::kDone;
+
+  var->is_forced = false;
+  return StmtResult::kDone;
+}
+
+// --- Randcase (IEEE §18.16) ---
+
+static ExecTask ExecRandcase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  uint64_t total_weight = 0;
+  for (const auto& item : stmt->randcase_items) {
+    total_weight += EvalExpr(item.first, ctx, arena).ToUint64();
+  }
+  if (total_weight == 0) co_return StmtResult::kDone;
+
+  uint64_t pick = ctx.Urandom32() % total_weight;
+  uint64_t cumulative = 0;
+  for (const auto& item : stmt->randcase_items) {
+    cumulative += EvalExpr(item.first, ctx, arena).ToUint64();
+    if (pick < cumulative) {
+      co_return co_await ExecStmt(item.second, ctx, arena);
+    }
+  }
+  co_return StmtResult::kDone;
+}
+
 // --- Container coroutines (return ExecTask, support suspension) ---
 
 static ExecTask ExecBlock(const Stmt* stmt, SimContext& ctx, Arena& arena) {
@@ -70,26 +149,96 @@ static ExecTask ExecBlock(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return StmtResult::kDone;
 }
 
+// --- If with unique/priority qualifiers ---
+
 static ExecTask ExecIf(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   auto cond = EvalExpr(stmt->condition, ctx, arena);
-  if (cond.ToUint64() != 0) {
+  bool taken = cond.ToUint64() != 0;
+
+  if (taken) {
     co_return co_await ExecStmt(stmt->then_branch, ctx, arena);
   }
   if (stmt->else_branch) {
     co_return co_await ExecStmt(stmt->else_branch, ctx, arena);
   }
+  // priority-if with no match and no else => warning.
+  if (stmt->qualifier == CaseQualifier::kPriority) {
+    ctx.GetDiag().Warning({}, "priority if: no condition matched");
+  }
   co_return StmtResult::kDone;
 }
 
+// --- Case matching helpers ---
+
+// Check if a bit position has X or Z in a Logic4Vec.
+static bool BitIsZ(const Logic4Vec& v, uint32_t bit) {
+  if (v.nwords == 0 || !v.words) return false;
+  uint32_t wi = bit / 64;
+  uint32_t bi = bit % 64;
+  if (wi >= v.nwords) return false;
+  bool a = (v.words[wi].aval >> bi) & 1;
+  bool b = (v.words[wi].bval >> bi) & 1;
+  return a && b;  // Z: aval=1, bval=1
+}
+
+static bool BitIsXZ(const Logic4Vec& v, uint32_t bit) {
+  if (v.nwords == 0 || !v.words) return false;
+  uint32_t wi = bit / 64;
+  uint32_t bi = bit % 64;
+  if (wi >= v.nwords) return false;
+  return (v.words[wi].bval >> bi) & 1;  // bval=1 means X or Z
+}
+
+static bool CasexMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
+  uint32_t width = (sel.width > pat.width) ? sel.width : pat.width;
+  for (uint32_t i = 0; i < width; ++i) {
+    if (BitIsXZ(sel, i) || BitIsXZ(pat, i)) continue;
+    uint32_t swi = i / 64, sbi = i % 64;
+    uint32_t pwi = i / 64, pbi = i % 64;
+    bool sa = (swi < sel.nwords) && ((sel.words[swi].aval >> sbi) & 1);
+    bool pa = (pwi < pat.nwords) && ((pat.words[pwi].aval >> pbi) & 1);
+    if (sa != pa) return false;
+  }
+  return true;
+}
+
+static bool CasezMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
+  uint32_t width = (sel.width > pat.width) ? sel.width : pat.width;
+  for (uint32_t i = 0; i < width; ++i) {
+    if (BitIsZ(sel, i) || BitIsZ(pat, i)) continue;
+    uint32_t swi = i / 64, sbi = i % 64;
+    uint32_t pwi = i / 64, pbi = i % 64;
+    bool sa = (swi < sel.nwords) && ((sel.words[swi].aval >> sbi) & 1);
+    bool pa = (pwi < pat.nwords) && ((pat.words[pwi].aval >> pbi) & 1);
+    if (sa != pa) return false;
+  }
+  return true;
+}
+
+// Case-inside uses value matching (exact for known bits).
+static bool CaseInsideMatch(uint64_t sel_val, const Logic4Vec& pat) {
+  return sel_val == pat.ToUint64();
+}
+
+// Check if a case item matches based on case_kind and case_inside.
+static bool CaseItemMatches(const Logic4Vec& sel, const Logic4Vec& pat,
+                            TokenKind case_kind, bool case_inside) {
+  if (case_inside) return CaseInsideMatch(sel.ToUint64(), pat);
+  if (case_kind == TokenKind::kKwCasex) return CasexMatch(sel, pat);
+  if (case_kind == TokenKind::kKwCasez) return CasezMatch(sel, pat);
+  return sel.ToUint64() == pat.ToUint64();
+}
+
+// --- Case with casex/casez/inside and qualifiers ---
+
 static ExecTask ExecCase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   auto sel = EvalExpr(stmt->condition, ctx, arena);
-  uint64_t sel_val = sel.ToUint64();
 
   for (const auto& item : stmt->case_items) {
     if (item.is_default) continue;
     for (auto* pat : item.patterns) {
       auto pat_val = EvalExpr(pat, ctx, arena);
-      if (pat_val.ToUint64() == sel_val) {
+      if (CaseItemMatches(sel, pat_val, stmt->case_kind, stmt->case_inside)) {
         co_return co_await ExecStmt(item.body, ctx, arena);
       }
     }
@@ -97,6 +246,12 @@ static ExecTask ExecCase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   // Fall through to default.
   for (const auto& item : stmt->case_items) {
     if (item.is_default) co_return co_await ExecStmt(item.body, ctx, arena);
+  }
+  // priority case: no match and no default => warning.
+  bool is_priority = stmt->qualifier == CaseQualifier::kPriority;
+  bool is_unique = stmt->qualifier == CaseQualifier::kUnique;
+  if (is_priority || is_unique) {
+    ctx.GetDiag().Warning({}, "case: no matching item found");
   }
   co_return StmtResult::kDone;
 }
@@ -167,6 +322,48 @@ static ExecTask ExecDoWhile(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     auto cond = EvalExpr(stmt->condition, ctx, arena);
     if (cond.ToUint64() == 0) break;
   } while (!ctx.StopRequested());
+  co_return StmtResult::kDone;
+}
+
+// --- Foreach (IEEE §12.7.3) ---
+
+static uint32_t GetArraySize(const Stmt* stmt, SimContext& ctx) {
+  if (!stmt->expr) return 0;
+  if (stmt->expr->kind != ExprKind::kIdentifier) return 0;
+  auto* var = ctx.FindVariable(stmt->expr->text);
+  if (!var) return 0;
+  return var->value.width;
+}
+
+static ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  uint32_t size = GetArraySize(stmt, ctx);
+  if (size == 0) co_return StmtResult::kDone;
+
+  // Determine loop variable name (first non-empty foreach_vars entry).
+  std::string_view iter_name;
+  if (!stmt->foreach_vars.empty() && !stmt->foreach_vars[0].empty()) {
+    iter_name = stmt->foreach_vars[0];
+  }
+
+  ctx.PushScope();
+  Variable* iter_var = nullptr;
+  if (!iter_name.empty()) {
+    iter_var = ctx.CreateLocalVariable(iter_name, 32);
+  }
+
+  for (uint32_t i = 0; i < size && !ctx.StopRequested(); ++i) {
+    if (iter_var) {
+      iter_var->value = MakeLogic4VecVal(arena, 32, i);
+    }
+    auto result = co_await ExecStmt(stmt->body, ctx, arena);
+    if (result == StmtResult::kBreak) break;
+    if (result != StmtResult::kDone && result != StmtResult::kContinue) {
+      ctx.PopScope();
+      co_return result;
+    }
+  }
+
+  ctx.PopScope();
   co_return StmtResult::kDone;
 }
 
@@ -316,6 +513,8 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       return ExecCase(stmt, ctx, arena);
     case StmtKind::kFor:
       return ExecFor(stmt, ctx, arena);
+    case StmtKind::kForeach:
+      return ExecForeach(stmt, ctx, arena);
     case StmtKind::kWhile:
       return ExecWhile(stmt, ctx, arena);
     case StmtKind::kForever:
@@ -342,6 +541,9 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       return ExecTask::Immediate(ExecEventTriggerImpl(stmt, ctx));
     case StmtKind::kTimingControl:
     case StmtKind::kDisable:
+    case StmtKind::kDisableFork:
+    case StmtKind::kWaitFork:
+    case StmtKind::kWaitOrder:
       return ExecTask::Immediate(StmtResult::kDone);
     case StmtKind::kBreak:
       return ExecTask::Immediate(StmtResult::kBreak);
@@ -353,6 +555,16 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     case StmtKind::kAssumeImmediate:
     case StmtKind::kCoverImmediate:
       return ExecImmediateAssert(stmt, ctx, arena);
+    case StmtKind::kForce:
+      return ExecTask::Immediate(ExecForceImpl(stmt, ctx, arena));
+    case StmtKind::kRelease:
+      return ExecTask::Immediate(ExecReleaseImpl(stmt, ctx));
+    case StmtKind::kAssign:
+      return ExecTask::Immediate(ExecProceduralAssignImpl(stmt, ctx, arena));
+    case StmtKind::kDeassign:
+      return ExecTask::Immediate(ExecDeassignImpl(stmt, ctx));
+    case StmtKind::kRandcase:
+      return ExecRandcase(stmt, ctx, arena);
     default:
       return ExecTask::Immediate(StmtResult::kDone);
   }

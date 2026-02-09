@@ -22,6 +22,22 @@ Logic4Vec EvalUtilitySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
 Logic4Vec EvalIOSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                         std::string_view name);
 
+// §20.8 Math system calls ($ln, $log10, $sin, $pow, etc.)
+Logic4Vec EvalMathSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                          std::string_view name);
+
+// §21.3 Extended file I/O ($fgets, $fgetc, $feof, $fseek, etc.)
+Logic4Vec EvalFileIOSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                            std::string_view name);
+
+// Extended expression evaluators (eval_expr.cpp).
+Logic4Vec EvalReplicate(const Expr* expr, SimContext& ctx, Arena& arena);
+Logic4Vec EvalPostfixUnary(const Expr* expr, SimContext& ctx, Arena& arena);
+Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena);
+Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena);
+Logic4Vec EvalInside(const Expr* expr, SimContext& ctx, Arena& arena);
+Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena);
+
 // Shared formatting helper (used by eval.cpp and eval_systask.cpp).
 std::string FormatDisplay(const std::string& fmt,
                           const std::vector<Logic4Vec>& vals);

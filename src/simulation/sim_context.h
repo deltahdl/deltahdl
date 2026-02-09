@@ -53,8 +53,12 @@ class SimContext {
 
   void PushScope();
   void PopScope();
+  void PushStaticScope(std::string_view func_name);
+  void PopStaticScope(std::string_view func_name);
   Variable* FindLocalVariable(std::string_view name);
   Variable* CreateLocalVariable(std::string_view name, uint32_t width);
+  // §13.5.2: Alias an existing variable into the current scope (pass by ref).
+  void AliasLocalVariable(std::string_view name, Variable* var);
 
   void SetVcdWriter(VcdWriter* vcd) { vcd_writer_ = vcd; }
   VcdWriter* GetVcdWriter() { return vcd_writer_; }
@@ -92,6 +96,10 @@ class SimContext {
   std::unordered_map<std::string_view, Net*> nets_;
   std::unordered_map<std::string_view, ModuleItem*> functions_;
   std::vector<std::unordered_map<std::string_view, Variable*>> scope_stack_;
+  // §13.3.1: Static function frames persist between calls.
+  std::unordered_map<std::string_view,
+                     std::unordered_map<std::string_view, Variable*>>
+      static_frames_;
   std::vector<Process*> final_processes_;
   std::unordered_map<std::string_view, std::vector<Process*>> sensitivity_map_;
   static const std::vector<Process*> kEmptyProcessList;

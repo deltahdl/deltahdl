@@ -1,8 +1,12 @@
 #include "simulation/eval.h"
 
+#include <algorithm>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <iostream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -47,10 +51,58 @@ static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
   return MakeLogic4Vec(arena, 1);  // X for unknown
 }
 
+// --- Reduction operations (§11.4.9) ---
+
+static uint64_t ReduceBits(uint64_t val, uint32_t width) {
+  uint64_t mask = (width >= 64) ? ~uint64_t{0} : (uint64_t{1} << width) - 1;
+  return val & mask;
+}
+
+static Logic4Vec EvalReductionOp(TokenKind op, Logic4Vec operand,
+                                 Arena& arena) {
+  uint64_t val = ReduceBits(operand.ToUint64(), operand.width);
+  uint64_t all_ones =
+      (operand.width >= 64) ? ~uint64_t{0} : (uint64_t{1} << operand.width) - 1;
+  uint64_t bit_count = __builtin_popcountll(val);
+  switch (op) {
+    case TokenKind::kAmp:
+      return MakeLogic4VecVal(arena, 1, (val == all_ones) ? 1 : 0);
+    case TokenKind::kPipe:
+      return MakeLogic4VecVal(arena, 1, (val != 0) ? 1 : 0);
+    case TokenKind::kCaret:
+      return MakeLogic4VecVal(arena, 1, bit_count & 1);
+    case TokenKind::kTildeAmp:
+      return MakeLogic4VecVal(arena, 1, (val == all_ones) ? 0 : 1);
+    case TokenKind::kTildePipe:
+      return MakeLogic4VecVal(arena, 1, (val != 0) ? 0 : 1);
+    case TokenKind::kTildeCaret:
+    case TokenKind::kCaretTilde:
+      return MakeLogic4VecVal(arena, 1, (bit_count & 1) ? 0 : 1);
+    default:
+      return operand;
+  }
+}
+
 // --- Unary operations ---
+
+static bool IsReductionOp(TokenKind op) {
+  switch (op) {
+    case TokenKind::kAmp:
+    case TokenKind::kPipe:
+    case TokenKind::kCaret:
+    case TokenKind::kTildeAmp:
+    case TokenKind::kTildePipe:
+    case TokenKind::kTildeCaret:
+    case TokenKind::kCaretTilde:
+      return true;
+    default:
+      return false;
+  }
+}
 
 static Logic4Vec EvalUnaryOp(TokenKind op, Logic4Vec operand, Arena& arena) {
   if (operand.nwords == 0) return operand;
+  if (IsReductionOp(op)) return EvalReductionOp(op, operand, arena);
   auto result = MakeLogic4Vec(arena, operand.width);
 
   switch (op) {
@@ -74,6 +126,16 @@ static Logic4Vec EvalUnaryOp(TokenKind op, Logic4Vec operand, Arena& arena) {
 
 // --- Binary arithmetic ---
 
+static uint64_t IntPow(uint64_t base, uint64_t exp) {
+  uint64_t result = 1;
+  while (exp > 0) {
+    if (exp & 1) result *= base;
+    base *= base;
+    exp >>= 1;
+  }
+  return result;
+}
+
 static Logic4Vec EvalBinaryArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
                                  Arena& arena) {
   uint64_t lv = lhs.ToUint64();
@@ -96,6 +158,9 @@ static Logic4Vec EvalBinaryArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
       break;
     case TokenKind::kPercent:
       result = (rv != 0) ? lv % rv : 0;
+      break;
+    case TokenKind::kPower:
+      result = IntPow(lv, rv);
       break;
     default:
       break;
@@ -172,6 +237,17 @@ static Logic4Vec EvalBinaryCompare(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
     case TokenKind::kPipePipe:
       result = static_cast<uint64_t>(lv != 0 || rv != 0);
       break;
+    case TokenKind::kEqEqQuestion: {
+      // Wildcard equality: X/Z bits in RHS are don't-care.
+      uint64_t rhs_dc = rhs.nwords > 0 ? rhs.words[0].bval : 0;
+      result = static_cast<uint64_t>(((lv ^ rv) & ~rhs_dc) == 0);
+      break;
+    }
+    case TokenKind::kBangEqQuestion: {
+      uint64_t rhs_dc = rhs.nwords > 0 ? rhs.words[0].bval : 0;
+      result = static_cast<uint64_t>(((lv ^ rv) & ~rhs_dc) != 0);
+      break;
+    }
     default:
       break;
   }
@@ -188,6 +264,7 @@ static Logic4Vec EvalBinaryOp(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
     case TokenKind::kStar:
     case TokenKind::kSlash:
     case TokenKind::kPercent:
+    case TokenKind::kPower:
       return EvalBinaryArith(op, lhs, rhs, arena);
     case TokenKind::kAmp:
     case TokenKind::kPipe:
@@ -198,7 +275,79 @@ static Logic4Vec EvalBinaryOp(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
   }
 }
 
+// --- Compound assignment operators (§11.4.1) ---
+
+static TokenKind CompoundAssignBaseOp(TokenKind op) {
+  switch (op) {
+    case TokenKind::kPlusEq:
+      return TokenKind::kPlus;
+    case TokenKind::kMinusEq:
+      return TokenKind::kMinus;
+    case TokenKind::kStarEq:
+      return TokenKind::kStar;
+    case TokenKind::kSlashEq:
+      return TokenKind::kSlash;
+    case TokenKind::kPercentEq:
+      return TokenKind::kPercent;
+    case TokenKind::kAmpEq:
+      return TokenKind::kAmp;
+    case TokenKind::kPipeEq:
+      return TokenKind::kPipe;
+    case TokenKind::kCaretEq:
+      return TokenKind::kCaret;
+    case TokenKind::kLtLtEq:
+      return TokenKind::kLtLt;
+    case TokenKind::kGtGtEq:
+      return TokenKind::kGtGt;
+    default:
+      return TokenKind::kEof;
+  }
+}
+
+static bool IsCompoundAssignOp(TokenKind op) {
+  return CompoundAssignBaseOp(op) != TokenKind::kEof;
+}
+
+static Logic4Vec EvalCompoundAssign(const Expr* expr, SimContext& ctx,
+                                    Arena& arena) {
+  auto lhs_val = EvalExpr(expr->lhs, ctx, arena);
+  auto rhs_val = EvalExpr(expr->rhs, ctx, arena);
+  auto base_op = CompoundAssignBaseOp(expr->op);
+  auto result = EvalBinaryOp(base_op, lhs_val, rhs_val, arena);
+  if (expr->lhs->kind == ExprKind::kIdentifier) {
+    auto* var = ctx.FindVariable(expr->lhs->text);
+    if (var) var->value = result;
+  }
+  return result;
+}
+
 // --- System call formatting ---
+
+static std::string FormatValueAsString(const Logic4Vec& val) {
+  std::string result;
+  uint64_t v = val.ToUint64();
+  uint32_t nbytes = (val.width + 7) / 8;
+  for (uint32_t i = nbytes; i > 0; --i) {
+    auto ch = static_cast<char>((v >> ((i - 1) * 8)) & 0xFF);
+    if (ch != 0) result += ch;
+  }
+  return result;
+}
+
+static std::string FormatValueAsReal(const Logic4Vec& val, char spec) {
+  uint64_t bits = val.ToUint64();
+  double d = 0.0;
+  std::memcpy(&d, &bits, sizeof(double));
+  char buf[128];
+  if (spec == 'e') {
+    std::snprintf(buf, sizeof(buf), "%e", d);
+  } else if (spec == 'g') {
+    std::snprintf(buf, sizeof(buf), "%g", d);
+  } else {
+    std::snprintf(buf, sizeof(buf), "%f", d);
+  }
+  return buf;
+}
 
 static std::string FormatArg(const Logic4Vec& val, char spec) {
   uint64_t v = val.ToUint64();
@@ -213,12 +362,22 @@ static std::string FormatArg(const Logic4Vec& val, char spec) {
       std::snprintf(buf, sizeof(buf), "%llx",
                     static_cast<unsigned long long>(v));
       return buf;
+    case 'o':
+      std::snprintf(buf, sizeof(buf), "%llo",
+                    static_cast<unsigned long long>(v));
+      return buf;
     case 'b':
       return val.ToString();
     case 't':
       std::snprintf(buf, sizeof(buf), "%llu",
                     static_cast<unsigned long long>(v));
       return buf;
+    case 's':
+      return FormatValueAsString(val);
+    case 'e':
+    case 'f':
+    case 'g':
+      return FormatValueAsReal(val, spec);
     default:
       return val.ToString();
   }
@@ -229,22 +388,35 @@ std::string FormatDisplay(const std::string& fmt,
   std::string out;
   size_t vi = 0;
   for (size_t i = 0; i < fmt.size(); ++i) {
-    if (fmt[i] == '%' && i + 1 < fmt.size()) {
-      char spec = fmt[i + 1];
-      if (vi < vals.size()) {
-        out += FormatArg(vals[vi++], spec);
-      }
-      ++i;
-    } else if (fmt[i] == '\\' && i + 1 < fmt.size()) {
-      if (fmt[i + 1] == 'n') {
-        out += '\n';
+    if (fmt[i] != '%' || i + 1 >= fmt.size()) {
+      if (fmt[i] == '\\' && i + 1 < fmt.size()) {
+        out += (fmt[i + 1] == 'n') ? '\n' : fmt[i + 1];
+        ++i;
       } else {
-        out += fmt[i + 1];
+        out += fmt[i];
       }
-      ++i;
-    } else {
-      out += fmt[i];
+      continue;
     }
+    // Handle %m (hierarchical name -- no arg consumed).
+    if (fmt[i + 1] == 'm') {
+      out += "<module>";
+      ++i;
+      continue;
+    }
+    // Handle %% (literal percent).
+    if (fmt[i + 1] == '%') {
+      out += '%';
+      ++i;
+      continue;
+    }
+    // Skip optional '0' width modifier (e.g. %0d).
+    size_t j = i + 1;
+    while (j < fmt.size() && (fmt[j] >= '0' && fmt[j] <= '9')) ++j;
+    char spec = (j < fmt.size()) ? fmt[j] : 'd';
+    if (vi < vals.size()) {
+      out += FormatArg(vals[vi++], spec);
+    }
+    i = j;
   }
   return out;
 }
@@ -352,16 +524,68 @@ static Logic4Vec EvalVcdSysCall(SimContext& ctx, Arena& arena,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
+static bool IsMathSysCall(std::string_view n) {
+  return n == "$ln" || n == "$log10" || n == "$exp" || n == "$sqrt" ||
+         n == "$pow" || n == "$floor" || n == "$ceil" || n == "$sin" ||
+         n == "$cos" || n == "$tan" || n == "$asin" || n == "$acos" ||
+         n == "$atan" || n == "$atan2" || n == "$hypot" || n == "$sinh" ||
+         n == "$cosh" || n == "$tanh" || n == "$asinh" || n == "$acosh" ||
+         n == "$atanh" || n == "$dist_uniform" || n == "$dist_normal" ||
+         n == "$dist_exponential" || n == "$dist_poisson" ||
+         n == "$dist_chi_square" || n == "$dist_t" || n == "$dist_erlang";
+}
+
+static bool IsExtFileIOSysCall(std::string_view n) {
+  return n == "$fgets" || n == "$fgetc" || n == "$fflush" || n == "$feof" ||
+         n == "$ferror" || n == "$fseek" || n == "$ftell";
+}
+
+static Logic4Vec EvalTimeSysCall(SimContext& ctx, Arena& arena,
+                                 std::string_view name) {
+  if (name == "$stime") {
+    auto ticks = ctx.CurrentTime().ticks & 0xFFFFFFFF;
+    return MakeLogic4VecVal(arena, 32, ticks);
+  }
+  return MakeLogic4VecVal(arena, 64, ctx.CurrentTime().ticks);
+}
+
+static Logic4Vec EvalSystemCommand(const Expr* expr, Arena& arena) {
+  if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
+  auto text = expr->args[0]->text;
+  std::string cmd;
+  if (text.size() >= 2 && text.front() == '"') {
+    cmd = std::string(text.substr(1, text.size() - 2));
+  } else {
+    cmd = std::string(text);
+  }
+  int ret = std::system(cmd.c_str());
+  return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(ret));
+}
+
 static Logic4Vec EvalMiscSysCall(const Expr* expr, SimContext& ctx,
                                  Arena& arena, std::string_view name) {
-  if (name == "$time" || name == "$realtime") {
-    return MakeLogic4VecVal(arena, 64, ctx.CurrentTime().ticks);
+  if (name == "$time" || name == "$stime" || name == "$realtime") {
+    return EvalTimeSysCall(ctx, arena, name);
   }
   if (name == "$strobe" || name == "$monitor") {
     return EvalDeferredPrint(expr, ctx, arena);
   }
+  if (name == "$monitoron" || name == "$monitoroff") {
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
+  if (name == "$printtimescale" || name == "$timeformat") {
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
+  if (name == "$system") return EvalSystemCommand(expr, arena);
+  if (name == "$stacktrace") {
+    std::cerr << "stacktrace not available\n";
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
   if (name.starts_with("$dump")) {
     return EvalVcdSysCall(ctx, arena, name);
+  }
+  if (IsMathSysCall(name)) {
+    return EvalMathSysCall(expr, ctx, arena, name);
   }
   // §20 utility system calls.
   if (name == "$clog2" || name == "$bits" || name == "$unsigned" ||
@@ -370,11 +594,14 @@ static Logic4Vec EvalMiscSysCall(const Expr* expr, SimContext& ctx,
       name == "$value$plusargs" || name == "$typename" || name == "$sformatf") {
     return EvalUtilitySysCall(expr, ctx, arena, name);
   }
-  // §21 I/O system calls.
+  // §21 I/O system calls (original set).
   if (name == "$fopen" || name == "$fclose" || name == "$fwrite" ||
       name == "$fdisplay" || name == "$readmemh" || name == "$readmemb" ||
       name == "$writememh" || name == "$writememb" || name == "$sscanf") {
     return EvalIOSysCall(expr, ctx, arena, name);
+  }
+  if (IsExtFileIOSysCall(name)) {
+    return EvalFileIOSysCall(expr, ctx, arena, name);
   }
   return EvalPrngCall(expr, ctx, arena, name);
 }
@@ -475,25 +702,65 @@ static Logic4Vec EvalTernary(const Expr* expr, SimContext& ctx, Arena& arena) {
 
 // --- Function call ---
 
+// §13.5.4: Resolve the call-site arg index for a given parameter index.
+static int ResolveArgIndex(const ModuleItem* func, const Expr* expr,
+                           size_t param_idx) {
+  if (expr->arg_names.empty()) {
+    return (param_idx < expr->args.size()) ? static_cast<int>(param_idx) : -1;
+  }
+  auto param_name = func->func_args[param_idx].name;
+  for (size_t j = 0; j < expr->arg_names.size(); ++j) {
+    if (expr->arg_names[j] == param_name) return static_cast<int>(j);
+  }
+  return -1;
+}
+
+// §13.5: Bind function arguments with named, default, and ref support.
 static void BindFunctionArgs(const ModuleItem* func, const Expr* expr,
                              SimContext& ctx, Arena& arena) {
-  for (size_t i = 0; i < func->func_args.size() && i < expr->args.size(); ++i) {
-    auto arg_val = EvalExpr(expr->args[i], ctx, arena);
-    auto* var = ctx.CreateLocalVariable(func->func_args[i].name, arg_val.width);
-    var->value = arg_val;
+  for (size_t i = 0; i < func->func_args.size(); ++i) {
+    int ai = ResolveArgIndex(func, expr, i);
+    auto dir = func->func_args[i].direction;
+
+    // §13.5.2: Pass by reference — alias the caller's variable.
+    if (dir == Direction::kRef && ai >= 0) {
+      auto* call_arg = expr->args[static_cast<size_t>(ai)];
+      if (call_arg->kind == ExprKind::kIdentifier) {
+        auto* target = ctx.FindVariable(call_arg->text);
+        if (target) {
+          ctx.AliasLocalVariable(func->func_args[i].name, target);
+          continue;
+        }
+      }
+    }
+
+    // §13.5.3: Evaluate call-site arg, use default value, or X.
+    Logic4Vec val;
+    if (ai >= 0) {
+      val = EvalExpr(expr->args[static_cast<size_t>(ai)], ctx, arena);
+    } else if (func->func_args[i].default_value) {
+      val = EvalExpr(func->func_args[i].default_value, ctx, arena);
+    } else {
+      val = MakeLogic4Vec(arena, 32);
+    }
+    auto* var = ctx.CreateLocalVariable(func->func_args[i].name, val.width);
+    var->value = val;
   }
 }
 
+// Write back output/inout args, respecting named binding (§13.5.4).
 static void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
                                 SimContext& ctx) {
-  for (size_t i = 0; i < func->func_args.size() && i < expr->args.size(); ++i) {
+  for (size_t i = 0; i < func->func_args.size(); ++i) {
     auto dir = func->func_args[i].direction;
     if (dir != Direction::kOutput && dir != Direction::kInout) continue;
     auto* local = ctx.FindLocalVariable(func->func_args[i].name);
     if (!local) continue;
-    // Write back to caller's variable (the call-site arg must be an lvalue).
-    if (expr->args[i]->kind != ExprKind::kIdentifier) continue;
-    auto* target = ctx.FindVariable(expr->args[i]->text);
+    int ai = ResolveArgIndex(func, expr, i);
+    if (ai < 0) continue;
+    auto* call_arg = expr->args[static_cast<size_t>(ai)];
+    if (call_arg->kind != ExprKind::kIdentifier) continue;
+    auto* target = ctx.FindVariable(call_arg->text);
     if (target) target->value = local->value;
   }
 }
@@ -529,18 +796,42 @@ static Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, 32, result);
 }
 
+// §13: Dispatch function calls with lifetime and void support.
 static Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx,
                                   Arena& arena) {
   auto* func = ctx.FindFunction(expr->callee);
   if (!func) return EvalDpiCall(expr, ctx, arena);
 
-  ctx.PushScope();
+  bool is_static = func->is_static && !func->is_automatic;
+  bool is_void = (func->return_type.kind == DataTypeKind::kVoid);
+
+  // §13.3.1: Static functions reuse their variable frame across calls.
+  if (is_static) {
+    ctx.PushStaticScope(func->name);
+  } else {
+    ctx.PushScope();
+  }
+
   BindFunctionArgs(func, expr, ctx, arena);
-  auto* ret_var = ctx.CreateLocalVariable(func->name, 32);
+
+  // §13.4.1: Void functions have no implicit return variable.
+  // For static functions, reuse the existing return variable if present.
+  Variable dummy_ret;
+  Variable* ret_var = &dummy_ret;
+  if (!is_void) {
+    auto* existing = is_static ? ctx.FindLocalVariable(func->name) : nullptr;
+    ret_var = existing ? existing : ctx.CreateLocalVariable(func->name, 32);
+  }
+
   ExecFunctionBody(func, ret_var, ctx, arena);
   WritebackOutputArgs(func, expr, ctx);
-  auto result = ret_var->value;
-  ctx.PopScope();
+  auto result = is_void ? MakeLogic4VecVal(arena, 1, 0) : ret_var->value;
+
+  if (is_static) {
+    ctx.PopStaticScope(func->name);
+  } else {
+    ctx.PopScope();
+  }
   return result;
 }
 
@@ -562,18 +853,33 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena) {
     case ExprKind::kUnary:
       return EvalUnaryOp(expr->op, EvalExpr(expr->lhs, ctx, arena), arena);
     case ExprKind::kBinary:
+      if (IsCompoundAssignOp(expr->op)) {
+        return EvalCompoundAssign(expr, ctx, arena);
+      }
       return EvalBinaryOp(expr->op, EvalExpr(expr->lhs, ctx, arena),
                           EvalExpr(expr->rhs, ctx, arena), arena);
     case ExprKind::kTernary:
       return EvalTernary(expr, ctx, arena);
     case ExprKind::kConcatenation:
       return EvalConcat(expr, ctx, arena);
+    case ExprKind::kReplicate:
+      return EvalReplicate(expr, ctx, arena);
     case ExprKind::kSelect:
       return EvalSelect(expr, ctx, arena);
     case ExprKind::kSystemCall:
       return EvalSystemCall(expr, ctx, arena);
     case ExprKind::kCall:
       return EvalFunctionCall(expr, ctx, arena);
+    case ExprKind::kPostfixUnary:
+      return EvalPostfixUnary(expr, ctx, arena);
+    case ExprKind::kMemberAccess:
+      return EvalMemberAccess(expr, ctx, arena);
+    case ExprKind::kCast:
+      return EvalCast(expr, ctx, arena);
+    case ExprKind::kInside:
+      return EvalInside(expr, ctx, arena);
+    case ExprKind::kStreamingConcat:
+      return EvalStreamingConcat(expr, ctx, arena);
     default:
       return MakeLogic4Vec(arena, 1);
   }
