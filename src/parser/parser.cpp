@@ -335,7 +335,8 @@ void Parser::ParseVarDeclList(std::vector<ModuleItem*>& items,
                               const DataType& dtype) {
   do {
     auto* item = arena_.Create<ModuleItem>();
-    item->kind = ModuleItemKind::kVarDecl;
+    item->kind =
+        dtype.is_net ? ModuleItemKind::kNetDecl : ModuleItemKind::kVarDecl;
     item->loc = CurrentLoc();
     item->data_type = dtype;
     item->name = Expect(TokenKind::kIdentifier).text;
@@ -766,9 +767,11 @@ DataType Parser::ParseDataType() {
     return dtype;
   }
 
-  auto kind = TokenToTypeKind(CurrentToken().kind);
+  auto tok_kind = CurrentToken().kind;
+  auto kind = TokenToTypeKind(tok_kind);
   if (!kind) return dtype;
   dtype.kind = *kind;
+  dtype.is_net = (tok_kind == TokenKind::kKwWire);
   Consume();
 
   if (Match(TokenKind::kKwSigned)) {

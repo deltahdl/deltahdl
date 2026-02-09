@@ -10,6 +10,7 @@
 #include "parser/ast.h"
 #include "simulation/awaiters.h"
 #include "simulation/eval.h"
+#include "simulation/net.h"
 #include "simulation/process.h"
 #include "simulation/sim_context.h"
 #include "simulation/stmt_exec.h"
@@ -78,10 +79,11 @@ static void ScheduleProcess(Process* proc, Scheduler& sched) {
 // --- Module lowering ---
 
 void Lowerer::LowerModule(const RtlirModule* mod) {
-  // Create variables for all declared nets and variables.
+  // Create Net objects for all declared nets (with resolution support).
   for (const auto& net : mod->nets) {
-    ctx_.CreateVariable(net.name, net.width);
+    ctx_.CreateNet(net.name, net.net_type, net.width);
   }
+  // Create variables for all declared variables.
   for (const auto& var : mod->variables) {
     ctx_.CreateVariable(var.name, var.width);
   }
@@ -110,6 +112,14 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
 
 // --- Process lowering ---
 
+static void RegisterSensitivity(const RtlirProcess& proc, Process* p,
+                                SimContext& ctx) {
+  auto signals = CollectReadSignals(proc.body);
+  for (auto name : signals) {
+    ctx.AddSensitivity(name, p);
+  }
+}
+
 void Lowerer::LowerProcess(const RtlirProcess& proc) {
   auto* p = arena_.Create<Process>();
   p->id = next_id_++;
@@ -134,6 +144,7 @@ void Lowerer::LowerProcess(const RtlirProcess& proc) {
     case RtlirProcessKind::kAlwaysLatch:
       p->kind = ProcessKind::kAlwaysComb;
       p->coro = MakeAlwaysCombCoroutine(proc.body, ctx_, arena_).Release();
+      RegisterSensitivity(proc, p, ctx_);
       break;
     case RtlirProcessKind::kAlwaysFF:
       p->kind = ProcessKind::kAlwaysFF;

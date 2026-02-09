@@ -1,6 +1,7 @@
 #include "simulation/sim_context.h"
 
 #include "common/diagnostic.h"
+#include "simulation/net.h"
 #include "simulation/process.h"
 
 namespace delta {
@@ -26,6 +27,26 @@ Variable* SimContext::CreateVariable(std::string_view name, uint32_t width) {
   }
   variables_[name] = var;
   return var;
+}
+
+Net* SimContext::FindNet(std::string_view name) {
+  auto it = nets_.find(name);
+  return (it != nets_.end()) ? it->second : nullptr;
+}
+
+Net* SimContext::CreateNet(std::string_view name, NetType type,
+                           uint32_t width) {
+  auto* var = CreateVariable(name, width);
+  // Initialize net value to z (aval=all-ones, bval=all-ones) per IEEE §6.5.
+  for (uint32_t i = 0; i < var->value.nwords; ++i) {
+    var->value.words[i].aval = ~uint64_t{0};
+    var->value.words[i].bval = ~uint64_t{0};
+  }
+  auto* net = arena_.Create<Net>();
+  net->type = type;
+  net->resolved = var;
+  nets_[name] = net;
+  return net;
 }
 
 void SimContext::RegisterFunction(std::string_view name, ModuleItem* item) {
@@ -63,6 +84,18 @@ Variable* SimContext::CreateLocalVariable(std::string_view name,
 
 void SimContext::RegisterFinalProcess(Process* proc) {
   final_processes_.push_back(proc);
+}
+
+void SimContext::AddSensitivity(std::string_view signal, Process* proc) {
+  sensitivity_map_[signal].push_back(proc);
+}
+
+const std::vector<Process*> SimContext::kEmptyProcessList;
+
+const std::vector<Process*>& SimContext::GetSensitiveProcesses(
+    std::string_view signal) const {
+  auto it = sensitivity_map_.find(signal);
+  return (it != sensitivity_map_.end()) ? it->second : kEmptyProcessList;
 }
 
 void SimContext::RunFinalBlocks() {

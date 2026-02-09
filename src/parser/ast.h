@@ -202,6 +202,7 @@ struct DataType {
   DataTypeKind kind = DataTypeKind::kImplicit;
   bool is_signed = false;
   bool is_packed = false;
+  bool is_net = false;  // True for wire/tri/wand/wor/supply/uwire types.
   Expr* packed_dim_left = nullptr;
   Expr* packed_dim_right = nullptr;
   std::string_view type_name;

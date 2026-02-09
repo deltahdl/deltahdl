@@ -690,3 +690,82 @@ TEST(Elaborator, AlwaysCombSensitivityInferred) {
   }
   EXPECT_TRUE(found_a);
 }
+
+TEST(Lowerer, AlwaysCombAutoTriggerTimeZero) {
+  // IEEE §9.2: always_comb auto-triggers once at time zero.
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] b;\n"
+      "  always_comb b = 42;\n"
+      "  initial #1 $finish;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* b = f.ctx.FindVariable("b");
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(b->value.ToUint64(), 42u);
+}
+
+TEST(Lowerer, SensitivityMapPopulated) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a, b;\n"
+      "  always_comb b = a + 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+
+  // Sensitivity map should have signal 'a' mapped to a process.
+  const auto& procs = f.ctx.GetSensitiveProcesses("a");
+  EXPECT_FALSE(procs.empty());
+}
+
+TEST(Lowerer, SensitivityMapEmpty) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial x = 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+
+  // Initial blocks don't contribute to sensitivity map.
+  const auto& procs = f.ctx.GetSensitiveProcesses("x");
+  EXPECT_TRUE(procs.empty());
+}
+
+TEST(Lowerer, NetCreatedFromDecl) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  wire [7:0] w;\n"
+      "  assign w = 55;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* net = f.ctx.FindNet("w");
+  ASSERT_NE(net, nullptr);
+  EXPECT_EQ(net->type, NetType::kWire);
+  auto* var = f.ctx.FindVariable("w");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 55u);
+}

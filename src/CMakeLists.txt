@@ -16,6 +16,7 @@ add_library(deltahdl_lib STATIC
     elaboration/const_eval.cpp
     elaboration/sensitivity.cpp
     simulation/driver_update.cpp
+    simulation/net.cpp
     simulation/scheduler.cpp
     simulation/process.cpp
     simulation/variable.cpp

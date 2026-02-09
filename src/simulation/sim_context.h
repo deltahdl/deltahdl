@@ -8,6 +8,7 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "simulation/net.h"
 #include "simulation/scheduler.h"
 #include "simulation/variable.h"
 
@@ -25,6 +26,9 @@ class SimContext {
   Variable* FindVariable(std::string_view name);
   Variable* CreateVariable(std::string_view name, uint32_t width);
 
+  Net* FindNet(std::string_view name);
+  Net* CreateNet(std::string_view name, NetType type, uint32_t width);
+
   Scheduler& GetScheduler() { return scheduler_; }
   Arena& GetArena() { return arena_; }
   DiagEngine& GetDiag() { return diag_; }
@@ -35,6 +39,10 @@ class SimContext {
 
   void RegisterFinalProcess(Process* proc);
   void RunFinalBlocks();
+
+  void AddSensitivity(std::string_view signal, Process* proc);
+  const std::vector<Process*>& GetSensitiveProcesses(
+      std::string_view signal) const;
 
   void RegisterFunction(std::string_view name, ModuleItem* item);
   ModuleItem* FindFunction(std::string_view name);
@@ -54,9 +62,12 @@ class SimContext {
   DiagEngine& diag_;
   std::mt19937 rng_;
   std::unordered_map<std::string_view, Variable*> variables_;
+  std::unordered_map<std::string_view, Net*> nets_;
   std::unordered_map<std::string_view, ModuleItem*> functions_;
   std::vector<std::unordered_map<std::string_view, Variable*>> scope_stack_;
   std::vector<Process*> final_processes_;
+  std::unordered_map<std::string_view, std::vector<Process*>> sensitivity_map_;
+  static const std::vector<Process*> kEmptyProcessList;
   bool stop_requested_ = false;
 };
 
