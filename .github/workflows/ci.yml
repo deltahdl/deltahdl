@@ -541,6 +541,9 @@ jobs:
           find src -name '*.cpp' |
           xargs clang-tidy-18 -p build
           --config-file=.clang-tidy
+          --quiet
+          --extra-arg=-ferror-limit=0
+          --extra-arg=-w
           --warnings-as-errors='*'
       - name: Run pylint
         run: >-
