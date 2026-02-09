@@ -24,6 +24,7 @@ class Parser {
   PortDecl ParsePortDecl();
   void ParseModuleBody(ModuleDecl& mod);
   void ParseModuleItem(std::vector<ModuleItem*>& items);
+  bool TryParseKeywordItem(std::vector<ModuleItem*>& items);
   void ParseParamPortDecl(ModuleDecl& mod);
   void ParseParamsPortsAndSemicolon(ModuleDecl& decl);
 

@@ -218,36 +218,41 @@ static std::optional<AlwaysKind> TokenToAlwaysKind(TokenKind tk) {
   }
 }
 
-void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
+bool Parser::TryParseKeywordItem(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kKwTypedef)) {
     items.push_back(ParseTypedef());
-    return;
+    return true;
   }
   if (Check(TokenKind::kKwFunction)) {
     items.push_back(ParseFunctionDecl());
-    return;
+    return true;
   }
   if (Check(TokenKind::kKwTask)) {
     items.push_back(ParseTaskDecl());
-    return;
+    return true;
   }
   if (Check(TokenKind::kKwAssign)) {
     items.push_back(ParseContinuousAssign());
-    return;
+    return true;
   }
   if (Check(TokenKind::kKwInitial)) {
     items.push_back(ParseInitialBlock());
-    return;
+    return true;
   }
   if (Check(TokenKind::kKwFinal)) {
     items.push_back(ParseFinalBlock());
-    return;
+    return true;
   }
   auto ak = TokenToAlwaysKind(CurrentToken().kind);
   if (ak) {
     items.push_back(ParseAlwaysBlock(*ak));
-    return;
+    return true;
   }
+  return false;
+}
+
+void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
+  if (TryParseKeywordItem(items)) return;
   if (Check(TokenKind::kKwParameter) || Check(TokenKind::kKwLocalparam)) {
     items.push_back(ParseParamDecl());
     return;
