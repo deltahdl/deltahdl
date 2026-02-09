@@ -43,8 +43,7 @@ TEST_F(SpecifyParseTest, EmptySpecifyBlock) {
 }
 
 TEST_F(SpecifyParseTest, SpecifyBlockWithPathDelay) {
-  auto* unit =
-      Parse("module m; specify (a => b) = 5; endspecify endmodule");
+  auto* unit = Parse("module m; specify (a => b) = 5; endspecify endmodule");
   ASSERT_EQ(unit->modules.size(), 1u);
   auto& items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
@@ -75,8 +74,7 @@ TEST_F(SpecifyParseTest, SpecparamDeclaration) {
 }
 
 TEST_F(SpecifyParseTest, SpecparamWithRange) {
-  auto* unit =
-      Parse("module m; specparam [31:0] tDELAY = 100; endmodule");
+  auto* unit = Parse("module m; specparam [31:0] tDELAY = 100; endmodule");
   ASSERT_EQ(unit->modules.size(), 1u);
   auto& items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
@@ -85,8 +83,8 @@ TEST_F(SpecifyParseTest, SpecparamWithRange) {
 }
 
 TEST_F(SpecifyParseTest, MultipleSpecparams) {
-  auto* unit = Parse(
-      "module m; specparam tRISE = 10; specparam tFALL = 12; endmodule");
+  auto* unit =
+      Parse("module m; specparam tRISE = 10; specparam tFALL = 12; endmodule");
   ASSERT_EQ(unit->modules.size(), 1u);
   auto& items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 2u);
@@ -101,8 +99,8 @@ TEST_F(SpecifyParseTest, MultipleSpecparams) {
 // =============================================================================
 
 TEST_F(SpecifyParseTest, SpecifyBlockCoexistsWithOtherItems) {
-  auto* unit = Parse(
-      "module m; logic a; specify endspecify assign a = 1; endmodule");
+  auto* unit =
+      Parse("module m; logic a; specify endspecify assign a = 1; endmodule");
   ASSERT_EQ(unit->modules.size(), 1u);
   auto& items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 3u);

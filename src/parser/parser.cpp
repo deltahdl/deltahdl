@@ -202,6 +202,11 @@ ModuleItem* Parser::ParseImportItem() {
 
 void Parser::ParseImportDecl(std::vector<ModuleItem*>& items) {
   Expect(TokenKind::kKwImport);
+  // DPI-C import: import "DPI-C" ...
+  if (Check(TokenKind::kStringLiteral)) {
+    items.push_back(ParseDpiImport());
+    return;
+  }
   items.push_back(ParseImportItem());
   while (Match(TokenKind::kComma)) {
     items.push_back(ParseImportItem());
@@ -212,6 +217,11 @@ void Parser::ParseImportDecl(std::vector<ModuleItem*>& items) {
 void Parser::ParseExportDecl(std::vector<ModuleItem*>& items) {
   auto loc = CurrentLoc();
   Expect(TokenKind::kKwExport);
+  // DPI-C export: export "DPI-C" ...
+  if (Check(TokenKind::kStringLiteral)) {
+    items.push_back(ParseDpiExport(loc));
+    return;
+  }
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kExportDecl;
   item->loc = loc;
@@ -232,6 +242,80 @@ void Parser::ParseExportDecl(std::vector<ModuleItem*>& items) {
   }
   items.push_back(item);
   Expect(TokenKind::kSemicolon);
+}
+
+ModuleItem* Parser::ParseDpiImport() {
+  auto* item = arena_.Create<ModuleItem>();
+  item->kind = ModuleItemKind::kDpiImport;
+  item->loc = CurrentLoc();
+  Consume();  // string literal "DPI-C"
+
+  // Optional: pure or context
+  if (Match(TokenKind::kKwPure)) {
+    item->dpi_is_pure = true;
+  }
+  if (Match(TokenKind::kKwContext)) {
+    item->dpi_is_context = true;
+  }
+
+  // Optional: c_identifier = (lookahead for identifier followed by '=')
+  if (Check(TokenKind::kIdentifier)) {
+    auto saved = lexer_.SavePos();
+    auto tok = Consume();
+    if (Match(TokenKind::kEq)) {
+      item->dpi_c_name = tok.text;
+    } else {
+      lexer_.RestorePos(saved);
+    }
+  }
+
+  // function or task
+  if (Match(TokenKind::kKwTask)) {
+    item->dpi_is_task = true;
+  } else {
+    Expect(TokenKind::kKwFunction);
+  }
+
+  // Parse return type (for functions) and name
+  if (!item->dpi_is_task) {
+    item->return_type = ParseDataType();
+  }
+  item->name = Expect(TokenKind::kIdentifier).text;
+
+  // Optional argument list
+  if (Check(TokenKind::kLParen)) {
+    item->func_args = ParseFunctionArgs();
+  }
+  Expect(TokenKind::kSemicolon);
+  return item;
+}
+
+ModuleItem* Parser::ParseDpiExport(SourceLoc loc) {
+  auto* item = arena_.Create<ModuleItem>();
+  item->kind = ModuleItemKind::kDpiExport;
+  item->loc = loc;
+  Consume();  // string literal "DPI-C"
+
+  // Optional: c_identifier =
+  if (Check(TokenKind::kIdentifier)) {
+    auto saved = lexer_.SavePos();
+    auto tok = Consume();
+    if (Match(TokenKind::kEq)) {
+      item->dpi_c_name = tok.text;
+    } else {
+      lexer_.RestorePos(saved);
+    }
+  }
+
+  // function or task
+  if (Match(TokenKind::kKwTask)) {
+    item->dpi_is_task = true;
+  } else {
+    Expect(TokenKind::kKwFunction);
+  }
+  item->name = Expect(TokenKind::kIdentifier).text;
+  Expect(TokenKind::kSemicolon);
+  return item;
 }
 
 void Parser::ParseParamPortDecl(ModuleDecl& mod) {
@@ -844,7 +928,6 @@ ModuleItem* Parser::ParseFinalBlock() {
   item->body = ParseStmt();
   return item;
 }
-
 
 Token Parser::ExpectIdentifier() {
   if (CheckIdentifier()) {

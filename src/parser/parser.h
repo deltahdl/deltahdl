@@ -25,6 +25,8 @@ class Parser {
   void ParseImportDecl(std::vector<ModuleItem*>& items);
   ModuleItem* ParseImportItem();
   void ParseExportDecl(std::vector<ModuleItem*>& items);
+  ModuleItem* ParseDpiImport();
+  ModuleItem* ParseDpiExport(SourceLoc loc);
   void ParsePortList(ModuleDecl& mod);
   void ParseNonAnsiPortList(ModuleDecl& mod);
   PortDecl ParsePortDecl();

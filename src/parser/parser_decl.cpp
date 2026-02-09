@@ -1,6 +1,6 @@
-#include "parser/parser.h"
-
 #include <optional>
+
+#include "parser/parser.h"
 
 namespace delta {
 

@@ -342,6 +342,8 @@ enum class ModuleItemKind : uint8_t {
   kCovergroupDecl,  // covergroup ... endgroup (§19)
   kSpecifyBlock,    // specify ... endspecify (§30)
   kSpecparam,       // specparam declarations (§30.2)
+  kDpiImport,       // import "DPI-C" function/task (§35)
+  kDpiExport,       // export "DPI-C" function/task (§35)
 };
 
 // clang-format off
@@ -486,6 +488,12 @@ struct ModuleItem {
   std::vector<ClockingSignalDecl> clocking_signals;  // Signal declarations
   bool is_default_clocking = false;
   bool is_global_clocking = false;
+
+  // DPI import/export (§35)
+  std::string_view dpi_c_name;  // C-side function name
+  bool dpi_is_pure = false;     // pure function (no side effects)
+  bool dpi_is_context = false;  // context function (needs sim context)
+  bool dpi_is_task = false;     // true for task, false for function
 };
 
 // --- Top-level declarations ---

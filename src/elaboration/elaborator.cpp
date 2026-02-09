@@ -337,6 +337,8 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kCovergroupDecl:
     case ModuleItemKind::kSpecifyBlock:
     case ModuleItemKind::kSpecparam:
+    case ModuleItemKind::kDpiImport:
+    case ModuleItemKind::kDpiExport:
       break;
   }
 }
