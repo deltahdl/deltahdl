@@ -45,6 +45,7 @@ add_library(deltahdl_lib STATIC
     simulation/sva_engine.cpp
     simulation/coverage.cpp
     simulation/dpi.cpp
+    simulation/dpi_runtime.cpp
     simulation/compiled_sim.cpp
     simulation/mt_sim.cpp
     simulation/constraint_solver.cpp
