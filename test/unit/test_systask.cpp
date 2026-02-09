@@ -46,7 +46,7 @@ static Expr* MkStr(Arena& arena, std::string_view text) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kStringLiteral;
   auto len = text.size() + 2;
-  char* buf = arena.AllocString("", len);
+  char* buf = static_cast<char*>(arena.Allocate(len + 1, 1));
   buf[0] = '"';
   for (size_t i = 0; i < text.size(); ++i) buf[i + 1] = text[i];
   buf[len - 1] = '"';
