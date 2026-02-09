@@ -8,6 +8,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(DELTAHDL_COVERAGE "Enable code coverage instrumentation" OFF)
 option(DELTAHDL_SANITIZERS "Enable ASan + UBSan" OFF)
+option(DELTAHDL_TSAN "Enable ThreadSanitizer" OFF)
 
 if(DELTAHDL_COVERAGE)
     add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
@@ -17,6 +18,11 @@ endif()
 if(DELTAHDL_SANITIZERS)
     add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
     add_link_options(-fsanitize=address,undefined)
+endif()
+
+if(DELTAHDL_TSAN)
+    add_compile_options(-fsanitize=thread -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=thread)
 endif()
 
 add_compile_options(-Wall -Wextra -Wpedantic -Werror)

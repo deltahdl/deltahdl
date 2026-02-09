@@ -136,6 +136,29 @@ jobs:
           name: build-sanitize
           path: build/
           retention-days: 1
+  build-tsan:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Clang
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-18
+      - name: Build
+        run: |
+          cmake -B build \
+            -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_C_COMPILER=clang-18 \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DDELTAHDL_TSAN=ON
+          cmake --build build --parallel --target deltahdl
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-tsan
+          path: build/
+          retention-days: 1
   build-ubuntu-24-04-x86-64-clang:
     needs: static-analysis
     runs-on: ubuntu-24.04
@@ -190,6 +213,7 @@ jobs:
       - unit-test-coverage
       - unit-test-macos-26-arm64-clang
       - unit-test-sanitize
+      - unit-test-tsan
       - unit-test-ubuntu-24-04-x86-64-clang
       - unit-test-ubuntu-24-04-x86-64-gcc
     outputs:
@@ -277,6 +301,22 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: build-sanitize
+          path: build/
+      - name: Fix permissions
+        run: chmod +x build/src/deltahdl
+      - name: E2E tests
+        run: python3 scripts/run_sim_tests.py
+  e2e-test-tsan:
+    env:
+      TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
+    needs: integration-test-tsan
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-tsan
           path: build/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
@@ -384,6 +424,28 @@ jobs:
         run: chmod +x build/src/deltahdl
       - name: Integration tests
         run: python3 scripts/run_sv_tests.py
+  integration-test-tsan:
+    env:
+      TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
+    needs: cache-sv-tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore sv-tests cache
+        uses: actions/cache/restore@v4
+        with:
+          fail-on-cache-miss: true
+          key: sv-tests-${{ needs.cache-sv-tests.outputs.sv-tests-sha }}
+          path: third_party/sv-tests
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-tsan
+          path: build/
+      - name: Fix permissions
+        run: chmod +x build/src/deltahdl
+      - name: Integration tests
+        run: python3 scripts/run_sv_tests.py
   integration-test-ubuntu-24-04-x86-64-clang:
     needs: cache-sv-tests
     runs-on: ubuntu-24.04
@@ -432,6 +494,7 @@ jobs:
       - assert-coverage
       - e2e-test-macos-26-arm64-clang
       - e2e-test-sanitize
+      - e2e-test-tsan
       - e2e-test-ubuntu-24-04-x86-64-clang
       - e2e-test-ubuntu-24-04-x86-64-gcc
     permissions:
@@ -607,6 +670,26 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: build-sanitize
+          path: build/
+      - name: Install Clang
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-18
+      - name: Build tests
+        run: cmake --build build --parallel
+      - name: Unit tests
+        run: ctest --test-dir build --output-on-failure --label-exclude e2e
+  unit-test-tsan:
+    env:
+      TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
+    needs: build-tsan
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-tsan
           path: build/
       - name: Install Clang
         run: |
