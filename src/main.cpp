@@ -382,18 +382,29 @@ void DumpIr(const delta::RtlirDesign* design) {
   }
 }
 
+std::string ResolveTopModule(const CliOptions& opts,
+                             delta::CompilationUnit* cu) {
+  if (!opts.top_module.empty()) return opts.top_module;
+  if (!cu->modules.empty()) return std::string(cu->modules.back()->name);
+  return "";
+}
+
+const delta::RtlirDesign* ElaborateDesign(const CliOptions& opts,
+                                          delta::CompilationUnit* cu,
+                                          delta::DiagEngine& diag,
+                                          delta::Arena& arena) {
+  delta::Elaborator elaborator(arena, diag, cu);
+  auto top = ResolveTopModule(opts, cu);
+  const auto* design = elaborator.Elaborate(top);
+  if (diag.HasErrors() || design == nullptr) return nullptr;
+  if (opts.dump_ir) DumpIr(design);
+  return design;
+}
+
 int RunSynthesis(const CliOptions& opts, delta::CompilationUnit* cu,
                  delta::DiagEngine& diag, delta::Arena& arena) {
-  delta::Elaborator elaborator(arena, diag, cu);
-  auto top = opts.top_module;
-  if (top.empty() && !cu->modules.empty()) {
-    top = std::string(cu->modules.back()->name);
-  }
-  const auto* design = elaborator.Elaborate(top);
-  if (diag.HasErrors() || design == nullptr || design->top_modules.empty()) {
-    return 1;
-  }
-  if (opts.dump_ir) DumpIr(design);
+  const auto* design = ElaborateDesign(opts, cu, diag, arena);
+  if (!design || design->top_modules.empty()) return 1;
 
   delta::SynthLower synth(arena, diag);
   auto* aig = synth.Lower(design->top_modules[0]);
@@ -419,16 +430,9 @@ int RunSynthesis(const CliOptions& opts, delta::CompilationUnit* cu,
 
 int RunSimulation(const CliOptions& opts, delta::CompilationUnit* cu,
                   delta::DiagEngine& diag, delta::Arena& arena) {
-  delta::Elaborator elaborator(arena, diag, cu);
-  auto top = opts.top_module;
-  if (top.empty() && !cu->modules.empty()) {
-    top = std::string(cu->modules.back()->name);
-  }
-  const auto* design = elaborator.Elaborate(top);
-  if (diag.HasErrors() || design == nullptr) {
-    return 1;
-  }
-  if (opts.dump_ir) DumpIr(design);
+  const auto* design = ElaborateDesign(opts, cu, diag, arena);
+  if (!design) return 1;
+  auto top = ResolveTopModule(opts, cu);
 
   delta::Scheduler scheduler(arena);
   delta::SimContext sim_ctx(scheduler, arena, diag, opts.seed);

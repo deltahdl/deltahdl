@@ -2,15 +2,6 @@
 
 DeltaHDL is an open-source event-driven SystemVerilog IEEE 1800-2023 simulator and synthesizer written in C++23.
 
-## Building
-
-Requires CMake 3.28+ and a C++23 compiler (Clang 18+ or GCC 14+).
-
-```sh
-cmake -B build
-cmake --build build --parallel
-```
-
 ## Usage
 
 ```
@@ -97,20 +88,3 @@ Where `project.args` contains one option per line (lines starting with `#` are c
 src/top.sv
 src/alu.sv
 ```
-
-## Testing
-
-```sh
-cmake --build build --parallel
-ctest --test-dir build --output-on-failure
-```
-
-The testing pyramid consists of:
-
-- **Unit tests** (Google Test) under `test/unit/` test individual components.
-- **Integration tests** use [CHIPS Alliance sv-tests](https://github.com/chipsalliance/sv-tests) for conformance via `scripts/run_sv_tests.py`.
-- **E2E tests** under `test/integration/` run full simulations and compare output against `.expected` files via `scripts/run_sim_tests.py`.
-
-## License
-
-GPL-3.0. See [LICENSE](LICENSE).
