@@ -64,6 +64,8 @@ uint32_t EvalTypeWidth(const DataType& dtype) {
     case DataTypeKind::kSupply1:
     case DataTypeKind::kUwire:
       return 1;  // Scalar net default width.
+    case DataTypeKind::kVirtualInterface:
+      return 0;
   }
   return 1;
 }

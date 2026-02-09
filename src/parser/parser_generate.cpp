@@ -2,6 +2,17 @@
 
 namespace delta {
 
+void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body) {
+  if (Match(TokenKind::kKwBegin)) {
+    while (!Check(TokenKind::kKwEnd) && !AtEnd()) {
+      ParseModuleItem(body);
+    }
+    Expect(TokenKind::kKwEnd);
+  } else {
+    ParseModuleItem(body);  // single generate item
+  }
+}
+
 void Parser::ParseGenerateRegion(std::vector<ModuleItem*>& items) {
   Expect(TokenKind::kKwGenerate);
   while (!Check(TokenKind::kKwEndgenerate) && !AtEnd()) {
@@ -16,17 +27,21 @@ ModuleItem* Parser::ParseGenerateFor() {
   item->loc = CurrentLoc();
   Expect(TokenKind::kKwFor);
   Expect(TokenKind::kLParen);
+  Match(TokenKind::kKwGenvar);  // optional inline genvar (§27.4)
   item->gen_init = ParseAssignmentOrExprStmt();
   item->gen_cond = ParseExpr();
   Expect(TokenKind::kSemicolon);
   item->gen_step = ParseAssignmentOrExprNoSemi();
   Expect(TokenKind::kRParen);
 
-  Expect(TokenKind::kKwBegin);
-  while (!Check(TokenKind::kKwEnd) && !AtEnd()) {
-    ParseModuleItem(item->gen_body);
+  if (Match(TokenKind::kKwBegin)) {
+    while (!Check(TokenKind::kKwEnd) && !AtEnd()) {
+      ParseModuleItem(item->gen_body);
+    }
+    Expect(TokenKind::kKwEnd);
+  } else {
+    ParseModuleItem(item->gen_body);  // single generate item
   }
-  Expect(TokenKind::kKwEnd);
   return item;
 }
 
@@ -39,11 +54,7 @@ ModuleItem* Parser::ParseGenerateIf() {
   item->gen_cond = ParseExpr();
   Expect(TokenKind::kRParen);
 
-  Expect(TokenKind::kKwBegin);
-  while (!Check(TokenKind::kKwEnd) && !AtEnd()) {
-    ParseModuleItem(item->gen_body);
-  }
-  Expect(TokenKind::kKwEnd);
+  ParseGenerateBody(item->gen_body);
 
   if (Match(TokenKind::kKwElse)) {
     if (Check(TokenKind::kKwIf)) {
@@ -52,11 +63,7 @@ ModuleItem* Parser::ParseGenerateIf() {
       auto* else_item = arena_.Create<ModuleItem>();
       else_item->kind = ModuleItemKind::kGenerateIf;
       else_item->loc = CurrentLoc();
-      Expect(TokenKind::kKwBegin);
-      while (!Check(TokenKind::kKwEnd) && !AtEnd()) {
-        ParseModuleItem(else_item->gen_body);
-      }
-      Expect(TokenKind::kKwEnd);
+      ParseGenerateBody(else_item->gen_body);
       item->gen_else = else_item;
     }
   }

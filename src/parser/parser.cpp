@@ -144,6 +144,9 @@ ModuleDecl* Parser::ParseModuleDecl() {
   auto loc = CurrentLoc();
   Expect(TokenKind::kKwModule);
 
+  // Optional lifetime qualifier (§3.4)
+  Match(TokenKind::kKwAutomatic) || Match(TokenKind::kKwStatic);
+
   auto name_tok = Expect(TokenKind::kIdentifier);
   mod->name = name_tok.text;
   mod->range.start = loc;
@@ -151,6 +154,7 @@ ModuleDecl* Parser::ParseModuleDecl() {
   ParseParamsPortsAndSemicolon(*mod);
   ParseModuleBody(*mod);
   Expect(TokenKind::kKwEndmodule);
+  if (Match(TokenKind::kColon)) ExpectIdentifier();
   mod->range.end = CurrentLoc();
   return mod;
 }
@@ -165,15 +169,15 @@ PackageDecl* Parser::ParsePackageDecl() {
     ParseModuleItem(pkg->items);
   }
   Expect(TokenKind::kKwEndpackage);
+  if (Match(TokenKind::kColon)) ExpectIdentifier();
   pkg->range.end = CurrentLoc();
   return pkg;
 }
 
-ModuleItem* Parser::ParseImportDecl() {
+ModuleItem* Parser::ParseImportItem() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kImportDecl;
   item->loc = CurrentLoc();
-  Expect(TokenKind::kKwImport);
   item->import_item.package_name = Expect(TokenKind::kIdentifier).text;
   Expect(TokenKind::kColonColon);
   if (Match(TokenKind::kStar)) {
@@ -181,8 +185,41 @@ ModuleItem* Parser::ParseImportDecl() {
   } else {
     item->import_item.item_name = Expect(TokenKind::kIdentifier).text;
   }
-  Expect(TokenKind::kSemicolon);
   return item;
+}
+
+void Parser::ParseImportDecl(std::vector<ModuleItem*>& items) {
+  Expect(TokenKind::kKwImport);
+  items.push_back(ParseImportItem());
+  while (Match(TokenKind::kComma)) {
+    items.push_back(ParseImportItem());
+  }
+  Expect(TokenKind::kSemicolon);
+}
+
+void Parser::ParseExportDecl(std::vector<ModuleItem*>& items) {
+  auto loc = CurrentLoc();
+  Expect(TokenKind::kKwExport);
+  auto* item = arena_.Create<ModuleItem>();
+  item->kind = ModuleItemKind::kExportDecl;
+  item->loc = loc;
+  if (Match(TokenKind::kStar)) {
+    // export *::*;
+    item->import_item.package_name = "*";
+    Expect(TokenKind::kColonColon);
+    Expect(TokenKind::kStar);
+    item->import_item.is_wildcard = true;
+  } else {
+    item->import_item.package_name = Expect(TokenKind::kIdentifier).text;
+    Expect(TokenKind::kColonColon);
+    if (Match(TokenKind::kStar)) {
+      item->import_item.is_wildcard = true;
+    } else {
+      item->import_item.item_name = Expect(TokenKind::kIdentifier).text;
+    }
+  }
+  items.push_back(item);
+  Expect(TokenKind::kSemicolon);
 }
 
 void Parser::ParseParamPortDecl(ModuleDecl& mod) {
@@ -197,6 +234,10 @@ void Parser::ParseParamPortDecl(ModuleDecl& mod) {
 }
 
 void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
+  // Optional package imports in module header (§26.4)
+  while (Check(TokenKind::kKwImport)) {
+    ParseImportDecl(decl.items);
+  }
   if (Check(TokenKind::kHash)) {
     Consume();
     Expect(TokenKind::kLParen);
@@ -379,6 +420,29 @@ bool Parser::TryParseKeywordItem(std::vector<ModuleItem*>& items) {
     items.push_back(ParseAlias());
     return true;
   }
+  if (Check(TokenKind::kKwGenvar)) {
+    Consume();  // genvar keyword
+    // Parse comma-separated identifier list: genvar i, j;
+    do {
+      auto* item = arena_.Create<ModuleItem>();
+      item->kind = ModuleItemKind::kVarDecl;
+      item->loc = CurrentLoc();
+      item->name = Expect(TokenKind::kIdentifier).text;
+      items.push_back(item);
+    } while (Match(TokenKind::kComma));
+    Expect(TokenKind::kSemicolon);
+    return true;
+  }
+  if (Check(TokenKind::kKwTimeunit) || Check(TokenKind::kKwTimeprecision)) {
+    Consume();  // timeunit or timeprecision keyword
+    Consume();  // time literal (e.g. 1ns)
+    // Optional slash for timeunit 1ns / 1ps; syntax
+    if (Match(TokenKind::kSlash)) {
+      Consume();  // second time literal
+    }
+    Expect(TokenKind::kSemicolon);
+    return true;
+  }
   return false;
 }
 
@@ -401,7 +465,12 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
     return;
   }
   if (Check(TokenKind::kKwImport)) {
-    items.push_back(ParseImportDecl());
+    ParseImportDecl(items);
+    AttachAttrs(items, before, attrs);
+    return;
+  }
+  if (Check(TokenKind::kKwExport)) {
+    ParseExportDecl(items);
     AttachAttrs(items, before, attrs);
     return;
   }
@@ -796,6 +865,18 @@ DataType Parser::ParseDataType() {
     dtype.is_const = true;
   }
 
+  // Virtual interface type: virtual [interface] type_name [.modport] (§25.9)
+  if (Check(TokenKind::kKwVirtual)) {
+    Consume();
+    dtype.kind = DataTypeKind::kVirtualInterface;
+    Match(TokenKind::kKwInterface);  // optional 'interface' keyword
+    dtype.type_name = Expect(TokenKind::kIdentifier).text;
+    if (Match(TokenKind::kDot)) {
+      dtype.modport_name = Expect(TokenKind::kIdentifier).text;
+    }
+    return dtype;
+  }
+
   if (CurrentToken().Is(TokenKind::kIdentifier) &&
       known_types_.count(CurrentToken().text) != 0) {
     dtype.kind = DataTypeKind::kNamed;
@@ -840,13 +921,11 @@ Token Parser::ExpectIdentifier() {
     return Consume();
   }
   auto tok = CurrentToken();
-  diag_.Error(tok.loc,
-              "expected identifier, got " + std::string(TokenKindName(tok.kind)));
+  diag_.Error(tok.loc, "expected identifier, got " +
+                           std::string(TokenKindName(tok.kind)));
   return tok;
 }
 
-bool Parser::CheckIdentifier() {
-  return Check(TokenKind::kIdentifier);
-}
+bool Parser::CheckIdentifier() { return Check(TokenKind::kIdentifier); }
 
 }  // namespace delta

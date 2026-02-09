@@ -122,18 +122,19 @@ enum class DataTypeKind : uint8_t {
   kUnion,
   kEvent,
   kChandle,
-  kWire,     // Synthesizable net
-  kTri,      // Tri-state net
-  kWand,     // Wired-AND
-  kWor,      // Wired-OR
-  kTriand,   // Tri-state AND
-  kTrior,    // Tri-state OR
-  kTri0,     // Pull-down
-  kTri1,     // Pull-up
-  kTrireg,   // Capacitive storage
-  kSupply0,  // Supply 0
-  kSupply1,  // Supply 1
-  kUwire,    // Unresolved wire
+  kWire,              // Synthesizable net
+  kTri,               // Tri-state net
+  kWand,              // Wired-AND
+  kWor,               // Wired-OR
+  kTriand,            // Tri-state AND
+  kTrior,             // Tri-state OR
+  kTri0,              // Pull-down
+  kTri1,              // Pull-up
+  kTrireg,            // Capacitive storage
+  kSupply0,           // Supply 0
+  kSupply1,           // Supply 1
+  kUwire,             // Unresolved wire
+  kVirtualInterface,  // virtual interface (§25.9)
 };
 
 struct EnumMember {
@@ -166,7 +167,8 @@ struct DataType {
   Expr* packed_dim_left = nullptr;
   Expr* packed_dim_right = nullptr;
   std::string_view type_name;
-  std::string_view scope_name;  // Package/class scope prefix (§6.25)
+  std::string_view scope_name;    // Package/class scope prefix (§6.25)
+  std::string_view modport_name;  // virtual interface modport (§25.9)
   std::vector<EnumMember> enum_members;
   std::vector<StructMember> struct_members;
 };
@@ -310,6 +312,7 @@ enum class ModuleItemKind : uint8_t {
   kFunctionDecl,
   kTaskDecl,
   kImportDecl,
+  kExportDecl,
   kGateInst,
   kDefparam,
   kAlias,  // Net alias (§10.11)
@@ -442,6 +445,9 @@ enum class ModuleDeclKind : uint8_t {
 struct ModportPort {
   Direction direction = Direction::kNone;
   std::string_view name;
+  Expr* expr = nullptr;    // Port expression: .name(expr) (§25.5.4)
+  bool is_import = false;  // import task/function (§25.7)
+  bool is_export = false;  // export task/function (§25.7)
 };
 
 struct ModportDecl {

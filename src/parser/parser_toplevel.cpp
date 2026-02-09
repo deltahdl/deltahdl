@@ -115,54 +115,78 @@ ModuleDecl* Parser::ParseInterfaceDecl() {
   decl->range.start = CurrentLoc();
   Expect(TokenKind::kKwInterface);
 
+  // Optional lifetime qualifier (§3.4)
+  Match(TokenKind::kKwAutomatic) || Match(TokenKind::kKwStatic);
+
   decl->name = Expect(TokenKind::kIdentifier).text;
   ParseParamsPortsAndSemicolon(*decl);
 
   while (!Check(TokenKind::kKwEndinterface) && !AtEnd()) {
     if (Check(TokenKind::kKwModport)) {
-      decl->modports.push_back(ParseModportDecl());
+      ParseModportDecl(decl->modports);
     } else {
       ParseModuleItem(decl->items);
     }
   }
   Expect(TokenKind::kKwEndinterface);
+  if (Match(TokenKind::kColon)) ExpectIdentifier();
   decl->range.end = CurrentLoc();
   return decl;
 }
 
 // --- Modport declaration ---
 
-ModportDecl* Parser::ParseModportDecl() {
-  auto* mp = arena_.Create<ModportDecl>();
-  mp->loc = CurrentLoc();
-  Expect(TokenKind::kKwModport);
-  mp->name = Expect(TokenKind::kIdentifier).text;
-  Expect(TokenKind::kLParen);
-
-  Direction cur_dir = Direction::kNone;
-  do {
-    if (Check(TokenKind::kKwInput)) {
-      cur_dir = Direction::kInput;
-      Consume();
-    } else if (Check(TokenKind::kKwOutput)) {
-      cur_dir = Direction::kOutput;
-      Consume();
-    } else if (Check(TokenKind::kKwInout)) {
-      cur_dir = Direction::kInout;
-      Consume();
-    } else if (Check(TokenKind::kKwRef)) {
-      cur_dir = Direction::kRef;
-      Consume();
-    }
-    ModportPort port;
-    port.direction = cur_dir;
+ModportPort Parser::ParseModportPort(Direction& cur_dir) {
+  ModportPort port;
+  // import/export task/function names (§25.7)
+  if (Check(TokenKind::kKwImport)) {
+    Consume();
+    port.is_import = true;
     port.name = Expect(TokenKind::kIdentifier).text;
-    mp->ports.push_back(port);
-  } while (Match(TokenKind::kComma));
+    return port;
+  }
+  if (Check(TokenKind::kKwExport)) {
+    Consume();
+    port.is_export = true;
+    port.name = Expect(TokenKind::kIdentifier).text;
+    return port;
+  }
+  // Direction keywords
+  // clang-format off
+  if      (Check(TokenKind::kKwInput))  { cur_dir = Direction::kInput;  Consume(); }
+  else if (Check(TokenKind::kKwOutput)) { cur_dir = Direction::kOutput; Consume(); }
+  else if (Check(TokenKind::kKwInout))  { cur_dir = Direction::kInout;  Consume(); }
+  else if (Check(TokenKind::kKwRef))    { cur_dir = Direction::kRef;    Consume(); }
+  // clang-format on
 
-  Expect(TokenKind::kRParen);
+  // Port expression syntax: .name(expr) (§25.5.4)
+  if (Match(TokenKind::kDot)) {
+    port.name = Expect(TokenKind::kIdentifier).text;
+    Expect(TokenKind::kLParen);
+    port.expr = ParseExpr();
+    Expect(TokenKind::kRParen);
+    return port;
+  }
+  port.direction = cur_dir;
+  port.name = Expect(TokenKind::kIdentifier).text;
+  return port;
+}
+
+void Parser::ParseModportDecl(std::vector<ModportDecl*>& out) {
+  Expect(TokenKind::kKwModport);
+  do {
+    auto* mp = arena_.Create<ModportDecl>();
+    mp->loc = CurrentLoc();
+    mp->name = Expect(TokenKind::kIdentifier).text;
+    Expect(TokenKind::kLParen);
+    Direction cur_dir = Direction::kNone;
+    do {
+      mp->ports.push_back(ParseModportPort(cur_dir));
+    } while (Match(TokenKind::kComma));
+    Expect(TokenKind::kRParen);
+    out.push_back(mp);
+  } while (Match(TokenKind::kComma));
   Expect(TokenKind::kSemicolon);
-  return mp;
 }
 
 // --- Program declaration ---
@@ -173,6 +197,9 @@ ModuleDecl* Parser::ParseProgramDecl() {
   decl->range.start = CurrentLoc();
   Expect(TokenKind::kKwProgram);
 
+  // Optional lifetime qualifier (§3.4)
+  Match(TokenKind::kKwAutomatic) || Match(TokenKind::kKwStatic);
+
   decl->name = Expect(TokenKind::kIdentifier).text;
   ParseParamsPortsAndSemicolon(*decl);
 
@@ -180,6 +207,7 @@ ModuleDecl* Parser::ParseProgramDecl() {
     ParseModuleItem(decl->items);
   }
   Expect(TokenKind::kKwEndprogram);
+  if (Match(TokenKind::kColon)) ExpectIdentifier();
   decl->range.end = CurrentLoc();
   return decl;
 }
@@ -209,6 +237,7 @@ ClassDecl* Parser::ParseClassDecl() {
     decl->members.push_back(ParseClassMember());
   }
   Expect(TokenKind::kKwEndclass);
+  if (Match(TokenKind::kColon)) ExpectIdentifier();
   decl->range.end = CurrentLoc();
   return decl;
 }

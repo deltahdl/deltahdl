@@ -541,8 +541,8 @@ Expr* Parser::ParseMinTypMaxExpr() {
   mtm->kind = ExprKind::kMinTypMax;
   mtm->range.start = expr->range.start;
   mtm->lhs = expr;       // min
-  mtm->condition = typ;   // typ
-  mtm->rhs = max;         // max
+  mtm->condition = typ;  // typ
+  mtm->rhs = max;        // max
   return mtm;
 }
 

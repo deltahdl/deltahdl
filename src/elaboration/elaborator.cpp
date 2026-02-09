@@ -203,6 +203,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       break;
     case ModuleItemKind::kDefparam:
     case ModuleItemKind::kImportDecl:
+    case ModuleItemKind::kExportDecl:
     case ModuleItemKind::kGateInst:
     case ModuleItemKind::kAlias:
       break;

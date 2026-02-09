@@ -110,8 +110,8 @@ DataType Parser::ParseStructOrUnionType() {
 
 DataType Parser::ParseStructOrUnionBody(TokenKind kw) {
   DataType dtype;
-  dtype.kind =
-      (kw == TokenKind::kKwStruct) ? DataTypeKind::kStruct : DataTypeKind::kUnion;
+  dtype.kind = (kw == TokenKind::kKwStruct) ? DataTypeKind::kStruct
+                                            : DataTypeKind::kUnion;
   Expect(TokenKind::kLBrace);
   while (!Check(TokenKind::kRBrace) && !AtEnd()) {
     StructMember member;

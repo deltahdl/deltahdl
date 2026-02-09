@@ -22,7 +22,9 @@ class Parser {
   ModuleDecl* ParseModuleDecl();
   ModuleDecl* ParseExternModuleDecl();
   PackageDecl* ParsePackageDecl();
-  ModuleItem* ParseImportDecl();
+  void ParseImportDecl(std::vector<ModuleItem*>& items);
+  ModuleItem* ParseImportItem();
+  void ParseExportDecl(std::vector<ModuleItem*>& items);
   void ParsePortList(ModuleDecl& mod);
   void ParseNonAnsiPortList(ModuleDecl& mod);
   PortDecl ParsePortDecl();
@@ -35,6 +37,7 @@ class Parser {
 
   // Generate blocks (parser_generate.cpp)
   void ParseGenerateRegion(std::vector<ModuleItem*>& items);
+  void ParseGenerateBody(std::vector<ModuleItem*>& body);
   ModuleItem* ParseGenerateFor();
   ModuleItem* ParseGenerateIf();
   ModuleItem* ParseGenerateCase();
@@ -42,7 +45,8 @@ class Parser {
   // Top-level declarations (parser_toplevel.cpp)
   ModuleDecl* ParseInterfaceDecl();
   ModuleDecl* ParseProgramDecl();
-  ModportDecl* ParseModportDecl();
+  void ParseModportDecl(std::vector<ModportDecl*>& out);
+  ModportPort ParseModportPort(Direction& cur_dir);
   ClassDecl* ParseClassDecl();
   ClassMember* ParseClassMember();
   ClassMember* ParseConstraintStub(ClassMember* member);

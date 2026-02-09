@@ -166,3 +166,211 @@ TEST(ParserSection23, InstanceArraySingle) {
   // Single dimension: only left is set, right is nullptr.
   EXPECT_EQ(item->inst_range_right, nullptr);
 }
+
+// --- End labels on design elements (LRM section 3) ---
+
+TEST(ParserSection23, EndLabelModule) {
+  auto r = Parse("module foo; endmodule : foo\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1);
+  EXPECT_EQ(r.cu->modules[0]->name, "foo");
+}
+
+TEST(ParserSection23, EndLabelModuleNoLabel) {
+  auto r = Parse("module bar; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1);
+  EXPECT_EQ(r.cu->modules[0]->name, "bar");
+}
+
+TEST(ParserSection23, EndLabelPackage) {
+  auto r = Parse("package mypkg; endpackage : mypkg\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->packages.size(), 1);
+  EXPECT_EQ(r.cu->packages[0]->name, "mypkg");
+}
+
+TEST(ParserSection23, EndLabelInterface) {
+  auto r = Parse("interface myif; endinterface : myif\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->interfaces.size(), 1);
+  EXPECT_EQ(r.cu->interfaces[0]->name, "myif");
+}
+
+TEST(ParserSection23, EndLabelProgram) {
+  auto r = Parse("program myprog; endprogram : myprog\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->programs.size(), 1);
+  EXPECT_EQ(r.cu->programs[0]->name, "myprog");
+}
+
+TEST(ParserSection23, EndLabelClass) {
+  auto r = Parse("class myclass; endclass : myclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1);
+  EXPECT_EQ(r.cu->classes[0]->name, "myclass");
+}
+
+// --- Multi-item import (LRM section 26.3) ---
+
+TEST(ParserSection23, MultiItemImport) {
+  auto r = Parse(
+      "module m;\n"
+      "  import pkg::a, pkg::b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 2);
+  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kImportDecl);
+  EXPECT_EQ(mod->items[0]->import_item.package_name, "pkg");
+  EXPECT_EQ(mod->items[0]->import_item.item_name, "a");
+  EXPECT_EQ(mod->items[1]->kind, ModuleItemKind::kImportDecl);
+  EXPECT_EQ(mod->items[1]->import_item.package_name, "pkg");
+  EXPECT_EQ(mod->items[1]->import_item.item_name, "b");
+}
+
+TEST(ParserSection23, MultiItemImportWithWildcard) {
+  auto r = Parse(
+      "module m;\n"
+      "  import pkg::*, other::func;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 2);
+  EXPECT_EQ(mod->items[0]->import_item.package_name, "pkg");
+  EXPECT_TRUE(mod->items[0]->import_item.is_wildcard);
+  EXPECT_EQ(mod->items[1]->import_item.package_name, "other");
+  EXPECT_EQ(mod->items[1]->import_item.item_name, "func");
+}
+
+// --- Package export declarations (LRM section 26.6) ---
+
+TEST(ParserSection23, ExportDecl) {
+  auto r = Parse(
+      "package p;\n"
+      "  export pkg::*;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* pkg = r.cu->packages[0];
+  ASSERT_EQ(pkg->items.size(), 1);
+  EXPECT_EQ(pkg->items[0]->kind, ModuleItemKind::kExportDecl);
+  EXPECT_EQ(pkg->items[0]->import_item.package_name, "pkg");
+  EXPECT_TRUE(pkg->items[0]->import_item.is_wildcard);
+}
+
+TEST(ParserSection23, ExportWildcardAll) {
+  auto r = Parse(
+      "package p;\n"
+      "  export *::*;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* pkg = r.cu->packages[0];
+  ASSERT_EQ(pkg->items.size(), 1);
+  EXPECT_EQ(pkg->items[0]->kind, ModuleItemKind::kExportDecl);
+  EXPECT_EQ(pkg->items[0]->import_item.package_name, "*");
+  EXPECT_TRUE(pkg->items[0]->import_item.is_wildcard);
+}
+
+// --- timeunit / timeprecision (LRM section 3.14) ---
+
+TEST(ParserSection23, TimeunitDecl) {
+  auto r = Parse(
+      "module m;\n"
+      "  timeunit 1ns;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_EQ(r.cu->modules[0]->name, "m");
+  // timeunit is consumed; no items generated (just parsed and skipped).
+}
+
+TEST(ParserSection23, TimeprecisionDecl) {
+  auto r = Parse(
+      "module m;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_EQ(r.cu->modules[0]->name, "m");
+}
+
+TEST(ParserSection23, TimeunitAndTimeprecision) {
+  auto r = Parse(
+      "module m;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 100ps;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_EQ(r.cu->modules[0]->name, "m");
+}
+
+// --- Lifetime qualifier on module/interface/program (LRM section 3) ---
+
+TEST(ParserSection23, ModuleLifetimeAutomatic) {
+  auto r = Parse("module automatic m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1);
+  EXPECT_EQ(r.cu->modules[0]->name, "m");
+}
+
+TEST(ParserSection23, ModuleLifetimeStatic) {
+  auto r = Parse("module static m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1);
+  EXPECT_EQ(r.cu->modules[0]->name, "m");
+}
+
+TEST(ParserSection23, InterfaceLifetimeAutomatic) {
+  auto r = Parse("interface automatic myif; endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->interfaces.size(), 1);
+  EXPECT_EQ(r.cu->interfaces[0]->name, "myif");
+}
+
+TEST(ParserSection23, ProgramLifetimeAutomatic) {
+  auto r = Parse("program automatic myprog; endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->programs.size(), 1);
+  EXPECT_EQ(r.cu->programs[0]->name, "myprog");
+}
+
+// --- Package import in module headers (LRM section 26.4) ---
+
+TEST(ParserSection23, ModuleHeaderImport) {
+  auto r = Parse(
+      "module m import pkg::*; ();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  EXPECT_EQ(mod->name, "m");
+  // The header import generates an import item in the module body.
+  ASSERT_GE(mod->items.size(), 1);
+  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kImportDecl);
+  EXPECT_EQ(mod->items[0]->import_item.package_name, "pkg");
+  EXPECT_TRUE(mod->items[0]->import_item.is_wildcard);
+}
+
+TEST(ParserSection23, ModuleHeaderImportWithParams) {
+  auto r = Parse(
+      "module m import A::*; #(parameter N = 4) (input logic clk);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  EXPECT_EQ(mod->name, "m");
+  ASSERT_GE(mod->items.size(), 1);
+  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kImportDecl);
+  ASSERT_EQ(mod->params.size(), 1);
+  ASSERT_EQ(mod->ports.size(), 1);
+}
+
+TEST(ParserSection23, ModuleHeaderMultipleImports) {
+  auto r = Parse(
+      "module m import A::*, B::foo; ();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  EXPECT_EQ(mod->name, "m");
+  ASSERT_GE(mod->items.size(), 2);
+  EXPECT_EQ(mod->items[0]->import_item.package_name, "A");
+  EXPECT_TRUE(mod->items[0]->import_item.is_wildcard);
+  EXPECT_EQ(mod->items[1]->import_item.package_name, "B");
+  EXPECT_EQ(mod->items[1]->import_item.item_name, "foo");
+}
