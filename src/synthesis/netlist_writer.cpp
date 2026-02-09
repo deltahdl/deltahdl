@@ -125,7 +125,11 @@ void EmitBlifInverters(std::string& out, const AigGraph& aig,
   for (uint32_t lit : sorted) {
     std::string base = NodeName(AigVar(lit), aig.inputs);
     std::string inv = base + "_inv";
-    out += ".names " + base + " " + inv + "\n";
+    out += ".names ";
+    out += base;
+    out += " ";
+    out += inv;
+    out += "\n";
     out += "0 1\n";
   }
 }
@@ -145,7 +149,11 @@ void EmitBlifOutputs(std::string& out, const AigGraph& aig) {
       continue;
     }
     std::string src = BlifLitName(lit, aig.inputs);
-    out += ".names " + src + " " + oname + "\n";
+    out += ".names ";
+    out += src;
+    out += " ";
+    out += oname;
+    out += "\n";
     out += "1 1\n";
   }
 }
@@ -290,7 +298,13 @@ std::string NetlistWriter::WriteBlif(const AigGraph& aig,
     std::string name = NodeName(nid, aig.inputs);
     std::string f0 = BlifLitName(node.fanin0, aig.inputs);
     std::string f1 = BlifLitName(node.fanin1, aig.inputs);
-    out += ".names " + f0 + " " + f1 + " " + name + "\n";
+    out += ".names ";
+    out += f0;
+    out += " ";
+    out += f1;
+    out += " ";
+    out += name;
+    out += "\n";
     out += "11 1\n";
   }
 
@@ -328,14 +342,24 @@ std::string NetlistWriter::WriteVerilog(const AigGraph& aig,
     std::string name = NodeName(nid, aig.inputs);
     std::string f0 = VerilogLitExpr(node.fanin0, aig.inputs);
     std::string f1 = VerilogLitExpr(node.fanin1, aig.inputs);
-    out += "  assign " + name + " = " + f0 + " & " + f1 + ";\n";
+    out += "  assign ";
+    out += name;
+    out += " = ";
+    out += f0;
+    out += " & ";
+    out += f1;
+    out += ";\n";
   }
 
   // Output assignments.
   for (size_t i = 0; i < aig.outputs.size(); ++i) {
     std::string oname = "o" + std::to_string(i);
     std::string expr = VerilogLitExpr(aig.outputs[i], aig.inputs);
-    out += "  assign " + oname + " = " + expr + ";\n";
+    out += "  assign ";
+    out += oname;
+    out += " = ";
+    out += expr;
+    out += ";\n";
   }
 
   out += "endmodule\n";

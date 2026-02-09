@@ -74,7 +74,7 @@ void VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* /*time*/,
                           int /*flags*/) {
   if (!obj || !value || !obj->var) return;
   if (value->format == kVpiIntVal) {
-    uint64_t new_val = static_cast<uint64_t>(value->value.integer);
+    auto new_val = static_cast<uint64_t>(value->value.integer);
     obj->var->value.words[0].aval = new_val;
     obj->var->value.words[0].bval = 0;
   }

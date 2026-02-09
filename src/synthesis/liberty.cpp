@@ -1,6 +1,7 @@
 #include "synthesis/liberty.h"
 
 #include <cctype>
+#include <cstdint>
 #include <cstdlib>
 #include <string>
 #include <string_view>

@@ -95,14 +95,18 @@ void MtScheduler::RunTimestep(SimContext& ctx,
                               const std::vector<CompiledProcess>& processes) {
   if (partitions_.empty()) return;
 
-  auto execute_partition = [&ctx, &processes](const SimPartition& part) {
-    for (uint32_t pid : part.process_ids) {
-      for (const auto& proc : processes) {
-        if (proc.Id() == pid) {
-          proc.Execute(ctx);
-          break;
-        }
+  auto find_and_execute = [&ctx, &processes](uint32_t pid) {
+    for (const auto& proc : processes) {
+      if (proc.Id() == pid) {
+        proc.Execute(ctx);
+        return;
       }
+    }
+  };
+
+  auto execute_partition = [&find_and_execute](const SimPartition& part) {
+    for (uint32_t pid : part.process_ids) {
+      find_and_execute(pid);
     }
   };
 

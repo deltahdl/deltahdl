@@ -138,7 +138,7 @@ LutMapping IterativeAreaDelay(const AigGraph& g, uint32_t lut_size,
                               uint32_t iterations) {
   // Start with a delay-oriented mapping as the baseline.
   LutMapping best = MapForDelay(g, lut_size);
-  uint32_t best_area = static_cast<uint32_t>(best.cells.size());
+  auto best_area = static_cast<uint32_t>(best.cells.size());
   uint32_t best_depth = ComputeMaxDepth(best);
 
   for (uint32_t i = 0; i < iterations; ++i) {
@@ -146,7 +146,7 @@ LutMapping IterativeAreaDelay(const AigGraph& g, uint32_t lut_size,
     LutMapping candidate =
         is_area_round ? MapForArea(g, lut_size) : MapForDelay(g, lut_size);
 
-    uint32_t cand_area = static_cast<uint32_t>(candidate.cells.size());
+    auto cand_area = static_cast<uint32_t>(candidate.cells.size());
     uint32_t cand_depth = ComputeMaxDepth(candidate);
 
     // Accept the candidate if it improves on the relevant metric without
