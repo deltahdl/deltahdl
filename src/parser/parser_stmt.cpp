@@ -89,6 +89,16 @@ Stmt* Parser::ParseStmtBody() {
       return ParseForceStmt();
     case TokenKind::kKwRelease:
       return ParseReleaseStmt();
+    case TokenKind::kKwAssert:
+      return ParseImmediateAssert();
+    case TokenKind::kKwAssume:
+      return ParseImmediateAssume();
+    case TokenKind::kKwCover:
+      return ParseImmediateCover();
+    case TokenKind::kKwWaitOrder:
+      return ParseWaitOrderStmt();
+    case TokenKind::kKwRandcase:
+      return ParseRandcaseStmt();
     default:
       return ParseAssignmentOrExprStmt();
   }

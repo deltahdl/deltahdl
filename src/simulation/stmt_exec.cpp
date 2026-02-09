@@ -281,6 +281,25 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return StmtResult::kDone;
 }
 
+// --- Immediate assertions (§16.3) ---
+
+static ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx,
+                                    Arena& arena) {
+  auto cond = EvalExpr(stmt->assert_expr, ctx, arena);
+  if (cond.ToUint64() != 0) {
+    // Pass action.
+    if (stmt->assert_pass_stmt) {
+      co_return co_await ExecStmt(stmt->assert_pass_stmt, ctx, arena);
+    }
+  } else {
+    // Fail action.
+    if (stmt->assert_fail_stmt) {
+      co_return co_await ExecStmt(stmt->assert_fail_stmt, ctx, arena);
+    }
+  }
+  co_return StmtResult::kDone;
+}
+
 // --- Main dispatch ---
 
 ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
@@ -330,6 +349,10 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       return ExecTask::Immediate(StmtResult::kContinue);
     case StmtKind::kReturn:
       return ExecTask::Immediate(StmtResult::kReturn);
+    case StmtKind::kAssertImmediate:
+    case StmtKind::kAssumeImmediate:
+    case StmtKind::kCoverImmediate:
+      return ExecImmediateAssert(stmt, ctx, arena);
     default:
       return ExecTask::Immediate(StmtResult::kDone);
   }

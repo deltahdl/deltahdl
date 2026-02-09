@@ -126,6 +126,10 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
     unit->udps.push_back(ParseUdpDecl());
     return;
   }
+  if (Check(TokenKind::kKwChecker)) {
+    unit->checkers.push_back(ParseCheckerDecl());
+    return;
+  }
   diag_.Error(CurrentLoc(), "expected top-level declaration");
   Consume();
 }
@@ -386,6 +390,45 @@ static std::optional<AlwaysKind> TokenToAlwaysKind(TokenKind tk) {
   }
 }
 
+void Parser::ParseGenvarDecl(std::vector<ModuleItem*>& items) {
+  Consume();  // genvar keyword
+  do {
+    auto* item = arena_.Create<ModuleItem>();
+    item->kind = ModuleItemKind::kVarDecl;
+    item->loc = CurrentLoc();
+    item->name = Expect(TokenKind::kIdentifier).text;
+    items.push_back(item);
+  } while (Match(TokenKind::kComma));
+  Expect(TokenKind::kSemicolon);
+}
+
+void Parser::ParseTimeunitDecl() {
+  Consume();  // timeunit or timeprecision keyword
+  Consume();  // time literal (e.g. 1ns)
+  if (Match(TokenKind::kSlash)) {
+    Consume();  // second time literal
+  }
+  Expect(TokenKind::kSemicolon);
+}
+
+bool Parser::TryParseClockingOrVerification(std::vector<ModuleItem*>& items) {
+  if (Check(TokenKind::kKwClocking)) {
+    items.push_back(ParseClockingDecl());
+    return true;
+  }
+  if (Check(TokenKind::kKwDefault) || Check(TokenKind::kKwGlobal)) {
+    auto saved = lexer_.SavePos();
+    Consume();
+    bool is_clocking = Check(TokenKind::kKwClocking);
+    lexer_.RestorePos(saved);
+    if (is_clocking) {
+      items.push_back(ParseClockingDecl());
+      return true;
+    }
+  }
+  return TryParseVerificationItem(items);
+}
+
 bool Parser::TryParseKeywordItem(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kKwTypedef)) {
     items.push_back(ParseTypedef());
@@ -425,26 +468,39 @@ bool Parser::TryParseKeywordItem(std::vector<ModuleItem*>& items) {
     return true;
   }
   if (Check(TokenKind::kKwGenvar)) {
-    Consume();  // genvar keyword
-    // Parse comma-separated identifier list: genvar i, j;
-    do {
-      auto* item = arena_.Create<ModuleItem>();
-      item->kind = ModuleItemKind::kVarDecl;
-      item->loc = CurrentLoc();
-      item->name = Expect(TokenKind::kIdentifier).text;
-      items.push_back(item);
-    } while (Match(TokenKind::kComma));
-    Expect(TokenKind::kSemicolon);
+    ParseGenvarDecl(items);
     return true;
   }
   if (Check(TokenKind::kKwTimeunit) || Check(TokenKind::kKwTimeprecision)) {
-    Consume();  // timeunit or timeprecision keyword
-    Consume();  // time literal (e.g. 1ns)
-    // Optional slash for timeunit 1ns / 1ps; syntax
-    if (Match(TokenKind::kSlash)) {
-      Consume();  // second time literal
-    }
-    Expect(TokenKind::kSemicolon);
+    ParseTimeunitDecl();
+    return true;
+  }
+  return TryParseClockingOrVerification(items);
+}
+
+bool Parser::TryParseVerificationItem(std::vector<ModuleItem*>& items) {
+  if (Check(TokenKind::kKwAssert)) {
+    items.push_back(ParseAssertProperty());
+    return true;
+  }
+  if (Check(TokenKind::kKwAssume)) {
+    items.push_back(ParseAssumeProperty());
+    return true;
+  }
+  if (Check(TokenKind::kKwCover)) {
+    items.push_back(ParseCoverProperty());
+    return true;
+  }
+  if (Check(TokenKind::kKwProperty)) {
+    items.push_back(ParsePropertyDecl());
+    return true;
+  }
+  if (Check(TokenKind::kKwSequence)) {
+    items.push_back(ParseSequenceDecl());
+    return true;
+  }
+  if (Check(TokenKind::kKwCovergroup)) {
+    ParseCovergroupDecl(items);
     return true;
   }
   return false;

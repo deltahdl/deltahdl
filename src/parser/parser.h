@@ -32,6 +32,10 @@ class Parser {
   void ParseNonAnsiPortDecls(ModuleDecl& mod);
   void ParseModuleItem(std::vector<ModuleItem*>& items);
   bool TryParseKeywordItem(std::vector<ModuleItem*>& items);
+  bool TryParseVerificationItem(std::vector<ModuleItem*>& items);
+  void ParseGenvarDecl(std::vector<ModuleItem*>& items);
+  void ParseTimeunitDecl();
+  bool TryParseClockingOrVerification(std::vector<ModuleItem*>& items);
   void ParseParamPortDecl(ModuleDecl& mod);
   void ParseParamsPortsAndSemicolon(ModuleDecl& decl);
 
@@ -61,6 +65,12 @@ class Parser {
 
   // User-defined primitives (parser_toplevel.cpp)
   UdpDecl* ParseUdpDecl();
+
+  // Verification constructs (parser_verify.cpp — §17/§18/§19)
+  ModuleDecl* ParseCheckerDecl();
+  Stmt* ParseRandcaseStmt();
+  void ParseCovergroupDecl(std::vector<ModuleItem*>& items);
+  void SkipCovergroupItem();
 
   // Declarations (parser_decl.cpp)
   ModuleItem* ParseDefparam();
@@ -120,6 +130,22 @@ class Parser {
   Stmt* ParseProceduralDeassignStmt();
   Stmt* ParseForceStmt();
   Stmt* ParseReleaseStmt();
+
+  // Clocking blocks and interprocess sync (parser_clocking.cpp — §14, §15)
+  ModuleItem* ParseClockingDecl();
+  void ParseClockingItem(ModuleItem* item);
+  void ParseClockingSkew(Edge& edge, Expr*& delay);
+  Stmt* ParseWaitOrderStmt();
+
+  // Assertions (parser_assert.cpp — §16)
+  Stmt* ParseImmediateAssert();
+  Stmt* ParseImmediateAssume();
+  Stmt* ParseImmediateCover();
+  ModuleItem* ParseAssertProperty();
+  ModuleItem* ParseAssumeProperty();
+  ModuleItem* ParseCoverProperty();
+  ModuleItem* ParsePropertyDecl();
+  ModuleItem* ParseSequenceDecl();
 
   // Expressions (Pratt parser — in expr_parser.cpp)
   Expr* ParseExpr();

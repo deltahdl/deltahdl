@@ -201,10 +201,15 @@ enum class StmtKind : uint8_t {
   kDisableFork,  // disable fork (§9.6.3)
   kEventTrigger,
   kNull,
-  kAssign,    // Procedural continuous assign (§10.6.1)
-  kDeassign,  // Procedural deassign (§10.6.1)
-  kForce,     // Force (§10.6.2)
-  kRelease,   // Release (§10.6.2)
+  kAssign,           // Procedural continuous assign (§10.6.1)
+  kDeassign,         // Procedural deassign (§10.6.1)
+  kForce,            // Force (§10.6.2)
+  kRelease,          // Release (§10.6.2)
+  kAssertImmediate,  // assert(expr) (§16.3)
+  kAssumeImmediate,  // assume(expr) (§16.3)
+  kCoverImmediate,   // cover(expr) (§16.3)
+  kWaitOrder,        // wait_order(ev1, ev2, ...) (§15.5.4)
+  kRandcase,         // randcase ... endcase (§18.16)
 };
 
 enum class Edge : uint8_t {
@@ -281,6 +286,18 @@ struct Stmt {
 
   // Foreach
   std::vector<std::string_view> foreach_vars;
+
+  // Assertions (§16)
+  Expr* assert_expr = nullptr;       // The assertion condition
+  Stmt* assert_pass_stmt = nullptr;  // Optional pass action
+  Stmt* assert_fail_stmt = nullptr;  // Optional else (fail) action
+  bool is_deferred = false;          // #0 deferred assertion
+
+  // wait_order (§15.5.4)
+  std::vector<Expr*> wait_order_events;
+
+  // randcase (§18.16)
+  std::vector<std::pair<Expr*, Stmt*>> randcase_items;  // weight : stmt
 };
 
 // --- Declarations and module items ---
@@ -315,7 +332,14 @@ enum class ModuleItemKind : uint8_t {
   kExportDecl,
   kGateInst,
   kDefparam,
-  kAlias,  // Net alias (§10.11)
+  kAlias,           // Net alias (§10.11)
+  kPropertyDecl,    // property ... endproperty (§16.12)
+  kSequenceDecl,    // sequence ... endsequence (§16.8)
+  kAssertProperty,  // assert property (§16.5)
+  kAssumeProperty,  // assume property (§16.5)
+  kCoverProperty,   // cover property (§16.5)
+  kClockingBlock,   // Clocking block (§14)
+  kCovergroupDecl,  // covergroup ... endgroup (§19)
 };
 
 // clang-format off
@@ -367,6 +391,17 @@ struct GenerateCaseItem {
   std::vector<Expr*> patterns;
   bool is_default = false;
   std::vector<ModuleItem*> body;
+};
+
+// Clocking signal entry within a clocking block (§14.3)
+struct ClockingSignalDecl {
+  Direction direction = Direction::kNone;  // input/output/inout
+  Edge skew_edge = Edge::kNone;            // Edge-based skew (posedge/negedge)
+  Expr* skew_delay = nullptr;              // Delay-based skew (#N)
+  Edge out_skew_edge = Edge::kNone;  // Output edge when dir is input+output
+  Expr* out_skew_delay = nullptr;    // Output delay when dir is input+output
+  std::string_view name;
+  Expr* hier_expr = nullptr;  // = hierarchical_expression (§14.5)
 };
 
 struct ModuleItem {
@@ -437,6 +472,18 @@ struct ModuleItem {
 
   // Net alias (§10.11)
   std::vector<Expr*> alias_nets;
+
+  // Property/sequence declarations and concurrent assertions (§16)
+  Expr* assert_expr = nullptr;       // Concurrent assertion property expr
+  Stmt* assert_pass_stmt = nullptr;  // Optional pass action
+  Stmt* assert_fail_stmt = nullptr;  // Optional else (fail) action
+  Expr* prop_body_expr = nullptr;    // Property/sequence body expression
+
+  // Clocking block (§14)
+  std::vector<EventExpr> clocking_event;             // Clock event
+  std::vector<ClockingSignalDecl> clocking_signals;  // Signal declarations
+  bool is_default_clocking = false;
+  bool is_global_clocking = false;
 };
 
 // --- Top-level declarations ---
@@ -445,6 +492,7 @@ enum class ModuleDeclKind : uint8_t {
   kModule,
   kInterface,
   kProgram,
+  kChecker,  // checker ... endchecker (§17)
 };
 
 struct ModportPort {
@@ -540,6 +588,7 @@ struct CompilationUnit {
   std::vector<ModuleDecl*> programs;
   std::vector<ClassDecl*> classes;
   std::vector<UdpDecl*> udps;
+  std::vector<ModuleDecl*> checkers;  // checker ... endchecker (§17)
 };
 
 }  // namespace delta

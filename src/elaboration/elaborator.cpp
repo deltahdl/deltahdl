@@ -328,6 +328,13 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kImportDecl:
     case ModuleItemKind::kExportDecl:
     case ModuleItemKind::kAlias:
+    case ModuleItemKind::kPropertyDecl:
+    case ModuleItemKind::kSequenceDecl:
+    case ModuleItemKind::kAssertProperty:
+    case ModuleItemKind::kAssumeProperty:
+    case ModuleItemKind::kCoverProperty:
+    case ModuleItemKind::kClockingBlock:
+    case ModuleItemKind::kCovergroupDecl:
       break;
   }
 }
