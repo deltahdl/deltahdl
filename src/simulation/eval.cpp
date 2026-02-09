@@ -324,6 +324,52 @@ static void ExecSeverityTask(const Expr* expr, SimContext& ctx, Arena& arena,
   os << prefix << ": " << msg << "\n";
 }
 
+static Logic4Vec EvalDeferredPrint(const Expr* expr, SimContext& ctx,
+                                   Arena& arena) {
+  auto* event = ctx.GetScheduler().GetEventPool().Acquire();
+  event->callback = [expr, &ctx, &arena]() {
+    ExecDisplayWrite(expr, ctx, arena);
+    std::cout << "\n";
+  };
+  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kPostponed,
+                                   event);
+  return MakeLogic4VecVal(arena, 1, 0);
+}
+
+static Logic4Vec EvalMiscSysCall(const Expr* expr, SimContext& ctx,
+                                 Arena& arena, std::string_view name) {
+  if (name == "$time" || name == "$realtime") {
+    return MakeLogic4VecVal(arena, 64, ctx.CurrentTime().ticks);
+  }
+  if (name == "$strobe" || name == "$monitor") {
+    return EvalDeferredPrint(expr, ctx, arena);
+  }
+  if (name == "$readmemh" || name == "$readmemb") {
+    std::cerr << "WARNING: " << name << " not yet implemented\n";
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
+  if (name == "$dumpfile" || name == "$dumpvars" || name == "$dumpoff" ||
+      name == "$dumpon" || name == "$dumpall") {
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
+  return EvalPrngCall(expr, ctx, arena, name);
+}
+
+static Logic4Vec EvalSeveritySysCall(const Expr* expr, SimContext& ctx,
+                                     Arena& arena, std::string_view name) {
+  if (name == "$fatal") {
+    ExecSeverityTask(expr, ctx, arena, "FATAL", std::cerr);
+    ctx.RequestStop();
+  } else if (name == "$error") {
+    ExecSeverityTask(expr, ctx, arena, "ERROR", std::cerr);
+  } else if (name == "$warning") {
+    ExecSeverityTask(expr, ctx, arena, "WARNING", std::cout);
+  } else if (name == "$info") {
+    ExecSeverityTask(expr, ctx, arena, "INFO", std::cout);
+  }
+  return MakeLogic4VecVal(arena, 1, 0);
+}
+
 static Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
   auto name = expr->callee;
@@ -332,35 +378,15 @@ static Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx,
     ExecDisplayWrite(expr, ctx, arena);
     return MakeLogic4VecVal(arena, 1, 0);
   }
-
   if (name == "$finish" || name == "$stop") {
     ctx.RequestStop();
     return MakeLogic4VecVal(arena, 1, 0);
   }
-
-  if (name == "$time") {
-    return MakeLogic4VecVal(arena, 64, ctx.CurrentTime().ticks);
+  if (name == "$fatal" || name == "$error" || name == "$warning" ||
+      name == "$info") {
+    return EvalSeveritySysCall(expr, ctx, arena, name);
   }
-
-  if (name == "$fatal") {
-    ExecSeverityTask(expr, ctx, arena, "FATAL", std::cerr);
-    ctx.RequestStop();
-    return MakeLogic4VecVal(arena, 1, 0);
-  }
-  if (name == "$error") {
-    ExecSeverityTask(expr, ctx, arena, "ERROR", std::cerr);
-    return MakeLogic4VecVal(arena, 1, 0);
-  }
-  if (name == "$warning") {
-    ExecSeverityTask(expr, ctx, arena, "WARNING", std::cout);
-    return MakeLogic4VecVal(arena, 1, 0);
-  }
-  if (name == "$info") {
-    ExecSeverityTask(expr, ctx, arena, "INFO", std::cout);
-    return MakeLogic4VecVal(arena, 1, 0);
-  }
-
-  return EvalPrngCall(expr, ctx, arena, name);
+  return EvalMiscSysCall(expr, ctx, arena, name);
 }
 
 // --- Concatenation ---

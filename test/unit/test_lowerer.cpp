@@ -896,6 +896,51 @@ TEST(NetResolution, Tri1ResolvesToOne) {
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0u);
 }
 
+TEST(Lowerer, StrobeDoesNotCrash) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    x = 42;\n"
+      "    $strobe(\"x=%d\", x);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
+TEST(Lowerer, RealtimeReturnsTime) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [63:0] t_val;\n"
+      "  initial begin\n"
+      "    #10;\n"
+      "    t_val = $realtime;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("t_val");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 10u);
+}
+
 TEST(Lowerer, NetCreatedFromDecl) {
   LowerFixture f;
   auto* design = ElaborateSrc(
