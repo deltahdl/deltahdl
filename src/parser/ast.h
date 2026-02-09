@@ -37,6 +37,10 @@ enum class ExprKind : uint8_t {
   kAssignmentPattern,  // '{expr, ...}  (§5.10/§5.11)
   kCast,               // type'(expr)   (§6.24)
   kTypeRef,            // type(expr)    (§6.23)
+  kPostfixUnary,       // a++, a--      (§11.4.2)
+  kInside,             // expr inside { range_list }  (§11.4.13)
+  kStreamingConcat,    // {<< [size] {exprs}} / {>> [size] {exprs}} (§11.4.14)
+  kMinTypMax,          // expr : expr : expr  (§11.11)
 };
 
 struct Expr {
@@ -61,6 +65,7 @@ struct Expr {
   // Call / system call
   std::string_view callee;
   std::vector<Expr*> args;
+  std::vector<std::string_view> arg_names;  // Named args (§13.5.4)
 
   // Select
   Expr* base = nullptr;
@@ -85,93 +90,7 @@ struct Attribute {
   Expr* value = nullptr;  // nullptr if no '= expr'
 };
 
-// --- Statements ---
-
-enum class StmtKind : uint8_t {
-  kBlock,
-  kIf,
-  kCase,
-  kFor,
-  kWhile,
-  kForever,
-  kRepeat,
-  kDoWhile,
-  kBreak,
-  kContinue,
-  kReturn,
-  kBlockingAssign,
-  kNonblockingAssign,
-  kExprStmt,
-  kTimingControl,
-  kDelay,
-  kEventControl,
-  kWait,
-  kFork,
-  kDisable,
-  kEventTrigger,
-  kNull,
-};
-
-enum class Edge : uint8_t {
-  kNone,
-  kPosedge,
-  kNegedge,
-};
-
-struct EventExpr {
-  Edge edge = Edge::kNone;
-  Expr* signal = nullptr;
-};
-
-struct CaseItem {
-  std::vector<Expr*> patterns;
-  Stmt* body = nullptr;
-  bool is_default = false;
-};
-
-struct Stmt {
-  StmtKind kind;
-  SourceRange range;
-  std::vector<Attribute> attrs;
-
-  // Block
-  std::vector<Stmt*> stmts;
-
-  // If
-  Expr* condition = nullptr;
-  Stmt* then_branch = nullptr;
-  Stmt* else_branch = nullptr;
-
-  // Assign
-  Expr* lhs = nullptr;
-  Expr* rhs = nullptr;
-  Expr* delay = nullptr;
-
-  // For
-  Stmt* for_init = nullptr;
-  Expr* for_cond = nullptr;
-  Stmt* for_step = nullptr;
-  Stmt* for_body = nullptr;
-
-  // Case
-  std::vector<CaseItem> case_items;
-  TokenKind case_kind = TokenKind::kKwCase;  // case/casex/casez
-
-  // Timing
-  std::vector<EventExpr> events;
-
-  // Fork
-  std::vector<Stmt*> fork_stmts;
-  TokenKind join_kind = TokenKind::kKwJoin;
-
-  // Expression statement
-  Expr* expr = nullptr;
-
-  // Repeat/while/do-while
-  Stmt* body = nullptr;
-};
-
-// --- Declarations and module items ---
+// --- Data types (must precede Stmt since Stmt uses DataType by value) ---
 
 enum class Direction : uint8_t {
   kNone,
@@ -203,11 +122,25 @@ enum class DataTypeKind : uint8_t {
   kUnion,
   kEvent,
   kChandle,
+  kWire,     // Synthesizable net
+  kTri,      // Tri-state net
+  kWand,     // Wired-AND
+  kWor,      // Wired-OR
+  kTriand,   // Tri-state AND
+  kTrior,    // Tri-state OR
+  kTri0,     // Pull-down
+  kTri1,     // Pull-up
+  kTrireg,   // Capacitive storage
+  kSupply0,  // Supply 0
+  kSupply1,  // Supply 1
+  kUwire,    // Unresolved wire
 };
 
 struct EnumMember {
   std::string_view name;
   Expr* value = nullptr;
+  Expr* range_start = nullptr;  // For [N] or [N:M] syntax (§6.19.2)
+  Expr* range_end = nullptr;    // For [N:M] syntax (nullptr for [N])
 };
 
 struct StructMember {
@@ -225,9 +158,11 @@ struct DataType {
   bool is_signed = false;
   bool is_packed = false;
   bool is_const = false;
-  bool is_net = false;     // True for wire/tri/wand/wor/supply/uwire types.
-  bool is_tagged = false;  // union tagged (§7.3.2)
-  bool is_soft = false;    // union soft (§7.3.1)
+  bool is_net = false;       // True for wire/tri/wand/wor/supply/uwire types.
+  bool is_tagged = false;    // union tagged (§7.3.2)
+  bool is_soft = false;      // union soft (§7.3.1)
+  bool is_vectored = false;  // vectored qualifier (§6.6.9)
+  bool is_scalared = false;  // scalared qualifier (§6.6.9)
   Expr* packed_dim_left = nullptr;
   Expr* packed_dim_right = nullptr;
   std::string_view type_name;
@@ -235,6 +170,118 @@ struct DataType {
   std::vector<EnumMember> enum_members;
   std::vector<StructMember> struct_members;
 };
+
+// --- Statements ---
+
+enum class StmtKind : uint8_t {
+  kBlock,
+  kIf,
+  kCase,
+  kFor,
+  kForeach,
+  kWhile,
+  kForever,
+  kRepeat,
+  kDoWhile,
+  kBreak,
+  kContinue,
+  kReturn,
+  kBlockingAssign,
+  kNonblockingAssign,
+  kExprStmt,
+  kTimingControl,
+  kDelay,
+  kEventControl,
+  kWait,
+  kWaitFork,  // wait fork (§9.6.1)
+  kFork,
+  kDisable,
+  kDisableFork,  // disable fork (§9.6.3)
+  kEventTrigger,
+  kNull,
+  kAssign,    // Procedural continuous assign (§10.6.1)
+  kDeassign,  // Procedural deassign (§10.6.1)
+  kForce,     // Force (§10.6.2)
+  kRelease,   // Release (§10.6.2)
+};
+
+enum class Edge : uint8_t {
+  kNone,
+  kPosedge,
+  kNegedge,
+};
+
+struct EventExpr {
+  Edge edge = Edge::kNone;
+  Expr* signal = nullptr;
+  Expr* iff_condition = nullptr;  // §9.4.2 iff guard
+};
+
+struct CaseItem {
+  std::vector<Expr*> patterns;
+  Stmt* body = nullptr;
+  bool is_default = false;
+};
+
+enum class CaseQualifier : uint8_t {
+  kNone,
+  kUnique,
+  kUnique0,
+  kPriority,
+};
+
+struct Stmt {
+  StmtKind kind;
+  SourceRange range;
+  std::vector<Attribute> attrs;
+  std::string_view label;
+  CaseQualifier qualifier = CaseQualifier::kNone;
+
+  // Block
+  std::vector<Stmt*> stmts;
+
+  // If
+  Expr* condition = nullptr;
+  Stmt* then_branch = nullptr;
+  Stmt* else_branch = nullptr;
+
+  // Assign
+  Expr* lhs = nullptr;
+  Expr* rhs = nullptr;
+  Expr* delay = nullptr;
+
+  // For
+  Stmt* for_init = nullptr;
+  Expr* for_cond = nullptr;
+  Stmt* for_step = nullptr;
+  Stmt* for_body = nullptr;
+  DataType for_init_type;  // Non-implicit when for-init declares a variable
+
+  // Case
+  std::vector<CaseItem> case_items;
+  TokenKind case_kind = TokenKind::kKwCase;  // case/casex/casez
+  bool case_inside = false;  // case ... inside (LRM section 12.5.4)
+
+  // Timing
+  std::vector<EventExpr> events;
+  bool is_star_event = false;  // @* or @(*) implicit sensitivity (§9.4.2.2)
+  Expr* repeat_event_count = nullptr;  // repeat(N) @(event) (§9.4.5)
+
+  // Fork
+  std::vector<Stmt*> fork_stmts;
+  TokenKind join_kind = TokenKind::kKwJoin;
+
+  // Expression statement
+  Expr* expr = nullptr;
+
+  // Repeat/while/do-while
+  Stmt* body = nullptr;
+
+  // Foreach
+  std::vector<std::string_view> foreach_vars;
+};
+
+// --- Declarations and module items ---
 
 struct PortDecl {
   Direction direction = Direction::kNone;
@@ -265,6 +312,7 @@ enum class ModuleItemKind : uint8_t {
   kImportDecl,
   kGateInst,
   kDefparam,
+  kAlias,  // Net alias (§10.11)
 };
 
 // clang-format off
@@ -303,8 +351,11 @@ struct ImportItem {
 
 struct FunctionArg {
   Direction direction = Direction::kNone;
+  bool is_const = false;  // const ref (§13.5.2)
   DataType data_type;
   std::string_view name;
+  Expr* default_value = nullptr;     // §13.5.3
+  std::vector<Expr*> unpacked_dims;  // Unpacked array dims (§13.4)
 };
 
 struct ModuleItem;
@@ -344,6 +395,9 @@ struct ModuleItem {
   std::string_view inst_name;
   std::vector<Expr*> inst_params;
   std::vector<std::pair<std::string_view, Expr*>> inst_ports;
+  bool inst_wildcard = false;        // .* port connection (§23.3.2.4)
+  Expr* inst_range_left = nullptr;   // Instance array left bound (§23.3.2)
+  Expr* inst_range_right = nullptr;  // Instance array right bound (§23.3.2)
 
   // Typedef
   DataType typedef_type;
@@ -372,6 +426,9 @@ struct ModuleItem {
 
   // Defparam: list of (hierarchical_path_expr, value_expr) pairs
   std::vector<std::pair<Expr*, Expr*>> defparam_assigns;
+
+  // Net alias (§10.11)
+  std::vector<Expr*> alias_nets;
 };
 
 // --- Top-level declarations ---
@@ -395,6 +452,7 @@ struct ModportDecl {
 
 struct ModuleDecl {
   ModuleDeclKind decl_kind = ModuleDeclKind::kModule;
+  bool is_extern = false;  // extern module declaration (§23.2.1)
   std::string_view name;
   SourceRange range;
   std::vector<PortDecl> ports;

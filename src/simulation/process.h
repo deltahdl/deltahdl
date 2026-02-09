@@ -96,6 +96,7 @@ struct Process {
   Region home_region = Region::kActive;
   uint32_t id = 0;
   bool active = true;
+  bool is_reactive = false;
 
   ~Process() {
     if (coro) coro.destroy();

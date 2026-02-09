@@ -60,6 +60,10 @@ class SimContext {
   void SetDpiContext(DpiContext* dpi) { dpi_context_ = dpi; }
   DpiContext* GetDpiContext() { return dpi_context_; }
 
+  void SetCurrentProcess(Process* proc) { current_process_ = proc; }
+  Process* CurrentProcess() const { return current_process_; }
+  bool IsReactiveContext() const;
+
   const std::unordered_map<std::string_view, Variable*>& GetVariables() const {
     return variables_;
   }
@@ -82,6 +86,7 @@ class SimContext {
   static const std::vector<Process*> kEmptyProcessList;
   VcdWriter* vcd_writer_ = nullptr;
   DpiContext* dpi_context_ = nullptr;
+  Process* current_process_ = nullptr;
   bool stop_requested_ = false;
 };
 

@@ -16,13 +16,18 @@ class Parser {
   CompilationUnit* Parse();
 
  private:
+  void ParseTopLevel(CompilationUnit* unit);
+
   // Module/package parsing
   ModuleDecl* ParseModuleDecl();
+  ModuleDecl* ParseExternModuleDecl();
   PackageDecl* ParsePackageDecl();
   ModuleItem* ParseImportDecl();
   void ParsePortList(ModuleDecl& mod);
+  void ParseNonAnsiPortList(ModuleDecl& mod);
   PortDecl ParsePortDecl();
   void ParseModuleBody(ModuleDecl& mod);
+  void ParseNonAnsiPortDecls(ModuleDecl& mod);
   void ParseModuleItem(std::vector<ModuleItem*>& items);
   bool TryParseKeywordItem(std::vector<ModuleItem*>& items);
   void ParseParamPortDecl(ModuleDecl& mod);
@@ -51,14 +56,18 @@ class Parser {
   ModuleItem* ParseTypedef();
   ModuleItem* ParseNettypeDecl();
   DataType ParseEnumType();
+  DataType ParseEnumBody(const DataType& base);
   DataType ParseStructOrUnionType();
+  DataType ParseStructOrUnionBody(TokenKind kw);
   ModuleItem* ParseFunctionDecl();
   ModuleItem* ParseTaskDecl();
   std::vector<FunctionArg> ParseFunctionArgs();
+  void ParseOldStylePortDecls(ModuleItem* item, TokenKind end_kw);
 
   // Declarations
   void ParseVarDeclList(std::vector<ModuleItem*>& items, const DataType& dtype);
   ModuleItem* ParseContinuousAssign();
+  ModuleItem* ParseAlias();
   ModuleItem* ParseParamDecl();
   ModuleItem* ParseAlwaysBlock(AlwaysKind kind);
   ModuleItem* ParseInitialBlock();
@@ -70,8 +79,9 @@ class Parser {
   void ParseUnpackedDims(std::vector<Expr*>& dims);
   void ParseParenList(std::vector<Expr*>& out);
 
-  // Statements
+  // Statements (parser_stmt.cpp)
   Stmt* ParseStmt();
+  Stmt* ParseStmtBody();
   Stmt* ParseBlockStmt();
   Stmt* ParseIfStmt();
   Stmt* ParseCaseStmt(TokenKind case_kind);
@@ -82,14 +92,23 @@ class Parser {
   Stmt* ParseRepeatStmt();
   Stmt* ParseForkStmt();
   Stmt* ParseDoWhileStmt();
+  Stmt* ParseForeachStmt();
+  Expr* ParseForeachArrayId();
+  void ParseForeachVars(std::vector<std::string_view>& vars);
   Stmt* ParseSimpleKeywordStmt(StmtKind kind);
   Stmt* ParseReturnStmt();
   Stmt* ParseWaitStmt();
   Stmt* ParseDisableStmt();
+  Stmt* ParseEventTriggerStmt();
   Stmt* ParseAssignmentOrExprStmt();
   Stmt* ParseAssignmentOrExprNoSemi();
   Stmt* ParseDelayStmt();
   Stmt* ParseEventControlStmt();
+  void ParseIntraAssignTiming(Stmt* stmt);
+  Stmt* ParseProceduralAssignStmt();
+  Stmt* ParseProceduralDeassignStmt();
+  Stmt* ParseForceStmt();
+  Stmt* ParseReleaseStmt();
 
   // Expressions (Pratt parser — in expr_parser.cpp)
   Expr* ParseExpr();
@@ -99,6 +118,7 @@ class Parser {
   Expr* ParsePrimaryExpr();
   Expr* MakeLiteral(ExprKind kind, const Token& tok);
   Expr* ParseCallExpr(Expr* callee);
+  void ParseNamedArg(Expr* call);
   Expr* ParseIdentifierExpr();
   Expr* ParseSelectExpr(Expr* base);
   Expr* ParseSystemCall();
@@ -107,6 +127,13 @@ class Parser {
   Expr* ParseCastExpr();
   Expr* ParseTypeRefExpr();
   Expr* ParseWithClause(Expr* expr);
+  Expr* ParseParenExpr();
+  Expr* ParseCompoundAssignExpr(Expr* lhs);
+  Expr* ParseInsideExpr(Expr* lhs);
+  void ParseInsideRangeList(std::vector<Expr*>& out);
+  Expr* ParseInsideValueRange();
+  Expr* ParseStreamingConcat(TokenKind dir);
+  Expr* ParseMinTypMaxExpr();
 
   // Attributes (§5.12)
   std::vector<Attribute> ParseAttributes();
@@ -122,6 +149,8 @@ class Parser {
 
   // Utilities
   Token Expect(TokenKind kind);
+  Token ExpectIdentifier();
+  bool CheckIdentifier();
   bool Match(TokenKind kind);
   Token Consume();
   Token CurrentToken();

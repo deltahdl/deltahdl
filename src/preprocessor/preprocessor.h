@@ -42,6 +42,10 @@ class Preprocessor {
   void HandleUndef(std::string_view rest, SourceLoc loc);
   void HandleIfdef(std::string_view rest, bool inverted);
   void HandleElsif(std::string_view rest);
+  bool EvalIfdefExpr(std::string_view expr);
+  bool EvalIfdefOr(std::string_view& expr);
+  bool EvalIfdefAnd(std::string_view& expr);
+  bool EvalIfdefUnary(std::string_view& expr);
   void HandleElse();
   void HandleEndif();
   void HandleInclude(std::string_view filename, SourceLoc loc, int depth,
@@ -55,7 +59,8 @@ class Preprocessor {
   std::string ExpandMacro(const MacroDef& macro, std::string_view args_text);
   std::string ResolveInclude(std::string_view filename);
 
-  static std::vector<std::string> ParseMacroParams(std::string_view params);
+  static std::vector<std::string> ParseMacroParams(
+      std::string_view params, std::vector<std::string>& defaults);
   static std::string_view ExtractBalancedArgs(std::string_view text);
   static std::vector<std::string_view> SplitMacroArgs(std::string_view args);
   static std::string SubstituteParams(
@@ -86,7 +91,8 @@ class Preprocessor {
   NetType default_net_type_ = NetType::kWire;
   bool in_celldefine_ = false;
   NetType unconnected_drive_ = NetType::kWire;  // kWire = no drive override
-  uint32_t line_offset_ = 0;  // Offset applied by `line directive.
+  uint32_t line_offset_ = 0;             // Line number from `line directive.
+  uint32_t line_override_src_line_ = 0;  // Source line where `line appeared.
   bool has_line_override_ = false;
 };
 

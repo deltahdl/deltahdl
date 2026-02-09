@@ -33,6 +33,34 @@ static std::string_view Trim(std::string_view s) {
   return s;
 }
 
+static bool EndsWithBackslash(std::string_view line) {
+  return !line.empty() && line.back() == '\\';
+}
+
+// Joins backslash-continued lines into a single string.
+// Updates eol/line_num so the main loop skips the continuation lines.
+static std::string JoinContinuation(std::string_view src, size_t pos,
+                                    size_t& eol, uint32_t& line_num) {
+  std::string_view first = src.substr(pos, eol - pos);
+  std::string joined(first.substr(0, first.size() - 1));  // Strip trailing '\'
+
+  while (eol < src.size()) {
+    size_t next_start = eol + 1;
+    size_t next_eol = src.find('\n', next_start);
+    if (next_eol == std::string_view::npos) next_eol = src.size();
+    std::string_view next_line = src.substr(next_start, next_eol - next_start);
+    ++line_num;
+    eol = next_eol;
+    if (EndsWithBackslash(next_line)) {
+      joined.append(next_line.substr(0, next_line.size() - 1));
+    } else {
+      joined.append(next_line);
+      break;
+    }
+  }
+  return joined;
+}
+
 static bool StartsWithDirective(std::string_view line, std::string_view dir) {
   auto trimmed = Trim(line);
   if (trimmed.size() < dir.size() + 1) {
@@ -70,6 +98,13 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
     }
     std::string_view line = src.substr(pos, eol - pos);
     ++line_num;
+
+    // Join backslash-continued lines for `define directives.
+    std::string joined;
+    if (StartsWithDirective(line, "define") && EndsWithBackslash(line)) {
+      joined = JoinContinuation(src, pos, eol, line_num);
+      line = joined;
+    }
 
     bool handled = ProcessDirective(line, file_id, line_num, depth, output);
     if (!handled && IsActive()) {
@@ -201,7 +236,11 @@ bool Preprocessor::TryExpandMacro(std::string_view trimmed, std::string& output,
     return true;
   }
   if (name == "__LINE__") {
-    output.append(std::to_string(line_num));
+    uint32_t effective_line = line_num;
+    if (has_line_override_) {
+      effective_line = line_offset_ + (line_num - line_override_src_line_);
+    }
+    output.append(std::to_string(effective_line));
     return true;
   }
 
@@ -247,7 +286,8 @@ void Preprocessor::HandleDefine(std::string_view rest, SourceLoc loc) {
     auto close = after_name.find(')');
     if (close != std::string_view::npos) {
       def.is_function_like = true;
-      def.params = ParseMacroParams(after_name.substr(1, close - 1));
+      def.params =
+          ParseMacroParams(after_name.substr(1, close - 1), def.param_defaults);
       def.body = std::string(Trim(after_name.substr(close + 1)));
     }
   } else {
@@ -262,10 +302,14 @@ void Preprocessor::HandleUndef(std::string_view rest, SourceLoc /*loc*/) {
   macros_.Undefine(name);
 }
 
+static bool IsIfdefExpr(std::string_view text) {
+  return !text.empty() && (text[0] == '(' || text[0] == '!');
+}
+
 void Preprocessor::HandleIfdef(std::string_view rest, bool inverted) {
   auto name = Trim(rest);
-  bool defined = macros_.IsDefined(name);
-  bool cond = inverted ? !defined : defined;
+  bool cond = IsIfdefExpr(name) ? EvalIfdefExpr(name) : macros_.IsDefined(name);
+  if (inverted) cond = !cond;
   bool parent = IsActive();
   bool active = parent && cond;
   cond_stack_.push_back({active, active, parent});
@@ -275,7 +319,8 @@ void Preprocessor::HandleElsif(std::string_view rest) {
   if (cond_stack_.empty()) return;
   auto& top = cond_stack_.back();
   auto name = Trim(rest);
-  bool defined = macros_.IsDefined(name);
+  bool defined =
+      IsIfdefExpr(name) ? EvalIfdefExpr(name) : macros_.IsDefined(name);
   top.active = top.parent_active && !top.any_taken && defined;
   if (top.active) top.any_taken = true;
 }
@@ -291,6 +336,67 @@ void Preprocessor::HandleEndif() {
   if (!cond_stack_.empty()) {
     cond_stack_.pop_back();
   }
+}
+
+// --- Ifdef expression evaluator (IEEE 1800-2023 §22.6) ---
+// Grammar: expr ::= or_expr
+//          or_expr ::= and_expr ('||' and_expr)*
+//          and_expr ::= unary ('&&' unary)*
+//          unary ::= '!' unary | '(' expr ')' | identifier
+
+static void SkipSpaces(std::string_view& s) {
+  while (!s.empty() && std::isspace(static_cast<unsigned char>(s[0]))) {
+    s.remove_prefix(1);
+  }
+}
+
+bool Preprocessor::EvalIfdefExpr(std::string_view expr) {
+  auto e = Trim(expr);
+  return EvalIfdefOr(e);
+}
+
+bool Preprocessor::EvalIfdefOr(std::string_view& expr) {
+  bool result = EvalIfdefAnd(expr);
+  SkipSpaces(expr);
+  while (expr.size() >= 2 && expr[0] == '|' && expr[1] == '|') {
+    expr.remove_prefix(2);
+    result = EvalIfdefAnd(expr) || result;
+    SkipSpaces(expr);
+  }
+  return result;
+}
+
+bool Preprocessor::EvalIfdefAnd(std::string_view& expr) {
+  bool result = EvalIfdefUnary(expr);
+  SkipSpaces(expr);
+  while (expr.size() >= 2 && expr[0] == '&' && expr[1] == '&') {
+    expr.remove_prefix(2);
+    result = EvalIfdefUnary(expr) && result;
+    SkipSpaces(expr);
+  }
+  return result;
+}
+
+bool Preprocessor::EvalIfdefUnary(std::string_view& expr) {
+  SkipSpaces(expr);
+  if (!expr.empty() && expr[0] == '!') {
+    expr.remove_prefix(1);
+    return !EvalIfdefUnary(expr);
+  }
+  if (!expr.empty() && expr[0] == '(') {
+    expr.remove_prefix(1);
+    bool result = EvalIfdefOr(expr);
+    SkipSpaces(expr);
+    if (!expr.empty() && expr[0] == ')') expr.remove_prefix(1);
+    return result;
+  }
+  // Identifier.
+  SkipSpaces(expr);
+  size_t len = 0;
+  while (len < expr.size() && IsIdentChar(expr[len])) ++len;
+  auto id = expr.substr(0, len);
+  expr.remove_prefix(len);
+  return macros_.IsDefined(id);
 }
 
 void Preprocessor::HandleInclude(std::string_view filename_raw, SourceLoc loc,
@@ -321,21 +427,41 @@ std::string Preprocessor::ExpandMacro(const MacroDef& macro,
                                       std::string_view args_text) {
   if (!macro.is_function_like) return macro.body;
   auto args = SplitMacroArgs(args_text);
-  return SubstituteParams(macro.body, macro.params, args);
+  // Apply defaults for empty arguments (IEEE §22.5.1).
+  std::vector<std::string> resolved;
+  resolved.reserve(macro.params.size());
+  for (size_t i = 0; i < macro.params.size(); ++i) {
+    std::string_view arg = (i < args.size()) ? args[i] : std::string_view{};
+    if (arg.empty() && i < macro.param_defaults.size() &&
+        !macro.param_defaults[i].empty()) {
+      resolved.emplace_back(macro.param_defaults[i]);
+    } else {
+      resolved.emplace_back(arg);
+    }
+  }
+  std::vector<std::string_view> resolved_views;
+  resolved_views.reserve(resolved.size());
+  for (const auto& s : resolved) resolved_views.emplace_back(s);
+  return SubstituteParams(macro.body, macro.params, resolved_views);
 }
 
 // --- Macro helper functions ---
 
 std::vector<std::string> Preprocessor::ParseMacroParams(
-    std::string_view param_list) {
+    std::string_view param_list, std::vector<std::string>& defaults) {
   std::vector<std::string> params;
   size_t pos = 0;
   while (pos < param_list.size()) {
     auto comma = param_list.find(',', pos);
     if (comma == std::string_view::npos) comma = param_list.size();
     auto token = Trim(param_list.substr(pos, comma - pos));
-    if (!token.empty()) {
+    auto eq = token.find('=');
+    if (eq != std::string_view::npos) {
+      params.emplace_back(Trim(token.substr(0, eq)));
+      defaults.emplace_back(Trim(token.substr(eq + 1)));
+    } else {
       params.emplace_back(token);
+      defaults.emplace_back();  // No default.
     }
     pos = comma + 1;
   }
@@ -526,6 +652,7 @@ void Preprocessor::HandleLine(std::string_view rest, SourceLoc loc) {
     new_line = new_line * 10 + (trimmed[j] - '0');
   }
   line_offset_ = new_line;
+  line_override_src_line_ = loc.line;
   has_line_override_ = true;
 }
 

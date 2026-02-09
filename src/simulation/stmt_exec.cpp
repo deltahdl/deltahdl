@@ -48,7 +48,8 @@ static StmtResult ExecNonblockingAssignImpl(const Stmt* stmt, SimContext& ctx,
       var->NotifyWatchers();
     }
   };
-  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kNBA, event);
+  auto nba_region = ctx.IsReactiveContext() ? Region::kReNBA : Region::kNBA;
+  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), nba_region, event);
   return StmtResult::kDone;
 }
 

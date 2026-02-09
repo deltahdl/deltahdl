@@ -14,6 +14,7 @@ struct MacroDef {
   std::string name;
   std::string body;
   std::vector<std::string> params;
+  std::vector<std::string> param_defaults;  // Per-param default; empty = none.
   SourceLoc def_loc;
   bool is_function_like = false;
 };

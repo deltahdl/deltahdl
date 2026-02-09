@@ -56,7 +56,7 @@ TEST(ParserSection6, WireDeclaration) {
   auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kWire);
   EXPECT_TRUE(item->data_type.is_net);
   EXPECT_EQ(item->name, "w");
 }

@@ -98,6 +98,10 @@ const std::vector<Process*>& SimContext::GetSensitiveProcesses(
   return (it != sensitivity_map_.end()) ? it->second : kEmptyProcessList;
 }
 
+bool SimContext::IsReactiveContext() const {
+  return current_process_ && current_process_->is_reactive;
+}
+
 void SimContext::RunFinalBlocks() {
   for (auto* proc : final_processes_) {
     proc->Resume();

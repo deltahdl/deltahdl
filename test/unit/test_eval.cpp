@@ -95,8 +95,8 @@ TEST(Eval, FunctionOutputArgWriteback) {
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "compute";
   func->func_args = {
-      {Direction::kInput, {}, "a"},
-      {Direction::kOutput, {}, "b"},
+      {Direction::kInput, false, {}, "a", nullptr, {}},
+      {Direction::kOutput, false, {}, "b", nullptr, {}},
   };
 
   // Body: b = a * 2
@@ -159,7 +159,7 @@ TEST(Eval, FunctionInoutArgWriteback) {
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "increment";
-  func->func_args = {{Direction::kInout, {}, "v"}};
+  func->func_args = {{Direction::kInout, false, {}, "v", nullptr, {}}};
 
   auto* lhs = f.arena.Create<Expr>();
   lhs->kind = ExprKind::kIdentifier;
@@ -214,8 +214,8 @@ TEST(Eval, NestedFunctionOutputArgs) {
   inner->kind = ModuleItemKind::kFunctionDecl;
   inner->name = "inner";
   inner->func_args = {
-      {Direction::kInput, {}, "a"},
-      {Direction::kOutput, {}, "b"},
+      {Direction::kInput, false, {}, "a", nullptr, {}},
+      {Direction::kOutput, false, {}, "b", nullptr, {}},
   };
   auto* inner_lhs = f.arena.Create<Expr>();
   inner_lhs->kind = ExprKind::kIdentifier;
@@ -243,8 +243,8 @@ TEST(Eval, NestedFunctionOutputArgs) {
   outer->kind = ModuleItemKind::kFunctionDecl;
   outer->name = "outer";
   outer->func_args = {
-      {Direction::kInput, {}, "x"},
-      {Direction::kOutput, {}, "y"},
+      {Direction::kInput, false, {}, "x", nullptr, {}},
+      {Direction::kOutput, false, {}, "y", nullptr, {}},
   };
   auto* call_arg0 = f.arena.Create<Expr>();
   call_arg0->kind = ExprKind::kIdentifier;

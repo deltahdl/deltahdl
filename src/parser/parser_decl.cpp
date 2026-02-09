@@ -35,17 +35,33 @@ DataType Parser::ParseEnumType() {
     dtype.packed_dim_right = base.packed_dim_right;
   }
 
+  dtype = ParseEnumBody(dtype);
+
+  return dtype;
+}
+
+// --- Enum body with range syntax (§6.19.2) ---
+
+DataType Parser::ParseEnumBody(const DataType& base) {
+  DataType dtype = base;
   Expect(TokenKind::kLBrace);
   do {
     EnumMember member;
     member.name = Expect(TokenKind::kIdentifier).text;
+    // Optional range: name[N] or name[N:M] (§6.19.2)
+    if (Match(TokenKind::kLBracket)) {
+      member.range_start = ParseExpr();
+      if (Match(TokenKind::kColon)) {
+        member.range_end = ParseExpr();
+      }
+      Expect(TokenKind::kRBracket);
+    }
     if (Match(TokenKind::kEq)) {
       member.value = ParseExpr();
     }
     dtype.enum_members.push_back(member);
   } while (Match(TokenKind::kComma));
   Expect(TokenKind::kRBrace);
-
   return dtype;
 }
 
@@ -72,6 +88,30 @@ DataType Parser::ParseStructOrUnionType() {
     }
   }
 
+  Expect(TokenKind::kLBrace);
+  while (!Check(TokenKind::kRBrace) && !AtEnd()) {
+    StructMember member;
+    auto member_type = ParseDataType();
+    member.type_kind = member_type.kind;
+    member.is_signed = member_type.is_signed;
+    member.packed_dim_left = member_type.packed_dim_left;
+    member.packed_dim_right = member_type.packed_dim_right;
+    member.name = Expect(TokenKind::kIdentifier).text;
+    ParseUnpackedDims(member.unpacked_dims);
+    if (Match(TokenKind::kEq)) {
+      member.init_expr = ParseExpr();
+    }
+    Expect(TokenKind::kSemicolon);
+    dtype.struct_members.push_back(member);
+  }
+  Expect(TokenKind::kRBrace);
+  return dtype;
+}
+
+DataType Parser::ParseStructOrUnionBody(TokenKind kw) {
+  DataType dtype;
+  dtype.kind =
+      (kw == TokenKind::kKwStruct) ? DataTypeKind::kStruct : DataTypeKind::kUnion;
   Expect(TokenKind::kLBrace);
   while (!Check(TokenKind::kRBrace) && !AtEnd()) {
     StructMember member;
@@ -142,23 +182,40 @@ std::vector<FunctionArg> Parser::ParseFunctionArgs() {
     Consume();
     return args;
   }
+  Direction sticky_dir = Direction::kNone;
   do {
     FunctionArg arg;
+    // const ref (§13.5.2)
+    if (Match(TokenKind::kKwConst)) {
+      arg.is_const = true;
+    }
     if (Check(TokenKind::kKwInput)) {
       arg.direction = Direction::kInput;
+      sticky_dir = Direction::kInput;
       Consume();
     } else if (Check(TokenKind::kKwOutput)) {
       arg.direction = Direction::kOutput;
+      sticky_dir = Direction::kOutput;
       Consume();
     } else if (Check(TokenKind::kKwInout)) {
       arg.direction = Direction::kInout;
+      sticky_dir = Direction::kInout;
       Consume();
     } else if (Check(TokenKind::kKwRef)) {
       arg.direction = Direction::kRef;
+      sticky_dir = Direction::kRef;
       Consume();
+    } else {
+      arg.direction = sticky_dir;
     }
     arg.data_type = ParseDataType();
     arg.name = Expect(TokenKind::kIdentifier).text;
+    // Unpacked dimensions on argument (§13.4)
+    ParseUnpackedDims(arg.unpacked_dims);
+    // Default value (§13.5.3)
+    if (Match(TokenKind::kEq)) {
+      arg.default_value = ParseExpr();
+    }
     args.push_back(arg);
   } while (Match(TokenKind::kComma));
   Expect(TokenKind::kRParen);
@@ -184,6 +241,13 @@ ModuleItem* Parser::ParseFunctionDecl() {
   if (Check(TokenKind::kKwVoid)) {
     item->return_type.kind = DataTypeKind::kVoid;
     Consume();
+  } else if (Check(TokenKind::kLBracket)) {
+    // Implicit type with packed dims: function [7:0] name;
+    Consume();
+    item->return_type.packed_dim_left = ParseExpr();
+    Expect(TokenKind::kColon);
+    item->return_type.packed_dim_right = ParseExpr();
+    Expect(TokenKind::kRBracket);
   } else {
     item->return_type = ParseDataType();
   }
@@ -195,10 +259,17 @@ ModuleItem* Parser::ParseFunctionDecl() {
   }
   Expect(TokenKind::kSemicolon);
 
+  // Old-style port declarations (§13.3)
+  ParseOldStylePortDecls(item, TokenKind::kKwEndfunction);
+
   while (!Check(TokenKind::kKwEndfunction) && !AtEnd()) {
     item->func_body_stmts.push_back(ParseStmt());
   }
   Expect(TokenKind::kKwEndfunction);
+  // Optional end label: ": name"
+  if (Match(TokenKind::kColon)) {
+    ExpectIdentifier();
+  }
   return item;
 }
 
@@ -223,10 +294,17 @@ ModuleItem* Parser::ParseTaskDecl() {
   }
   Expect(TokenKind::kSemicolon);
 
+  // Old-style port declarations (§13.3)
+  ParseOldStylePortDecls(item, TokenKind::kKwEndtask);
+
   while (!Check(TokenKind::kKwEndtask) && !AtEnd()) {
     item->func_body_stmts.push_back(ParseStmt());
   }
   Expect(TokenKind::kKwEndtask);
+  // Optional end label: ": name"
+  if (Match(TokenKind::kColon)) {
+    ExpectIdentifier();
+  }
   return item;
 }
 
@@ -249,7 +327,36 @@ EventExpr Parser::ParseSingleEvent() {
     ev.edge = Edge::kNegedge;
   }
   ev.signal = ParseExpr();
+  // iff guard (§9.4.2)
+  if (Match(TokenKind::kKwIff)) {
+    ev.iff_condition = ParseExpr();
+  }
   return ev;
+}
+
+// --- Old-style port declarations (§13.3) ---
+
+void Parser::ParseOldStylePortDecls(ModuleItem* item, TokenKind end_kw) {
+  // Parse port direction declarations before the function/task body.
+  while (Check(TokenKind::kKwInput) || Check(TokenKind::kKwOutput) ||
+         Check(TokenKind::kKwInout) || Check(TokenKind::kKwRef)) {
+    FunctionArg arg;
+    if (Check(TokenKind::kKwInput)) {
+      arg.direction = Direction::kInput;
+    } else if (Check(TokenKind::kKwOutput)) {
+      arg.direction = Direction::kOutput;
+    } else if (Check(TokenKind::kKwInout)) {
+      arg.direction = Direction::kInout;
+    } else {
+      arg.direction = Direction::kRef;
+    }
+    Consume();
+    arg.data_type = ParseDataType();
+    arg.name = Expect(TokenKind::kIdentifier).text;
+    Expect(TokenKind::kSemicolon);
+    item->func_args.push_back(arg);
+  }
+  (void)end_kw;
 }
 
 }  // namespace delta

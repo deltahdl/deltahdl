@@ -329,3 +329,138 @@ TEST(Preprocessor, EndKeywords_EmitsWarning) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_TRUE(f.diag.WarningCount() > 0);
 }
+
+// --- Macro default parameter tests (IEEE 1800-2023 §22.5.1) ---
+
+TEST(Preprocessor, MacroDefaultParam) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define M(a=1, b=2) a+b\n"
+      "`M(,)\n",
+      f);
+  EXPECT_NE(result.find("1+2"), std::string::npos);
+}
+
+TEST(Preprocessor, MacroDefaultParamPartial) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define M(a=1, b) a+b\n"
+      "`M(,3)\n",
+      f);
+  EXPECT_NE(result.find("1+3"), std::string::npos);
+}
+
+TEST(Preprocessor, MacroDefaultParamOverride) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define M(a=1) a\n"
+      "`M(5)\n",
+      f);
+  EXPECT_NE(result.find("5"), std::string::npos);
+}
+
+TEST(Preprocessor, MacroDefaultParamString) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define M(a=\"hello\") a\n"
+      "`M()\n",
+      f);
+  EXPECT_NE(result.find("\"hello\""), std::string::npos);
+}
+
+// --- Multi-line macro tests (IEEE 1800-2023 §22.5.1) ---
+
+TEST(Preprocessor, MultiLineMacro) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define BLOCK(x) begin \\\n"
+      "  x; \\\n"
+      "end\n"
+      "`BLOCK(foo)\n",
+      f);
+  EXPECT_NE(result.find("begin"), std::string::npos);
+  EXPECT_NE(result.find("foo;"), std::string::npos);
+  EXPECT_NE(result.find("end"), std::string::npos);
+}
+
+TEST(Preprocessor, MultiLineMacroContinuation) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define LONG a + \\\n"
+      "b + \\\n"
+      "c\n"
+      "`LONG\n",
+      f);
+  EXPECT_NE(result.find("a + b + c"), std::string::npos);
+}
+
+// --- Ifdef expression tests (IEEE 1800-2023 §22.6) ---
+
+TEST(Preprocessor, IfdefExprAnd) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"A", "1"}, {"B", "1"}};
+  auto result = Preprocess(
+      "`ifdef (A && B)\n"
+      "both_defined\n"
+      "`endif\n",
+      f, std::move(cfg));
+  EXPECT_NE(result.find("both_defined"), std::string::npos);
+}
+
+TEST(Preprocessor, IfdefExprAndFalse) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"A", "1"}};
+  auto result = Preprocess(
+      "`ifdef (A && B)\n"
+      "both_defined\n"
+      "`endif\n",
+      f, std::move(cfg));
+  EXPECT_EQ(result.find("both_defined"), std::string::npos);
+}
+
+TEST(Preprocessor, IfdefExprOr) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"A", "1"}};
+  auto result = Preprocess(
+      "`ifdef (A || B)\n"
+      "either_defined\n"
+      "`endif\n",
+      f, std::move(cfg));
+  EXPECT_NE(result.find("either_defined"), std::string::npos);
+}
+
+TEST(Preprocessor, IfdefExprNot) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`ifdef (!A)\n"
+      "not_defined\n"
+      "`endif\n",
+      f);
+  EXPECT_NE(result.find("not_defined"), std::string::npos);
+}
+
+TEST(Preprocessor, IfdefExprComplex) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"A", "1"}};
+  auto result = Preprocess(
+      "`ifdef (A && (B || !C))\n"
+      "complex_true\n"
+      "`endif\n",
+      f, std::move(cfg));
+  EXPECT_NE(result.find("complex_true"), std::string::npos);
+}
+
+// --- __LINE__ with `line directive ---
+
+TEST(Preprocessor, LineDirectiveAffectsLineMacro) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`line 100 \"test.sv\" 0\n"
+      "`__LINE__\n",
+      f);
+  EXPECT_NE(result.find("101"), std::string::npos);
+}

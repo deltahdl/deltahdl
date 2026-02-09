@@ -204,6 +204,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kDefparam:
     case ModuleItemKind::kImportDecl:
     case ModuleItemKind::kGateInst:
+    case ModuleItemKind::kAlias:
       break;
   }
 }

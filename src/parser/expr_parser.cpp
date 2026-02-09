@@ -182,6 +182,12 @@ Expr* Parser::ParseInfixBp(Expr* lhs, int min_bp) {
       continue;
     }
 
+    // inside expression: expr inside { range_list }
+    if (tok.kind == TokenKind::kKwInside && min_bp <= 1) {
+      lhs = ParseInsideExpr(lhs);
+      continue;
+    }
+
     auto [lbp, rbp] = InfixBp(tok.kind);
     if (lbp < 0 || lbp < min_bp) {
       break;
@@ -202,6 +208,19 @@ Expr* Parser::ParseInfixBp(Expr* lhs, int min_bp) {
 
 Expr* Parser::ParsePrefixExpr() {
   auto tok = CurrentToken();
+
+  // Prefix increment/decrement (§11.4.2)
+  if (tok.kind == TokenKind::kPlusPlus || tok.kind == TokenKind::kMinusMinus) {
+    auto op = Consume();
+    auto* operand = ParsePrimaryExpr();
+    auto* unary = arena_.Create<Expr>();
+    unary->kind = ExprKind::kUnary;
+    unary->op = op.kind;
+    unary->lhs = operand;
+    unary->range.start = op.loc;
+    return unary;
+  }
+
   int bp = PrefixBp(tok.kind);
   if (bp >= 0) {
     auto op = Consume();
@@ -253,10 +272,7 @@ Expr* Parser::ParsePrimaryExpr() {
     return ParseIdentifierExpr();
   }
   if (tok.kind == TokenKind::kLParen) {
-    Consume();
-    auto* expr = ParseExpr();
-    Expect(TokenKind::kRParen);
-    return expr;
+    return ParseParenExpr();
   }
   if (tok.kind == TokenKind::kLBrace) {
     return ParseConcatenation();
@@ -305,6 +321,18 @@ Expr* Parser::ParseIdentifierExpr() {
 
   if (Check(TokenKind::kLParen)) return ParseWithClause(ParseCallExpr(result));
   if (Check(TokenKind::kLBracket)) return ParseSelectExpr(result);
+
+  // Postfix increment/decrement (§11.4.2)
+  if (Check(TokenKind::kPlusPlus) || Check(TokenKind::kMinusMinus)) {
+    auto op_tok = Consume();
+    auto* post = arena_.Create<Expr>();
+    post->kind = ExprKind::kPostfixUnary;
+    post->op = op_tok.kind;
+    post->lhs = result;
+    post->range.start = result->range.start;
+    return post;
+  }
+
   return ParseWithClause(result);
 }
 
@@ -316,9 +344,17 @@ Expr* Parser::ParseCallExpr(Expr* callee) {
   call->lhs = callee;
   call->range.start = callee->range.start;
   if (!Check(TokenKind::kRParen)) {
-    call->args.push_back(ParseExpr());
-    while (Match(TokenKind::kComma)) {
+    if (Check(TokenKind::kDot)) {
+      // Named arguments: .name(expr), ...
+      ParseNamedArg(call);
+      while (Match(TokenKind::kComma)) {
+        ParseNamedArg(call);
+      }
+    } else {
       call->args.push_back(ParseExpr());
+      while (Match(TokenKind::kComma)) {
+        call->args.push_back(ParseExpr());
+      }
     }
   }
   Expect(TokenKind::kRParen);
@@ -372,6 +408,15 @@ Expr* Parser::ParseSystemCall() {
 Expr* Parser::ParseConcatenation() {
   auto loc = CurrentLoc();
   Expect(TokenKind::kLBrace);
+
+  // Streaming concatenation: {<< ...} or {>> ...}
+  if (Check(TokenKind::kLtLt) || Check(TokenKind::kGtGt)) {
+    auto dir = CurrentToken().kind;
+    auto* sc = ParseStreamingConcat(dir);
+    Expect(TokenKind::kRBrace);
+    return sc;
+  }
+
   auto* first = ParseExpr();
 
   // Replication: {count{elements}}
@@ -481,6 +526,157 @@ Expr* Parser::ParseTypeRefExpr() {
   ref->lhs = ParseExpr();
   Expect(TokenKind::kRParen);
   return ref;
+}
+
+// --- Min:Typ:Max expression (§11.11) ---
+
+Expr* Parser::ParseMinTypMaxExpr() {
+  auto* expr = ParseExpr();
+  if (!Check(TokenKind::kColon)) return expr;
+  Consume();  // first ':'
+  auto* typ = ParseExpr();
+  Expect(TokenKind::kColon);
+  auto* max = ParseExpr();
+  auto* mtm = arena_.Create<Expr>();
+  mtm->kind = ExprKind::kMinTypMax;
+  mtm->range.start = expr->range.start;
+  mtm->lhs = expr;       // min
+  mtm->condition = typ;   // typ
+  mtm->rhs = max;         // max
+  return mtm;
+}
+
+// --- Inside expression (§11.4.13) ---
+
+Expr* Parser::ParseInsideExpr(Expr* lhs) {
+  Consume();  // 'inside'
+  auto* inside = arena_.Create<Expr>();
+  inside->kind = ExprKind::kInside;
+  inside->range.start = lhs->range.start;
+  inside->lhs = lhs;
+  Expect(TokenKind::kLBrace);
+  ParseInsideRangeList(inside->elements);
+  Expect(TokenKind::kRBrace);
+  return inside;
+}
+
+void Parser::ParseInsideRangeList(std::vector<Expr*>& out) {
+  out.push_back(ParseInsideValueRange());
+  while (Match(TokenKind::kComma)) {
+    out.push_back(ParseInsideValueRange());
+  }
+}
+
+Expr* Parser::ParseInsideValueRange() {
+  // Range syntax: [lo:hi]
+  if (Check(TokenKind::kLBracket)) {
+    Consume();
+    auto* lo = ParseExpr();
+    Expect(TokenKind::kColon);
+    auto* hi = ParseExpr();
+    Expect(TokenKind::kRBracket);
+    auto* range = arena_.Create<Expr>();
+    range->kind = ExprKind::kSelect;
+    range->index = lo;
+    range->index_end = hi;
+    return range;
+  }
+  return ParseExpr();
+}
+
+// --- Streaming concatenation (§11.4.14) ---
+
+Expr* Parser::ParseStreamingConcat(TokenKind dir) {
+  auto loc = CurrentLoc();
+  Consume();  // << or >>
+  auto* sc = arena_.Create<Expr>();
+  sc->kind = ExprKind::kStreamingConcat;
+  sc->range.start = loc;
+  sc->op = dir;  // store direction
+
+  // Optional slice_size (type or expression).
+  if (!Check(TokenKind::kLBrace)) {
+    sc->lhs = ParsePrimaryExpr();
+  }
+
+  Expect(TokenKind::kLBrace);
+  sc->elements.push_back(ParseExpr());
+  while (Match(TokenKind::kComma)) {
+    sc->elements.push_back(ParseExpr());
+  }
+  Expect(TokenKind::kRBrace);
+  return sc;
+}
+
+// --- Named argument (§13.5.4) ---
+
+void Parser::ParseNamedArg(Expr* call) {
+  Expect(TokenKind::kDot);
+  auto name_tok = Expect(TokenKind::kIdentifier);
+  Expect(TokenKind::kLParen);
+  Expr* value = nullptr;
+  if (!Check(TokenKind::kRParen)) {
+    value = ParseExpr();
+  }
+  Expect(TokenKind::kRParen);
+  call->arg_names.push_back(name_tok.text);
+  call->args.push_back(value);
+}
+
+// --- Compound assignment expression (§11.4.1) ---
+
+Expr* Parser::ParseCompoundAssignExpr(Expr* lhs) {
+  auto op_tok = Consume();
+  auto* rhs = ParseExpr();
+  auto* bin = arena_.Create<Expr>();
+  bin->kind = ExprKind::kBinary;
+  bin->op = op_tok.kind;
+  bin->lhs = lhs;
+  bin->rhs = rhs;
+  bin->range.start = lhs->range.start;
+  return bin;
+}
+
+// --- Parenthesized expression ---
+
+static bool IsAssignOp(TokenKind kind) {
+  switch (kind) {
+    case TokenKind::kEq:
+    case TokenKind::kPlusEq:
+    case TokenKind::kMinusEq:
+    case TokenKind::kStarEq:
+    case TokenKind::kSlashEq:
+    case TokenKind::kPercentEq:
+    case TokenKind::kAmpEq:
+    case TokenKind::kPipeEq:
+    case TokenKind::kCaretEq:
+    case TokenKind::kLtLtEq:
+    case TokenKind::kGtGtEq:
+    case TokenKind::kLtLtLtEq:
+    case TokenKind::kGtGtGtEq:
+      return true;
+    default:
+      return false;
+  }
+}
+
+Expr* Parser::ParseParenExpr() {
+  Consume();  // (
+  auto* lhs = ParseExpr();
+  // Assignment expression inside parens: (a = b), (a += 1)
+  if (IsAssignOp(CurrentToken().kind)) {
+    auto op_tok = Consume();
+    auto* rhs = ParseExpr();
+    auto* bin = arena_.Create<Expr>();
+    bin->kind = ExprKind::kBinary;
+    bin->op = op_tok.kind;
+    bin->lhs = lhs;
+    bin->rhs = rhs;
+    bin->range.start = lhs->range.start;
+    lhs = bin;
+  }
+  Expect(TokenKind::kRParen);
+  return lhs;
 }
 
 }  // namespace delta

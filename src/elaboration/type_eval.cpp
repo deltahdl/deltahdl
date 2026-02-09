@@ -51,6 +51,19 @@ uint32_t EvalTypeWidth(const DataType& dtype) {
     case DataTypeKind::kEvent:
     case DataTypeKind::kChandle:
       return 0;
+    case DataTypeKind::kWire:
+    case DataTypeKind::kTri:
+    case DataTypeKind::kWand:
+    case DataTypeKind::kWor:
+    case DataTypeKind::kTriand:
+    case DataTypeKind::kTrior:
+    case DataTypeKind::kTri0:
+    case DataTypeKind::kTri1:
+    case DataTypeKind::kTrireg:
+    case DataTypeKind::kSupply0:
+    case DataTypeKind::kSupply1:
+    case DataTypeKind::kUwire:
+      return 1;  // Scalar net default width.
   }
   return 1;
 }
@@ -170,6 +183,10 @@ uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs) {
     case ExprKind::kAssignmentPattern:
     case ExprKind::kCast:
     case ExprKind::kTypeRef:
+    case ExprKind::kPostfixUnary:
+    case ExprKind::kInside:
+    case ExprKind::kStreamingConcat:
+    case ExprKind::kMinTypMax:
       return 0;
   }
   return 0;

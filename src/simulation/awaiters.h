@@ -24,10 +24,15 @@ struct DelayAwaiter {
 
   void await_suspend(std::coroutine_handle<> h) {
     auto time = ctx.CurrentTime() + SimTime{delay_ticks};
-    auto region = (delay_ticks == 0) ? Region::kInactive : Region::kActive;
+    auto region = SelectDelayRegion();
     auto* event = ctx.GetScheduler().GetEventPool().Acquire();
     event->callback = [h]() mutable { h.resume(); };
     ctx.GetScheduler().ScheduleEvent(time, region, event);
+  }
+
+  Region SelectDelayRegion() const {
+    if (delay_ticks != 0) return Region::kActive;
+    return ctx.IsReactiveContext() ? Region::kReInactive : Region::kInactive;
   }
 
   void await_resume() const noexcept {}
