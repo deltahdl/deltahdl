@@ -15,6 +15,7 @@
 namespace delta {
 
 class DiagEngine;
+class VcdWriter;
 struct ModuleItem;
 struct Process;
 
@@ -52,6 +53,13 @@ class SimContext {
   Variable* FindLocalVariable(std::string_view name);
   Variable* CreateLocalVariable(std::string_view name, uint32_t width);
 
+  void SetVcdWriter(VcdWriter* vcd) { vcd_writer_ = vcd; }
+  VcdWriter* GetVcdWriter() { return vcd_writer_; }
+
+  const std::unordered_map<std::string_view, Variable*>& GetVariables() const {
+    return variables_;
+  }
+
   int32_t Random32();
   uint32_t Urandom32();
   uint32_t UrandomRange(uint32_t min_val, uint32_t max_val);
@@ -68,6 +76,7 @@ class SimContext {
   std::vector<Process*> final_processes_;
   std::unordered_map<std::string_view, std::vector<Process*>> sensitivity_map_;
   static const std::vector<Process*> kEmptyProcessList;
+  VcdWriter* vcd_writer_ = nullptr;
   bool stop_requested_ = false;
 };
 

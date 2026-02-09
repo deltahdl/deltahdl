@@ -82,6 +82,10 @@ class Scheduler {
 
   EventPool& GetEventPool() { return pool_; }
 
+  void SetPostTimestepCallback(std::function<void()> cb) {
+    post_timestep_cb_ = std::move(cb);
+  }
+
  private:
   void ExecuteTimeSlot(TimeSlot& slot);
   void ExecuteActiveRegions(TimeSlot& slot);
@@ -94,6 +98,7 @@ class Scheduler {
 
   EventPool pool_;
   std::map<SimTime, TimeSlot> event_calendar_;
+  std::function<void()> post_timestep_cb_;
   SimTime current_time_{0};
   bool stop_requested_ = false;
 };

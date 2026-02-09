@@ -24,6 +24,7 @@ add_library(deltahdl_lib STATIC
     simulation/eval.cpp
     simulation/stmt_exec.cpp
     simulation/lowerer.cpp
+    simulation/vcd_writer.cpp
     synthesis/aig.cpp
 )
 

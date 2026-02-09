@@ -8,6 +8,7 @@
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/sim_context.h"
+#include "simulation/vcd_writer.h"
 
 namespace delta {
 
@@ -336,6 +337,19 @@ static Logic4Vec EvalDeferredPrint(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
+static Logic4Vec EvalVcdSysCall(SimContext& ctx, Arena& arena,
+                                std::string_view name) {
+  auto* vcd = ctx.GetVcdWriter();
+  if (name == "$dumpvars" || name == "$dumpall") {
+    if (vcd) vcd->DumpAllValues();
+  } else if (name == "$dumpoff") {
+    if (vcd) vcd->SetEnabled(false);
+  } else if (name == "$dumpon") {
+    if (vcd) vcd->SetEnabled(true);
+  }
+  return MakeLogic4VecVal(arena, 1, 0);
+}
+
 static Logic4Vec EvalMiscSysCall(const Expr* expr, SimContext& ctx,
                                  Arena& arena, std::string_view name) {
   if (name == "$time" || name == "$realtime") {
@@ -348,9 +362,8 @@ static Logic4Vec EvalMiscSysCall(const Expr* expr, SimContext& ctx,
     std::cerr << "WARNING: " << name << " not yet implemented\n";
     return MakeLogic4VecVal(arena, 1, 0);
   }
-  if (name == "$dumpfile" || name == "$dumpvars" || name == "$dumpoff" ||
-      name == "$dumpon" || name == "$dumpall") {
-    return MakeLogic4VecVal(arena, 1, 0);
+  if (name.starts_with("$dump")) {
+    return EvalVcdSysCall(ctx, arena, name);
   }
   return EvalPrngCall(expr, ctx, arena, name);
 }

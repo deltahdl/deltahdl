@@ -1,6 +1,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -16,6 +17,7 @@
 #include "simulation/lowerer.h"
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
+#include "simulation/vcd_writer.h"
 
 namespace {
 
@@ -198,6 +200,25 @@ delta::CompilationUnit* ParseSource(const std::string& source,
   return parser.Parse();
 }
 
+void SetupVcd(delta::VcdWriter& vcd, delta::SimContext& ctx,
+              delta::Scheduler& scheduler, const std::string& top) {
+  ctx.SetVcdWriter(&vcd);
+  vcd.WriteHeader("1ns");
+  vcd.BeginScope(top);
+  for (const auto& [name, var] : ctx.GetVariables()) {
+    vcd.RegisterSignal(name, var->value.width, var);
+  }
+  vcd.EndScope();
+  vcd.EndDefinitions();
+  vcd.WriteTimestamp(0);
+  vcd.DumpAllValues();
+
+  scheduler.SetPostTimestepCallback([&vcd, &ctx]() {
+    vcd.WriteTimestamp(ctx.CurrentTime().ticks);
+    vcd.DumpChangedValues(0);
+  });
+}
+
 int RunSimulation(const CliOptions& opts, delta::CompilationUnit* cu,
                   delta::DiagEngine& diag, delta::Arena& arena) {
   delta::Elaborator elaborator(arena, diag, cu);
@@ -214,6 +235,13 @@ int RunSimulation(const CliOptions& opts, delta::CompilationUnit* cu,
   delta::SimContext sim_ctx(scheduler, arena, diag, opts.seed);
   delta::Lowerer lowerer(sim_ctx, arena, diag);
   lowerer.Lower(design);
+
+  std::unique_ptr<delta::VcdWriter> vcd;
+  if (!opts.vcd_file.empty()) {
+    vcd = std::make_unique<delta::VcdWriter>(opts.vcd_file);
+    SetupVcd(*vcd, sim_ctx, scheduler, top);
+  }
+
   scheduler.Run();
   sim_ctx.RunFinalBlocks();
   return diag.HasErrors() ? 1 : 0;

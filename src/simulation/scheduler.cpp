@@ -106,6 +106,8 @@ void Scheduler::ExecuteTimeSlot(TimeSlot& slot) {
 
   // Postponed region
   ExecuteRegion(slot.regions[static_cast<size_t>(Region::kPostponed)]);
+
+  if (post_timestep_cb_) post_timestep_cb_();
 }
 
 // --- Scheduler: Active region set iteration ---
