@@ -333,7 +333,26 @@ Token Lexer::LexNumber() {
 Token Lexer::LexStringLiteral() {
   auto loc = MakeLoc();
   uint32_t start = pos_;
-  Advance();  // skip opening "
+  // Detect triple-quoted string: """...""" (§5.9)
+  bool triple = PeekChar() == '"' && pos_ + 2 < source_.size() &&
+                source_[pos_ + 2] == '"';
+  if (triple) {
+    Advance();
+    Advance();
+    Advance();  // skip opening """
+    LexTripleQuotedBody();
+  } else {
+    Advance();  // skip opening "
+    LexQuotedBody();
+  }
+  Token tok;
+  tok.kind = TokenKind::kStringLiteral;
+  tok.loc = loc;
+  tok.text = source_.substr(start, pos_ - start);
+  return tok;
+}
+
+void Lexer::LexQuotedBody() {
   while (!AtEnd() && Current() != '"') {
     if (Current() == '\\') {
       Advance();
@@ -343,11 +362,22 @@ Token Lexer::LexStringLiteral() {
   if (!AtEnd()) {
     Advance();  // skip closing "
   }
-  Token tok;
-  tok.kind = TokenKind::kStringLiteral;
-  tok.loc = loc;
-  tok.text = source_.substr(start, pos_ - start);
-  return tok;
+}
+
+void Lexer::LexTripleQuotedBody() {
+  while (!AtEnd()) {
+    if (Current() == '"' && PeekChar() == '"' && pos_ + 2 < source_.size() &&
+        source_[pos_ + 2] == '"') {
+      Advance();
+      Advance();
+      Advance();  // skip closing """
+      return;
+    }
+    if (Current() == '\\') {
+      Advance();  // skip escape character
+    }
+    Advance();
+  }
 }
 
 Token Lexer::LexSystemIdentifier() {

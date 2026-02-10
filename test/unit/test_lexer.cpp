@@ -592,3 +592,30 @@ TEST(Lexer, BasedNumber_NoDigitsAfterBase_Error) {
   lexer.LexAll();  // lex the based number
   EXPECT_TRUE(diag.HasErrors());
 }
+
+// --- Triple-quoted strings (§5.9) ---
+
+TEST(Lexer, TripleQuotedString_Basic) {
+  auto tokens = lex(R"("""hello""")");
+  ASSERT_EQ(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
+  EXPECT_EQ(tokens[0].text, R"("""hello""")");
+}
+
+TEST(Lexer, TripleQuotedString_WithNewline) {
+  auto tokens = lex("\"\"\"line1\nline2\"\"\"");
+  ASSERT_EQ(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
+}
+
+TEST(Lexer, TripleQuotedString_WithQuote) {
+  auto tokens = lex(R"("""a "quoted" word""")");
+  ASSERT_EQ(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
+}
+
+TEST(Lexer, TripleQuotedString_WithEscape) {
+  auto tokens = lex(R"("""hello\nworld""")");
+  ASSERT_EQ(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
+}

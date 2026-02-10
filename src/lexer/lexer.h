@@ -52,6 +52,8 @@ class Lexer {
   Token LexIdentifier();
   Token LexNumber();
   Token LexStringLiteral();
+  void LexQuotedBody();
+  void LexTripleQuotedBody();
   Token LexSystemIdentifier();
   Token LexEscapedIdentifier();
   Token LexApostrophe();
