@@ -374,7 +374,7 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: Integration tests
-        run: python3 scripts/run_sv_tests.py
+        run: python3 scripts/run_sv_tests.py --min-pass 350
       - name: Upload profraw
         uses: actions/upload-artifact@v4
         with:
@@ -400,7 +400,7 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: Integration tests
-        run: python3 scripts/run_sv_tests.py
+        run: python3 scripts/run_sv_tests.py --min-pass 350
   integration-test-sanitize:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
@@ -423,7 +423,7 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: Integration tests
-        run: python3 scripts/run_sv_tests.py
+        run: python3 scripts/run_sv_tests.py --min-pass 350
   integration-test-tsan:
     env:
       TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
@@ -445,7 +445,7 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: Integration tests
-        run: python3 scripts/run_sv_tests.py
+        run: python3 scripts/run_sv_tests.py --min-pass 350
   integration-test-ubuntu-24-04-x86-64-clang:
     needs: cache-sv-tests
     runs-on: ubuntu-24.04
@@ -465,7 +465,7 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: Integration tests
-        run: python3 scripts/run_sv_tests.py
+        run: python3 scripts/run_sv_tests.py --min-pass 350
   integration-test-ubuntu-24-04-x86-64-gcc:
     needs: cache-sv-tests
     runs-on: ubuntu-24.04
@@ -485,7 +485,7 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: Integration tests
-        run: python3 scripts/run_sv_tests.py
+        run: python3 scripts/run_sv_tests.py --min-pass 350
   release:
     if: >-
       github.ref == 'refs/heads/main'

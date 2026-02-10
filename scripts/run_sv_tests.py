@@ -25,6 +25,13 @@ def parse_args():
         metavar="FILE",
         help="Write JUnit XML results to FILE.",
     )
+    parser.add_argument(
+        "--min-pass",
+        metavar="N",
+        type=int,
+        default=0,
+        help="Exit 0 if at least N tests pass (regression baseline).",
+    )
     return parser.parse_args()
 
 
@@ -169,6 +176,13 @@ def main():
         elapsed = time.monotonic() - suite_start
         write_junit_xml(results, elapsed, args.junit_xml)
         print(f"\nJUnit XML written to {args.junit_xml}")
+
+    if args.min_pass > 0:
+        if passed < args.min_pass:
+            print(f"\nREGRESSION: {passed} < {args.min_pass} baseline")
+            sys.exit(1)
+        print(f"\nBaseline met: {passed} >= {args.min_pass}")
+        sys.exit(0)
 
     sys.exit(min(failed, 1))
 
