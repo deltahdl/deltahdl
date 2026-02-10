@@ -5,6 +5,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "lexer/keywords.h"
 #include "lexer/token.h"
 
 namespace delta {
@@ -25,6 +26,7 @@ class Lexer {
     uint32_t column;
     bool has_peeked;
     Token peeked;
+    KeywordVersion keyword_version;
   };
   SavedPos SavePos() const;
   void RestorePos(const SavedPos& saved);
@@ -38,6 +40,7 @@ class Lexer {
 
   // Whitespace / comments
   void SkipWhitespaceAndComments();
+  void ConsumeKeywordMarker();
   void SkipLineComment();
   void SkipBlockComment();
 
@@ -90,6 +93,7 @@ class Lexer {
   bool has_peeked_ = false;
   bool in_attribute_ = false;
   Token peeked_;
+  KeywordVersion keyword_version_ = KeywordVersion::kVer18002023;
 };
 
 }  // namespace delta

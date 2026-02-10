@@ -147,7 +147,8 @@ def _aggregate_chapters(results):
         c = chapters[name]
         total = c["passed"] + c["failed"]
         pct = 100.0 * c["passed"] / total if total else 0.0
-        rows.append((name, str(c["passed"]), str(total), f"{pct:.1f}%"))
+        display = name.removeprefix("chapter-")
+        rows.append((display, str(c["passed"]), str(total), f"{pct:.1f}%"))
     return rows
 
 

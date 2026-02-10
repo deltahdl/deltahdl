@@ -3,6 +3,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
+#include "lexer/keywords.h"
 #include "preprocessor/preprocessor.h"
 
 using namespace delta;
@@ -312,22 +313,60 @@ TEST(Preprocessor, Line_OverridesLineNumber) {
   EXPECT_EQ(pp.LineOffset(), 42);
 }
 
-// --- begin_keywords / end_keywords tests ---
+// --- begin_keywords / end_keywords tests (IEEE 1800-2023 §22.14) ---
 
-TEST(Preprocessor, BeginKeywords_EmitsWarning) {
+TEST(Preprocessor, BeginKeywords_EmitsMarker) {
   PreprocFixture f;
-  Preprocessor pp(f.mgr, f.diag, {});
-  PreprocessWithPP("`begin_keywords \"1800-2023\"\n", f, pp);
+  auto result = Preprocess("`begin_keywords \"1364-2001\"\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_TRUE(f.diag.WarningCount() > 0);
+  // Marker: \x01 + version byte (1 = kVer13642001) + \n
+  std::string expected = {kKeywordMarker, '\x01', '\n'};
+  EXPECT_NE(result.find(expected), std::string::npos);
 }
 
-TEST(Preprocessor, EndKeywords_EmitsWarning) {
+TEST(Preprocessor, EndKeywords_EmitsRestoreMarker) {
   PreprocFixture f;
-  Preprocessor pp(f.mgr, f.diag, {});
-  PreprocessWithPP("`end_keywords\n", f, pp);
+  auto result = Preprocess(
+      "`begin_keywords \"1364-2001\"\n"
+      "`end_keywords\n",
+      f);
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_TRUE(f.diag.WarningCount() > 0);
+  // After end_keywords with empty stack, restores to kVer18002023 (8).
+  std::string restore = {kKeywordMarker, '\x08', '\n'};
+  EXPECT_NE(result.find(restore), std::string::npos);
+}
+
+TEST(Preprocessor, BeginKeywords_InvalidVersion) {
+  PreprocFixture f;
+  Preprocess("`begin_keywords \"bogus\"\n", f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, EndKeywords_WithoutBegin) {
+  PreprocFixture f;
+  Preprocess("`end_keywords\n", f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, BeginKeywords_NestedRestoresVersion) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`begin_keywords \"1364-2001\"\n"
+      "`begin_keywords \"1800-2005\"\n"
+      "`end_keywords\n"
+      "`end_keywords\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  // First begin: version 1 (1364-2001)
+  std::string m1 = {kKeywordMarker, '\x01', '\n'};
+  // Second begin: version 4 (1800-2005)
+  std::string m2 = {kKeywordMarker, '\x04', '\n'};
+  // Second end: restore to 8 (1800-2023)
+  std::string m4 = {kKeywordMarker, '\x08', '\n'};
+  EXPECT_NE(result.find(m1), std::string::npos);
+  EXPECT_NE(result.find(m2), std::string::npos);
+  // First end restores to version 1, same as m1 — already verified.
+  EXPECT_NE(result.find(m4), std::string::npos);
 }
 
 // --- Macro default parameter tests (IEEE 1800-2023 §22.5.1) ---

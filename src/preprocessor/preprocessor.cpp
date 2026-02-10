@@ -156,14 +156,6 @@ bool Preprocessor::ProcessStateDirective(std::string_view line, SourceLoc loc) {
     HandleLine(AfterDirective(line, "line"), loc);
     return true;
   }
-  if (StartsWithDirective(line, "begin_keywords")) {
-    diag_.Warning(loc, "`begin_keywords not fully supported; ignored");
-    return true;
-  }
-  if (StartsWithDirective(line, "end_keywords")) {
-    diag_.Warning(loc, "`end_keywords not fully supported; ignored");
-    return true;
-  }
   return false;
 }
 
@@ -186,6 +178,14 @@ bool Preprocessor::ProcessDirective(std::string_view line, uint32_t file_id,
   if (ProcessConditionalDirective(line)) return true;
   if (StartsWithDirective(line, "include") && IsActive()) {
     HandleInclude(AfterDirective(line, "include"), loc, depth, output);
+    return true;
+  }
+  if (StartsWithDirective(line, "begin_keywords") && IsActive()) {
+    HandleBeginKeywords(AfterDirective(line, "begin_keywords"), loc, output);
+    return true;
+  }
+  if (StartsWithDirective(line, "end_keywords") && IsActive()) {
+    HandleEndKeywords(loc, output);
     return true;
   }
   if (ProcessStateDirective(line, loc)) return true;
@@ -675,6 +675,40 @@ std::string Preprocessor::ResolveInclude(std::string_view filename) {
     }
   }
   return "";
+}
+
+void Preprocessor::HandleBeginKeywords(std::string_view rest, SourceLoc loc,
+                                       std::string& output) {
+  auto start = rest.find('"');
+  auto end = rest.find('"', start + 1);
+  if (start == std::string_view::npos || end == std::string_view::npos) {
+    diag_.Error(loc, "expected quoted version string after `begin_keywords");
+    return;
+  }
+  auto spec = rest.substr(start + 1, end - start - 1);
+  auto version = ParseKeywordVersion(spec);
+  if (!version) {
+    diag_.Error(
+        loc, "unrecognized version specifier: \"" + std::string(spec) + "\"");
+    return;
+  }
+  keyword_version_stack_.push_back(*version);
+  output += kKeywordMarker;
+  output += static_cast<char>(static_cast<uint8_t>(*version));
+  output += '\n';
+}
+
+void Preprocessor::HandleEndKeywords(SourceLoc loc, std::string& output) {
+  if (keyword_version_stack_.empty()) {
+    diag_.Error(loc, "`end_keywords without matching `begin_keywords");
+    return;
+  }
+  keyword_version_stack_.pop_back();
+  auto version = keyword_version_stack_.empty() ? KeywordVersion::kVer18002023
+                                                : keyword_version_stack_.back();
+  output += kKeywordMarker;
+  output += static_cast<char>(static_cast<uint8_t>(version));
+  output += '\n';
 }
 
 }  // namespace delta

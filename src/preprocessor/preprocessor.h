@@ -8,6 +8,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
+#include "lexer/keywords.h"
 #include "preprocessor/macro_table.h"
 
 namespace delta {
@@ -54,6 +55,9 @@ class Preprocessor {
   void HandleDefaultNettype(std::string_view rest, SourceLoc loc);
   void HandleUnconnectedDrive(std::string_view rest, SourceLoc loc);
   void HandleLine(std::string_view rest, SourceLoc loc);
+  void HandleBeginKeywords(std::string_view rest, SourceLoc loc,
+                           std::string& output);
+  void HandleEndKeywords(SourceLoc loc, std::string& output);
   bool TryExpandMacro(std::string_view trimmed, std::string& output,
                       uint32_t file_id, uint32_t line_num);
   std::string ExpandMacro(const MacroDef& macro, std::string_view args_text);
@@ -94,6 +98,7 @@ class Preprocessor {
   uint32_t line_offset_ = 0;             // Line number from `line directive.
   uint32_t line_override_src_line_ = 0;  // Source line where `line appeared.
   bool has_line_override_ = false;
+  std::vector<KeywordVersion> keyword_version_stack_;
 };
 
 }  // namespace delta

@@ -68,6 +68,10 @@ void Lexer::SkipWhitespaceAndComments() {
       Advance();
       continue;
     }
+    if (Current() == kKeywordMarker) {
+      ConsumeKeywordMarker();
+      continue;
+    }
     if (Current() == '/' && PeekChar() == '/') {
       SkipLineComment();
       continue;
@@ -79,6 +83,17 @@ void Lexer::SkipWhitespaceAndComments() {
       continue;
     }
     break;
+  }
+}
+
+void Lexer::ConsumeKeywordMarker() {
+  Advance();  // skip marker byte
+  if (!AtEnd()) {
+    keyword_version_ = static_cast<KeywordVersion>(Current());
+    Advance();  // skip version byte
+  }
+  if (!AtEnd() && Current() == '\n') {
+    Advance();  // skip trailing newline
   }
 }
 
@@ -163,7 +178,7 @@ Token Lexer::LexIdentifier() {
     Advance();
   }
   std::string_view text = source_.substr(start, pos_ - start);
-  auto kw = LookupKeyword(text);
+  auto kw = LookupKeyword(text, keyword_version_);
   Token tok;
   tok.kind = kw.value_or(TokenKind::kIdentifier);
   tok.loc = loc;
@@ -757,7 +772,7 @@ std::vector<Token> Lexer::LexAll() {
 }
 
 Lexer::SavedPos Lexer::SavePos() const {
-  return {pos_, line_, column_, has_peeked_, peeked_};
+  return {pos_, line_, column_, has_peeked_, peeked_, keyword_version_};
 }
 
 void Lexer::RestorePos(const SavedPos& saved) {
@@ -766,6 +781,7 @@ void Lexer::RestorePos(const SavedPos& saved) {
   column_ = saved.column;
   has_peeked_ = saved.has_peeked;
   peeked_ = saved.peeked;
+  keyword_version_ = saved.keyword_version;
 }
 
 }  // namespace delta

@@ -419,3 +419,49 @@ TEST(Lexical, EscapedIdentifier_InVarDecl) {
   }
   EXPECT_TRUE(found) << "variable with escaped identifier not found";
 }
+
+// ===========================================================================
+// 9. begin_keywords / end_keywords (IEEE 1800-2023 §22.14)
+// ===========================================================================
+
+TEST(Lexical, BeginKeywords_LogicAsIdentifier) {
+  PreprocFixture f;
+  auto preprocessed = Preprocess(
+      "`begin_keywords \"1364-2001\"\n"
+      "module m; reg logic; endmodule\n"
+      "`end_keywords\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  DiagEngine diag2(f.mgr);
+  Lexer lexer(preprocessed, 0, diag2);
+  auto tokens = lexer.LexAll();
+  // Find the token after "reg" — should be kIdentifier ("logic"), not kKwLogic.
+  for (size_t i = 0; i + 1 < tokens.size(); ++i) {
+    if (tokens[i].kind == TokenKind::kKwReg) {
+      EXPECT_EQ(tokens[i + 1].kind, TokenKind::kIdentifier);
+      EXPECT_EQ(tokens[i + 1].text, "logic");
+      return;
+    }
+  }
+  FAIL() << "did not find 'reg' token in lexed output";
+}
+
+TEST(Lexical, BeginKeywords_RestoresAfterEnd) {
+  PreprocFixture f;
+  auto preprocessed = Preprocess(
+      "`begin_keywords \"1364-2001\"\n"
+      "logic\n"
+      "`end_keywords\n"
+      "logic\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  DiagEngine diag2(f.mgr);
+  Lexer lexer(preprocessed, 0, diag2);
+  auto tokens = lexer.LexAll();
+  // First "logic" should be identifier (under 1364-2001).
+  // Second "logic" should be keyword (restored to 1800-2023).
+  ASSERT_GE(tokens.size(), 3);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[0].text, "logic");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kKwLogic);
+}

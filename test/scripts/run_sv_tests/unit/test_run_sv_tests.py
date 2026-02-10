@@ -241,14 +241,17 @@ def test_print_chapter_breakdown_shows_correct_values(capsys):
 
 
 def test_print_chapter_breakdown_uses_natural_order(capsys):
-    """print_chapter_breakdown() should list chapter-5 before chapter-25."""
+    """print_chapter_breakdown() should list 5 before 25 (natural order)."""
     results = [
         {"chapter": "chapter-25", "status": "pass"},
         {"chapter": "chapter-5", "status": "pass"},
     ]
     run_sv_tests.print_chapter_breakdown(results)
     captured = capsys.readouterr().out
-    assert captured.index("chapter-5") < captured.index("chapter-25")
+    # Chapter column shows just the number, not "chapter-N".
+    idx5 = captured.index("│ 5")
+    idx25 = captured.index("│ 25")
+    assert idx5 < idx25
 
 
 class TestBuildResult:
