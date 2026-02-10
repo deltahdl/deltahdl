@@ -639,13 +639,14 @@ jobs:
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
       - name: Run clang-tidy
         run: >-
-          find src -name '*.cpp' |
-          xargs clang-tidy-18 -p build
-          --config-file=.clang-tidy
-          --quiet
-          --extra-arg=-ferror-limit=0
-          --extra-arg=-w
-          --warnings-as-errors='*'
+          run-clang-tidy-18 -p build
+          -j "$(nproc)"
+          -config-file=.clang-tidy
+          -quiet
+          -extra-arg=-ferror-limit=0
+          -extra-arg=-w
+          -warnings-as-errors='*'
+          'src/.*\.cpp$'
   unit-test-coverage:
     env:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
