@@ -47,22 +47,22 @@ jobs:
             --ignore-filename-regex='test/|third_party/' \
             --format=html \
             -output-dir=coverage-html
-      - name: Enforce coverage baseline
+      # Requires 100% line and branch coverage. Currently at ~86% lines.
+      # To fix: add unit tests for all uncovered paths in simulation/,
+      # elaboration/, parser/, and main.cpp.
+      - name: Enforce 100% coverage
         run: |
           llvm-cov-18 report build/src/deltahdl \
             -instr-profile=merged.profdata \
             --ignore-filename-regex='test/|third_party/'
-          LINE_PCT=$(llvm-cov-18 export build/src/deltahdl \
+          llvm-cov-18 export build/src/deltahdl \
             -instr-profile=merged.profdata \
             --ignore-filename-regex='test/|third_party/' \
             --summary-only \
-            | jq '.data[0].totals.lines |
-              (100.0 * .covered / .count)')
-          echo "Line coverage: ${LINE_PCT}%"
-          jq -n --argjson pct "$LINE_PCT" \
-            'if $pct >= 85 then true else false end' \
-            | jq -e . \
-            || { echo "REGRESSION: ${LINE_PCT}% < 85% baseline"; exit 1; }
+            | jq -e '.data[0].totals |
+              .lines.covered == .lines.count and
+              .branches.covered == .branches.count' \
+            || { echo "FAIL: coverage must be 100%"; exit 1; }
       - if: >-
           github.ref == 'refs/heads/main'
           && github.event_name == 'push'
@@ -70,8 +70,9 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: coverage-html/
-      - continue-on-error: true
-        if: >-
+      # Requires GitHub Pages to be enabled in repo settings:
+      # Settings > Pages > Source = "GitHub Actions".
+      - if: >-
           github.ref == 'refs/heads/main'
           && github.event_name == 'push'
         name: Publish to GitHub Pages
@@ -354,6 +355,10 @@ jobs:
         run: chmod +x build/src/deltahdl
       - name: E2E tests
         run: python3 scripts/run_sim_tests.py
+  # Requires 100% sv-tests pass rate (716/716). Currently at ~352/716.
+  # To fix: implement remaining parser/elaboration features for each
+  # failing chapter (especially §5, §8, §16, §18, §22).
+  #
   # Each integration-test job runs on a fresh runner with an empty
   # filesystem, so cache/restore is always needed to download sv-tests
   # from persistent storage — even though cache-sv-tests already saved it.
@@ -378,7 +383,7 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: Integration tests
-        run: python3 scripts/run_sv_tests.py --min-pass 350
+        run: python3 scripts/run_sv_tests.py
       - name: Upload profraw
         uses: actions/upload-artifact@v4
         with:
@@ -404,7 +409,7 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: Integration tests
-        run: python3 scripts/run_sv_tests.py --min-pass 350
+        run: python3 scripts/run_sv_tests.py
   integration-test-sanitize:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
@@ -427,7 +432,7 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: Integration tests
-        run: python3 scripts/run_sv_tests.py --min-pass 350
+        run: python3 scripts/run_sv_tests.py
   integration-test-tsan:
     env:
       TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
@@ -449,7 +454,7 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: Integration tests
-        run: python3 scripts/run_sv_tests.py --min-pass 350
+        run: python3 scripts/run_sv_tests.py
   integration-test-ubuntu-24-04-x86-64-clang:
     needs: cache-sv-tests
     runs-on: ubuntu-24.04
@@ -469,7 +474,7 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: Integration tests
-        run: python3 scripts/run_sv_tests.py --min-pass 350
+        run: python3 scripts/run_sv_tests.py
   integration-test-ubuntu-24-04-x86-64-gcc:
     needs: cache-sv-tests
     runs-on: ubuntu-24.04
@@ -489,7 +494,7 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: Integration tests
-        run: python3 scripts/run_sv_tests.py --min-pass 350
+        run: python3 scripts/run_sv_tests.py
   release:
     if: >-
       github.ref == 'refs/heads/main'
