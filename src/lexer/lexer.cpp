@@ -50,7 +50,7 @@ void Lexer::SkipLineComment() {
   }
 }
 
-void Lexer::SkipBlockComment() {
+void Lexer::SkipBlockComment(SourceLoc start_loc) {
   // Caller has already consumed '/' and '*'.
   while (!AtEnd()) {
     if (Current() == '*' && PeekChar() == '/') {
@@ -60,6 +60,7 @@ void Lexer::SkipBlockComment() {
     }
     Advance();
   }
+  diag_.Error(start_loc, "unterminated block comment");
 }
 
 void Lexer::SkipWhitespaceAndComments() {
@@ -77,9 +78,10 @@ void Lexer::SkipWhitespaceAndComments() {
       continue;
     }
     if (Current() == '/' && PeekChar() == '*') {
+      auto comment_loc = MakeLoc();
       Advance();  // skip '/'
       Advance();  // skip '*'
-      SkipBlockComment();
+      SkipBlockComment(comment_loc);
       continue;
     }
     break;

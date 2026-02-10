@@ -171,6 +171,10 @@ bool Preprocessor::ProcessDirective(std::string_view line, uint32_t file_id,
     HandleDefine(AfterDirective(line, "define"), loc);
     return true;
   }
+  if (StartsWithDirective(line, "undefineall")) {
+    macros_.UndefineAll();
+    return true;
+  }
   if (StartsWithDirective(line, "undef")) {
     HandleUndef(AfterDirective(line, "undef"), loc);
     return true;

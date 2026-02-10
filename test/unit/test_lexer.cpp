@@ -699,3 +699,13 @@ TEST(Lexer, EscapedIdentifierMaxLength_Error) {
   lexer.LexAll();
   EXPECT_TRUE(diag.HasErrors());
 }
+
+TEST(Lexer, UnterminatedBlockComment_Error) {
+  std::string src = "/* no end";
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<test>", src);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  lexer.LexAll();
+  EXPECT_TRUE(diag.HasErrors());
+}

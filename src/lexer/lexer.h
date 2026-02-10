@@ -42,7 +42,7 @@ class Lexer {
   void SkipWhitespaceAndComments();
   void ConsumeKeywordMarker();
   void SkipLineComment();
-  void SkipBlockComment();
+  void SkipBlockComment(SourceLoc start_loc);
 
   // Token construction helpers
   Token MakeToken(TokenKind kind, SourceLoc loc) const;
