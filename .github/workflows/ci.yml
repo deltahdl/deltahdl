@@ -47,9 +47,8 @@ jobs:
             --ignore-filename-regex='test/|third_party/' \
             --format=html \
             -output-dir=coverage-html
-      # Requires 100% line and branch coverage. Currently at ~86% lines.
-      # To fix: add unit tests for all uncovered paths in simulation/,
-      # elaboration/, parser/, and main.cpp.
+      # DO NOT lower this threshold. Uncovered code is untested code —
+      # lowering it hides bugs and lets regressions slip through silently.
       - name: Enforce 100% coverage
         run: |
           llvm-cov-18 report build/src/deltahdl \
@@ -70,8 +69,9 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: coverage-html/
-      # Requires GitHub Pages to be enabled in repo settings:
-      # Settings > Pages > Source = "GitHub Actions".
+      # DO NOT add continue-on-error here. If Pages deployment fails,
+      # the repo settings need to be fixed (Settings > Pages > Source =
+      # "GitHub Actions"), not the workflow.
       - if: >-
           github.ref == 'refs/heads/main'
           && github.event_name == 'push'
@@ -355,9 +355,9 @@ jobs:
         run: chmod +x build/src/deltahdl
       - name: E2E tests
         run: python3 scripts/run_sim_tests.py
-  # Requires 100% sv-tests pass rate (716/716). Currently at ~352/716.
-  # To fix: implement remaining parser/elaboration features for each
-  # failing chapter (especially §5, §8, §16, §18, §22).
+  # DO NOT lower the sv-tests pass threshold. Every failing test
+  # represents a real LRM conformance gap — lowering it hides parser
+  # and elaboration bugs instead of fixing them.
   #
   # Each integration-test job runs on a fresh runner with an empty
   # filesystem, so cache/restore is always needed to download sv-tests
