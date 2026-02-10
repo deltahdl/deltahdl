@@ -1,5 +1,6 @@
 """Unit tests for run_sv_tests module."""
 
+import ast
 import subprocess
 from unittest.mock import MagicMock, patch
 from xml.etree import ElementTree as ET
@@ -64,6 +65,151 @@ class TestRunTest:
                 raised = True
         assert raised
 
+    def test_simulate_pass_with_assertions(self):
+        """run_test(simulate=True) should pass when exit 0 and assertions pass."""
+        mock_result = MagicMock(returncode=0, stdout=":assert: (True)\n", stderr="")
+        with patch("run_sv_tests.subprocess.run", return_value=mock_result):
+            actual = run_sv_tests.run_test("/fake/test.sv", simulate=True)
+        assert actual == (True, "")
+
+    def test_simulate_fail_on_assertion(self):
+        """run_test(simulate=True) should fail when assertion fails."""
+        mock_result = MagicMock(
+            returncode=0, stdout=":assert: (1 == 2)\n", stderr=""
+        )
+        with patch("run_sv_tests.subprocess.run", return_value=mock_result):
+            ok, detail = run_sv_tests.run_test("/fake/test.sv", simulate=True)
+        assert ok is False and "Assertion failed" in detail
+
+    def test_simulate_fail_on_nonzero_exit(self):
+        """run_test(simulate=True) should fail when exit code is non-zero."""
+        mock_result = MagicMock(returncode=1, stdout="", stderr="error\n")
+        with patch("run_sv_tests.subprocess.run", return_value=mock_result):
+            actual = run_sv_tests.run_test("/fake/test.sv", simulate=True)
+        assert actual == (False, "error\n")
+
+
+class TestParseMetadata:
+    """Tests for the parse_metadata() function."""
+
+    def test_extracts_all_fields(self, tmp_path):
+        """parse_metadata() should extract all key-value pairs."""
+        sv = tmp_path / "test.sv"
+        sv.write_text(
+            "/*\n:name: foo\n:type: simulation elaboration parsing\n"
+            ":tags: 7.3.2\n:should_fail_because: bad code\n*/\n"
+            "module top; endmodule\n"
+        )
+        meta = run_sv_tests.parse_metadata(str(sv))
+        assert (
+            meta["name"] == "foo"
+            and meta["type"] == "simulation elaboration parsing"
+            and meta["tags"] == "7.3.2"
+            and meta["should_fail_because"] == "bad code"
+        )
+
+    def test_returns_empty_dict_when_no_comment(self, tmp_path):
+        """parse_metadata() should return {} when no block comment exists."""
+        sv = tmp_path / "bare.sv"
+        sv.write_text("module bare; endmodule\n")
+        assert not run_sv_tests.parse_metadata(str(sv))
+
+    def test_returns_empty_type_when_absent(self, tmp_path):
+        """parse_metadata() should omit 'type' key when not present."""
+        sv = tmp_path / "no_type.sv"
+        sv.write_text("/*\n:name: no_type\n:tags: 5.10\n*/\nmodule m; endmodule\n")
+        meta = run_sv_tests.parse_metadata(str(sv))
+        assert "name" in meta and "type" not in meta
+
+
+class TestEvalNode:
+    """Tests for the eval_node() AST evaluator."""
+
+    def test_constant_true(self):
+        """eval_node() should return True for ast.Constant(True)."""
+        assert run_sv_tests.eval_node(ast.Constant(value=True)) is True
+
+    def test_constant_integer(self):
+        """eval_node() should return the integer value."""
+        assert run_sv_tests.eval_node(ast.Constant(value=42)) == 42
+
+    def test_equality_pass(self):
+        """eval_node() should return True for equal constants."""
+        tree = ast.parse("('hello' == 'hello')", mode="eval")
+        assert run_sv_tests.eval_node(tree.body) is True
+
+    def test_equality_fail(self):
+        """eval_node() should return False for unequal constants."""
+        tree = ast.parse("(1 == 2)", mode="eval")
+        assert run_sv_tests.eval_node(tree.body) is False
+
+    def test_in_operator(self):
+        """eval_node() should handle the 'in' operator."""
+        tree = ast.parse("('est' in 'Test')", mode="eval")
+        assert run_sv_tests.eval_node(tree.body) is True
+
+    def test_not_in_operator(self):
+        """eval_node() should handle the 'not in' operator."""
+        tree = ast.parse("('xyz' not in 'Test')", mode="eval")
+        assert run_sv_tests.eval_node(tree.body) is True
+
+    def test_bool_and(self):
+        """eval_node() should handle 'and' boolean operator."""
+        tree = ast.parse("(True and True)", mode="eval")
+        assert run_sv_tests.eval_node(tree.body) is True
+
+    def test_bool_or(self):
+        """eval_node() should handle 'or' boolean operator."""
+        tree = ast.parse("(False or True)", mode="eval")
+        assert run_sv_tests.eval_node(tree.body) is True
+
+    def test_unary_not(self):
+        """eval_node() should handle unary 'not' operator."""
+        tree = ast.parse("(not False)", mode="eval")
+        assert run_sv_tests.eval_node(tree.body) is True
+
+    def test_unsupported_node_raises(self):
+        """eval_node() should raise ValueError for unsupported nodes."""
+        raised = False
+        try:
+            run_sv_tests.eval_node(ast.Name(id="x"))
+        except ValueError:
+            raised = True
+        assert raised
+
+
+class TestCheckAssertions:
+    """Tests for the check_assertions() function."""
+
+    def test_passing_assertion(self):
+        """check_assertions() should return (True, '') for passing assert."""
+        assert run_sv_tests.check_assertions(":assert: (True)") == (True, "")
+
+    def test_failing_assertion(self):
+        """check_assertions() should return (False, detail) for failing assert."""
+        ok, detail = run_sv_tests.check_assertions(":assert: (1 == 2)")
+        assert ok is False and "Assertion failed" in detail
+
+    def test_no_assertions_passes(self):
+        """check_assertions() should pass when stdout has no :assert: lines."""
+        assert run_sv_tests.check_assertions("hello world\n") == (True, "")
+
+    def test_multiple_assertions_all_pass(self):
+        """check_assertions() should pass when all assertions pass."""
+        stdout = ":assert: (True)\n:assert: (1 == 1)\n"
+        assert run_sv_tests.check_assertions(stdout) == (True, "")
+
+    def test_multiple_assertions_one_fails(self):
+        """check_assertions() should fail on the first failing assertion."""
+        stdout = ":assert: (True)\n:assert: (1 == 2)\n"
+        ok, _ = run_sv_tests.check_assertions(stdout)
+        assert ok is False
+
+    def test_syntax_error_fails(self):
+        """check_assertions() should fail on malformed expression."""
+        ok, detail = run_sv_tests.check_assertions(":assert: (!!!)")
+        assert ok is False and "Assertion error" in detail
+
 
 def test_chapter_from_path_extracts_chapter_directory():
     """chapter_from_path() should return the parent directory name."""
@@ -103,6 +249,111 @@ def test_print_chapter_breakdown_uses_natural_order(capsys):
     run_sv_tests.print_chapter_breakdown(results)
     captured = capsys.readouterr().out
     assert captured.index("chapter-5") < captured.index("chapter-25")
+
+
+class TestBuildResult:
+    """Tests for the build_result() function."""
+
+    def test_pass_returns_correct_dict(self, tmp_path):
+        """build_result() should return result dict with status=pass."""
+        sv = tmp_path / "chapter-5" / "foo.sv"
+        sv.parent.mkdir(parents=True)
+        sv.write_text("/*\n:name: foo\n:tags: 5.10\n*/\nmodule m; endmodule\n")
+        mock_result = MagicMock(returncode=0, stderr="")
+        with patch("run_sv_tests.subprocess.run", return_value=mock_result):
+            result, ok = run_sv_tests.build_result(str(sv))
+        assert (
+            ok == 1
+            and result["name"] == "foo.sv"
+            and result["chapter"] == "chapter-5"
+            and result["status"] == "pass"
+        )
+
+    def test_fail_returns_correct_dict(self, tmp_path):
+        """build_result() should return result dict with status=fail."""
+        sv = tmp_path / "chapter-5" / "bar.sv"
+        sv.parent.mkdir(parents=True)
+        sv.write_text("/*\n:name: bar\n:tags: 5.10\n*/\nmodule m; endmodule\n")
+        mock_result = MagicMock(returncode=1, stderr="error\n")
+        with patch("run_sv_tests.subprocess.run", return_value=mock_result):
+            result, ok = run_sv_tests.build_result(str(sv))
+        assert ok == 0 and result["status"] == "fail"
+
+    def test_timeout_returns_timeout_status(self, tmp_path):
+        """build_result() should return status=timeout on TimeoutExpired."""
+        sv = tmp_path / "chapter-5" / "slow.sv"
+        sv.parent.mkdir(parents=True)
+        sv.write_text("/*\n:name: slow\n:tags: 5.10\n*/\nmodule m; endmodule\n")
+        with patch(
+            "run_sv_tests.subprocess.run",
+            side_effect=subprocess.TimeoutExpired(cmd="x", timeout=30),
+        ):
+            result, ok = run_sv_tests.build_result(str(sv))
+        assert ok == 0 and result["status"] == "timeout"
+
+    def test_should_fail_inverts_failure_to_pass(self, tmp_path):
+        """build_result() should invert fail→pass when should_fail_because set."""
+        sv = tmp_path / "chapter-5" / "xfail.sv"
+        sv.parent.mkdir(parents=True)
+        sv.write_text(
+            "/*\n:name: xfail\n:tags: 5.10\n"
+            ":should_fail_because: bad code\n*/\nmodule m; endmodule\n"
+        )
+        mock_result = MagicMock(returncode=1, stderr="error\n")
+        with patch("run_sv_tests.subprocess.run", return_value=mock_result):
+            result, ok = run_sv_tests.build_result(str(sv))
+        assert ok == 1 and result["status"] == "pass"
+
+    def test_should_fail_inverts_pass_to_failure(self, tmp_path):
+        """build_result() should invert pass→fail when should_fail_because set."""
+        sv = tmp_path / "chapter-5" / "xpass.sv"
+        sv.parent.mkdir(parents=True)
+        sv.write_text(
+            "/*\n:name: xpass\n:tags: 5.10\n"
+            ":should_fail_because: bad code\n*/\nmodule m; endmodule\n"
+        )
+        mock_result = MagicMock(returncode=0, stderr="")
+        with patch("run_sv_tests.subprocess.run", return_value=mock_result):
+            result, ok = run_sv_tests.build_result(str(sv))
+        assert ok == 0 and result["status"] == "fail"
+
+    def test_simulation_mode_used_for_simulation_type(self, tmp_path):
+        """build_result() should run simulation when type contains 'simulation'."""
+        sv = tmp_path / "chapter-7" / "sim.sv"
+        sv.parent.mkdir(parents=True)
+        sv.write_text(
+            "/*\n:name: sim\n:type: simulation elaboration parsing\n"
+            ":tags: 7.3.2\n*/\nmodule m; endmodule\n"
+        )
+        mock_result = MagicMock(
+            returncode=0, stdout=":assert: (True)\n", stderr=""
+        )
+        with patch("run_sv_tests.subprocess.run", return_value=mock_result) as mock_run:
+            result, ok = run_sv_tests.build_result(str(sv))
+        assert (
+            ok == 1
+            and result["status"] == "pass"
+            and "--lint-only" not in mock_run.call_args[0][0]
+        )
+
+
+class TestPrintStatus:
+    """Tests for the print_status() function."""
+
+    def test_prints_pass(self, capsys):
+        """print_status() should print PASS for passing tests."""
+        run_sv_tests.print_status({"name": "x.sv", "status": "pass"}, 1)
+        assert "PASS" in capsys.readouterr().out
+
+    def test_prints_fail(self, capsys):
+        """print_status() should print FAIL for failing tests."""
+        run_sv_tests.print_status({"name": "x.sv", "status": "fail"}, 0)
+        assert "FAIL" in capsys.readouterr().out
+
+    def test_prints_timeout(self, capsys):
+        """print_status() should print TIMEOUT for timed-out tests."""
+        run_sv_tests.print_status({"name": "x.sv", "status": "timeout"}, 0)
+        assert "TIMEOUT" in capsys.readouterr().out
 
 
 class TestWriteJunitXml:

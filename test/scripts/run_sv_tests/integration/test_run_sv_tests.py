@@ -14,7 +14,8 @@ class TestExecuteSingleTest:
     def test_returns_dict_with_all_required_keys(self, capsys):
         """execute_single_test() should return a dict with all required keys."""
         mock_result = MagicMock(returncode=0, stderr="")
-        with patch("run_sv_tests.subprocess.run", return_value=mock_result):
+        with patch("run_sv_tests.subprocess.run", return_value=mock_result), \
+             patch("run_sv_tests.parse_metadata", return_value={}):
             result, ok = run_sv_tests.execute_single_test(
                 "/tests/chapter-5/foo.sv"
             )
@@ -35,7 +36,7 @@ class TestExecuteSingleTest:
         with patch(
             "run_sv_tests.subprocess.run",
             side_effect=subprocess.TimeoutExpired(cmd="x", timeout=30),
-        ):
+        ), patch("run_sv_tests.parse_metadata", return_value={}):
             result, ok = run_sv_tests.execute_single_test(
                 "/tests/chapter-5/bar.sv"
             )
@@ -54,7 +55,8 @@ def test_pipeline_produces_correct_result_list():
     mock_result = MagicMock(returncode=0, stderr="")
 
     with patch("run_sv_tests.glob.glob", return_value=fake_paths), \
-         patch("run_sv_tests.subprocess.run", return_value=mock_result):
+         patch("run_sv_tests.subprocess.run", return_value=mock_result), \
+         patch("run_sv_tests.parse_metadata", return_value={}):
         tests = run_sv_tests.collect_tests()
         results = []
         for path in tests:
@@ -126,7 +128,8 @@ class TestMain:
             with patch("sys.argv", ["run_sv_tests.py"]), \
                  patch("run_sv_tests.check_binary"), \
                  patch("run_sv_tests.glob.glob", return_value=fake_paths), \
-                 patch("run_sv_tests.subprocess.run", return_value=mock_result):
+                 patch("run_sv_tests.subprocess.run", return_value=mock_result), \
+                 patch("run_sv_tests.parse_metadata", return_value={}):
                 run_sv_tests.main()
 
         assert get_exit_code(run) == 0 and "100.0%" in capsys.readouterr().out
@@ -152,7 +155,8 @@ class TestMain:
             with patch("sys.argv", ["run_sv_tests.py", "--junit-xml", xml_path]), \
                  patch("run_sv_tests.check_binary"), \
                  patch("run_sv_tests.glob.glob", return_value=fake_paths), \
-                 patch("run_sv_tests.subprocess.run", return_value=mock_result):
+                 patch("run_sv_tests.subprocess.run", return_value=mock_result), \
+                 patch("run_sv_tests.parse_metadata", return_value={}):
                 run_sv_tests.main()
 
         get_exit_code(run)

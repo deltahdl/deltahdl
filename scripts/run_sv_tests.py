@@ -2,16 +2,20 @@
 """Run CHIPS Alliance sv-tests against deltahdl (advisory)."""
 
 import argparse
+import ast
 import glob
+import operator
+import os
 import re
 import subprocess
 import sys
 import time
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-from test_common import BINARY, RED, REPO_ROOT, RESET, check_binary, print_result
+from test_common import BINARY, GREEN, RED, REPO_ROOT, RESET, check_binary, print_result
 
 TEST_DIR = REPO_ROOT / "third_party" / "sv-tests" / "tests"
 
@@ -40,19 +44,88 @@ def collect_tests():
     return sorted(glob.glob(pattern), key=_natural_sort_key)
 
 
-def run_test(path):
-    """Run deltahdl --lint-only on a single .sv file.
+def parse_metadata(path):
+    """Parse sv-tests metadata from a .sv file header comment."""
+    text = Path(path).read_text(encoding="utf-8")
+    match = re.search(r"/\*(.*?)\*/", text, re.DOTALL)
+    if not match:
+        return {}
+    metadata = {}
+    for line in match.group(1).splitlines():
+        m = re.match(r"\s*:(\w+):\s*(.*)", line)
+        if m:
+            metadata[m.group(1)] = m.group(2).strip()
+    return metadata
 
-    Returns (passed, stderr) tuple.
+
+_COMPARE_OPS = {
+    ast.Eq: operator.eq,
+    ast.NotEq: operator.ne,
+    ast.Lt: operator.lt,
+    ast.LtE: operator.le,
+    ast.Gt: operator.gt,
+    ast.GtE: operator.ge,
+    ast.In: lambda a, b: operator.contains(b, a),
+    ast.NotIn: lambda a, b: not operator.contains(b, a),
+}
+
+
+def eval_node(node):
+    """Evaluate an AST node containing only constants and comparisons."""
+    if isinstance(node, ast.Constant):
+        return node.value
+    if isinstance(node, ast.Compare):
+        left = eval_node(node.left)
+        for op, comp in zip(node.ops, node.comparators):
+            right = eval_node(comp)
+            if not _COMPARE_OPS[type(op)](left, right):
+                return False
+            left = right
+        return True
+    if isinstance(node, ast.BoolOp):
+        vals = [eval_node(v) for v in node.values]
+        if isinstance(node.op, ast.And):
+            return all(vals)
+        return any(vals)
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not):
+        return not eval_node(node.operand)
+    raise ValueError(f"Unsupported node: {type(node).__name__}")
+
+
+def check_assertions(stdout):
+    """Evaluate :assert: patterns in simulation output."""
+    for line in stdout.splitlines():
+        match = re.search(r":assert:\s*(.*)", line)
+        if not match:
+            continue
+        expr = match.group(1).strip()
+        try:
+            tree = ast.parse(expr, mode="eval")
+            if not eval_node(tree.body):
+                return False, f"Assertion failed: {expr}"
+        except (SyntaxError, ValueError) as exc:
+            return False, f"Assertion error: {expr}: {exc}"
+    return True, ""
+
+
+def run_test(path, simulate=False):
+    """Run deltahdl on a single .sv file.
+
+    Returns (passed, stderr_or_detail) tuple.
     """
+    cmd = [str(BINARY), path] if simulate else [str(BINARY), "--lint-only", path]
     result = subprocess.run(
-        [str(BINARY), "--lint-only", path],
+        cmd,
         capture_output=True,
         timeout=30,
         check=False,
         text=True,
     )
-    return result.returncode == 0, result.stderr
+    if not simulate:
+        return result.returncode == 0, result.stderr
+    if result.returncode != 0:
+        return False, result.stderr
+    return check_assertions(result.stdout)
 
 
 def chapter_from_path(path):
@@ -60,8 +133,8 @@ def chapter_from_path(path):
     return Path(path).parent.name
 
 
-def print_chapter_breakdown(results):
-    """Print per-chapter pass/fail summary as a box-drawing table."""
+def _aggregate_chapters(results):
+    """Aggregate results into sorted (name, passed, total, pct) row tuples."""
     chapters = defaultdict(lambda: {"passed": 0, "failed": 0})
     for r in results:
         bucket = chapters[r["chapter"]]
@@ -69,15 +142,18 @@ def print_chapter_breakdown(results):
             bucket["passed"] += 1
         else:
             bucket["failed"] += 1
-
-    names = sorted(chapters, key=_natural_sort_key)
     rows = []
-    for name in names:
+    for name in sorted(chapters, key=_natural_sort_key):
         c = chapters[name]
         total = c["passed"] + c["failed"]
         pct = 100.0 * c["passed"] / total if total else 0.0
         rows.append((name, str(c["passed"]), str(total), f"{pct:.1f}%"))
+    return rows
 
+
+def print_chapter_breakdown(results):
+    """Print per-chapter pass/fail summary as a box-drawing table."""
+    rows = _aggregate_chapters(results)
     headers = ("Chapter", "Passed", "Sub-Total", "Percentage")
     widths = [
         max(len(h), max((len(row[i]) for row in rows), default=0))
@@ -87,16 +163,18 @@ def print_chapter_breakdown(results):
     def _border(left, mid, right):
         return left + mid.join("─" * (w + 2) for w in widths) + right
 
-    def _row(vals, aligns):
+    def _row(vals, aligns, color=""):
         cells = [f" {v:{a}{widths[i]}} " for i, (v, a) in enumerate(zip(vals, aligns))]
-        return "│" + "│".join(cells) + "│"
+        inner = "│".join(cells)
+        return f"│{color}{inner}{RESET}│" if color else "│" + inner + "│"
 
     print("\nPer-chapter breakdown:")
     print(_border("┌", "┬", "┐"))
     print(_row(headers, ["<"] * 4))
     print(_border("├", "┼", "┤"))
     for row in rows:
-        print(_row(row, ["<", ">", ">", ">"]))
+        color = GREEN if row[3] == "100.0%" else RED
+        print(_row(row, ["<", ">", ">", ">"], color))
     print(_border("└", "┴", "┘"))
 
 
@@ -141,31 +219,49 @@ def write_junit_xml(results, elapsed, filepath):
     tree.write(filepath, xml_declaration=True, encoding="unicode")
 
 
-def execute_single_test(path):
-    """Run one sv-test and return (result_dict, passed_flag)."""
+def build_result(path):
+    """Run one sv-test and return (result_dict, ok_int). Does not print."""
     name = Path(path).name
     chapter = chapter_from_path(path)
+    metadata = parse_metadata(path)
+    simulate = "simulation" in metadata.get("type", "").split()
+    should_fail = bool(metadata.get("should_fail_because"))
+
     t0 = time.monotonic()
     stderr = ""
     try:
-        ok, stderr = run_test(path)
+        ok, stderr = run_test(path, simulate=simulate)
         dt = time.monotonic() - t0
-        print_result(ok, name)
+        if should_fail:
+            ok = not ok
         status = "pass" if ok else "fail"
         ok_int = int(ok)
     except subprocess.TimeoutExpired:
         dt = time.monotonic() - t0
         status = "timeout"
         ok_int = 0
-        print(f"  {RED}TIMEOUT{RESET}: {name}", flush=True)
 
-    result = {
+    return {
         "name": name,
         "chapter": chapter,
         "status": status,
         "time": dt,
         "stderr": stderr,
-    }
+    }, ok_int
+
+
+def print_status(result, ok_int):
+    """Print PASS/FAIL/TIMEOUT for a single test result."""
+    if result["status"] == "timeout":
+        print(f"  {RED}TIMEOUT{RESET}: {result['name']}", flush=True)
+    else:
+        print_result(bool(ok_int), result["name"])
+
+
+def execute_single_test(path):
+    """Run one sv-test, print result, and return (result_dict, ok_int)."""
+    result, ok_int = build_result(path)
+    print_status(result, ok_int)
     return result, ok_int
 
 
@@ -184,10 +280,11 @@ def main():
     passed = 0
     suite_start = time.monotonic()
 
-    for path in tests:
-        result, ok = execute_single_test(path)
-        results.append(result)
-        passed += ok
+    with ThreadPoolExecutor(max_workers=os.cpu_count()) as pool:
+        for result, ok in pool.map(build_result, tests):
+            print_status(result, ok)
+            results.append(result)
+            passed += ok
 
     failed = len(results) - passed
     pct = 100.0 * passed / len(results)
