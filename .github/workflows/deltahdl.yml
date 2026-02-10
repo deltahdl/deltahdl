@@ -1,7 +1,7 @@
 ---
 concurrency:
   cancel-in-progress: true
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: deltahdl-${{ github.event.workflow_run.head_branch }}
 jobs:
   assert-coverage:
     needs: e2e-test-coverage
@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -63,8 +65,8 @@ jobs:
               .branches.covered == .branches.count' \
             || { echo "FAIL: coverage must be 100%"; exit 1; }
       - if: >-
-          github.ref == 'refs/heads/main'
-          && github.event_name == 'push'
+          github.event.workflow_run.head_branch == 'main'
+          && github.event.workflow_run.event == 'push'
         name: Upload pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -73,8 +75,8 @@ jobs:
       # the repo settings need to be fixed (Settings > Pages > Source =
       # "GitHub Actions"), not the workflow.
       - if: >-
-          github.ref == 'refs/heads/main'
-          && github.event_name == 'push'
+          github.event.workflow_run.head_branch == 'main'
+          && github.event.workflow_run.event == 'push'
         name: Publish to GitHub Pages
         uses: actions/deploy-pages@v4
   build-coverage:
@@ -82,6 +84,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - name: Install Clang
         run: |
           sudo apt-get update
@@ -105,6 +109,8 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - name: Build
         run: |
           cmake -B build \
@@ -123,6 +129,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - name: Install Clang
         run: |
           sudo apt-get update
@@ -146,6 +154,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - name: Install Clang
         run: |
           sudo apt-get update
@@ -169,6 +179,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - name: Install compiler
         run: |
           sudo apt-get update
@@ -191,6 +203,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - name: Install compiler
         run: |
           sudo apt-get update
@@ -265,6 +279,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -285,6 +301,8 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -302,6 +320,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -318,6 +338,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -332,6 +354,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -346,6 +370,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -355,6 +381,11 @@ jobs:
         run: chmod +x build/src/deltahdl
       - name: E2E tests
         run: python3 scripts/run_sim_tests.py
+  gate:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo "Tools workflow passed"
   # DO NOT lower the sv-tests pass threshold. Every failing test
   # represents a real LRM conformance gap — lowering it hides parser
   # and elaboration bugs instead of fixing them.
@@ -369,6 +400,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - name: Restore sv-tests cache
         uses: actions/cache/restore@v4
         with:
@@ -395,6 +428,8 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - name: Restore sv-tests cache
         uses: actions/cache/restore@v4
         with:
@@ -418,6 +453,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - name: Restore sv-tests cache
         uses: actions/cache/restore@v4
         with:
@@ -440,6 +477,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - name: Restore sv-tests cache
         uses: actions/cache/restore@v4
         with:
@@ -460,6 +499,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - name: Restore sv-tests cache
         uses: actions/cache/restore@v4
         with:
@@ -480,6 +521,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - name: Restore sv-tests cache
         uses: actions/cache/restore@v4
         with:
@@ -497,8 +540,8 @@ jobs:
         run: python3 scripts/run_sv_tests.py
   release:
     if: >-
-      github.ref == 'refs/heads/main'
-      && github.event_name == 'push'
+      github.event.workflow_run.head_branch == 'main'
+      && github.event.workflow_run.event == 'push'
     needs:
       - assert-coverage
       - e2e-test-macos-26-arm64-clang
@@ -513,6 +556,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha }}
       - name: Download Ubuntu build
         uses: actions/download-artifact@v4
         with:
@@ -554,32 +598,22 @@ jobs:
           git tag -f latest
           git push origin latest --force
   static-analysis:
+    needs: gate
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - name: Install tools
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             clang-18 clang-tidy-18 clang-format-18
-          pip install yamllint pylint mypy
-          npm install -g jscpd
           PMD=pmd-dist-7.21.0-bin.zip
           PMD_URL=https://github.com/pmd/pmd/releases
           wget -q "$PMD_URL/download/pmd_releases%2F7.21.0/$PMD"
           unzip -q pmd-dist-7.21.0-bin.zip
           echo "$PWD/pmd-bin-7.21.0/bin" >> "$GITHUB_PATH"
-      - name: Lint YAML
-        run: |
-          EMPTY='empty-lines: {max: 0, max-start: 0, max-end: 1}'
-          KEY='key-ordering: enable'
-          NL='new-line-at-end-of-file: enable'
-          TR='truthy: {allowed-values: ["true", "false", "on"]}'
-          RULES="$EMPTY, $KEY, $NL, $TR"
-          yamllint --strict \
-            --config-data \
-            "{extends: default, rules: {$RULES}}" \
-            .github/workflows/*.yml
       - name: Check formatting
         run: |
           find src test -name '*.cpp' -o -name '*.h' | \
@@ -617,16 +651,6 @@ jobs:
           --extra-arg=-ferror-limit=0
           --extra-arg=-w
           --warnings-as-errors='*'
-      - name: Run pylint
-        run: >-
-          python3 -m pylint scripts/
-          --fail-on=C,R,W --fail-under=10.0
-      - name: Run mypy
-        run: python3 -m mypy scripts/
-      - name: Detect Python copy-paste
-        run: >-
-          jscpd --pattern "**/*.py" --threshold 0
-          --reporters console scripts/
   unit-test-coverage:
     env:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
@@ -634,6 +658,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -658,6 +684,8 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -675,6 +703,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -695,6 +725,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -713,6 +745,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -731,6 +765,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -744,10 +780,8 @@ jobs:
         run: cmake --build build --parallel 2
       - name: Unit tests
         run: ctest --test-dir build --output-on-failure --label-exclude e2e
-name: CI
+name: DeltaHDL
 on:
-  pull_request:
-    paths-ignore: ["docs/**", "*.md", LICENSE]
-  push:
-    branches: [main]
-    paths-ignore: ["docs/**", "*.md", LICENSE]
+  workflow_run:
+    types: [completed]
+    workflows: [Tools]

@@ -1,0 +1,153 @@
+---
+concurrency:
+  cancel-in-progress: true
+  group: tools-${{ github.ref }}
+jobs:
+  # ── Lane: run_sim_tests ──
+  e2e-test-run-sim-tests:
+    needs: integration-test-run-sim-tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pytest
+        run: pip install pytest
+      - name: Run e2e tests
+        run: >-
+          python3 -m pytest
+          test/scripts/run_sim_tests/e2e/ -v
+  # ── Lane: run_sv_tests ──
+  e2e-test-run-sv-tests:
+    needs: integration-test-run-sv-tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pytest
+        run: pip install pytest
+      - name: Run e2e tests
+        run: >-
+          python3 -m pytest
+          test/scripts/run_sv_tests/e2e/ -v
+  # ── Lane: test_common ──
+  e2e-test-test-common:
+    needs: integration-test-test-common
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pytest
+        run: pip install pytest
+      - name: Run e2e tests
+        run: >-
+          python3 -m pytest
+          test/scripts/test_common/e2e/ -v
+  integration-test-run-sim-tests:
+    needs: unit-test-run-sim-tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pytest
+        run: pip install pytest
+      - name: Run integration tests
+        run: >-
+          python3 -m pytest
+          test/scripts/run_sim_tests/integration/ -v
+  integration-test-run-sv-tests:
+    needs: unit-test-run-sv-tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pytest
+        run: pip install pytest
+      - name: Run integration tests
+        run: >-
+          python3 -m pytest
+          test/scripts/run_sv_tests/integration/ -v
+  integration-test-test-common:
+    needs: unit-test-test-common
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pytest
+        run: pip install pytest
+      - name: Run integration tests
+        run: >-
+          python3 -m pytest
+          test/scripts/test_common/integration/ -v
+  # ── Gate: static analysis for all scripts ──
+  static-analysis:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: |
+          pip install yamllint pylint mypy
+          npm install -g jscpd
+      - name: Lint YAML
+        run: |
+          EMPTY='empty-lines: {max: 0, max-start: 0, max-end: 1}'
+          KEY='key-ordering: enable'
+          NL='new-line-at-end-of-file: enable'
+          TR='truthy: {allowed-values: ["true", "false", "on"]}'
+          RULES="$EMPTY, $KEY, $NL, $TR"
+          yamllint --strict \
+            --config-data \
+            "{extends: default, rules: {$RULES}}" \
+            .github/workflows/*.yml
+      - name: Run pylint
+        run: >-
+          python3 -m pylint scripts/
+          --fail-on=C,R,W --fail-under=10.0
+      - name: Run mypy
+        run: python3 -m mypy scripts/
+      - name: Detect Python copy-paste
+        run: >-
+          jscpd --pattern "**/*.py" --threshold 0
+          --reporters console scripts/
+  # ── Trigger ──
+  trigger-deltahdl-ci:
+    needs:
+      - e2e-test-run-sim-tests
+      - e2e-test-run-sv-tests
+      - e2e-test-test-common
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo "All tools tests passed"
+  unit-test-run-sim-tests:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pytest
+        run: pip install pytest
+      - name: Run unit tests
+        run: >-
+          python3 -m pytest
+          test/scripts/run_sim_tests/unit/ -v
+  unit-test-run-sv-tests:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pytest
+        run: pip install pytest
+      - name: Run unit tests
+        run: >-
+          python3 -m pytest
+          test/scripts/run_sv_tests/unit/ -v
+  unit-test-test-common:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pytest
+        run: pip install pytest
+      - name: Run unit tests
+        run: >-
+          python3 -m pytest
+          test/scripts/test_common/unit/ -v
+name: Tools
+on:
+  pull_request:
+    paths-ignore: ["docs/**", "*.md", LICENSE]
+  push:
+    branches: [main]
+    paths-ignore: ["docs/**", "*.md", LICENSE]
