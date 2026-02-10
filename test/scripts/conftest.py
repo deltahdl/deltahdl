@@ -1,6 +1,5 @@
 """Shared fixtures for scripts test suite."""
 
-import os
 import stat
 import sys
 from pathlib import Path
@@ -14,13 +13,17 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 
+def _shell_quote(s):
+    """Quote a string for use in a shell script."""
+    return "'" + s.replace("'", "'\\''") + "'"
+
+
 @pytest.fixture()
 def stub_binary(tmp_path):
     """Create a stub deltahdl binary for testing.
 
     Returns a factory function: call it with (exit_code, stdout, stderr)
     to get a Path to an executable shell script that behaves accordingly.
-    The returned path is also patched into test_common.BINARY.
     """
 
     def _make(exit_code=0, stdout="", stderr=""):
@@ -39,16 +42,17 @@ def stub_binary(tmp_path):
 
 
 @pytest.fixture()
-def patch_binary(stub_binary):
+def patch_binary(request):
     """Patch test_common.BINARY to point at a stub binary.
 
     Returns a factory: call it with (exit_code, stdout, stderr) and the
     patch is applied for the duration of the test.
     """
+    make_stub = request.getfixturevalue("stub_binary")
     patches = []
 
     def _make(exit_code=0, stdout="", stderr=""):
-        binary = stub_binary(exit_code, stdout, stderr)
+        binary = make_stub(exit_code, stdout, stderr)
         p = patch("test_common.BINARY", binary)
         p.start()
         patches.append(p)
@@ -60,6 +64,18 @@ def patch_binary(stub_binary):
         p.stop()
 
 
-def _shell_quote(s):
-    """Quote a string for use in a shell script."""
-    return "'" + s.replace("'", "'\\''") + "'"
+@pytest.fixture()
+def get_exit_code():
+    """Return a helper that calls func() and captures its SystemExit code.
+
+    Returns None if func() returns normally (no SystemExit raised).
+    """
+
+    def _capture(func):
+        try:
+            func()
+        except SystemExit as exc:
+            return exc.code
+        return None
+
+    return _capture

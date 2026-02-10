@@ -4,8 +4,6 @@ import subprocess
 from unittest.mock import MagicMock, patch
 from xml.etree import ElementTree as ET
 
-import pytest
-
 import run_sv_tests
 
 
@@ -33,50 +31,48 @@ class TestRunTest:
         """run_test() should return (True, '') when subprocess exits 0."""
         mock_result = MagicMock(returncode=0, stderr="")
         with patch("run_sv_tests.subprocess.run", return_value=mock_result):
-            passed, stderr = run_sv_tests.run_test("/fake/test.sv")
-        assert passed is True
-        assert stderr == ""
+            actual = run_sv_tests.run_test("/fake/test.sv")
+        assert actual == (True, "")
 
     def test_returns_false_on_nonzero_exit(self):
         """run_test() should return (False, stderr) on non-zero exit."""
         mock_result = MagicMock(returncode=1, stderr="parse error\n")
         with patch("run_sv_tests.subprocess.run", return_value=mock_result):
-            passed, stderr = run_sv_tests.run_test("/fake/test.sv")
-        assert passed is False
-        assert stderr == "parse error\n"
+            actual = run_sv_tests.run_test("/fake/test.sv")
+        assert actual == (False, "parse error\n")
 
     def test_timeout_propagates(self):
         """run_test() does not catch TimeoutExpired; it propagates."""
+        raised = False
         with patch(
             "run_sv_tests.subprocess.run",
             side_effect=subprocess.TimeoutExpired(cmd="x", timeout=30),
         ):
-            with pytest.raises(subprocess.TimeoutExpired):
+            try:
                 run_sv_tests.run_test("/fake/test.sv")
+            except subprocess.TimeoutExpired:
+                raised = True
+        assert raised
 
 
-class TestChapterFromPath:
-    """Tests for the chapter_from_path() function."""
-
-    def test_extracts_chapter_directory(self):
-        """chapter_from_path() should return the parent directory name."""
-        assert run_sv_tests.chapter_from_path("/a/chapter-5/foo.sv") == "chapter-5"
+def test_chapter_from_path_extracts_chapter_directory():
+    """chapter_from_path() should return the parent directory name."""
+    assert run_sv_tests.chapter_from_path("/a/chapter-5/foo.sv") == "chapter-5"
 
 
-class TestPrintChapterBreakdown:
-    """Tests for the print_chapter_breakdown() function."""
-
-    def test_groups_pass_fail_by_chapter(self, capsys):
-        """print_chapter_breakdown() should print per-chapter counts."""
-        results = [
-            {"chapter": "chapter-5", "status": "pass"},
-            {"chapter": "chapter-5", "status": "fail"},
-            {"chapter": "chapter-6", "status": "pass"},
-        ]
-        run_sv_tests.print_chapter_breakdown(results)
-        captured = capsys.readouterr().out
-        assert "chapter-5: 1/2 passed" in captured
-        assert "chapter-6: 1/1 passed" in captured
+def test_print_chapter_breakdown_groups_pass_fail_by_chapter(capsys):
+    """print_chapter_breakdown() should print per-chapter counts."""
+    results = [
+        {"chapter": "chapter-5", "status": "pass"},
+        {"chapter": "chapter-5", "status": "fail"},
+        {"chapter": "chapter-6", "status": "pass"},
+    ]
+    run_sv_tests.print_chapter_breakdown(results)
+    captured = capsys.readouterr().out
+    assert all(
+        s in captured
+        for s in ("chapter-5: 1/2 passed", "chapter-6: 1/1 passed")
+    )
 
 
 class TestWriteJunitXml:
@@ -101,10 +97,12 @@ class TestWriteJunitXml:
 
         tree = ET.parse(filepath)
         root = tree.getroot()
-        assert root.tag == "testsuite"
-        assert root.attrib["tests"] == "3"
-        assert root.attrib["failures"] == "1"
-        assert root.attrib["errors"] == "1"
+        assert (
+            root.tag,
+            root.attrib["tests"],
+            root.attrib["failures"],
+            root.attrib["errors"],
+        ) == ("testsuite", "3", "1", "1")
 
     def test_failure_elements_present(self, tmp_path):
         """write_junit_xml() should include <failure> for failed tests."""
@@ -114,9 +112,11 @@ class TestWriteJunitXml:
 
         tree = ET.parse(filepath)
         failures = tree.findall(".//failure")
-        assert len(failures) == 1
-        assert "b.sv" in failures[0].attrib["message"]
-        assert failures[0].text == "error msg"
+        assert (
+            len(failures) == 1
+            and "b.sv" in failures[0].attrib["message"]
+            and failures[0].text == "error msg"
+        )
 
     def test_error_elements_present(self, tmp_path):
         """write_junit_xml() should include <error> for timed-out tests."""
@@ -126,6 +126,8 @@ class TestWriteJunitXml:
 
         tree = ET.parse(filepath)
         errors = tree.findall(".//error")
-        assert len(errors) == 1
-        assert "c.sv" in errors[0].attrib["message"]
-        assert "30s timeout" in errors[0].text
+        assert (
+            len(errors) == 1
+            and "c.sv" in errors[0].attrib["message"]
+            and "30s timeout" in errors[0].text
+        )

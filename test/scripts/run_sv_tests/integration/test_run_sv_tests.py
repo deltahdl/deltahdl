@@ -1,6 +1,7 @@
 """Integration tests for run_sv_tests module."""
 
 import subprocess
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 from xml.etree import ElementTree as ET
 
@@ -17,17 +18,17 @@ class TestExecuteSingleTest:
             result, ok = run_sv_tests.execute_single_test(
                 "/tests/chapter-5/foo.sv"
             )
-        assert ok == 1
-        required_keys = {"name", "chapter", "status", "time", "stderr"}
-        assert required_keys == set(result.keys())
-        assert result["name"] == "foo.sv"
-        assert result["chapter"] == "chapter-5"
-        assert result["status"] == "pass"
-        assert result["time"] >= 0
-        assert result["stderr"] == ""
-
         captured = capsys.readouterr().out
-        assert "PASS" in captured
+        assert (
+            ok == 1
+            and set(result.keys()) == {"name", "chapter", "status", "time", "stderr"}
+            and result["name"] == "foo.sv"
+            and result["chapter"] == "chapter-5"
+            and result["status"] == "pass"
+            and result["time"] >= 0
+            and result["stderr"] == ""
+            and "PASS" in captured
+        )
 
     def test_timeout_produces_timeout_status(self, capsys):
         """execute_single_test() should catch TimeoutExpired and set status."""
@@ -38,67 +39,63 @@ class TestExecuteSingleTest:
             result, ok = run_sv_tests.execute_single_test(
                 "/tests/chapter-5/bar.sv"
             )
-        assert ok == 0
-        assert result["status"] == "timeout"
-        assert result["name"] == "bar.sv"
-
         captured = capsys.readouterr().out
-        assert "TIMEOUT" in captured
+        assert (
+            ok == 0
+            and result["status"] == "timeout"
+            and result["name"] == "bar.sv"
+            and "TIMEOUT" in captured
+        )
 
 
-class TestCollectAndExecutePipeline:
-    """Test the collect_tests -> execute_single_test pipeline."""
+def test_pipeline_produces_correct_result_list():
+    """Collecting tests and executing them yields correct result dicts."""
+    fake_paths = ["/tests/chapter-5/a.sv", "/tests/chapter-6/b.sv"]
+    mock_result = MagicMock(returncode=0, stderr="")
 
-    def test_pipeline_produces_correct_result_list(self, capsys):
-        """Collecting tests and executing them yields correct result dicts."""
-        fake_paths = ["/tests/chapter-5/a.sv", "/tests/chapter-6/b.sv"]
-        mock_result = MagicMock(returncode=0, stderr="")
+    with patch("run_sv_tests.glob.glob", return_value=fake_paths), \
+         patch("run_sv_tests.subprocess.run", return_value=mock_result):
+        tests = run_sv_tests.collect_tests()
+        results = []
+        for path in tests:
+            result, _ = run_sv_tests.execute_single_test(path)
+            results.append(result)
 
-        with patch("run_sv_tests.glob.glob", return_value=fake_paths), \
-             patch("run_sv_tests.subprocess.run", return_value=mock_result):
-            tests = run_sv_tests.collect_tests()
-            results = []
-            for path in tests:
-                result, _ = run_sv_tests.execute_single_test(path)
-                results.append(result)
-
-        assert len(results) == 2
-        assert results[0]["name"] == "a.sv"
-        assert results[0]["chapter"] == "chapter-5"
-        assert results[1]["name"] == "b.sv"
-        assert results[1]["chapter"] == "chapter-6"
+    assert (
+        len(results) == 2
+        and results[0]["name"] == "a.sv"
+        and results[0]["chapter"] == "chapter-5"
+        and results[1]["name"] == "b.sv"
+        and results[1]["chapter"] == "chapter-6"
+    )
 
 
-class TestWriteJunitXmlRoundTrip:
-    """Test that write_junit_xml() produces parseable, correct XML."""
+def test_write_junit_xml_round_trip_preserves_structure(tmp_path):
+    """Write XML, parse it back, verify full structure."""
+    results = [
+        {"name": "x.sv", "chapter": "chapter-5", "status": "pass",
+         "time": 0.5, "stderr": ""},
+        {"name": "y.sv", "chapter": "chapter-5", "status": "fail",
+         "time": 0.3, "stderr": "lint error"},
+    ]
+    filepath = str(tmp_path / "results.xml")
+    run_sv_tests.write_junit_xml(results, 1.0, filepath)
 
-    def test_round_trip_preserves_structure(self, tmp_path):
-        """Write XML, parse it back, verify full structure."""
-        results = [
-            {"name": "x.sv", "chapter": "chapter-5", "status": "pass",
-             "time": 0.5, "stderr": ""},
-            {"name": "y.sv", "chapter": "chapter-5", "status": "fail",
-             "time": 0.3, "stderr": "lint error"},
-        ]
-        filepath = str(tmp_path / "results.xml")
-        run_sv_tests.write_junit_xml(results, 1.0, filepath)
-
-        tree = ET.parse(filepath)
-        root = tree.getroot()
-        assert root.tag == "testsuite"
-        assert root.attrib["name"] == "sv-tests"
-
-        testcases = root.findall("testcase")
-        assert len(testcases) == 2
-        names = [tc.attrib["name"] for tc in testcases]
-        assert "x.sv" in names
-        assert "y.sv" in names
-
-        # The failing test case should have a <failure> child.
-        fail_tc = [tc for tc in testcases if tc.attrib["name"] == "y.sv"][0]
-        failures = fail_tc.findall("failure")
-        assert len(failures) == 1
-        assert failures[0].text == "lint error"
+    tree = ET.parse(filepath)
+    root = tree.getroot()
+    testcases = root.findall("testcase")
+    names = [tc.attrib["name"] for tc in testcases]
+    fail_tc = [tc for tc in testcases if tc.attrib["name"] == "y.sv"][0]
+    failures = fail_tc.findall("failure")
+    assert (
+        root.tag == "testsuite"
+        and root.attrib["name"] == "sv-tests"
+        and len(testcases) == 2
+        and "x.sv" in names
+        and "y.sv" in names
+        and len(failures) == 1
+        and failures[0].text == "lint error"
+    )
 
 
 class TestParseArgs:
@@ -115,3 +112,48 @@ class TestParseArgs:
         with patch("sys.argv", ["run_sv_tests.py"]):
             args = run_sv_tests.parse_args()
         assert args.junit_xml is None
+
+
+class TestMain:
+    """Tests for the main() function."""
+
+    def test_all_pass_exits_zero(self, get_exit_code):
+        """main() exits 0 when all sv-tests pass."""
+        fake_paths = ["/tests/chapter-5/a.sv"]
+        mock_result = MagicMock(returncode=0, stderr="")
+
+        def run():
+            with patch("sys.argv", ["run_sv_tests.py"]), \
+                 patch("run_sv_tests.check_binary"), \
+                 patch("run_sv_tests.glob.glob", return_value=fake_paths), \
+                 patch("run_sv_tests.subprocess.run", return_value=mock_result):
+                run_sv_tests.main()
+
+        assert get_exit_code(run) == 0
+
+    def test_no_tests_exits_one(self, get_exit_code):
+        """main() exits 1 when no .sv files are found."""
+
+        def run():
+            with patch("sys.argv", ["run_sv_tests.py"]), \
+                 patch("run_sv_tests.check_binary"), \
+                 patch("run_sv_tests.glob.glob", return_value=[]):
+                run_sv_tests.main()
+
+        assert get_exit_code(run) == 1
+
+    def test_writes_junit_xml(self, tmp_path, get_exit_code):
+        """main() writes JUnit XML when --junit-xml is given."""
+        xml_path = str(tmp_path / "report.xml")
+        fake_paths = ["/tests/chapter-5/a.sv"]
+        mock_result = MagicMock(returncode=0, stderr="")
+
+        def run():
+            with patch("sys.argv", ["run_sv_tests.py", "--junit-xml", xml_path]), \
+                 patch("run_sv_tests.check_binary"), \
+                 patch("run_sv_tests.glob.glob", return_value=fake_paths), \
+                 patch("run_sv_tests.subprocess.run", return_value=mock_result):
+                run_sv_tests.main()
+
+        get_exit_code(run)
+        assert Path(xml_path).exists()

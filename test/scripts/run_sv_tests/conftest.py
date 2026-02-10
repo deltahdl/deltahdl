@@ -1,7 +1,5 @@
 """Fixtures specific to run_sv_tests tests."""
 
-from pathlib import Path
-
 import pytest
 
 

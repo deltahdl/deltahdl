@@ -3,7 +3,6 @@
 import subprocess
 import sys
 import textwrap
-from pathlib import Path
 
 import test_common
 
@@ -40,53 +39,38 @@ def _run_sim_script(test_dir, binary_path):
     )
 
 
-class TestAllPassing:
-    """E2E test: all tests pass -> exit 0."""
+def test_exit_zero_when_all_pass(tmp_path, stub_binary):
+    """Script should exit 0 when stub binary echoes expected output."""
+    test_dir = tmp_path / "tests"
+    test_dir.mkdir()
+    (test_dir / "hello.sv").write_text("module hello; endmodule\n")
+    (test_dir / "hello.expected").write_text("Hello, World!\n")
 
-    def test_exit_zero_when_all_pass(self, tmp_path, stub_binary):
-        """Script should exit 0 when stub binary echoes expected output."""
-        test_dir = tmp_path / "tests"
-        test_dir.mkdir()
-        (test_dir / "hello.sv").write_text("module hello; endmodule\n")
-        (test_dir / "hello.expected").write_text("Hello, World!\n")
+    binary = stub_binary(exit_code=0, stdout="Hello, World!\n")
+    result = _run_sim_script(test_dir, binary)
 
-        binary = stub_binary(exit_code=0, stdout="Hello, World!\n")
-        result = _run_sim_script(test_dir, binary)
-
-        assert result.returncode == 0, (
-            f"Expected exit 0, got {result.returncode}\n"
-            f"stdout: {result.stdout}\nstderr: {result.stderr}"
-        )
+    assert result.returncode == 0
 
 
-class TestFailingTest:
-    """E2E test: mismatched output -> exit 1 with diff."""
+def test_exit_one_with_diff_on_mismatch(tmp_path, stub_binary):
+    """Script should exit 1 and show diff when output mismatches."""
+    test_dir = tmp_path / "tests"
+    test_dir.mkdir()
+    (test_dir / "bad.sv").write_text("module bad; endmodule\n")
+    (test_dir / "bad.expected").write_text("expected output\n")
 
-    def test_exit_one_with_diff_on_mismatch(self, tmp_path, stub_binary):
-        """Script should exit 1 and show diff when output mismatches."""
-        test_dir = tmp_path / "tests"
-        test_dir.mkdir()
-        (test_dir / "bad.sv").write_text("module bad; endmodule\n")
-        (test_dir / "bad.expected").write_text("expected output\n")
+    binary = stub_binary(exit_code=0, stdout="wrong output\n")
+    result = _run_sim_script(test_dir, binary)
 
-        binary = stub_binary(exit_code=0, stdout="wrong output\n")
-        result = _run_sim_script(test_dir, binary)
-
-        assert result.returncode == 1
-        assert "expected output" in result.stdout or "expected" in result.stdout
+    assert result.returncode == 1 and "expected" in result.stdout
 
 
-class TestNoTestPairs:
-    """E2E test: no .sv/.expected pairs -> exit 1 with error."""
+def test_exit_one_with_error_when_no_pairs(tmp_path, stub_binary):
+    """Script should exit 1 and print error when no test pairs exist."""
+    test_dir = tmp_path / "tests"
+    test_dir.mkdir()
 
-    def test_exit_one_with_error_when_no_pairs(self, tmp_path, stub_binary):
-        """Script should exit 1 and print error when no test pairs exist."""
-        test_dir = tmp_path / "tests"
-        test_dir.mkdir()
-        # No .sv/.expected pairs at all.
+    binary = stub_binary(exit_code=0, stdout="")
+    result = _run_sim_script(test_dir, binary)
 
-        binary = stub_binary(exit_code=0, stdout="")
-        result = _run_sim_script(test_dir, binary)
-
-        assert result.returncode == 1
-        assert "error" in result.stderr
+    assert result.returncode == 1 and "error" in result.stderr

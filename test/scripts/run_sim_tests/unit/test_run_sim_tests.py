@@ -14,8 +14,7 @@ class TestCollectTests:
         with patch.object(run_sim_tests, "TEST_DIR", sim_test_tree):
             pairs = run_sim_tests.collect_tests()
         names = [sv.stem for sv, _ in pairs]
-        assert "hello" in names
-        assert "fail" in names
+        assert "hello" in names and "fail" in names
 
     def test_ignores_sv_without_expected(self, sim_test_tree):
         """collect_tests() should skip .sv files that lack a .expected."""
@@ -29,7 +28,7 @@ class TestCollectTests:
         (tmp_path / "readme.txt").write_text("nothing here\n")
         with patch.object(run_sim_tests, "TEST_DIR", tmp_path):
             pairs = run_sim_tests.collect_tests()
-        assert pairs == []
+        assert not pairs
 
 
 class TestRunTest:
@@ -45,9 +44,8 @@ class TestRunTest:
         mock_result = MagicMock()
         mock_result.stdout = "Hello, World!\n"
         with patch("run_sim_tests.subprocess.run", return_value=mock_result):
-            ok, detail = run_sim_tests.run_test(sv, expected)
-        assert ok is True
-        assert detail == ""
+            result = run_sim_tests.run_test(sv, expected)
+        assert result == (True, "")
 
     def test_returns_false_on_mismatched_output(self, tmp_path):
         """run_test() should return (False, diff) when stdout differs."""
@@ -60,9 +58,7 @@ class TestRunTest:
         mock_result.stdout = "wrong output\n"
         with patch("run_sim_tests.subprocess.run", return_value=mock_result):
             ok, detail = run_sim_tests.run_test(sv, expected)
-        assert ok is False
-        assert "expected output" in detail
-        assert "wrong output" in detail
+        assert not ok and "expected output" in detail and "wrong output" in detail
 
     def test_strips_trailing_newlines_before_comparing(self, tmp_path):
         """run_test() should strip trailing newlines from both sides."""
@@ -74,9 +70,8 @@ class TestRunTest:
         mock_result = MagicMock()
         mock_result.stdout = "output\n"
         with patch("run_sim_tests.subprocess.run", return_value=mock_result):
-            ok, detail = run_sim_tests.run_test(sv, expected)
-        assert ok is True
-        assert detail == ""
+            result = run_sim_tests.run_test(sv, expected)
+        assert result == (True, "")
 
     def test_returns_timeout_on_timeout_expired(self, tmp_path):
         """run_test() should return (False, 'TIMEOUT') on TimeoutExpired."""
@@ -89,6 +84,5 @@ class TestRunTest:
             "run_sim_tests.subprocess.run",
             side_effect=subprocess.TimeoutExpired(cmd="deltahdl", timeout=30),
         ):
-            ok, detail = run_sim_tests.run_test(sv, expected)
-        assert ok is False
-        assert detail == "TIMEOUT"
+            result = run_sim_tests.run_test(sv, expected)
+        assert result == (False, "TIMEOUT")

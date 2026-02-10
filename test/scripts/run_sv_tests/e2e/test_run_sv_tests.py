@@ -65,57 +65,50 @@ def _run_sv_tests(tmp_path, exit_code=0, extra_args=None):
         run_sv_tests.main()
     """)
 
-    result = subprocess.run(
+    return subprocess.run(
         [sys.executable, "-c", code],
         capture_output=True,
         text=True,
         timeout=30,
+        check=False,
         env={**os.environ, "NO_COLOR": "1"},
     )
-    return result
 
 
-class TestAllPass:
-    """E2E: all tests pass when the stub binary exits 0."""
-
-    def test_exit_zero_and_pass_in_output(self, tmp_path):
-        """With exit-0 stub, script exits 0 and stdout contains PASS."""
-        result = _run_sv_tests(tmp_path, exit_code=0)
-        assert result.returncode == 0, (
-            f"Expected exit 0, got {result.returncode}.\n"
-            f"stderr: {result.stderr}"
-        )
-        assert "PASS" in result.stdout
-        assert "summary" in result.stdout
+def test_all_pass_exit_zero_and_pass_in_output(tmp_path):
+    """With exit-0 stub, script exits 0 and stdout contains PASS."""
+    result = _run_sv_tests(tmp_path, exit_code=0)
+    assert (
+        result.returncode == 0
+        and "PASS" in result.stdout
+        and "summary" in result.stdout
+    )
 
 
-class TestAllFail:
-    """E2E: tests fail when the stub binary exits 1."""
-
-    def test_exit_one_and_fail_in_output(self, tmp_path):
-        """With exit-1 stub, script exits 1 and stdout contains FAIL."""
-        result = _run_sv_tests(tmp_path, exit_code=1)
-        assert result.returncode == 1
-        assert "FAIL" in result.stdout
+def test_all_fail_exit_one_and_fail_in_output(tmp_path):
+    """With exit-1 stub, script exits 1 and stdout contains FAIL."""
+    result = _run_sv_tests(tmp_path, exit_code=1)
+    assert result.returncode == 1 and "FAIL" in result.stdout
 
 
-class TestJunitXmlOutput:
-    """E2E: --junit-xml flag produces a valid XML report."""
+def test_junit_xml_exit_code(tmp_path):
+    """With --junit-xml, the script exits 0 when all tests pass."""
+    xml_path = str(tmp_path / "report.xml")
+    result = _run_sv_tests(
+        tmp_path, exit_code=0, extra_args=["--junit-xml", xml_path]
+    )
+    assert result.returncode == 0 and Path(xml_path).exists()
 
-    def test_xml_file_created(self, tmp_path):
-        """With --junit-xml, the script writes a parseable XML file."""
-        xml_path = str(tmp_path / "report.xml")
-        result = _run_sv_tests(
-            tmp_path, exit_code=0, extra_args=["--junit-xml", xml_path]
-        )
-        assert result.returncode == 0, (
-            f"Expected exit 0, got {result.returncode}.\n"
-            f"stderr: {result.stderr}"
-        )
-        assert Path(xml_path).exists(), "JUnit XML file was not created"
 
-        tree = ET.parse(xml_path)
-        root = tree.getroot()
-        assert root.tag == "testsuite"
-        assert root.attrib["tests"] == "2"
-        assert root.attrib["failures"] == "0"
+def test_junit_xml_structure(tmp_path):
+    """With --junit-xml, the script writes a parseable XML file."""
+    xml_path = str(tmp_path / "report.xml")
+    _run_sv_tests(
+        tmp_path, exit_code=0, extra_args=["--junit-xml", xml_path]
+    )
+
+    tree = ET.parse(xml_path)
+    root = tree.getroot()
+    assert (
+        root.tag, root.attrib["tests"], root.attrib["failures"]
+    ) == ("testsuite", "2", "0")
