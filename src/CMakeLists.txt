@@ -6,6 +6,7 @@ add_library(deltahdl_lib STATIC
     preprocessor/preprocessor.cpp
     lexer/keywords.cpp
     lexer/lexer.cpp
+    lexer/string_escape.cpp
     parser/parser.cpp
     parser/parser_decl.cpp
     parser/parser_generate.cpp

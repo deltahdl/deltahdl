@@ -4,6 +4,7 @@
 #include "common/source_mgr.h"
 #include "lexer/keywords.h"
 #include "lexer/lexer.h"
+#include "lexer/string_escape.h"
 
 using namespace delta;
 
@@ -618,4 +619,46 @@ TEST(Lexer, TripleQuotedString_WithEscape) {
   auto tokens = lex(R"("""hello\nworld""")");
   ASSERT_EQ(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
+}
+
+// --- §5.9.1: String escape sequence interpretation ---
+
+TEST(Lexer, InterpretEscapes_NamedChars) {
+  using delta::InterpretStringEscapes;
+  EXPECT_EQ(InterpretStringEscapes(R"(hello\nworld)"), "hello\nworld");
+  EXPECT_EQ(InterpretStringEscapes(R"(a\tb)"), "a\tb");
+  EXPECT_EQ(InterpretStringEscapes(R"(a\\b)"), "a\\b");
+  EXPECT_EQ(InterpretStringEscapes(R"(a\"b)"), "a\"b");
+  EXPECT_EQ(InterpretStringEscapes(R"(a\vb)"), std::string("a\vb"));
+  EXPECT_EQ(InterpretStringEscapes(R"(a\fb)"), std::string("a\fb"));
+  EXPECT_EQ(InterpretStringEscapes(R"(a\ab)"), std::string("a\ab"));
+}
+
+TEST(Lexer, InterpretEscapes_Octal) {
+  using delta::InterpretStringEscapes;
+  EXPECT_EQ(InterpretStringEscapes(R"(\101)"), "A");      // 0101 = 65 = 'A'
+  EXPECT_EQ(InterpretStringEscapes(R"(\12)"), "\n");      // 012 = 10 = newline
+  EXPECT_EQ(InterpretStringEscapes(R"(\7)"), "\a");       // 07 = 7 = bell
+  EXPECT_EQ(InterpretStringEscapes(R"(\101BC)"), "ABC");  // \101 then BC
+}
+
+TEST(Lexer, InterpretEscapes_Hex) {
+  using delta::InterpretStringEscapes;
+  EXPECT_EQ(InterpretStringEscapes(R"(\x41)"), "A");   // 0x41 = 65 = 'A'
+  EXPECT_EQ(InterpretStringEscapes(R"(\x0A)"), "\n");  // 0x0A = newline
+  EXPECT_EQ(InterpretStringEscapes(R"(\xAhello)"),
+            "\nhello");  // single hex digit
+}
+
+TEST(Lexer, InterpretEscapes_Unknown) {
+  using delta::InterpretStringEscapes;
+  // Unknown escape: treated as if not escaped (§5.9.1)
+  EXPECT_EQ(InterpretStringEscapes(R"(\b)"), "b");
+  EXPECT_EQ(InterpretStringEscapes(R"(\q)"), "q");
+}
+
+TEST(Lexer, InterpretEscapes_NoEscapes) {
+  using delta::InterpretStringEscapes;
+  EXPECT_EQ(InterpretStringEscapes("hello world"), "hello world");
+  EXPECT_EQ(InterpretStringEscapes(""), "");
 }
