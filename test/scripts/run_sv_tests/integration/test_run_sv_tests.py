@@ -117,8 +117,8 @@ class TestParseArgs:
 class TestMain:
     """Tests for the main() function."""
 
-    def test_all_pass_exits_zero(self, get_exit_code):
-        """main() exits 0 when all sv-tests pass."""
+    def test_all_pass_exits_zero_with_percentage(self, capsys, get_exit_code):
+        """main() exits 0 and summary includes pass percentage."""
         fake_paths = ["/tests/chapter-5/a.sv"]
         mock_result = MagicMock(returncode=0, stderr="")
 
@@ -129,22 +129,7 @@ class TestMain:
                  patch("run_sv_tests.subprocess.run", return_value=mock_result):
                 run_sv_tests.main()
 
-        assert get_exit_code(run) == 0
-
-    def test_summary_includes_percentage(self, capsys, get_exit_code):
-        """main() summary line should include pass percentage."""
-        fake_paths = ["/tests/chapter-5/a.sv", "/tests/chapter-5/b.sv"]
-        mock_result = MagicMock(returncode=0, stderr="")
-
-        def run():
-            with patch("sys.argv", ["run_sv_tests.py"]), \
-                 patch("run_sv_tests.check_binary"), \
-                 patch("run_sv_tests.glob.glob", return_value=fake_paths), \
-                 patch("run_sv_tests.subprocess.run", return_value=mock_result):
-                run_sv_tests.main()
-
-        get_exit_code(run)
-        assert "100.0%" in capsys.readouterr().out
+        assert get_exit_code(run) == 0 and "100.0%" in capsys.readouterr().out
 
     def test_no_tests_exits_one(self, get_exit_code):
         """main() exits 1 when no .sv files are found."""
