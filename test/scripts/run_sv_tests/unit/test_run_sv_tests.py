@@ -95,11 +95,10 @@ class TestRunTest:
         with patch("run_sv_tests.subprocess.run", return_value=mock_result) as mock_run:
             run_sv_tests.run_test("/fake/test.sv", defines=["FOO", "BAR=2"])
         cmd = mock_run.call_args[0][0]
-        assert "-D" in cmd
-        foo_idx = cmd.index("-D")
-        assert cmd[foo_idx + 1] == "FOO"
-        bar_idx = cmd.index("-D", foo_idx + 2)
-        assert cmd[bar_idx + 1] == "BAR=2"
+        d_pairs = [
+            cmd[i + 1] for i, v in enumerate(cmd) if v == "-D" and i + 1 < len(cmd)
+        ]
+        assert d_pairs == ["FOO", "BAR=2"]
 
 
 class TestParseMetadata:
@@ -343,10 +342,10 @@ class TestBuildResult:
         with patch("run_sv_tests.subprocess.run", return_value=mock_result) as mock_run:
             run_sv_tests.build_result(str(sv))
         cmd = mock_run.call_args[0][0]
-        assert cmd.count("-D") == 2
-        d_indices = [i for i, v in enumerate(cmd) if v == "-D"]
-        assert cmd[d_indices[0] + 1] == "TEST_VAR"
-        assert cmd[d_indices[1] + 1] == "VAR_1=2"
+        d_pairs = [
+            cmd[i + 1] for i, v in enumerate(cmd) if v == "-D" and i + 1 < len(cmd)
+        ]
+        assert d_pairs == ["TEST_VAR", "VAR_1=2"]
 
     def test_simulation_mode_used_for_simulation_type(self, tmp_path):
         """build_result() should run simulation when type contains 'simulation'."""
