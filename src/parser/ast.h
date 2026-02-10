@@ -306,6 +306,8 @@ struct Stmt {
   std::string_view var_name;
   std::vector<Expr*> var_unpacked_dims;
   Expr* var_init = nullptr;
+  bool var_is_automatic = false;  // §6.21 explicit automatic lifetime
+  bool var_is_static = false;     // §6.21 explicit static lifetime
 };
 
 // --- Declarations and module items ---

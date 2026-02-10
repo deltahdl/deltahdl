@@ -139,6 +139,9 @@ Stmt* Parser::ParseEventTriggerStmt() {
 // LRM section 9.3.1 -- block_item_declaration detection
 bool Parser::IsBlockVarDeclStart() {
   auto tk = CurrentToken().kind;
+  if (tk == TokenKind::kKwAutomatic || tk == TokenKind::kKwStatic) {
+    return true;  // §6.21 explicit lifetime qualifier
+  }
   if (tk == TokenKind::kKwStruct || tk == TokenKind::kKwUnion ||
       tk == TokenKind::kKwEnum || tk == TokenKind::kKwVar) {
     return true;
@@ -157,6 +160,8 @@ bool Parser::IsBlockVarDeclStart() {
 
 // LRM section 9.3.1 -- block-level variable declarations
 void Parser::ParseBlockVarDecls(std::vector<Stmt*>& stmts) {
+  bool is_automatic = Match(TokenKind::kKwAutomatic);             // §6.21
+  bool is_static = !is_automatic && Match(TokenKind::kKwStatic);  // §6.21
   Match(TokenKind::kKwVar);  // optional 'var' prefix (§6.8)
   DataType dtype = ParseDataType();
   do {
@@ -164,6 +169,8 @@ void Parser::ParseBlockVarDecls(std::vector<Stmt*>& stmts) {
     s->kind = StmtKind::kVarDecl;
     s->range.start = CurrentLoc();
     s->var_decl_type = dtype;
+    s->var_is_automatic = is_automatic;
+    s->var_is_static = is_static;
     s->var_name = ExpectIdentifier().text;
     ParseUnpackedDims(s->var_unpacked_dims);
     if (Match(TokenKind::kEq)) {

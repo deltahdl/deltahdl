@@ -289,6 +289,9 @@ Expr* Parser::ParsePrimaryExpr() {
   if (IsCastTypeToken(tok.kind)) {
     return ParseCastExpr();
   }
+  if (tok.kind == TokenKind::kDollar) {
+    return MakeLiteral(ExprKind::kIdentifier, tok);  // §6.20.7 $ constant
+  }
 
   diag_.Error(tok.loc, "expected expression");
   Consume();

@@ -624,3 +624,74 @@ TEST(ParserSection6, TypeRef_DataType) {
                "  end\n"
                "endmodule\n"));
 }
+
+// =========================================================================
+// §6.21: Scope and lifetime — block-level automatic/static qualifiers
+// =========================================================================
+
+TEST(ParserSection6, BlockVarDecl_Automatic) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    automatic int auto1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
+  EXPECT_TRUE(stmt->var_is_automatic);
+  EXPECT_FALSE(stmt->var_is_static);
+  EXPECT_EQ(stmt->var_name, "auto1");
+}
+
+TEST(ParserSection6, BlockVarDecl_Static) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    static int st2;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
+  EXPECT_FALSE(stmt->var_is_automatic);
+  EXPECT_TRUE(stmt->var_is_static);
+  EXPECT_EQ(stmt->var_name, "st2");
+}
+
+TEST(ParserSection6, BlockVarDecl_AutomaticWithInit) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    automatic int loop3 = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
+  EXPECT_TRUE(stmt->var_is_automatic);
+  ASSERT_NE(stmt->var_init, nullptr);
+}
+
+TEST(ParserSection6, BlockVarDecl_StaticVar) {
+  EXPECT_TRUE(
+      ParseOk6("module t;\n"
+               "  initial begin\n"
+               "    static var logic x;\n"
+               "  end\n"
+               "endmodule\n"));
+}
+
+// =========================================================================
+// §6.20.7: $ as a constant
+// =========================================================================
+
+TEST(ParserSection6, DollarConstant_ParamAssign) {
+  EXPECT_TRUE(
+      ParseOk6("module t;\n"
+               "  parameter p = $;\n"
+               "endmodule\n"));
+}
