@@ -19,6 +19,7 @@ jobs:
         run: >-
           python3 -m pytest test/scripts/ -v
           --cov=scripts
+          --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
   # ── Lane: run_sim_tests ──
