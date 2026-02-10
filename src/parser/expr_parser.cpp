@@ -169,9 +169,10 @@ Expr* Parser::ParseInfixBp(Expr* lhs, int min_bp) {
       break;
     }
 
-    // Ternary: expr ? expr : expr
+    // Ternary: expr ? (* attr *) expr : expr
     if (tok.kind == TokenKind::kQuestion && min_bp <= 1) {
       Consume();
+      ParseAttributes();  // optional attribute before true-branch
       auto* tern = arena_.Create<Expr>();
       tern->kind = ExprKind::kTernary;
       tern->condition = lhs;
@@ -194,6 +195,7 @@ Expr* Parser::ParseInfixBp(Expr* lhs, int min_bp) {
     }
 
     auto op = Consume();
+    ParseAttributes();  // optional attribute before RHS operand
     auto* rhs = ParseExprBp(rbp);
     auto* bin = arena_.Create<Expr>();
     bin->kind = ExprKind::kBinary;
@@ -460,6 +462,62 @@ Expr* Parser::ParseCastExpr() {
   return cast;
 }
 
+static bool IsAssignmentPatternKey(TokenKind k) {
+  switch (k) {
+    case TokenKind::kIdentifier:
+    case TokenKind::kKwDefault:
+    case TokenKind::kIntLiteral:
+    case TokenKind::kKwInt:
+    case TokenKind::kKwReal:
+    case TokenKind::kKwLogic:
+    case TokenKind::kKwByte:
+    case TokenKind::kKwShortint:
+    case TokenKind::kKwLongint:
+    case TokenKind::kKwShortreal:
+    case TokenKind::kKwInteger:
+    case TokenKind::kKwString:
+      return true;
+    default:
+      return false;
+  }
+}
+
+Expr* Parser::ParsePatternReplication(Expr* count, SourceLoc loc) {
+  Consume();  // '{'
+  auto* rep = arena_.Create<Expr>();
+  rep->kind = ExprKind::kReplicate;
+  rep->repeat_count = count;
+  rep->range.start = loc;
+  rep->elements.push_back(ParseExpr());
+  while (Match(TokenKind::kComma)) {
+    rep->elements.push_back(ParseExpr());
+  }
+  Expect(TokenKind::kRBrace);
+  return rep;
+}
+
+bool Parser::ParseFirstPatternElement(Expr* pat, bool& named) {
+  auto first = CurrentToken();
+  if (!IsAssignmentPatternKey(first.kind)) {
+    pat->elements.push_back(ParseExpr());
+    return true;
+  }
+  Consume();
+  if (Check(TokenKind::kColon)) {
+    named = true;
+    pat->pattern_keys.push_back(first.text);
+    Consume();
+    pat->elements.push_back(ParseExpr());
+    return true;
+  }
+  auto* id = arena_.Create<Expr>();
+  id->kind = ExprKind::kIdentifier;
+  id->text = first.text;
+  id->range.start = first.loc;
+  pat->elements.push_back(ParseInfixBp(id, 0));
+  return true;
+}
+
 Expr* Parser::ParseAssignmentPattern() {
   auto loc = CurrentLoc();
   Expect(TokenKind::kApostropheLBrace);
@@ -472,34 +530,16 @@ Expr* Parser::ParseAssignmentPattern() {
     return pat;
   }
 
-  // Detect named vs positional: if first token is identifier or "default"
-  // followed by ':', it's a named pattern.
   bool named = false;
-  auto first = CurrentToken();
-  bool is_key = first.kind == TokenKind::kIdentifier ||
-                first.kind == TokenKind::kKwDefault;
-  if (is_key) {
-    // Peek past the identifier/keyword to check for ':'
-    Consume();
-    if (Check(TokenKind::kColon)) {
-      named = true;
-      pat->pattern_keys.push_back(first.text);
-      Consume();  // skip ':'
-      pat->elements.push_back(ParseExpr());
-    } else {
-      // Not named — push back and parse as positional expression.
-      // We already consumed the identifier, so build an Expr for it.
-      auto* id = arena_.Create<Expr>();
-      id->kind = ExprKind::kIdentifier;
-      id->text = first.text;
-      id->range.start = first.loc;
-      Expr* expr = id;
-      // Continue parsing the rest of the expression (infix operators etc.)
-      expr = ParseInfixBp(expr, 0);
-      pat->elements.push_back(expr);
-    }
-  } else {
-    pat->elements.push_back(ParseExpr());
+  ParseFirstPatternElement(pat, named);
+
+  // Replication form: '{count{expr, ...}}
+  if (!named && Check(TokenKind::kLBrace)) {
+    auto* count = pat->elements[0];
+    pat->elements.clear();
+    pat->elements.push_back(ParsePatternReplication(count, loc));
+    Expect(TokenKind::kRBrace);
+    return pat;
   }
 
   while (Match(TokenKind::kComma)) {
@@ -507,10 +547,8 @@ Expr* Parser::ParseAssignmentPattern() {
       auto key_tok = Consume();
       pat->pattern_keys.push_back(key_tok.text);
       Expect(TokenKind::kColon);
-      pat->elements.push_back(ParseExpr());
-    } else {
-      pat->elements.push_back(ParseExpr());
     }
+    pat->elements.push_back(ParseExpr());
   }
 
   Expect(TokenKind::kRBrace);

@@ -544,3 +544,51 @@ TEST(Lexer, ParseKeywordVersion_Invalid) {
   EXPECT_FALSE(ParseKeywordVersion("bogus").has_value());
   EXPECT_FALSE(ParseKeywordVersion("").has_value());
 }
+
+// --- Whitespace in numeric literals (§5.7.1) ---
+
+TEST(Lexer, SpaceBeforeBase_SizedHex) {
+  auto tokens = lex("32 'h 12ab_f001");
+  ASSERT_GE(tokens.size(), 1);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[0].text, "32 'h 12ab_f001");
+}
+
+TEST(Lexer, SpaceAfterBase_UnsizedHex) {
+  auto tokens = lex("'h 837FF");
+  ASSERT_GE(tokens.size(), 1);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[0].text, "'h 837FF");
+}
+
+TEST(Lexer, SpaceAfterBase_HexXZ) {
+  auto tokens = lex("'h x");
+  ASSERT_GE(tokens.size(), 1);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[0].text, "'h x");
+}
+
+TEST(Lexer, NoSpace_SizedHexStillWorks) {
+  auto tokens = lex("32'hFF");
+  ASSERT_GE(tokens.size(), 1);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[0].text, "32'hFF");
+}
+
+TEST(Lexer, SpaceAfterBase_SignedDecimal) {
+  auto tokens = lex("8'd 6");
+  ASSERT_GE(tokens.size(), 1);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[0].text, "8'd 6");
+}
+
+// --- Reject negative after base (§5.7.1) ---
+
+TEST(Lexer, BasedNumber_NoDigitsAfterBase_Error) {
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<test>", "8'd-6");
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  lexer.LexAll();  // lex the based number
+  EXPECT_TRUE(diag.HasErrors());
+}

@@ -36,6 +36,17 @@ static Stmt* FirstInitialStmt(ParseResult5& r) {
   return nullptr;
 }
 
+static bool ParseOk5(const std::string& src) {
+  SourceManager mgr;
+  Arena arena;
+  auto fid = mgr.AddFile("<test>", src);
+  DiagEngine diag(mgr);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, arena, diag);
+  parser.Parse();
+  return !diag.HasErrors();
+}
+
 // --- §5.10/§5.11: Assignment patterns ---
 
 TEST(ParserSection5, AssignmentPatternPositional) {
@@ -135,4 +146,114 @@ TEST(ParserSection5, BuiltInMethodCall) {
   // The callee_expr should be the full member-access expression.
   ASSERT_NE(rhs->lhs, nullptr);
   EXPECT_EQ(rhs->lhs->kind, ExprKind::kMemberAccess);
+}
+
+// --- Unpacked range dimensions [M:N] ---
+
+TEST(ParserSection5, UnpackedDim_Range) {
+  EXPECT_TRUE(ParseOk5("module m; int a[1:0]; endmodule"));
+}
+
+TEST(ParserSection5, UnpackedDim_MultiRange) {
+  EXPECT_TRUE(ParseOk5("module m; int a[1:2][1:3]; endmodule"));
+}
+
+TEST(ParserSection5, UnpackedDim_Typedef) {
+  EXPECT_TRUE(ParseOk5("module m; typedef int triple[1:3]; endmodule"));
+}
+
+// --- Assignment pattern type/default/integer keys ---
+
+TEST(ParserSection5, AssignmentPattern_TypeKey) {
+  EXPECT_TRUE(
+      ParseOk5("module m;\n"
+               "  typedef struct { int x; int y; } ms_t;\n"
+               "  ms_t ms = '{int:0, int:1};\n"
+               "endmodule"));
+}
+
+TEST(ParserSection5, AssignmentPattern_DefaultKey) {
+  EXPECT_TRUE(
+      ParseOk5("module m;\n"
+               "  typedef struct { int x; int y; } ms_t;\n"
+               "  ms_t ms = '{default:1};\n"
+               "endmodule"));
+}
+
+TEST(ParserSection5, AssignmentPattern_IntKey) {
+  EXPECT_TRUE(
+      ParseOk5("module m;\n"
+               "  typedef int triple[1:3];\n"
+               "  triple t = '{1:1, default:0};\n"
+               "endmodule"));
+}
+
+// --- Comma-separated struct members ---
+
+TEST(ParserSection5, StructMembers_CommaSeparated) {
+  auto r = Parse(
+      "module m;\n"
+      "  struct { int X, Y, Z; } s;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->data_type.struct_members.size(), 3u);
+}
+
+TEST(ParserSection5, StructMembers_Single) {
+  EXPECT_TRUE(ParseOk5("module m; struct { int X; } s; endmodule"));
+}
+
+// --- Null module items ---
+
+TEST(ParserSection5, ModuleBody_NullItem) {
+  EXPECT_TRUE(ParseOk5("module m; ; endmodule"));
+}
+
+TEST(ParserSection5, ModuleBody_SemicolonAfterEnd) {
+  EXPECT_TRUE(ParseOk5("module m; initial begin end; endmodule"));
+}
+
+// --- Attributes before top-level declarations ---
+
+TEST(ParserSection5, TopLevel_AttributeBeforeModule) {
+  EXPECT_TRUE(ParseOk5("(* optimize_power *) module m; endmodule"));
+}
+
+TEST(ParserSection5, TopLevel_TrailingSemicolonAfterEndmodule) {
+  EXPECT_TRUE(ParseOk5("module m; endmodule;"));
+}
+
+// --- Attributes in expressions ---
+
+TEST(ParserSection5, Expr_AttributeOnOperator) {
+  EXPECT_TRUE(
+      ParseOk5("module m;\n"
+               "  logic a, b, c;\n"
+               "  assign a = b + (* mode = \"cla\" *) c;\n"
+               "endmodule"));
+}
+
+TEST(ParserSection5, Expr_AttributeOnTernary) {
+  EXPECT_TRUE(
+      ParseOk5("module m;\n"
+               "  logic a, b, c, d;\n"
+               "  assign a = b ? (* no_glitch *) c : d;\n"
+               "endmodule"));
+}
+
+// --- Assignment pattern replication ---
+
+TEST(ParserSection5, AssignmentPattern_Replication) {
+  EXPECT_TRUE(
+      ParseOk5("module m;\n"
+               "  int a[1:3] = '{3{1}};\n"
+               "endmodule"));
+}
+
+TEST(ParserSection5, AssignmentPattern_NestedReplication) {
+  EXPECT_TRUE(
+      ParseOk5("module m;\n"
+               "  int n[1:2][1:6] = '{2{'{3{4, 5}}}};\n"
+               "endmodule"));
 }

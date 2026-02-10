@@ -96,6 +96,8 @@ CompilationUnit* Parser::Parse() {
 }
 
 void Parser::ParseTopLevel(CompilationUnit* unit) {
+  if (Match(TokenKind::kSemicolon)) return;  // null item
+  ParseAttributes();                         // consume optional (* ... *)
   if (Check(TokenKind::kKwExtern)) {
     Consume();
     if (Check(TokenKind::kKwModule)) {
@@ -427,6 +429,7 @@ void Parser::ParseModuleBody(ModuleDecl& mod) {
   current_module_ = &mod;
   bool non_ansi = HasNonAnsiPorts(mod);
   while (!Check(TokenKind::kKwEndmodule) && !AtEnd()) {
+    if (Match(TokenKind::kSemicolon)) continue;  // null module item
     if (non_ansi && IsPortDirection(CurrentToken().kind)) {
       ParseNonAnsiPortDecls(mod);
       continue;
@@ -780,7 +783,16 @@ void Parser::ParseUnpackedDims(std::vector<Expr*>& dims) {
       continue;
     }
     auto* expr = ParseExpr();
-    dims.push_back(expr);
+    if (Match(TokenKind::kColon)) {
+      auto* range = arena_.Create<Expr>();
+      range->kind = ExprKind::kBinary;
+      range->op = TokenKind::kColon;
+      range->lhs = expr;
+      range->rhs = ParseExpr();
+      dims.push_back(range);
+    } else {
+      dims.push_back(expr);
+    }
     Expect(TokenKind::kRBracket);
   }
 }

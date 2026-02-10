@@ -60,6 +60,11 @@ class Preprocessor {
   void HandleEndKeywords(SourceLoc loc, std::string& output);
   bool TryExpandMacro(std::string_view trimmed, std::string& output,
                       uint32_t file_id, uint32_t line_num);
+  std::string ExpandInlineMacros(std::string_view line, uint32_t file_id,
+                                 uint32_t line_num);
+  size_t ExpandSingleInlineMacro(std::string_view line, size_t pos,
+                                 uint32_t file_id, uint32_t line_num,
+                                 std::string& result);
   std::string ExpandMacro(const MacroDef& macro, std::string_view args_text);
   std::string ResolveInclude(std::string_view filename);
 

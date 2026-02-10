@@ -89,6 +89,18 @@ class TestRunTest:
             actual = run_sv_tests.run_test("/fake/test.sv", simulate=True)
         assert actual == (False, "error\n")
 
+    def test_defines_passed_as_dash_d_flags(self):
+        """run_test(defines=...) should include -D flags in the command."""
+        mock_result = MagicMock(returncode=0, stderr="")
+        with patch("run_sv_tests.subprocess.run", return_value=mock_result) as mock_run:
+            run_sv_tests.run_test("/fake/test.sv", defines=["FOO", "BAR=2"])
+        cmd = mock_run.call_args[0][0]
+        assert "-D" in cmd
+        foo_idx = cmd.index("-D")
+        assert cmd[foo_idx + 1] == "FOO"
+        bar_idx = cmd.index("-D", foo_idx + 2)
+        assert cmd[bar_idx + 1] == "BAR=2"
+
 
 class TestParseMetadata:
     """Tests for the parse_metadata() function."""
@@ -318,6 +330,23 @@ class TestBuildResult:
         with patch("run_sv_tests.subprocess.run", return_value=mock_result):
             result, ok = run_sv_tests.build_result(str(sv))
         assert ok == 0 and result["status"] == "fail"
+
+    def test_defines_passed_to_command(self, tmp_path):
+        """build_result() should pass :defines: metadata as -D flags."""
+        sv = tmp_path / "chapter-5" / "defs.sv"
+        sv.parent.mkdir(parents=True)
+        sv.write_text(
+            "/*\n:name: defs\n:tags: 5.6.4\n"
+            ":defines: TEST_VAR VAR_1=2\n*/\nmodule m; endmodule\n"
+        )
+        mock_result = MagicMock(returncode=0, stderr="")
+        with patch("run_sv_tests.subprocess.run", return_value=mock_result) as mock_run:
+            run_sv_tests.build_result(str(sv))
+        cmd = mock_run.call_args[0][0]
+        assert cmd.count("-D") == 2
+        d_indices = [i for i, v in enumerate(cmd) if v == "-D"]
+        assert cmd[d_indices[0] + 1] == "TEST_VAR"
+        assert cmd[d_indices[1] + 1] == "VAR_1=2"
 
     def test_simulation_mode_used_for_simulation_type(self, tmp_path):
         """build_result() should run simulation when type contains 'simulation'."""

@@ -108,7 +108,7 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
 
     bool handled = ProcessDirective(line, file_id, line_num, depth, output);
     if (!handled && IsActive()) {
-      output.append(line);
+      output.append(ExpandInlineMacros(line, file_id, line_num));
     }
     output.push_back('\n');
     pos = eol + 1;
@@ -258,13 +258,101 @@ bool Preprocessor::TryExpandMacro(std::string_view trimmed, std::string& output,
   return true;
 }
 
+static bool IsIdentChar(char c) {
+  return std::isalnum(static_cast<unsigned char>(c)) || c == '_';
+}
+
+// Find the next backtick outside a string literal, starting at pos.
+// Returns npos if not found.  Updates in_string tracking.
+static size_t FindNextBacktick(std::string_view line, size_t pos,
+                               bool& in_string) {
+  for (size_t i = pos; i < line.size(); ++i) {
+    if (line[i] == '"' && (i == 0 || line[i - 1] != '\\')) {
+      in_string = !in_string;
+    }
+    if (!in_string && line[i] == '`') return i;
+  }
+  return std::string_view::npos;
+}
+
+// Expand a single inline macro at position `pos` (pointing at the backtick).
+// Appends expansion to `result` and returns the position after the macro.
+// If the backtick is not a valid macro, appends the literal text and returns
+// the position just past the backtick.
+size_t Preprocessor::ExpandSingleInlineMacro(std::string_view line, size_t pos,
+                                             uint32_t file_id,
+                                             uint32_t line_num,
+                                             std::string& result) {
+  size_t i = pos + 1;  // skip backtick
+  size_t name_start = i;
+  while (i < line.size() && IsIdentChar(line[i])) ++i;
+  if (i == name_start) {
+    result += '`';
+    return pos + 1;
+  }
+  auto name = line.substr(name_start, i - name_start);
+
+  if (name == "__FILE__") {
+    result += '"';
+    result += src_mgr_.FilePath(file_id);
+    result += '"';
+    return i;
+  }
+  if (name == "__LINE__") {
+    uint32_t effective = line_num;
+    if (has_line_override_) {
+      effective = line_offset_ + (line_num - line_override_src_line_);
+    }
+    result += std::to_string(effective);
+    return i;
+  }
+
+  const auto* def = macros_.Lookup(name);
+  if (def == nullptr) {
+    result.append(line.substr(pos, i - pos));
+    return i;
+  }
+
+  std::string_view args_text;
+  if (def->is_function_like) {
+    auto rest = line.substr(i);
+    auto balanced = ExtractBalancedArgs(rest);
+    if (balanced.empty()) {
+      result.append(line.substr(pos, i - pos));
+      return i;
+    }
+    args_text = balanced.substr(1, balanced.size() - 2);
+    i += balanced.size();
+  }
+  result += ExpandMacro(*def, args_text);
+  return i;
+}
+
+std::string Preprocessor::ExpandInlineMacros(std::string_view line,
+                                             uint32_t file_id,
+                                             uint32_t line_num) {
+  bool in_string = false;
+  size_t first = FindNextBacktick(line, 0, in_string);
+  if (first == std::string_view::npos) return std::string(line);
+
+  std::string result;
+  result.reserve(line.size());
+  size_t copied = 0;
+  in_string = false;  // reset for second pass
+
+  while (true) {
+    size_t bt = FindNextBacktick(line, copied, in_string);
+    if (bt == std::string_view::npos) break;
+    result.append(line.substr(copied, bt - copied));
+    copied = ExpandSingleInlineMacro(line, bt, file_id, line_num, result);
+  }
+  result.append(line.substr(copied));
+  return result;
+}
+
 bool Preprocessor::IsActive() const {
   return std::all_of(cond_stack_.begin(), cond_stack_.end(),
                      [](const CondState& s) { return s.active; });
-}
-
-static bool IsIdentChar(char c) {
-  return std::isalnum(static_cast<unsigned char>(c)) || c == '_';
 }
 
 void Preprocessor::HandleDefine(std::string_view rest, SourceLoc loc) {
@@ -667,6 +755,11 @@ void Preprocessor::HandleLine(std::string_view rest, SourceLoc loc) {
 }
 
 std::string Preprocessor::ResolveInclude(std::string_view filename) {
+  if (!filename.empty() && filename[0] == '/') {
+    std::string path{filename};
+    std::ifstream ifs(path);
+    if (ifs.good()) return path;
+  }
   for (const auto& dir : config_.include_dirs) {
     auto path = dir + "/" + std::string(filename);
     std::ifstream ifs(path);

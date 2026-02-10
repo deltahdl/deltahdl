@@ -30,6 +30,11 @@ def parse_args():
         metavar="FILE",
         help="Write JUnit XML results to FILE.",
     )
+    parser.add_argument(
+        "--chapter",
+        metavar="N",
+        help="Only run tests for the given chapter number (e.g. 5).",
+    )
     return parser.parse_args()
 
 
@@ -38,9 +43,13 @@ def _natural_sort_key(text):
     return [int(tok) if tok.isdigit() else tok for tok in re.split(r"(\d+)", text)]
 
 
-def collect_tests():
-    """Collect all .sv files under the chapter directories."""
-    pattern = str(TEST_DIR / "chapter-*" / "*.sv")
+def collect_tests(chapter=None):
+    """Collect .sv files under the chapter directories.
+
+    If *chapter* is given (e.g. "5"), only that chapter's tests are collected.
+    """
+    chapter_glob = f"chapter-{chapter}" if chapter else "chapter-*"
+    pattern = str(TEST_DIR / chapter_glob / "*.sv")
     return sorted(glob.glob(pattern), key=_natural_sort_key)
 
 
@@ -108,12 +117,15 @@ def check_assertions(stdout):
     return True, ""
 
 
-def run_test(path, simulate=False):
+def run_test(path, simulate=False, defines=()):
     """Run deltahdl on a single .sv file.
 
     Returns (passed, stderr_or_detail) tuple.
     """
-    cmd = [str(BINARY), path] if simulate else [str(BINARY), "--lint-only", path]
+    cmd = [str(BINARY)] if simulate else [str(BINARY), "--lint-only"]
+    for d in defines:
+        cmd.extend(["-D", d])
+    cmd.append(path)
     result = subprocess.run(
         cmd,
         capture_output=True,
@@ -227,11 +239,12 @@ def build_result(path):
     metadata = parse_metadata(path)
     simulate = "simulation" in metadata.get("type", "").split()
     should_fail = bool(metadata.get("should_fail_because"))
+    defines = metadata.get("defines", "").split()
 
     t0 = time.monotonic()
     stderr = ""
     try:
-        ok, stderr = run_test(path, simulate=simulate)
+        ok, stderr = run_test(path, simulate=simulate, defines=defines)
         dt = time.monotonic() - t0
         if should_fail:
             ok = not ok
@@ -272,7 +285,7 @@ def main():
 
     check_binary()
 
-    tests = collect_tests()
+    tests = collect_tests(chapter=args.chapter)
     if not tests:
         print(f"error: no .sv files found in {TEST_DIR}", file=sys.stderr)
         sys.exit(1)

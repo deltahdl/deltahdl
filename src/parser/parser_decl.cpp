@@ -105,19 +105,21 @@ DataType Parser::ParseStructOrUnionBody(TokenKind kw) {
 void Parser::ParseStructMembers(DataType& dtype) {
   Expect(TokenKind::kLBrace);
   while (!Check(TokenKind::kRBrace) && !AtEnd()) {
-    StructMember member;
     auto member_type = ParseDataType();
-    member.type_kind = member_type.kind;
-    member.is_signed = member_type.is_signed;
-    member.packed_dim_left = member_type.packed_dim_left;
-    member.packed_dim_right = member_type.packed_dim_right;
-    member.name = Expect(TokenKind::kIdentifier).text;
-    ParseUnpackedDims(member.unpacked_dims);
-    if (Match(TokenKind::kEq)) {
-      member.init_expr = ParseExpr();
-    }
+    do {
+      StructMember member;
+      member.type_kind = member_type.kind;
+      member.is_signed = member_type.is_signed;
+      member.packed_dim_left = member_type.packed_dim_left;
+      member.packed_dim_right = member_type.packed_dim_right;
+      member.name = Expect(TokenKind::kIdentifier).text;
+      ParseUnpackedDims(member.unpacked_dims);
+      if (Match(TokenKind::kEq)) {
+        member.init_expr = ParseExpr();
+      }
+      dtype.struct_members.push_back(member);
+    } while (Match(TokenKind::kComma));
     Expect(TokenKind::kSemicolon);
-    dtype.struct_members.push_back(member);
   }
   Expect(TokenKind::kRBrace);
 }
@@ -139,6 +141,7 @@ ModuleItem* Parser::ParseTypedef() {
   }
 
   item->name = Expect(TokenKind::kIdentifier).text;
+  ParseUnpackedDims(item->unpacked_dims);
   known_types_.insert(item->name);
   Expect(TokenKind::kSemicolon);
   return item;

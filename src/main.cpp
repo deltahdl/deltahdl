@@ -80,6 +80,7 @@ void PrintHelp() {
             << "  --max-time <time>    Maximum simulation time\n"
             << "  --seed <n>           Random seed\n"
             << "  --timescale <t/p>    Override default timescale\n"
+            << "  -D <name>[=<value>]  Define preprocessor macro\n"
             << "  --lint-only          Parse and elaborate only\n"
             << "  --dump-ast           Print AST to stdout\n"
             << "  --dump-ir            Print RTLIR to stdout\n\n"
@@ -233,10 +234,24 @@ bool TryParseLibArg(std::string_view arg, int& i, int argc,
   return false;
 }
 
+bool TryParseDefineArg(std::string_view arg, int& i, int argc,
+                       const char* const argv[], CliOptions& opts) {
+  if (arg.starts_with("-D") && arg.size() > 2) {
+    ParseDefine(arg.substr(2), opts);
+    return true;
+  }
+  if (arg == "-D" && i + 1 < argc) {
+    ParseDefine(argv[++i], opts);
+    return true;
+  }
+  return false;
+}
+
 bool TryParseSingleArg(std::string_view arg, int& i, int argc,
                        const char* const argv[], CliOptions& opts) {
   if (TryParseGeneralFlag(arg, opts)) return true;
   if (TryParseSynthFlag(arg, opts)) return true;
+  if (TryParseDefineArg(arg, i, argc, argv, opts)) return true;
   if (TryParseSimArg(arg, i, argc, argv, opts)) return true;
   if (TryParseSynthArg(arg, i, argc, argv, opts)) return true;
   if (TryParseLibArg(arg, i, argc, argv, opts)) return true;

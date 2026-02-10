@@ -211,11 +211,19 @@ Token Lexer::LexBasedNumber(SourceLoc loc, uint32_t start) {
   if (!AtEnd()) {
     Advance();  // base letter (h/d/b/o)
   }
+  // Skip optional whitespace after base letter (IEEE §5.7.1).
+  while (!AtEnd() && (Current() == ' ' || Current() == '\t')) {
+    Advance();
+  }
+  uint32_t before_digits = pos_;
   while (!AtEnd() &&
          (std::isxdigit(static_cast<unsigned char>(Current())) ||
           Current() == '_' || Current() == 'x' || Current() == 'z' ||
           Current() == 'X' || Current() == 'Z' || Current() == '?')) {
     Advance();
+  }
+  if (pos_ == before_digits) {
+    diag_.Error(loc, "missing value digits after base specifier");
   }
   Token tok;
   tok.kind = TokenKind::kIntLiteral;
@@ -290,10 +298,16 @@ Token Lexer::LexNumber() {
     Advance();
   }
 
+  // Skip optional whitespace before base specifier (IEEE §5.7.1).
+  uint32_t before_ws = pos_;
+  while (!AtEnd() && (Current() == ' ' || Current() == '\t')) {
+    Advance();
+  }
   // Check for base specifier: 'h, 'b, 'o, 'd
   if (!AtEnd() && Current() == '\'') {
     return LexBasedNumber(loc, start);
   }
+  pos_ = before_ws;  // no apostrophe — restore past whitespace
 
   // Check for real literal (decimal point or exponent)
   uint32_t before_real = pos_;

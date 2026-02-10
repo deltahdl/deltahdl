@@ -503,3 +503,59 @@ TEST(Preprocessor, LineDirectiveAffectsLineMacro) {
       f);
   EXPECT_NE(result.find("101"), std::string::npos);
 }
+
+// --- Inline macro expansion ---
+
+TEST(Preprocessor, InlineMacro_ExpandsDefined) {
+  PreprocFixture f;
+  auto result = Preprocess("`define FOO 42\nint x = `FOO;\n", f);
+  EXPECT_NE(result.find("int x = 42;"), std::string::npos);
+}
+
+TEST(Preprocessor, InlineMacro_ExpandsFileInline) {
+  PreprocFixture f;
+  auto result = Preprocess("$display(`__FILE__);\n", f);
+  EXPECT_NE(result.find("$display(\"<test>\");"), std::string::npos);
+}
+
+TEST(Preprocessor, InlineMacro_ExpandsLineInline) {
+  PreprocFixture f;
+  auto result = Preprocess("$display(`__LINE__);\n", f);
+  EXPECT_NE(result.find("$display(1);"), std::string::npos);
+}
+
+TEST(Preprocessor, InlineMacro_SkipsStringLiterals) {
+  PreprocFixture f;
+  auto result = Preprocess("`define FOO 42\n\"hello `FOO\";\n", f);
+  EXPECT_NE(result.find("\"hello `FOO\""), std::string::npos);
+}
+
+TEST(Preprocessor, InlineMacro_MultipleMacrosOnOneLine) {
+  PreprocFixture f;
+  auto result = Preprocess("`define A 1\n`define B 2\nint x = `A + `B;\n", f);
+  EXPECT_NE(result.find("int x = 1 + 2;"), std::string::npos);
+}
+
+TEST(Preprocessor, InlineMacro_FunctionLikeMacro) {
+  PreprocFixture f;
+  auto result =
+      Preprocess("`define ADD(a, b) (a + b)\nint x = `ADD(3, 4);\n", f);
+  EXPECT_NE(result.find("int x = (3 + 4);"), std::string::npos);
+}
+
+TEST(Preprocessor, InlineMacro_CommandLineDefines) {
+  PreprocFixture f;
+  PreprocConfig config;
+  config.defines = {{"VAR_1", "2"}, {"VAR_2", "5"}};
+  auto result = Preprocess("int a = `VAR_1 + `VAR_2;\n", f, config);
+  EXPECT_NE(result.find("int a = 2 + 5;"), std::string::npos);
+}
+
+// --- Absolute include paths ---
+
+TEST(Preprocessor, Include_AbsolutePath) {
+  PreprocFixture f;
+  auto result = Preprocess("`include \"/dev/null\"\nmodule m; endmodule\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("module m;"), std::string::npos);
+}
