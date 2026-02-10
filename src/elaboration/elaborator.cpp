@@ -295,6 +295,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       var.is_4state = Is4stateType(item->data_type, typedefs_);
       var.is_event = (item->data_type.kind == DataTypeKind::kEvent);
       mod->variables.push_back(var);
+      ValidateArrayInitPattern(item);
       break;
     }
     case ModuleItemKind::kContAssign: {
@@ -610,6 +611,36 @@ void Elaborator::ApplyDefparams(RtlirModule* top, const ModuleDecl* decl) {
       param->resolved_value = *val;
       param->is_resolved = true;
     }
+  }
+}
+
+void Elaborator::ValidateArrayInitPattern(const ModuleItem* item) {
+  if (!item->init_expr || item->unpacked_dims.empty()) return;
+  if (item->init_expr->kind != ExprKind::kAssignmentPattern) return;
+  if (item->init_expr->repeat_count) return;           // replication form
+  if (!item->init_expr->pattern_keys.empty()) return;  // named form
+
+  const auto* dim = item->unpacked_dims[0];
+  if (!dim) return;  // dynamic array
+
+  std::optional<int64_t> dim_size;
+  if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
+    auto left = ConstEvalInt(dim->lhs);
+    auto right = ConstEvalInt(dim->rhs);
+    if (left && right) {
+      dim_size = std::abs(*left - *right) + 1;
+    }
+  } else {
+    dim_size = ConstEvalInt(dim);
+  }
+  if (!dim_size) return;
+
+  auto count = static_cast<int64_t>(item->init_expr->elements.size());
+  if (count != *dim_size) {
+    diag_.Error(item->loc,
+                std::format("assignment pattern has {} elements, but array "
+                            "dimension requires {}",
+                            count, *dim_size));
   }
 }
 

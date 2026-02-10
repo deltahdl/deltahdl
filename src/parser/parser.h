@@ -161,6 +161,8 @@ class Parser {
   Stmt* ParseProceduralDeassignStmt();
   Stmt* ParseForceStmt();
   Stmt* ParseReleaseStmt();
+  bool IsBlockVarDeclStart();
+  void ParseBlockVarDecls(std::vector<Stmt*>& stmts);
 
   // Clocking blocks and interprocess sync (parser_clocking.cpp — §14, §15)
   ModuleItem* ParseClockingDecl();

@@ -257,3 +257,81 @@ TEST(ParserSection5, AssignmentPattern_NestedReplication) {
                "  int n[1:2][1:6] = '{2{'{3{4, 5}}}};\n"
                "endmodule"));
 }
+
+// --- §9.3.1: Block-level variable declarations ---
+
+TEST(ParserSection5, BlockVarDecl_BuiltinType) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int x;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->kind, ModuleItemKind::kInitialBlock);
+  auto* blk = item->body;
+  ASSERT_NE(blk, nullptr);
+  ASSERT_EQ(blk->kind, StmtKind::kBlock);
+  ASSERT_EQ(blk->stmts.size(), 1u);
+  EXPECT_EQ(blk->stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(blk->stmts[0]->var_decl_type.kind, DataTypeKind::kInt);
+  EXPECT_EQ(blk->stmts[0]->var_name, "x");
+}
+
+TEST(ParserSection5, BlockVarDecl_UserDefinedType) {
+  EXPECT_TRUE(
+      ParseOk5("module m;\n"
+               "  typedef struct {int a, b[4];} ab_t;\n"
+               "  initial begin\n"
+               "    ab_t v1[1:0] [2:0];\n"
+               "  end\n"
+               "endmodule\n"));
+}
+
+TEST(ParserSection5, BlockVarDecl_CommaSeparated) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int a, b, c;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* blk = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(blk, nullptr);
+  ASSERT_EQ(blk->stmts.size(), 3u);
+  EXPECT_EQ(blk->stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(blk->stmts[1]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(blk->stmts[2]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(blk->stmts[0]->var_name, "a");
+  EXPECT_EQ(blk->stmts[1]->var_name, "b");
+  EXPECT_EQ(blk->stmts[2]->var_name, "c");
+}
+
+TEST(ParserSection5, BlockVarDecl_WithInit) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int x = 42;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* blk = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(blk, nullptr);
+  ASSERT_EQ(blk->stmts.size(), 1u);
+  EXPECT_EQ(blk->stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_NE(blk->stmts[0]->var_init, nullptr);
+}
+
+TEST(ParserSection5, BlockVarDecl_FullStructReplication) {
+  EXPECT_TRUE(
+      ParseOk5("module top();\n"
+               "  struct {int X,Y,Z;} XYZ = '{3{1}};\n"
+               "  typedef struct {int a,b[4];} ab_t;\n"
+               "  int a,b,c;\n"
+               "  initial begin\n"
+               "    ab_t v1[1:0] [2:0];\n"
+               "    v1 = '{2{'{3{'{a,'{2{b,c}}}}}}};\n"
+               "  end\n"
+               "endmodule\n"));
+}

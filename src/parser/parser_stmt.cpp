@@ -17,6 +17,27 @@ static CaseQualifier TokenToCaseQualifier(TokenKind tk) {
   }
 }
 
+// Helper: check whether the current token starts a data type keyword.
+static bool IsDataTypeKeyword(TokenKind tk) {
+  switch (tk) {
+    case TokenKind::kKwLogic:
+    case TokenKind::kKwReg:
+    case TokenKind::kKwBit:
+    case TokenKind::kKwByte:
+    case TokenKind::kKwShortint:
+    case TokenKind::kKwInt:
+    case TokenKind::kKwLongint:
+    case TokenKind::kKwInteger:
+    case TokenKind::kKwReal:
+    case TokenKind::kKwShortreal:
+    case TokenKind::kKwRealtime:
+    case TokenKind::kKwTime:
+      return true;
+    default:
+      return false;
+  }
+}
+
 Stmt* Parser::ParseStmt() {
   auto attrs = ParseAttributes();
 
@@ -114,6 +135,44 @@ Stmt* Parser::ParseEventTriggerStmt() {
   return s;
 }
 
+// LRM section 9.3.1 -- block_item_declaration detection
+bool Parser::IsBlockVarDeclStart() {
+  auto tk = CurrentToken().kind;
+  if (tk == TokenKind::kKwStruct || tk == TokenKind::kKwUnion ||
+      tk == TokenKind::kKwEnum || tk == TokenKind::kKwVar) {
+    return true;
+  }
+  if (IsDataTypeKeyword(tk)) {
+    auto saved = lexer_.SavePos();
+    Consume();
+    bool is_decl = CheckIdentifier() || Check(TokenKind::kKwSigned) ||
+                   Check(TokenKind::kKwUnsigned) || Check(TokenKind::kLBracket);
+    lexer_.RestorePos(saved);
+    return is_decl;
+  }
+  return CurrentToken().Is(TokenKind::kIdentifier) &&
+         known_types_.count(CurrentToken().text) != 0;
+}
+
+// LRM section 9.3.1 -- block-level variable declarations
+void Parser::ParseBlockVarDecls(std::vector<Stmt*>& stmts) {
+  Match(TokenKind::kKwVar);  // optional 'var' prefix (§6.8)
+  DataType dtype = ParseDataType();
+  do {
+    auto* s = arena_.Create<Stmt>();
+    s->kind = StmtKind::kVarDecl;
+    s->range.start = CurrentLoc();
+    s->var_decl_type = dtype;
+    s->var_name = ExpectIdentifier().text;
+    ParseUnpackedDims(s->var_unpacked_dims);
+    if (Match(TokenKind::kEq)) {
+      s->var_init = ParseExpr();
+    }
+    stmts.push_back(s);
+  } while (Match(TokenKind::kComma));
+  Expect(TokenKind::kSemicolon);
+}
+
 // LRM section 12.6 / section 9.3.4 -- named blocks
 Stmt* Parser::ParseBlockStmt() {
   auto* stmt = arena_.Create<Stmt>();
@@ -125,9 +184,13 @@ Stmt* Parser::ParseBlockStmt() {
     stmt->label = ExpectIdentifier().text;
   }
   while (!Check(TokenKind::kKwEnd) && !AtEnd()) {
-    auto* s = ParseStmt();
-    if (s != nullptr) {
-      stmt->stmts.push_back(s);
+    if (IsBlockVarDeclStart()) {
+      ParseBlockVarDecls(stmt->stmts);
+    } else {
+      auto* s = ParseStmt();
+      if (s != nullptr) {
+        stmt->stmts.push_back(s);
+      }
     }
   }
   Expect(TokenKind::kKwEnd);
@@ -188,27 +251,6 @@ CaseItem Parser::ParseCaseItem() {
   Expect(TokenKind::kColon);
   item.body = ParseStmt();
   return item;
-}
-
-// Helper: check whether the current token starts a data type keyword.
-static bool IsDataTypeKeyword(TokenKind tk) {
-  switch (tk) {
-    case TokenKind::kKwLogic:
-    case TokenKind::kKwReg:
-    case TokenKind::kKwBit:
-    case TokenKind::kKwByte:
-    case TokenKind::kKwShortint:
-    case TokenKind::kKwInt:
-    case TokenKind::kKwLongint:
-    case TokenKind::kKwInteger:
-    case TokenKind::kKwReal:
-    case TokenKind::kKwShortreal:
-    case TokenKind::kKwRealtime:
-    case TokenKind::kKwTime:
-      return true;
-    default:
-      return false;
-  }
 }
 
 // LRM section 12.7.1 -- for with optional variable declaration in init

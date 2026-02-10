@@ -88,6 +88,9 @@ class Elaborator {
   /// Return a scoped name (prefixed during generate-for expansion).
   std::string_view ScopedName(std::string_view base);
 
+  /// Validate array assignment pattern element count (§5.11).
+  void ValidateArrayInitPattern(const ModuleItem* item);
+
   Arena& arena_;
   DiagEngine& diag_;
   CompilationUnit* unit_;

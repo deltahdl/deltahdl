@@ -211,6 +211,7 @@ enum class StmtKind : uint8_t {
   kCoverImmediate,   // cover(expr) (§16.3)
   kWaitOrder,        // wait_order(ev1, ev2, ...) (§15.5.4)
   kRandcase,         // randcase ... endcase (§18.16)
+  kVarDecl,          // Block-level variable declaration (§9.3.1)
 };
 
 enum class Edge : uint8_t {
@@ -299,6 +300,12 @@ struct Stmt {
 
   // randcase (§18.16)
   std::vector<std::pair<Expr*, Stmt*>> randcase_items;  // weight : stmt
+
+  // Variable declaration (kVarDecl) — block-level data declaration (§9.3.1)
+  DataType var_decl_type;
+  std::string_view var_name;
+  std::vector<Expr*> var_unpacked_dims;
+  Expr* var_init = nullptr;
 };
 
 // --- Declarations and module items ---

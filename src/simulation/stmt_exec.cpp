@@ -539,6 +539,7 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       return ExecTask::Immediate(ExecReleaseOrDeassignImpl(stmt, ctx));
     case StmtKind::kRandcase:
       return ExecRandcase(stmt, ctx, arena);
+    case StmtKind::kVarDecl:
     default:
       return ExecTask::Immediate(StmtResult::kDone);
   }
