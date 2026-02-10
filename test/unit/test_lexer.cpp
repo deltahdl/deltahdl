@@ -670,3 +670,32 @@ TEST(Lexer, InterpretEscapes_NoEscapes) {
   EXPECT_EQ(InterpretStringEscapes("hello world"), "hello world");
   EXPECT_EQ(InterpretStringEscapes(""), "");
 }
+
+// --- §5.6: Identifier max length validation ---
+
+TEST(Lexer, IdentifierMaxLength_Ok) {
+  std::string id(1024, 'a');
+  auto tokens = lex(id);
+  ASSERT_EQ(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+}
+
+TEST(Lexer, IdentifierMaxLength_Error) {
+  std::string id(1025, 'a');
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<test>", id);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  lexer.LexAll();
+  EXPECT_TRUE(diag.HasErrors());
+}
+
+TEST(Lexer, EscapedIdentifierMaxLength_Error) {
+  std::string id = "\\" + std::string(1025, 'a') + " ";
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<test>", id);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  lexer.LexAll();
+  EXPECT_TRUE(diag.HasErrors());
+}

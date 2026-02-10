@@ -183,6 +183,9 @@ Token Lexer::LexIdentifier() {
   tok.kind = kw.value_or(TokenKind::kIdentifier);
   tok.loc = loc;
   tok.text = text;
+  if (text.size() > 1024) {
+    diag_.Error(loc, "identifier exceeds maximum length of 1024 characters");
+  }
   return tok;
 }
 
@@ -392,6 +395,9 @@ Token Lexer::LexSystemIdentifier() {
   tok.kind = TokenKind::kSystemIdentifier;
   tok.loc = loc;
   tok.text = source_.substr(start, pos_ - start);
+  if (tok.text.size() > 1024) {
+    diag_.Error(loc, "identifier exceeds maximum length of 1024 characters");
+  }
   return tok;
 }
 
@@ -406,6 +412,9 @@ Token Lexer::LexEscapedIdentifier() {
   tok.kind = TokenKind::kEscapedIdentifier;
   tok.loc = loc;
   tok.text = source_.substr(start, pos_ - start);
+  if (tok.text.size() > 1024) {
+    diag_.Error(loc, "identifier exceeds maximum length of 1024 characters");
+  }
   return tok;
 }
 
