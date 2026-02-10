@@ -70,7 +70,8 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: coverage-html/
-      - if: >-
+      - continue-on-error: true
+        if: >-
           github.ref == 'refs/heads/main'
           && github.event_name == 'push'
         name: Publish to GitHub Pages
