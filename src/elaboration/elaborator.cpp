@@ -278,57 +278,62 @@ static void ElaborateGateInst(ModuleItem* item, RtlirModule* mod,
   mod->assigns.push_back(ca);
 }
 
+void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
+  if (!declared_names_.insert(item->name).second) {
+    diag_.Error(item->loc, std::format("redeclaration of '{}'", item->name));
+  }
+  var_types_[item->name] = item->data_type.kind;
+  RtlirNet net;
+  net.name = ScopedName(item->name);
+  net.net_type = NetType::kWire;
+  net.width = EvalTypeWidth(item->data_type, typedefs_);
+  mod->nets.push_back(net);
+}
+
+void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
+  if (!declared_names_.insert(item->name).second) {
+    diag_.Error(item->loc, std::format("redeclaration of '{}'", item->name));
+  }
+  var_types_[item->name] = item->data_type.kind;
+  RtlirVariable var;
+  var.name = ScopedName(item->name);
+  var.width = EvalTypeWidth(item->data_type, typedefs_);
+  var.is_4state = Is4stateType(item->data_type, typedefs_);
+  var.is_event = (item->data_type.kind == DataTypeKind::kEvent);
+  mod->variables.push_back(var);
+  ValidateArrayInitPattern(item);
+  TrackEnumVariable(item);
+  if (item->data_type.kind == DataTypeKind::kEnum) {
+    ValidateEnumDecl(item->data_type, item->loc);
+  }
+}
+
+void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
+  if (item->assign_lhs && item->assign_lhs->kind == ExprKind::kIdentifier) {
+    auto name = item->assign_lhs->text;
+    if (!cont_assign_targets_.emplace(name, item->loc).second) {
+      diag_.Error(item->loc,
+                  std::format("multiple continuous assignments to '{}'", name));
+    }
+  }
+  RtlirContAssign ca;
+  ca.lhs = item->assign_lhs;
+  ca.rhs = item->assign_rhs;
+  ca.width = LookupLhsWidth(ca.lhs, mod);
+  mod->assigns.push_back(ca);
+}
+
 void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
   switch (item->kind) {
-    case ModuleItemKind::kNetDecl: {
-      if (!declared_names_.insert(item->name).second) {
-        diag_.Error(item->loc,
-                    std::format("redeclaration of '{}'", item->name));
-      }
-      var_types_[item->name] = item->data_type.kind;
-      RtlirNet net;
-      net.name = ScopedName(item->name);
-      net.net_type = NetType::kWire;
-      net.width = EvalTypeWidth(item->data_type, typedefs_);
-      mod->nets.push_back(net);
+    case ModuleItemKind::kNetDecl:
+      ElaborateNetDecl(item, mod);
       break;
-    }
-    case ModuleItemKind::kVarDecl: {
-      if (!declared_names_.insert(item->name).second) {
-        diag_.Error(item->loc,
-                    std::format("redeclaration of '{}'", item->name));
-      }
-      var_types_[item->name] = item->data_type.kind;
-      RtlirVariable var;
-      var.name = ScopedName(item->name);
-      var.width = EvalTypeWidth(item->data_type, typedefs_);
-      var.is_4state = Is4stateType(item->data_type, typedefs_);
-      var.is_event = (item->data_type.kind == DataTypeKind::kEvent);
-      mod->variables.push_back(var);
-      ValidateArrayInitPattern(item);
-      TrackEnumVariable(item);
-      if (item->data_type.kind == DataTypeKind::kEnum) {
-        ValidateEnumDecl(item->data_type, item->loc);
-      }
+    case ModuleItemKind::kVarDecl:
+      ElaborateVarDecl(item, mod);
       break;
-    }
-    case ModuleItemKind::kContAssign: {
-      if (item->assign_lhs && item->assign_lhs->kind == ExprKind::kIdentifier) {
-        auto name = item->assign_lhs->text;
-        auto [it, ok] = cont_assign_targets_.emplace(name, item->loc);
-        if (!ok) {
-          diag_.Error(
-              item->loc,
-              std::format("multiple continuous assignments to '{}'", name));
-        }
-      }
-      RtlirContAssign ca;
-      ca.lhs = item->assign_lhs;
-      ca.rhs = item->assign_rhs;
-      ca.width = LookupLhsWidth(ca.lhs, mod);
-      mod->assigns.push_back(ca);
+    case ModuleItemKind::kContAssign:
+      ElaborateContAssign(item, mod);
       break;
-    }
     case ModuleItemKind::kInitialBlock:
       AddProcess(RtlirProcessKind::kInitial, item, mod, arena_);
       break;

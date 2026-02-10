@@ -33,6 +33,7 @@ class Parser {
   void ParseModuleBody(ModuleDecl& mod);
   void ParseNonAnsiPortDecls(ModuleDecl& mod);
   void ParseModuleItem(std::vector<ModuleItem*>& items);
+  bool TryParseProcessBlock(std::vector<ModuleItem*>& items);
   bool TryParseKeywordItem(std::vector<ModuleItem*>& items);
   bool TryParseVerificationItem(std::vector<ModuleItem*>& items);
   void ParseGenvarDecl(std::vector<ModuleItem*>& items);
@@ -193,6 +194,7 @@ class Parser {
   Expr* MakeLiteral(ExprKind kind, const Token& tok);
   Expr* ParseCallExpr(Expr* callee);
   void ParseNamedArg(Expr* call);
+  Expr* ParseMemberAccessChain(Token tok);
   Expr* ParseIdentifierExpr();
   Expr* ParseSelectExpr(Expr* base);
   Expr* ParseSystemCall();

@@ -301,6 +301,29 @@ Expr* Parser::ParsePrimaryExpr() {
   return err;
 }
 
+Expr* Parser::ParseMemberAccessChain(Token tok) {
+  auto* id = arena_.Create<Expr>();
+  id->kind = ExprKind::kIdentifier;
+  id->text = tok.text;
+  id->range.start = tok.loc;
+  Expr* result = id;
+  while (Check(TokenKind::kDot)) {
+    Consume();
+    auto member_tok = ExpectIdentifier();
+    auto* member_id = arena_.Create<Expr>();
+    member_id->kind = ExprKind::kIdentifier;
+    member_id->text = member_tok.text;
+    member_id->range.start = member_tok.loc;
+    auto* acc = arena_.Create<Expr>();
+    acc->kind = ExprKind::kMemberAccess;
+    acc->lhs = result;
+    acc->rhs = member_id;
+    acc->range.start = result->range.start;
+    result = acc;
+  }
+  return result;
+}
+
 Expr* Parser::ParseIdentifierExpr() {
   auto tok = Consume();
 
@@ -321,27 +344,7 @@ Expr* Parser::ParseIdentifierExpr() {
     lexer_.RestorePos(saved);
   }
 
-  auto* id = arena_.Create<Expr>();
-  id->kind = ExprKind::kIdentifier;
-  id->text = tok.text;
-  id->range.start = tok.loc;
-
-  // Member access chain: a.b.c
-  Expr* result = id;
-  while (Check(TokenKind::kDot)) {
-    Consume();
-    auto member_tok = ExpectIdentifier();
-    auto* member_id = arena_.Create<Expr>();
-    member_id->kind = ExprKind::kIdentifier;
-    member_id->text = member_tok.text;
-    member_id->range.start = member_tok.loc;
-    auto* acc = arena_.Create<Expr>();
-    acc->kind = ExprKind::kMemberAccess;
-    acc->lhs = result;
-    acc->rhs = member_id;
-    acc->range.start = result->range.start;
-    result = acc;
-  }
+  Expr* result = ParseMemberAccessChain(tok);
 
   if (Check(TokenKind::kLParen)) return ParseWithClause(ParseCallExpr(result));
   if (Check(TokenKind::kLBracket)) return ParseSelectExpr(result);

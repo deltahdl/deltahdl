@@ -589,6 +589,23 @@ bool Parser::TryParseClockingOrVerification(std::vector<ModuleItem*>& items) {
   return TryParseVerificationItem(items);
 }
 
+bool Parser::TryParseProcessBlock(std::vector<ModuleItem*>& items) {
+  if (Check(TokenKind::kKwInitial)) {
+    items.push_back(ParseInitialBlock());
+    return true;
+  }
+  if (Check(TokenKind::kKwFinal)) {
+    items.push_back(ParseFinalBlock());
+    return true;
+  }
+  auto ak = TokenToAlwaysKind(CurrentToken().kind);
+  if (ak) {
+    items.push_back(ParseAlwaysBlock(*ak));
+    return true;
+  }
+  return false;
+}
+
 bool Parser::TryParseKeywordItem(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kKwTypedef)) {
     items.push_back(ParseTypedef());
@@ -610,19 +627,7 @@ bool Parser::TryParseKeywordItem(std::vector<ModuleItem*>& items) {
     items.push_back(ParseContinuousAssign());
     return true;
   }
-  if (Check(TokenKind::kKwInitial)) {
-    items.push_back(ParseInitialBlock());
-    return true;
-  }
-  if (Check(TokenKind::kKwFinal)) {
-    items.push_back(ParseFinalBlock());
-    return true;
-  }
-  auto ak = TokenToAlwaysKind(CurrentToken().kind);
-  if (ak) {
-    items.push_back(ParseAlwaysBlock(*ak));
-    return true;
-  }
+  if (TryParseProcessBlock(items)) return true;
   if (Check(TokenKind::kKwAlias)) {
     items.push_back(ParseAlias());
     return true;
