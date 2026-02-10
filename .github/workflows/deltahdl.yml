@@ -1,7 +1,7 @@
 ---
 concurrency:
   cancel-in-progress: true
-  group: deltahdl-${{ github.event.workflow_run.head_branch }}
+  group: deltahdl-${{ github.event.workflow_run.head_branch || github.ref }}
 jobs:
   assert-coverage:
     needs: e2e-test-coverage
