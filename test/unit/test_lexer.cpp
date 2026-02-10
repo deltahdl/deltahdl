@@ -657,6 +657,14 @@ TEST(Lexer, InterpretEscapes_Unknown) {
   EXPECT_EQ(InterpretStringEscapes(R"(\q)"), "q");
 }
 
+TEST(Lexer, InterpretEscapes_LineContinuation) {
+  using delta::InterpretStringEscapes;
+  // §5.9: backslash + newline → both ignored (line continuation)
+  EXPECT_EQ(InterpretStringEscapes("hello\\\nworld"), "helloworld");
+  // Windows line endings
+  EXPECT_EQ(InterpretStringEscapes("hello\\\r\nworld"), "helloworld");
+}
+
 TEST(Lexer, InterpretEscapes_NoEscapes) {
   using delta::InterpretStringEscapes;
   EXPECT_EQ(InterpretStringEscapes("hello world"), "hello world");

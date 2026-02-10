@@ -16,7 +16,7 @@ int HexVal(char c) {
   return c - 'A' + 10;
 }
 
-// Parse 1–3 octal digits starting at pos. Returns (value, chars_consumed).
+// Parse 1-3 octal digits starting at pos. Returns (value, chars_consumed).
 std::pair<char, size_t> ParseOctal(std::string_view s, size_t pos) {
   int val = 0;
   size_t count = 0;
@@ -27,7 +27,7 @@ std::pair<char, size_t> ParseOctal(std::string_view s, size_t pos) {
   return {static_cast<char>(val), count};
 }
 
-// Parse 1–2 hex digits starting at pos. Returns (value, chars_consumed).
+// Parse 1-2 hex digits starting at pos. Returns (value, chars_consumed).
 std::pair<char, size_t> ParseHex(std::string_view s, size_t pos) {
   int val = 0;
   size_t count = 0;
@@ -36,6 +36,60 @@ std::pair<char, size_t> ParseHex(std::string_view s, size_t pos) {
     ++count;
   }
   return {static_cast<char>(val), count};
+}
+
+// Map a named escape character to its value. Returns 0 if not a named escape.
+char NamedEscape(char c) {
+  switch (c) {
+    case 'n':
+      return '\n';
+    case 't':
+      return '\t';
+    case '\\':
+      return '\\';
+    case '"':
+      return '"';
+    case 'v':
+      return '\v';
+    case 'f':
+      return '\f';
+    case 'a':
+      return '\a';
+    default:
+      return 0;
+  }
+}
+
+// Process one escape sequence starting after the backslash.
+// Appends the result to 'out' and returns the number of extra chars consumed.
+size_t ProcessEscape(std::string_view raw, size_t i, std::string& out) {
+  char c = raw[i];
+  char named = NamedEscape(c);
+  if (named != 0) {
+    out += named;
+    return 0;
+  }
+  if (c == '\n') return 0;  // §5.9 line continuation: both chars ignored
+  if (c == '\r') {
+    if (i + 1 < raw.size() && raw[i + 1] == '\n') return 1;  // skip \r\n
+    return 0;  // bare \r continuation
+  }
+  if (c == 'x') {
+    auto [val, count] = ParseHex(raw, i + 1);
+    if (count > 0) {
+      out += val;
+      return count;
+    }
+    out += 'x';
+    return 0;
+  }
+  if (IsOctalDigit(c)) {
+    auto [val, count] = ParseOctal(raw, i);
+    out += val;
+    return count - 1;  // -1 because caller already consumed first char
+  }
+  out += c;  // Unknown escape: drop backslash (§5.9.1)
+  return 0;
 }
 
 }  // namespace
@@ -50,49 +104,7 @@ std::string InterpretStringEscapes(std::string_view raw) {
     }
     ++i;  // skip backslash
     if (i >= raw.size()) break;
-    char c = raw[i];
-    switch (c) {
-      case 'n':
-        result += '\n';
-        break;
-      case 't':
-        result += '\t';
-        break;
-      case '\\':
-        result += '\\';
-        break;
-      case '"':
-        result += '"';
-        break;
-      case 'v':
-        result += '\v';
-        break;
-      case 'f':
-        result += '\f';
-        break;
-      case 'a':
-        result += '\a';
-        break;
-      case 'x': {
-        auto [val, count] = ParseHex(raw, i + 1);
-        if (count > 0) {
-          result += val;
-          i += count;
-        } else {
-          result += 'x';  // \x with no digits → literal x
-        }
-        break;
-      }
-      default:
-        if (IsOctalDigit(c)) {
-          auto [val, count] = ParseOctal(raw, i);
-          result += val;
-          i += count - 1;  // -1 because loop increments i
-        } else {
-          result += c;  // Unknown escape: drop backslash (§5.9.1)
-        }
-        break;
-    }
+    i += ProcessEscape(raw, i, result);
   }
   return result;
 }
