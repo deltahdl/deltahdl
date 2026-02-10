@@ -381,11 +381,6 @@ jobs:
         run: chmod +x build/src/deltahdl
       - name: E2E tests
         run: python3 scripts/run_sim_tests.py
-  gate:
-    if: github.event.workflow_run.conclusion == 'success'
-    runs-on: ubuntu-24.04
-    steps:
-      - run: echo "Tools workflow passed"
   # DO NOT lower the sv-tests pass threshold. Every failing test
   # represents a real LRM conformance gap — lowering it hides parser
   # and elaboration bugs instead of fixing them.
@@ -598,7 +593,7 @@ jobs:
           git tag -f latest
           git push origin latest --force
   static-analysis:
-    needs: gate
+    if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4

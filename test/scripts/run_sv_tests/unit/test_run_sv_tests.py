@@ -10,12 +10,22 @@ import run_sv_tests
 class TestCollectTests:
     """Tests for the collect_tests() function."""
 
-    def test_returns_sorted_paths(self):
-        """collect_tests() should return sorted paths matching the glob."""
-        fake_paths = ["/x/chapter-6/b.sv", "/x/chapter-5/a.sv"]
+    def test_returns_naturally_sorted_paths(self):
+        """collect_tests() should use natural sort: chapter-5 before chapter-25."""
+        fake_paths = [
+            "/x/chapter-25/3-interface.sv",
+            "/x/chapter-5/10-arrays.sv",
+            "/x/chapter-5/3-types.sv",
+            "/x/chapter-26/1-pkg.sv",
+        ]
         with patch("run_sv_tests.glob.glob", return_value=fake_paths):
             result = run_sv_tests.collect_tests()
-        assert result == sorted(fake_paths)
+        assert result == [
+            "/x/chapter-5/3-types.sv",
+            "/x/chapter-5/10-arrays.sv",
+            "/x/chapter-25/3-interface.sv",
+            "/x/chapter-26/1-pkg.sv",
+        ]
 
     def test_returns_empty_when_no_files(self):
         """collect_tests() should return an empty list when nothing matches."""
@@ -60,8 +70,20 @@ def test_chapter_from_path_extracts_chapter_directory():
     assert run_sv_tests.chapter_from_path("/a/chapter-5/foo.sv") == "chapter-5"
 
 
-def test_print_chapter_breakdown_groups_pass_fail_by_chapter(capsys):
-    """print_chapter_breakdown() should print per-chapter counts."""
+def test_print_chapter_breakdown_has_box_drawing_table(capsys):
+    """print_chapter_breakdown() should print a box-drawing table."""
+    results = [{"chapter": "chapter-5", "status": "pass"}]
+    run_sv_tests.print_chapter_breakdown(results)
+    captured = capsys.readouterr().out
+    assert all(
+        s in captured
+        for s in ("┌", "┐", "├", "┤", "└", "┘", "│",
+                   "Chapter", "Passed", "Sub-Total", "Percentage")
+    )
+
+
+def test_print_chapter_breakdown_shows_correct_values(capsys):
+    """print_chapter_breakdown() should show passed, total, and percentage."""
     results = [
         {"chapter": "chapter-5", "status": "pass"},
         {"chapter": "chapter-5", "status": "fail"},
@@ -69,10 +91,18 @@ def test_print_chapter_breakdown_groups_pass_fail_by_chapter(capsys):
     ]
     run_sv_tests.print_chapter_breakdown(results)
     captured = capsys.readouterr().out
-    assert all(
-        s in captured
-        for s in ("chapter-5: 1/2 passed", "chapter-6: 1/1 passed")
-    )
+    assert "50.0%" in captured and "100.0%" in captured
+
+
+def test_print_chapter_breakdown_uses_natural_order(capsys):
+    """print_chapter_breakdown() should list chapter-5 before chapter-25."""
+    results = [
+        {"chapter": "chapter-25", "status": "pass"},
+        {"chapter": "chapter-5", "status": "pass"},
+    ]
+    run_sv_tests.print_chapter_breakdown(results)
+    captured = capsys.readouterr().out
+    assert captured.index("chapter-5") < captured.index("chapter-25")
 
 
 class TestWriteJunitXml:

@@ -3,94 +3,6 @@ concurrency:
   cancel-in-progress: true
   group: tools-${{ github.ref }}
 jobs:
-  # DO NOT lower this threshold. Uncovered code is untested code —
-  # lowering it hides bugs and lets regressions slip through silently.
-  assert-coverage:
-    needs:
-      - e2e-test-run-sim-tests
-      - e2e-test-run-sv-tests
-      - e2e-test-test-common
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install tools
-        run: pip install pytest pytest-cov
-      - name: Enforce 100% coverage
-        run: >-
-          python3 -m pytest test/scripts/ -v
-          --cov=scripts
-          --cov-branch
-          --cov-report=term-missing
-          --cov-fail-under=100
-  # ── Lane: run_sim_tests ──
-  e2e-test-run-sim-tests:
-    needs: integration-test-run-sim-tests
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install pytest
-        run: pip install pytest
-      - name: Run e2e tests
-        run: >-
-          python3 -m pytest
-          test/scripts/run_sim_tests/e2e/ -v
-  # ── Lane: run_sv_tests ──
-  e2e-test-run-sv-tests:
-    needs: integration-test-run-sv-tests
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install pytest
-        run: pip install pytest
-      - name: Run e2e tests
-        run: >-
-          python3 -m pytest
-          test/scripts/run_sv_tests/e2e/ -v
-  # ── Lane: test_common ──
-  e2e-test-test-common:
-    needs: integration-test-test-common
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install pytest
-        run: pip install pytest
-      - name: Run e2e tests
-        run: >-
-          python3 -m pytest
-          test/scripts/test_common/e2e/ -v
-  integration-test-run-sim-tests:
-    needs: unit-test-run-sim-tests
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install pytest
-        run: pip install pytest
-      - name: Run integration tests
-        run: >-
-          python3 -m pytest
-          test/scripts/run_sim_tests/integration/ -v
-  integration-test-run-sv-tests:
-    needs: unit-test-run-sv-tests
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install pytest
-        run: pip install pytest
-      - name: Run integration tests
-        run: >-
-          python3 -m pytest
-          test/scripts/run_sv_tests/integration/ -v
-  integration-test-test-common:
-    needs: unit-test-test-common
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install pytest
-        run: pip install pytest
-      - name: Run integration tests
-        run: >-
-          python3 -m pytest
-          test/scripts/test_common/integration/ -v
   # ── Gate: static analysis for all scripts ──
   static-analysis:
     runs-on: ubuntu-24.04
@@ -153,45 +65,62 @@ jobs:
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
           --reporters console test/scripts/
+  # ── Lane: run_sim_tests ──
+  # DO NOT lower coverage thresholds. Uncovered code is untested code —
+  # lowering it hides bugs and lets regressions slip through silently.
+  test-run-sim-tests:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run tests with 100% coverage gate
+        run: >-
+          python3 -m pytest test/scripts/run_sim_tests/ -v
+          --cov=run_sim_tests
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
+  # ── Lane: run_sv_tests ──
+  test-run-sv-tests:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run tests with 100% coverage gate
+        run: >-
+          python3 -m pytest test/scripts/run_sv_tests/ -v
+          --cov=run_sv_tests
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
+  # ── Lane: test_common ──
+  test-test-common:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run tests with 100% coverage gate
+        run: >-
+          python3 -m pytest test/scripts/test_common/ -v
+          --cov=test_common
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
   # ── Trigger ──
   trigger-deltahdl-ci:
-    needs: assert-coverage
+    needs:
+      - test-run-sim-tests
+      - test-run-sv-tests
+      - test-test-common
     runs-on: ubuntu-24.04
     steps:
       - run: echo "All tools tests passed"
-  unit-test-run-sim-tests:
-    needs: static-analysis
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install pytest
-        run: pip install pytest
-      - name: Run unit tests
-        run: >-
-          python3 -m pytest
-          test/scripts/run_sim_tests/unit/ -v
-  unit-test-run-sv-tests:
-    needs: static-analysis
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install pytest
-        run: pip install pytest
-      - name: Run unit tests
-        run: >-
-          python3 -m pytest
-          test/scripts/run_sv_tests/unit/ -v
-  unit-test-test-common:
-    needs: static-analysis
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install pytest
-        run: pip install pytest
-      - name: Run unit tests
-        run: >-
-          python3 -m pytest
-          test/scripts/test_common/unit/ -v
 name: Tools
 on:
   pull_request:

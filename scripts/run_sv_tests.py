@@ -3,6 +3,7 @@
 
 import argparse
 import glob
+import re
 import subprocess
 import sys
 import time
@@ -28,10 +29,15 @@ def parse_args():
     return parser.parse_args()
 
 
+def _natural_sort_key(text):
+    """Split text into (str, int, str, int, ...) for natural ordering."""
+    return [int(tok) if tok.isdigit() else tok for tok in re.split(r"(\d+)", text)]
+
+
 def collect_tests():
     """Collect all .sv files under the chapter directories."""
     pattern = str(TEST_DIR / "chapter-*" / "*.sv")
-    return sorted(glob.glob(pattern))
+    return sorted(glob.glob(pattern), key=_natural_sort_key)
 
 
 def run_test(path):
@@ -55,7 +61,7 @@ def chapter_from_path(path):
 
 
 def print_chapter_breakdown(results):
-    """Print per-chapter pass/fail summary grouped by chapter directory."""
+    """Print per-chapter pass/fail summary as a box-drawing table."""
     chapters = defaultdict(lambda: {"passed": 0, "failed": 0})
     for r in results:
         bucket = chapters[r["chapter"]]
@@ -64,11 +70,34 @@ def print_chapter_breakdown(results):
         else:
             bucket["failed"] += 1
 
+    names = sorted(chapters, key=_natural_sort_key)
+    rows = []
+    for name in names:
+        c = chapters[name]
+        total = c["passed"] + c["failed"]
+        pct = 100.0 * c["passed"] / total if total else 0.0
+        rows.append((name, str(c["passed"]), str(total), f"{pct:.1f}%"))
+
+    headers = ("Chapter", "Passed", "Sub-Total", "Percentage")
+    widths = [
+        max(len(h), max((len(row[i]) for row in rows), default=0))
+        for i, h in enumerate(headers)
+    ]
+
+    def _border(left, mid, right):
+        return left + mid.join("─" * (w + 2) for w in widths) + right
+
+    def _row(vals, aligns):
+        cells = [f" {v:{a}{widths[i]}} " for i, (v, a) in enumerate(zip(vals, aligns))]
+        return "│" + "│".join(cells) + "│"
+
     print("\nPer-chapter breakdown:")
-    for chapter in sorted(chapters):
-        counts = chapters[chapter]
-        total = counts["passed"] + counts["failed"]
-        print(f"  {chapter}: {counts['passed']}/{total} passed")
+    print(_border("┌", "┬", "┐"))
+    print(_row(headers, ["<"] * 4))
+    print(_border("├", "┼", "┤"))
+    for row in rows:
+        print(_row(row, ["<", ">", ">", ">"]))
+    print(_border("└", "┴", "┘"))
 
 
 def write_junit_xml(results, elapsed, filepath):
@@ -161,7 +190,8 @@ def main():
         passed += ok
 
     failed = len(results) - passed
-    print(f"\nsv-tests summary: {passed}/{len(results)} passed, {failed} failed")
+    pct = 100.0 * passed / len(results)
+    print(f"\nsv-tests summary: {passed}/{len(results)} passed ({pct:.1f}%), {failed} failed")
 
     print_chapter_breakdown(results)
 
