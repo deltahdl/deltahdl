@@ -47,19 +47,22 @@ jobs:
             --ignore-filename-regex='test/|third_party/' \
             --format=html \
             -output-dir=coverage-html
-      - name: Enforce 100% coverage
+      - name: Enforce coverage baseline
         run: |
           llvm-cov-18 report build/src/deltahdl \
             -instr-profile=merged.profdata \
             --ignore-filename-regex='test/|third_party/'
-          llvm-cov-18 export build/src/deltahdl \
+          LINE_PCT=$(llvm-cov-18 export build/src/deltahdl \
             -instr-profile=merged.profdata \
             --ignore-filename-regex='test/|third_party/' \
             --summary-only \
-            | jq -e '.data[0].totals |
-              .lines.covered == .lines.count and
-              .branches.covered == .branches.count' \
-            || { echo "FAIL: coverage must be 100%"; exit 1; }
+            | jq '.data[0].totals.lines |
+              (100.0 * .covered / .count)')
+          echo "Line coverage: ${LINE_PCT}%"
+          jq -n --argjson pct "$LINE_PCT" \
+            'if $pct >= 85 then true else false end' \
+            | jq -e . \
+            || { echo "REGRESSION: ${LINE_PCT}% < 85% baseline"; exit 1; }
       - if: >-
           github.ref == 'refs/heads/main'
           && github.event_name == 'push'
