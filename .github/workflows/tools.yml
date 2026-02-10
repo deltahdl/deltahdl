@@ -3,6 +3,24 @@ concurrency:
   cancel-in-progress: true
   group: tools-${{ github.ref }}
 jobs:
+  # DO NOT lower this threshold. Uncovered code is untested code —
+  # lowering it hides bugs and lets regressions slip through silently.
+  assert-coverage:
+    needs:
+      - e2e-test-run-sim-tests
+      - e2e-test-run-sv-tests
+      - e2e-test-test-common
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Enforce 100% coverage
+        run: >-
+          python3 -m pytest test/scripts/ -v
+          --cov=scripts
+          --cov-report=term-missing
+          --cov-fail-under=100
   # ── Lane: run_sim_tests ──
   e2e-test-run-sim-tests:
     needs: integration-test-run-sim-tests
@@ -104,10 +122,7 @@ jobs:
           --reporters console scripts/
   # ── Trigger ──
   trigger-deltahdl-ci:
-    needs:
-      - e2e-test-run-sim-tests
-      - e2e-test-run-sv-tests
-      - e2e-test-test-common
+    needs: assert-coverage
     runs-on: ubuntu-24.04
     steps:
       - run: echo "All tools tests passed"
