@@ -325,6 +325,20 @@ ModuleItem* Parser::ParseDpiExport(SourceLoc loc) {
 
 void Parser::ParseParamPortDecl(ModuleDecl& mod) {
   Match(TokenKind::kKwParameter);
+  // Handle type parameter: #(type T = real)  (§6.20.3)
+  if (Match(TokenKind::kKwType)) {
+    auto name = Expect(TokenKind::kIdentifier);
+    if (Match(TokenKind::kEq)) {
+      if (Check(TokenKind::kKwType)) {
+        ParseExpr();  // type() expression as default
+      } else {
+        ParseDataType();  // consume default type
+      }
+    }
+    mod.params.push_back({name.text, nullptr});
+    known_types_.insert(name.text);
+    return;
+  }
   ParseDataType();  // consume optional type (not stored in params)
   auto name = Expect(TokenKind::kIdentifier);
   Expr* default_val = nullptr;
@@ -409,6 +423,17 @@ PortDecl Parser::ParsePortDecl() {
   }
 
   port.data_type = ParseDataType();
+
+  // Handle implicit type with packed dims: input [3:0] a (§6.10)
+  if (port.data_type.kind == DataTypeKind::kImplicit &&
+      Check(TokenKind::kLBracket)) {
+    port.data_type.kind = DataTypeKind::kLogic;
+    Consume();
+    port.data_type.packed_dim_left = ParseExpr();
+    Expect(TokenKind::kColon);
+    port.data_type.packed_dim_right = ParseExpr();
+    Expect(TokenKind::kRBracket);
+  }
 
   auto name_tok = ExpectIdentifier();
   port.name = name_tok.text;
@@ -610,6 +635,14 @@ bool Parser::TryParseKeywordItem(std::vector<ModuleItem*>& items) {
     ParseTimeunitDecl(current_module_);
     return true;
   }
+  if (Check(TokenKind::kKwInterconnect)) {
+    Consume();
+    DataType dtype;
+    dtype.kind = DataTypeKind::kWire;
+    dtype.is_net = true;
+    ParseVarDeclList(items, dtype);
+    return true;
+  }
   return TryParseClockingOrVerification(items);
 }
 
@@ -689,6 +722,26 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
 }
 
 void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items) {
+  // Handle 'var' prefix: var type(expr) name; or var data_type name; (§6.8)
+  if (Match(TokenKind::kKwVar)) {
+    if (Check(TokenKind::kKwType)) {
+      Consume();  // type
+      Expect(TokenKind::kLParen);
+      ParseExpr();  // type expression (not semantically tracked yet)
+      Expect(TokenKind::kRParen);
+      auto* item = arena_.Create<ModuleItem>();
+      item->kind = ModuleItemKind::kVarDecl;
+      item->loc = CurrentLoc();
+      item->name = ExpectIdentifier().text;
+      ParseUnpackedDims(item->unpacked_dims);
+      Expect(TokenKind::kSemicolon);
+      items.push_back(item);
+      return;
+    }
+    auto dtype = ParseDataType();
+    ParseVarDeclList(items, dtype);
+    return;
+  }
   if (Check(TokenKind::kKwCase)) {
     items.push_back(ParseGenerateCase());
     return;
@@ -918,14 +971,37 @@ ModuleItem* Parser::ParseParamDecl() {
   item->kind = ModuleItemKind::kParamDecl;
   item->loc = CurrentLoc();
   Consume();  // parameter or localparam
-  // Handle "parameter type T = ..." (type parameter).
+  // Handle "parameter type T = ..." (type parameter, §6.20.3).
   if (Match(TokenKind::kKwType)) {
     item->data_type.kind = DataTypeKind::kVoid;  // Marker for type params.
+    item->name = Expect(TokenKind::kIdentifier).text;
+    if (Match(TokenKind::kEq)) {
+      auto dtype = ParseDataType();
+      if (dtype.kind != DataTypeKind::kImplicit) {
+        item->typedef_type = dtype;
+      } else {
+        item->init_expr = ParseExpr();
+      }
+    }
+    known_types_.insert(item->name);
+    Expect(TokenKind::kSemicolon);
+    return item;
   } else {
     item->data_type = ParseDataType();
+    // Handle implicit type with packed dims: localparam [10:0] p (§6.10)
+    if (item->data_type.kind == DataTypeKind::kImplicit &&
+        Check(TokenKind::kLBracket)) {
+      item->data_type.kind = DataTypeKind::kLogic;
+      Consume();
+      item->data_type.packed_dim_left = ParseExpr();
+      Expect(TokenKind::kColon);
+      item->data_type.packed_dim_right = ParseExpr();
+      Expect(TokenKind::kRBracket);
+    }
   }
   auto name_tok = Expect(TokenKind::kIdentifier);
   item->name = name_tok.text;
+  ParseUnpackedDims(item->unpacked_dims);
   if (Match(TokenKind::kEq)) {
     item->init_expr = ParseExpr();
   }

@@ -32,6 +32,7 @@ static bool IsDataTypeKeyword(TokenKind tk) {
     case TokenKind::kKwShortreal:
     case TokenKind::kKwRealtime:
     case TokenKind::kKwTime:
+    case TokenKind::kKwString:
       return true;
     default:
       return false;

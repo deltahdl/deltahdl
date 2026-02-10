@@ -300,6 +300,24 @@ Expr* Parser::ParsePrimaryExpr() {
 
 Expr* Parser::ParseIdentifierExpr() {
   auto tok = Consume();
+
+  // User-defined type cast: type_name'(expr) (§6.19.4, §6.24)
+  if (known_types_.count(tok.text) != 0 && Check(TokenKind::kApostrophe)) {
+    auto saved = lexer_.SavePos();
+    Consume();  // '
+    if (Check(TokenKind::kLParen)) {
+      Consume();  // (
+      auto* cast = arena_.Create<Expr>();
+      cast->kind = ExprKind::kCast;
+      cast->text = tok.text;
+      cast->range.start = tok.loc;
+      cast->lhs = ParseExpr();
+      Expect(TokenKind::kRParen);
+      return cast;
+    }
+    lexer_.RestorePos(saved);
+  }
+
   auto* id = arena_.Create<Expr>();
   id->kind = ExprKind::kIdentifier;
   id->text = tok.text;
@@ -562,7 +580,13 @@ Expr* Parser::ParseTypeRefExpr() {
   auto* ref = arena_.Create<Expr>();
   ref->kind = ExprKind::kTypeRef;
   ref->range.start = loc;
-  ref->lhs = ParseExpr();
+  // Try parsing as data type first: type(logic[11:0]) (§6.23)
+  auto dtype = ParseDataType();
+  if (dtype.kind != DataTypeKind::kImplicit) {
+    ref->text = dtype.type_name;
+  } else {
+    ref->lhs = ParseExpr();
+  }
   Expect(TokenKind::kRParen);
   return ref;
 }

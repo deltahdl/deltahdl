@@ -376,3 +376,182 @@ TEST(Elaboration, ArrayInitPattern_SizeMismatch) {
       f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
+
+// --- §6.5: Variable constraints ---
+
+TEST(Elaboration, VarRedeclare_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  reg v;\n"
+      "  wire v;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Elaboration, VarMultiContAssign_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  int v;\n"
+      "  assign v = 12;\n"
+      "  assign v = 13;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Elaboration, VarMixedAssign_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  wire clk = 0;\n"
+      "  int v;\n"
+      "  assign v = 12;\n"
+      "  always @(posedge clk) v <= ~v;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Elaboration, VarSingleContAssign_Ok) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  int v;\n"
+      "  assign v = 12;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// --- §6.12: Real type restrictions ---
+
+TEST(Elaboration, RealBitSelect_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  real a = 0.5;\n"
+      "  wire b;\n"
+      "  assign b = a[2];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Elaboration, RealIndex_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  real a = 0.5;\n"
+      "  wire [3:0] b;\n"
+      "  wire c;\n"
+      "  assign c = b[a];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Elaboration, RealEdge_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  real a = 0.5;\n"
+      "  always @(posedge a)\n"
+      "    $display(\"posedge\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Elaboration, RealAssign_Ok) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  real a = 0.5;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// --- §6.19: Enum validation ---
+
+TEST(Elaboration, EnumSizedLiteralMismatch_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  enum logic [2:0] {\n"
+      "    Global = 4'h2,\n"
+      "    Local = 4'h3\n"
+      "  } myenum;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Elaboration, EnumXZin2State_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  enum bit [1:0] {a=0, b=2'bxx, c=1} val;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Elaboration, EnumUnassignedAfterXZ_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  enum integer {a=0, b={32{1'bx}}, c} val;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// --- §6.19.3: Enum strict type checking ---
+
+TEST(Elaboration, EnumStrictTypeCheck_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {a, b, c, d} e;\n"
+      "  initial begin\n"
+      "    e val;\n"
+      "    val = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// --- §6.19.4: Enum arithmetic without cast ---
+
+TEST(Elaboration, EnumArithNoCast_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {a, b, c, d} e;\n"
+      "  initial begin\n"
+      "    e val;\n"
+      "    val = a;\n"
+      "    val += 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// --- §6.20.5: Specparam restriction ---
+
+TEST(Elaboration, SpecparamInParam_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  specparam delay = 50;\n"
+      "  parameter p = delay + 2;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}

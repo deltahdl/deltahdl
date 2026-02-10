@@ -498,3 +498,129 @@ TEST(ParserSection6, ScopeResolutionType) {
   EXPECT_EQ(var_item->data_type.scope_name, "pkg");
   EXPECT_EQ(var_item->data_type.type_name, "mytype");
 }
+
+// =========================================================================
+// §6 — TDD tests for remaining sv-tests
+// =========================================================================
+
+// Helper: check parse succeeds with no errors.
+static bool ParseOk6(const std::string& src) {
+  SourceManager mgr;
+  Arena arena;
+  auto fid = mgr.AddFile("<test>", src);
+  DiagEngine diag(mgr);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, arena, diag);
+  parser.Parse();
+  return !diag.HasErrors();
+}
+
+// Step 1a: string type in block-level declarations (fixes 6.19.5.6)
+TEST(ParserSection6, BlockVarDecl_StringType) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    string s;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(stmt->var_decl_type.kind, DataTypeKind::kString);
+  EXPECT_EQ(stmt->var_name, "s");
+}
+
+// Step 1b: implicit port types (fixes 6.10)
+TEST(ParserSection6, ParsePortDecl_ImplicitType) {
+  auto r = Parse("module m(input [3:0] a, output [7:0] b); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_FALSE(r.cu->modules.empty());
+  auto& ports = r.cu->modules[0]->ports;
+  ASSERT_EQ(ports.size(), 2u);
+  EXPECT_EQ(ports[0].name, "a");
+  EXPECT_EQ(ports[0].data_type.kind, DataTypeKind::kLogic);
+  EXPECT_EQ(ports[1].name, "b");
+  EXPECT_EQ(ports[1].data_type.kind, DataTypeKind::kLogic);
+}
+
+// Step 1c: localparam implicit type (fixes 6.20.4)
+TEST(ParserSection6, ParamDecl_ImplicitType) {
+  EXPECT_TRUE(
+      ParseOk6("module t;\n"
+               "  localparam [10:0] p = 1 << 5;\n"
+               "  localparam logic [10:0] q = 1 << 5;\n"
+               "endmodule\n"));
+}
+
+// Step 1c: parameter unpacked dims (fixes 6.20.2)
+TEST(ParserSection6, ParamDecl_UnpackedDims) {
+  EXPECT_TRUE(
+      ParseOk6("module t;\n"
+               "  parameter logic [31:0] p [3:0] = '{1, 2, 3, 4};\n"
+               "endmodule\n"));
+}
+
+// Step 1d: type parameter in module header (fixes 6.20.3)
+TEST(ParserSection6, TypeParamPort) {
+  EXPECT_TRUE(ParseOk6("module top #(type T = real); endmodule\n"));
+}
+
+// Step 1d: localparam type declaration (fixes 6.23-localparam_type_decl)
+TEST(ParserSection6, LocalparamTypeDecl) {
+  EXPECT_TRUE(
+      ParseOk6("module t;\n"
+               "  localparam type testtype = logic;\n"
+               "  testtype x;\n"
+               "endmodule\n"));
+}
+
+// Step 2a: user-defined type cast (fixes 6.19.4-cast)
+TEST(ParserSection6, TypeCast_UserDefined) {
+  EXPECT_TRUE(
+      ParseOk6("module t;\n"
+               "  typedef enum {a, b, c, d} e;\n"
+               "  initial begin\n"
+               "    e val;\n"
+               "    val = a;\n"
+               "    val = e'(val + 1);\n"
+               "  end\n"
+               "endmodule\n"));
+}
+
+// Step 2b: interconnect (fixes 6.6.8)
+TEST(ParserSection6, Interconnect_Basic) {
+  EXPECT_TRUE(
+      ParseOk6("module t;\n"
+               "  interconnect bus;\n"
+               "endmodule\n"));
+}
+
+// Step 3a: var type(expr) declarations (fixes 6.23-type_op)
+TEST(ParserSection6, VarTypeOp_Basic) {
+  EXPECT_TRUE(
+      ParseOk6("module t;\n"
+               "  real a = 4.76;\n"
+               "  real b = 0.74;\n"
+               "  var type(a+b) c;\n"
+               "endmodule\n"));
+}
+
+// Step 3b: type(data_type) in expressions (fixes 6.23-type_op_compare)
+TEST(ParserSection6, TypeRef_DataType) {
+  EXPECT_TRUE(
+      ParseOk6("module top #(parameter type T = type(logic[11:0]))\n"
+               "  ();\n"
+               "  initial begin\n"
+               "    case (type(T))\n"
+               "      type(logic[11:0]) : ;\n"
+               "      default : $stop;\n"
+               "    endcase\n"
+               "    if (type(T) == type(logic[12:0])) $stop;\n"
+               "    if (type(T) != type(logic[11:0])) $stop;\n"
+               "    if (type(T) === type(logic[12:0])) $stop;\n"
+               "    if (type(T) !== type(logic[11:0])) $stop;\n"
+               "    $finish;\n"
+               "  end\n"
+               "endmodule\n"));
+}

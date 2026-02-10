@@ -3,8 +3,11 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
+#include "common/source_loc.h"
 #include "elaboration/const_eval.h"
 #include "elaboration/type_eval.h"
 
@@ -21,6 +24,8 @@ struct ModuleItem;
 struct Expr;
 struct RtlirModuleInst;
 struct RtlirParamDecl;
+struct EnumMember;
+struct Stmt;
 
 /// Elaborator transforms a parsed AST (CompilationUnit) into the
 /// elaborated RTLIR representation.  Phase 1 supports single-module
@@ -91,11 +96,54 @@ class Elaborator {
   /// Validate array assignment pattern element count (§5.11).
   void ValidateArrayInitPattern(const ModuleItem* item);
 
+  /// Run all post-item validation checks for a module (§6).
+  void ValidateModuleConstraints(const ModuleDecl* decl);
+
+  /// Validate enum declaration constraints (§6.19).
+  void ValidateEnumDecl(const DataType& dtype, SourceLoc loc);
+
+  /// Validate a single enum member literal (§6.19).
+  bool ValidateEnumLiteral(const EnumMember& member, uint32_t base_width,
+                           bool is_2state);
+
+  /// Validate edge events don't reference real types (§6.12).
+  void ValidateEdgeOnReal(const ModuleItem* item);
+
+  /// Per-item validation within ValidateModuleConstraints.
+  void ValidateItemConstraints(const ModuleItem* item);
+
+  /// Check for mixed continuous/procedural assignments (§6.5).
+  void ValidateMixedAssignments();
+
+  /// Check specparam not used in parameter expressions (§6.20.5).
+  void ValidateSpecparamInParams(const ModuleDecl* decl);
+
+  /// Track enum type info for a variable declaration.
+  void TrackEnumVariable(const ModuleItem* item);
+
+  /// Check assignments to enum vars in a statement tree (§6.19.3/§6.19.4).
+  void ValidateEnumAssignments(const ModuleDecl* decl);
+
+  /// Walk statement tree checking enum assignment constraints.
+  void WalkStmtsForEnumAssign(const Stmt* s);
+
+  /// Check a single assignment statement for enum type violations.
+  void CheckEnumAssignStmt(const Stmt* s);
+
   Arena& arena_;
   DiagEngine& diag_;
   CompilationUnit* unit_;
   std::string gen_prefix_;
   TypedefMap typedefs_;
+
+  // Per-module validation state (cleared in ElaborateItems).
+  std::unordered_set<std::string_view> declared_names_;
+  std::unordered_map<std::string_view, SourceLoc> cont_assign_targets_;
+  std::unordered_set<std::string_view> proc_assign_targets_;
+  std::unordered_map<std::string_view, DataTypeKind> var_types_;
+  std::unordered_set<std::string_view> specparam_names_;
+  std::unordered_set<std::string_view> enum_var_names_;
+  std::unordered_set<std::string_view> enum_member_names_;
 };
 
 }  // namespace delta
