@@ -1,6 +1,7 @@
 """Unit tests for run_sv_tests module."""
 
 import ast
+import re
 import subprocess
 from unittest.mock import MagicMock, patch
 from xml.etree import ElementTree as ET
@@ -247,11 +248,9 @@ def test_print_chapter_breakdown_uses_natural_order(capsys):
         {"chapter": "chapter-5", "status": "pass"},
     ]
     run_sv_tests.print_chapter_breakdown(results)
-    captured = capsys.readouterr().out
+    captured = re.sub(r"\033\[[0-9;]*m", "", capsys.readouterr().out)
     # Chapter column shows just the number, not "chapter-N".
-    idx5 = captured.index("│ 5")
-    idx25 = captured.index("│ 25")
-    assert idx5 < idx25
+    assert captured.index("│ 5") < captured.index("│ 25")
 
 
 class TestBuildResult:
