@@ -45,6 +45,257 @@ static ModuleItem* FirstAlwaysItem(ParseResult& r) {
 }
 
 // =============================================================================
+// LRM section 9.2.1 -- Initial and final blocks
+// =============================================================================
+
+TEST(ParserSection9, InitialBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = 1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  bool found = false;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) {
+      found = true;
+      ASSERT_NE(item->body, nullptr);
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+TEST(ParserSection9, FinalBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  final $display(\"done\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  bool found = false;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kFinalBlock) {
+      found = true;
+      ASSERT_NE(item->body, nullptr);
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+// =============================================================================
+// LRM section 9.2.2 -- Always blocks (always, always_comb, always_ff, always_latch)
+// =============================================================================
+
+TEST(ParserSection9, AlwaysBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk) q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlways);
+  ASSERT_FALSE(item->sensitivity.empty());
+  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
+}
+
+TEST(ParserSection9, AlwaysComb) {
+  auto r = Parse(
+      "module m;\n"
+      "  always_comb a = b & c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
+  ASSERT_NE(item->body, nullptr);
+}
+
+TEST(ParserSection9, AlwaysFF) {
+  auto r = Parse(
+      "module m;\n"
+      "  always_ff @(posedge clk) q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysFF);
+  ASSERT_FALSE(item->sensitivity.empty());
+  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
+}
+
+TEST(ParserSection9, AlwaysLatch) {
+  auto r = Parse(
+      "module m;\n"
+      "  always_latch\n"
+      "    if (en) q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysLatch);
+  ASSERT_NE(item->body, nullptr);
+}
+
+// =============================================================================
+// LRM section 9.3.2 -- Fork / join variants
+// =============================================================================
+
+TEST(ParserSection9, ForkJoin) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      #10 a = 1;\n"
+      "      #20 b = 1;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoin);
+  EXPECT_GE(stmt->fork_stmts.size(), 2u);
+}
+
+TEST(ParserSection9, ForkJoinAny) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      #10 a = 1;\n"
+      "      #20 b = 1;\n"
+      "    join_any\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinAny);
+}
+
+TEST(ParserSection9, ForkJoinNone) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      #10 a = 1;\n"
+      "    join_none\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinNone);
+}
+
+// =============================================================================
+// LRM section 9.4.1 -- Delay control (#)
+// =============================================================================
+
+TEST(ParserSection9, DelayControl) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    #10 a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDelay);
+  EXPECT_NE(stmt->delay, nullptr);
+  EXPECT_NE(stmt->body, nullptr);
+}
+
+// =============================================================================
+// LRM section 9.4.2 -- Event control (@)
+// =============================================================================
+
+TEST(ParserSection9, EventControlPosedge) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge clk) a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  ASSERT_FALSE(stmt->events.empty());
+  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
+  EXPECT_NE(stmt->body, nullptr);
+}
+
+TEST(ParserSection9, EventControlNegedge) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(negedge rst) a = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  ASSERT_FALSE(stmt->events.empty());
+  EXPECT_EQ(stmt->events[0].edge, Edge::kNegedge);
+}
+
+TEST(ParserSection9, EventControlMultiple) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge clk or negedge rst) a = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  ASSERT_GE(stmt->events.size(), 2u);
+  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
+  EXPECT_EQ(stmt->events[1].edge, Edge::kNegedge);
+}
+
+TEST(ParserSection9, EventControlComma) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge clk, negedge rst) a = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  ASSERT_GE(stmt->events.size(), 2u);
+}
+
+// =============================================================================
+// LRM section 9.4.3 -- Wait statement
+// =============================================================================
+
+TEST(ParserSection9, WaitStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    wait (done == 1) a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kWait);
+  EXPECT_NE(stmt->condition, nullptr);
+  EXPECT_NE(stmt->body, nullptr);
+}
+
+// =============================================================================
 // LRM section 9.4.2.2 -- @* and @(*) implicit event list
 // =============================================================================
 
