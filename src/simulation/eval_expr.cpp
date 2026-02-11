@@ -169,15 +169,28 @@ static uint32_t CastWidth(std::string_view type_name) {
   if (type_name == "int") return 32;
   if (type_name == "longint") return 64;
   if (type_name == "integer") return 32;
+  if (type_name == "real" || type_name == "realtime") return 64;
+  if (type_name == "shortreal") return 32;
   if (type_name == "bit") return 1;
   if (type_name == "logic") return 1;
   if (type_name == "reg") return 1;
-  return 32;  // Default to 32-bit.
+  if (type_name == "string") return 0;  // String cast handled separately.
+  return 32;                            // Default to 32-bit.
 }
 
 Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto inner = EvalExpr(expr->lhs, ctx, arena);
-  uint32_t target_width = CastWidth(expr->text);
+  std::string_view type_name = expr->text;
+  // §6.24.1: signed'(x) / unsigned'(x) change signedness, not width.
+  if (type_name == "signed") {
+    inner.is_signed = true;
+    return inner;
+  }
+  if (type_name == "unsigned" || type_name == "const") {
+    inner.is_signed = false;
+    return inner;
+  }
+  uint32_t target_width = CastWidth(type_name);
   uint64_t val = inner.ToUint64();
   // Truncate or zero-extend to target width.
   if (target_width < 64) {
