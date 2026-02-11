@@ -926,10 +926,18 @@ static StmtResult ExecEventTriggerImpl(const Stmt* stmt, SimContext& ctx) {
     return StmtResult::kDone;
   }
   auto* var = ctx.FindVariable(stmt->expr->text);
-  if (var) {
-    // §15.5.2: Set sticky triggered state for this timeslot.
-    ctx.SetEventTriggered(stmt->expr->text);
-    var->NotifyWatchers();
+  if (!var) return StmtResult::kDone;
+  // §15.5.2: Set sticky triggered state for this timeslot.
+  ctx.SetEventTriggered(stmt->expr->text);
+  // §9.4.2: Schedule triggered processes in Active region rather than
+  // running them inline, so the triggering process continues first.
+  auto pending = std::move(var->watchers);
+  var->watchers.clear();
+  auto& sched = ctx.GetScheduler();
+  for (auto& cb : pending) {
+    auto* event = sched.GetEventPool().Acquire();
+    event->callback = std::move(cb);
+    sched.ScheduleEvent(ctx.CurrentTime(), Region::kActive, event);
   }
   return StmtResult::kDone;
 }

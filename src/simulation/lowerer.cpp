@@ -20,8 +20,8 @@
 
 namespace delta {
 
-Lowerer::Lowerer(SimContext& ctx, Arena& arena, DiagEngine& diag)
-    : ctx_(ctx), arena_(arena), diag_(diag) {}
+Lowerer::Lowerer(SimContext& ctx, Arena& arena, DiagEngine& /*diag*/)
+    : ctx_(ctx), arena_(arena) {}
 
 // --- Coroutine factories ---
 
@@ -231,6 +231,15 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls) {
   ctx_.RegisterClassType(cls->name, info);
 }
 
+void Lowerer::LowerProcesses(const std::vector<RtlirProcess>& procs) {
+  for (const auto& proc : procs) {
+    if (proc.kind != RtlirProcessKind::kInitial) LowerProcess(proc);
+  }
+  for (const auto& proc : procs) {
+    if (proc.kind == RtlirProcessKind::kInitial) LowerProcess(proc);
+  }
+}
+
 void Lowerer::LowerModule(const RtlirModule* mod) {
   // Create variables for resolved parameters (§6.20).
   for (const auto& p : mod->params) {
@@ -262,10 +271,9 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
     LowerClassDecl(cls);
   }
 
-  // Lower processes.
-  for (const auto& proc : mod->processes) {
-    LowerProcess(proc);
-  }
+  // §9.4.2: Always blocks first so they register sensitivity before
+  // initial blocks trigger events.
+  LowerProcesses(mod->processes);
 
   // Lower continuous assignments.
   for (const auto& ca : mod->assigns) {

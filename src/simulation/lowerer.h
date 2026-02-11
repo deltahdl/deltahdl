@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 
 namespace delta {
 
@@ -26,6 +27,7 @@ class Lowerer {
   void LowerModule(const RtlirModule* mod);
   void LowerVar(const RtlirVariable& var);
   void LowerVarAggregate(const RtlirVariable& var);
+  void LowerProcesses(const std::vector<RtlirProcess>& procs);
   void LowerProcess(const RtlirProcess& proc);
   void LowerContAssign(const RtlirContAssign& ca);
   void LowerClassDecl(const ClassDecl* cls);
@@ -33,7 +35,6 @@ class Lowerer {
 
   SimContext& ctx_;
   Arena& arena_;
-  DiagEngine& diag_;
   uint32_t next_id_ = 0;
 };
 
