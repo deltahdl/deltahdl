@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -186,8 +187,93 @@ static Logic4Vec EvalSformatf(const Expr* expr, SimContext& ctx, Arena& arena) {
 }
 
 // ============================================================================
+// §20.5 — Type conversion functions
+// ============================================================================
+
+static Logic4Vec EvalItor(const Expr* expr, SimContext& ctx, Arena& arena) {
+  if (expr->args.empty()) return MakeLogic4VecVal(arena, 64, 0);
+  auto val = EvalExpr(expr->args[0], ctx, arena);
+  auto d = static_cast<double>(static_cast<int64_t>(val.ToUint64()));
+  uint64_t bits = 0;
+  std::memcpy(&bits, &d, sizeof(double));
+  return MakeLogic4VecVal(arena, 64, bits);
+}
+
+static Logic4Vec EvalRtoi(const Expr* expr, SimContext& ctx, Arena& arena) {
+  if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
+  auto val = EvalExpr(expr->args[0], ctx, arena);
+  uint64_t raw_bits = val.ToUint64();
+  double d = 0.0;
+  std::memcpy(&d, &raw_bits, sizeof(double));
+  auto truncated = static_cast<int64_t>(d);
+  return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(truncated));
+}
+
+static Logic4Vec EvalBitstoreal(const Expr* expr, SimContext& ctx,
+                                Arena& arena) {
+  if (expr->args.empty()) return MakeLogic4VecVal(arena, 64, 0);
+  auto val = EvalExpr(expr->args[0], ctx, arena);
+  return MakeLogic4VecVal(arena, 64, val.ToUint64());
+}
+
+static Logic4Vec EvalRealtobits(const Expr* expr, SimContext& ctx,
+                                Arena& arena) {
+  if (expr->args.empty()) return MakeLogic4VecVal(arena, 64, 0);
+  auto val = EvalExpr(expr->args[0], ctx, arena);
+  uint64_t raw_bits = val.ToUint64();
+  // If argument is a real literal, convert from double directly.
+  if (expr->args[0]->kind == ExprKind::kRealLiteral) {
+    double d = expr->args[0]->real_val;
+    std::memcpy(&raw_bits, &d, sizeof(double));
+  }
+  return MakeLogic4VecVal(arena, 64, raw_bits);
+}
+
+// ============================================================================
+// §20.9 — $countbits
+// ============================================================================
+
+static Logic4Vec EvalCountbits(const Expr* expr, SimContext& ctx,
+                               Arena& arena) {
+  if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 32, 0);
+  auto val = EvalExpr(expr->args[0], ctx, arena);
+  // Gather target bit values (0 or 1).
+  bool match_one = false;
+  bool match_zero = false;
+  for (size_t i = 1; i < expr->args.size(); ++i) {
+    uint64_t pat = EvalExpr(expr->args[i], ctx, arena).ToUint64();
+    if (pat == 1) match_one = true;
+    if (pat == 0) match_zero = true;
+  }
+  uint32_t count = 0;
+  for (uint32_t i = 0; i < val.nwords; ++i) {
+    uint64_t known_ones = val.words[i].aval & ~val.words[i].bval;
+    uint64_t known_zeros = ~val.words[i].aval & ~val.words[i].bval;
+    if (match_one) count += static_cast<uint32_t>(std::popcount(known_ones));
+    if (match_zero) count += static_cast<uint32_t>(std::popcount(known_zeros));
+  }
+  // Mask to actual width.
+  if (match_zero && val.width < val.nwords * 64) {
+    uint32_t extra_bits = val.nwords * 64 - val.width;
+    count -= extra_bits;  // Discount padding zeros beyond actual width.
+  }
+  return MakeLogic4VecVal(arena, 32, count);
+}
+
+// ============================================================================
 // §20 dispatch
 // ============================================================================
+
+// §20.5 type conversion sub-dispatch.
+static Logic4Vec EvalConversionSysCall(const Expr* expr, SimContext& ctx,
+                                       Arena& arena, std::string_view name) {
+  if (name == "$itor") return EvalItor(expr, ctx, arena);
+  if (name == "$rtoi") return EvalRtoi(expr, ctx, arena);
+  if (name == "$bitstoreal") return EvalBitstoreal(expr, ctx, arena);
+  if (name == "$realtobits") return EvalRealtobits(expr, ctx, arena);
+  if (name == "$countbits") return EvalCountbits(expr, ctx, arena);
+  return MakeLogic4VecVal(arena, 1, 0);
+}
 
 Logic4Vec EvalUtilitySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                              std::string_view name) {
@@ -204,7 +290,7 @@ Logic4Vec EvalUtilitySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   if (name == "$value$plusargs") return EvalValuePlusargs(expr, ctx, arena);
   if (name == "$typename") return EvalTypename(expr, ctx, arena);
   if (name == "$sformatf") return EvalSformatf(expr, ctx, arena);
-  return MakeLogic4VecVal(arena, 1, 0);
+  return EvalConversionSysCall(expr, ctx, arena, name);
 }
 
 // ============================================================================

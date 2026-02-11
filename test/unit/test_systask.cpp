@@ -638,6 +638,68 @@ TEST(SysTask, FormatModule_m) {
 }
 
 // ============================================================================
+// §20.5 — Type conversion functions
+// ============================================================================
+
+TEST(SysTask, ItoRConvertsIntToReal) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$itor", {MkInt(f.arena, 42)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 64u);
+  EXPECT_DOUBLE_EQ(ResultToDouble(result), 42.0);
+}
+
+TEST(SysTask, RtoIConvertsRealToInt) {
+  SysTaskFixture f;
+  // Build a real literal with value 3.7 — expect truncation to 3.
+  double dval = 3.7;
+  uint64_t bits = 0;
+  std::memcpy(&bits, &dval, sizeof(double));
+  auto* real_arg = f.arena.Create<Expr>();
+  real_arg->kind = ExprKind::kRealLiteral;
+  real_arg->real_val = dval;
+  auto* expr = MkSysCall(f.arena, "$rtoi", {real_arg});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 32u);
+  EXPECT_EQ(result.ToUint64(), 3u);
+}
+
+TEST(SysTask, BitstorealReinterpretsBitsAsReal) {
+  SysTaskFixture f;
+  // 0x4045000000000000 is IEEE 754 for 42.0
+  double expected = 42.0;
+  uint64_t bits = 0;
+  std::memcpy(&bits, &expected, sizeof(double));
+  auto* expr = MkSysCall(f.arena, "$bitstoreal", {MkInt(f.arena, bits)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 64u);
+  EXPECT_DOUBLE_EQ(ResultToDouble(result), 42.0);
+}
+
+TEST(SysTask, RealtobitsReinterpretsRealAsBits) {
+  SysTaskFixture f;
+  double dval = 42.0;
+  auto* real_arg = f.arena.Create<Expr>();
+  real_arg->kind = ExprKind::kRealLiteral;
+  real_arg->real_val = dval;
+  auto* expr = MkSysCall(f.arena, "$realtobits", {real_arg});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 64u);
+  uint64_t expected_bits = 0;
+  std::memcpy(&expected_bits, &dval, sizeof(double));
+  EXPECT_EQ(result.ToUint64(), expected_bits);
+}
+
+TEST(SysTask, CountbitsMatchingPattern) {
+  SysTaskFixture f;
+  // $countbits(0b1010_0101, '1) should return 4 (count of 1-bits).
+  auto* expr = MkSysCall(f.arena, "$countbits",
+                         {MkInt(f.arena, 0xA5), MkInt(f.arena, 1)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 4u);
+}
+
+// ============================================================================
 // $printtimescale (section 20.4) — does not crash
 // ============================================================================
 
