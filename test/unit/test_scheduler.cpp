@@ -235,3 +235,148 @@ TEST(Scheduler, PreponeScheduling) {
   EXPECT_EQ(order[0], 1);
   EXPECT_EQ(order[1], 2);
 }
+
+// --- §4.6 Determinism: FIFO within a region ---
+
+TEST(Scheduler, FIFOWithinRegion) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<int> order;
+
+  for (int i = 0; i < 5; ++i) {
+    auto* ev = sched.GetEventPool().Acquire();
+    ev->callback = [&order, i]() { order.push_back(i); };
+    sched.ScheduleEvent({0}, Region::kActive, ev);
+  }
+
+  sched.Run();
+  ASSERT_EQ(order.size(), 5u);
+  for (int i = 0; i < 5; ++i) {
+    EXPECT_EQ(order[i], i);
+  }
+}
+
+// --- §4.4.2 All 17 regions execute in correct order ---
+
+TEST(Scheduler, AllRegionsOrder) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<int> order;
+
+  // Schedule one event in each of all 17 regions.
+  for (int r = 0; r < static_cast<int>(Region::kCOUNT); ++r) {
+    auto* ev = sched.GetEventPool().Acquire();
+    ev->callback = [&order, r]() { order.push_back(r); };
+    sched.ScheduleEvent({0}, static_cast<Region>(r), ev);
+  }
+
+  sched.Run();
+  ASSERT_EQ(order.size(), static_cast<size_t>(Region::kCOUNT));
+  // Verify monotonically increasing region indices.
+  for (size_t i = 1; i < order.size(); ++i) {
+    EXPECT_LT(order[i - 1], order[i]);
+  }
+}
+
+// --- §4.5 Active set iteration with feedback ---
+
+TEST(Scheduler, ActiveSetFeedback) {
+  Arena arena;
+  Scheduler sched(arena);
+  int count = 0;
+
+  // Schedule an Active event that schedules an NBA event, which should
+  // execute within the same time step.
+  auto* ev = sched.GetEventPool().Acquire();
+  ev->callback = [&]() {
+    count++;
+    if (count == 1) {
+      auto* nba = sched.GetEventPool().Acquire();
+      nba->callback = [&count]() { count++; };
+      sched.ScheduleEvent({0}, Region::kNBA, nba);
+    }
+  };
+  sched.ScheduleEvent({0}, Region::kActive, ev);
+
+  sched.Run();
+  EXPECT_EQ(count, 2);
+}
+
+// --- §4.5 Reactive-to-active restart ---
+
+TEST(Scheduler, ReactiveRestartsActive) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<int> order;
+
+  // Reactive event schedules a new Active event, which should run
+  // within the same time step via the restart mechanism.
+  auto* reactive = sched.GetEventPool().Acquire();
+  reactive->callback = [&]() {
+    order.push_back(2);
+    auto* active = sched.GetEventPool().Acquire();
+    active->callback = [&order]() { order.push_back(3); };
+    sched.ScheduleEvent({0}, Region::kActive, active);
+  };
+  sched.ScheduleEvent({0}, Region::kReactive, reactive);
+
+  auto* first_active = sched.GetEventPool().Acquire();
+  first_active->callback = [&order]() { order.push_back(1); };
+  sched.ScheduleEvent({0}, Region::kActive, first_active);
+
+  sched.Run();
+  ASSERT_EQ(order.size(), 3u);
+  EXPECT_EQ(order[0], 1);  // Active runs first
+  EXPECT_EQ(order[1], 2);  // Reactive runs
+  EXPECT_EQ(order[2], 3);  // Restarted Active runs
+}
+
+// --- §4.9.4 Nonblocking assignment goes to NBA region ---
+
+TEST(Scheduler, NBARegionOrder) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<std::string> order;
+
+  auto* active = sched.GetEventPool().Acquire();
+  active->callback = [&order]() { order.push_back("active"); };
+  sched.ScheduleEvent({0}, Region::kActive, active);
+
+  auto* nba = sched.GetEventPool().Acquire();
+  nba->callback = [&order]() { order.push_back("nba"); };
+  sched.ScheduleEvent({0}, Region::kNBA, nba);
+
+  auto* inactive = sched.GetEventPool().Acquire();
+  inactive->callback = [&order]() { order.push_back("inactive"); };
+  sched.ScheduleEvent({0}, Region::kInactive, inactive);
+
+  sched.Run();
+  ASSERT_EQ(order.size(), 3u);
+  EXPECT_EQ(order[0], "active");
+  EXPECT_EQ(order[1], "inactive");
+  EXPECT_EQ(order[2], "nba");
+}
+
+// --- §4.5 Multiple time steps advance correctly ---
+
+TEST(Scheduler, MultipleTimeSteps) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<SimTime> times;
+
+  sched.SetPostTimestepCallback(
+      [&]() { times.push_back(sched.CurrentTime()); });
+
+  for (uint64_t t : {0, 5, 10, 100}) {
+    auto* ev = sched.GetEventPool().Acquire();
+    ev->callback = []() {};
+    sched.ScheduleEvent({t}, Region::kActive, ev);
+  }
+
+  sched.Run();
+  ASSERT_EQ(times.size(), 4u);
+  EXPECT_EQ(times[0].ticks, 0u);
+  EXPECT_EQ(times[1].ticks, 5u);
+  EXPECT_EQ(times[2].ticks, 10u);
+  EXPECT_EQ(times[3].ticks, 100u);
+}

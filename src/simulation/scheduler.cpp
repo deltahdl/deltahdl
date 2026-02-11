@@ -147,19 +147,14 @@ void Scheduler::ExecuteActiveRegions(TimeSlot& slot) {
 //          ReInactive, PreReNBA, ReNBA, PostReNBA, PrePostponed
 
 bool Scheduler::IterateReactiveSet(TimeSlot& slot) {
-  bool did_work = false;
-
-  ExecuteReactiveRegions(slot);
-  if (slot.AnyNonemptyIn(Region::kPreObserved, Region::kPrePostponed)) {
-    did_work = true;
+  if (!slot.AnyNonemptyIn(Region::kPreObserved, Region::kPrePostponed)) {
+    return false;
   }
-
   while (slot.AnyNonemptyIn(Region::kPreObserved, Region::kPrePostponed)) {
     ExecuteReactiveRegions(slot);
     RestartActiveSet(slot);
   }
-
-  return did_work;
+  return true;
 }
 
 void Scheduler::RestartActiveSet(TimeSlot& slot) {
