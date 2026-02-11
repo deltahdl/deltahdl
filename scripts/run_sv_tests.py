@@ -96,8 +96,15 @@ def eval_node(node):
         if isinstance(node.op, ast.And):
             return all(vals)
         return any(vals)
-    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not):
-        return not eval_node(node.operand)
+    if isinstance(node, ast.UnaryOp):
+        if isinstance(node.op, ast.Not):
+            return not eval_node(node.operand)
+        if isinstance(node.op, ast.USub):
+            return -eval_node(node.operand)
+        if isinstance(node.op, ast.UAdd):
+            return +eval_node(node.operand)
+        if isinstance(node.op, ast.Invert):
+            return ~eval_node(node.operand)
     raise ValueError(f"Unsupported node: {type(node).__name__}")
 
 
