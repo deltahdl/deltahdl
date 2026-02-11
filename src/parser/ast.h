@@ -150,6 +150,7 @@ struct StructMember {
   bool is_signed = false;
   Expr* packed_dim_left = nullptr;
   Expr* packed_dim_right = nullptr;
+  std::vector<std::pair<Expr*, Expr*>> extra_packed_dims;  // §7.4.1
   std::string_view name;
   Expr* init_expr = nullptr;         // Default member value (§7.2.2)
   std::vector<Expr*> unpacked_dims;  // Unpacked dims on member (§7.4)
@@ -168,6 +169,7 @@ struct DataType {
   uint8_t charge_strength = 0;  // §6.6.4: 1=small, 2=medium, 4=large
   Expr* packed_dim_left = nullptr;
   Expr* packed_dim_right = nullptr;
+  std::vector<std::pair<Expr*, Expr*>> extra_packed_dims;  // §7.4.1
   std::string_view type_name;
   std::string_view scope_name;    // Package/class scope prefix (§6.25)
   std::string_view modport_name;  // virtual interface modport (§25.9)

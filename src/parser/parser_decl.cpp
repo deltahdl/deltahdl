@@ -105,13 +105,23 @@ DataType Parser::ParseStructOrUnionBody(TokenKind kw) {
 void Parser::ParseStructMembers(DataType& dtype) {
   Expect(TokenKind::kLBrace);
   while (!Check(TokenKind::kRBrace) && !AtEnd()) {
-    auto member_type = ParseDataType();
+    DataType member_type;
+    if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
+      member_type = ParseStructOrUnionType();
+    } else {
+      member_type = ParseDataType();
+    }
+    if (member_type.kind == DataTypeKind::kImplicit && !CheckIdentifier()) {
+      Synchronize();
+      continue;
+    }
     do {
       StructMember member;
       member.type_kind = member_type.kind;
       member.is_signed = member_type.is_signed;
       member.packed_dim_left = member_type.packed_dim_left;
       member.packed_dim_right = member_type.packed_dim_right;
+      member.extra_packed_dims = member_type.extra_packed_dims;
       member.name = Expect(TokenKind::kIdentifier).text;
       ParseUnpackedDims(member.unpacked_dims);
       if (Match(TokenKind::kEq)) {
@@ -442,6 +452,30 @@ DataType Parser::ParseVirtualInterfaceType() {
   return dtype;
 }
 
+// Parse packed dimensions: [a:b] ([c:d] ...)* (§7.4.1)
+void Parser::ParsePackedDims(DataType& dtype) {
+  if (!Check(TokenKind::kLBracket)) return;
+  Consume();
+  dtype.packed_dim_left = ParseExpr();
+  Expect(TokenKind::kColon);
+  dtype.packed_dim_right = ParseExpr();
+  Expect(TokenKind::kRBracket);
+  // Additional packed dimensions: bit [3:0] [7:0] ...
+  while (Check(TokenKind::kLBracket)) {
+    auto saved = lexer_.SavePos();
+    Consume();
+    auto* left = ParseExpr();
+    if (!Check(TokenKind::kColon)) {
+      lexer_.RestorePos(saved);
+      return;
+    }
+    Consume();
+    auto* right = ParseExpr();
+    Expect(TokenKind::kRBracket);
+    dtype.extra_packed_dims.emplace_back(left, right);
+  }
+}
+
 DataType Parser::ParseDataType() {
   DataType dtype;
 
@@ -488,13 +522,7 @@ DataType Parser::ParseDataType() {
     dtype.is_signed = false;
   }
 
-  if (Check(TokenKind::kLBracket)) {
-    Consume();
-    dtype.packed_dim_left = ParseExpr();
-    Expect(TokenKind::kColon);
-    dtype.packed_dim_right = ParseExpr();
-    Expect(TokenKind::kRBracket);
-  }
+  ParsePackedDims(dtype);
   return dtype;
 }
 

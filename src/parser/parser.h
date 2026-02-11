@@ -222,6 +222,7 @@ class Parser {
 
   // Types
   DataType ParseDataType();
+  void ParsePackedDims(DataType& dtype);
   DataType ParseVirtualInterfaceType();
 
   // Event lists

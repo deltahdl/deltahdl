@@ -375,3 +375,569 @@ TEST(ParserSection7, ArraySortWithClause) {
   auto* expr = stmt->expr;
   ASSERT_NE(expr, nullptr);
 }
+
+// =========================================================================
+// §7.2.1: Packed structures (additional)
+// =========================================================================
+
+TEST(ParserSection7, StructPackedUnsigned) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct packed unsigned {\n"
+      "    time a;\n"
+      "    integer b;\n"
+      "    logic [31:0] c;\n"
+      "  } pack2;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->typedef_type.is_packed);
+  EXPECT_FALSE(item->typedef_type.is_signed);
+  EXPECT_EQ(item->typedef_type.struct_members.size(), 3u);
+}
+
+TEST(ParserSection7, StructMultipleMembersSameType) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct {\n"
+      "    int x, y, z;\n"
+      "  } point;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->typedef_type.struct_members.size(), 3u);
+  EXPECT_EQ(item->typedef_type.struct_members[0].name, "x");
+  EXPECT_EQ(item->typedef_type.struct_members[1].name, "y");
+  EXPECT_EQ(item->typedef_type.struct_members[2].name, "z");
+}
+
+// =========================================================================
+// §7.2.2: Assigning to structures
+// =========================================================================
+
+TEST(ParserSection7, StructAssignmentPattern) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct { int a; int b; } pair;\n"
+      "  initial begin\n"
+      "    pair p = '{1, 2};\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
+  ASSERT_NE(stmt->var_init, nullptr);
+  EXPECT_EQ(stmt->var_init->kind, ExprKind::kAssignmentPattern);
+}
+
+// =========================================================================
+// §7.3.1: Packed unions
+// =========================================================================
+
+TEST(ParserSection7, UnionPacked) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef union packed {\n"
+      "    logic [31:0] word;\n"
+      "    logic [3:0] [7:0] bytes;\n"
+      "  } word_u;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kUnion);
+  EXPECT_TRUE(item->typedef_type.is_packed);
+  EXPECT_EQ(item->typedef_type.struct_members.size(), 2u);
+}
+
+// =========================================================================
+// §7.3.2: Tagged unions (void members)
+// =========================================================================
+
+TEST(ParserSection7, TaggedUnionVoidMember) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef union tagged {\n"
+      "    void Invalid;\n"
+      "    int Valid;\n"
+      "  } VInt;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->typedef_type.is_tagged);
+  EXPECT_EQ(item->typedef_type.struct_members[0].type_kind,
+            DataTypeKind::kVoid);
+  EXPECT_EQ(item->typedef_type.struct_members[0].name, "Invalid");
+}
+
+// =========================================================================
+// §7.4.1: Packed arrays (multidimensional packed dims)
+// =========================================================================
+
+TEST(ParserSection7, MultidimensionalPackedArray) {
+  auto r = Parse(
+      "module t;\n"
+      "  bit [3:0] [7:0] joe [1:10];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->name, "joe");
+  EXPECT_NE(item->data_type.packed_dim_left, nullptr);
+  EXPECT_FALSE(item->unpacked_dims.empty());
+}
+
+// =========================================================================
+// §7.4.3: Memories
+// =========================================================================
+
+TEST(ParserSection7, MemoryDeclaration) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic [7:0] mema [0:255];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->name, "mema");
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
+  ASSERT_EQ(item->unpacked_dims.size(), 1u);
+  auto* dim = item->unpacked_dims[0];
+  ASSERT_NE(dim, nullptr);
+  EXPECT_EQ(dim->kind, ExprKind::kBinary);
+  EXPECT_EQ(dim->op, TokenKind::kColon);
+}
+
+// =========================================================================
+// §7.4.6: Operations on arrays
+// =========================================================================
+
+TEST(ParserSection7, ArrayAssignWhole) {
+  auto r = Parse(
+      "module t;\n"
+      "  int a[4], b[4];\n"
+      "  initial a = b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+}
+
+// =========================================================================
+// §7.5.1: Dynamic array new[]
+// =========================================================================
+
+TEST(ParserSection7, DynamicArrayNew) {
+  auto r = Parse(
+      "module t;\n"
+      "  int dyn[];\n"
+      "  initial dyn = new[10];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
+TEST(ParserSection7, DynamicArrayNewWithInit) {
+  auto r = Parse(
+      "module t;\n"
+      "  int dyn[];\n"
+      "  int src[];\n"
+      "  initial dyn = new[20](src);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+}
+
+// =========================================================================
+// §7.5.2/7.5.3: Dynamic array size() and delete()
+// =========================================================================
+
+TEST(ParserSection7, DynamicArraySizeMethod) {
+  auto r = Parse(
+      "module t;\n"
+      "  int dyn[];\n"
+      "  initial x = dyn.size();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kCall);
+}
+
+TEST(ParserSection7, DynamicArrayDeleteMethod) {
+  auto r = Parse(
+      "module t;\n"
+      "  int dyn[];\n"
+      "  initial dyn.delete();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* expr = stmt->expr;
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCall);
+}
+
+// =========================================================================
+// §7.6: Array assignments
+// =========================================================================
+
+TEST(ParserSection7, ArraySliceAssign) {
+  auto r = Parse(
+      "module t;\n"
+      "  int a[8], b[8];\n"
+      "  initial a[3:0] = b[7:4];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
+}
+
+// =========================================================================
+// §7.9: Associative array methods
+// =========================================================================
+
+TEST(ParserSection7, AssocArrayNumMethod) {
+  auto r = Parse(
+      "module t;\n"
+      "  int aa[string];\n"
+      "  initial x = aa.num();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kCall);
+}
+
+TEST(ParserSection7, AssocArrayExistsMethod) {
+  auto r = Parse(
+      "module t;\n"
+      "  int aa[string];\n"
+      "  initial x = aa.exists(\"key\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kCall);
+}
+
+TEST(ParserSection7, AssocArrayDeleteMethod) {
+  auto r = Parse(
+      "module t;\n"
+      "  int aa[string];\n"
+      "  initial aa.delete(\"key\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_NE(stmt->expr, nullptr);
+}
+
+// =========================================================================
+// §7.10.1: Queue operators
+// =========================================================================
+
+TEST(ParserSection7, QueueConcatAssign) {
+  auto r = Parse(
+      "module t;\n"
+      "  int q[$];\n"
+      "  initial q = {1, 2, 3};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
+}
+
+// =========================================================================
+// §7.10.2: Queue methods
+// =========================================================================
+
+TEST(ParserSection7, QueuePushBack) {
+  auto r = Parse(
+      "module t;\n"
+      "  int q[$];\n"
+      "  initial q.push_back(42);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* expr = stmt->expr;
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCall);
+}
+
+TEST(ParserSection7, QueuePopFront) {
+  auto r = Parse(
+      "module t;\n"
+      "  int q[$];\n"
+      "  initial x = q.pop_front();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
+}
+
+TEST(ParserSection7, QueueSizeMethod) {
+  auto r = Parse(
+      "module t;\n"
+      "  int q[$];\n"
+      "  initial x = q.size();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
+}
+
+TEST(ParserSection7, QueueInsertMethod) {
+  auto r = Parse(
+      "module t;\n"
+      "  int q[$];\n"
+      "  initial q.insert(2, 99);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* expr = stmt->expr;
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCall);
+}
+
+// =========================================================================
+// §7.11: Array querying functions
+// =========================================================================
+
+TEST(ParserSection7, ArrayDimensionsQuery) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[4][8];\n"
+      "  initial x = $dimensions(arr);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
+  EXPECT_EQ(stmt->rhs->callee, "$dimensions");
+}
+
+TEST(ParserSection7, ArraySizeQuery) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[4];\n"
+      "  initial x = $size(arr);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
+  EXPECT_EQ(stmt->rhs->callee, "$size");
+}
+
+// =========================================================================
+// §7.12.1: Array locator methods
+// =========================================================================
+
+TEST(ParserSection7, ArrayFindWithClause) {
+  auto r = Parse(
+      "module t;\n"
+      "  int d[] = '{1,2,3,4,5};\n"
+      "  initial qi = d.find with (item > 3);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+}
+
+TEST(ParserSection7, ArrayFindIndexMethod) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[8];\n"
+      "  initial qi = arr.find_index with (item == 0);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
+// =========================================================================
+// §7.12.2: Array ordering methods
+// =========================================================================
+
+TEST(ParserSection7, ArrayReverseMethod) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[4];\n"
+      "  initial arr.reverse();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_NE(stmt->expr, nullptr);
+}
+
+TEST(ParserSection7, ArrayShuffleMethod) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[4];\n"
+      "  initial arr.shuffle();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_NE(stmt->expr, nullptr);
+}
+
+// =========================================================================
+// §7.12.3: Array reduction methods
+// =========================================================================
+
+TEST(ParserSection7, ArraySumMethod) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[4];\n"
+      "  initial x = arr.sum;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
+}
+
+TEST(ParserSection7, ArraySumWithClause) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[4];\n"
+      "  initial x = arr.sum with (item * 2);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
+TEST(ParserSection7, ArrayProductMethod) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[4];\n"
+      "  initial x = arr.product;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
+// =========================================================================
+// §7.12.5: Array mapping method
+// =========================================================================
+
+TEST(ParserSection7, ArrayMapMethod) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[4];\n"
+      "  initial qi = arr.map with (item + 1);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
+// =========================================================================
+// §7.4.5: Array indexing (element select)
+// =========================================================================
+
+TEST(ParserSection7, ArrayElementSelect) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[8];\n"
+      "  initial x = arr[3];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kSelect);
+}
+
+TEST(ParserSection7, MultiDimSelect) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[4][8];\n"
+      "  initial x = arr[2][5];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kSelect);
+}
+
+// =========================================================================
+// §7.4: Struct variable declaration (non-typedef)
+// =========================================================================
+
+TEST(ParserSection7, StructVariableDecl) {
+  auto r = Parse(
+      "module t;\n"
+      "  struct { int a; int b; } my_var;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kStruct);
+  EXPECT_EQ(item->name, "my_var");
+}
+
+// =========================================================================
+// §7.3: Union with nested struct
+// =========================================================================
+
+TEST(ParserSection7, UnionWithNestedStruct) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef union tagged {\n"
+      "    struct {\n"
+      "      bit [4:0] reg1, reg2;\n"
+      "    } Add;\n"
+      "    bit [9:0] Jmp;\n"
+      "  } Instr;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kUnion);
+  EXPECT_TRUE(item->typedef_type.is_tagged);
+  EXPECT_EQ(item->typedef_type.struct_members.size(), 2u);
+}
