@@ -779,4 +779,4 @@ name: DeltaHDL
 on:
   workflow_run:
     types: [completed]
-    workflows: [Tools]
+    workflows: [CI]
