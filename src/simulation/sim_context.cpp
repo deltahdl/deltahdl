@@ -139,6 +139,14 @@ void SimContext::AddPlusArg(std::string arg) {
   plus_args_.push_back(std::move(arg));
 }
 
+void SimContext::RegisterStringVariable(std::string_view name) {
+  string_vars_.insert(name);
+}
+
+bool SimContext::IsStringVariable(std::string_view name) const {
+  return string_vars_.count(name) != 0;
+}
+
 void SimContext::RegisterEnumType(std::string_view name,
                                   const EnumTypeInfo& info) {
   enum_types_[name] = info;

@@ -60,6 +60,7 @@ struct RtlirVariable {
   uint32_t width = 1;
   bool is_4state = true;
   bool is_event = false;
+  bool is_string = false;
 };
 
 // --- Continuous assignment ---

@@ -821,6 +821,11 @@ static Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx,
   if (TryEvalEnumMethodCall(expr, ctx, arena, enum_result)) {
     return enum_result;
   }
+  // §6.16: Try string method dispatch (e.g., my_str.len()).
+  Logic4Vec string_result;
+  if (TryEvalStringMethodCall(expr, ctx, arena, string_result)) {
+    return string_result;
+  }
 
   auto* func = ctx.FindFunction(expr->callee);
   if (!func) return EvalDpiCall(expr, ctx, arena);

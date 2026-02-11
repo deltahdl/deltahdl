@@ -87,6 +87,7 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   for (const auto& var : mod->variables) {
     auto* v = ctx_.CreateVariable(var.name, var.width);
     if (var.is_event) v->is_event = true;
+    if (var.is_string) ctx_.RegisterStringVariable(var.name);
   }
   // Create variables for output ports.
   for (const auto& port : mod->ports) {

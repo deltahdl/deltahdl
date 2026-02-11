@@ -30,6 +30,10 @@ Logic4Vec EvalMathSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
 Logic4Vec EvalFileIOSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                             std::string_view name);
 
+// §6.16 String method dispatch (eval_string.cpp).
+bool TryEvalStringMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                             Logic4Vec& out);
+
 // §6.19 Enum method dispatch (eval_enum.cpp).
 bool TryEvalEnumMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                            Logic4Vec& out);

@@ -300,6 +300,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   var.width = EvalTypeWidth(item->data_type, typedefs_);
   var.is_4state = Is4stateType(item->data_type, typedefs_);
   var.is_event = (item->data_type.kind == DataTypeKind::kEvent);
+  var.is_string = (item->data_type.kind == DataTypeKind::kString);
   mod->variables.push_back(var);
   ValidateArrayInitPattern(item);
   TrackEnumVariable(item);

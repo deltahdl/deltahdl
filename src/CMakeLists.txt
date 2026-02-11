@@ -33,6 +33,7 @@ add_library(deltahdl_lib STATIC
     simulation/eval_systask.cpp
     simulation/eval_expr.cpp
     simulation/eval_enum.cpp
+    simulation/eval_string.cpp
     simulation/eval_math.cpp
     simulation/eval_fileio.cpp
     simulation/stmt_exec.cpp

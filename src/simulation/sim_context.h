@@ -6,6 +6,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "common/arena.h"
@@ -92,6 +93,10 @@ class SimContext {
   uint32_t Urandom32();
   uint32_t UrandomRange(uint32_t min_val, uint32_t max_val);
 
+  // §6.16: String variable registration and lookup.
+  void RegisterStringVariable(std::string_view name);
+  bool IsStringVariable(std::string_view name) const;
+
   // §6.19: Enum type registration and lookup.
   void RegisterEnumType(std::string_view name, const EnumTypeInfo& info);
   const EnumTypeInfo* FindEnumType(std::string_view name) const;
@@ -164,6 +169,8 @@ class SimContext {
   std::vector<std::string> plus_args_;
   std::unordered_map<int, FILE*> file_descriptors_;
   int next_fd_ = 3;  // Start after stdin/stdout/stderr.
+  // §6.16: String variable tracking.
+  std::unordered_set<std::string_view> string_vars_;
   // §6.19: Enum type info and variable-to-enum-type mapping.
   std::unordered_map<std::string_view, EnumTypeInfo> enum_types_;
   std::unordered_map<std::string_view, std::string_view> var_enum_types_;
