@@ -155,6 +155,26 @@ bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs) {
 
 // --- Type compatibility (IEEE §6.22) ---
 
+// §6.11: Return true if the type kind is an integral type.
+static bool IsIntegralKind(DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kBit:
+    case DataTypeKind::kLogic:
+    case DataTypeKind::kReg:
+    case DataTypeKind::kByte:
+    case DataTypeKind::kShortint:
+    case DataTypeKind::kInt:
+    case DataTypeKind::kLongint:
+    case DataTypeKind::kInteger:
+    case DataTypeKind::kTime:
+    case DataTypeKind::kEnum:
+    case DataTypeKind::kImplicit:
+      return true;
+    default:
+      return false;
+  }
+}
+
 bool TypesMatch(const DataType& a, const DataType& b) {
   if (a.kind != b.kind) return false;
   if (a.is_signed != b.is_signed) return false;
@@ -164,10 +184,41 @@ bool TypesMatch(const DataType& a, const DataType& b) {
 
 bool TypesEquivalent(const DataType& a, const DataType& b) {
   if (TypesMatch(a, b)) return true;
-  // Packed types with same width/signing are equivalent (§6.22.2c).
+  // §6.22.2c: Packed/integral types equivalent if same width, signing,
+  // and state-ness (both 2-state or both 4-state).
   uint32_t wa = EvalTypeWidth(a);
   uint32_t wb = EvalTypeWidth(b);
-  return wa == wb && wa > 0 && a.is_signed == b.is_signed;
+  if (wa != wb || wa == 0 || a.is_signed != b.is_signed) return false;
+  return Is4stateType(a.kind) == Is4stateType(b.kind);
+}
+
+bool IsAssignmentCompatible(const DataType& a, const DataType& b) {
+  if (TypesEquivalent(a, b)) return true;
+  // §6.22.3: All integral types are assignment compatible with each other.
+  if (IsIntegralKind(a.kind) && IsIntegralKind(b.kind)) return true;
+  // §6.22.3: enum → integral is assignment compatible.
+  if (a.kind == DataTypeKind::kEnum && IsIntegralKind(b.kind)) return true;
+  if (b.kind == DataTypeKind::kEnum && IsIntegralKind(a.kind)) return true;
+  // Real types are assignment compatible with integral types.
+  bool a_real =
+      (a.kind == DataTypeKind::kReal || a.kind == DataTypeKind::kShortreal ||
+       a.kind == DataTypeKind::kRealtime);
+  bool b_real =
+      (b.kind == DataTypeKind::kReal || b.kind == DataTypeKind::kShortreal ||
+       b.kind == DataTypeKind::kRealtime);
+  if ((a_real && IsIntegralKind(b.kind)) ||
+      (b_real && IsIntegralKind(a.kind))) {
+    return true;
+  }
+  return a_real && b_real;
+}
+
+bool IsCastCompatible(const DataType& a, const DataType& b) {
+  if (IsAssignmentCompatible(a, b)) return true;
+  // §6.22.4: integral → enum requires explicit cast but is cast compatible.
+  if (IsIntegralKind(a.kind) && b.kind == DataTypeKind::kEnum) return true;
+  if (IsIntegralKind(b.kind) && a.kind == DataTypeKind::kEnum) return true;
+  return false;
 }
 
 // --- Width inference (IEEE §11.6) ---

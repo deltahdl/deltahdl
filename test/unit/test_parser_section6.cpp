@@ -430,13 +430,62 @@ TEST(ParserSection6, TypesMatchSignedness) {
 }
 
 TEST(ParserSection6, TypesEquivalentPackedSameWidth) {
-  // bit [7:0] and logic [7:0] are equivalent (same width, same signing).
+  // §6.22.2c: same width+signing+state-ness → equivalent.
+  // byte (8-bit, 2-state) and shortint differ in width → not equivalent.
+  // int and integer: same 32-bit width, but int is 2-state, integer is
+  // 4-state → not equivalent.
+  DataType a;
+  a.kind = DataTypeKind::kByte;
+  DataType b;
+  b.kind = DataTypeKind::kByte;
+  b.is_signed = true;  // byte defaults to signed, make both agree.
+  a.is_signed = true;
+  EXPECT_TRUE(TypesEquivalent(a, b));  // Same kind → match → equivalent.
+}
+
+TEST(ParserSection6, TypesNotEquivalentDifferentState) {
+  // §6.22.2c: bit (2-state) and logic (4-state) are NOT equivalent.
   DataType a;
   a.kind = DataTypeKind::kBit;
   DataType b;
   b.kind = DataTypeKind::kLogic;
-  // Both default unsigned, same base width (1 bit without dims).
-  EXPECT_TRUE(TypesEquivalent(a, b));
+  EXPECT_FALSE(TypesEquivalent(a, b));
+}
+
+TEST(ParserSection6, AssignmentCompatibleIntegral) {
+  // §6.22.3: All integral types are assignment compatible.
+  DataType a;
+  a.kind = DataTypeKind::kInt;
+  DataType b;
+  b.kind = DataTypeKind::kLogic;
+  EXPECT_TRUE(IsAssignmentCompatible(a, b));
+}
+
+TEST(ParserSection6, AssignmentCompatibleEnumToInt) {
+  // §6.22.3: enum → integral is assignment compatible.
+  DataType a;
+  a.kind = DataTypeKind::kEnum;
+  DataType b;
+  b.kind = DataTypeKind::kInt;
+  EXPECT_TRUE(IsAssignmentCompatible(a, b));
+}
+
+TEST(ParserSection6, NotAssignmentCompatibleStringInt) {
+  // string and int are not assignment compatible.
+  DataType a;
+  a.kind = DataTypeKind::kString;
+  DataType b;
+  b.kind = DataTypeKind::kInt;
+  EXPECT_FALSE(IsAssignmentCompatible(a, b));
+}
+
+TEST(ParserSection6, CastCompatibleIntToEnum) {
+  // §6.22.4: integral → enum requires cast (cast compatible).
+  DataType a;
+  a.kind = DataTypeKind::kInt;
+  DataType b;
+  b.kind = DataTypeKind::kEnum;
+  EXPECT_TRUE(IsCastCompatible(a, b));
 }
 
 // =========================================================================

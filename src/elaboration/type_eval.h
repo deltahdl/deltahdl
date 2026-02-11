@@ -40,6 +40,12 @@ bool TypesMatch(const DataType& a, const DataType& b);
 /// Return true if two types are equivalent (IEEE §6.22.2).
 bool TypesEquivalent(const DataType& a, const DataType& b);
 
+/// Return true if type a is assignment compatible with type b (IEEE §6.22.3).
+bool IsAssignmentCompatible(const DataType& a, const DataType& b);
+
+/// Return true if type a is cast compatible with type b (IEEE §6.22.4).
+bool IsCastCompatible(const DataType& a, const DataType& b);
+
 /// Infer the self-determined width of an expression (IEEE §11.6).
 /// Returns 0 for expressions that can't be sized.
 uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs);
