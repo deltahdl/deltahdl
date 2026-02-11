@@ -532,20 +532,26 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
   ParseUnpackedDims(member->unpacked_dims);
   if (Match(TokenKind::kEq)) member->init_expr = ParseExpr();
   members.push_back(member);
+  ParseExtraPropertyDecls(members, member, dtype);
+  Expect(TokenKind::kSemicolon);
+}
+
+void Parser::ParseExtraPropertyDecls(std::vector<ClassMember*>& members,
+                                     const ClassMember* first,
+                                     const DataType& dtype) {
   while (Match(TokenKind::kComma)) {
     auto* extra = arena_.Create<ClassMember>();
     extra->loc = CurrentLoc();
     extra->kind = ClassMemberKind::kProperty;
     extra->data_type = dtype;
-    extra->is_rand = member->is_rand;
-    extra->is_randc = member->is_randc;
-    extra->is_static = member->is_static;
+    extra->is_rand = first->is_rand;
+    extra->is_randc = first->is_randc;
+    extra->is_static = first->is_static;
     extra->name = Expect(TokenKind::kIdentifier).text;
     ParseUnpackedDims(extra->unpacked_dims);
     if (Match(TokenKind::kEq)) extra->init_expr = ParseExpr();
     members.push_back(extra);
   }
-  Expect(TokenKind::kSemicolon);
 }
 
 ClassMember* Parser::ParseConstraintStub(ClassMember* member) {

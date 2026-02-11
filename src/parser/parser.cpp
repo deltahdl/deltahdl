@@ -121,6 +121,35 @@ void Parser::ParseOutOfBlockConstraint(CompilationUnit* unit) {
   (void)unit;
 }
 
+// Parse secondary top-level items (primitives, checkers, configs, etc.)
+bool Parser::TryParseSecondaryTopLevel(CompilationUnit* unit) {
+  if (Check(TokenKind::kKwPrimitive)) {
+    unit->udps.push_back(ParseUdpDecl());
+    return true;
+  }
+  if (Check(TokenKind::kKwChecker)) {
+    unit->checkers.push_back(ParseCheckerDecl());
+    return true;
+  }
+  if (Check(TokenKind::kKwConfig)) {
+    unit->configs.push_back(ParseConfigDecl());
+    return true;
+  }
+  if (Check(TokenKind::kKwFunction)) {
+    unit->cu_items.push_back(ParseFunctionDecl());
+    return true;
+  }
+  if (Check(TokenKind::kKwTask)) {
+    unit->cu_items.push_back(ParseTaskDecl());
+    return true;
+  }
+  if (Check(TokenKind::kKwConstraint)) {
+    ParseOutOfBlockConstraint(unit);
+    return true;
+  }
+  return false;
+}
+
 void Parser::ParseTopLevel(CompilationUnit* unit) {
   if (Match(TokenKind::kSemicolon)) return;  // null item
   ParseAttributes();                         // consume optional (* ... *)
@@ -153,32 +182,7 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
     ParseModuleItem(discard);
     return;
   }
-  if (Check(TokenKind::kKwPrimitive)) {
-    unit->udps.push_back(ParseUdpDecl());
-    return;
-  }
-  if (Check(TokenKind::kKwChecker)) {
-    unit->checkers.push_back(ParseCheckerDecl());
-    return;
-  }
-  if (Check(TokenKind::kKwConfig)) {
-    unit->configs.push_back(ParseConfigDecl());
-    return;
-  }
-  // §3.12.1: compilation-unit scope functions and tasks
-  if (Check(TokenKind::kKwFunction)) {
-    unit->cu_items.push_back(ParseFunctionDecl());
-    return;
-  }
-  if (Check(TokenKind::kKwTask)) {
-    unit->cu_items.push_back(ParseTaskDecl());
-    return;
-  }
-  // §18.5.1: out-of-block constraint definition
-  if (Check(TokenKind::kKwConstraint)) {
-    ParseOutOfBlockConstraint(unit);
-    return;
-  }
+  if (TryParseSecondaryTopLevel(unit)) return;
   diag_.Error(CurrentLoc(), "expected top-level declaration");
   Consume();
 }
@@ -737,6 +741,10 @@ bool Parser::TryParseKeywordItem(std::vector<ModuleItem*>& items) {
     ParseVarDeclList(items, dtype);
     return true;
   }
+  return TryParseClassOrVerification(items);
+}
+
+bool Parser::TryParseClassOrVerification(std::vector<ModuleItem*>& items) {
   if (IsAtClassDecl()) {
     auto* item = arena_.Create<ModuleItem>();
     item->kind = ModuleItemKind::kClassDecl;

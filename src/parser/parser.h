@@ -18,6 +18,7 @@ class Parser {
  private:
   void ParseTopLevel(CompilationUnit* unit);
   void ParseExternTopLevel(CompilationUnit* unit);
+  bool TryParseSecondaryTopLevel(CompilationUnit* unit);
   void ParseOutOfBlockConstraint(CompilationUnit* unit);
 
   // Module/package parsing
@@ -37,6 +38,7 @@ class Parser {
   void ParseModuleItem(std::vector<ModuleItem*>& items);
   bool TryParseProcessBlock(std::vector<ModuleItem*>& items);
   bool TryParseKeywordItem(std::vector<ModuleItem*>& items);
+  bool TryParseClassOrVerification(std::vector<ModuleItem*>& items);
   bool TryParseVerificationItem(std::vector<ModuleItem*>& items);
   ModuleItem* ParseLetDecl();
   void ParseGenvarDecl(std::vector<ModuleItem*>& items);
@@ -64,6 +66,8 @@ class Parser {
   void ParseClassExtendsClause(ClassDecl* decl);
   void ParseClassMembers(std::vector<ClassMember*>& members);
   bool ParseClassQualifiers(ClassMember* member);
+  void ParseExtraPropertyDecls(std::vector<ClassMember*>& members,
+                               const ClassMember* first, const DataType& dtype);
   ClassMember* ParseConstraintStub(ClassMember* member);
 
   // Gate primitives (parser_toplevel.cpp)
