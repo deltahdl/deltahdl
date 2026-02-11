@@ -69,11 +69,11 @@ struct MethodCallParts {
 };
 bool ExtractMethodCallParts(const Expr* expr, MethodCallParts& out);
 
-// Shared formatting helper (used by eval.cpp and eval_systask.cpp).
+// Shared formatting helpers (eval_format.cpp).
 std::string FormatDisplay(const std::string& fmt,
                           const std::vector<Logic4Vec>& vals);
-
-// Extract format string from a string literal expression.
+std::string FormatArg(const Logic4Vec& val, char spec);
+std::string FormatValueAsString(const Logic4Vec& val);
 std::string ExtractFormatString(const Expr* first_arg);
 
 }  // namespace delta

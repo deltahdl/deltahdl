@@ -85,6 +85,8 @@ Logic4Vec MakeLogic4Vec(Arena& arena, uint32_t width) {
 Logic4Vec MakeLogic4VecVal(Arena& arena, uint32_t width, uint64_t val) {
   auto vec = MakeLogic4Vec(arena, width);
   if (vec.nwords > 0) {
+    // Mask to declared width to prevent stale upper bits.
+    if (width < 64) val &= (uint64_t{1} << width) - 1;
     vec.words[0].aval = val;
   }
   return vec;

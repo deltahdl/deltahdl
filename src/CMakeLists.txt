@@ -38,6 +38,7 @@ add_library(deltahdl_lib STATIC
     simulation/eval_string.cpp
     simulation/eval_math.cpp
     simulation/eval_fileio.cpp
+    simulation/eval_format.cpp
     simulation/stmt_exec.cpp
     simulation/lowerer.cpp
     simulation/vcd_writer.cpp

@@ -30,7 +30,9 @@ static double ArgToDouble(const Expr* arg, SimContext& ctx, Arena& arena) {
 static Logic4Vec DoubleToResult(Arena& arena, double d) {
   uint64_t bits = 0;
   std::memcpy(&bits, &d, sizeof(double));
-  return MakeLogic4VecVal(arena, 64, bits);
+  auto vec = MakeLogic4VecVal(arena, 64, bits);
+  vec.is_real = true;
+  return vec;
 }
 
 // ============================================================================

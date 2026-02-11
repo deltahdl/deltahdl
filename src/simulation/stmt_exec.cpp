@@ -95,6 +95,9 @@ static StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
   // Identifier or MemberAccess: whole-variable assign.
   auto* var = ResolveLhsVariable(stmt->lhs, ctx);
   if (var) {
+    if (rhs_val.width != var->value.width && var->value.width > 0) {
+      rhs_val = MakeLogic4VecVal(arena, var->value.width, rhs_val.ToUint64());
+    }
     var->value = rhs_val;
     var->NotifyWatchers();
   }

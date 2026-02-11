@@ -309,8 +309,9 @@ Expr* Parser::ParsePrimaryExpr() {
   // clang-format off
   switch (tok.kind) {
     case TokenKind::kIntLiteral:
-    case TokenKind::kUnbasedUnsizedLiteral:
       return MakeLiteral(ExprKind::kIntegerLiteral, tok);
+    case TokenKind::kUnbasedUnsizedLiteral:
+      return MakeLiteral(ExprKind::kUnbasedUnsizedLiteral, tok);
     case TokenKind::kRealLiteral:
       return MakeLiteral(ExprKind::kRealLiteral, tok);
     case TokenKind::kTimeLiteral:

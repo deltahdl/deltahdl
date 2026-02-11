@@ -1,12 +1,9 @@
 #include "simulation/eval.h"
 
-#include <algorithm>
-#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -21,8 +18,37 @@ namespace delta {
 
 // --- Literal evaluation ---
 
+static uint32_t LiteralWidth(std::string_view text, uint64_t val) {
+  auto tick = text.find('\'');
+  if (tick != std::string_view::npos && tick > 0) {
+    uint32_t w = 0;
+    for (size_t i = 0; i < tick; ++i) {
+      if (text[i] >= '0' && text[i] <= '9') w = w * 10 + (text[i] - '0');
+    }
+    if (w > 0) return w;
+  }
+  return (val > UINT32_MAX) ? 64 : 32;
+}
+
+static Logic4Vec EvalUnbasedUnsized(const Expr* expr, Arena& arena) {
+  // §5.7.1: '0, '1, 'x, 'z — single-bit unbased unsized literal.
+  auto text = expr->text;
+  if (text.size() >= 2 && text[0] == '\'') {
+    char c = text[1];
+    if (c == '1') return MakeLogic4VecVal(arena, 1, 1);
+    if (c == '0') return MakeLogic4VecVal(arena, 1, 0);
+    // 'x and 'z: set bval to indicate unknown.
+    auto vec = MakeLogic4Vec(arena, 1);
+    if (c == 'x' || c == 'X') vec.words[0] = {1, 1};
+    if (c == 'z' || c == 'Z' || c == '?') vec.words[0] = {0, 1};
+    return vec;
+  }
+  return MakeLogic4VecVal(arena, 1, expr->int_val);
+}
+
 static Logic4Vec EvalIntLiteral(const Expr* expr, Arena& arena) {
-  return MakeLogic4VecVal(arena, 32, expr->int_val);
+  uint32_t width = LiteralWidth(expr->text, expr->int_val);
+  return MakeLogic4VecVal(arena, width, expr->int_val);
 }
 
 static Logic4Vec EvalStringLiteral(const Expr* expr, Arena& arena) {
@@ -48,7 +74,11 @@ static Logic4Vec EvalStringLiteral(const Expr* expr, Arena& arena) {
 static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
   auto* var = ctx.FindVariable(expr->text);
-  if (var) return var->value;
+  if (var) {
+    auto val = var->value;
+    if (ctx.IsRealVariable(expr->text)) val.is_real = true;
+    return val;
+  }
   return MakeLogic4Vec(arena, 1);  // X for unknown
 }
 
@@ -197,62 +227,109 @@ static Logic4Vec EvalBinaryBitwise(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
   return result;
 }
 
-// --- Binary comparison and shifts ---
+// --- Case equality (compares both aval and bval) ---
+
+static bool EvalCaseEquality(Logic4Vec lhs, Logic4Vec rhs) {
+  if (lhs.width != rhs.width) return false;
+  for (uint32_t i = 0; i < lhs.nwords; ++i) {
+    if (lhs.words[i].aval != rhs.words[i].aval) return false;
+    if (lhs.words[i].bval != rhs.words[i].bval) return false;
+  }
+  return true;
+}
+
+// --- Shift operations ---
+
+static Logic4Vec EvalShift(TokenKind op, Logic4Vec lhs, uint64_t rv,
+                           Arena& arena) {
+  uint64_t lv = lhs.ToUint64();
+  if (op == TokenKind::kLtLt || op == TokenKind::kLtLtLt) {
+    return MakeLogic4VecVal(arena, lhs.width, lv << rv);
+  }
+  if (op == TokenKind::kGtGt) {
+    return MakeLogic4VecVal(arena, lhs.width, lv >> rv);
+  }
+  // kGtGtGt: arithmetic right shift — sign-extend from operand width.
+  uint32_t w = lhs.width;
+  if (w > 0 && w < 64 && ((lv >> (w - 1)) & 1)) {
+    auto sv = static_cast<int64_t>(lv | (~uint64_t{0} << w));
+    auto shifted = static_cast<uint64_t>(sv >> rv);
+    uint64_t mask = (w >= 64) ? ~uint64_t{0} : (uint64_t{1} << w) - 1;
+    return MakeLogic4VecVal(arena, w, shifted & mask);
+  }
+  return MakeLogic4VecVal(arena, lhs.width, lv >> rv);
+}
+
+// --- Wildcard equality ---
+
+static uint64_t EvalWildcardEq(Logic4Vec lhs, Logic4Vec rhs) {
+  uint64_t rhs_dc = rhs.nwords > 0 ? rhs.words[0].bval : 0;
+  return (((lhs.ToUint64() ^ rhs.ToUint64()) & ~rhs_dc) == 0) ? 1 : 0;
+}
+
+// --- Equality operations (§11.4.5, §11.4.6) ---
+
+static uint64_t EvalEqualityOp(TokenKind op, Logic4Vec lhs, Logic4Vec rhs) {
+  uint64_t lv = lhs.ToUint64();
+  uint64_t rv = rhs.ToUint64();
+  switch (op) {
+    case TokenKind::kEqEq:
+      return (lv == rv) ? 1 : 0;
+    case TokenKind::kEqEqEq:
+      return EvalCaseEquality(lhs, rhs) ? 1 : 0;
+    case TokenKind::kBangEq:
+      return (lv != rv) ? 1 : 0;
+    case TokenKind::kBangEqEq:
+      return EvalCaseEquality(lhs, rhs) ? 0 : 1;
+    case TokenKind::kEqEqQuestion:
+      return EvalWildcardEq(lhs, rhs);
+    case TokenKind::kBangEqQuestion:
+      return EvalWildcardEq(lhs, rhs) ^ 1;
+    default:
+      return 0;
+  }
+}
+
+// --- Relational and logical operations (§11.4.4, §11.4.7) ---
+
+static uint64_t EvalRelationalOp(TokenKind op, uint64_t lv, uint64_t rv) {
+  switch (op) {
+    case TokenKind::kLt:
+      return (lv < rv) ? 1 : 0;
+    case TokenKind::kGt:
+      return (lv > rv) ? 1 : 0;
+    case TokenKind::kLtEq:
+      return (lv <= rv) ? 1 : 0;
+    case TokenKind::kGtEq:
+      return (lv >= rv) ? 1 : 0;
+    case TokenKind::kAmpAmp:
+      return (lv != 0 && rv != 0) ? 1 : 0;
+    case TokenKind::kPipePipe:
+      return (lv != 0 || rv != 0) ? 1 : 0;
+    default:
+      return 0;
+  }
+}
+
+// --- Binary comparison dispatch ---
+
+static bool IsEqualityOp(TokenKind op) {
+  return op == TokenKind::kEqEq || op == TokenKind::kEqEqEq ||
+         op == TokenKind::kBangEq || op == TokenKind::kBangEqEq ||
+         op == TokenKind::kEqEqQuestion || op == TokenKind::kBangEqQuestion;
+}
 
 static Logic4Vec EvalBinaryCompare(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
                                    Arena& arena) {
-  uint64_t lv = lhs.ToUint64();
-  uint64_t rv = rhs.ToUint64();
-  uint64_t result = 0;
-
-  switch (op) {
-    case TokenKind::kEqEq:
-    case TokenKind::kEqEqEq:
-      result = static_cast<uint64_t>(lv == rv);
-      break;
-    case TokenKind::kBangEq:
-    case TokenKind::kBangEqEq:
-      result = static_cast<uint64_t>(lv != rv);
-      break;
-    case TokenKind::kLt:
-      result = static_cast<uint64_t>(lv < rv);
-      break;
-    case TokenKind::kGt:
-      result = static_cast<uint64_t>(lv > rv);
-      break;
-    case TokenKind::kLtEq:
-      result = static_cast<uint64_t>(lv <= rv);
-      break;
-    case TokenKind::kGtEq:
-      result = static_cast<uint64_t>(lv >= rv);
-      break;
-    case TokenKind::kLtLt:
-    case TokenKind::kLtLtLt:
-      return MakeLogic4VecVal(arena, lhs.width, lv << rv);
-    case TokenKind::kGtGt:
-    case TokenKind::kGtGtGt:
-      return MakeLogic4VecVal(arena, lhs.width, lv >> rv);
-    case TokenKind::kAmpAmp:
-      result = static_cast<uint64_t>(lv != 0 && rv != 0);
-      break;
-    case TokenKind::kPipePipe:
-      result = static_cast<uint64_t>(lv != 0 || rv != 0);
-      break;
-    case TokenKind::kEqEqQuestion: {
-      // Wildcard equality: X/Z bits in RHS are don't-care.
-      uint64_t rhs_dc = rhs.nwords > 0 ? rhs.words[0].bval : 0;
-      result = static_cast<uint64_t>(((lv ^ rv) & ~rhs_dc) == 0);
-      break;
-    }
-    case TokenKind::kBangEqQuestion: {
-      uint64_t rhs_dc = rhs.nwords > 0 ? rhs.words[0].bval : 0;
-      result = static_cast<uint64_t>(((lv ^ rv) & ~rhs_dc) != 0);
-      break;
-    }
-    default:
-      break;
+  if (op == TokenKind::kLtLt || op == TokenKind::kLtLtLt ||
+      op == TokenKind::kGtGt || op == TokenKind::kGtGtGt) {
+    return EvalShift(op, lhs, rhs.ToUint64(), arena);
   }
-  return MakeLogic4VecVal(arena, 1, result);
+  if (IsEqualityOp(op)) {
+    return MakeLogic4VecVal(arena, 1, EvalEqualityOp(op, lhs, rhs));
+  }
+  return MakeLogic4VecVal(arena, 1,
+                          EvalRelationalOp(op, lhs.ToUint64(), rhs.ToUint64()));
 }
 
 // --- Binary dispatch ---
@@ -300,6 +377,10 @@ static TokenKind CompoundAssignBaseOp(TokenKind op) {
       return TokenKind::kLtLt;
     case TokenKind::kGtGtEq:
       return TokenKind::kGtGt;
+    case TokenKind::kLtLtLtEq:
+      return TokenKind::kLtLtLt;
+    case TokenKind::kGtGtGtEq:
+      return TokenKind::kGtGtGt;
     default:
       return TokenKind::kEof;
   }
@@ -320,121 +401,6 @@ static Logic4Vec EvalCompoundAssign(const Expr* expr, SimContext& ctx,
     if (var) var->value = result;
   }
   return result;
-}
-
-// --- System call formatting ---
-
-static std::string FormatValueAsString(const Logic4Vec& val) {
-  std::string result;
-  uint64_t v = val.ToUint64();
-  uint32_t nbytes = (val.width + 7) / 8;
-  for (uint32_t i = nbytes; i > 0; --i) {
-    auto ch = static_cast<char>((v >> ((i - 1) * 8)) & 0xFF);
-    if (ch != 0) result += ch;
-  }
-  return result;
-}
-
-static std::string FormatValueAsReal(const Logic4Vec& val, char spec) {
-  uint64_t bits = val.ToUint64();
-  double d = 0.0;
-  std::memcpy(&d, &bits, sizeof(double));
-  char buf[128];
-  if (spec == 'e') {
-    std::snprintf(buf, sizeof(buf), "%e", d);
-  } else if (spec == 'g') {
-    std::snprintf(buf, sizeof(buf), "%g", d);
-  } else {
-    std::snprintf(buf, sizeof(buf), "%f", d);
-  }
-  return buf;
-}
-
-static std::string FormatArg(const Logic4Vec& val, char spec) {
-  uint64_t v = val.ToUint64();
-  char buf[64];
-  switch (spec) {
-    case 'd':
-      std::snprintf(buf, sizeof(buf), "%llu",
-                    static_cast<unsigned long long>(v));
-      return buf;
-    case 'h':
-    case 'x':
-      std::snprintf(buf, sizeof(buf), "%llx",
-                    static_cast<unsigned long long>(v));
-      return buf;
-    case 'o':
-      std::snprintf(buf, sizeof(buf), "%llo",
-                    static_cast<unsigned long long>(v));
-      return buf;
-    case 'b':
-      return val.ToString();
-    case 't':
-      std::snprintf(buf, sizeof(buf), "%llu",
-                    static_cast<unsigned long long>(v));
-      return buf;
-    case 's':
-      return FormatValueAsString(val);
-    case 'e':
-    case 'f':
-    case 'g':
-      return FormatValueAsReal(val, spec);
-    default:
-      return val.ToString();
-  }
-}
-
-// Append a literal (non-format) character, handling backslash escapes.
-static void AppendLiteralChar(const std::string& fmt, size_t& i,
-                              std::string& out) {
-  if (fmt[i] == '\\' && i + 1 < fmt.size()) {
-    out += (fmt[i + 1] == 'n') ? '\n' : fmt[i + 1];
-    ++i;
-  } else {
-    out += fmt[i];
-  }
-}
-
-// Process a single format specifier starting at '%'.
-// Advances i past the specifier and returns true if an arg was consumed.
-static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
-                              const std::vector<Logic4Vec>& vals, size_t& vi,
-                              std::string& out) {
-  // Handle %m (hierarchical name -- no arg consumed).
-  if (fmt[i + 1] == 'm') {
-    out += "<module>";
-    ++i;
-    return false;
-  }
-  // Handle %% (literal percent).
-  if (fmt[i + 1] == '%') {
-    out += '%';
-    ++i;
-    return false;
-  }
-  // Skip optional '0' width modifier (e.g. %0d).
-  size_t j = i + 1;
-  while (j < fmt.size() && (fmt[j] >= '0' && fmt[j] <= '9')) ++j;
-  char spec = (j < fmt.size()) ? fmt[j] : 'd';
-  if (vi < vals.size()) {
-    out += FormatArg(vals[vi++], spec);
-  }
-  i = j;
-  return true;
-}
-
-std::string FormatDisplay(const std::string& fmt,
-                          const std::vector<Logic4Vec>& vals) {
-  std::string out;
-  size_t vi = 0;
-  for (size_t i = 0; i < fmt.size(); ++i) {
-    if (fmt[i] != '%' || i + 1 >= fmt.size()) {
-      AppendLiteralChar(fmt, i, out);
-      continue;
-    }
-    ProcessFormatSpec(fmt, i, vals, vi, out);
-  }
-  return out;
 }
 
 // --- PRNG system calls ---
@@ -464,14 +430,6 @@ static Logic4Vec EvalPrngCall(const Expr* expr, SimContext& ctx, Arena& arena,
 }
 
 // --- System call evaluation ---
-
-std::string ExtractFormatString(const Expr* first_arg) {
-  auto text = first_arg->text;
-  if (text.size() >= 2 && text.front() == '"') {
-    return std::string(text.substr(1, text.size() - 2));
-  }
-  return std::string(text);
-}
 
 static void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena) {
   std::string fmt;
@@ -931,6 +889,26 @@ static Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx,
   return result;
 }
 
+// --- Binary expression with short-circuit ---
+
+static Logic4Vec EvalBinaryExpr(const Expr* expr, SimContext& ctx,
+                                Arena& arena) {
+  if (expr->op == TokenKind::kAmpAmp) {
+    auto l = EvalExpr(expr->lhs, ctx, arena);
+    if (l.ToUint64() == 0) return MakeLogic4VecVal(arena, 1, 0);
+    auto r = EvalExpr(expr->rhs, ctx, arena);
+    return MakeLogic4VecVal(arena, 1, r.ToUint64() != 0 ? 1 : 0);
+  }
+  if (expr->op == TokenKind::kPipePipe) {
+    auto l = EvalExpr(expr->lhs, ctx, arena);
+    if (l.ToUint64() != 0) return MakeLogic4VecVal(arena, 1, 1);
+    auto r = EvalExpr(expr->rhs, ctx, arena);
+    return MakeLogic4VecVal(arena, 1, r.ToUint64() != 0 ? 1 : 0);
+  }
+  return EvalBinaryOp(expr->op, EvalExpr(expr->lhs, ctx, arena),
+                      EvalExpr(expr->rhs, ctx, arena), arena);
+}
+
 // --- Main dispatch ---
 
 Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena) {
@@ -938,8 +916,9 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena) {
 
   switch (expr->kind) {
     case ExprKind::kIntegerLiteral:
-    case ExprKind::kUnbasedUnsizedLiteral:
       return EvalIntLiteral(expr, arena);
+    case ExprKind::kUnbasedUnsizedLiteral:
+      return EvalUnbasedUnsized(expr, arena);
     case ExprKind::kStringLiteral:
       return EvalStringLiteral(expr, arena);
     case ExprKind::kRealLiteral: {
@@ -962,8 +941,7 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena) {
       if (expr->op == TokenKind::kKwMatches) {
         return EvalMatches(expr, ctx, arena);
       }
-      return EvalBinaryOp(expr->op, EvalExpr(expr->lhs, ctx, arena),
-                          EvalExpr(expr->rhs, ctx, arena), arena);
+      return EvalBinaryExpr(expr, ctx, arena);
     case ExprKind::kTernary:
       return EvalTernary(expr, ctx, arena);
     case ExprKind::kConcatenation:

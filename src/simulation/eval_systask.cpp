@@ -167,6 +167,7 @@ static Logic4Vec EvalTypename(const Expr* expr, SimContext& ctx, Arena& arena) {
     return StringToLogic4Vec(arena, "logic");
   }
   auto val = EvalExpr(expr->args[0], ctx, arena);
+  if (val.width <= 1) return StringToLogic4Vec(arena, "logic");
   std::string name = "logic[" + std::to_string(val.width - 1) + ":0]";
   return StringToLogic4Vec(arena, name);
 }
@@ -233,31 +234,34 @@ static Logic4Vec EvalRealtobits(const Expr* expr, SimContext& ctx,
 // §20.9 — $countbits
 // ============================================================================
 
+static uint32_t CountMatchingBits(const Logic4Vec& val, const bool match[4]) {
+  uint32_t count = 0;
+  for (uint32_t i = 0; i < val.nwords; ++i) {
+    uint64_t a = val.words[i].aval;
+    uint64_t b = val.words[i].bval;
+    if (match[1]) count += static_cast<uint32_t>(std::popcount(a & ~b));
+    if (match[0]) count += static_cast<uint32_t>(std::popcount(~a & ~b));
+    if (match[3]) count += static_cast<uint32_t>(std::popcount(a & b));
+    if (match[2]) count += static_cast<uint32_t>(std::popcount(~a & b));
+  }
+  if (match[0] && val.width < val.nwords * 64) {
+    count -= val.nwords * 64 - val.width;
+  }
+  return count;
+}
+
 static Logic4Vec EvalCountbits(const Expr* expr, SimContext& ctx,
                                Arena& arena) {
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 32, 0);
   auto val = EvalExpr(expr->args[0], ctx, arena);
-  // Gather target bit values (0 or 1).
-  bool match_one = false;
-  bool match_zero = false;
+  bool match[4] = {};
   for (size_t i = 1; i < expr->args.size(); ++i) {
-    uint64_t pat = EvalExpr(expr->args[i], ctx, arena).ToUint64();
-    if (pat == 1) match_one = true;
-    if (pat == 0) match_zero = true;
+    auto pat = EvalExpr(expr->args[i], ctx, arena);
+    uint64_t a = pat.nwords > 0 ? pat.words[0].aval & 1 : 0;
+    uint64_t b = pat.nwords > 0 ? pat.words[0].bval & 1 : 0;
+    match[a + b * 2] = true;
   }
-  uint32_t count = 0;
-  for (uint32_t i = 0; i < val.nwords; ++i) {
-    uint64_t known_ones = val.words[i].aval & ~val.words[i].bval;
-    uint64_t known_zeros = ~val.words[i].aval & ~val.words[i].bval;
-    if (match_one) count += static_cast<uint32_t>(std::popcount(known_ones));
-    if (match_zero) count += static_cast<uint32_t>(std::popcount(known_zeros));
-  }
-  // Mask to actual width.
-  if (match_zero && val.width < val.nwords * 64) {
-    uint32_t extra_bits = val.nwords * 64 - val.width;
-    count -= extra_bits;  // Discount padding zeros beyond actual width.
-  }
-  return MakeLogic4VecVal(arena, 32, count);
+  return MakeLogic4VecVal(arena, 32, CountMatchingBits(val, match));
 }
 
 // ============================================================================
