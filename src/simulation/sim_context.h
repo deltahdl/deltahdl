@@ -46,7 +46,9 @@ class SimContext {
   Variable* CreateVariable(std::string_view name, uint32_t width);
 
   Net* FindNet(std::string_view name);
-  Net* CreateNet(std::string_view name, NetType type, uint32_t width);
+  Net* CreateNet(std::string_view name, NetType type, uint32_t width,
+                 Strength charge_strength = Strength::kMedium,
+                 uint64_t decay_ticks = 0);
 
   Scheduler& GetScheduler() { return scheduler_; }
   Arena& GetArena() { return arena_; }

@@ -81,7 +81,8 @@ static void ScheduleProcess(Process* proc, Scheduler& sched) {
 void Lowerer::LowerModule(const RtlirModule* mod) {
   // Create Net objects for all declared nets (with resolution support).
   for (const auto& net : mod->nets) {
-    ctx_.CreateNet(net.name, net.net_type, net.width);
+    ctx_.CreateNet(net.name, net.net_type, net.width, net.charge_strength,
+                   net.decay_ticks);
   }
   // Create variables for all declared variables.
   for (const auto& var : mod->variables) {

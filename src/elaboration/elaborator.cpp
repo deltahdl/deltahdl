@@ -316,6 +316,15 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   net.name = ScopedName(item->name);
   net.net_type = DataTypeToNetType(item->data_type.kind);
   net.width = EvalTypeWidth(item->data_type, typedefs_);
+  // §6.6.4: Extract charge strength and decay time for trireg nets.
+  if (item->data_type.charge_strength != 0) {
+    net.charge_strength =
+        static_cast<Strength>(item->data_type.charge_strength);
+  }
+  if (item->net_delay_decay) {
+    net.decay_ticks =
+        static_cast<uint64_t>(ConstEvalInt(item->net_delay_decay).value_or(0));
+  }
   mod->nets.push_back(net);
 }
 

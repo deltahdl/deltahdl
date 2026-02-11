@@ -34,8 +34,8 @@ Net* SimContext::FindNet(std::string_view name) {
   return (it != nets_.end()) ? it->second : nullptr;
 }
 
-Net* SimContext::CreateNet(std::string_view name, NetType type,
-                           uint32_t width) {
+Net* SimContext::CreateNet(std::string_view name, NetType type, uint32_t width,
+                           Strength charge_strength, uint64_t decay_ticks) {
   auto* var = CreateVariable(name, width);
   // Initialize net value to z (aval=all-ones, bval=all-ones) per IEEE §6.5.
   for (uint32_t i = 0; i < var->value.nwords; ++i) {
@@ -45,6 +45,8 @@ Net* SimContext::CreateNet(std::string_view name, NetType type,
   auto* net = arena_.Create<Net>();
   net->type = type;
   net->resolved = var;
+  net->charge_strength = charge_strength;
+  net->decay_ticks = decay_ticks;
   nets_[name] = net;
   return net;
 }

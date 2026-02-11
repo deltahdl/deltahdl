@@ -695,3 +695,58 @@ TEST(ParserSection6, DollarConstant_ParamAssign) {
                "  parameter p = $;\n"
                "endmodule\n"));
 }
+
+// =========================================================================
+// §6.6.4: Trireg charge strength and net delays
+// =========================================================================
+
+TEST(ParserSection6, TriregChargeStrengthSmall) {
+  auto r = Parse(
+      "module t;\n"
+      "  trireg (small) s1;\n"
+      "endmodule\n");
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
+  EXPECT_EQ(item->data_type.charge_strength, 1);
+}
+
+TEST(ParserSection6, TriregChargeStrengthLarge) {
+  auto r = Parse(
+      "module t;\n"
+      "  trireg (large) l1;\n"
+      "endmodule\n");
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.charge_strength, 4);
+}
+
+TEST(ParserSection6, TriregThreeDelay) {
+  auto r = Parse(
+      "module t;\n"
+      "  trireg (large) #(10, 20, 50) cap1;\n"
+      "endmodule\n");
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.charge_strength, 4);
+  ASSERT_NE(item->net_delay, nullptr);
+  EXPECT_EQ(item->net_delay->int_val, 10u);
+  ASSERT_NE(item->net_delay_fall, nullptr);
+  EXPECT_EQ(item->net_delay_fall->int_val, 20u);
+  ASSERT_NE(item->net_delay_decay, nullptr);
+  EXPECT_EQ(item->net_delay_decay->int_val, 50u);
+}
+
+TEST(ParserSection6, TriregSingleDelay) {
+  auto r = Parse(
+      "module t;\n"
+      "  trireg #5 t1;\n"
+      "endmodule\n");
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
+  ASSERT_NE(item->net_delay, nullptr);
+  EXPECT_EQ(item->net_delay->int_val, 5u);
+  EXPECT_EQ(item->net_delay_fall, nullptr);
+  EXPECT_EQ(item->net_delay_decay, nullptr);
+}

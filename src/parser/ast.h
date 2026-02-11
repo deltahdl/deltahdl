@@ -165,6 +165,7 @@ struct DataType {
   bool is_soft = false;      // union soft (§7.3.1)
   bool is_vectored = false;  // vectored qualifier (§6.6.9)
   bool is_scalared = false;  // scalared qualifier (§6.6.9)
+  uint8_t charge_strength = 0;  // §6.6.4: 1=small, 2=medium, 4=large
   Expr* packed_dim_left = nullptr;
   Expr* packed_dim_right = nullptr;
   std::string_view type_name;
@@ -437,6 +438,11 @@ struct ModuleItem {
   Expr* assign_lhs = nullptr;
   Expr* assign_rhs = nullptr;
   Expr* assign_delay = nullptr;  // Optional delay: assign #5 out = in (§10.3.3)
+
+  // Net declaration delay: #(rise, fall, charge_decay) (§6.6.4/§28.16)
+  Expr* net_delay = nullptr;
+  Expr* net_delay_fall = nullptr;
+  Expr* net_delay_decay = nullptr;
 
   // Always/initial/final blocks
   AlwaysKind always_kind = AlwaysKind::kAlways;

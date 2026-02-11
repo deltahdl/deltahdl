@@ -1,6 +1,7 @@
 #include "simulation/net.h"
 
 #include "common/arena.h"
+#include "simulation/scheduler.h"
 #include "simulation/variable.h"
 
 namespace delta {
@@ -173,7 +174,7 @@ static void ResolveStrengthBit(const std::vector<Logic4Vec>& drivers,
   SetBit(result, bit, conflict ? 2 : max_val);
 }
 
-// --- Net::Resolve ---
+// --- Helpers ---
 
 static bool AllDriversZ(const std::vector<Logic4Vec>& drivers) {
   for (const auto& drv : drivers) {
@@ -187,9 +188,29 @@ static bool AllDriversZ(const std::vector<Logic4Vec>& drivers) {
   return true;
 }
 
+static void SetAllX(Logic4Vec& val) {
+  for (uint32_t w = 0; w < val.nwords; ++w) {
+    val.words[w] = {0, ~uint64_t{0}};
+  }
+}
+
+// §6.6.4.2: Schedule charge decay event with generation counter.
+static void ScheduleDecay(Net& net, Scheduler* sched) {
+  uint64_t gen = ++net.decay_generation;
+  auto* event = sched->GetEventPool().Acquire();
+  event->callback = [&net, gen]() {
+    if (net.decay_generation != gen) return;
+    SetAllX(net.resolved->value);
+    net.resolved->NotifyWatchers();
+  };
+  auto time = sched->CurrentTime();
+  time.ticks += net.decay_ticks;
+  sched->ScheduleEvent(time, Region::kActive, event);
+}
+
 // §6.6.6/§6.6.4: Handle supply nets and trireg charge retention.
 // Returns true if the net type was handled (caller should return early).
-static bool ResolveSpecialNet(Net& net, Arena& arena) {
+static bool ResolveSpecialNet(Net& net, Arena& arena, Scheduler* sched) {
   if (net.type == NetType::kSupply0) {
     net.resolved->value = MakeLogic4VecVal(arena, net.resolved->value.width, 0);
     net.resolved->NotifyWatchers();
@@ -205,15 +226,30 @@ static bool ResolveSpecialNet(Net& net, Arena& arena) {
     return true;
   }
   if (net.type == NetType::kTrireg && AllDriversZ(net.drivers)) {
+    if (net.decay_ticks > 0 && sched != nullptr) {
+      ScheduleDecay(net, sched);
+    }
     net.resolved->NotifyWatchers();
     return true;
   }
   return false;
 }
 
-void Net::Resolve(Arena& arena) {
+// --- Net::Resolve ---
+
+bool Net::InCapacitiveState() const {
+  return type == NetType::kTrireg && AllDriversZ(drivers);
+}
+
+void Net::Resolve(Arena& arena, Scheduler* sched) {
   if (!resolved || drivers.empty()) return;
-  if (ResolveSpecialNet(*this, arena)) return;
+
+  // Cancel pending decay when trireg exits capacitive state.
+  if (type == NetType::kTrireg && !AllDriversZ(drivers)) {
+    ++decay_generation;
+  }
+
+  if (ResolveSpecialNet(*this, arena, sched)) return;
 
   // Strength-aware path.
   if (!driver_strengths.empty()) {
@@ -247,6 +283,35 @@ void Net::Resolve(Arena& arena) {
   FixupTriPull(result, type);
   resolved->value = result;
   resolved->NotifyWatchers();
+}
+
+// --- §6.6.4.1: Capacitive network charge propagation ---
+
+static bool ValuesEqual(const Logic4Vec& a, const Logic4Vec& b) {
+  uint32_t n = (a.nwords < b.nwords) ? a.nwords : b.nwords;
+  for (uint32_t w = 0; w < n; ++w) {
+    if (a.words[w].aval != b.words[w].aval) return false;
+    if (a.words[w].bval != b.words[w].bval) return false;
+  }
+  return true;
+}
+
+void PropagateCharge(Net& a, Net& b) {
+  if (!a.InCapacitiveState() || !b.InCapacitiveState()) return;
+  auto sa = static_cast<uint8_t>(a.charge_strength);
+  auto sb = static_cast<uint8_t>(b.charge_strength);
+  if (sa > sb) {
+    b.resolved->value = a.resolved->value;
+    b.resolved->NotifyWatchers();
+  } else if (sb > sa) {
+    a.resolved->value = b.resolved->value;
+    a.resolved->NotifyWatchers();
+  } else if (!ValuesEqual(a.resolved->value, b.resolved->value)) {
+    SetAllX(a.resolved->value);
+    SetAllX(b.resolved->value);
+    a.resolved->NotifyWatchers();
+    b.resolved->NotifyWatchers();
+  }
 }
 
 }  // namespace delta

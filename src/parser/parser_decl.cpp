@@ -410,6 +410,26 @@ static std::optional<DataTypeKind> TokenToTypeKind(TokenKind tk) {
 }
 // clang-format on
 
+uint8_t Parser::ParseChargeStrength() {
+  if (!Check(TokenKind::kLParen)) return 0;
+  auto saved = lexer_.SavePos();
+  Consume();  // '('
+  uint8_t result = 0;
+  if (Match(TokenKind::kKwSmall)) {
+    result = 1;
+  } else if (Match(TokenKind::kKwMedium)) {
+    result = 2;
+  } else if (Match(TokenKind::kKwLarge)) {
+    result = 4;
+  }
+  if (result != 0) {
+    Expect(TokenKind::kRParen);
+  } else {
+    lexer_.RestorePos(saved);
+  }
+  return result;
+}
+
 DataType Parser::ParseDataType() {
   DataType dtype;
 
@@ -442,6 +462,11 @@ DataType Parser::ParseDataType() {
   dtype.kind = *kind;
   dtype.is_net = IsNetTypeToken(tok_kind);
   Consume();
+
+  // §6.6.4: charge_strength for trireg — (small), (medium), (large)
+  if (dtype.kind == DataTypeKind::kTrireg) {
+    dtype.charge_strength = ParseChargeStrength();
+  }
 
   // vectored/scalared qualifiers (§6.6.9) — net types only
   if (dtype.is_net) {
@@ -515,14 +540,36 @@ void Parser::ParseUnpackedDims(std::vector<Expr*>& dims) {
 
 // --- Variable declaration list ---
 
+void Parser::ParseNetDelay(Expr*& d1, Expr*& d2, Expr*& d3) {
+  if (!Check(TokenKind::kHash)) return;
+  Consume();  // '#'
+  if (Match(TokenKind::kLParen)) {
+    d1 = ParseExpr();
+    if (Match(TokenKind::kComma)) {
+      d2 = ParseExpr();
+      if (Match(TokenKind::kComma)) d3 = ParseExpr();
+    }
+    Expect(TokenKind::kRParen);
+  } else {
+    d1 = ParsePrimaryExpr();
+  }
+}
+
 void Parser::ParseVarDeclList(std::vector<ModuleItem*>& items,
                               const DataType& dtype) {
+  Expr* nd1 = nullptr;
+  Expr* nd2 = nullptr;
+  Expr* nd3 = nullptr;
+  if (dtype.is_net) ParseNetDelay(nd1, nd2, nd3);
   do {
     auto* item = arena_.Create<ModuleItem>();
     item->kind =
         dtype.is_net ? ModuleItemKind::kNetDecl : ModuleItemKind::kVarDecl;
     item->loc = CurrentLoc();
     item->data_type = dtype;
+    item->net_delay = nd1;
+    item->net_delay_fall = nd2;
+    item->net_delay_decay = nd3;
     item->name = ExpectIdentifier().text;
     ParseUnpackedDims(item->unpacked_dims);
     if (Match(TokenKind::kEq)) {

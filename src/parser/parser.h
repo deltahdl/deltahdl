@@ -118,6 +118,8 @@ class Parser {
   void ParseOldStylePortDecls(ModuleItem* item, TokenKind end_kw);
 
   // Declarations
+  uint8_t ParseChargeStrength();
+  void ParseNetDelay(Expr*& d1, Expr*& d2, Expr*& d3);
   void ParseVarDeclList(std::vector<ModuleItem*>& items, const DataType& dtype);
   ModuleItem* ParseContinuousAssign();
   ModuleItem* ParseAlias();

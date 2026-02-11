@@ -51,6 +51,9 @@ struct RtlirNet {
   NetType net_type = NetType::kWire;
   uint32_t width = 1;
   std::vector<uint32_t> driver_indices;
+  // §6.6.4: Trireg charge strength and decay time.
+  Strength charge_strength = Strength::kMedium;
+  uint64_t decay_ticks = 0;
 };
 
 // --- Variable ---

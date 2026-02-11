@@ -7,6 +7,7 @@
 namespace delta {
 
 class Arena;
+class Scheduler;
 struct Variable;
 
 /// Runtime net object for multi-driver resolution (IEEE 1800-2023 §6.5).
@@ -23,9 +24,20 @@ struct Net {
   std::vector<Logic4Vec> drivers;
   std::vector<DriverStrength> driver_strengths;
 
+  // §6.6.4: Trireg charge strength and decay.
+  Strength charge_strength = Strength::kMedium;
+  uint64_t decay_ticks = 0;
+  uint64_t decay_generation = 0;
+
   /// Resolve all driver values into the resolved variable.
-  void Resolve(Arena& arena);
+  void Resolve(Arena& arena, Scheduler* sched = nullptr);
+
+  /// Returns true if this is a trireg net with all drivers at Z.
+  bool InCapacitiveState() const;
 };
+
+/// §6.6.4.1: Propagate charge between two connected trireg nets.
+void PropagateCharge(Net& a, Net& b);
 
 /// Resolve two Logic4Word values using wire/tri semantics (§28.7).
 Logic4Word ResolveWireWord(Logic4Word a, Logic4Word b);
