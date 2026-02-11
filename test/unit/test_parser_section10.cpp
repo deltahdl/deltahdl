@@ -585,7 +585,8 @@ TEST(ParserSection10, ContinuousAssignDriveStrength) {
     }
   }
   ASSERT_NE(ca, nullptr);
-  // 4=strong, 2=weak (parser encoding: 0=none,1=highz,2=weak,3=pull,4=strong,5=supply)
+  // 4=strong, 2=weak (parser encoding:
+  // 0=none,1=highz,2=weak,3=pull,4=strong,5=supply)
   EXPECT_EQ(ca->drive_strength0, 4u);
   EXPECT_EQ(ca->drive_strength1, 2u);
 }
