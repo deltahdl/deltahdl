@@ -52,11 +52,15 @@ struct EventAwaiter {
       if (!ev.signal || ev.signal->kind != ExprKind::kIdentifier) continue;
       auto* var = ctx.FindVariable(ev.signal->text);
       if (!var) continue;
+      // Named events: resume unconditionally on trigger (no edge check).
+      if (var->is_event) {
+        var->AddWatcher([h]() mutable { h.resume(); });
+        continue;
+      }
       var->prev_value = var->value;
       Edge edge = ev.edge;
       var->AddWatcher([h, var, edge]() mutable {
-        bool trigger = CheckEdge(var, edge);
-        if (trigger) h.resume();
+        if (CheckEdge(var, edge)) h.resume();
       });
     }
   }

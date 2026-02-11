@@ -440,6 +440,9 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       ElaborateTypedef(item, mod);
       break;
     case ModuleItemKind::kFunctionDecl:
+      ValidateFunctionBody(item);
+      mod->function_decls.push_back(item);
+      break;
     case ModuleItemKind::kTaskDecl:
       mod->function_decls.push_back(item);
       break;

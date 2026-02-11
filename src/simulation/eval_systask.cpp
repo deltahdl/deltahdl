@@ -65,12 +65,15 @@ static Logic4Vec EvalBits(const Expr* expr, SimContext& ctx, Arena& arena) {
 }
 
 // ============================================================================
-// §20 — $unsigned, $signed (pass-through for now)
+// §20 — $unsigned, $signed
 // ============================================================================
 
-static Logic4Vec EvalSignCast(const Expr* expr, SimContext& ctx, Arena& arena) {
+static Logic4Vec EvalSignCast(const Expr* expr, SimContext& ctx, Arena& arena,
+                              bool make_signed) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
-  return EvalExpr(expr->args[0], ctx, arena);
+  auto val = EvalExpr(expr->args[0], ctx, arena);
+  val.is_signed = make_signed;
+  return val;
 }
 
 // ============================================================================
@@ -328,6 +331,30 @@ static Logic4Vec EvalConversionSysCall(const Expr* expr, SimContext& ctx,
   if (name == "$rtoi") return EvalRtoi(expr, ctx, arena);
   if (name == "$bitstoreal") return EvalBitstoreal(expr, ctx, arena);
   if (name == "$realtobits") return EvalRealtobits(expr, ctx, arena);
+  if (name == "$shortrealtobits") {
+    if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
+    auto val = EvalExpr(expr->args[0], ctx, arena);
+    double d = 0.0;
+    uint64_t bits = val.ToUint64();
+    std::memcpy(&d, &bits, sizeof(double));
+    auto f = static_cast<float>(d);
+    uint32_t fbits = 0;
+    std::memcpy(&fbits, &f, sizeof(float));
+    return MakeLogic4VecVal(arena, 32, fbits);
+  }
+  if (name == "$bitstoshortreal") {
+    if (expr->args.empty()) return MakeLogic4VecVal(arena, 64, 0);
+    auto val = EvalExpr(expr->args[0], ctx, arena);
+    auto fbits = static_cast<uint32_t>(val.ToUint64());
+    float f = 0.0f;
+    std::memcpy(&f, &fbits, sizeof(float));
+    auto d = static_cast<double>(f);
+    uint64_t dbits = 0;
+    std::memcpy(&dbits, &d, sizeof(double));
+    auto result = MakeLogic4VecVal(arena, 64, dbits);
+    result.is_real = true;
+    return result;
+  }
   if (name == "$countbits") return EvalCountbits(expr, ctx, arena);
   return MakeLogic4VecVal(arena, 1, 0);
 }
@@ -336,9 +363,8 @@ Logic4Vec EvalUtilitySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                              std::string_view name) {
   if (name == "$clog2") return EvalClog2(expr, ctx, arena);
   if (name == "$bits") return EvalBits(expr, ctx, arena);
-  if (name == "$unsigned" || name == "$signed") {
-    return EvalSignCast(expr, ctx, arena);
-  }
+  if (name == "$signed") return EvalSignCast(expr, ctx, arena, true);
+  if (name == "$unsigned") return EvalSignCast(expr, ctx, arena, false);
   if (name == "$countones") return EvalCountones(expr, ctx, arena);
   if (name == "$onehot") return EvalOnehot(expr, ctx, arena);
   if (name == "$onehot0") return EvalOnehot0(expr, ctx, arena);

@@ -87,12 +87,17 @@ static void RegisterStructInfo(const RtlirVariable& var, SimContext& ctx) {
   info.type_name = var.name;
   info.is_packed = var.dtype->is_packed;
   info.total_width = var.width;
-  // §7.2.1: First member is MSB. Build field layout from MSB to LSB.
+  bool is_union = (var.dtype->kind == DataTypeKind::kUnion);
+  // §7.2.1: First struct member is MSB. Union members all at offset 0.
   uint32_t offset = var.width;
   for (const auto& m : var.dtype->struct_members) {
     uint32_t fw = EvalStructMemberWidth(m);
-    offset -= fw;
-    info.fields.push_back({m.name, offset, fw});
+    if (is_union) {
+      info.fields.push_back({m.name, 0, fw});
+    } else {
+      offset -= fw;
+      info.fields.push_back({m.name, offset, fw});
+    }
   }
   ctx.RegisterStructType(var.name, info);
   ctx.SetVariableStructType(var.name, var.name);

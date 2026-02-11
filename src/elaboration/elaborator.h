@@ -121,6 +121,10 @@ class Elaborator {
   /// Check specparam not used in parameter expressions (§6.20.5).
   void ValidateSpecparamInParams(const ModuleDecl* decl);
 
+  /// §13.4.1: Validate void function doesn't return a value.
+  /// §13.4.4: Validate only fork/join_none in function body.
+  void ValidateFunctionBody(const ModuleItem* item);
+
   /// Track enum type info for a variable declaration.
   void TrackEnumVariable(const ModuleItem* item);
 

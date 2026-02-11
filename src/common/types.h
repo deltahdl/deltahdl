@@ -32,7 +32,8 @@ struct Logic4Vec {
   uint32_t width = 0;
   uint32_t nwords = 0;
   Logic4Word* words = nullptr;
-  bool is_real = false;  // True when value holds IEEE 754 double bits.
+  bool is_real = false;    // True when value holds IEEE 754 double bits.
+  bool is_signed = false;  // True when value should be treated as signed.
 
   bool IsKnown() const;
   uint64_t ToUint64() const;

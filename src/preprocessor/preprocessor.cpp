@@ -56,6 +56,45 @@ static std::string_view Trim(std::string_view s) {
   return s;
 }
 
+// §22.5.1: Compiler directive names that cannot be redefined as macros.
+static bool IsCompilerDirective(std::string_view name) {
+  static constexpr std::string_view kDirectives[] = {
+      "define",
+      "undef",
+      "undefineall",
+      "ifdef",
+      "ifndef",
+      "elsif",
+      "else",
+      "endif",
+      "include",
+      "timescale",
+      "resetall",
+      "line",
+      "pragma",
+      "celldefine",
+      "endcelldefine",
+      "default_nettype",
+      "unconnected_drive",
+      "nounconnected_drive",
+      "begin_keywords",
+      "end_keywords",
+  };
+  for (auto d : kDirectives) {
+    if (name == d) return true;
+  }
+  return false;
+}
+
+// §22.5.1: Check for unterminated string literals in macro bodies.
+static bool HasUnterminatedString(std::string_view body) {
+  size_t quotes = 0;
+  for (size_t i = 0; i < body.size(); ++i) {
+    if (body[i] == '"' && (i == 0 || body[i - 1] != '\\')) ++quotes;
+  }
+  return quotes % 2 != 0;
+}
+
 static bool EndsWithBackslash(std::string_view line) {
   return !line.empty() && line.back() == '\\';
 }
@@ -172,7 +211,11 @@ bool Preprocessor::ProcessStateDirective(std::string_view line, SourceLoc loc) {
     return true;
   }
   if (StartsWithDirective(line, "pragma")) {
-    // Implementation-defined per IEEE 22.10; consume silently.
+    // §22.11: pragma_name is required after `pragma.
+    auto rest = Trim(AfterDirective(line, "pragma"));
+    if (rest.empty()) {
+      diag_.Error(loc, "`pragma requires a pragma_name");
+    }
     return true;
   }
   if (StartsWithDirective(line, "line")) {
@@ -250,16 +293,26 @@ bool Preprocessor::ProcessConditionalDirective(std::string_view line) {
   return false;
 }
 
-bool Preprocessor::TryExpandMacro(std::string_view trimmed, std::string& output,
-                                  uint32_t file_id, uint32_t line_num,
-                                  int depth) {
-  auto macro_name = trimmed.substr(1);
-  auto space_pos = macro_name.find_first_of(" \t(");
-  auto name = (space_pos != std::string_view::npos)
-                  ? macro_name.substr(0, space_pos)
-                  : macro_name;
+// §22.5.1: Validate that all required macro args are provided.
+bool Preprocessor::ValidateMacroArgCount(const MacroDef& def,
+                                         std::string_view args_text,
+                                         SourceLoc loc, std::string_view name) {
+  auto args = SplitMacroArgs(args_text);
+  for (size_t i = args.size(); i < def.params.size(); ++i) {
+    bool has_default =
+        i < def.param_defaults.size() && !def.param_defaults[i].empty();
+    if (!has_default) {
+      diag_.Error(loc,
+                  "too few arguments for macro '" + std::string(name) + "'");
+      return false;
+    }
+  }
+  return true;
+}
 
-  // Predefined macros (IEEE 1800-2023 §22.13).
+bool Preprocessor::TryPredefinedMacro(std::string_view name,
+                                      std::string& output, uint32_t file_id,
+                                      uint32_t line_num) {
   if (name == "__FILE__") {
     output.append("\"");
     output.append(src_mgr_.FilePath(file_id));
@@ -274,6 +327,20 @@ bool Preprocessor::TryExpandMacro(std::string_view trimmed, std::string& output,
     output.append(std::to_string(effective_line));
     return true;
   }
+  return false;
+}
+
+bool Preprocessor::TryExpandMacro(std::string_view trimmed, std::string& output,
+                                  uint32_t file_id, uint32_t line_num,
+                                  int depth) {
+  auto macro_name = trimmed.substr(1);
+  auto space_pos = macro_name.find_first_of(" \t(");
+  auto name = (space_pos != std::string_view::npos)
+                  ? macro_name.substr(0, space_pos)
+                  : macro_name;
+
+  // Predefined macros (IEEE 1800-2023 §22.13).
+  if (TryPredefinedMacro(name, output, file_id, line_num)) return true;
 
   const auto* def = macros_.Lookup(name);
   if (def == nullptr) return false;
@@ -285,6 +352,9 @@ bool Preprocessor::TryExpandMacro(std::string_view trimmed, std::string& output,
     auto balanced = ExtractBalancedArgs(after_name);
     if (balanced.empty()) return false;
     auto args_text = balanced.substr(1, balanced.size() - 2);
+    if (!ValidateMacroArgCount(*def, args_text, {file_id, line_num, 1}, name)) {
+      return false;
+    }
     expanded = ExpandMacro(*def, args_text);
     auto end_pos = static_cast<size_t>(balanced.data() + balanced.size() -
                                        after_name.data());
@@ -416,6 +486,13 @@ void Preprocessor::HandleDefine(std::string_view rest, SourceLoc loc) {
   if (name_end == 0) return;
 
   def.name = std::string(rest.substr(0, name_end));
+
+  // §22.5.1: All compiler directives are predefined; redefining is illegal.
+  if (IsCompilerDirective(def.name)) {
+    diag_.Error(loc, "redefining compiler directive '" + def.name + "'");
+    return;
+  }
+
   auto after_name = rest.substr(name_end);
 
   // Function-like: `( immediately after name, NO space (IEEE §22.5.1).
@@ -430,6 +507,11 @@ void Preprocessor::HandleDefine(std::string_view rest, SourceLoc loc) {
   } else {
     def.body = std::string(Trim(after_name));
   }
+  if (HasUnterminatedString(def.body)) {
+    diag_.Error(loc, "unterminated string literal in macro body");
+    return;
+  }
+
   macros_.Define(std::move(def));
 }
 

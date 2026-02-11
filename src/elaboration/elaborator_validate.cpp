@@ -160,6 +160,32 @@ void Elaborator::ValidateSpecparamInParams(const ModuleDecl* decl) {
   }
 }
 
+// §13.4.1/§13.4.4: Check function body for illegal return/fork constructs.
+static void CheckFuncBodyStmt(const Stmt* s, bool is_void, DiagEngine& diag) {
+  if (!s) return;
+  if (s->kind == StmtKind::kReturn && s->expr && is_void) {
+    diag.Error(s->range.start, "void function returns a value");
+  }
+  if (s->kind == StmtKind::kFork && s->join_kind != TokenKind::kKwJoinNone) {
+    diag.Error(s->range.start,
+               "only fork/join_none is permitted inside a function");
+  }
+  for (auto* sub : s->stmts) CheckFuncBodyStmt(sub, is_void, diag);
+  CheckFuncBodyStmt(s->then_branch, is_void, diag);
+  CheckFuncBodyStmt(s->else_branch, is_void, diag);
+  CheckFuncBodyStmt(s->body, is_void, diag);
+  CheckFuncBodyStmt(s->for_body, is_void, diag);
+  for (auto& ci : s->case_items) CheckFuncBodyStmt(ci.body, is_void, diag);
+}
+
+void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
+  if (item->kind != ModuleItemKind::kFunctionDecl) return;
+  bool is_void = (item->return_type.kind == DataTypeKind::kVoid);
+  for (auto* s : item->func_body_stmts) {
+    CheckFuncBodyStmt(s, is_void, diag_);
+  }
+}
+
 void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     ValidateItemConstraints(item);
