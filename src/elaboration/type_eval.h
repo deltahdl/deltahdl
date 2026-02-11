@@ -17,6 +17,10 @@ using TypedefMap = std::unordered_map<std::string_view, DataType>;
 /// Returns 1 for implicit/unsized types.
 uint32_t EvalTypeWidth(const DataType& dtype);
 
+/// Evaluate the bit width of a struct/union member.
+struct StructMember;
+uint32_t EvalStructMemberWidth(const StructMember& m);
+
 /// Overload that resolves kNamed types via the typedef map.
 uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs);
 

@@ -1,6 +1,7 @@
 #include "elaboration/type_eval.h"
 
 #include <algorithm>
+#include <cstdlib>
 
 #include "elaboration/const_eval.h"
 #include "lexer/token.h"
@@ -8,17 +9,63 @@
 
 namespace delta {
 
+// Compute the bit-width of a single struct/union member.
+uint32_t EvalStructMemberWidth(const StructMember& m) {
+  // If the member has explicit packed dimensions, use them.
+  if (m.packed_dim_left && m.packed_dim_right) {
+    auto left = ConstEvalInt(m.packed_dim_left);
+    auto right = ConstEvalInt(m.packed_dim_right);
+    if (left && right) {
+      auto w = std::abs(*left - *right) + 1;
+      return static_cast<uint32_t>(w);
+    }
+  }
+  // Default widths for common types.
+  switch (m.type_kind) {
+    case DataTypeKind::kByte:
+      return 8;
+    case DataTypeKind::kShortint:
+      return 16;
+    case DataTypeKind::kInt:
+    case DataTypeKind::kInteger:
+      return 32;
+    case DataTypeKind::kLongint:
+      return 64;
+    default:
+      return 1;  // bit, logic, reg default to 1.
+  }
+}
+
+// §7.2/§7.3: Compute total width of a packed struct or union from members.
+static uint32_t EvalStructOrUnionWidth(const DataType& dtype) {
+  if (dtype.struct_members.empty()) return 0;
+  if (dtype.kind == DataTypeKind::kUnion) {
+    uint32_t max_w = 0;
+    for (const auto& m : dtype.struct_members) {
+      max_w = std::max(max_w, EvalStructMemberWidth(m));
+    }
+    return max_w;
+  }
+  uint32_t total = 0;
+  for (const auto& m : dtype.struct_members) {
+    total += EvalStructMemberWidth(m);
+  }
+  return total;
+}
+
+// Compute width from explicit [left:right] packed dimension range.
+static uint32_t EvalRangeWidth(const Expr* left_expr, const Expr* right_expr) {
+  auto left = ConstEvalInt(left_expr);
+  auto right = ConstEvalInt(right_expr);
+  if (!left || !right) return 0;
+  return static_cast<uint32_t>(std::abs(*left - *right) + 1);
+}
+
 uint32_t EvalTypeWidth(const DataType& dtype) {
   // If explicit packed dimensions are present, compute from range.
   if (dtype.packed_dim_left && dtype.packed_dim_right) {
-    auto left = ConstEvalInt(dtype.packed_dim_left);
-    auto right = ConstEvalInt(dtype.packed_dim_right);
-    if (left && right) {
-      int64_t hi = *left;
-      int64_t lo = *right;
-      int64_t w = (hi >= lo) ? (hi - lo + 1) : (lo - hi + 1);
-      return static_cast<uint32_t>(w);
-    }
+    uint32_t w = EvalRangeWidth(dtype.packed_dim_left, dtype.packed_dim_right);
+    if (w > 0) return w;
   }
 
   // Built-in type widths per IEEE 1800-2023.
@@ -45,6 +92,7 @@ uint32_t EvalTypeWidth(const DataType& dtype) {
       return 32;  // default enum base type is int (32-bit)
     case DataTypeKind::kStruct:
     case DataTypeKind::kUnion:
+      return EvalStructOrUnionWidth(dtype);
     case DataTypeKind::kString:
     case DataTypeKind::kVoid:
     case DataTypeKind::kNamed:

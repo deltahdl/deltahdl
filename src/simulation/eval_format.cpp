@@ -47,6 +47,23 @@ static std::string FormatRealAsInt(const Logic4Vec& val) {
   return buf;
 }
 
+static std::string FormatDecimal(const Logic4Vec& val) {
+  uint64_t v = val.ToUint64();
+  char buf[64];
+  if (val.is_signed) {
+    auto sv = static_cast<int64_t>(v);
+    if (val.width < 64) {
+      uint64_t sign_bit = uint64_t{1} << (val.width - 1);
+      if (v & sign_bit)
+        sv = static_cast<int64_t>(v | (~uint64_t{0} << val.width));
+    }
+    std::snprintf(buf, sizeof(buf), "%lld", static_cast<long long>(sv));
+  } else {
+    std::snprintf(buf, sizeof(buf), "%llu", static_cast<unsigned long long>(v));
+  }
+  return buf;
+}
+
 std::string FormatArg(const Logic4Vec& val, char spec) {
   if (val.is_real && spec == 'd') return FormatRealAsInt(val);
 
@@ -54,18 +71,24 @@ std::string FormatArg(const Logic4Vec& val, char spec) {
   char buf[64];
   switch (spec) {
     case 'd':
-      std::snprintf(buf, sizeof(buf), "%llu",
-                    static_cast<unsigned long long>(v));
-      return buf;
+      return FormatDecimal(val);
     case 'h':
-    case 'x':
-      std::snprintf(buf, sizeof(buf), "%llx",
+    case 'x': {
+      // §21.2.1.2: %h prints ceil(width/4) hex digits with leading zeros.
+      uint32_t ndigits = (val.width + 3) / 4;
+      if (ndigits == 0) ndigits = 1;
+      std::snprintf(buf, sizeof(buf), "%0*llx", static_cast<int>(ndigits),
                     static_cast<unsigned long long>(v));
       return buf;
-    case 'o':
-      std::snprintf(buf, sizeof(buf), "%llo",
+    }
+    case 'o': {
+      // §21.2.1.2: %o prints ceil(width/3) octal digits with leading zeros.
+      uint32_t ndigits = (val.width + 2) / 3;
+      if (ndigits == 0) ndigits = 1;
+      std::snprintf(buf, sizeof(buf), "%0*llo", static_cast<int>(ndigits),
                     static_cast<unsigned long long>(v));
       return buf;
+    }
     case 'b':
       return val.ToString();
     case 't':

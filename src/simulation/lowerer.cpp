@@ -1,5 +1,6 @@
 #include "simulation/lowerer.h"
 
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -7,6 +8,7 @@
 #include "common/diagnostic.h"
 #include "elaboration/rtlir.h"
 #include "elaboration/sensitivity.h"
+#include "elaboration/type_eval.h"
 #include "parser/ast.h"
 #include "simulation/awaiters.h"
 #include "simulation/eval.h"
@@ -78,9 +80,43 @@ static void ScheduleProcess(Process* proc, Scheduler& sched) {
 
 // --- Module lowering ---
 
+// Register struct type metadata for field-level access at runtime.
+static void RegisterStructInfo(const RtlirVariable& var, SimContext& ctx) {
+  if (!var.dtype || var.dtype->struct_members.empty()) return;
+  StructTypeInfo info;
+  info.type_name = var.name;
+  info.is_packed = var.dtype->is_packed;
+  info.total_width = var.width;
+  // §7.2.1: First member is MSB. Build field layout from MSB to LSB.
+  uint32_t offset = var.width;
+  for (const auto& m : var.dtype->struct_members) {
+    uint32_t fw = EvalStructMemberWidth(m);
+    offset -= fw;
+    info.fields.push_back({m.name, offset, fw});
+  }
+  ctx.RegisterStructType(var.name, info);
+  ctx.SetVariableStructType(var.name, var.name);
+}
+
+// §7.4: Create individual element variables for unpacked arrays.
+static void CreateArrayElements(const RtlirVariable& var, SimContext& ctx,
+                                Arena& arena) {
+  if (var.unpacked_size == 0) return;
+  for (uint32_t i = 0; i < var.unpacked_size; ++i) {
+    uint32_t idx = var.unpacked_lo + i;
+    auto elem_name = std::string(var.name) + "[" + std::to_string(idx) + "]";
+    // Store the element name in the arena so it outlives this stack frame.
+    auto* stored = arena.Create<std::string>(std::move(elem_name));
+    auto* elem = ctx.CreateVariable(*stored, var.width);
+    // Zero-initialize (clear X state from CreateVariable default).
+    elem->value = MakeLogic4VecVal(arena, var.width, 0);
+  }
+}
+
 void Lowerer::LowerVar(const RtlirVariable& var) {
   auto* v = ctx_.CreateVariable(var.name, var.width);
   if (var.is_event) v->is_event = true;
+  if (var.is_signed) v->is_signed = true;
   if (var.is_string) ctx_.RegisterStringVariable(var.name);
   if (var.is_real) ctx_.RegisterRealVariable(var.name);
   if (var.init_expr) {
@@ -89,6 +125,8 @@ void Lowerer::LowerVar(const RtlirVariable& var) {
       val = MakeLogic4VecVal(arena_, var.width, val.ToUint64());
     v->value = val;
   }
+  RegisterStructInfo(var, ctx_);
+  CreateArrayElements(var, ctx_, arena_);
 }
 
 void Lowerer::LowerModule(const RtlirModule* mod) {

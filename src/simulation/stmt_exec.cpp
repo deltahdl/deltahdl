@@ -1,6 +1,7 @@
 #include "simulation/stmt_exec.h"
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 #include <unordered_set>
 
@@ -34,6 +35,19 @@ static void BuildLhsName(const Expr* expr, std::string& out) {
   }
 }
 
+// §7.4: Try to resolve an array element variable (e.g. "A[0]").
+// Returns the element variable if found, null otherwise.
+static Variable* TryResolveArrayElement(const Expr* lhs, SimContext& ctx) {
+  if (lhs->kind != ExprKind::kSelect || !lhs->base || !lhs->index)
+    return nullptr;
+  if (lhs->base->kind != ExprKind::kIdentifier) return nullptr;
+  if (lhs->index_end) return nullptr;  // Part-select, not array index.
+  auto idx = EvalExpr(lhs->index, ctx, ctx.GetArena());
+  auto elem_name =
+      std::string(lhs->base->text) + "[" + std::to_string(idx.ToUint64()) + "]";
+  return ctx.FindVariable(elem_name);
+}
+
 // Find the target variable for a compound LHS expression.
 static Variable* ResolveLhsVariable(const Expr* lhs, SimContext& ctx) {
   if (lhs->kind == ExprKind::kIdentifier) return ctx.FindVariable(lhs->text);
@@ -46,6 +60,33 @@ static Variable* ResolveLhsVariable(const Expr* lhs, SimContext& ctx) {
     return ResolveLhsVariable(lhs->base, ctx);
   }
   return nullptr;
+}
+
+// §7.2: Write to a packed struct/union field by name.
+static bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
+                             SimContext& ctx, Arena& arena) {
+  std::string name;
+  BuildLhsName(lhs, name);
+  auto dot = name.find('.');
+  if (dot == std::string::npos) return false;
+  auto base_name = std::string_view(name).substr(0, dot);
+  auto field_name = std::string_view(name).substr(dot + 1);
+  auto* base_var = ctx.FindVariable(base_name);
+  auto* info = ctx.GetVariableStructType(base_name);
+  if (!base_var || !info) return false;
+  for (const auto& f : info->fields) {
+    if (f.name != field_name) continue;
+    uint64_t old_val = base_var->value.ToUint64();
+    uint64_t mask =
+        (f.width >= 64) ? ~uint64_t{0} : (uint64_t{1} << f.width) - 1;
+    uint64_t new_bits = (rhs_val.ToUint64() & mask) << f.bit_offset;
+    uint64_t cleared = old_val & ~(mask << f.bit_offset);
+    base_var->value =
+        MakeLogic4VecVal(arena, base_var->value.width, cleared | new_bits);
+    base_var->NotifyWatchers();
+    return true;
+  }
+  return false;
 }
 
 // Write rhs_val to var at the bit position(s) indicated by a Select LHS.
@@ -77,6 +118,19 @@ static void WriteBitSelect(Variable* var, const Expr* lhs,
   }
 }
 
+// §11.8.2: Resize value to target width, sign-extending when signed.
+static Logic4Vec ResizeToWidth(Logic4Vec val, uint32_t target_width,
+                               Arena& arena) {
+  if (val.width == target_width || target_width == 0) return val;
+  uint64_t v = val.ToUint64();
+  if (val.is_signed && target_width > val.width && val.width > 0 &&
+      val.width < 64) {
+    uint64_t sign_bit = uint64_t{1} << (val.width - 1);
+    if (v & sign_bit) v |= ~uint64_t{0} << val.width;
+  }
+  return MakeLogic4VecVal(arena, target_width, v);
+}
+
 // Execute a blocking assignment with full LHS support.
 static StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
                                          Arena& arena) {
@@ -84,6 +138,13 @@ static StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
   if (!stmt->lhs) return StmtResult::kDone;
 
   if (stmt->lhs->kind == ExprKind::kSelect) {
+    // §7.4: Check for unpacked array element variable first.
+    if (auto* elem = TryResolveArrayElement(stmt->lhs, ctx)) {
+      rhs_val = ResizeToWidth(rhs_val, elem->value.width, arena);
+      elem->value = rhs_val;
+      elem->NotifyWatchers();
+      return StmtResult::kDone;
+    }
     auto* var = ResolveLhsVariable(stmt->lhs, ctx);
     if (var) {
       WriteBitSelect(var, stmt->lhs, rhs_val, ctx, arena);
@@ -95,11 +156,11 @@ static StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
   // Identifier or MemberAccess: whole-variable assign.
   auto* var = ResolveLhsVariable(stmt->lhs, ctx);
   if (var) {
-    if (rhs_val.width != var->value.width && var->value.width > 0) {
-      rhs_val = MakeLogic4VecVal(arena, var->value.width, rhs_val.ToUint64());
-    }
+    rhs_val = ResizeToWidth(rhs_val, var->value.width, arena);
     var->value = rhs_val;
     var->NotifyWatchers();
+  } else if (stmt->lhs->kind == ExprKind::kMemberAccess) {
+    WriteStructField(stmt->lhs, rhs_val, ctx, arena);
   }
   return StmtResult::kDone;
 }
@@ -109,12 +170,14 @@ static StmtResult ExecNonblockingAssignImpl(const Stmt* stmt, SimContext& ctx,
   auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
   if (!stmt->lhs) return StmtResult::kDone;
 
+  // §7.4: Check for unpacked array element first.
   bool is_select = (stmt->lhs->kind == ExprKind::kSelect);
-  auto* var = ResolveLhsVariable(stmt->lhs, ctx);
+  auto* elem = is_select ? TryResolveArrayElement(stmt->lhs, ctx) : nullptr;
+  auto* var = elem ? elem : ResolveLhsVariable(stmt->lhs, ctx);
   if (!var) return StmtResult::kDone;
 
   auto* event = ctx.GetScheduler().GetEventPool().Acquire();
-  if (is_select) {
+  if (is_select && !elem) {
     // Capture select info for deferred bit-write.
     const Expr* lhs_copy = stmt->lhs;
     event->callback = [var, lhs_copy, rhs_val, &ctx, &arena]() {

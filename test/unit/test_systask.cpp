@@ -591,9 +591,10 @@ TEST(SysTask, StacktraceDoesNotCrash) {
 TEST(SysTask, FormatOctal) {
   std::vector<Logic4Vec> vals;
   Arena arena;
+  // §21.2.1.2: %o prints ceil(width/3) digits — 32-bit = 11 octal digits.
   vals.push_back(MakeLogic4VecVal(arena, 32, 8));
   auto out = FormatDisplay("%o", vals);
-  EXPECT_EQ(out, "10");
+  EXPECT_EQ(out, "00000000010");
 }
 
 TEST(SysTask, FormatReal_e) {

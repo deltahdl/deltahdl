@@ -77,6 +77,7 @@ static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
   if (var) {
     auto val = var->value;
     if (ctx.IsRealVariable(expr->text)) val.is_real = true;
+    if (var->is_signed) val.is_signed = true;
     return val;
   }
   return MakeLogic4Vec(arena, 1);  // X for unknown
@@ -240,24 +241,35 @@ static bool EvalCaseEquality(Logic4Vec lhs, Logic4Vec rhs) {
 
 // --- Shift operations ---
 
-static Logic4Vec EvalShift(TokenKind op, Logic4Vec lhs, uint64_t rv,
-                           Arena& arena) {
+static Logic4Vec MakeSignedResult(Arena& arena, uint32_t width, uint64_t val,
+                                  bool is_signed) {
+  auto result = MakeLogic4VecVal(arena, width, val);
+  result.is_signed = is_signed;
+  return result;
+}
+
+static Logic4Vec EvalArithShiftRight(Logic4Vec lhs, uint64_t rv, Arena& arena) {
   uint64_t lv = lhs.ToUint64();
-  if (op == TokenKind::kLtLt || op == TokenKind::kLtLtLt) {
-    return MakeLogic4VecVal(arena, lhs.width, lv << rv);
-  }
-  if (op == TokenKind::kGtGt) {
-    return MakeLogic4VecVal(arena, lhs.width, lv >> rv);
-  }
-  // kGtGtGt: arithmetic right shift — sign-extend from operand width.
   uint32_t w = lhs.width;
   if (w > 0 && w < 64 && ((lv >> (w - 1)) & 1)) {
     auto sv = static_cast<int64_t>(lv | (~uint64_t{0} << w));
     auto shifted = static_cast<uint64_t>(sv >> rv);
     uint64_t mask = (w >= 64) ? ~uint64_t{0} : (uint64_t{1} << w) - 1;
-    return MakeLogic4VecVal(arena, w, shifted & mask);
+    return MakeSignedResult(arena, w, shifted & mask, lhs.is_signed);
   }
-  return MakeLogic4VecVal(arena, lhs.width, lv >> rv);
+  return MakeSignedResult(arena, lhs.width, lv >> rv, lhs.is_signed);
+}
+
+static Logic4Vec EvalShift(TokenKind op, Logic4Vec lhs, uint64_t rv,
+                           Arena& arena) {
+  uint64_t lv = lhs.ToUint64();
+  if (op == TokenKind::kLtLt || op == TokenKind::kLtLtLt) {
+    return MakeSignedResult(arena, lhs.width, lv << rv, lhs.is_signed);
+  }
+  if (op == TokenKind::kGtGt) {
+    return MakeSignedResult(arena, lhs.width, lv >> rv, lhs.is_signed);
+  }
+  return EvalArithShiftRight(lhs, rv, arena);
 }
 
 // --- Wildcard equality ---
@@ -542,7 +554,8 @@ static bool IsUtilitySysCall(std::string_view n) {
          n == "$countones" || n == "$onehot" || n == "$onehot0" ||
          n == "$isunknown" || n == "$test$plusargs" || n == "$value$plusargs" ||
          n == "$typename" || n == "$sformatf" || n == "$itor" || n == "$rtoi" ||
-         n == "$bitstoreal" || n == "$realtobits" || n == "$countbits";
+         n == "$bitstoreal" || n == "$realtobits" || n == "$countbits" ||
+         n == "$shortrealtobits" || n == "$bitstoshortreal";
 }
 
 static bool IsArrayQuerySysCall(std::string_view n) {
@@ -644,10 +657,15 @@ static Logic4Vec EvalConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
   uint32_t bit_pos = 0;
   for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
     uint64_t val = it->ToUint64();
+    uint32_t w = it->width;
+    if (w > 64) w = 64;
     uint32_t word = bit_pos / 64;
     uint32_t bit = bit_pos % 64;
     if (word < result.nwords) {
       result.words[word].aval |= val << bit;
+      if (bit + w > 64 && word + 1 < result.nwords) {
+        result.words[word + 1].aval |= val >> (64 - bit);
+      }
     }
     bit_pos += it->width;
   }
@@ -657,9 +675,19 @@ static Logic4Vec EvalConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
 // --- Select (bit/part) ---
 
 static Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
-  auto base_val = EvalExpr(expr->base, ctx, arena);
   auto idx_val = EvalExpr(expr->index, ctx, arena);
   uint64_t idx = idx_val.ToUint64();
+
+  // §7.4: Try unpacked array element variable first (e.g. "A[0]").
+  if (expr->base && expr->base->kind == ExprKind::kIdentifier &&
+      !expr->index_end) {
+    auto elem_name =
+        std::string(expr->base->text) + "[" + std::to_string(idx) + "]";
+    auto* elem = ctx.FindVariable(elem_name);
+    if (elem) return elem->value;
+  }
+
+  auto base_val = EvalExpr(expr->base, ctx, arena);
 
   if (expr->index_end) {
     auto end_val = EvalExpr(expr->index_end, ctx, arena);
@@ -891,8 +919,20 @@ static Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx,
 
 // --- Binary expression with short-circuit ---
 
+// §10.3: Assignment within expression — evaluate RHS, store in LHS, return.
+static Logic4Vec EvalAssignInExpr(const Expr* expr, SimContext& ctx,
+                                  Arena& arena) {
+  auto rhs_val = EvalExpr(expr->rhs, ctx, arena);
+  if (expr->lhs->kind == ExprKind::kIdentifier) {
+    auto* var = ctx.FindVariable(expr->lhs->text);
+    if (var) var->value = rhs_val;
+  }
+  return rhs_val;
+}
+
 static Logic4Vec EvalBinaryExpr(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
+  if (expr->op == TokenKind::kEq) return EvalAssignInExpr(expr, ctx, arena);
   if (expr->op == TokenKind::kAmpAmp) {
     auto l = EvalExpr(expr->lhs, ctx, arena);
     if (l.ToUint64() == 0) return MakeLogic4VecVal(arena, 1, 0);

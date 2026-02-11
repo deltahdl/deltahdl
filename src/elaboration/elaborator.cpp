@@ -1,6 +1,7 @@
 #include "elaboration/elaborator.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <format>
 #include <optional>
 
@@ -307,6 +308,30 @@ static void ElaborateGateInst(ModuleItem* item, RtlirModule* mod,
   mod->assigns.push_back(ca);
 }
 
+// §7.4: Extract unpacked array size from dimension expressions.
+static void ComputeUnpackedDims(const std::vector<Expr*>& dims,
+                                RtlirVariable& var) {
+  if (dims.empty() || !dims[0]) return;
+  auto* dim = dims[0];
+  // Range syntax [hi:lo] — parsed as kBinary with kColon operator.
+  if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
+    auto lval = ConstEvalInt(dim->lhs);
+    auto rval = ConstEvalInt(dim->rhs);
+    if (lval && rval) {
+      auto lo = std::min(*lval, *rval);
+      auto hi = std::max(*lval, *rval);
+      var.unpacked_lo = static_cast<uint32_t>(lo);
+      var.unpacked_size = static_cast<uint32_t>(hi - lo + 1);
+    }
+    return;
+  }
+  // Simple size [N] — creates N elements indexed from 0.
+  auto size_val = ConstEvalInt(dim);
+  if (size_val && *size_val > 0) {
+    var.unpacked_size = static_cast<uint32_t>(*size_val);
+  }
+}
+
 void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   if (!declared_names_.insert(item->name).second) {
     diag_.Error(item->loc, std::format("redeclaration of '{}'", item->name));
@@ -342,7 +367,15 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   var.is_real = (item->data_type.kind == DataTypeKind::kReal ||
                  item->data_type.kind == DataTypeKind::kShortreal ||
                  item->data_type.kind == DataTypeKind::kRealtime);
+  var.is_signed = item->data_type.is_signed;
   var.init_expr = item->init_expr;
+  // Pass struct/union type info for field-level access.
+  if (item->data_type.kind == DataTypeKind::kStruct ||
+      item->data_type.kind == DataTypeKind::kUnion) {
+    var.dtype = &item->data_type;
+  }
+  // §7.4: Compute unpacked array element count.
+  ComputeUnpackedDims(item->unpacked_dims, var);
   mod->variables.push_back(var);
   ValidateArrayInitPattern(item);
   TrackEnumVariable(item);

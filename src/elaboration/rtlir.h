@@ -65,7 +65,11 @@ struct RtlirVariable {
   bool is_event = false;
   bool is_string = false;
   bool is_real = false;
+  bool is_signed = false;
   const Expr* init_expr = nullptr;  // Module-level variable initializer.
+  const DataType* dtype = nullptr;  // Full type for struct/union layout.
+  uint32_t unpacked_size = 0;       // §7.4: unpacked array element count.
+  uint32_t unpacked_lo = 0;         // §7.4: unpacked array low index.
 };
 
 // --- Continuous assignment ---

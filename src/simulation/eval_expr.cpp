@@ -47,11 +47,15 @@ Logic4Vec EvalReplicate(const Expr* expr, SimContext& ctx, Arena& arena) {
   uint32_t total_width = elem_width * count;
   auto result = MakeLogic4Vec(arena, total_width);
   bit_pos = 0;
+  uint32_t ew = (elem_width > 64) ? 64 : elem_width;
   for (uint32_t i = 0; i < count; ++i) {
     uint32_t word = bit_pos / 64;
     uint32_t bit = bit_pos % 64;
     if (word < result.nwords) {
       result.words[word].aval |= inner_val << bit;
+      if (bit + ew > 64 && word + 1 < result.nwords) {
+        result.words[word + 1].aval |= inner_val >> (64 - bit);
+      }
     }
     bit_pos += elem_width;
   }
@@ -99,11 +103,35 @@ static void BuildMemberName(const Expr* expr, std::string& out) {
   }
 }
 
+// §7.2: Extract a packed struct/union field from the base variable.
+static Logic4Vec ExtractStructField(Variable* base_var,
+                                    const StructTypeInfo* info,
+                                    std::string_view field, Arena& arena) {
+  for (const auto& f : info->fields) {
+    if (f.name != field) continue;
+    uint64_t val = base_var->value.ToUint64() >> f.bit_offset;
+    uint64_t mask =
+        (f.width >= 64) ? ~uint64_t{0} : (uint64_t{1} << f.width) - 1;
+    return MakeLogic4VecVal(arena, f.width, val & mask);
+  }
+  return MakeLogic4Vec(arena, 1);
+}
+
 Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   std::string name;
   BuildMemberName(expr, name);
   auto* var = ctx.FindVariable(name);
   if (var) return var->value;
+
+  // Try packed struct field extraction: split "base.field".
+  auto dot = name.find('.');
+  if (dot == std::string::npos) return MakeLogic4Vec(arena, 1);
+  auto base_name = std::string_view(name).substr(0, dot);
+  auto field_name = std::string_view(name).substr(dot + 1);
+  auto* base_var = ctx.FindVariable(base_name);
+  auto* info = ctx.GetVariableStructType(base_name);
+  if (base_var && info)
+    return ExtractStructField(base_var, info, field_name, arena);
   return MakeLogic4Vec(arena, 1);
 }
 
@@ -153,16 +181,73 @@ Logic4Vec EvalInside(const Expr* expr, SimContext& ctx, Arena& arena) {
 
 // --- Streaming concatenation (§11.4.14) ---
 
-static uint64_t ReverseBits(uint64_t val, uint32_t width) {
+// Parse a numeric string to uint32_t. Returns 0 if not a digit string.
+static uint32_t ParseDigitStr(std::string_view text) {
+  if (text.empty() || text[0] < '0' || text[0] > '9') return 0;
+  uint32_t n = 0;
+  for (char c : text) {
+    if (c >= '0' && c <= '9') n = n * 10 + (c - '0');
+  }
+  return n;
+}
+
+// §11.4.14: Determine the slice size from the optional type/expression.
+static uint32_t StreamSliceSize(const Expr* size_expr, SimContext& ctx,
+                                Arena& arena) {
+  if (!size_expr) return 1;
+  if (size_expr->kind == ExprKind::kIdentifier) {
+    uint32_t num = ParseDigitStr(size_expr->text);
+    if (num > 0) return num;
+    return CastWidth(size_expr->text);
+  }
+  auto val = EvalExpr(size_expr, ctx, arena).ToUint64();
+  return (val == 0) ? 1 : static_cast<uint32_t>(val);
+}
+
+// Extract a slice of `slice_size` bits starting at `start_bit` from `src`.
+static uint64_t ExtractSlice(const Logic4Vec& src, uint32_t start_bit,
+                             uint32_t slice_size) {
   uint64_t result = 0;
-  for (uint32_t i = 0; i < width; ++i) {
-    result |= ((val >> i) & 1) << (width - 1 - i);
+  uint32_t bits_left = slice_size;
+  uint32_t dst_bit = 0;
+  while (bits_left > 0 && start_bit < src.width) {
+    uint32_t word = start_bit / 64;
+    uint32_t bit = start_bit % 64;
+    uint32_t avail = 64 - bit;
+    uint32_t take = (bits_left < avail) ? bits_left : avail;
+    if (word < src.nwords) {
+      uint64_t mask = (take >= 64) ? ~uint64_t{0} : (uint64_t{1} << take) - 1;
+      result |= ((src.words[word].aval >> bit) & mask) << dst_bit;
+    }
+    dst_bit += take;
+    start_bit += take;
+    bits_left -= take;
   }
   return result;
 }
 
+// Place a `slice_size`-bit value at `start_bit` in `dst`.
+static void PlaceSlice(Logic4Vec& dst, uint32_t start_bit, uint64_t val,
+                       uint32_t slice_size) {
+  uint32_t bits_left = slice_size;
+  uint32_t src_bit = 0;
+  while (bits_left > 0 && start_bit < dst.width) {
+    uint32_t word = start_bit / 64;
+    uint32_t bit = start_bit % 64;
+    uint32_t avail = 64 - bit;
+    uint32_t put = (bits_left < avail) ? bits_left : avail;
+    if (word < dst.nwords) {
+      uint64_t mask = (put >= 64) ? ~uint64_t{0} : (uint64_t{1} << put) - 1;
+      dst.words[word].aval |= ((val >> src_bit) & mask) << bit;
+    }
+    src_bit += put;
+    start_bit += put;
+    bits_left -= put;
+  }
+}
+
 Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
-  // Concatenate all elements.
+  // Concatenate all elements MSB-first (left-to-right = most significant).
   uint32_t total_width = 0;
   std::vector<Logic4Vec> parts;
   for (auto* elem : expr->elements) {
@@ -171,17 +256,27 @@ Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
   }
   if (total_width == 0) return MakeLogic4Vec(arena, 1);
 
-  uint64_t concat_val = 0;
+  auto concat = MakeLogic4Vec(arena, total_width);
   uint32_t bit_pos = 0;
   for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
-    concat_val |= it->ToUint64() << bit_pos;
+    PlaceSlice(concat, bit_pos, it->ToUint64(), it->width);
     bit_pos += it->width;
   }
-  // Left-shift streaming (<<) reverses bit order.
-  if (expr->op == TokenKind::kLtLt) {
-    concat_val = ReverseBits(concat_val, total_width);
+
+  // Right-shift streaming (>>) returns concatenation as-is.
+  if (expr->op != TokenKind::kLtLt) return concat;
+
+  // Left-shift streaming (<<): reverse order of slice_size-bit chunks.
+  uint32_t ss = StreamSliceSize(expr->lhs, ctx, arena);
+  uint32_t nslices = (total_width + ss - 1) / ss;
+  auto result = MakeLogic4Vec(arena, total_width);
+  for (uint32_t i = 0; i < nslices; ++i) {
+    uint32_t src_start = i * ss;
+    uint32_t dst_start = (nslices - 1 - i) * ss;
+    uint64_t slice = ExtractSlice(concat, src_start, ss);
+    PlaceSlice(result, dst_start, slice, ss);
   }
-  return MakeLogic4VecVal(arena, total_width, concat_val);
+  return result;
 }
 
 // --- Assignment pattern (§10.9) ---
