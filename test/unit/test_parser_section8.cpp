@@ -591,3 +591,186 @@ TEST(ParserSection8, InterfaceClassWithTypedef) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
   EXPECT_EQ(r.cu->classes[0]->name, "ihello");
 }
+
+// §8.19 — Constant class properties
+TEST(ParserSection8, ConstProperty) {
+  auto r = Parse(
+      "class MyClass;\n"
+      "  const int MAX = 100;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto* cls = r.cu->classes[0];
+  ASSERT_GE(cls->members.size(), 1u);
+  EXPECT_TRUE(cls->members[0]->is_const);
+  EXPECT_EQ(cls->members[0]->name, "MAX");
+}
+
+// §8.26 — Class implements interface class
+TEST(ParserSection8, ClassImplementsInterface) {
+  auto r = Parse(
+      "interface class PutIf;\n"
+      "  pure virtual function void put(int a);\n"
+      "endclass\n"
+      "class Fifo implements PutIf;\n"
+      "  virtual function void put(int a);\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 2u);
+  EXPECT_EQ(r.cu->classes[1]->name, "Fifo");
+}
+
+// §8.26 — Interface class extends multiple interfaces
+TEST(ParserSection8, InterfaceClassExtendsMultiple) {
+  auto r = Parse(
+      "interface class A;\n"
+      "  pure virtual function void fa();\n"
+      "endclass\n"
+      "interface class B;\n"
+      "  pure virtual function void fb();\n"
+      "endclass\n"
+      "interface class C extends A, B;\n"
+      "  pure virtual function void fc();\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 3u);
+  EXPECT_EQ(r.cu->classes[2]->name, "C");
+  EXPECT_EQ(r.cu->classes[2]->base_class, "A");
+}
+
+// §8.12 — Shallow copy with new
+TEST(ParserSection8, ShallowCopy) {
+  auto r = Parse(
+      "module m;\n"
+      "  class Packet;\n"
+      "    int data;\n"
+      "  endclass\n"
+      "  initial begin\n"
+      "    Packet p1, p2;\n"
+      "    p1 = new;\n"
+      "    p2 = new p1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
+// §8.3 — Class inside class (nested class)
+TEST(ParserSection8, NestedClass) {
+  auto r = Parse(
+      "class Outer;\n"
+      "  class Inner;\n"
+      "    int x;\n"
+      "  endclass\n"
+      "  Inner inst;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->name, "Outer");
+}
+
+// §8.3 — Covergroup inside class
+TEST(ParserSection8, CovergroupInClass) {
+  auto r = Parse(
+      "class CoveredClass;\n"
+      "  int x;\n"
+      "  covergroup cg @(posedge clk);\n"
+      "    coverpoint x;\n"
+      "  endgroup\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+}
+
+// §8.3 — Multiple properties on one line (comma-separated)
+TEST(ParserSection8, MultiplePropertiesCommaSeparated) {
+  auto r = Parse(
+      "class MyClass;\n"
+      "  int a, b, c;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto* cls = r.cu->classes[0];
+  ASSERT_EQ(cls->members.size(), 3u);
+  EXPECT_EQ(cls->members[0]->name, "a");
+  EXPECT_EQ(cls->members[1]->name, "b");
+  EXPECT_EQ(cls->members[2]->name, "c");
+}
+
+// §8.17 — Chaining constructors with super.new() and default
+TEST(ParserSection8, ConstructorChainingDefault) {
+  auto r = Parse(
+      "class Base;\n"
+      "  function new(int x = 0);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class Child extends Base;\n"
+      "  function new();\n"
+      "    super.new(5);\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 2u);
+}
+
+// §8.3 — Randc qualifier
+TEST(ParserSection8, RandcQualifier) {
+  auto r = Parse(
+      "class Die;\n"
+      "  randc bit [2:0] face;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  ASSERT_GE(r.cu->classes[0]->members.size(), 1u);
+  EXPECT_TRUE(r.cu->classes[0]->members[0]->is_randc);
+}
+
+// §8.18 — Extern constraint declaration
+TEST(ParserSection8, ExternConstraintDecl) {
+  auto r = Parse(
+      "class A;\n"
+      "  rand int x;\n"
+      "  extern constraint c1;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  bool found = false;
+  for (auto* m : r.cu->classes[0]->members) {
+    if (m->kind == ClassMemberKind::kConstraint && m->name == "c1") {
+      found = true;
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+// §8.26.2 — Extends and implements together
+TEST(ParserSection8, ExtendsAndImplements) {
+  auto r = Parse(
+      "interface class Iface;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "class Base;\n"
+      "endclass\n"
+      "class Child extends Base implements Iface;\n"
+      "  virtual function void foo();\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 3u);
+  EXPECT_EQ(r.cu->classes[2]->base_class, "Base");
+}
+
+// §8.9 — Static property with const
+TEST(ParserSection8, StaticConstProperty) {
+  auto r = Parse(
+      "class Config;\n"
+      "  static const int VERSION = 3;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto* cls = r.cu->classes[0];
+  ASSERT_GE(cls->members.size(), 1u);
+  EXPECT_TRUE(cls->members[0]->is_static);
+  EXPECT_TRUE(cls->members[0]->is_const);
+}

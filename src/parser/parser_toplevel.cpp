@@ -483,6 +483,7 @@ bool Parser::ParseClassQualifiers(ClassMember* m) {
     else if (Match(TokenKind::kKwPure))      { m->is_virtual = true; proto = true; }
     else if (Match(TokenKind::kKwRand))      { m->is_rand = true; }
     else if (Match(TokenKind::kKwRandc))     { m->is_randc = true; }
+    else if (Match(TokenKind::kKwConst))     { m->is_const = true; }
     else if (Match(TokenKind::kKwExtern))    { proto = true; }
     else { break; }
     // clang-format on
@@ -547,6 +548,7 @@ void Parser::ParseExtraPropertyDecls(std::vector<ClassMember*>& members,
     extra->is_rand = first->is_rand;
     extra->is_randc = first->is_randc;
     extra->is_static = first->is_static;
+    extra->is_const = first->is_const;
     extra->name = Expect(TokenKind::kIdentifier).text;
     ParseUnpackedDims(extra->unpacked_dims);
     if (Match(TokenKind::kEq)) extra->init_expr = ParseExpr();

@@ -590,6 +590,7 @@ struct ClassMember {
   bool is_protected = false;
   bool is_rand = false;
   bool is_randc = false;
+  bool is_const = false;
 
   // Property fields
   DataType data_type;
