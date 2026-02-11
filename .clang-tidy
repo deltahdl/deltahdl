@@ -60,15 +60,21 @@ CheckOptions:
   # [coroutine.handle]. The compiler requires this exact
   # struct name. It is NOT our naming choice.
   # Do NOT remove this exception.
-  readability-identifier-naming.StructIgnoredRegexp: promise_type
+  # IEEE 1800-2023 Annex I/K/L/M C struct tags (t_vpi_*, s_vpi_*) are
+  # mandated by the standard.
+  readability-identifier-naming.StructIgnoredRegexp: 'promise_type|t_vpi_.*|s_vpi_.*'
   readability-identifier-naming.EnumCase: CamelCase
   readability-identifier-naming.TypeAliasCase: CamelCase
   # VPI type aliases are MANDATED by IEEE Std 1800-2023 §36.6.
   # The standard specifies exact type names (vpiHandle,
   # s_vpi_value, etc.) for VPI compatibility.
-  readability-identifier-naming.TypeAliasIgnoredRegexp: 'vpiHandle|s_vpi_value|s_vpi_time|s_cb_data|s_vpi_systf_data|s_vpi_vecval'
+  # IEEE 1800-2023 §36 + Annex I/K/L/M: VPI/DPI C-API type aliases.
+  readability-identifier-naming.TypeAliasIgnoredRegexp: 'vpiHandle|s_vpi_.*|s_cb_data|SVpi.*|PLI_.*'
   readability-identifier-naming.TypedefCase: CamelCase
-  readability-identifier-naming.TypedefIgnoredRegexp: 'vpiHandle|s_vpi_value|s_vpi_time|s_cb_data|s_vpi_systf_data|s_vpi_vecval'
+  # IEEE 1800-2023 Annex I (svdpi.h) typedefs: sv-prefixed types, C struct
+  # tags (t_vpi_*), and pointer typedefs (p_vpi_*) are mandated names.
+  # IEEE 1800-2023 Annex I/K/L/M: VPI/DPI C-API typedefs and struct tags.
+  readability-identifier-naming.TypedefIgnoredRegexp: 's_vpi_.*|s_cb_data|sv[A-Z].*|t_vpi_.*|p_vpi_.*|vpi_assertion_callback_func'
   readability-identifier-naming.TemplateParameterCase: CamelCase
 
   # -- Naming: enum constants (kCamelCase) -----------------
@@ -107,7 +113,9 @@ CheckOptions:
   # §36.7-§36.34. The standard specifies exact function names
   # (snake_case) that must be provided for VPI compatibility.
   # This is the same category as C++ standard names above.
-  readability-identifier-naming.FunctionIgnoredRegexp: 'main|get_return_object|initial_suspend|final_suspend|return_void|return_value|unhandled_exception|await_ready|await_suspend|await_resume|vpi_register_systf|vpi_handle_by_name|vpi_iterate|vpi_scan|vpi_get_value|vpi_put_value|vpi_register_cb|vpi_get|vpi_get_str|vpi_free_object'
+  # IEEE 1800-2023 Annex I (svdpi.h): DPI C-layer functions use lowerCamelCase
+  # names mandated by the standard (sv-prefixed), same as VPI above.
+  readability-identifier-naming.FunctionIgnoredRegexp: 'main|get_return_object|initial_suspend|final_suspend|return_void|return_value|unhandled_exception|await_ready|await_suspend|await_resume|vpi_register_systf|vpi_handle_by_name|vpi_iterate|vpi_scan|vpi_get_value|vpi_put_value|vpi_register_cb|vpi_get|vpi_get_str|vpi_free_object|vpi_get_vlog_info|vpi_register_assertion_cb|sv[A-Z].*'
   # SmallVec methods below are MANDATED by the C++ Container
   # and Range concepts ([container.reqmts], [range.range]).
   # Renaming them would break range-based for loops, STL
