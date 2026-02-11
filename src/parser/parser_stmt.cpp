@@ -40,6 +40,19 @@ static bool IsDataTypeKeyword(TokenKind tk) {
 }
 
 Stmt* Parser::ParseStmt() {
+  // §9.3.5: statement label — identifier ':' before statement
+  std::string_view prefix_label;
+  if (CheckIdentifier()) {
+    auto saved = lexer_.SavePos();
+    auto id_tok = Consume();
+    if (Check(TokenKind::kColon)) {
+      Consume();
+      prefix_label = id_tok.text;
+    } else {
+      lexer_.RestorePos(saved);
+    }
+  }
+
   auto attrs = ParseAttributes();
 
   if (Match(TokenKind::kSemicolon)) {
@@ -57,6 +70,9 @@ Stmt* Parser::ParseStmt() {
 
   Stmt* stmt = ParseStmtBody();
   if (stmt != nullptr) {
+    if (!prefix_label.empty() && stmt->label.empty()) {
+      stmt->label = prefix_label;
+    }
     if (!attrs.empty()) stmt->attrs = std::move(attrs);
     if (qual != CaseQualifier::kNone) stmt->qualifier = qual;
   }
@@ -336,9 +352,12 @@ Stmt* Parser::ParseForkStmt() {
   }
   while (!Check(TokenKind::kKwJoin) && !Check(TokenKind::kKwJoinAny) &&
          !Check(TokenKind::kKwJoinNone) && !AtEnd()) {
-    auto* s = ParseStmt();
-    if (s != nullptr) {
-      stmt->fork_stmts.push_back(s);
+    // §9.3.1: block-level variable declarations allowed in fork
+    if (IsBlockVarDeclStart()) {
+      ParseBlockVarDecls(stmt->fork_stmts);
+    } else {
+      auto* s = ParseStmt();
+      if (s != nullptr) stmt->fork_stmts.push_back(s);
     }
   }
   stmt->join_kind = CurrentToken().kind;

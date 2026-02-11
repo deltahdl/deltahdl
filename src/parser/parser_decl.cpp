@@ -366,6 +366,8 @@ EventExpr Parser::ParseSingleEvent() {
     ev.edge = Edge::kPosedge;
   } else if (Match(TokenKind::kKwNegedge)) {
     ev.edge = Edge::kNegedge;
+  } else if (Match(TokenKind::kKwEdge)) {
+    ev.edge = Edge::kEdge;
   }
   ev.signal = ParseExpr();
   // iff guard (§9.4.2)
@@ -533,6 +535,7 @@ DataType Parser::ParseDataType() {
     dtype.type_name = Consume().text;
     // §8.26.3 scope-resolved types: class_name::type_name
     while (Match(TokenKind::kColonColon)) {
+      dtype.scope_name = dtype.type_name;
       dtype.type_name = ExpectIdentifier().text;
     }
     // §8.25 parameterized class type: cls #(params)

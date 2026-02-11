@@ -8,7 +8,13 @@
 namespace delta {
 
 Parser::Parser(Lexer& lexer, Arena& arena, DiagEngine& diag)
-    : lexer_(lexer), arena_(arena), diag_(diag) {}
+    : lexer_(lexer), arena_(arena), diag_(diag) {
+  // §9.7: process is a built-in class type
+  known_types_.insert("process");
+  // §19.4: semaphore and mailbox are built-in class types
+  known_types_.insert("semaphore");
+  known_types_.insert("mailbox");
+}
 
 Token Parser::CurrentToken() { return lexer_.Peek(); }
 bool Parser::Check(TokenKind kind) { return CurrentToken().Is(kind); }

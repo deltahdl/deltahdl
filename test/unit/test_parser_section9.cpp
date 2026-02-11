@@ -525,3 +525,94 @@ TEST(ParserSection9, RepeatEventControlNonblocking) {
   EXPECT_NE(stmt->repeat_event_count, nullptr);
   EXPECT_FALSE(stmt->events.empty());
 }
+
+// =============================================================================
+// §9.3.5 -- Statement labels
+// =============================================================================
+
+TEST(ParserSection9, StatementLabelOnBeginBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial\n"
+      "    name: begin\n"
+      "      a = 1;\n"
+      "    end: name\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  EXPECT_EQ(item->body->label, "name");
+}
+
+TEST(ParserSection9, StatementLabelOnForkBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial\n"
+      "    name: fork\n"
+      "      a = 1;\n"
+      "    join: name\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  EXPECT_EQ(stmt->label, "name");
+}
+
+// =============================================================================
+// §9.4.2 -- edge keyword in event control
+// =============================================================================
+
+TEST(ParserSection9, EventControlEdge) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg [3:0] a;\n"
+      "  wire clk;\n"
+      "  always @(edge clk) a = ~a;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->sensitivity.size(), 1u);
+  EXPECT_EQ(item->sensitivity[0].edge, Edge::kEdge);
+}
+
+// =============================================================================
+// §7.5.1 / §8.7 -- new[N] dynamic array constructor
+// =============================================================================
+
+TEST(ParserSection9, DynamicArrayNew) {
+  auto r = Parse(
+      "module m;\n"
+      "  int arr[];\n"
+      "  initial arr = new[5];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+}
+
+// =============================================================================
+// §9.3.1 -- automatic variable declarations in fork blocks
+// =============================================================================
+
+TEST(ParserSection9, AutomaticVarInFork) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      automatic int k = 0;\n"
+      "      begin k = 1; end\n"
+      "    join_none\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  ASSERT_GE(stmt->fork_stmts.size(), 1u);
+  EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kVarDecl);
+}

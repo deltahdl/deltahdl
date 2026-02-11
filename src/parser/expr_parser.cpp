@@ -263,6 +263,46 @@ Expr* Parser::MakeLiteral(ExprKind kind, const Token& tok) {
   return lit;
 }
 
+Expr* Parser::ParseNewExpr() {
+  auto* expr = arena_.Create<Expr>();
+  expr->kind = ExprKind::kCall;
+  expr->text = "new";
+  expr->range.start = Consume().loc;
+  if (Check(TokenKind::kLBracket)) {
+    // §7.5.1: new[size] — dynamic array constructor
+    Consume();
+    expr->args.push_back(ParseExpr());
+    Expect(TokenKind::kRBracket);
+    if (Check(TokenKind::kLParen)) ParseParenList(expr->args);
+  } else if (Check(TokenKind::kLParen)) {
+    ParseParenList(expr->args);
+  }
+  // §8.12 shallow copy: new <identifier>
+  if (CheckIdentifier()) expr->lhs = ParseExpr();
+  return expr;
+}
+
+Expr* Parser::ParseTaggedExpr() {
+  auto* expr = arena_.Create<Expr>();
+  expr->kind = ExprKind::kIdentifier;
+  expr->text = "tagged";
+  expr->range.start = Consume().loc;
+  auto member_tok = ExpectIdentifier();
+  auto* member = arena_.Create<Expr>();
+  member->kind = ExprKind::kIdentifier;
+  member->text = member_tok.text;
+  member->range.start = member_tok.loc;
+  expr->rhs = member;
+  if (Check(TokenKind::kLParen)) {
+    Consume();
+    expr->lhs = ParseExpr();
+    Expect(TokenKind::kRParen);
+  } else if (Check(TokenKind::kApostropheLBrace)) {
+    expr->lhs = ParseAssignmentPattern();
+  }
+  return expr;
+}
+
 Expr* Parser::ParsePrimaryExpr() {
   auto tok = CurrentToken();
 
@@ -300,36 +340,10 @@ Expr* Parser::ParsePrimaryExpr() {
       if (Check(TokenKind::kLBracket)) result = ParseSelectExpr(result);
       return ParseWithClause(result);
     }
-    case TokenKind::kKwTagged: {                          // §11.9
-      auto* expr = arena_.Create<Expr>();
-      expr->kind = ExprKind::kIdentifier;
-      expr->text = "tagged";
-      expr->range.start = Consume().loc;
-      auto member_tok = ExpectIdentifier();
-      auto* member = arena_.Create<Expr>();
-      member->kind = ExprKind::kIdentifier;
-      member->text = member_tok.text;
-      member->range.start = member_tok.loc;
-      expr->rhs = member;
-      if (Check(TokenKind::kLParen)) {
-        Consume();
-        expr->lhs = ParseExpr();
-        Expect(TokenKind::kRParen);
-      } else if (Check(TokenKind::kApostropheLBrace)) {
-        expr->lhs = ParseAssignmentPattern();
-      }
-      return expr;
-    }
-    case TokenKind::kKwNew: {                            // §8.7
-      auto* expr = arena_.Create<Expr>();
-      expr->kind = ExprKind::kCall;
-      expr->text = "new";
-      expr->range.start = Consume().loc;
-      if (Check(TokenKind::kLParen)) ParseParenList(expr->args);
-      // §8.12 shallow copy: new <identifier>
-      if (CheckIdentifier()) expr->lhs = ParseExpr();
-      return expr;
-    }
+    case TokenKind::kKwTagged:                            // §11.9
+      return ParseTaggedExpr();
+    case TokenKind::kKwNew:                               // §8.7
+      return ParseNewExpr();
     default:
       break;
   }

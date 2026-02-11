@@ -221,6 +221,7 @@ enum class Edge : uint8_t {
   kNone,
   kPosedge,
   kNegedge,
+  kEdge,
 };
 
 struct EventExpr {

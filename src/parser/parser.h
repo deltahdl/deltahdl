@@ -225,6 +225,8 @@ class Parser {
   Expr* ParseInsideExpr(Expr* lhs);
   void ParseInsideRangeList(std::vector<Expr*>& out);
   Expr* ParseInsideValueRange();
+  Expr* ParseNewExpr();
+  Expr* ParseTaggedExpr();
   Expr* ParseStreamingConcat(TokenKind dir);
   Expr* ParseMinTypMaxExpr();
 
