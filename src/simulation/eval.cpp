@@ -675,40 +675,71 @@ static Logic4Vec EvalConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
 
 // --- Select (bit/part) ---
 
+// §7.10: Resolve a queue index with $ = last element index.
+static uint64_t ResolveQueueIdx(const Expr* idx_expr, QueueObject* q,
+                                SimContext& ctx, Arena& arena) {
+  ctx.PushScope();
+  auto* dv = ctx.CreateLocalVariable("$", 32);
+  uint64_t last = q->elements.empty() ? 0 : q->elements.size() - 1;
+  dv->value = MakeLogic4VecVal(arena, 32, last);
+  auto val = EvalExpr(idx_expr, ctx, arena);
+  ctx.PopScope();
+  return val.ToUint64();
+}
+
+// §7.10: Try queue indexed access with $ support. Returns true if handled.
+static bool TryQueueSelect(const Expr* expr, SimContext& ctx, Arena& arena,
+                           Logic4Vec& out) {
+  if (!expr->base || expr->base->kind != ExprKind::kIdentifier) return false;
+  if (expr->index_end) return false;
+  auto* q = ctx.FindQueue(expr->base->text);
+  if (!q) return false;
+  auto idx = ResolveQueueIdx(expr->index, q, ctx, arena);
+  out = (idx < q->elements.size()) ? q->elements[idx]
+                                   : MakeLogic4VecVal(arena, q->elem_width, 0);
+  return true;
+}
+
+// §7.4: Try unpacked array element access. Returns true if handled.
+static bool TryArrayElementSelect(const Expr* expr, uint64_t idx,
+                                  SimContext& ctx, Logic4Vec& out) {
+  if (!expr->base || expr->base->kind != ExprKind::kIdentifier) return false;
+  if (expr->index_end) return false;
+  auto elem_name =
+      std::string(expr->base->text) + "[" + std::to_string(idx) + "]";
+  auto* elem = ctx.FindVariable(elem_name);
+  if (!elem) return false;
+  out = elem->value;
+  return true;
+}
+
+// Evaluate a packed part-select: base[hi:lo].
+static Logic4Vec EvalPartSelect(const Logic4Vec& base_val, uint64_t idx,
+                                uint64_t end_idx, Arena& arena) {
+  uint32_t lo = static_cast<uint32_t>(std::min(idx, end_idx));
+  uint32_t hi = static_cast<uint32_t>(std::max(idx, end_idx));
+  uint32_t width = hi - lo + 1;
+  uint64_t val = base_val.ToUint64() >> lo;
+  uint64_t mask = (width >= 64) ? ~uint64_t{0} : (uint64_t{1} << width) - 1;
+  return MakeLogic4VecVal(arena, width, val & mask);
+}
+
 static Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
+  Logic4Vec result;
+  if (TryQueueSelect(expr, ctx, arena, result)) return result;
+
   auto idx_val = EvalExpr(expr->index, ctx, arena);
   uint64_t idx = idx_val.ToUint64();
 
-  // §7.4: Try unpacked array element variable first (e.g. "A[0]").
-  if (expr->base && expr->base->kind == ExprKind::kIdentifier &&
-      !expr->index_end) {
-    auto elem_name =
-        std::string(expr->base->text) + "[" + std::to_string(idx) + "]";
-    auto* elem = ctx.FindVariable(elem_name);
-    if (elem) return elem->value;
-    // §7.10: Queue indexed access.
-    auto* q = ctx.FindQueue(expr->base->text);
-    if (q && idx < q->elements.size()) return q->elements[idx];
-  }
+  if (TryArrayElementSelect(expr, idx, ctx, result)) return result;
 
   auto base_val = EvalExpr(expr->base, ctx, arena);
-
   if (expr->index_end) {
     auto end_val = EvalExpr(expr->index_end, ctx, arena);
-    uint64_t end_idx = end_val.ToUint64();
-    uint32_t lo = (idx < end_idx) ? static_cast<uint32_t>(idx)
-                                  : static_cast<uint32_t>(end_idx);
-    uint32_t hi = (idx > end_idx) ? static_cast<uint32_t>(idx)
-                                  : static_cast<uint32_t>(end_idx);
-    uint32_t width = hi - lo + 1;
-    uint64_t val = base_val.ToUint64() >> lo;
-    uint64_t mask = (width >= 64) ? ~uint64_t{0} : (uint64_t{1} << width) - 1;
-    return MakeLogic4VecVal(arena, width, val & mask);
+    return EvalPartSelect(base_val, idx, end_val.ToUint64(), arena);
   }
-
   // Single bit select.
-  uint64_t bit = (base_val.ToUint64() >> idx) & 1;
-  return MakeLogic4VecVal(arena, 1, bit);
+  return MakeLogic4VecVal(arena, 1, (base_val.ToUint64() >> idx) & 1);
 }
 
 // --- Ternary ---

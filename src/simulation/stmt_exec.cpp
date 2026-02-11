@@ -5,6 +5,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_set>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -214,11 +215,109 @@ static bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
   return false;
 }
 
+// §7.10: Evaluate a queue index expression with $ = last index.
+static int64_t EvalQueueIndex(const Expr* expr, QueueObject* q,
+                              SimContext& ctx, Arena& arena) {
+  ctx.PushScope();
+  auto* dv = ctx.CreateLocalVariable("$", 32);
+  int64_t last =
+      q->elements.empty() ? 0 : static_cast<int64_t>(q->elements.size()) - 1;
+  dv->value = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(last));
+  auto val = EvalExpr(expr, ctx, arena);
+  ctx.PopScope();
+  // Sign-extend narrow values so negative indices (e.g. -2) are preserved.
+  uint64_t raw = val.ToUint64();
+  if (val.width > 0 && val.width < 64) {
+    uint64_t sign = uint64_t{1} << (val.width - 1);
+    if (raw & sign) raw |= ~uint64_t{0} << val.width;
+  }
+  return static_cast<int64_t>(raw);
+}
+
+// §7.10.1: Collect elements from a queue slice (q[lo:hi]).
+static bool CollectFromQueueSlice(const Expr* expr, SimContext& ctx,
+                                  Arena& arena, std::vector<Logic4Vec>& out) {
+  if (expr->kind != ExprKind::kSelect || !expr->base || !expr->index_end)
+    return false;
+  if (expr->base->kind != ExprKind::kIdentifier) return false;
+  auto* q = ctx.FindQueue(expr->base->text);
+  if (!q) return false;
+  auto lo = EvalQueueIndex(expr->index, q, ctx, arena);
+  auto hi = EvalQueueIndex(expr->index_end, q, ctx, arena);
+  if (lo < 0) lo = 0;
+  auto qsz = static_cast<int64_t>(q->elements.size());
+  if (hi >= qsz) hi = qsz - 1;
+  for (int64_t i = lo; i <= hi; ++i)
+    out.push_back(q->elements[static_cast<size_t>(i)]);
+  return true;
+}
+
+// §7.10: Collect a single queue element (q[i]) with $ support.
+static bool CollectFromQueueElem(const Expr* expr, SimContext& ctx,
+                                 Arena& arena, std::vector<Logic4Vec>& out) {
+  if (expr->kind != ExprKind::kSelect || !expr->base || expr->index_end)
+    return false;
+  if (expr->base->kind != ExprKind::kIdentifier) return false;
+  auto* q = ctx.FindQueue(expr->base->text);
+  if (!q) return false;
+  auto idx = EvalQueueIndex(expr->index, q, ctx, arena);
+  if (idx >= 0 && static_cast<size_t>(idx) < q->elements.size())
+    out.push_back(q->elements[static_cast<size_t>(idx)]);
+  return true;
+}
+
+// §7.10: Collect elements from an expression for queue assignment.
+static void CollectQueueElements(const Expr* expr, SimContext& ctx,
+                                 Arena& arena, std::vector<Logic4Vec>& out) {
+  if (expr->kind == ExprKind::kConcatenation) {
+    for (auto* elem : expr->elements)
+      CollectQueueElements(elem, ctx, arena, out);
+    return;
+  }
+  if (CollectFromQueueSlice(expr, ctx, arena, out)) return;
+  if (CollectFromQueueElem(expr, ctx, arena, out)) return;
+  // Queue variable: expand all elements.
+  if (expr->kind == ExprKind::kIdentifier) {
+    auto* q = ctx.FindQueue(expr->text);
+    if (q) {
+      out.insert(out.end(), q->elements.begin(), q->elements.end());
+      return;
+    }
+  }
+  out.push_back(EvalExpr(expr, ctx, arena));
+}
+
+// §7.10.4: Queue assignment from concatenation, slice, or literal.
+static bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx,
+                                   Arena& arena) {
+  if (stmt->lhs->kind != ExprKind::kIdentifier) return false;
+  auto* q = ctx.FindQueue(stmt->lhs->text);
+  if (!q) return false;
+  // Empty concat: q = {} -> clear.
+  if (stmt->rhs->kind == ExprKind::kConcatenation &&
+      stmt->rhs->elements.empty()) {
+    q->elements.clear();
+    return true;
+  }
+  std::vector<Logic4Vec> elems;
+  CollectQueueElements(stmt->rhs, ctx, arena, elems);
+  if (q->max_size > 0 &&
+      static_cast<int32_t>(elems.size()) > q->max_size) {
+    elems.resize(static_cast<size_t>(q->max_size));
+  }
+  q->elements = std::move(elems);
+  return true;
+}
+
 // Execute a blocking assignment with full LHS support.
 static StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
                                          Arena& arena) {
-  auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
   if (!stmt->lhs) return StmtResult::kDone;
+
+  // §7.10.4: Queue assignment must be checked before RHS evaluation.
+  if (TryQueueBlockingAssign(stmt, ctx, arena)) return StmtResult::kDone;
+
+  auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
 
   if (stmt->lhs->kind == ExprKind::kSelect) {
     // §7.4: Check for unpacked array element variable first.
