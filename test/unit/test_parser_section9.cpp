@@ -83,7 +83,8 @@ TEST(ParserSection9, FinalBlock) {
 }
 
 // =============================================================================
-// LRM section 9.2.2 -- Always blocks (always, always_comb, always_ff, always_latch)
+// LRM section 9.2.2 -- Always blocks (always, always_comb, always_ff,
+// always_latch)
 // =============================================================================
 
 TEST(ParserSection9, AlwaysBlock) {

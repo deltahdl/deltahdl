@@ -357,6 +357,7 @@ enum class ModuleItemKind : uint8_t {
   kSpecparam,       // specparam declarations (§30.2)
   kDpiImport,       // import "DPI-C" function/task (§35)
   kDpiExport,       // export "DPI-C" function/task (§35)
+  kClassDecl,       // class ... endclass inside module (§8.3)
 };
 
 // clang-format off
@@ -403,6 +404,7 @@ struct FunctionArg {
 };
 
 struct ModuleItem;
+struct ClassDecl;
 
 struct GenerateCaseItem {
   std::vector<Expr*> patterns;
@@ -513,6 +515,9 @@ struct ModuleItem {
   bool dpi_is_pure = false;     // pure function (no side effects)
   bool dpi_is_context = false;  // context function (needs sim context)
   bool dpi_is_task = false;     // true for task, false for function
+
+  // Nested class declaration (§8.3)
+  ClassDecl* class_decl = nullptr;
 
   // Specify block body (§30, §31)
   std::vector<SpecifyItem*> specify_items;

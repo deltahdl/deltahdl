@@ -142,6 +142,15 @@ ModuleItem* Parser::ParseTypedef() {
   item->loc = CurrentLoc();
   Expect(TokenKind::kKwTypedef);
 
+  // Forward declarations: typedef class/struct/union/enum X; (§8.26)
+  if (Check(TokenKind::kKwClass) || Check(TokenKind::kKwInterface)) {
+    Consume();
+    if (Check(TokenKind::kKwClass)) Consume();  // "interface class"
+    item->name = Expect(TokenKind::kIdentifier).text;
+    known_types_.insert(item->name);
+    Expect(TokenKind::kSemicolon);
+    return item;
+  }
   if (Check(TokenKind::kKwEnum)) {
     item->typedef_type = ParseEnumType();
   } else if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
@@ -227,7 +236,7 @@ std::vector<FunctionArg> Parser::ParseFunctionArgs() {
 
 // --- Function declaration ---
 
-ModuleItem* Parser::ParseFunctionDecl() {
+ModuleItem* Parser::ParseFunctionDecl(bool prototype_only) {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kFunctionDecl;
   item->loc = CurrentLoc();
@@ -255,12 +264,24 @@ ModuleItem* Parser::ParseFunctionDecl() {
     item->return_type = ParseDataType();
   }
 
-  item->name = Expect(TokenKind::kIdentifier).text;
+  // §8.7 constructors use 'new' as function name
+  if (Match(TokenKind::kKwNew)) {
+    item->name = "new";
+  } else {
+    item->name = Expect(TokenKind::kIdentifier).text;
+  }
+  // §8.24 out-of-block methods: class_name::method_name
+  while (Match(TokenKind::kColonColon)) {
+    item->name = Expect(TokenKind::kIdentifier).text;
+  }
 
   if (Check(TokenKind::kLParen)) {
     item->func_args = ParseFunctionArgs();
   }
   Expect(TokenKind::kSemicolon);
+
+  // Pure virtual / extern prototypes have no body (§8.21, §8.24)
+  if (prototype_only) return item;
 
   // Old-style port declarations (§13.3)
   ParseOldStylePortDecls(item, TokenKind::kKwEndfunction);
@@ -269,16 +290,16 @@ ModuleItem* Parser::ParseFunctionDecl() {
     item->func_body_stmts.push_back(ParseStmt());
   }
   Expect(TokenKind::kKwEndfunction);
-  // Optional end label: ": name"
+  // Optional end label: ": name" (may be 'new' for constructors)
   if (Match(TokenKind::kColon)) {
-    ExpectIdentifier();
+    if (!Match(TokenKind::kKwNew)) ExpectIdentifier();
   }
   return item;
 }
 
 // --- Task declaration ---
 
-ModuleItem* Parser::ParseTaskDecl() {
+ModuleItem* Parser::ParseTaskDecl(bool prototype_only) {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kTaskDecl;
   item->loc = CurrentLoc();
@@ -291,11 +312,18 @@ ModuleItem* Parser::ParseTaskDecl() {
   }
 
   item->name = Expect(TokenKind::kIdentifier).text;
+  // §8.24 out-of-block methods: class_name::method_name
+  while (Match(TokenKind::kColonColon)) {
+    item->name = Expect(TokenKind::kIdentifier).text;
+  }
 
   if (Check(TokenKind::kLParen)) {
     item->func_args = ParseFunctionArgs();
   }
   Expect(TokenKind::kSemicolon);
+
+  // Pure virtual / extern prototypes have no body (§8.21, §8.24)
+  if (prototype_only) return item;
 
   // Old-style port declarations (§13.3)
   ParseOldStylePortDecls(item, TokenKind::kKwEndtask);
@@ -488,10 +516,21 @@ DataType Parser::ParseDataType() {
     return ParseVirtualInterfaceType();
   }
 
-  if (CurrentToken().Is(TokenKind::kIdentifier) &&
-      known_types_.count(CurrentToken().text) != 0) {
+  bool is_named = CurrentToken().Is(TokenKind::kIdentifier) &&
+                  known_types_.count(CurrentToken().text) != 0;
+  if (is_named) {
     dtype.kind = DataTypeKind::kNamed;
     dtype.type_name = Consume().text;
+    // §8.26.3 scope-resolved types: class_name::type_name
+    while (Match(TokenKind::kColonColon)) {
+      dtype.type_name = ExpectIdentifier().text;
+    }
+    // §8.25 parameterized class type: cls #(params)
+    if (Check(TokenKind::kHash)) {
+      Consume();
+      std::vector<Expr*> discard;
+      ParseParenList(discard);
+    }
     return dtype;
   }
 

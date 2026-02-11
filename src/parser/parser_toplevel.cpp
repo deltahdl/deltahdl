@@ -393,26 +393,60 @@ ModuleDecl* Parser::ParseProgramDecl() {
 
 // --- Class declaration ---
 
+void Parser::ParseClassExtendsClause(ClassDecl* decl) {
+  // §8.26: interface classes may extend multiple base classes
+  // (comma-separated).
+  do {
+    auto name = Expect(TokenKind::kIdentifier).text;
+    while (Match(TokenKind::kColonColon)) {
+      name = Expect(TokenKind::kIdentifier).text;
+    }
+    if (decl->base_class.empty()) decl->base_class = name;
+    // Skip parameter value assignment: #(expr, ...)
+    if (Check(TokenKind::kHash)) {
+      Consume();
+      std::vector<Expr*> discard;
+      ParseParenList(discard);
+    }
+    // Skip constructor arguments: (expr, ...)
+    if (Check(TokenKind::kLParen)) {
+      std::vector<Expr*> discard;
+      ParseParenList(discard);
+    }
+  } while (Match(TokenKind::kComma));
+}
+
 ClassDecl* Parser::ParseClassDecl() {
   auto* decl = arena_.Create<ClassDecl>();
   decl->range.start = CurrentLoc();
-
-  if (Match(TokenKind::kKwVirtual)) {
-    decl->is_virtual = true;
-  }
+  decl->is_virtual = Match(TokenKind::kKwVirtual);
+  Match(TokenKind::kKwInterface);
   Expect(TokenKind::kKwClass);
+  Match(TokenKind::kKwAutomatic);
+  Match(TokenKind::kKwStatic);
   decl->name = Expect(TokenKind::kIdentifier).text;
   known_types_.insert(decl->name);
 
-  // Optional extends.
-  if (Match(TokenKind::kKwExtends)) {
-    decl->base_class = Expect(TokenKind::kIdentifier).text;
+  // Optional parameter port list: #(parameter ...) (§8.25)
+  if (Check(TokenKind::kHash)) {
+    Consume();
+    Expect(TokenKind::kLParen);
+    if (!Check(TokenKind::kRParen)) {
+      ParseParamPortDecl(decl->params);
+      while (Match(TokenKind::kComma)) {
+        ParseParamPortDecl(decl->params);
+      }
+    }
+    Expect(TokenKind::kRParen);
   }
 
+  if (Match(TokenKind::kKwExtends)) ParseClassExtendsClause(decl);
+  // §8.26: 'implements' with optional #(...) parameter assignments
+  if (Match(TokenKind::kKwImplements)) ParseClassExtendsClause(decl);
   Expect(TokenKind::kSemicolon);
 
   while (!Check(TokenKind::kKwEndclass) && !AtEnd()) {
-    if (Match(TokenKind::kSemicolon)) continue;  // skip empty items
+    if (Match(TokenKind::kSemicolon)) continue;
     decl->members.push_back(ParseClassMember());
   }
   Expect(TokenKind::kKwEndclass);
@@ -421,46 +455,65 @@ ClassDecl* Parser::ParseClassDecl() {
   return decl;
 }
 
-// --- Class member parsing ---
+// --- Class member qualifier parsing ---
+
+bool Parser::ParseClassQualifiers(ClassMember* m) {
+  bool proto = false;
+  while (true) {
+    // clang-format off
+    if      (Match(TokenKind::kKwLocal))     { m->is_local = true; }
+    else if (Match(TokenKind::kKwProtected)) { m->is_protected = true; }
+    else if (Match(TokenKind::kKwStatic))    { m->is_static = true; }
+    else if (Match(TokenKind::kKwVirtual))   { m->is_virtual = true; }
+    else if (Match(TokenKind::kKwPure))      { m->is_virtual = true; proto = true; }
+    else if (Match(TokenKind::kKwRand))      { m->is_rand = true; }
+    else if (Match(TokenKind::kKwRandc))     { m->is_randc = true; }
+    else if (Match(TokenKind::kKwExtern))    { proto = true; }
+    else { break; }
+    // clang-format on
+  }
+  return proto;
+}
 
 ClassMember* Parser::ParseClassMember() {
   auto* member = arena_.Create<ClassMember>();
   member->loc = CurrentLoc();
-
-  // Parse optional qualifier chain.
-  while (true) {
-    // clang-format off
-    if      (Match(TokenKind::kKwLocal))     { member->is_local = true; }
-    else if (Match(TokenKind::kKwProtected)) { member->is_protected = true; }
-    else if (Match(TokenKind::kKwStatic))    { member->is_static = true; }
-    else if (Match(TokenKind::kKwVirtual))   { member->is_virtual = true; }
-    else if (Match(TokenKind::kKwRand))      { member->is_rand = true; }
-    else if (Match(TokenKind::kKwRandc))     { member->is_randc = true; }
-    else { break; }
-    // clang-format on
-  }
+  bool proto = ParseClassQualifiers(member);
 
   if (Check(TokenKind::kKwFunction)) {
     member->kind = ClassMemberKind::kMethod;
-    member->method = ParseFunctionDecl();
+    member->method = ParseFunctionDecl(proto);
     return member;
   }
   if (Check(TokenKind::kKwTask)) {
     member->kind = ClassMemberKind::kMethod;
-    member->method = ParseTaskDecl();
+    member->method = ParseTaskDecl(proto);
     return member;
   }
-  if (Check(TokenKind::kKwConstraint)) {
-    return ParseConstraintStub(member);
+  if (Check(TokenKind::kKwConstraint)) return ParseConstraintStub(member);
+  // §8.5 typedef inside class body (enum, struct, etc.)
+  if (Check(TokenKind::kKwTypedef)) {
+    member->kind = ClassMemberKind::kProperty;
+    member->name = ParseTypedef()->name;
+    return member;
+  }
+  // §8.5 parameter/localparam inside class body
+  if (Check(TokenKind::kKwParameter)) {
+    member->kind = ClassMemberKind::kProperty;
+    member->name = ParseParamDecl()->name;
+    return member;
+  }
+  if (Check(TokenKind::kKwLocalparam)) {
+    member->kind = ClassMemberKind::kProperty;
+    member->name = ParseParamDecl()->name;
+    return member;
   }
 
   // Property: type name [= expr] ;
   member->kind = ClassMemberKind::kProperty;
   member->data_type = ParseDataType();
   member->name = Expect(TokenKind::kIdentifier).text;
-  if (Match(TokenKind::kEq)) {
-    member->init_expr = ParseExpr();
-  }
+  if (Match(TokenKind::kEq)) member->init_expr = ParseExpr();
   Expect(TokenKind::kSemicolon);
   return member;
 }

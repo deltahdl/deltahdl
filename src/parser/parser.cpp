@@ -115,6 +115,10 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
     unit->packages.push_back(ParsePackageDecl());
     return;
   }
+  if (IsAtClassDecl()) {
+    unit->classes.push_back(ParseClassDecl());
+    return;
+  }
   if (Check(TokenKind::kKwInterface)) {
     unit->interfaces.push_back(ParseInterfaceDecl());
     return;
@@ -123,8 +127,9 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
     unit->programs.push_back(ParseProgramDecl());
     return;
   }
-  if (Check(TokenKind::kKwClass) || Check(TokenKind::kKwVirtual)) {
-    unit->classes.push_back(ParseClassDecl());
+  if (Check(TokenKind::kKwTypedef)) {
+    std::vector<ModuleItem*> discard;
+    ParseModuleItem(discard);
     return;
   }
   if (Check(TokenKind::kKwPrimitive)) {
@@ -323,7 +328,8 @@ ModuleItem* Parser::ParseDpiExport(SourceLoc loc) {
   return item;
 }
 
-void Parser::ParseParamPortDecl(ModuleDecl& mod) {
+void Parser::ParseParamPortDecl(
+    std::vector<std::pair<std::string_view, Expr*>>& params) {
   Match(TokenKind::kKwParameter);
   // Handle type parameter: #(type T = real)  (§6.20.3)
   if (Match(TokenKind::kKwType)) {
@@ -335,7 +341,7 @@ void Parser::ParseParamPortDecl(ModuleDecl& mod) {
         ParseDataType();  // consume default type
       }
     }
-    mod.params.push_back({name.text, nullptr});
+    params.push_back({name.text, nullptr});
     known_types_.insert(name.text);
     return;
   }
@@ -345,7 +351,7 @@ void Parser::ParseParamPortDecl(ModuleDecl& mod) {
   if (Match(TokenKind::kEq)) {
     default_val = ParseExpr();
   }
-  mod.params.push_back({name.text, default_val});
+  params.push_back({name.text, default_val});
 }
 
 void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
@@ -357,9 +363,9 @@ void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
     Consume();
     Expect(TokenKind::kLParen);
     if (!Check(TokenKind::kRParen)) {
-      ParseParamPortDecl(decl);
+      ParseParamPortDecl(decl.params);
       while (Match(TokenKind::kComma)) {
-        ParseParamPortDecl(decl);
+        ParseParamPortDecl(decl.params);
       }
     }
     Expect(TokenKind::kRParen);
@@ -606,6 +612,20 @@ bool Parser::TryParseProcessBlock(std::vector<ModuleItem*>& items) {
   return false;
 }
 
+bool Parser::IsAtClassDecl() {
+  if (Check(TokenKind::kKwClass)) return true;
+  // 'virtual class' or 'interface class' — need lookahead to distinguish
+  // from 'virtual interface' or plain 'interface'.
+  if (!Check(TokenKind::kKwVirtual) && !Check(TokenKind::kKwInterface)) {
+    return false;
+  }
+  auto saved = lexer_.SavePos();
+  Consume();  // consume 'virtual' or 'interface'
+  bool result = Check(TokenKind::kKwClass);
+  lexer_.RestorePos(saved);
+  return result;
+}
+
 bool Parser::TryParseKeywordItem(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kKwTypedef)) {
     items.push_back(ParseTypedef());
@@ -646,6 +666,15 @@ bool Parser::TryParseKeywordItem(std::vector<ModuleItem*>& items) {
     dtype.kind = DataTypeKind::kWire;
     dtype.is_net = true;
     ParseVarDeclList(items, dtype);
+    return true;
+  }
+  if (IsAtClassDecl()) {
+    auto* item = arena_.Create<ModuleItem>();
+    item->kind = ModuleItemKind::kClassDecl;
+    item->loc = CurrentLoc();
+    item->class_decl = ParseClassDecl();
+    if (item->class_decl) item->name = item->class_decl->name;
+    items.push_back(item);
     return true;
   }
   return TryParseClockingOrVerification(items);

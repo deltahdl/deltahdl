@@ -254,44 +254,56 @@ Expr* Parser::MakeLiteral(ExprKind kind, const Token& tok) {
 Expr* Parser::ParsePrimaryExpr() {
   auto tok = CurrentToken();
 
-  if (tok.kind == TokenKind::kIntLiteral ||
-      tok.kind == TokenKind::kUnbasedUnsizedLiteral) {
-    return MakeLiteral(ExprKind::kIntegerLiteral, tok);
+  // clang-format off
+  switch (tok.kind) {
+    case TokenKind::kIntLiteral:
+    case TokenKind::kUnbasedUnsizedLiteral:
+      return MakeLiteral(ExprKind::kIntegerLiteral, tok);
+    case TokenKind::kRealLiteral:
+      return MakeLiteral(ExprKind::kRealLiteral, tok);
+    case TokenKind::kTimeLiteral:
+      return MakeLiteral(ExprKind::kTimeLiteral, tok);
+    case TokenKind::kStringLiteral:
+      return MakeLiteral(ExprKind::kStringLiteral, tok);
+    case TokenKind::kSystemIdentifier:
+      return ParseSystemCall();
+    case TokenKind::kIdentifier:
+    case TokenKind::kEscapedIdentifier:
+      return ParseIdentifierExpr();
+    case TokenKind::kLParen:
+      return ParseParenExpr();
+    case TokenKind::kLBrace:
+      return ParseConcatenation();
+    case TokenKind::kApostropheLBrace:
+      return ParseAssignmentPattern();
+    case TokenKind::kKwType:
+      return ParseTypeRefExpr();
+    case TokenKind::kDollar:  // §6.20.7
+    case TokenKind::kKwNull:  // §8.4
+      return MakeLiteral(ExprKind::kIdentifier, tok);
+    case TokenKind::kKwThis:
+    case TokenKind::kKwSuper: {                          // §8.11/§8.15
+      Expr* result = ParseMemberAccessChain(Consume());
+      if (Check(TokenKind::kLParen)) return ParseCallExpr(result);
+      if (Check(TokenKind::kLBracket)) return ParseSelectExpr(result);
+      return result;
+    }
+    case TokenKind::kKwNew: {                            // §8.7
+      auto* expr = arena_.Create<Expr>();
+      expr->kind = ExprKind::kCall;
+      expr->text = "new";
+      expr->range.start = Consume().loc;
+      if (Check(TokenKind::kLParen)) ParseParenList(expr->args);
+      // §8.12 shallow copy: new <identifier>
+      if (CheckIdentifier()) expr->lhs = ParseExpr();
+      return expr;
+    }
+    default:
+      break;
   }
-  if (tok.kind == TokenKind::kRealLiteral) {
-    return MakeLiteral(ExprKind::kRealLiteral, tok);
-  }
-  if (tok.kind == TokenKind::kTimeLiteral) {
-    return MakeLiteral(ExprKind::kTimeLiteral, tok);
-  }
-  if (tok.kind == TokenKind::kStringLiteral) {
-    return MakeLiteral(ExprKind::kStringLiteral, tok);
-  }
-  if (tok.kind == TokenKind::kSystemIdentifier) {
-    return ParseSystemCall();
-  }
-  if (tok.kind == TokenKind::kIdentifier ||
-      tok.kind == TokenKind::kEscapedIdentifier) {
-    return ParseIdentifierExpr();
-  }
-  if (tok.kind == TokenKind::kLParen) {
-    return ParseParenExpr();
-  }
-  if (tok.kind == TokenKind::kLBrace) {
-    return ParseConcatenation();
-  }
-  if (tok.kind == TokenKind::kApostropheLBrace) {
-    return ParseAssignmentPattern();
-  }
-  if (tok.kind == TokenKind::kKwType) {
-    return ParseTypeRefExpr();
-  }
-  if (IsCastTypeToken(tok.kind)) {
-    return ParseCastExpr();
-  }
-  if (tok.kind == TokenKind::kDollar) {
-    return MakeLiteral(ExprKind::kIdentifier, tok);  // §6.20.7 $ constant
-  }
+  // clang-format on
+
+  if (IsCastTypeToken(tok.kind)) return ParseCastExpr();
 
   diag_.Error(tok.loc, "expected expression");
   Consume();
@@ -307,9 +319,10 @@ Expr* Parser::ParseMemberAccessChain(Token tok) {
   id->text = tok.text;
   id->range.start = tok.loc;
   Expr* result = id;
-  while (Check(TokenKind::kDot)) {
+  while (Check(TokenKind::kDot) || Check(TokenKind::kColonColon)) {
     Consume();
-    auto member_tok = ExpectIdentifier();
+    // Accept 'new' as member name for super.new() (§8.15)
+    auto member_tok = Check(TokenKind::kKwNew) ? Consume() : ExpectIdentifier();
     auto* member_id = arena_.Create<Expr>();
     member_id->kind = ExprKind::kIdentifier;
     member_id->text = member_tok.text;
@@ -328,7 +341,9 @@ Expr* Parser::ParseIdentifierExpr() {
   auto tok = Consume();
 
   // User-defined type cast: type_name'(expr) (§6.19.4, §6.24)
-  if (known_types_.count(tok.text) != 0 && Check(TokenKind::kApostrophe)) {
+  bool is_cast =
+      known_types_.count(tok.text) != 0 && Check(TokenKind::kApostrophe);
+  if (is_cast) {
     auto saved = lexer_.SavePos();
     Consume();  // '
     if (Check(TokenKind::kLParen)) {
@@ -346,8 +361,28 @@ Expr* Parser::ParseIdentifierExpr() {
 
   Expr* result = ParseMemberAccessChain(tok);
 
-  if (Check(TokenKind::kLParen)) return ParseWithClause(ParseCallExpr(result));
-  if (Check(TokenKind::kLBracket)) return ParseSelectExpr(result);
+  // Postfix chain: calls, selects, and member access (§8.22 arr[0].method())
+  while (Check(TokenKind::kLParen) || Check(TokenKind::kLBracket)) {
+    if (Check(TokenKind::kLParen)) {
+      result = ParseCallExpr(result);
+    } else {
+      result = ParseSelectExpr(result);
+    }
+    // Continue member access chain after call/select
+    if (!Check(TokenKind::kDot) && !Check(TokenKind::kColonColon)) continue;
+    Consume();
+    auto mt = Check(TokenKind::kKwNew) ? Consume() : ExpectIdentifier();
+    auto* mid = arena_.Create<Expr>();
+    mid->kind = ExprKind::kIdentifier;
+    mid->text = mt.text;
+    mid->range.start = mt.loc;
+    auto* acc = arena_.Create<Expr>();
+    acc->kind = ExprKind::kMemberAccess;
+    acc->lhs = result;
+    acc->rhs = mid;
+    acc->range.start = result->range.start;
+    result = acc;
+  }
 
   // Postfix increment/decrement (§11.4.2)
   if (Check(TokenKind::kPlusPlus) || Check(TokenKind::kMinusMinus)) {

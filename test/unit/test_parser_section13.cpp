@@ -334,7 +334,10 @@ TEST(ParserSection13, DpiImportFunction) {
   auto* mod = r.cu->modules[0];
   ModuleItem* dpi = nullptr;
   for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kDpiImport) { dpi = item; break; }
+    if (item->kind == ModuleItemKind::kDpiImport) {
+      dpi = item;
+      break;
+    }
   }
   ASSERT_NE(dpi, nullptr);
   EXPECT_EQ(dpi->name, "c_add");
@@ -351,7 +354,10 @@ TEST(ParserSection13, DpiImportPureFunction) {
   auto* mod = r.cu->modules[0];
   ModuleItem* dpi = nullptr;
   for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kDpiImport) { dpi = item; break; }
+    if (item->kind == ModuleItemKind::kDpiImport) {
+      dpi = item;
+      break;
+    }
   }
   ASSERT_NE(dpi, nullptr);
   EXPECT_TRUE(dpi->dpi_is_pure);
@@ -367,7 +373,10 @@ TEST(ParserSection13, DpiImportContextTask) {
   auto* mod = r.cu->modules[0];
   ModuleItem* dpi = nullptr;
   for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kDpiImport) { dpi = item; break; }
+    if (item->kind == ModuleItemKind::kDpiImport) {
+      dpi = item;
+      break;
+    }
   }
   ASSERT_NE(dpi, nullptr);
   EXPECT_TRUE(dpi->dpi_is_context);
@@ -383,7 +392,10 @@ TEST(ParserSection13, DpiImportWithCName) {
   auto* mod = r.cu->modules[0];
   ModuleItem* dpi = nullptr;
   for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kDpiImport) { dpi = item; break; }
+    if (item->kind == ModuleItemKind::kDpiImport) {
+      dpi = item;
+      break;
+    }
   }
   ASSERT_NE(dpi, nullptr);
   EXPECT_EQ(dpi->dpi_c_name, "c_real_name");
@@ -399,7 +411,10 @@ TEST(ParserSection13, DpiExportFunction) {
   auto* mod = r.cu->modules[0];
   ModuleItem* dpi = nullptr;
   for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kDpiExport) { dpi = item; break; }
+    if (item->kind == ModuleItemKind::kDpiExport) {
+      dpi = item;
+      break;
+    }
   }
   ASSERT_NE(dpi, nullptr);
   EXPECT_EQ(dpi->name, "my_sv_func");
@@ -414,7 +429,10 @@ TEST(ParserSection13, DpiExportTask) {
   auto* mod = r.cu->modules[0];
   ModuleItem* dpi = nullptr;
   for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kDpiExport) { dpi = item; break; }
+    if (item->kind == ModuleItemKind::kDpiExport) {
+      dpi = item;
+      break;
+    }
   }
   ASSERT_NE(dpi, nullptr);
   EXPECT_EQ(dpi->name, "my_sv_task");

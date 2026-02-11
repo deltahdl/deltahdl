@@ -39,7 +39,8 @@ class Parser {
   void ParseGenvarDecl(std::vector<ModuleItem*>& items);
   void ParseTimeunitDecl(ModuleDecl* mod = nullptr);
   bool TryParseClockingOrVerification(std::vector<ModuleItem*>& items);
-  void ParseParamPortDecl(ModuleDecl& mod);
+  void ParseParamPortDecl(
+      std::vector<std::pair<std::string_view, Expr*>>& params);
   void ParseParamsPortsAndSemicolon(ModuleDecl& decl);
 
   // Generate blocks (parser_generate.cpp)
@@ -55,8 +56,11 @@ class Parser {
   ModuleDecl* ParseProgramDecl();
   void ParseModportDecl(std::vector<ModportDecl*>& out);
   ModportPort ParseModportPort(Direction& cur_dir);
+  bool IsAtClassDecl();
   ClassDecl* ParseClassDecl();
+  void ParseClassExtendsClause(ClassDecl* decl);
   ClassMember* ParseClassMember();
+  bool ParseClassQualifiers(ClassMember* member);
   ClassMember* ParseConstraintStub(ClassMember* member);
 
   // Gate primitives (parser_toplevel.cpp)
@@ -113,8 +117,8 @@ class Parser {
   DataType ParseStructOrUnionType();
   DataType ParseStructOrUnionBody(TokenKind kw);
   void ParseStructMembers(DataType& dtype);
-  ModuleItem* ParseFunctionDecl();
-  ModuleItem* ParseTaskDecl();
+  ModuleItem* ParseFunctionDecl(bool prototype_only = false);
+  ModuleItem* ParseTaskDecl(bool prototype_only = false);
   std::vector<FunctionArg> ParseFunctionArgs();
   void ParseOldStylePortDecls(ModuleItem* item, TokenKind end_kw);
 

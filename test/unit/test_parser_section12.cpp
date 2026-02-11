@@ -566,7 +566,10 @@ TEST(ParserSection12, ReturnWithValue) {
   ASSERT_FALSE(fn->func_body_stmts.empty());
   Stmt* ret = nullptr;
   for (auto* s : fn->func_body_stmts) {
-    if (s->kind == StmtKind::kReturn) { ret = s; break; }
+    if (s->kind == StmtKind::kReturn) {
+      ret = s;
+      break;
+    }
   }
   ASSERT_NE(ret, nullptr);
   EXPECT_EQ(ret->kind, StmtKind::kReturn);
@@ -590,7 +593,10 @@ TEST(ParserSection12, ReturnVoid) {
   ASSERT_FALSE(fn->func_body_stmts.empty());
   Stmt* ret = nullptr;
   for (auto* s : fn->func_body_stmts) {
-    if (s->kind == StmtKind::kReturn) { ret = s; break; }
+    if (s->kind == StmtKind::kReturn) {
+      ret = s;
+      break;
+    }
   }
   ASSERT_NE(ret, nullptr);
   EXPECT_EQ(ret->kind, StmtKind::kReturn);
