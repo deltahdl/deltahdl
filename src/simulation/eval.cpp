@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "elaboration/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/dpi.h"
@@ -800,20 +801,69 @@ static void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
   }
 }
 
+// Forward declarations for mutually recursive function body execution.
+static bool ExecFuncStmt(const Stmt* stmt, Variable* ret_var, SimContext& ctx,
+                         Arena& arena);
+static bool ExecFuncBlock(const Stmt* stmt, Variable* ret_var, SimContext& ctx,
+                          Arena& arena);
+
+static bool ExecFuncIf(const Stmt* stmt, Variable* ret_var, SimContext& ctx,
+                       Arena& arena) {
+  auto cond = EvalExpr(stmt->condition, ctx, arena);
+  bool taken = cond.ToUint64() != 0;
+  if (taken) return ExecFuncStmt(stmt->then_branch, ret_var, ctx, arena);
+  if (stmt->else_branch) {
+    return ExecFuncStmt(stmt->else_branch, ret_var, ctx, arena);
+  }
+  return false;
+}
+
+static bool ExecFuncBlock(const Stmt* stmt, Variable* ret_var, SimContext& ctx,
+                          Arena& arena) {
+  for (auto* c : stmt->stmts) {
+    if (ExecFuncStmt(c, ret_var, ctx, arena)) return true;
+  }
+  return false;
+}
+
+// Execute a single statement in a function body; returns true on 'return'.
+static bool ExecFuncStmt(const Stmt* stmt, Variable* ret_var, SimContext& ctx,
+                         Arena& arena) {
+  if (!stmt) return false;
+  switch (stmt->kind) {
+    case StmtKind::kReturn:
+      if (stmt->expr) ret_var->value = EvalExpr(stmt->expr, ctx, arena);
+      return true;
+    case StmtKind::kBlockingAssign:
+      if (stmt->lhs) {
+        auto val = EvalExpr(stmt->rhs, ctx, arena);
+        auto* var = ctx.FindVariable(stmt->lhs->text);
+        if (var) var->value = val;
+      }
+      return false;
+    case StmtKind::kExprStmt:
+      EvalExpr(stmt->expr, ctx, arena);
+      return false;
+    case StmtKind::kVarDecl: {
+      uint32_t w = EvalTypeWidth(stmt->var_decl_type);
+      if (w == 0) w = 32;
+      auto* v = ctx.CreateVariable(stmt->var_name, w);
+      if (stmt->var_init) v->value = EvalExpr(stmt->var_init, ctx, arena);
+      return false;
+    }
+    case StmtKind::kIf:
+      return ExecFuncIf(stmt, ret_var, ctx, arena);
+    case StmtKind::kBlock:
+      return ExecFuncBlock(stmt, ret_var, ctx, arena);
+    default:
+      return false;
+  }
+}
+
 static void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
                              SimContext& ctx, Arena& arena) {
-  for (auto* stmt : func->func_body_stmts) {
-    if (stmt->kind == StmtKind::kReturn) {
-      if (stmt->expr) ret_var->value = EvalExpr(stmt->expr, ctx, arena);
-      return;
-    }
-    if (stmt->kind == StmtKind::kBlockingAssign && stmt->lhs) {
-      auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
-      auto* var = ctx.FindVariable(stmt->lhs->text);
-      if (var) var->value = rhs_val;
-    } else if (stmt->kind == StmtKind::kExprStmt) {
-      EvalExpr(stmt->expr, ctx, arena);
-    }
+  for (auto* s : func->func_body_stmts) {
+    if (ExecFuncStmt(s, ret_var, ctx, arena)) return;
   }
 }
 

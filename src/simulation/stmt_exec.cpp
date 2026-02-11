@@ -7,6 +7,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "elaboration/sensitivity.h"
+#include "elaboration/type_eval.h"
 #include "parser/ast.h"
 #include "simulation/awaiters.h"
 #include "simulation/eval.h"
@@ -136,6 +137,25 @@ static StmtResult ExecNonblockingAssignImpl(const Stmt* stmt, SimContext& ctx,
 static StmtResult ExecExprStmtImpl(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
   EvalExpr(stmt->expr, ctx, arena);
+  return StmtResult::kDone;
+}
+
+// --- Block-level variable declaration (IEEE §9.3.1) ---
+
+static StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx,
+                                  Arena& arena) {
+  uint32_t width = EvalTypeWidth(stmt->var_decl_type);
+  if (width == 0 && stmt->var_decl_type.kind == DataTypeKind::kString) {
+    ctx.CreateVariable(stmt->var_name, 0);
+    ctx.RegisterStringVariable(stmt->var_name);
+  } else {
+    if (width == 0) width = 32;  // Default to int-sized.
+    ctx.CreateVariable(stmt->var_name, width);
+  }
+  if (stmt->var_init) {
+    auto* var = ctx.FindVariable(stmt->var_name);
+    if (var) var->value = EvalExpr(stmt->var_init, ctx, arena);
+  }
   return StmtResult::kDone;
 }
 
@@ -303,7 +323,17 @@ static ExecTask ExecCase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 
 // --- Loops ---
 
+// Create for-init variable when the init declares a type (§12.7.1).
+static void CreateForInitVar(const Stmt* stmt, SimContext& ctx) {
+  if (stmt->for_init_type.kind == DataTypeKind::kImplicit) return;
+  if (!stmt->for_init || !stmt->for_init->lhs) return;
+  uint32_t w = EvalTypeWidth(stmt->for_init_type);
+  if (w == 0) w = 32;
+  ctx.CreateVariable(stmt->for_init->lhs->text, w);
+}
+
 static ExecTask ExecFor(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  CreateForInitVar(stmt, ctx);
   if (stmt->for_init) co_await ExecStmt(stmt->for_init, ctx, arena);
   while (!ctx.StopRequested()) {
     if (stmt->for_cond) {
@@ -613,6 +643,7 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     case StmtKind::kRandcase:
       return ExecRandcase(stmt, ctx, arena);
     case StmtKind::kVarDecl:
+      return ExecTask::Immediate(ExecVarDeclImpl(stmt, ctx, arena));
     default:
       return ExecTask::Immediate(StmtResult::kDone);
   }
