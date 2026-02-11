@@ -641,3 +641,65 @@ TEST(Preprocessor, ResetAll_PreservesTextMacros) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("bar"), std::string::npos);
 }
+
+// §22.8: `default_nettype trireg
+TEST(Preprocessor, DefaultNettypeTrireg) {
+  PreprocFixture f;
+  Preprocess("`default_nettype trireg\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §22.4: include filename with trailing comment
+TEST(Preprocessor, IncludeFilenameStripsComment) {
+  PreprocFixture f;
+  // The include filename should stop at closing ", not consume comments
+  Preprocess("`include \"nonexistent.sv\" // this is a comment\n", f);
+  // Should error about "nonexistent.sv", not a garbled filename with comment
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §22.5.1: macro expansion preserves trailing text on the line
+TEST(Preprocessor, MacroExpansionTrailingText) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define TAG(x) x\n"
+      "`TAG(hello) world;\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("hello world"), std::string::npos);
+}
+
+// §22.5.1: function-like macro with trailing tokens
+TEST(Preprocessor, FunctionMacroTrailingTokens) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define GATE(d) nand #d\n"
+      "`GATE(2) g1 (q, a, b);\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("nand #2 g1"), std::string::npos);
+}
+
+// §22.5.1: macro string delimiter `"
+TEST(Preprocessor, MacroStringDelimiter) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define msg(x,y) `\"x: `\\`\"y`\\`\"`\"\n"
+      "$display(`msg(left side,right side));\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  // Should expand to: $display("left side: \"right side\"");
+  EXPECT_NE(result.find("\"left side: \\\"right side\\\"\""),
+            std::string::npos);
+}
+
+// §22.5.1: `" for constructing filenames
+TEST(Preprocessor, MacroStringFilename) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define home(filename) `\"/home/mydir/filename`\"\n"
+      "`home(myfile)\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("\"/home/mydir/myfile\""), std::string::npos);
+}

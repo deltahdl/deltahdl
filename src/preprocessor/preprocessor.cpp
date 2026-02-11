@@ -204,7 +204,10 @@ bool Preprocessor::ProcessDirective(std::string_view line, uint32_t file_id,
   }
   if (ProcessConditionalDirective(line)) return true;
   if (StartsWithDirective(line, "include") && IsActive()) {
-    HandleInclude(AfterDirective(line, "include"), loc, depth, output);
+    auto inc_arg = AfterDirective(line, "include");
+    // §22.4: expand macros in include argument before processing.
+    auto expanded_arg = ExpandInlineMacros(inc_arg, file_id, line_num);
+    HandleInclude(expanded_arg, loc, depth, output);
     return true;
   }
   if (StartsWithDirective(line, "begin_keywords") && IsActive()) {
@@ -217,7 +220,7 @@ bool Preprocessor::ProcessDirective(std::string_view line, uint32_t file_id,
   }
   if (ProcessStateDirective(line, loc)) return true;
   // Check for macro invocation: `MACRO_NAME
-  if (IsActive() && TryExpandMacro(trimmed, output, file_id, line_num)) {
+  if (IsActive() && TryExpandMacro(trimmed, output, file_id, line_num, depth)) {
     return true;
   }
   return false;
@@ -248,7 +251,8 @@ bool Preprocessor::ProcessConditionalDirective(std::string_view line) {
 }
 
 bool Preprocessor::TryExpandMacro(std::string_view trimmed, std::string& output,
-                                  uint32_t file_id, uint32_t line_num) {
+                                  uint32_t file_id, uint32_t line_num,
+                                  int depth) {
   auto macro_name = trimmed.substr(1);
   auto space_pos = macro_name.find_first_of(" \t(");
   auto name = (space_pos != std::string_view::npos)
@@ -274,14 +278,32 @@ bool Preprocessor::TryExpandMacro(std::string_view trimmed, std::string& output,
   const auto* def = macros_.Lookup(name);
   if (def == nullptr) return false;
 
-  std::string_view args_text;
+  std::string expanded;
+  std::string_view rest;
   if (def->is_function_like) {
     auto after_name = macro_name.substr(name.size());
     auto balanced = ExtractBalancedArgs(after_name);
     if (balanced.empty()) return false;
-    args_text = balanced.substr(1, balanced.size() - 2);
+    auto args_text = balanced.substr(1, balanced.size() - 2);
+    expanded = ExpandMacro(*def, args_text);
+    auto end_pos = static_cast<size_t>(balanced.data() + balanced.size() -
+                                       after_name.data());
+    rest = after_name.substr(end_pos);
+  } else {
+    expanded = ExpandMacro(*def, {});
+    rest = macro_name.substr(name.size());
   }
-  output.append(ExpandMacro(*def, args_text));
+  // Append remaining text and expand further inline macros.
+  if (!rest.empty()) {
+    expanded += ExpandInlineMacros(rest, file_id, line_num);
+  }
+  // §22.5.1: rescan expansion for directives (e.g., `include from macro).
+  auto exp_trimmed = Trim(std::string_view(expanded));
+  if (!exp_trimmed.empty() && exp_trimmed[0] == '`') {
+    ProcessDirective(expanded, file_id, line_num, depth, output);
+  } else {
+    output.append(expanded);
+  }
   return true;
 }
 
@@ -516,12 +538,25 @@ bool Preprocessor::EvalIfdefUnary(std::string_view& expr) {
 
 void Preprocessor::HandleInclude(std::string_view filename_raw, SourceLoc loc,
                                  int depth, std::string& output) {
-  // Strip quotes: "file.sv" or <file.sv>
   auto fn = Trim(filename_raw);
+  // Strip quotes properly: find matching closing " or >.
   if (fn.size() >= 2 && (fn.front() == '"' || fn.front() == '<')) {
-    fn = fn.substr(1, fn.size() - 2);
+    char close = (fn.front() == '"') ? '"' : '>';
+    auto end = fn.find(close, 1);
+    if (end != std::string_view::npos) {
+      fn = fn.substr(1, end - 1);
+    } else {
+      fn = fn.substr(1, fn.size() - 2);
+    }
   }
-  auto resolved = ResolveInclude(fn);
+  // §22.4: search relative to current source file's directory first.
+  auto src_path = src_mgr_.FilePath(loc.file_id);
+  std::string src_dir;
+  auto slash = src_path.rfind('/');
+  if (slash != std::string_view::npos) {
+    src_dir = std::string(src_path.substr(0, slash));
+  }
+  auto resolved = ResolveInclude(fn, src_dir);
   if (resolved.empty()) {
     diag_.Error(loc, "cannot find include file '" + std::string(fn) + "'");
     return;
@@ -633,6 +668,19 @@ std::string Preprocessor::SubstituteParams(
   result.reserve(body.size());
   size_t i = 0;
   while (i < body.size()) {
+    // Handle `\`" — escaped quote in macro string (IEEE §22.5.1).
+    if (i + 3 < body.size() && body[i] == '`' && body[i + 1] == '\\' &&
+        body[i + 2] == '`' && body[i + 3] == '"') {
+      result += "\\\"";
+      i += 4;
+      continue;
+    }
+    // Handle `" — macro string delimiter (IEEE §22.5.1).
+    if (i + 1 < body.size() && body[i] == '`' && body[i + 1] == '"') {
+      result += '"';
+      i += 2;
+      continue;
+    }
     // Handle `` (double backtick) concatenation (IEEE §22.5.1).
     if (i + 1 < body.size() && body[i] == '`' && body[i + 1] == '`') {
       i += 2;  // Skip both backticks — concatenate adjacent tokens.
@@ -724,6 +772,8 @@ static bool ParseNetTypeName(std::string_view name, NetType& out) {
     out = NetType::kTri1;
   } else if (name == "uwire") {
     out = NetType::kUwire;
+  } else if (name == "trireg") {
+    out = NetType::kTrireg;
   } else {
     return false;
   }
@@ -807,9 +857,16 @@ void Preprocessor::HandleLine(std::string_view rest, SourceLoc loc) {
   has_line_override_ = true;
 }
 
-std::string Preprocessor::ResolveInclude(std::string_view filename) {
+std::string Preprocessor::ResolveInclude(std::string_view filename,
+                                         const std::string& src_dir) {
   if (!filename.empty() && filename[0] == '/') {
     std::string path{filename};
+    std::ifstream ifs(path);
+    if (ifs.good()) return path;
+  }
+  // §22.4: try relative to source file directory first.
+  if (!src_dir.empty()) {
+    auto path = src_dir + "/" + std::string(filename);
     std::ifstream ifs(path);
     if (ifs.good()) return path;
   }

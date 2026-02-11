@@ -539,6 +539,17 @@ Expr* Parser::ParseWithClause(Expr* expr) {
     SkipConstraintBlock(lexer_);
     return expr;
   }
+  // §11.4.14.4: streaming with [ array_range_expression ]
+  if (Check(TokenKind::kLBracket)) {
+    Consume();
+    expr->with_expr = ParseExpr();
+    if (Match(TokenKind::kPlusColon) || Match(TokenKind::kMinusColon) ||
+        Match(TokenKind::kColon)) {
+      ParseExpr();
+    }
+    Expect(TokenKind::kRBracket);
+    return expr;
+  }
   Expect(TokenKind::kLParen);
   expr->with_expr = ParseExpr();
   Expect(TokenKind::kRParen);
