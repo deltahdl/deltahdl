@@ -567,3 +567,46 @@ TEST(ParserSection10, ContinuousAssignMultipleTargets) {
   }
   EXPECT_GE(count, 1);
 }
+
+// §10.3.4: Drive strength on continuous assignment.
+TEST(ParserSection10, ContinuousAssignDriveStrength) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign (strong0, weak1) w = 1'b1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ModuleItem* ca = nullptr;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      ca = item;
+      break;
+    }
+  }
+  ASSERT_NE(ca, nullptr);
+  // 4=strong, 2=weak (parser encoding: 0=none,1=highz,2=weak,3=pull,4=strong,5=supply)
+  EXPECT_EQ(ca->drive_strength0, 4u);
+  EXPECT_EQ(ca->drive_strength1, 2u);
+}
+
+// §10.3.4: Drive strength order can be reversed.
+TEST(ParserSection10, ContinuousAssignDriveStrengthReversed) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign (pull1, supply0) w = 1'b0;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ModuleItem* ca = nullptr;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      ca = item;
+      break;
+    }
+  }
+  ASSERT_NE(ca, nullptr);
+  EXPECT_EQ(ca->drive_strength0, 5u);  // supply0
+  EXPECT_EQ(ca->drive_strength1, 3u);  // pull1
+}

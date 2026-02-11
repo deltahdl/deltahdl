@@ -449,6 +449,8 @@ void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
   ca.lhs = item->assign_lhs;
   ca.rhs = item->assign_rhs;
   ca.width = LookupLhsWidth(ca.lhs, mod);
+  ca.drive_strength0 = item->drive_strength0;
+  ca.drive_strength1 = item->drive_strength1;
   mod->assigns.push_back(ca);
 }
 

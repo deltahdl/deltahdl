@@ -784,3 +784,18 @@ TEST(ParserSection6, BareTypeKeywordInExpr) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
+
+// §6.3.2.2: Drive strength on net declaration with inline assignment.
+TEST(ParserSection6, NetDeclDriveStrength) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire (weak0, strong1) w = 1'b1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  // 2=weak, 4=strong (parser encoding)
+  EXPECT_EQ(item->drive_strength0, 2u);
+  EXPECT_EQ(item->drive_strength1, 4u);
+}

@@ -84,6 +84,8 @@ struct RtlirContAssign {
   Expr* lhs = nullptr;
   Expr* rhs = nullptr;
   uint32_t width = 0;
+  uint8_t drive_strength0 = 0;  // §10.3.4: 0=none,1=highz,...,5=supply
+  uint8_t drive_strength1 = 0;
 };
 
 // --- Process block ---

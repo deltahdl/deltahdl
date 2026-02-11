@@ -58,15 +58,41 @@ static SimCoroutine MakeAlwaysCombCoroutine(const Stmt* body, SimContext& ctx,
   }
 }
 
+// §10.3.4: Convert parser strength encoding to Strength enum.
+static Strength ParserStrToStrength(uint8_t s) {
+  switch (s) {
+    case 1:
+      return Strength::kHighz;
+    case 2:
+      return Strength::kWeak;
+    case 3:
+      return Strength::kPull;
+    case 4:
+      return Strength::kStrong;
+    case 5:
+      return Strength::kSupply;
+    default:
+      return Strength::kStrong;
+  }
+}
+
 static SimCoroutine MakeContAssignCoroutine(const Expr* lhs, const Expr* rhs,
-                                            SimContext& ctx, Arena& arena) {
+                                            DriverStrength ds, SimContext& ctx,
+                                            Arena& arena) {
   auto val = EvalExpr(rhs, ctx, arena);
-  if (lhs && lhs->kind == ExprKind::kIdentifier) {
-    auto* var = ctx.FindVariable(lhs->text);
-    if (var) {
-      var->value = val;
-      var->NotifyWatchers();
-    }
+  if (!lhs || lhs->kind != ExprKind::kIdentifier) co_return;
+  // §10.3.4: If target is a net, add as a strength-aware driver.
+  auto* net = ctx.FindNet(lhs->text);
+  if (net) {
+    net->drivers.push_back(val);
+    net->driver_strengths.push_back(ds);
+    net->Resolve(arena);
+    co_return;
+  }
+  auto* var = ctx.FindVariable(lhs->text);
+  if (var) {
+    var->value = val;
+    var->NotifyWatchers();
   }
   co_return;
 }
@@ -338,7 +364,9 @@ void Lowerer::LowerContAssign(const RtlirContAssign& ca) {
   p->kind = ProcessKind::kContAssign;
   p->id = next_id_++;
   p->home_region = Region::kActive;
-  p->coro = MakeContAssignCoroutine(ca.lhs, ca.rhs, ctx_, arena_).Release();
+  DriverStrength ds{ParserStrToStrength(ca.drive_strength0),
+                    ParserStrToStrength(ca.drive_strength1)};
+  p->coro = MakeContAssignCoroutine(ca.lhs, ca.rhs, ds, ctx_, arena_).Release();
 
   ScheduleProcess(p, ctx_.GetScheduler());
 }

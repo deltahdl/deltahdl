@@ -64,11 +64,69 @@ void Parser::ParsePortConnection(ModuleItem* item) {
   }
 }
 
+// §10.3.4: Check if a token is a strength-0 keyword.
+static bool IsStr0Token(TokenKind k) {
+  switch (k) {
+    case TokenKind::kKwSupply0:
+    case TokenKind::kKwStrong0:
+    case TokenKind::kKwPull0:
+    case TokenKind::kKwWeak0:
+    case TokenKind::kKwHighz0:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// §10.3.4: Parse drive strength pair. Called after '(' when first token is
+// a strength keyword. Sets s0 (strength for value 0) and s1 (value 1).
+void Parser::ParseDriveStrength(uint8_t& s0, uint8_t& s1) {
+  if (IsStr0Token(CurrentToken().kind)) {
+    s0 = ParseStrength0();
+    Expect(TokenKind::kComma);
+    s1 = ParseStrength1();
+  } else {
+    s1 = ParseStrength1();
+    Expect(TokenKind::kComma);
+    s0 = ParseStrength0();
+  }
+}
+
+// §10.3.4: Check if a token is a drive strength keyword.
+static bool IsDriveStrengthToken(TokenKind k) {
+  switch (k) {
+    case TokenKind::kKwSupply0:
+    case TokenKind::kKwStrong0:
+    case TokenKind::kKwPull0:
+    case TokenKind::kKwWeak0:
+    case TokenKind::kKwHighz0:
+    case TokenKind::kKwSupply1:
+    case TokenKind::kKwStrong1:
+    case TokenKind::kKwPull1:
+    case TokenKind::kKwWeak1:
+    case TokenKind::kKwHighz1:
+      return true;
+    default:
+      return false;
+  }
+}
+
 ModuleItem* Parser::ParseContinuousAssign() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kContAssign;
   item->loc = CurrentLoc();
   Expect(TokenKind::kKwAssign);
+  // §10.3.4: Optional drive strength: assign (strong0, weak1) ...
+  if (Check(TokenKind::kLParen)) {
+    auto saved = lexer_.SavePos();
+    Consume();  // '('
+    if (IsDriveStrengthToken(CurrentToken().kind)) {
+      ParseDriveStrength(item->drive_strength0, item->drive_strength1);
+      Expect(TokenKind::kRParen);
+    } else {
+      lexer_.RestorePos(saved);
+    }
+  }
   // Optional delay: assign #(delay) or assign #delay (§10.3.3)
   if (Check(TokenKind::kHash)) {
     Consume();

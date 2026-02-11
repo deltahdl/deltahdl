@@ -166,7 +166,9 @@ struct DataType {
   bool is_soft = false;      // union soft (§7.3.1)
   bool is_vectored = false;  // vectored qualifier (§6.6.9)
   bool is_scalared = false;  // scalared qualifier (§6.6.9)
-  uint8_t charge_strength = 0;  // §6.6.4: 1=small, 2=medium, 4=large
+  uint8_t charge_strength = 0;    // §6.6.4: 1=small, 2=medium, 4=large
+  uint8_t drive_strength0 = 0;    // §6.3.2.2: 0=none,...,5=supply
+  uint8_t drive_strength1 = 0;
   Expr* packed_dim_left = nullptr;
   Expr* packed_dim_right = nullptr;
   std::vector<std::pair<Expr*, Expr*>> extra_packed_dims;  // §7.4.1

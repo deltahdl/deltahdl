@@ -460,6 +460,25 @@ static std::optional<DataTypeKind> TokenToTypeKind(TokenKind tk) {
 }
 // clang-format on
 
+// §6.3.2.2: Check if a token is a drive strength keyword.
+static bool IsStrengthToken(TokenKind k) {
+  switch (k) {
+    case TokenKind::kKwSupply0:
+    case TokenKind::kKwStrong0:
+    case TokenKind::kKwPull0:
+    case TokenKind::kKwWeak0:
+    case TokenKind::kKwHighz0:
+    case TokenKind::kKwSupply1:
+    case TokenKind::kKwStrong1:
+    case TokenKind::kKwPull1:
+    case TokenKind::kKwWeak1:
+    case TokenKind::kKwHighz1:
+      return true;
+    default:
+      return false;
+  }
+}
+
 uint8_t Parser::ParseChargeStrength() {
   if (!Check(TokenKind::kLParen)) return 0;
   auto saved = lexer_.SavePos();
@@ -530,6 +549,23 @@ void Parser::ParseTypeParamList() {
   Expect(TokenKind::kRParen);
 }
 
+// §6.3.2: Parse charge strength (trireg) or drive strength (other nets).
+void Parser::ParseNetStrength(DataType& dtype) {
+  if (dtype.kind == DataTypeKind::kTrireg) {
+    dtype.charge_strength = ParseChargeStrength();
+    return;
+  }
+  if (!dtype.is_net || !Check(TokenKind::kLParen)) return;
+  auto saved = lexer_.SavePos();
+  Consume();  // '('
+  if (IsStrengthToken(CurrentToken().kind)) {
+    ParseDriveStrength(dtype.drive_strength0, dtype.drive_strength1);
+    Expect(TokenKind::kRParen);
+  } else {
+    lexer_.RestorePos(saved);
+  }
+}
+
 DataType Parser::ParseDataType() {
   DataType dtype;
 
@@ -567,10 +603,8 @@ DataType Parser::ParseDataType() {
   dtype.is_net = IsNetTypeToken(tok_kind);
   Consume();
 
-  // §6.6.4: charge_strength for trireg — (small), (medium), (large)
-  if (dtype.kind == DataTypeKind::kTrireg) {
-    dtype.charge_strength = ParseChargeStrength();
-  }
+  // §6.3.2: Parse charge or drive strength for net types.
+  ParseNetStrength(dtype);
 
   // vectored/scalared qualifiers (§6.6.9) — net types only
   dtype.is_vectored = dtype.is_net && Match(TokenKind::kKwVectored);
@@ -676,6 +710,8 @@ void Parser::ParseVarDeclList(std::vector<ModuleItem*>& items,
         dtype.is_net ? ModuleItemKind::kNetDecl : ModuleItemKind::kVarDecl;
     item->loc = CurrentLoc();
     item->data_type = dtype;
+    item->drive_strength0 = dtype.drive_strength0;
+    item->drive_strength1 = dtype.drive_strength1;
     item->net_delay = nd1;
     item->net_delay_fall = nd2;
     item->net_delay_decay = nd3;
