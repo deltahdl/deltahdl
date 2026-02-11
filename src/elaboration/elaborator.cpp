@@ -342,6 +342,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   var.is_real = (item->data_type.kind == DataTypeKind::kReal ||
                  item->data_type.kind == DataTypeKind::kShortreal ||
                  item->data_type.kind == DataTypeKind::kRealtime);
+  var.init_expr = item->init_expr;
   mod->variables.push_back(var);
   ValidateArrayInitPattern(item);
   TrackEnumVariable(item);

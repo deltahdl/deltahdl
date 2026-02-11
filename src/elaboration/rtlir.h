@@ -65,6 +65,7 @@ struct RtlirVariable {
   bool is_event = false;
   bool is_string = false;
   bool is_real = false;
+  const Expr* init_expr = nullptr;  // Module-level variable initializer.
 };
 
 // --- Continuous assignment ---

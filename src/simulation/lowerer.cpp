@@ -78,19 +78,26 @@ static void ScheduleProcess(Process* proc, Scheduler& sched) {
 
 // --- Module lowering ---
 
+void Lowerer::LowerVar(const RtlirVariable& var) {
+  auto* v = ctx_.CreateVariable(var.name, var.width);
+  if (var.is_event) v->is_event = true;
+  if (var.is_string) ctx_.RegisterStringVariable(var.name);
+  if (var.is_real) ctx_.RegisterRealVariable(var.name);
+  if (var.init_expr) {
+    auto val = EvalExpr(var.init_expr, ctx_, arena_);
+    if (val.width != var.width)
+      val = MakeLogic4VecVal(arena_, var.width, val.ToUint64());
+    v->value = val;
+  }
+}
+
 void Lowerer::LowerModule(const RtlirModule* mod) {
   // Create Net objects for all declared nets (with resolution support).
   for (const auto& net : mod->nets) {
     ctx_.CreateNet(net.name, net.net_type, net.width, net.charge_strength,
                    net.decay_ticks);
   }
-  // Create variables for all declared variables.
-  for (const auto& var : mod->variables) {
-    auto* v = ctx_.CreateVariable(var.name, var.width);
-    if (var.is_event) v->is_event = true;
-    if (var.is_string) ctx_.RegisterStringVariable(var.name);
-    if (var.is_real) ctx_.RegisterRealVariable(var.name);
-  }
+  for (const auto& var : mod->variables) LowerVar(var);
   // Create variables for output ports.
   for (const auto& port : mod->ports) {
     if (!ctx_.FindVariable(port.name)) {

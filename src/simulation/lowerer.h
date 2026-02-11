@@ -11,6 +11,7 @@ struct RtlirContAssign;
 struct RtlirDesign;
 struct RtlirModule;
 struct RtlirProcess;
+struct RtlirVariable;
 
 class Lowerer {
  public:
@@ -20,6 +21,7 @@ class Lowerer {
 
  private:
   void LowerModule(const RtlirModule* mod);
+  void LowerVar(const RtlirVariable& var);
   void LowerProcess(const RtlirProcess& proc);
   void LowerContAssign(const RtlirContAssign& ca);
 
