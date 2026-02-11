@@ -687,11 +687,15 @@ static bool IsStringArray(std::string_view var_name, const ArrayInfo& info,
 
 // Evaluate a with-clause predicate with 'item' bound to a value.
 static bool EvalWithPredicate(const Expr* with_expr, const Logic4Vec& item_val,
-                              bool is_string, SimContext& ctx, Arena& arena) {
+                              bool is_string, size_t item_index,
+                              SimContext& ctx, Arena& arena) {
   ctx.PushScope();
   auto* item_var = ctx.CreateLocalVariable("item", item_val.width);
   item_var->value = item_val;
   if (is_string) ctx.RegisterStringVariable("item");
+  // §7.12.4: item.index provides the array index of the current element.
+  auto* idx_var = ctx.CreateLocalVariable("item.index", 32);
+  idx_var->value = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(item_index));
   auto result = EvalExpr(with_expr, ctx, arena).ToUint64();
   ctx.PopScope();
   return result != 0;
@@ -710,7 +714,7 @@ static void LocatorFind(std::string_view method,
                         const Expr* with_expr, SimContext& ctx, Arena& arena,
                         std::vector<Logic4Vec>& out) {
   for (size_t i = 0; i < elems.size(); ++i) {
-    if (!EvalWithPredicate(with_expr, elems[i], is_string, ctx, arena))
+    if (!EvalWithPredicate(with_expr, elems[i], is_string, i, ctx, arena))
       continue;
     out.push_back(elems[i]);
     if (method == "find_first" || method == "find_last") break;
@@ -724,9 +728,9 @@ static void LocatorFindDispatch(std::string_view method,
                                 SimContext& ctx, Arena& arena,
                                 std::vector<Logic4Vec>& out) {
   if (method == "find_last") {
-    // Search from end for find_last.
     for (size_t i = elems.size(); i > 0; --i) {
-      if (!EvalWithPredicate(with_expr, elems[i - 1], is_string, ctx, arena))
+      if (!EvalWithPredicate(with_expr, elems[i - 1], is_string, i - 1, ctx,
+                             arena))
         continue;
       out.push_back(elems[i - 1]);
       break;
@@ -744,7 +748,8 @@ static void LocatorFindIndex(std::string_view method,
                              std::vector<Logic4Vec>& out) {
   if (method == "find_last_index") {
     for (size_t i = elems.size(); i > 0; --i) {
-      if (!EvalWithPredicate(with_expr, elems[i - 1], is_string, ctx, arena))
+      if (!EvalWithPredicate(with_expr, elems[i - 1], is_string, i - 1, ctx,
+                             arena))
         continue;
       out.push_back(MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(i - 1)));
       break;
@@ -752,7 +757,7 @@ static void LocatorFindIndex(std::string_view method,
     return;
   }
   for (size_t i = 0; i < elems.size(); ++i) {
-    if (!EvalWithPredicate(with_expr, elems[i], is_string, ctx, arena))
+    if (!EvalWithPredicate(with_expr, elems[i], is_string, i, ctx, arena))
       continue;
     out.push_back(MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(i)));
   }
