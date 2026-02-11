@@ -170,7 +170,9 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
 
     bool handled = ProcessDirective(line, file_id, line_num, depth, output);
     if (!handled && IsActive()) {
-      output.append(ExpandInlineMacros(line, file_id, line_num));
+      auto expanded = ExpandInlineMacros(line, file_id, line_num);
+      TrackDesignElement(Trim(expanded));
+      output.append(expanded);
     }
     output.push_back('\n');
     pos = eol + 1;
@@ -184,6 +186,10 @@ bool Preprocessor::ProcessStateDirective(std::string_view line, SourceLoc loc) {
     return true;
   }
   if (StartsWithDirective(line, "resetall")) {
+    if (design_element_depth_ > 0) {
+      diag_.Error(loc, "`resetall illegal inside a design element");
+      return true;
+    }
     // §22.3: `resetall does NOT affect text macros.
     default_net_type_ = NetType::kWire;
     in_celldefine_ = false;
@@ -472,6 +478,19 @@ std::string Preprocessor::ExpandInlineMacros(std::string_view line,
 bool Preprocessor::IsActive() const {
   return std::all_of(cond_stack_.begin(), cond_stack_.end(),
                      [](const CondState& s) { return s.active; });
+}
+
+// §22.3: Track design element nesting for resetall validation.
+void Preprocessor::TrackDesignElement(std::string_view trimmed) {
+  if (trimmed.starts_with("module ") || trimmed.starts_with("interface ") ||
+      trimmed.starts_with("program ") || trimmed.starts_with("package ")) {
+    ++design_element_depth_;
+  } else if (trimmed.starts_with("endmodule") ||
+             trimmed.starts_with("endinterface") ||
+             trimmed.starts_with("endprogram") ||
+             trimmed.starts_with("endpackage")) {
+    if (design_element_depth_ > 0) --design_element_depth_;
+  }
 }
 
 void Preprocessor::HandleDefine(std::string_view rest, SourceLoc loc) {

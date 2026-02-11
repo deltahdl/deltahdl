@@ -73,6 +73,7 @@ class Preprocessor {
   std::string ResolveInclude(std::string_view filename,
                              const std::string& src_dir);
   void DefinePredefined(std::string name, std::string body);
+  void TrackDesignElement(std::string_view trimmed);
 
   static std::vector<std::string> ParseMacroParams(
       std::string_view params, std::vector<std::string>& defaults);
@@ -110,6 +111,7 @@ class Preprocessor {
   uint32_t line_override_src_line_ = 0;  // Source line where `line appeared.
   bool has_line_override_ = false;
   std::vector<KeywordVersion> keyword_version_stack_;
+  uint32_t design_element_depth_ = 0;  // §22.3: for resetall validation.
 };
 
 }  // namespace delta
