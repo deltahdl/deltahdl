@@ -831,6 +831,26 @@ static Logic4Vec EvalPartSelect(const Logic4Vec& base_val, uint64_t idx,
   return MakeLogic4VecVal(arena, width, val & mask);
 }
 
+// §7.8: Return the default-or-zero value for an assoc array miss.
+static Logic4Vec AssocDefault(const AssocArrayObject* aa, Arena& arena) {
+  return aa->has_default ? aa->default_value
+                         : MakeLogic4VecVal(arena, aa->elem_width, 0);
+}
+
+// §7.8: Extract string key from a Logic4Vec (packed byte representation).
+static std::string ExtractStringKey(const Logic4Vec& key) {
+  uint32_t nb = key.width / 8;
+  std::string s;
+  s.reserve(nb);
+  for (uint32_t i = nb; i > 0; --i) {
+    uint32_t bi = i - 1;
+    auto ch = static_cast<char>(
+        (key.words[(bi * 8) / 64].aval >> ((bi * 8) % 64)) & 0xFF);
+    if (ch != 0) s.push_back(ch);
+  }
+  return s;
+}
+
 // §7.8: Try associative array indexed access. Returns true if handled.
 static bool TryAssocSelect(const Expr* expr, SimContext& ctx, Arena& arena,
                            Logic4Vec& out) {
@@ -839,27 +859,14 @@ static bool TryAssocSelect(const Expr* expr, SimContext& ctx, Arena& arena,
   auto* aa = ctx.FindAssocArray(expr->base->text);
   if (!aa) return false;
   if (aa->is_string_key) {
-    auto key = EvalExpr(expr->index, ctx, arena);
-    uint32_t nb = key.width / 8;
-    std::string s;
-    s.reserve(nb);
-    for (uint32_t i = nb; i > 0; --i) {
-      uint32_t bi = i - 1;
-      auto ch = static_cast<char>(
-          (key.words[(bi * 8) / 64].aval >> ((bi * 8) % 64)) & 0xFF);
-      if (ch != 0) s.push_back(ch);
-    }
+    auto s = ExtractStringKey(EvalExpr(expr->index, ctx, arena));
     auto it = aa->str_data.find(s);
-    out = (it != aa->str_data.end())
-              ? it->second
-              : MakeLogic4VecVal(arena, aa->elem_width, 0);
+    out = (it != aa->str_data.end()) ? it->second : AssocDefault(aa, arena);
   } else {
     auto key =
         static_cast<int64_t>(EvalExpr(expr->index, ctx, arena).ToUint64());
     auto it = aa->int_data.find(key);
-    out = (it != aa->int_data.end())
-              ? it->second
-              : MakeLogic4VecVal(arena, aa->elem_width, 0);
+    out = (it != aa->int_data.end()) ? it->second : AssocDefault(aa, arena);
   }
   return true;
 }

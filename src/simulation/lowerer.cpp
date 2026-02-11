@@ -140,6 +140,40 @@ static void CreateArrayElements(const RtlirVariable& var, SimContext& ctx,
   }
 }
 
+// §7.8: Set default value for an assoc array from '{default: val} pattern.
+void Lowerer::InitAssocDefault(const Expr* init, AssocArrayObject* aa) {
+  if (!init || init->kind != ExprKind::kAssignmentPattern) return;
+  for (size_t i = 0; i < init->pattern_keys.size(); ++i) {
+    if (init->pattern_keys[i] != "default") continue;
+    if (i >= init->elements.size()) break;
+    aa->has_default = true;
+    aa->default_value = EvalExpr(init->elements[i], ctx_, arena_);
+    return;
+  }
+}
+
+// §7.2.2: Apply struct member default values to a packed struct variable.
+static void ApplyStructMemberDefaults(const RtlirVariable& var, Variable* v,
+                                      SimContext& ctx, Arena& arena) {
+  if (!var.dtype || var.dtype->struct_members.empty()) return;
+  if (var.dtype->kind == DataTypeKind::kUnion) return;
+  auto* sinfo = ctx.GetVariableStructType(var.name);
+  if (!sinfo) return;
+  for (const auto& f : sinfo->fields) {
+    // Find the matching struct member with an init_expr.
+    for (const auto& m : var.dtype->struct_members) {
+      if (m.name != f.name || !m.init_expr) continue;
+      auto val = EvalExpr(m.init_expr, ctx, arena).ToUint64();
+      uint64_t mask =
+          (f.width >= 64) ? ~uint64_t{0} : (uint64_t{1} << f.width) - 1;
+      uint64_t old_val = v->value.ToUint64();
+      old_val |= (val & mask) << f.bit_offset;
+      v->value = MakeLogic4VecVal(arena, v->value.width, old_val);
+      break;
+    }
+  }
+}
+
 void Lowerer::LowerVar(const RtlirVariable& var) {
   // §8: Class handles are 64-bit.
   uint32_t width = var.class_type_name.empty() ? var.width : 64;
@@ -155,13 +189,15 @@ void Lowerer::LowerVar(const RtlirVariable& var) {
     v->value = val;
   }
   RegisterStructInfo(var, ctx_);
+  if (!var.init_expr) ApplyStructMemberDefaults(var, v, ctx_, arena_);
   if (!var.class_type_name.empty()) {
     ctx_.SetVariableClassType(var.name, var.class_type_name);
   }
   if (var.is_queue) {
     ctx_.CreateQueue(var.name, var.width, var.queue_max_size);
   } else if (var.is_assoc) {
-    ctx_.CreateAssocArray(var.name, var.width, var.is_string_index);
+    auto* aa = ctx_.CreateAssocArray(var.name, var.width, var.is_string_index);
+    InitAssocDefault(var.init_expr, aa);
   } else {
     CreateArrayElements(var, ctx_, arena_);
   }

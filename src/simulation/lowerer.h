@@ -11,7 +11,9 @@ struct RtlirContAssign;
 struct RtlirDesign;
 struct RtlirModule;
 struct RtlirProcess;
+struct AssocArrayObject;
 struct ClassDecl;
+struct Expr;
 struct RtlirVariable;
 
 class Lowerer {
@@ -26,6 +28,7 @@ class Lowerer {
   void LowerProcess(const RtlirProcess& proc);
   void LowerContAssign(const RtlirContAssign& ca);
   void LowerClassDecl(const ClassDecl* cls);
+  void InitAssocDefault(const Expr* init, AssocArrayObject* aa);
 
   SimContext& ctx_;
   Arena& arena_;

@@ -66,6 +66,8 @@ struct AssocArrayObject {
   std::map<std::string, Logic4Vec> str_data;
   uint32_t elem_width = 32;
   bool is_string_key = false;
+  bool has_default = false;
+  Logic4Vec default_value;
   uint32_t Size() const;
 };
 
