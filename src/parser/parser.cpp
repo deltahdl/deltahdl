@@ -128,7 +128,7 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
     ParseExternTopLevel(unit);
     return;
   }
-  if (Check(TokenKind::kKwModule)) {
+  if (Check(TokenKind::kKwModule) || Check(TokenKind::kKwMacromodule)) {
     unit->modules.push_back(ParseModuleDecl());
     return;
   }
@@ -185,7 +185,7 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
 
 void Parser::ParseExternTopLevel(CompilationUnit* unit) {
   Consume();  // extern
-  if (Check(TokenKind::kKwModule)) {
+  if (Check(TokenKind::kKwModule) || Check(TokenKind::kKwMacromodule)) {
     unit->modules.push_back(ParseExternModuleDecl());
     return;
   }
@@ -198,7 +198,9 @@ ModuleDecl* Parser::ParseExternModuleDecl() {
   auto* mod = arena_.Create<ModuleDecl>();
   mod->is_extern = true;
   mod->range.start = CurrentLoc();
-  Expect(TokenKind::kKwModule);
+  if (!Match(TokenKind::kKwMacromodule)) {
+    Expect(TokenKind::kKwModule);
+  }
   mod->name = Expect(TokenKind::kIdentifier).text;
   ParseParamsPortsAndSemicolon(*mod);
   mod->range.end = CurrentLoc();
@@ -208,7 +210,9 @@ ModuleDecl* Parser::ParseExternModuleDecl() {
 ModuleDecl* Parser::ParseModuleDecl() {
   auto* mod = arena_.Create<ModuleDecl>();
   auto loc = CurrentLoc();
-  Expect(TokenKind::kKwModule);
+  if (!Match(TokenKind::kKwMacromodule)) {
+    Expect(TokenKind::kKwModule);
+  }
 
   // Optional lifetime qualifier (§3.4)
   Match(TokenKind::kKwAutomatic) || Match(TokenKind::kKwStatic);
