@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <string>
 
@@ -25,6 +26,13 @@ struct SysTaskFixture {
   DiagEngine diag{mgr};
   SimContext ctx{scheduler, arena, diag};
 };
+
+static double ResultToDouble(const Logic4Vec& vec) {
+  uint64_t bits = vec.ToUint64();
+  double d = 0.0;
+  std::memcpy(&d, &bits, sizeof(double));
+  return d;
+}
 
 static Expr* MkSysCall(Arena& arena, std::string_view name,
                        std::vector<Expr*> args) {
@@ -101,39 +109,35 @@ TEST(SysTask, LnOfE) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$ln", {MkInt(f.arena, 1)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  // ln(1) = 0 -> truncated to integer 0
-  EXPECT_EQ(result.ToUint64(), 0u);
+  EXPECT_DOUBLE_EQ(ResultToDouble(result), 0.0);
 }
 
 TEST(SysTask, Log10Of100) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$log10", {MkInt(f.arena, 100)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  // log10(100) = 2
-  EXPECT_EQ(result.ToUint64(), 2u);
+  EXPECT_DOUBLE_EQ(ResultToDouble(result), 2.0);
 }
 
 TEST(SysTask, ExpOf0) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$exp", {MkInt(f.arena, 0)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  // exp(0) = 1
-  EXPECT_EQ(result.ToUint64(), 1u);
+  EXPECT_DOUBLE_EQ(ResultToDouble(result), 1.0);
 }
 
 TEST(SysTask, SqrtOf16) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$sqrt", {MkInt(f.arena, 16)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  // sqrt(16) = 4
-  EXPECT_EQ(result.ToUint64(), 4u);
+  EXPECT_DOUBLE_EQ(ResultToDouble(result), 4.0);
 }
 
 TEST(SysTask, SqrtOf9) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$sqrt", {MkInt(f.arena, 9)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 3u);
+  EXPECT_DOUBLE_EQ(ResultToDouble(result), 3.0);
 }
 
 TEST(SysTask, PowOf2And10) {
@@ -141,44 +145,42 @@ TEST(SysTask, PowOf2And10) {
   auto* expr =
       MkSysCall(f.arena, "$pow", {MkInt(f.arena, 2), MkInt(f.arena, 10)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1024u);
+  EXPECT_DOUBLE_EQ(ResultToDouble(result), 1024.0);
 }
 
 TEST(SysTask, FloorOf7) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$floor", {MkInt(f.arena, 7)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 7u);
+  EXPECT_DOUBLE_EQ(ResultToDouble(result), 7.0);
 }
 
 TEST(SysTask, CeilOf7) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$ceil", {MkInt(f.arena, 7)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 7u);
+  EXPECT_DOUBLE_EQ(ResultToDouble(result), 7.0);
 }
 
 TEST(SysTask, SinOf0) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$sin", {MkInt(f.arena, 0)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  // sin(0) = 0 -> truncated to 0
-  EXPECT_EQ(result.ToUint64(), 0u);
+  EXPECT_DOUBLE_EQ(ResultToDouble(result), 0.0);
 }
 
 TEST(SysTask, CosOf0) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$cos", {MkInt(f.arena, 0)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  // cos(0) = 1
-  EXPECT_EQ(result.ToUint64(), 1u);
+  EXPECT_DOUBLE_EQ(ResultToDouble(result), 1.0);
 }
 
 TEST(SysTask, TanOf0) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$tan", {MkInt(f.arena, 0)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
+  EXPECT_DOUBLE_EQ(ResultToDouble(result), 0.0);
 }
 
 TEST(SysTask, Atan2Of0And1) {
@@ -186,7 +188,7 @@ TEST(SysTask, Atan2Of0And1) {
   auto* expr =
       MkSysCall(f.arena, "$atan2", {MkInt(f.arena, 0), MkInt(f.arena, 1)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
+  EXPECT_DOUBLE_EQ(ResultToDouble(result), 0.0);
 }
 
 TEST(SysTask, HypotOf3And4) {
@@ -194,43 +196,42 @@ TEST(SysTask, HypotOf3And4) {
   auto* expr =
       MkSysCall(f.arena, "$hypot", {MkInt(f.arena, 3), MkInt(f.arena, 4)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 5u);
+  EXPECT_DOUBLE_EQ(ResultToDouble(result), 5.0);
 }
 
 TEST(SysTask, SinhOf0) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$sinh", {MkInt(f.arena, 0)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
+  EXPECT_DOUBLE_EQ(ResultToDouble(result), 0.0);
 }
 
 TEST(SysTask, CoshOf0) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$cosh", {MkInt(f.arena, 0)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
+  EXPECT_DOUBLE_EQ(ResultToDouble(result), 1.0);
 }
 
 TEST(SysTask, AsinOf0) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$asin", {MkInt(f.arena, 0)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
+  EXPECT_DOUBLE_EQ(ResultToDouble(result), 0.0);
 }
 
 TEST(SysTask, AcosOf1) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$acos", {MkInt(f.arena, 1)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  // acos(1) = 0
-  EXPECT_EQ(result.ToUint64(), 0u);
+  EXPECT_DOUBLE_EQ(ResultToDouble(result), 0.0);
 }
 
 TEST(SysTask, AtanOf0) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$atan", {MkInt(f.arena, 0)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
+  EXPECT_DOUBLE_EQ(ResultToDouble(result), 0.0);
 }
 
 // ============================================================================
