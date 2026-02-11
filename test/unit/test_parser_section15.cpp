@@ -38,6 +38,52 @@ static Stmt* FirstInitialStmt(ParseResult15& r) {
 }
 
 // =============================================================================
+// §15.5.1 — Nonblocking event trigger (->>)
+// =============================================================================
+
+TEST(ParserSection15, NonblockingEventTrigger) {
+  auto r = Parse(
+      "module m;\n"
+      "  event e;\n"
+      "  initial begin\n"
+      "    ->> e;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNbEventTrigger);
+}
+
+TEST(ParserSection15, NonblockingEventTriggerHierarchical) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial ->> top.e;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNbEventTrigger);
+}
+
+// =============================================================================
+// §15.4 — Parameterized mailbox: mailbox #(type)
+// =============================================================================
+
+TEST(ParserSection15, MailboxParameterized) {
+  auto r = Parse(
+      "module m;\n"
+      "  mailbox #(string) m_box;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  // Should parse without errors — mailbox #(string) is a parameterized type
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_FALSE(items.empty());
+  EXPECT_EQ(items[0]->name, "m_box");
+}
+
+// =============================================================================
 // §15.5.4 — wait_order basic parsing
 // =============================================================================
 

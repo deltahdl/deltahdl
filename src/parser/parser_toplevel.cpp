@@ -402,11 +402,10 @@ void Parser::ParseClassExtendsClause(ClassDecl* decl) {
       name = Expect(TokenKind::kIdentifier).text;
     }
     if (decl->base_class.empty()) decl->base_class = name;
-    // Skip parameter value assignment: #(expr, ...)
+    // Skip parameter value assignment: #(type_or_expr, ...)
     if (Check(TokenKind::kHash)) {
       Consume();
-      std::vector<Expr*> discard;
-      ParseParenList(discard);
+      ParseTypeParamList();
     }
     // Skip constructor arguments: (expr, ...)
     if (Check(TokenKind::kLParen)) {
@@ -447,7 +446,10 @@ ClassDecl* Parser::ParseClassDecl() {
 
   while (!Check(TokenKind::kKwEndclass) && !AtEnd()) {
     if (Match(TokenKind::kSemicolon)) continue;
+    auto before = lexer_.SavePos().pos;
     ParseClassMembers(decl->members);
+    // Safety: if no progress was made, skip a token to avoid infinite loops.
+    if (lexer_.SavePos().pos == before) Consume();
   }
   Expect(TokenKind::kKwEndclass);
   if (Match(TokenKind::kColon)) ExpectIdentifier();
@@ -514,6 +516,7 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
   member->kind = ClassMemberKind::kProperty;
   member->data_type = dtype;
   member->name = Expect(TokenKind::kIdentifier).text;
+  ParseUnpackedDims(member->unpacked_dims);
   if (Match(TokenKind::kEq)) member->init_expr = ParseExpr();
   members.push_back(member);
   while (Match(TokenKind::kComma)) {
@@ -525,6 +528,7 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
     extra->is_randc = member->is_randc;
     extra->is_static = member->is_static;
     extra->name = Expect(TokenKind::kIdentifier).text;
+    ParseUnpackedDims(extra->unpacked_dims);
     if (Match(TokenKind::kEq)) extra->init_expr = ParseExpr();
     members.push_back(extra);
   }

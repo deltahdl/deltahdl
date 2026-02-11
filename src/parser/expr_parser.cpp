@@ -359,11 +359,26 @@ Expr* Parser::ParsePrimaryExpr() {
   return err;
 }
 
+// Returns true if token is a keyword valid as a method/member name after '.'.
+static bool IsMethodKeyword(TokenKind kind) {
+  switch (kind) {
+    case TokenKind::kKwNew:
+    case TokenKind::kKwUnique:
+    case TokenKind::kKwAnd:
+    case TokenKind::kKwOr:
+    case TokenKind::kKwXor:
+      return true;
+    default:
+      return false;
+  }
+}
+
 // Build a member-access node: consumes '.' or '::' then the member name.
-// Accepts 'new' as member name for super.new() (§8.15).
+// Accepts keywords that double as built-in method names (§7.12, §8.15).
 Expr* Parser::MakeMemberAccess(Expr* base) {
   Consume();  // '.' or '::'
-  auto member_tok = Check(TokenKind::kKwNew) ? Consume() : ExpectIdentifier();
+  auto member_tok =
+      IsMethodKeyword(CurrentToken().kind) ? Consume() : ExpectIdentifier();
   auto* member_id = arena_.Create<Expr>();
   member_id->kind = ExprKind::kIdentifier;
   member_id->text = member_tok.text;
@@ -541,6 +556,15 @@ Expr* Parser::ParseSystemCall() {
 Expr* Parser::ParseConcatenation() {
   auto loc = CurrentLoc();
   Expect(TokenKind::kLBrace);
+
+  // Empty concatenation: {} (§7.10.4 — clear queue)
+  if (Check(TokenKind::kRBrace)) {
+    Consume();
+    auto* cat = arena_.Create<Expr>();
+    cat->kind = ExprKind::kConcatenation;
+    cat->range.start = loc;
+    return cat;
+  }
 
   // Streaming concatenation: {<< ...} or {>> ...}
   if (Check(TokenKind::kLtLt) || Check(TokenKind::kGtGt)) {

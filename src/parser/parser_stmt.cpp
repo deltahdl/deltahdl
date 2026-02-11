@@ -119,6 +119,8 @@ Stmt* Parser::ParseStmtBody() {
       return ParseEventControlStmt();
     case TokenKind::kArrow:
       return ParseEventTriggerStmt();
+    case TokenKind::kDashGtGt:
+      return ParseNbEventTriggerStmt();
     case TokenKind::kKwAssign:
       return ParseProceduralAssignStmt();
     case TokenKind::kKwDeassign:
@@ -151,6 +153,17 @@ Stmt* Parser::ParseEventTriggerStmt() {
   s->kind = StmtKind::kEventTrigger;
   s->range.start = CurrentLoc();
   Consume();
+  s->expr = ParseExpr();
+  Expect(TokenKind::kSemicolon);
+  return s;
+}
+
+// §15.5.1 — nonblocking event trigger: ->> [delay_or_event] event_id;
+Stmt* Parser::ParseNbEventTriggerStmt() {
+  auto* s = arena_.Create<Stmt>();
+  s->kind = StmtKind::kNbEventTrigger;
+  s->range.start = CurrentLoc();
+  Consume();  // ->>
   s->expr = ParseExpr();
   Expect(TokenKind::kSemicolon);
   return s;

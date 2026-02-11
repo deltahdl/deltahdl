@@ -924,6 +924,86 @@ TEST(ParserSection7, StructVariableDecl) {
 // §7.3: Union with nested struct
 // =========================================================================
 
+// =========================================================================
+// §7.12.1: Array locator method 'unique' (keyword as method name)
+// =========================================================================
+
+TEST(ParserSection7, ArrayLocatorUnique) {
+  auto r = Parse(
+      "module t;\n"
+      "  int s[] = '{10, 10, 3, 20, 20, 10};\n"
+      "  int qi[$];\n"
+      "  initial qi = s.unique;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
+}
+
+// =========================================================================
+// §7.12.3: Array reduction methods 'and', 'or', 'xor' (keywords as names)
+// =========================================================================
+
+TEST(ParserSection7, ArrayReductionAnd) {
+  auto r = Parse(
+      "module t;\n"
+      "  byte b[] = '{1, 3, 5, 7};\n"
+      "  initial y = b.and;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
+}
+
+TEST(ParserSection7, ArrayReductionOr) {
+  auto r = Parse(
+      "module t;\n"
+      "  byte b[] = '{1, 2, 3, 4};\n"
+      "  initial y = b.or;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
+}
+
+TEST(ParserSection7, ArrayReductionXor) {
+  auto r = Parse(
+      "module t;\n"
+      "  byte b[] = '{1, 2, 3, 4};\n"
+      "  initial y = b.xor;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
+}
+
+// =========================================================================
+// §7.10.4: Empty concatenation {} to clear queue
+// =========================================================================
+
+TEST(ParserSection7, EmptyConcatClearQueue) {
+  auto r = Parse(
+      "module t;\n"
+      "  int q[$];\n"
+      "  initial q = {};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
+  EXPECT_TRUE(stmt->rhs->elements.empty());
+}
+
 TEST(ParserSection7, UnionWithNestedStruct) {
   auto r = Parse(
       "module t;\n"

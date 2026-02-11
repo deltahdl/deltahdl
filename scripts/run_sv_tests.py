@@ -49,8 +49,8 @@ def collect_tests(chapter=None):
     If *chapter* is given (e.g. "5"), only that chapter's tests are collected.
     """
     chapter_glob = f"chapter-{chapter}" if chapter else "chapter-*"
-    pattern = str(TEST_DIR / chapter_glob / "*.sv")
-    return sorted(glob.glob(pattern), key=_natural_sort_key)
+    pattern = str(TEST_DIR / chapter_glob / "**" / "*.sv")
+    return sorted(glob.glob(pattern, recursive=True), key=_natural_sort_key)
 
 
 def parse_metadata(path):
@@ -142,6 +142,9 @@ def run_test(path, simulate=False, defines=()):
 
 def chapter_from_path(path):
     """Extract the chapter directory name (e.g. 'chapter-5') from a path."""
+    for part in Path(path).parts:
+        if part.startswith("chapter-"):
+            return part
     return Path(path).parent.name
 
 

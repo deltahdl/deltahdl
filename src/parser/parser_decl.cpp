@@ -516,6 +516,20 @@ void Parser::ParsePackedDims(DataType& dtype) {
   }
 }
 
+// §8.25: parse type parameter list — each element is a type or expression.
+void Parser::ParseTypeParamList() {
+  Expect(TokenKind::kLParen);
+  if (!Check(TokenKind::kRParen)) {
+    auto dt = ParseDataType();
+    if (dt.kind == DataTypeKind::kImplicit) ParseExpr();
+    while (Match(TokenKind::kComma)) {
+      dt = ParseDataType();
+      if (dt.kind == DataTypeKind::kImplicit) ParseExpr();
+    }
+  }
+  Expect(TokenKind::kRParen);
+}
+
 DataType Parser::ParseDataType() {
   DataType dtype;
 
@@ -541,8 +555,7 @@ DataType Parser::ParseDataType() {
     // §8.25 parameterized class type: cls #(params)
     if (Check(TokenKind::kHash)) {
       Consume();
-      std::vector<Expr*> discard;
-      ParseParenList(discard);
+      ParseTypeParamList();
     }
     return dtype;
   }

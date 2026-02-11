@@ -204,6 +204,7 @@ enum class StmtKind : uint8_t {
   kDisable,
   kDisableFork,  // disable fork (§9.6.3)
   kEventTrigger,
+  kNbEventTrigger,  // Nonblocking event trigger ->> (§15.5.1)
   kNull,
   kAssign,           // Procedural continuous assign (§10.6.1)
   kDeassign,         // Procedural deassign (§10.6.1)
@@ -593,6 +594,7 @@ struct ClassMember {
   // Property fields
   DataType data_type;
   std::string_view name;
+  std::vector<Expr*> unpacked_dims;  // §7.4 unpacked array dims
   Expr* init_expr = nullptr;
 
   // Method (reuses ModuleItem for function/task)

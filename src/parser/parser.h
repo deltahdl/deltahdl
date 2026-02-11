@@ -143,6 +143,7 @@ class Parser {
   void ParsePortConnection(ModuleItem* item);
   void ParseUnpackedDims(std::vector<Expr*>& dims);
   void ParseParenList(std::vector<Expr*>& out);
+  void ParseTypeParamList();
 
   // Statements (parser_stmt.cpp)
   Stmt* ParseStmt();
@@ -165,6 +166,7 @@ class Parser {
   Stmt* ParseWaitStmt();
   Stmt* ParseDisableStmt();
   Stmt* ParseEventTriggerStmt();
+  Stmt* ParseNbEventTriggerStmt();
   Stmt* ParseAssignmentOrExprStmt();
   Stmt* ParseAssignmentOrExprNoSemi();
   Stmt* ParseDelayStmt();
