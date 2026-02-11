@@ -247,6 +247,184 @@ TEST(ParserSection13, OldStyleTask) {
   EXPECT_EQ(tk->func_args[1].direction, Direction::kOutput);
 }
 
+// =============================================================================
+// LRM section 13.4.1 -- Function return type
+// =============================================================================
+
+TEST(ParserSection13, FunctionReturnTypeInt) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int foo();\n"
+      "    return 42;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* fn = FindFunc(r, "foo");
+  ASSERT_NE(fn, nullptr);
+  EXPECT_EQ(fn->return_type.kind, DataTypeKind::kInt);
+}
+
+TEST(ParserSection13, FunctionReturnTypeVoid) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void bar();\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* fn = FindFunc(r, "bar");
+  ASSERT_NE(fn, nullptr);
+  EXPECT_EQ(fn->return_type.kind, DataTypeKind::kVoid);
+}
+
+TEST(ParserSection13, FunctionReturnTypeLogicVec) {
+  auto r = Parse(
+      "module m;\n"
+      "  function logic [7:0] get_byte();\n"
+      "    return 8'hAB;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* fn = FindFunc(r, "get_byte");
+  ASSERT_NE(fn, nullptr);
+  EXPECT_EQ(fn->return_type.kind, DataTypeKind::kLogic);
+}
+
+// =============================================================================
+// LRM section 13.3.1 -- Static and automatic tasks/functions
+// =============================================================================
+
+TEST(ParserSection13, AutomaticFunction) {
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int fact(int n);\n"
+      "    if (n <= 1) return 1;\n"
+      "    return n * fact(n - 1);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* fn = FindFunc(r, "fact");
+  ASSERT_NE(fn, nullptr);
+  EXPECT_TRUE(fn->is_automatic);
+  EXPECT_FALSE(fn->is_static);
+}
+
+TEST(ParserSection13, StaticTask) {
+  auto r = Parse(
+      "module m;\n"
+      "  task static do_stuff();\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* tk = FindFunc(r, "do_stuff");
+  ASSERT_NE(tk, nullptr);
+  EXPECT_TRUE(tk->is_static);
+  EXPECT_FALSE(tk->is_automatic);
+}
+
+// =============================================================================
+// LRM section 13.6 -- DPI import / export
+// =============================================================================
+
+TEST(ParserSection13, DpiImportFunction) {
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function int c_add(int a, int b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ModuleItem* dpi = nullptr;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kDpiImport) { dpi = item; break; }
+  }
+  ASSERT_NE(dpi, nullptr);
+  EXPECT_EQ(dpi->name, "c_add");
+  EXPECT_FALSE(dpi->dpi_is_task);
+  EXPECT_FALSE(dpi->dpi_is_pure);
+}
+
+TEST(ParserSection13, DpiImportPureFunction) {
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" pure function int c_mul(int a, int b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ModuleItem* dpi = nullptr;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kDpiImport) { dpi = item; break; }
+  }
+  ASSERT_NE(dpi, nullptr);
+  EXPECT_TRUE(dpi->dpi_is_pure);
+  EXPECT_FALSE(dpi->dpi_is_context);
+}
+
+TEST(ParserSection13, DpiImportContextTask) {
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" context task c_display(input int x);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ModuleItem* dpi = nullptr;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kDpiImport) { dpi = item; break; }
+  }
+  ASSERT_NE(dpi, nullptr);
+  EXPECT_TRUE(dpi->dpi_is_context);
+  EXPECT_TRUE(dpi->dpi_is_task);
+}
+
+TEST(ParserSection13, DpiImportWithCName) {
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" c_real_name = function void sv_wrapper();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ModuleItem* dpi = nullptr;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kDpiImport) { dpi = item; break; }
+  }
+  ASSERT_NE(dpi, nullptr);
+  EXPECT_EQ(dpi->dpi_c_name, "c_real_name");
+  EXPECT_EQ(dpi->name, "sv_wrapper");
+}
+
+TEST(ParserSection13, DpiExportFunction) {
+  auto r = Parse(
+      "module m;\n"
+      "  export \"DPI-C\" function my_sv_func;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ModuleItem* dpi = nullptr;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kDpiExport) { dpi = item; break; }
+  }
+  ASSERT_NE(dpi, nullptr);
+  EXPECT_EQ(dpi->name, "my_sv_func");
+}
+
+TEST(ParserSection13, DpiExportTask) {
+  auto r = Parse(
+      "module m;\n"
+      "  export \"DPI-C\" task my_sv_task;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ModuleItem* dpi = nullptr;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kDpiExport) { dpi = item; break; }
+  }
+  ASSERT_NE(dpi, nullptr);
+  EXPECT_EQ(dpi->name, "my_sv_task");
+  EXPECT_TRUE(dpi->dpi_is_task);
+}
+
+// =============================================================================
+// LRM section 13.3-13.4 -- Old-style (non-ANSI) task/function declarations
+// =============================================================================
+
 TEST(ParserSection13, OldStyleTaskMultipleInputs) {
   auto r = Parse(
       "module m;\n"

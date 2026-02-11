@@ -418,6 +418,281 @@ TEST(ParserSection12, CasezStatement) {
 // Combined tests -- qualifiers with named blocks
 // =============================================================================
 
+// =============================================================================
+// LRM section 12.7.4 -- While loop
+// =============================================================================
+
+TEST(ParserSection12, WhileLoop) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    while (x > 0) x = x - 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kWhile);
+  EXPECT_NE(stmt->condition, nullptr);
+  EXPECT_NE(stmt->body, nullptr);
+}
+
+TEST(ParserSection12, WhileLoopWithBlock) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    while (x > 0) begin\n"
+      "      x = x - 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kWhile);
+  EXPECT_NE(stmt->body, nullptr);
+  EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
+}
+
+// =============================================================================
+// LRM section 12.7.5 -- Do-while loop
+// =============================================================================
+
+TEST(ParserSection12, DoWhileLoop) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    do x = x + 1; while (x < 10);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDoWhile);
+  EXPECT_NE(stmt->condition, nullptr);
+  EXPECT_NE(stmt->body, nullptr);
+}
+
+TEST(ParserSection12, DoWhileLoopWithBlock) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    do begin\n"
+      "      x = x + 1;\n"
+      "    end while (x < 10);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDoWhile);
+  EXPECT_NE(stmt->body, nullptr);
+  EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
+}
+
+// =============================================================================
+// LRM section 12.7.6 -- Repeat loop
+// =============================================================================
+
+TEST(ParserSection12, RepeatLoop) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    repeat (10) x = x + 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kRepeat);
+  EXPECT_NE(stmt->condition, nullptr);
+  EXPECT_NE(stmt->body, nullptr);
+}
+
+// =============================================================================
+// LRM section 12.7.7 -- Forever loop
+// =============================================================================
+
+TEST(ParserSection12, ForeverLoop) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    forever x = x + 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kForever);
+  EXPECT_NE(stmt->body, nullptr);
+}
+
+TEST(ParserSection12, ForeverLoopWithBlock) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    forever begin\n"
+      "      @(posedge clk);\n"
+      "      x = x + 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kForever);
+  EXPECT_NE(stmt->body, nullptr);
+  EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
+}
+
+// =============================================================================
+// LRM section 12.8 -- Jump statements (return, break, continue)
+// =============================================================================
+
+TEST(ParserSection12, ReturnWithValue) {
+  auto r = Parse(
+      "module t;\n"
+      "  function int foo();\n"
+      "    return 42;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ModuleItem* fn = nullptr;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kFunctionDecl) fn = item;
+  }
+  ASSERT_NE(fn, nullptr);
+  ASSERT_FALSE(fn->func_body_stmts.empty());
+  Stmt* ret = nullptr;
+  for (auto* s : fn->func_body_stmts) {
+    if (s->kind == StmtKind::kReturn) { ret = s; break; }
+  }
+  ASSERT_NE(ret, nullptr);
+  EXPECT_EQ(ret->kind, StmtKind::kReturn);
+  EXPECT_NE(ret->expr, nullptr);
+}
+
+TEST(ParserSection12, ReturnVoid) {
+  auto r = Parse(
+      "module t;\n"
+      "  function void bar();\n"
+      "    return;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ModuleItem* fn = nullptr;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kFunctionDecl) fn = item;
+  }
+  ASSERT_NE(fn, nullptr);
+  ASSERT_FALSE(fn->func_body_stmts.empty());
+  Stmt* ret = nullptr;
+  for (auto* s : fn->func_body_stmts) {
+    if (s->kind == StmtKind::kReturn) { ret = s; break; }
+  }
+  ASSERT_NE(ret, nullptr);
+  EXPECT_EQ(ret->kind, StmtKind::kReturn);
+  EXPECT_EQ(ret->expr, nullptr);
+}
+
+TEST(ParserSection12, BreakStatement) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    forever begin\n"
+      "      if (done) break;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kForever);
+  // The body contains an if whose then_branch is break.
+  auto* if_stmt = stmt->body->stmts[0];
+  ASSERT_NE(if_stmt, nullptr);
+  EXPECT_EQ(if_stmt->kind, StmtKind::kIf);
+  ASSERT_NE(if_stmt->then_branch, nullptr);
+  EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kBreak);
+}
+
+TEST(ParserSection12, ContinueStatement) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 10; i = i + 1) begin\n"
+      "      if (i == 5) continue;\n"
+      "      x = i;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFor);
+  auto* body = stmt->for_body;
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kBlock);
+  auto* if_stmt = body->stmts[0];
+  EXPECT_EQ(if_stmt->kind, StmtKind::kIf);
+  EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kContinue);
+}
+
+// =============================================================================
+// LRM section 12.9 -- Event trigger (->)
+// =============================================================================
+
+TEST(ParserSection12, EventTrigger) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    -> done_event;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventTrigger);
+  EXPECT_NE(stmt->expr, nullptr);
+}
+
+// =============================================================================
+// LRM section 12.10 -- Disable statement
+// =============================================================================
+
+TEST(ParserSection12, DisableBlock) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    disable my_block;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDisable);
+  EXPECT_NE(stmt->expr, nullptr);
+}
+
+TEST(ParserSection12, DisableFork) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    disable fork;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDisableFork);
+}
+
+// =============================================================================
+// Combined tests -- qualifiers with named blocks
+// =============================================================================
+
 TEST(ParserSection12, UniqueCasexQualifier) {
   auto r = Parse(
       "module t;\n"

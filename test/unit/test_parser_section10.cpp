@@ -280,3 +280,290 @@ TEST(ParserSection10, NetAliasThreeNets) {
   ASSERT_NE(alias_item, nullptr);
   ASSERT_EQ(alias_item->alias_nets.size(), 3u);
 }
+
+// =============================================================================
+// LRM section 10.3.1/10.3.2 -- Continuous assignment
+// =============================================================================
+
+TEST(ParserSection10, ContinuousAssignBasic) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire a, b;\n"
+      "  assign a = b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  bool found = false;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      found = true;
+      ASSERT_NE(item->assign_lhs, nullptr);
+      ASSERT_NE(item->assign_rhs, nullptr);
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+TEST(ParserSection10, NetDeclAssignment) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire a = 1'b0;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_FALSE(mod->items.empty());
+  auto* item = mod->items[0];
+  EXPECT_EQ(item->name, "a");
+  EXPECT_NE(item->init_expr, nullptr);
+}
+
+// =============================================================================
+// LRM section 10.3.3 -- Continuous assignment delays
+// =============================================================================
+
+TEST(ParserSection10, ContinuousAssignDelay) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire a, b;\n"
+      "  assign #10 a = b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      EXPECT_NE(item->assign_delay, nullptr);
+    }
+  }
+}
+
+// =============================================================================
+// LRM section 10.5 -- Variable declaration assignment
+// =============================================================================
+
+TEST(ParserSection10, VarDeclAssignment) {
+  auto r = Parse(
+      "module m;\n"
+      "  int x = 42;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_FALSE(mod->items.empty());
+  auto* item = mod->items[0];
+  EXPECT_EQ(item->name, "x");
+  EXPECT_NE(item->init_expr, nullptr);
+}
+
+TEST(ParserSection10, VarDeclAssignmentLogic) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] data = 8'hFF;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_FALSE(mod->items.empty());
+  EXPECT_NE(mod->items[0]->init_expr, nullptr);
+}
+
+// =============================================================================
+// LRM section 10.4 -- Blocking and nonblocking assignments
+// =============================================================================
+
+TEST(ParserSection10, BlockingAssignSimple) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial a = 1;\n"
+      "endmodule\n");
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+}
+
+TEST(ParserSection10, NonblockingAssignSimple) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial a <= 1;\n"
+      "endmodule\n");
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
+}
+
+// =============================================================================
+// LRM section 10.8 -- Operator assignments (+=, -=, etc.)
+// =============================================================================
+
+TEST(ParserSection10, OperatorAssignPlusEq) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a += 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
+TEST(ParserSection10, OperatorAssignMinusEq) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a -= 2;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+}
+
+TEST(ParserSection10, OperatorAssignStarEq) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a *= 3;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+}
+
+TEST(ParserSection10, OperatorAssignSlashEq) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a /= 4;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+}
+
+TEST(ParserSection10, OperatorAssignPercentEq) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a %= 5;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+}
+
+TEST(ParserSection10, OperatorAssignAmpEq) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a &= 8'hFF;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+}
+
+TEST(ParserSection10, OperatorAssignPipeEq) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a |= 8'h01;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+}
+
+TEST(ParserSection10, OperatorAssignCaretEq) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a ^= 8'hAA;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+}
+
+TEST(ParserSection10, OperatorAssignLtLtEq) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a <<= 2;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+}
+
+TEST(ParserSection10, OperatorAssignGtGtEq) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a >>= 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+}
+
+TEST(ParserSection10, OperatorAssignLtLtLtEq) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a <<<= 3;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+}
+
+TEST(ParserSection10, OperatorAssignGtGtGtEq) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a >>>= 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+}
+
+// =============================================================================
+// LRM section 10.3.4 -- Continuous assignment with drive strengths
+// =============================================================================
+
+TEST(ParserSection10, ContinuousAssignMultipleTargets) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire a, b, c, d;\n"
+      "  assign a = b, c = d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  int count = 0;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kContAssign) count++;
+  }
+  EXPECT_GE(count, 1);
+}
