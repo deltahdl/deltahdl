@@ -18,15 +18,84 @@ namespace delta {
 
 // --- Leaf executors (regular functions, no coroutine frame) ---
 
+// --- LHS resolution helpers ---
+
+// Build a dotted name from a MemberAccess expression tree (e.g., "s.a.b").
+static void BuildLhsName(const Expr* expr, std::string& out) {
+  if (expr->kind == ExprKind::kIdentifier) {
+    out += expr->text;
+    return;
+  }
+  if (expr->kind == ExprKind::kMemberAccess) {
+    BuildLhsName(expr->lhs, out);
+    out += ".";
+    BuildLhsName(expr->rhs, out);
+  }
+}
+
+// Find the target variable for a compound LHS expression.
+static Variable* ResolveLhsVariable(const Expr* lhs, SimContext& ctx) {
+  if (lhs->kind == ExprKind::kIdentifier) return ctx.FindVariable(lhs->text);
+  if (lhs->kind == ExprKind::kMemberAccess) {
+    std::string name;
+    BuildLhsName(lhs, name);
+    return ctx.FindVariable(name);
+  }
+  if (lhs->kind == ExprKind::kSelect && lhs->base) {
+    return ResolveLhsVariable(lhs->base, ctx);
+  }
+  return nullptr;
+}
+
+// Write rhs_val to var at the bit position(s) indicated by a Select LHS.
+static void WriteBitSelect(Variable* var, const Expr* lhs,
+                           const Logic4Vec& rhs_val, SimContext& ctx,
+                           Arena& arena) {
+  auto idx_val = EvalExpr(lhs->index, ctx, arena);
+  uint64_t idx = idx_val.ToUint64();
+
+  if (lhs->index_end) {
+    // Part-select: var[hi:lo] = rhs_val.
+    auto end_val = EvalExpr(lhs->index_end, ctx, arena);
+    uint64_t end_idx = end_val.ToUint64();
+    auto lo = static_cast<uint32_t>((idx < end_idx) ? idx : end_idx);
+    auto hi = static_cast<uint32_t>((idx > end_idx) ? idx : end_idx);
+    uint32_t width = hi - lo + 1;
+    uint64_t mask = (width >= 64) ? ~uint64_t{0} : (uint64_t{1} << width) - 1;
+    uint64_t old_val = var->value.ToUint64();
+    uint64_t new_bits = (rhs_val.ToUint64() & mask) << lo;
+    uint64_t cleared = old_val & ~(mask << lo);
+    var->value = MakeLogic4VecVal(arena, var->value.width, cleared | new_bits);
+  } else {
+    // Single bit select: var[idx] = rhs_val[0].
+    uint64_t old_val = var->value.ToUint64();
+    uint64_t bit = rhs_val.ToUint64() & 1;
+    uint64_t cleared = old_val & ~(uint64_t{1} << idx);
+    var->value =
+        MakeLogic4VecVal(arena, var->value.width, cleared | (bit << idx));
+  }
+}
+
+// Execute a blocking assignment with full LHS support.
 static StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
                                          Arena& arena) {
   auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
-  if (stmt->lhs && stmt->lhs->kind == ExprKind::kIdentifier) {
-    auto* var = ctx.FindVariable(stmt->lhs->text);
+  if (!stmt->lhs) return StmtResult::kDone;
+
+  if (stmt->lhs->kind == ExprKind::kSelect) {
+    auto* var = ResolveLhsVariable(stmt->lhs, ctx);
     if (var) {
-      var->value = rhs_val;
+      WriteBitSelect(var, stmt->lhs, rhs_val, ctx, arena);
       var->NotifyWatchers();
     }
+    return StmtResult::kDone;
+  }
+
+  // Identifier or MemberAccess: whole-variable assign.
+  auto* var = ResolveLhsVariable(stmt->lhs, ctx);
+  if (var) {
+    var->value = rhs_val;
+    var->NotifyWatchers();
   }
   return StmtResult::kDone;
 }
@@ -34,23 +103,31 @@ static StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
 static StmtResult ExecNonblockingAssignImpl(const Stmt* stmt, SimContext& ctx,
                                             Arena& arena) {
   auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
-  if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier) {
-    return StmtResult::kDone;
-  }
-  auto* var = ctx.FindVariable(stmt->lhs->text);
+  if (!stmt->lhs) return StmtResult::kDone;
+
+  bool is_select = (stmt->lhs->kind == ExprKind::kSelect);
+  auto* var = ResolveLhsVariable(stmt->lhs, ctx);
   if (!var) return StmtResult::kDone;
 
-  var->pending_nba = rhs_val;
-  var->has_pending_nba = true;
-
   auto* event = ctx.GetScheduler().GetEventPool().Acquire();
-  event->callback = [var]() {
-    if (var->has_pending_nba) {
-      var->value = var->pending_nba;
-      var->has_pending_nba = false;
+  if (is_select) {
+    // Capture select info for deferred bit-write.
+    const Expr* lhs_copy = stmt->lhs;
+    event->callback = [var, lhs_copy, rhs_val, &ctx, &arena]() {
+      WriteBitSelect(var, lhs_copy, rhs_val, ctx, arena);
       var->NotifyWatchers();
-    }
-  };
+    };
+  } else {
+    var->pending_nba = rhs_val;
+    var->has_pending_nba = true;
+    event->callback = [var]() {
+      if (var->has_pending_nba) {
+        var->value = var->pending_nba;
+        var->has_pending_nba = false;
+        var->NotifyWatchers();
+      }
+    };
+  }
   auto nba_region = ctx.IsReactiveContext() ? Region::kReNBA : Region::kNBA;
   ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), nba_region, event);
   return StmtResult::kDone;
@@ -67,10 +144,8 @@ static StmtResult ExecExprStmtImpl(const Stmt* stmt, SimContext& ctx,
 // Shared logic for force and procedural assign (IEEE §10.6).
 static StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
                                         Arena& arena) {
-  if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier) {
-    return StmtResult::kDone;
-  }
-  auto* var = ctx.FindVariable(stmt->lhs->text);
+  if (!stmt->lhs) return StmtResult::kDone;
+  auto* var = ResolveLhsVariable(stmt->lhs, ctx);
   if (!var) return StmtResult::kDone;
 
   auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
@@ -82,10 +157,8 @@ static StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
 
 // Shared logic for release and deassign (IEEE §10.6).
 static StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx) {
-  if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier) {
-    return StmtResult::kDone;
-  }
-  auto* var = ctx.FindVariable(stmt->lhs->text);
+  if (!stmt->lhs) return StmtResult::kDone;
+  auto* var = ResolveLhsVariable(stmt->lhs, ctx);
   if (!var) return StmtResult::kDone;
 
   var->is_forced = false;
