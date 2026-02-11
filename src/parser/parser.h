@@ -107,7 +107,7 @@ class Parser {
   TimingCheckKind ParseTimingCheckKind(std::string_view name);
   bool CheckNextIsCommaOrRParen();
   void ParseTimingCheckTrailingArgs(TimingCheckDecl& tc);
-  void SkipRemainingCommaArgs();
+  void ParseExtendedTimingCheckArgs(TimingCheckDecl& tc);
 
   // Configuration (parser_config.cpp — §33)
   ConfigDecl* ParseConfigDecl();

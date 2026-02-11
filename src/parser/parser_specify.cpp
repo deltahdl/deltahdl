@@ -227,23 +227,39 @@ void Parser::ParseTimingCheckTrailingArgs(TimingCheckDecl& tc) {
     if (Check(TokenKind::kRParen)) break;
     if (Check(TokenKind::kIdentifier) && CheckNextIsCommaOrRParen()) {
       tc.notifier = Consume().text;
-      SkipRemainingCommaArgs();
+      ParseExtendedTimingCheckArgs(tc);
       break;
     }
     tc.limits.push_back(ParseExpr());
   }
 }
 
-// Skip remaining comma-separated arguments until ')'.
-void Parser::SkipRemainingCommaArgs() {
-  while (Match(TokenKind::kComma)) {
-    if (Check(TokenKind::kRParen)) break;
-    Consume();
+// §31.9: Parse extended args after notifier: timestamp_cond, timecheck_cond,
+// delayed_reference, delayed_data.
+void Parser::ParseExtendedTimingCheckArgs(TimingCheckDecl& tc) {
+  // timestamp_condition (expression or empty)
+  if (!Match(TokenKind::kComma) || Check(TokenKind::kRParen)) return;
+  if (!Check(TokenKind::kComma) && !Check(TokenKind::kRParen)) {
+    tc.timestamp_cond = ParseExpr();
+  }
+  // timecheck_condition (expression or empty)
+  if (!Match(TokenKind::kComma) || Check(TokenKind::kRParen)) return;
+  if (!Check(TokenKind::kComma) && !Check(TokenKind::kRParen)) {
+    tc.timecheck_cond = ParseExpr();
+  }
+  // delayed_reference (identifier or empty)
+  if (!Match(TokenKind::kComma) || Check(TokenKind::kRParen)) return;
+  if (Check(TokenKind::kIdentifier)) {
+    tc.delayed_ref = Consume().text;
+  }
+  // delayed_data (identifier or empty)
+  if (!Match(TokenKind::kComma) || Check(TokenKind::kRParen)) return;
+  if (Check(TokenKind::kIdentifier)) {
+    tc.delayed_data = Consume().text;
   }
 }
 
-// Parse: $setup(data, posedge clk, limit [, notifier]) ;
-// and similar timing checks.
+// Parse: $setup(data [&&& cond], posedge clk [&&& cond], limit ...) ;
 SpecifyItem* Parser::ParseTimingCheck() {
   auto* item = arena_.Create<SpecifyItem>();
   item->kind = SpecifyItemKind::kTimingCheck;
@@ -255,20 +271,26 @@ SpecifyItem* Parser::ParseTimingCheck() {
 
   Expect(TokenKind::kLParen);
 
-  // First signal argument (with optional edge)
+  // First signal argument (with optional edge and §31.7 condition).
   item->timing_check.ref_edge = ParseSpecifyEdge();
   item->timing_check.ref_signal = Expect(TokenKind::kIdentifier).text;
+  if (Match(TokenKind::kAmpAmpAmp)) {
+    item->timing_check.ref_condition = ParseExpr();
+  }
   Expect(TokenKind::kComma);
 
-  // Second signal argument (with optional edge) or limit
+  // Second signal argument (with optional edge/condition) or limit.
   bool has_data_signal = NeedsDataSignal(item->timing_check.check_kind);
   if (has_data_signal) {
     item->timing_check.data_edge = ParseSpecifyEdge();
     item->timing_check.data_signal = Expect(TokenKind::kIdentifier).text;
+    if (Match(TokenKind::kAmpAmpAmp)) {
+      item->timing_check.data_condition = ParseExpr();
+    }
     Expect(TokenKind::kComma);
   }
 
-  // Timing limit(s) and optional notifier.
+  // Timing limit(s) and optional notifier / §31.9 extended args.
   item->timing_check.limits.push_back(ParseExpr());
   ParseTimingCheckTrailingArgs(item->timing_check);
   Expect(TokenKind::kRParen);

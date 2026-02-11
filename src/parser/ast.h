@@ -654,10 +654,17 @@ struct TimingCheckDecl {
   TimingCheckKind check_kind = TimingCheckKind::kSetup;
   SpecifyEdge ref_edge = SpecifyEdge::kNone;
   std::string_view ref_signal;
+  Expr* ref_condition = nullptr;  // §31.7: &&& condition on ref signal
   SpecifyEdge data_edge = SpecifyEdge::kNone;
   std::string_view data_signal;
-  std::vector<Expr*> limits;  // Timing limit expressions
-  std::string_view notifier;  // Optional notifier variable
+  Expr* data_condition = nullptr;  // §31.7: &&& condition on data signal
+  std::vector<Expr*> limits;       // Timing limit expressions
+  std::string_view notifier;       // Optional notifier variable
+  // §31.9: Extended arguments for $setuphold / $recrem.
+  Expr* timestamp_cond = nullptr;
+  Expr* timecheck_cond = nullptr;
+  std::string_view delayed_ref;
+  std::string_view delayed_data;
   SourceLoc loc;
 };
 
