@@ -65,6 +65,10 @@ uint32_t EvalTypeWidth(const DataType& dtype) {
   // If explicit packed dimensions are present, compute from range.
   if (dtype.packed_dim_left && dtype.packed_dim_right) {
     uint32_t w = EvalRangeWidth(dtype.packed_dim_left, dtype.packed_dim_right);
+    // §7.4.1: Multiply by extra packed dimensions (e.g., [3:0][7:0]).
+    for (const auto& [left, right] : dtype.extra_packed_dims) {
+      w *= EvalRangeWidth(left, right);
+    }
     if (w > 0) return w;
   }
 

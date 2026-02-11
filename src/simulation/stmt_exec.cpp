@@ -51,6 +51,35 @@ static Variable* TryResolveArrayElement(const Expr* lhs, SimContext& ctx) {
   return ctx.FindVariable(elem_name);
 }
 
+// §7.4: Build a compound name from chained selects (e.g., mem[i][j]).
+static bool BuildCompoundLhsName(const Expr* expr, SimContext& ctx,
+                                 Arena& arena, std::string& name) {
+  if (expr->kind == ExprKind::kIdentifier) {
+    name = expr->text;
+    return true;
+  }
+  if (expr->kind != ExprKind::kSelect || expr->index_end) return false;
+  if (!BuildCompoundLhsName(expr->base, ctx, arena, name)) return false;
+  auto idx = EvalExpr(expr->index, ctx, arena).ToUint64();
+  name += "[" + std::to_string(idx) + "]";
+  return true;
+}
+
+// §7.4: Multi-dim array element write — create element lazily.
+static Variable* TryResolveCompoundElement(const Expr* lhs, SimContext& ctx,
+                                           Arena& arena) {
+  if (lhs->kind != ExprKind::kSelect || !lhs->base) return nullptr;
+  if (lhs->base->kind != ExprKind::kSelect) return nullptr;
+  if (lhs->index_end) return nullptr;
+  std::string compound;
+  if (!BuildCompoundLhsName(lhs, ctx, arena, compound)) return nullptr;
+  auto* var = ctx.FindVariable(compound);
+  if (var) return var;
+  // Lazily create the element for multi-dim arrays.
+  return ctx.CreateVariable(
+      *arena.Create<std::string>(std::move(compound)), 32);
+}
+
 // Find the target variable for a compound LHS expression.
 static Variable* ResolveLhsVariable(const Expr* lhs, SimContext& ctx) {
   if (lhs->kind == ExprKind::kIdentifier) return ctx.FindVariable(lhs->text);
@@ -344,6 +373,33 @@ static bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx,
   return true;
 }
 
+// Write to a variable and notify watchers.
+static void WriteVar(Variable* var, const Logic4Vec& val, Arena& arena) {
+  var->value = ResizeToWidth(val, var->value.width, arena);
+  var->NotifyWatchers();
+}
+
+// Handle indexed/select LHS in blocking assignments.
+static bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
+                                    SimContext& ctx, Arena& arena) {
+  if (auto* elem = TryResolveArrayElement(lhs, ctx)) {
+    WriteVar(elem, rhs_val, arena);
+    return true;
+  }
+  if (TryQueueIndexedWrite(lhs, rhs_val, ctx, arena)) return true;
+  if (TryAssocIndexedWrite(lhs, rhs_val, ctx, arena)) return true;
+  if (auto* compound = TryResolveCompoundElement(lhs, ctx, arena)) {
+    WriteVar(compound, rhs_val, arena);
+    return true;
+  }
+  auto* var = ResolveLhsVariable(lhs, ctx);
+  if (var) {
+    WriteBitSelect(var, lhs, rhs_val, ctx, arena);
+    var->NotifyWatchers();
+  }
+  return true;  // Select always handled (even if var not found).
+}
+
 // Execute a blocking assignment with full LHS support.
 static StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
                                          Arena& arena) {
@@ -355,26 +411,7 @@ static StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
   auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
 
   if (stmt->lhs->kind == ExprKind::kSelect) {
-    // §7.4: Check for unpacked array element variable first.
-    if (auto* elem = TryResolveArrayElement(stmt->lhs, ctx)) {
-      rhs_val = ResizeToWidth(rhs_val, elem->value.width, arena);
-      elem->value = rhs_val;
-      elem->NotifyWatchers();
-      return StmtResult::kDone;
-    }
-    // §7.10: Queue indexed write (q[i] = val).
-    if (TryQueueIndexedWrite(stmt->lhs, rhs_val, ctx, arena)) {
-      return StmtResult::kDone;
-    }
-    // §7.8: Associative array indexed write (aa[key] = val).
-    if (TryAssocIndexedWrite(stmt->lhs, rhs_val, ctx, arena)) {
-      return StmtResult::kDone;
-    }
-    auto* var = ResolveLhsVariable(stmt->lhs, ctx);
-    if (var) {
-      WriteBitSelect(var, stmt->lhs, rhs_val, ctx, arena);
-      var->NotifyWatchers();
-    }
+    TrySelectBlockingAssign(stmt->lhs, rhs_val, ctx, arena);
     return StmtResult::kDone;
   }
 

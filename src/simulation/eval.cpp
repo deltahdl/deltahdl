@@ -784,6 +784,33 @@ static bool TryArrayElementSelect(const Expr* expr, uint64_t idx,
   return true;
 }
 
+// §7.4: Build a compound variable name from chained selects (e.g., mem[i][j]).
+static bool BuildCompoundName(const Expr* expr, SimContext& ctx, Arena& arena,
+                              std::string& name) {
+  if (expr->kind == ExprKind::kIdentifier) {
+    name = expr->text;
+    return true;
+  }
+  if (expr->kind != ExprKind::kSelect || expr->index_end) return false;
+  if (!BuildCompoundName(expr->base, ctx, arena, name)) return false;
+  auto idx = EvalExpr(expr->index, ctx, arena).ToUint64();
+  name += "[" + std::to_string(idx) + "]";
+  return true;
+}
+
+// §7.4: Try multi-dimensional array element access (e.g., mem[i][j]).
+static bool TryCompoundArraySelect(const Expr* expr, SimContext& ctx,
+                                   Arena& arena, Logic4Vec& out) {
+  if (!expr->base || expr->base->kind != ExprKind::kSelect) return false;
+  if (expr->index_end) return false;
+  std::string compound;
+  if (!BuildCompoundName(expr, ctx, arena, compound)) return false;
+  auto* elem = ctx.FindVariable(compound);
+  if (!elem) return false;
+  out = elem->value;
+  return true;
+}
+
 // Evaluate a packed part-select: base[hi:lo].
 static Logic4Vec EvalPartSelect(const Logic4Vec& base_val, uint64_t idx,
                                 uint64_t end_idx, Arena& arena) {
@@ -834,6 +861,7 @@ static Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
   uint64_t idx = idx_val.ToUint64();
 
   if (TryArrayElementSelect(expr, idx, ctx, result)) return result;
+  if (TryCompoundArraySelect(expr, ctx, arena, result)) return result;
 
   auto base_val = EvalExpr(expr->base, ctx, arena);
   if (expr->index_end) {
