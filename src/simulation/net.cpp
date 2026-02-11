@@ -175,8 +175,45 @@ static void ResolveStrengthBit(const std::vector<Logic4Vec>& drivers,
 
 // --- Net::Resolve ---
 
+static bool AllDriversZ(const std::vector<Logic4Vec>& drivers) {
+  for (const auto& drv : drivers) {
+    for (uint32_t w = 0; w < drv.nwords; ++w) {
+      if (drv.words[w].bval != ~uint64_t{0} ||
+          drv.words[w].aval != ~uint64_t{0}) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+// §6.6.6/§6.6.4: Handle supply nets and trireg charge retention.
+// Returns true if the net type was handled (caller should return early).
+static bool ResolveSpecialNet(Net& net, Arena& arena) {
+  if (net.type == NetType::kSupply0) {
+    net.resolved->value = MakeLogic4VecVal(arena, net.resolved->value.width, 0);
+    net.resolved->NotifyWatchers();
+    return true;
+  }
+  if (net.type == NetType::kSupply1) {
+    auto result = MakeLogic4Vec(arena, net.resolved->value.width);
+    for (uint32_t w = 0; w < result.nwords; ++w) {
+      result.words[w] = {~uint64_t{0}, 0};
+    }
+    net.resolved->value = result;
+    net.resolved->NotifyWatchers();
+    return true;
+  }
+  if (net.type == NetType::kTrireg && AllDriversZ(net.drivers)) {
+    net.resolved->NotifyWatchers();
+    return true;
+  }
+  return false;
+}
+
 void Net::Resolve(Arena& arena) {
   if (!resolved || drivers.empty()) return;
+  if (ResolveSpecialNet(*this, arena)) return;
 
   // Strength-aware path.
   if (!driver_strengths.empty()) {

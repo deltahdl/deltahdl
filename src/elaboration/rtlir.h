@@ -61,6 +61,7 @@ struct RtlirVariable {
   bool is_4state = true;
   bool is_event = false;
   bool is_string = false;
+  bool is_real = false;
 };
 
 // --- Continuous assignment ---

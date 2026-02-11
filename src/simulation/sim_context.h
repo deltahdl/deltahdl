@@ -93,6 +93,10 @@ class SimContext {
   uint32_t Urandom32();
   uint32_t UrandomRange(uint32_t min_val, uint32_t max_val);
 
+  // §6.12: Real variable registration and lookup.
+  void RegisterRealVariable(std::string_view name);
+  bool IsRealVariable(std::string_view name) const;
+
   // §6.16: String variable registration and lookup.
   void RegisterStringVariable(std::string_view name);
   bool IsStringVariable(std::string_view name) const;
@@ -169,6 +173,8 @@ class SimContext {
   std::vector<std::string> plus_args_;
   std::unordered_map<int, FILE*> file_descriptors_;
   int next_fd_ = 3;  // Start after stdin/stdout/stderr.
+  // §6.12: Real variable tracking.
+  std::unordered_set<std::string_view> real_vars_;
   // §6.16: String variable tracking.
   std::unordered_set<std::string_view> string_vars_;
   // §6.19: Enum type info and variable-to-enum-type mapping.

@@ -139,6 +139,14 @@ void SimContext::AddPlusArg(std::string arg) {
   plus_args_.push_back(std::move(arg));
 }
 
+void SimContext::RegisterRealVariable(std::string_view name) {
+  real_vars_.insert(name);
+}
+
+bool SimContext::IsRealVariable(std::string_view name) const {
+  return real_vars_.count(name) != 0;
+}
+
 void SimContext::RegisterStringVariable(std::string_view name) {
   string_vars_.insert(name);
 }

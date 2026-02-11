@@ -15,6 +15,35 @@
 
 namespace delta {
 
+static NetType DataTypeToNetType(DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kTri:
+      return NetType::kTri;
+    case DataTypeKind::kWand:
+      return NetType::kWand;
+    case DataTypeKind::kWor:
+      return NetType::kWor;
+    case DataTypeKind::kTriand:
+      return NetType::kTriand;
+    case DataTypeKind::kTrior:
+      return NetType::kTrior;
+    case DataTypeKind::kTri0:
+      return NetType::kTri0;
+    case DataTypeKind::kTri1:
+      return NetType::kTri1;
+    case DataTypeKind::kSupply0:
+      return NetType::kSupply0;
+    case DataTypeKind::kSupply1:
+      return NetType::kSupply1;
+    case DataTypeKind::kTrireg:
+      return NetType::kTrireg;
+    case DataTypeKind::kUwire:
+      return NetType::kUwire;
+    default:
+      return NetType::kWire;
+  }
+}
+
 Elaborator::Elaborator(Arena& arena, DiagEngine& diag, CompilationUnit* unit)
     : arena_(arena), diag_(diag), unit_(unit) {}
 
@@ -285,7 +314,7 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   var_types_[item->name] = item->data_type.kind;
   RtlirNet net;
   net.name = ScopedName(item->name);
-  net.net_type = NetType::kWire;
+  net.net_type = DataTypeToNetType(item->data_type.kind);
   net.width = EvalTypeWidth(item->data_type, typedefs_);
   mod->nets.push_back(net);
 }
@@ -301,6 +330,9 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   var.is_4state = Is4stateType(item->data_type, typedefs_);
   var.is_event = (item->data_type.kind == DataTypeKind::kEvent);
   var.is_string = (item->data_type.kind == DataTypeKind::kString);
+  var.is_real = (item->data_type.kind == DataTypeKind::kReal ||
+                 item->data_type.kind == DataTypeKind::kShortreal ||
+                 item->data_type.kind == DataTypeKind::kRealtime);
   mod->variables.push_back(var);
   ValidateArrayInitPattern(item);
   TrackEnumVariable(item);

@@ -1,6 +1,6 @@
 #include <cmath>
 #include <cstdint>
-#include <random>
+#include <cstring>
 #include <string_view>
 
 #include "common/arena.h"
@@ -16,13 +16,21 @@ namespace delta {
 // ============================================================================
 
 static double ArgToDouble(const Expr* arg, SimContext& ctx, Arena& arena) {
+  if (arg->kind == ExprKind::kRealLiteral) return arg->real_val;
   auto val = EvalExpr(arg, ctx, arena);
+  if (arg->kind == ExprKind::kIdentifier && ctx.IsRealVariable(arg->text)) {
+    uint64_t bits = val.ToUint64();
+    double d = 0.0;
+    std::memcpy(&d, &bits, sizeof(double));
+    return d;
+  }
   return static_cast<double>(val.ToUint64());
 }
 
 static Logic4Vec DoubleToResult(Arena& arena, double d) {
-  auto v = static_cast<int64_t>(std::trunc(d));
-  return MakeLogic4VecVal(arena, 64, static_cast<uint64_t>(v));
+  uint64_t bits = 0;
+  std::memcpy(&bits, &d, sizeof(double));
+  return MakeLogic4VecVal(arena, 64, bits);
 }
 
 // ============================================================================

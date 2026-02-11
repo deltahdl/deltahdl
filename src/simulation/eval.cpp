@@ -874,8 +874,11 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena) {
       return EvalIntLiteral(expr, arena);
     case ExprKind::kStringLiteral:
       return EvalStringLiteral(expr, arena);
-    case ExprKind::kRealLiteral:
-      return MakeLogic4VecVal(arena, 64, 0);
+    case ExprKind::kRealLiteral: {
+      uint64_t bits = 0;
+      std::memcpy(&bits, &expr->real_val, sizeof(double));
+      return MakeLogic4VecVal(arena, 64, bits);
+    }
     case ExprKind::kIdentifier:
       return EvalIdentifier(expr, ctx, arena);
     case ExprKind::kUnary:

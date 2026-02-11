@@ -382,3 +382,76 @@ TEST(NetResolution, Tri1ResolvesToOne) {
   EXPECT_EQ(var->value.words[0].aval & 0xFF, 0xFFu);
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0u);
 }
+
+// --- §6.6.6: Supply net resolution ---
+
+TEST(NetResolution, Supply0AlwaysZero) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 8);
+  Net net;
+  net.type = NetType::kSupply0;
+  net.resolved = var;
+  // Driver tries to drive 0xFF — supply0 should override to 0.
+  net.drivers.push_back(MakeLogic4VecVal(arena, 8, 0xFF));
+  net.Resolve(arena);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+TEST(NetResolution, Supply1AlwaysOne) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 8);
+  Net net;
+  net.type = NetType::kSupply1;
+  net.resolved = var;
+  // Driver tries to drive 0x00 — supply1 should override to all-1.
+  net.drivers.push_back(MakeLogic4VecVal(arena, 8, 0));
+  net.Resolve(arena);
+  EXPECT_EQ(var->value.ToUint64() & 0xFF, 0xFFu);
+}
+
+TEST(NetResolution, Supply0OverridesMultipleDrivers) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 8);
+  Net net;
+  net.type = NetType::kSupply0;
+  net.resolved = var;
+  net.drivers.push_back(MakeLogic4VecVal(arena, 8, 0xFF));
+  net.drivers.push_back(MakeLogic4VecVal(arena, 8, 0xAA));
+  net.Resolve(arena);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+// --- §6.6.4: Trireg charge retention ---
+
+TEST(NetResolution, TriregRetainsPrevValue) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  // First set the variable to a known value (simulating previous driven state).
+  var->value = MakeLogic4VecVal(arena, 8, 42);
+  Net net;
+  net.type = NetType::kTrireg;
+  net.resolved = var;
+  // All drivers go to Z — trireg should retain value 42.
+  auto z_drv = MakeLogic4Vec(arena, 8);
+  z_drv.words[0].aval = ~uint64_t{0};
+  z_drv.words[0].bval = ~uint64_t{0};
+  net.drivers.push_back(z_drv);
+  net.Resolve(arena);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
+TEST(NetResolution, TriregDrivenNormally) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4VecVal(arena, 8, 42);
+  Net net;
+  net.type = NetType::kTrireg;
+  net.resolved = var;
+  // Non-Z driver overrides previous value.
+  net.drivers.push_back(MakeLogic4VecVal(arena, 8, 99));
+  net.Resolve(arena);
+  EXPECT_EQ(var->value.ToUint64(), 99u);
+}
