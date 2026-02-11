@@ -222,6 +222,7 @@ class Parser {
 
   // Types
   DataType ParseDataType();
+  DataType ParseVirtualInterfaceType();
 
   // Event lists
   std::vector<EventExpr> ParseEventList();

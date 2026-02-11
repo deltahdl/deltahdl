@@ -430,6 +430,18 @@ uint8_t Parser::ParseChargeStrength() {
   return result;
 }
 
+// Virtual interface type: virtual [interface] type_name [.modport] (§25.9)
+DataType Parser::ParseVirtualInterfaceType() {
+  DataType dtype;
+  dtype.kind = DataTypeKind::kVirtualInterface;
+  Match(TokenKind::kKwInterface);
+  dtype.type_name = Expect(TokenKind::kIdentifier).text;
+  if (Match(TokenKind::kDot)) {
+    dtype.modport_name = Expect(TokenKind::kIdentifier).text;
+  }
+  return dtype;
+}
+
 DataType Parser::ParseDataType() {
   DataType dtype;
 
@@ -437,16 +449,9 @@ DataType Parser::ParseDataType() {
     dtype.is_const = true;
   }
 
-  // Virtual interface type: virtual [interface] type_name [.modport] (§25.9)
   if (Check(TokenKind::kKwVirtual)) {
     Consume();
-    dtype.kind = DataTypeKind::kVirtualInterface;
-    Match(TokenKind::kKwInterface);  // optional 'interface' keyword
-    dtype.type_name = Expect(TokenKind::kIdentifier).text;
-    if (Match(TokenKind::kDot)) {
-      dtype.modport_name = Expect(TokenKind::kIdentifier).text;
-    }
-    return dtype;
+    return ParseVirtualInterfaceType();
   }
 
   if (CurrentToken().Is(TokenKind::kIdentifier) &&
