@@ -76,8 +76,8 @@ static Variable* TryResolveCompoundElement(const Expr* lhs, SimContext& ctx,
   auto* var = ctx.FindVariable(compound);
   if (var) return var;
   // Lazily create the element for multi-dim arrays.
-  return ctx.CreateVariable(
-      *arena.Create<std::string>(std::move(compound)), 32);
+  return ctx.CreateVariable(*arena.Create<std::string>(std::move(compound)),
+                            32);
 }
 
 // Find the target variable for a compound LHS expression.
@@ -121,25 +121,43 @@ static bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
   return false;
 }
 
+// Write a range of bits [hi:lo] into var.
+static void WritePartSelect(Variable* var, uint32_t lo, uint32_t width,
+                            const Logic4Vec& rhs_val, Arena& arena) {
+  uint64_t mask = (width >= 64) ? ~uint64_t{0} : (uint64_t{1} << width) - 1;
+  uint64_t old_val = var->value.ToUint64();
+  uint64_t new_bits = (rhs_val.ToUint64() & mask) << lo;
+  uint64_t cleared = old_val & ~(mask << lo);
+  var->value = MakeLogic4VecVal(arena, var->value.width, cleared | new_bits);
+}
+
 // Write rhs_val to var at the bit position(s) indicated by a Select LHS.
 static void WriteBitSelect(Variable* var, const Expr* lhs,
                            const Logic4Vec& rhs_val, SimContext& ctx,
                            Arena& arena) {
   auto idx_val = EvalExpr(lhs->index, ctx, arena);
-  uint64_t idx = idx_val.ToUint64();
+  auto idx = static_cast<uint32_t>(idx_val.ToUint64());
 
   if (lhs->index_end) {
-    // Part-select: var[hi:lo] = rhs_val.
-    auto end_val = EvalExpr(lhs->index_end, ctx, arena);
-    uint64_t end_idx = end_val.ToUint64();
-    auto lo = static_cast<uint32_t>((idx < end_idx) ? idx : end_idx);
-    auto hi = static_cast<uint32_t>((idx > end_idx) ? idx : end_idx);
-    uint32_t width = hi - lo + 1;
-    uint64_t mask = (width >= 64) ? ~uint64_t{0} : (uint64_t{1} << width) - 1;
-    uint64_t old_val = var->value.ToUint64();
-    uint64_t new_bits = (rhs_val.ToUint64() & mask) << lo;
-    uint64_t cleared = old_val & ~(mask << lo);
-    var->value = MakeLogic4VecVal(arena, var->value.width, cleared | new_bits);
+    if (lhs->is_part_select_plus) {
+      // §7.4.5: var[base +: width] — write `width` bits starting at `base`.
+      auto w = static_cast<uint32_t>(
+          EvalExpr(lhs->index_end, ctx, arena).ToUint64());
+      WritePartSelect(var, idx, w, rhs_val, arena);
+    } else if (lhs->is_part_select_minus) {
+      // §7.4.5: var[base -: width] — write `width` bits ending at `base`.
+      auto w = static_cast<uint32_t>(
+          EvalExpr(lhs->index_end, ctx, arena).ToUint64());
+      uint32_t lo = (idx >= w - 1) ? idx - w + 1 : 0;
+      WritePartSelect(var, lo, w, rhs_val, arena);
+    } else {
+      // Part-select: var[hi:lo] = rhs_val.
+      auto end_idx = static_cast<uint32_t>(
+          EvalExpr(lhs->index_end, ctx, arena).ToUint64());
+      auto lo = std::min(idx, end_idx);
+      auto hi = std::max(idx, end_idx);
+      WritePartSelect(var, lo, hi - lo + 1, rhs_val, arena);
+    }
   } else {
     // Single bit select: var[idx] = rhs_val[0].
     uint64_t old_val = var->value.ToUint64();
@@ -249,7 +267,8 @@ static bool TryAssocIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
     }
     aa->str_data[s] = rhs_val;
   } else {
-    auto key = static_cast<int64_t>(EvalExpr(lhs->index, ctx, arena).ToUint64());
+    auto key =
+        static_cast<int64_t>(EvalExpr(lhs->index, ctx, arena).ToUint64());
     aa->int_data[key] = rhs_val;
   }
   return true;
@@ -270,8 +289,8 @@ static bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
 }
 
 // §7.10: Evaluate a queue index expression with $ = last index.
-static int64_t EvalQueueIndex(const Expr* expr, QueueObject* q,
-                              SimContext& ctx, Arena& arena) {
+static int64_t EvalQueueIndex(const Expr* expr, QueueObject* q, SimContext& ctx,
+                              Arena& arena) {
   ctx.PushScope();
   auto* dv = ctx.CreateLocalVariable("$", 32);
   int64_t last =
@@ -360,13 +379,12 @@ static bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx,
       !stmt->rhs->args.empty()) {
     auto sz = EvalExpr(stmt->rhs->args[0], ctx, arena).ToUint64();
     q->elements.resize(static_cast<size_t>(sz),
-                        MakeLogic4VecVal(arena, q->elem_width, 0));
+                       MakeLogic4VecVal(arena, q->elem_width, 0));
     return true;
   }
   std::vector<Logic4Vec> elems;
   CollectQueueElements(stmt->rhs, ctx, arena, elems);
-  if (q->max_size > 0 &&
-      static_cast<int32_t>(elems.size()) > q->max_size) {
+  if (q->max_size > 0 && static_cast<int32_t>(elems.size()) > q->max_size) {
     elems.resize(static_cast<size_t>(q->max_size));
   }
   q->elements = std::move(elems);
@@ -400,10 +418,25 @@ static bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
   return true;  // Select always handled (even if var not found).
 }
 
+// §7.8: Associative array whole-array copy assignment (w = words).
+static bool TryAssocCopyAssign(const Stmt* stmt, SimContext& ctx) {
+  if (stmt->lhs->kind != ExprKind::kIdentifier) return false;
+  if (stmt->rhs->kind != ExprKind::kIdentifier) return false;
+  auto* dst = ctx.FindAssocArray(stmt->lhs->text);
+  auto* src = ctx.FindAssocArray(stmt->rhs->text);
+  if (!dst || !src) return false;
+  dst->int_data = src->int_data;
+  dst->str_data = src->str_data;
+  return true;
+}
+
 // Execute a blocking assignment with full LHS support.
 static StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
                                          Arena& arena) {
   if (!stmt->lhs) return StmtResult::kDone;
+
+  // §7.8: Associative array copy assignment.
+  if (TryAssocCopyAssign(stmt, ctx)) return StmtResult::kDone;
 
   // §7.10.4: Queue assignment must be checked before RHS evaluation.
   if (TryQueueBlockingAssign(stmt, ctx, arena)) return StmtResult::kDone;
@@ -472,6 +505,30 @@ static StmtResult ExecExprStmtImpl(const Stmt* stmt, SimContext& ctx,
 
 // --- Block-level variable declaration (IEEE §9.3.1) ---
 
+// §7.4: Create unpacked array elements for block-level variable declarations.
+static void CreateBlockArrayElements(const Stmt* stmt, uint32_t elem_width,
+                                     SimContext& ctx, Arena& arena) {
+  if (stmt->var_unpacked_dims.empty()) return;
+  auto* dim = stmt->var_unpacked_dims[0];
+  if (!dim || dim->kind != ExprKind::kBinary || dim->op != TokenKind::kColon)
+    return;
+  auto left = static_cast<int64_t>(EvalExpr(dim->lhs, ctx, arena).ToUint64());
+  auto right = static_cast<int64_t>(EvalExpr(dim->rhs, ctx, arena).ToUint64());
+  auto lo = static_cast<uint32_t>(std::min(left, right));
+  auto size = static_cast<uint32_t>(std::abs(left - right) + 1);
+  ArrayInfo info;
+  info.lo = lo;
+  info.size = size;
+  info.elem_width = elem_width;
+  info.is_descending = (left > right);
+  ctx.RegisterArray(stmt->var_name, info);
+  for (uint32_t i = 0; i < size; ++i) {
+    uint32_t idx = lo + i;
+    auto name = std::string(stmt->var_name) + "[" + std::to_string(idx) + "]";
+    ctx.CreateVariable(*arena.Create<std::string>(std::move(name)), elem_width);
+  }
+}
+
 static StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx,
                                   Arena& arena) {
   uint32_t width = EvalTypeWidth(stmt->var_decl_type);
@@ -481,6 +538,7 @@ static StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx,
   } else {
     if (width == 0) width = 32;  // Default to int-sized.
     ctx.CreateVariable(stmt->var_name, width);
+    CreateBlockArrayElements(stmt, width, ctx, arena);
   }
   if (stmt->var_init) {
     auto* var = ctx.FindVariable(stmt->var_name);

@@ -61,10 +61,17 @@ static bool TextHasXZ(std::string_view text) {
 // Bits per digit for each base letter.
 static int BitsPerDigit(char base_letter) {
   switch (base_letter) {
-    case 'h': case 'H': return 4;
-    case 'o': case 'O': return 3;
-    case 'b': case 'B': return 1;
-    default: return 0;
+    case 'h':
+    case 'H':
+      return 4;
+    case 'o':
+    case 'O':
+      return 3;
+    case 'b':
+    case 'B':
+      return 1;
+    default:
+      return 0;
   }
 }
 
@@ -119,7 +126,8 @@ static Logic4Vec ParseBasedXZLiteral(std::string_view text, uint32_t width,
 
 static Logic4Vec EvalIntLiteral(const Expr* expr, Arena& arena) {
   uint32_t width = LiteralWidth(expr->text, expr->int_val);
-  if (TextHasXZ(expr->text)) return ParseBasedXZLiteral(expr->text, width, arena);
+  if (TextHasXZ(expr->text))
+    return ParseBasedXZLiteral(expr->text, width, arena);
   return MakeLogic4VecVal(arena, width, expr->int_val);
 }
 
@@ -836,18 +844,21 @@ static bool TryAssocSelect(const Expr* expr, SimContext& ctx, Arena& arena,
     s.reserve(nb);
     for (uint32_t i = nb; i > 0; --i) {
       uint32_t bi = i - 1;
-      auto ch = static_cast<char>((key.words[(bi * 8) / 64].aval >>
-                                   ((bi * 8) % 64)) & 0xFF);
+      auto ch = static_cast<char>(
+          (key.words[(bi * 8) / 64].aval >> ((bi * 8) % 64)) & 0xFF);
       if (ch != 0) s.push_back(ch);
     }
     auto it = aa->str_data.find(s);
-    out = (it != aa->str_data.end()) ? it->second
-                                     : MakeLogic4VecVal(arena, aa->elem_width, 0);
+    out = (it != aa->str_data.end())
+              ? it->second
+              : MakeLogic4VecVal(arena, aa->elem_width, 0);
   } else {
-    auto key = static_cast<int64_t>(EvalExpr(expr->index, ctx, arena).ToUint64());
+    auto key =
+        static_cast<int64_t>(EvalExpr(expr->index, ctx, arena).ToUint64());
     auto it = aa->int_data.find(key);
-    out = (it != aa->int_data.end()) ? it->second
-                                     : MakeLogic4VecVal(arena, aa->elem_width, 0);
+    out = (it != aa->int_data.end())
+              ? it->second
+              : MakeLogic4VecVal(arena, aa->elem_width, 0);
   }
   return true;
 }
@@ -865,8 +876,19 @@ static Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
 
   auto base_val = EvalExpr(expr->base, ctx, arena);
   if (expr->index_end) {
-    auto end_val = EvalExpr(expr->index_end, ctx, arena);
-    return EvalPartSelect(base_val, idx, end_val.ToUint64(), arena);
+    auto end_val = EvalExpr(expr->index_end, ctx, arena).ToUint64();
+    if (expr->is_part_select_plus) {
+      // §7.4.5: base[idx +: width] → extract `width` bits from bit `idx`.
+      auto w = static_cast<uint32_t>(end_val);
+      return EvalPartSelect(base_val, idx, idx + w - 1, arena);
+    }
+    if (expr->is_part_select_minus) {
+      // §7.4.5: base[idx -: width] → extract `width` bits ending at `idx`.
+      auto w = static_cast<uint32_t>(end_val);
+      uint64_t lo = (idx >= w - 1) ? idx - w + 1 : 0;
+      return EvalPartSelect(base_val, lo, idx, arena);
+    }
+    return EvalPartSelect(base_val, idx, end_val, arena);
   }
   // Single bit select.
   return MakeLogic4VecVal(arena, 1, (base_val.ToUint64() >> idx) & 1);
@@ -919,6 +941,41 @@ static Logic4Vec ResolveArgValue(const FunctionArg& param, const Expr* expr,
   return MakeLogic4Vec(arena, 32);
 }
 
+// §7.8: Copy associative array data when passing to a subroutine.
+static bool TryBindAssocArg(const Expr* call_arg, std::string_view param_name,
+                            SimContext& ctx) {
+  if (!call_arg || call_arg->kind != ExprKind::kIdentifier) return false;
+  auto* src = ctx.FindAssocArray(call_arg->text);
+  if (!src) return false;
+  auto* dst =
+      ctx.CreateAssocArray(param_name, src->elem_width, src->is_string_key);
+  dst->int_data = src->int_data;
+  dst->str_data = src->str_data;
+  return true;
+}
+
+// §13.4: Copy array elements when passing an unpacked array to a subroutine.
+static bool TryBindArrayArg(const Expr* call_arg, std::string_view param_name,
+                            SimContext& ctx, Arena& arena) {
+  if (!call_arg || call_arg->kind != ExprKind::kIdentifier) return false;
+  if (TryBindAssocArg(call_arg, param_name, ctx)) return true;
+  auto* info = ctx.FindArrayInfo(call_arg->text);
+  if (!info) return false;
+  ctx.RegisterArray(param_name, *info);
+  for (uint32_t j = 0; j < info->size; ++j) {
+    uint32_t idx = info->lo + j;
+    auto src = std::string(call_arg->text) + "[" + std::to_string(idx) + "]";
+    auto dst = std::string(param_name) + "[" + std::to_string(idx) + "]";
+    auto* src_var = ctx.FindVariable(src);
+    auto val =
+        src_var ? src_var->value : MakeLogic4VecVal(arena, info->elem_width, 0);
+    auto* dst_var = ctx.CreateLocalVariable(
+        *arena.Create<std::string>(std::move(dst)), val.width);
+    dst_var->value = val;
+  }
+  return true;
+}
+
 // §13.5: Bind function arguments with named, default, and ref support.
 static void BindFunctionArgs(const ModuleItem* func, const Expr* expr,
                              SimContext& ctx, Arena& arena) {
@@ -927,6 +984,10 @@ static void BindFunctionArgs(const ModuleItem* func, const Expr* expr,
     auto dir = func->func_args[i].direction;
     if (dir == Direction::kRef &&
         TryBindRefArg(expr, ai, func->func_args[i].name, ctx)) {
+      continue;
+    }
+    if (ai >= 0 && TryBindArrayArg(expr->args[static_cast<size_t>(ai)],
+                                   func->func_args[i].name, ctx, arena)) {
       continue;
     }
     auto val = ResolveArgValue(func->func_args[i], expr, ai, ctx, arena);
@@ -949,6 +1010,40 @@ static void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
     if (call_arg->kind != ExprKind::kIdentifier) continue;
     auto* target = ctx.FindVariable(call_arg->text);
     if (target) target->value = local->value;
+  }
+}
+
+// §13: Handle blocking assignment inside function/task body.
+static void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx,
+                                   Arena& arena) {
+  if (!stmt->lhs) return;
+  auto val = EvalExpr(stmt->rhs, ctx, arena);
+  // Simple identifier LHS.
+  if (stmt->lhs->kind == ExprKind::kIdentifier) {
+    auto* var = ctx.FindVariable(stmt->lhs->text);
+    if (var) var->value = val;
+    return;
+  }
+  // Select (indexed) LHS: array or assoc array element write.
+  if (stmt->lhs->kind == ExprKind::kSelect && stmt->lhs->base &&
+      stmt->lhs->base->kind == ExprKind::kIdentifier) {
+    auto* aa = ctx.FindAssocArray(stmt->lhs->base->text);
+    if (aa && stmt->lhs->index) {
+      if (aa->is_string_key) {
+        auto key = FormatValueAsString(EvalExpr(stmt->lhs->index, ctx, arena));
+        aa->str_data[key] = val;
+      } else {
+        auto key = static_cast<int64_t>(
+            EvalExpr(stmt->lhs->index, ctx, arena).ToUint64());
+        aa->int_data[key] = val;
+      }
+      return;
+    }
+    auto idx = EvalExpr(stmt->lhs->index, ctx, arena).ToUint64();
+    auto name =
+        std::string(stmt->lhs->base->text) + "[" + std::to_string(idx) + "]";
+    auto* elem = ctx.FindVariable(name);
+    if (elem) elem->value = val;
   }
 }
 
@@ -986,11 +1081,7 @@ static bool ExecFuncStmt(const Stmt* stmt, Variable* ret_var, SimContext& ctx,
       if (stmt->expr) ret_var->value = EvalExpr(stmt->expr, ctx, arena);
       return true;
     case StmtKind::kBlockingAssign:
-      if (stmt->lhs) {
-        auto val = EvalExpr(stmt->rhs, ctx, arena);
-        auto* var = ctx.FindVariable(stmt->lhs->text);
-        if (var) var->value = val;
-      }
+      ExecFuncBlockingAssign(stmt, ctx, arena);
       return false;
     case StmtKind::kExprStmt:
       EvalExpr(stmt->expr, ctx, arena);

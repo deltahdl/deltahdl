@@ -44,7 +44,8 @@ static void WriteElements(std::string_view var_name, const ArrayInfo& info,
 // Collect Logic4Vec values from an unpacked array (preserves full value).
 static std::vector<Logic4Vec> CollectVecElements(std::string_view var_name,
                                                  const ArrayInfo& info,
-                                                 SimContext& ctx, Arena& arena) {
+                                                 SimContext& ctx,
+                                                 Arena& arena) {
   std::vector<Logic4Vec> vals;
   vals.reserve(info.size);
   for (uint32_t i = 0; i < info.size; ++i) {
@@ -548,17 +549,19 @@ static bool AssocStrTraversal(AssocArrayObject* aa, std::string_view method,
 static bool AssocIntTraversal(AssocArrayObject* aa, std::string_view method,
                               Variable* ref_var, Arena& arena, Logic4Vec& out) {
   auto& m = aa->int_data;
+  uint32_t w = ref_var->value.width;
+  if (w == 0) w = 32;
   if (m.empty()) {
     out = MakeLogic4VecVal(arena, 32, 0);
     return true;
   }
   if (method == "first") {
-    ref_var->value = MakeLogic4VecVal(arena, 32, m.begin()->first);
+    ref_var->value = MakeLogic4VecVal(arena, w, m.begin()->first);
     out = MakeLogic4VecVal(arena, 32, 1);
     return true;
   }
   if (method == "last") {
-    ref_var->value = MakeLogic4VecVal(arena, 32, m.rbegin()->first);
+    ref_var->value = MakeLogic4VecVal(arena, w, m.rbegin()->first);
     out = MakeLogic4VecVal(arena, 32, 1);
     return true;
   }
@@ -574,14 +577,14 @@ static bool AssocIntTraversal(AssocArrayObject* aa, std::string_view method,
       out = MakeLogic4VecVal(arena, 32, 0);
       return true;
     }
-    ref_var->value = MakeLogic4VecVal(arena, 32, it->first);
+    ref_var->value = MakeLogic4VecVal(arena, w, it->first);
   } else {
     if (it == m.begin()) {
       out = MakeLogic4VecVal(arena, 32, 0);
       return true;
     }
     --it;
-    ref_var->value = MakeLogic4VecVal(arena, 32, it->first);
+    ref_var->value = MakeLogic4VecVal(arena, w, it->first);
   }
   out = MakeLogic4VecVal(arena, 32, 1);
   return true;
@@ -695,7 +698,8 @@ static bool EvalWithPredicate(const Expr* with_expr, const Logic4Vec& item_val,
   if (is_string) ctx.RegisterStringVariable("item");
   // §7.12.4: item.index provides the array index of the current element.
   auto* idx_var = ctx.CreateLocalVariable("item.index", 32);
-  idx_var->value = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(item_index));
+  idx_var->value =
+      MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(item_index));
   auto result = EvalExpr(with_expr, ctx, arena).ToUint64();
   ctx.PopScope();
   return result != 0;
@@ -764,14 +768,17 @@ static void LocatorFindIndex(std::string_view method,
 }
 
 // §7.12.1: unique — return queue of distinct values.
-static void LocatorUnique(const std::vector<Logic4Vec>& elems,
-                          Arena& /*arena*/, std::vector<Logic4Vec>& out) {
+static void LocatorUnique(const std::vector<Logic4Vec>& elems, Arena& /*arena*/,
+                          std::vector<Logic4Vec>& out) {
   std::vector<uint64_t> seen;
   for (const auto& e : elems) {
     uint64_t v = e.ToUint64();
     bool dup = false;
     for (uint64_t s : seen) {
-      if (s == v) { dup = true; break; }
+      if (s == v) {
+        dup = true;
+        break;
+      }
     }
     if (!dup) {
       seen.push_back(v);
@@ -788,7 +795,10 @@ static void LocatorUniqueIndex(const std::vector<Logic4Vec>& elems,
     uint64_t v = elems[i].ToUint64();
     bool dup = false;
     for (uint64_t s : seen) {
-      if (s == v) { dup = true; break; }
+      if (s == v) {
+        dup = true;
+        break;
+      }
     }
     if (!dup) {
       seen.push_back(v);

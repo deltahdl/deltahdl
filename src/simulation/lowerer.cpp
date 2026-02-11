@@ -162,6 +162,13 @@ void Lowerer::LowerVar(const RtlirVariable& var) {
 }
 
 void Lowerer::LowerModule(const RtlirModule* mod) {
+  // Create variables for resolved parameters (§6.20).
+  for (const auto& p : mod->params) {
+    if (!p.is_resolved) continue;
+    auto* var = ctx_.CreateVariable(p.name, 32);
+    var->value =
+        MakeLogic4VecVal(arena_, 32, static_cast<uint64_t>(p.resolved_value));
+  }
   // Create Net objects for all declared nets (with resolution support).
   for (const auto& net : mod->nets) {
     ctx_.CreateNet(net.name, net.net_type, net.width, net.charge_strength,

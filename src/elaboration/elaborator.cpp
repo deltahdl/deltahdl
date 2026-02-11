@@ -316,7 +316,7 @@ static void ElaborateGateInst(ModuleItem* item, RtlirModule* mod,
 static void InferDynArraySize(const std::vector<Expr*>& dims, const Expr* init,
                               RtlirVariable& var) {
   if (dims.empty() || dims[0] != nullptr) return;  // Not a dynamic array.
-  if (var.is_queue || var.is_assoc) return;         // Already classified.
+  if (var.is_queue || var.is_assoc) return;        // Already classified.
   if (init && !init->elements.empty()) {
     var.unpacked_size = static_cast<uint32_t>(init->elements.size());
     return;
@@ -473,8 +473,22 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kModuleInst:
       ElaborateModuleInst(item, mod);
       break;
-    case ModuleItemKind::kParamDecl:
+    case ModuleItemKind::kParamDecl: {
+      // §6.20: Body-level parameter/localparam declarations.
+      RtlirParamDecl pd;
+      pd.name = item->name;
+      pd.default_value = item->init_expr;
+      if (item->init_expr) {
+        auto scope = BuildParamScope(mod);
+        auto val = ConstEvalInt(item->init_expr, scope);
+        if (val) {
+          pd.resolved_value = *val;
+          pd.is_resolved = true;
+        }
+      }
+      mod->params.push_back(pd);
       break;
+    }
     case ModuleItemKind::kGenerateIf:
       ElaborateGenerateIf(item, mod, BuildParamScope(mod));
       break;
