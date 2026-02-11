@@ -141,6 +141,105 @@ TEST(ParserSection27, GenerateForPostIncrement) {
   ASSERT_EQ(gen->gen_body.size(), 1);
 }
 
+// --- Generate-case (§27.6) ---
+
+TEST(ParserSection27, GenerateCase) {
+  auto r = Parse(
+      "module m;\n"
+      "  case (WIDTH)\n"
+      "    1: assign out = in;\n"
+      "    2: assign out = in2;\n"
+      "    default: assign out = 0;\n"
+      "  endcase\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 1u);
+  auto* gen = mod->items[0];
+  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateCase);
+  ASSERT_EQ(gen->gen_case_items.size(), 3u);
+  EXPECT_FALSE(gen->gen_case_items[0].is_default);
+  EXPECT_FALSE(gen->gen_case_items[1].is_default);
+  EXPECT_TRUE(gen->gen_case_items[2].is_default);
+}
+
+// --- Generate-for with labeled begin/end (§27.4) ---
+
+TEST(ParserSection27, GenerateForLabeled) {
+  auto r = Parse(
+      "module m;\n"
+      "  for (genvar i = 0; i < 4; i++) begin : gen_blk\n"
+      "    assign out[i] = in[i];\n"
+      "  end : gen_blk\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 1u);
+  auto* gen = mod->items[0];
+  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateFor);
+  ASSERT_EQ(gen->gen_body.size(), 1u);
+}
+
+// --- Generate-if with begin/end blocks (§27.5) ---
+
+TEST(ParserSection27, GenerateIfBeginEnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  if (WIDTH > 1) begin\n"
+      "    assign a = b;\n"
+      "    assign c = d;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 1u);
+  auto* gen = mod->items[0];
+  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateIf);
+  ASSERT_GE(gen->gen_body.size(), 2u);
+}
+
+// --- Generate-if/else-if chain (§27.5) ---
+
+TEST(ParserSection27, GenerateIfElseIfChain) {
+  auto r = Parse(
+      "module m;\n"
+      "  if (WIDTH == 1)\n"
+      "    assign out = a;\n"
+      "  else if (WIDTH == 2)\n"
+      "    assign out = b;\n"
+      "  else\n"
+      "    assign out = c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 1u);
+  auto* gen = mod->items[0];
+  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateIf);
+  ASSERT_NE(gen->gen_else, nullptr);
+  EXPECT_EQ(gen->gen_else->kind, ModuleItemKind::kGenerateIf);
+  ASSERT_NE(gen->gen_else->gen_else, nullptr);
+}
+
+// --- generate...endgenerate wrapper (§27.3) ---
+
+TEST(ParserSection27, GenerateRegion) {
+  auto r = Parse(
+      "module m;\n"
+      "  generate\n"
+      "    for (genvar i = 0; i < 4; i++) begin\n"
+      "      assign out[i] = in[i];\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  bool found_gen_for = false;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kGenerateFor) found_gen_for = true;
+  }
+  EXPECT_TRUE(found_gen_for);
+}
+
 TEST(ParserSection27, GenerateForCompoundAssign) {
   auto r = Parse(
       "module m;\n"

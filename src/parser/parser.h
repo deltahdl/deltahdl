@@ -47,6 +47,7 @@ class Parser {
   void ParseGenerateBody(std::vector<ModuleItem*>& body);
   ModuleItem* ParseGenerateFor();
   ModuleItem* ParseGenerateIf();
+  void ParseGenerateCaseLabel(GenerateCaseItem& ci);
   ModuleItem* ParseGenerateCase();
 
   // Top-level declarations (parser_toplevel.cpp)

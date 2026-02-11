@@ -4,10 +4,12 @@ namespace delta {
 
 void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body) {
   if (Match(TokenKind::kKwBegin)) {
+    if (Match(TokenKind::kColon)) Match(TokenKind::kIdentifier);
     while (!Check(TokenKind::kKwEnd) && !AtEnd()) {
       ParseModuleItem(body);
     }
     Expect(TokenKind::kKwEnd);
+    if (Match(TokenKind::kColon)) Match(TokenKind::kIdentifier);
   } else {
     ParseModuleItem(body);  // single generate item
   }
@@ -33,15 +35,7 @@ ModuleItem* Parser::ParseGenerateFor() {
   Expect(TokenKind::kSemicolon);
   item->gen_step = ParseAssignmentOrExprNoSemi();
   Expect(TokenKind::kRParen);
-
-  if (Match(TokenKind::kKwBegin)) {
-    while (!Check(TokenKind::kKwEnd) && !AtEnd()) {
-      ParseModuleItem(item->gen_body);
-    }
-    Expect(TokenKind::kKwEnd);
-  } else {
-    ParseModuleItem(item->gen_body);  // single generate item
-  }
+  ParseGenerateBody(item->gen_body);
   return item;
 }
 
@@ -53,21 +47,31 @@ ModuleItem* Parser::ParseGenerateIf() {
   Expect(TokenKind::kLParen);
   item->gen_cond = ParseExpr();
   Expect(TokenKind::kRParen);
-
   ParseGenerateBody(item->gen_body);
-
-  if (Match(TokenKind::kKwElse)) {
-    if (Check(TokenKind::kKwIf)) {
-      item->gen_else = ParseGenerateIf();
-    } else {
-      auto* else_item = arena_.Create<ModuleItem>();
-      else_item->kind = ModuleItemKind::kGenerateIf;
-      else_item->loc = CurrentLoc();
-      ParseGenerateBody(else_item->gen_body);
-      item->gen_else = else_item;
-    }
+  if (!Match(TokenKind::kKwElse)) return item;
+  if (Check(TokenKind::kKwIf)) {
+    item->gen_else = ParseGenerateIf();
+  } else {
+    auto* else_item = arena_.Create<ModuleItem>();
+    else_item->kind = ModuleItemKind::kGenerateIf;
+    else_item->loc = CurrentLoc();
+    ParseGenerateBody(else_item->gen_body);
+    item->gen_else = else_item;
   }
   return item;
+}
+
+void Parser::ParseGenerateCaseLabel(GenerateCaseItem& ci) {
+  if (Match(TokenKind::kKwDefault)) {
+    ci.is_default = true;
+    Match(TokenKind::kColon);
+    return;
+  }
+  ci.patterns.push_back(ParseExpr());
+  while (Match(TokenKind::kComma)) {
+    ci.patterns.push_back(ParseExpr());
+  }
+  Expect(TokenKind::kColon);
 }
 
 ModuleItem* Parser::ParseGenerateCase() {
@@ -78,28 +82,10 @@ ModuleItem* Parser::ParseGenerateCase() {
   Expect(TokenKind::kLParen);
   item->gen_cond = ParseExpr();
   Expect(TokenKind::kRParen);
-
   while (!Check(TokenKind::kKwEndcase) && !AtEnd()) {
     GenerateCaseItem ci;
-    if (Match(TokenKind::kKwDefault)) {
-      ci.is_default = true;
-      Match(TokenKind::kColon);
-    } else {
-      ci.patterns.push_back(ParseExpr());
-      while (Match(TokenKind::kComma)) {
-        ci.patterns.push_back(ParseExpr());
-      }
-      Expect(TokenKind::kColon);
-    }
-    if (Check(TokenKind::kKwBegin)) {
-      Expect(TokenKind::kKwBegin);
-      while (!Check(TokenKind::kKwEnd) && !AtEnd()) {
-        ParseModuleItem(ci.body);
-      }
-      Expect(TokenKind::kKwEnd);
-    } else {
-      ParseModuleItem(ci.body);
-    }
+    ParseGenerateCaseLabel(ci);
+    ParseGenerateBody(ci.body);
     item->gen_case_items.push_back(std::move(ci));
   }
   Expect(TokenKind::kKwEndcase);
