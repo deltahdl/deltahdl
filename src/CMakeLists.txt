@@ -18,6 +18,7 @@ add_library(deltahdl_lib STATIC
     parser/parser_verify.cpp
     parser/parser_specify.cpp
     parser/parser_config.cpp
+    parser/parser_inst.cpp
     elaboration/elaborator.cpp
     elaboration/elaborator_validate.cpp
     elaboration/type_eval.cpp
