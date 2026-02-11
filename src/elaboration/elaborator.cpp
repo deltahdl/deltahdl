@@ -437,6 +437,15 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   }
 }
 
+// §6.20.5: Elaborate a specparam as a simulation-accessible constant variable.
+void Elaborator::ElaborateSpecparam(ModuleItem* item, RtlirModule* mod) {
+  RtlirVariable var;
+  var.name = ScopedName(item->name);
+  var.width = 32;
+  var.init_expr = item->init_expr;
+  mod->variables.push_back(var);
+}
+
 void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
   if (item->assign_lhs && item->assign_lhs->kind == ExprKind::kIdentifier) {
     auto name = item->assign_lhs->text;
@@ -520,6 +529,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       break;
     case ModuleItemKind::kSpecparam:
       specparam_names_.insert(item->name);
+      ElaborateSpecparam(item, mod);
       break;
     case ModuleItemKind::kDefparam:
     case ModuleItemKind::kImportDecl:

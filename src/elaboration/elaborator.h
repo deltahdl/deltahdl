@@ -55,6 +55,7 @@ class Elaborator {
   void ElaborateNetDecl(ModuleItem* item, RtlirModule* mod);
   void ElaborateVarDecl(ModuleItem* item, RtlirModule* mod);
   void ElaborateContAssign(ModuleItem* item, RtlirModule* mod);
+  void ElaborateSpecparam(ModuleItem* item, RtlirModule* mod);
 
   /// Elaborate a typedef item (e.g. enum constants).
   void ElaborateTypedef(ModuleItem* item, RtlirModule* mod);
