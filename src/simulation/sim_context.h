@@ -52,6 +52,15 @@ struct StructTypeInfo {
   bool is_packed = false;
 };
 
+// §7.4/§7.5/§7.10: Array metadata for method dispatch.
+struct ArrayInfo {
+  uint32_t lo = 0;           // Low index of unpacked dimension.
+  uint32_t size = 0;         // Number of elements.
+  uint32_t elem_width = 32;  // Width of each element in bits.
+  bool is_dynamic = false;   // §7.5: dynamic array (new/delete).
+  bool is_queue = false;     // §7.10: queue ($).
+};
+
 class SimContext {
  public:
   SimContext(Scheduler& sched, Arena& arena, DiagEngine& diag,
@@ -132,6 +141,11 @@ class SimContext {
                              std::string_view type_name);
   const StructTypeInfo* GetVariableStructType(std::string_view var_name) const;
 
+  // §7.4/§7.5/§7.10: Array metadata registration and lookup.
+  void RegisterArray(std::string_view name, const ArrayInfo& info);
+  ArrayInfo* FindArrayInfo(std::string_view name);
+  const ArrayInfo* FindArrayInfo(std::string_view name) const;
+
   // §7.3.2: Tagged union tag management.
   void SetVariableTag(std::string_view var_name, std::string_view tag);
   std::string_view GetVariableTag(std::string_view var_name) const;
@@ -211,6 +225,8 @@ class SimContext {
   // §7.2: Struct type info and variable-to-struct-type mapping.
   std::unordered_map<std::string_view, StructTypeInfo> struct_types_;
   std::unordered_map<std::string_view, std::string_view> var_struct_types_;
+  // §7.4/§7.5/§7.10: Array metadata.
+  std::unordered_map<std::string_view, ArrayInfo> array_infos_;
   // §7.3.2: Tagged union tag tracking (variable name → active tag).
   std::unordered_map<std::string_view, std::string> var_tags_;
   // §15.3: Semaphore objects.

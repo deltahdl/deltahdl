@@ -203,6 +203,22 @@ const StructTypeInfo* SimContext::GetVariableStructType(
   return FindStructType(it->second);
 }
 
+// --- §7.4/§7.5/§7.10: Array metadata ---
+
+void SimContext::RegisterArray(std::string_view name, const ArrayInfo& info) {
+  array_infos_[name] = info;
+}
+
+ArrayInfo* SimContext::FindArrayInfo(std::string_view name) {
+  auto it = array_infos_.find(name);
+  return (it != array_infos_.end()) ? &it->second : nullptr;
+}
+
+const ArrayInfo* SimContext::FindArrayInfo(std::string_view name) const {
+  auto it = array_infos_.find(name);
+  return (it != array_infos_.end()) ? &it->second : nullptr;
+}
+
 // --- §7.3.2: Tagged union tag management ---
 
 void SimContext::SetVariableTag(std::string_view var_name,

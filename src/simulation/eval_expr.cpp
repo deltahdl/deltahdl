@@ -6,6 +6,7 @@
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
+#include "simulation/eval_array.h"
 #include "simulation/sim_context.h"
 
 namespace delta {
@@ -129,9 +130,15 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto base_name = std::string_view(name).substr(0, dot);
   auto field_name = std::string_view(name).substr(dot + 1);
   auto* base_var = ctx.FindVariable(base_name);
-  auto* info = ctx.GetVariableStructType(base_name);
-  if (base_var && info)
-    return ExtractStructField(base_var, info, field_name, arena);
+  auto* sinfo = ctx.GetVariableStructType(base_name);
+  if (base_var && sinfo)
+    return ExtractStructField(base_var, sinfo, field_name, arena);
+  // §7.12: Array property/method access (e.g., arr.sum, arr.sort).
+  Logic4Vec arr_result;
+  if (TryEvalArrayProperty(base_name, field_name, ctx, arena, arr_result))
+    return arr_result;
+  if (TryExecArrayPropertyStmt(base_name, field_name, ctx, arena))
+    return MakeLogic4VecVal(arena, 1, 0);
   return MakeLogic4Vec(arena, 1);
 }
 

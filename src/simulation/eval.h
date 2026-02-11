@@ -46,6 +46,11 @@ bool TryEvalStringMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
 bool TryEvalEnumMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                            Logic4Vec& out);
 
+// §7.12 Array method dispatch (eval_array.cpp).
+bool TryEvalArrayMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                            Logic4Vec& out);
+bool TryExecArrayMethodStmt(const Expr* expr, SimContext& ctx, Arena& arena);
+
 // Extended expression evaluators (eval_expr.cpp).
 Logic4Vec EvalReplicate(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalPrefixUnary(const Expr* expr, SimContext& ctx, Arena& arena);

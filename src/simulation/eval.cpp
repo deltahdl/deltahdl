@@ -880,6 +880,11 @@ static Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx,
   if (TryEvalStringMethodCall(expr, ctx, arena, string_result)) {
     return string_result;
   }
+  // §7.12: Try array method dispatch (e.g., arr.sum()).
+  Logic4Vec array_result;
+  if (TryEvalArrayMethodCall(expr, ctx, arena, array_result)) {
+    return array_result;
+  }
 
   auto* func = ctx.FindFunction(expr->callee);
   if (!func) return EvalDpiCall(expr, ctx, arena);

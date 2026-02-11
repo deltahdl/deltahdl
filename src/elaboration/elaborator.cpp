@@ -308,6 +308,14 @@ static void ElaborateGateInst(ModuleItem* item, RtlirModule* mod,
   mod->assigns.push_back(ca);
 }
 
+// §7.5: Check for dynamic array [] with init to infer size from elements.
+static void InferDynArraySize(const std::vector<Expr*>& dims,
+                              const Expr* init, RtlirVariable& var) {
+  if (dims.empty() || dims[0] != nullptr) return;  // Not a dynamic array.
+  if (!init || init->elements.empty()) return;
+  var.unpacked_size = static_cast<uint32_t>(init->elements.size());
+}
+
 // §7.4: Extract unpacked array size from dimension expressions.
 static void ComputeUnpackedDims(const std::vector<Expr*>& dims,
                                 RtlirVariable& var) {
@@ -374,8 +382,9 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
       item->data_type.kind == DataTypeKind::kUnion) {
     var.dtype = &item->data_type;
   }
-  // §7.4: Compute unpacked array element count.
+  // §7.4/§7.5: Compute unpacked array element count.
   ComputeUnpackedDims(item->unpacked_dims, var);
+  InferDynArraySize(item->unpacked_dims, item->init_expr, var);
   mod->variables.push_back(var);
   ValidateArrayInitPattern(item);
   TrackEnumVariable(item);

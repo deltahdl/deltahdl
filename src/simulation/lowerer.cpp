@@ -103,18 +103,36 @@ static void RegisterStructInfo(const RtlirVariable& var, SimContext& ctx) {
   ctx.SetVariableStructType(var.name, var.name);
 }
 
+// §7.4: Initialize an individual array element, optionally from init pattern.
+static void InitArrayElement(const RtlirVariable& var, uint32_t elem_idx,
+                             Variable* elem, SimContext& ctx, Arena& arena) {
+  if (!var.init_expr) {
+    elem->value = MakeLogic4VecVal(arena, var.width, 0);
+    return;
+  }
+  auto& elements = var.init_expr->elements;
+  if (elem_idx < elements.size()) {
+    elem->value = EvalExpr(elements[elem_idx], ctx, arena);
+    return;
+  }
+  elem->value = MakeLogic4VecVal(arena, var.width, 0);
+}
+
 // §7.4: Create individual element variables for unpacked arrays.
 static void CreateArrayElements(const RtlirVariable& var, SimContext& ctx,
                                 Arena& arena) {
   if (var.unpacked_size == 0) return;
+  ArrayInfo info;
+  info.lo = var.unpacked_lo;
+  info.size = var.unpacked_size;
+  info.elem_width = var.width;
+  ctx.RegisterArray(var.name, info);
   for (uint32_t i = 0; i < var.unpacked_size; ++i) {
     uint32_t idx = var.unpacked_lo + i;
     auto elem_name = std::string(var.name) + "[" + std::to_string(idx) + "]";
-    // Store the element name in the arena so it outlives this stack frame.
     auto* stored = arena.Create<std::string>(std::move(elem_name));
     auto* elem = ctx.CreateVariable(*stored, var.width);
-    // Zero-initialize (clear X state from CreateVariable default).
-    elem->value = MakeLogic4VecVal(arena, var.width, 0);
+    InitArrayElement(var, i, elem, ctx, arena);
   }
 }
 
