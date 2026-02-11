@@ -388,9 +388,15 @@ void Lexer::LexTripleQuotedBody() {
 Token Lexer::LexSystemIdentifier() {
   auto loc = MakeLoc();
   uint32_t start = pos_;
-  Advance();  // skip $
-  while (!AtEnd() && (std::isalnum(static_cast<unsigned char>(Current())) ||
-                      Current() == '_')) {
+  Advance();  // skip leading $
+  while (!AtEnd()) {
+    char ch = Current();
+    bool is_word = std::isalnum(static_cast<unsigned char>(ch)) || ch == '_';
+    bool is_inner_dollar =
+        (ch == '$') && (pos_ + 1 < source_.size()) &&
+        (std::isalpha(static_cast<unsigned char>(source_[pos_ + 1])) ||
+         source_[pos_ + 1] == '_');
+    if (!is_word && !is_inner_dollar) break;
     Advance();
   }
   Token tok;

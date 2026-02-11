@@ -159,6 +159,32 @@ static Logic4Vec EvalFtell(const Expr* expr, SimContext& ctx, Arena& arena) {
 }
 
 // ============================================================================
+// section 21.3 -- $rewind(fd)
+// ============================================================================
+
+static Logic4Vec EvalRewind(const Expr* expr, SimContext& ctx, Arena& arena) {
+  if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
+  int fd = FdFromArg(expr->args[0], ctx, arena);
+  FILE* fp = ctx.GetFileHandle(fd);
+  if (fp) std::fseek(fp, 0, SEEK_SET);
+  return MakeLogic4VecVal(arena, 32, 0);
+}
+
+// ============================================================================
+// section 21.3 -- $ungetc(char, fd)
+// ============================================================================
+
+static Logic4Vec EvalUngetc(const Expr* expr, SimContext& ctx, Arena& arena) {
+  if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 32, 0);
+  auto ch = static_cast<int>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
+  int fd = FdFromArg(expr->args[1], ctx, arena);
+  FILE* fp = ctx.GetFileHandle(fd);
+  if (!fp) return MakeLogic4VecVal(arena, 32, 0);
+  int result = std::ungetc(ch, fp);
+  return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(result));
+}
+
+// ============================================================================
 // Public dispatch: EvalFileIOSysCall
 // ============================================================================
 
@@ -171,6 +197,8 @@ Logic4Vec EvalFileIOSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   if (name == "$ferror") return EvalFerror(expr, ctx, arena);
   if (name == "$fseek") return EvalFseek(expr, ctx, arena);
   if (name == "$ftell") return EvalFtell(expr, ctx, arena);
+  if (name == "$rewind") return EvalRewind(expr, ctx, arena);
+  if (name == "$ungetc") return EvalUngetc(expr, ctx, arena);
   return MakeLogic4VecVal(arena, 1, 0);
 }
 

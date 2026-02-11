@@ -65,6 +65,15 @@ TEST(Lexer, SystemIdentifiers) {
   EXPECT_EQ(tokens[1].text, "$finish");
 }
 
+TEST(Lexer, EmbeddedDollarSystemIdentifiers) {
+  auto tokens = lex("$test$plusargs $value$plusargs");
+  ASSERT_EQ(tokens.size(), 3);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
+  EXPECT_EQ(tokens[0].text, "$test$plusargs");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kSystemIdentifier);
+  EXPECT_EQ(tokens[1].text, "$value$plusargs");
+}
+
 TEST(Lexer, Operators) {
   auto tokens = lex("+ - * / == != <= >= << >> && ||");
   EXPECT_EQ(tokens[0].kind, TokenKind::kPlus);

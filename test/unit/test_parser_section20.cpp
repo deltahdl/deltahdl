@@ -494,3 +494,78 @@ TEST(Section21, SscanfDecimal) {
   EXPECT_EQ(result.ToUint64(), 1u);  // 1 item scanned
   EXPECT_EQ(dest->value.ToUint64(), 42u);
 }
+
+// ============================================================================
+// §21.3 — $rewind(fd)
+// ============================================================================
+
+TEST(Section21, Rewind) {
+  SysCallFixture f;
+  std::string tmp_path = "/tmp/deltahdl_test_rewind.txt";
+  {
+    std::ofstream ofs(tmp_path);
+    ofs << "ABCD";
+  }
+  auto* open_expr = MakeSysCall(
+      f.arena, "$fopen",
+      {MakeStrLit(f.arena, tmp_path.c_str()), MakeStrLit(f.arena, "r")});
+  auto fd_val = EvalExpr(open_expr, f.ctx, f.arena);
+  uint64_t fd = fd_val.ToUint64();
+  ASSERT_NE(fd, 0u);
+
+  // Read first char.
+  auto* getc1 = MakeSysCall(f.arena, "$fgetc", {MakeIntLit(f.arena, fd)});
+  auto ch1 = EvalExpr(getc1, f.ctx, f.arena);
+  EXPECT_EQ(ch1.ToUint64(), static_cast<uint64_t>('A'));
+
+  // Rewind.
+  auto* rw = MakeSysCall(f.arena, "$rewind", {MakeIntLit(f.arena, fd)});
+  EvalExpr(rw, f.ctx, f.arena);
+
+  // Read first char again — should be 'A' after rewind.
+  auto* getc2 = MakeSysCall(f.arena, "$fgetc", {MakeIntLit(f.arena, fd)});
+  auto ch2 = EvalExpr(getc2, f.ctx, f.arena);
+  EXPECT_EQ(ch2.ToUint64(), static_cast<uint64_t>('A'));
+
+  auto* close_expr = MakeSysCall(f.arena, "$fclose", {MakeIntLit(f.arena, fd)});
+  EvalExpr(close_expr, f.ctx, f.arena);
+  std::remove(tmp_path.c_str());
+}
+
+// ============================================================================
+// §21.3 — $ungetc(char, fd)
+// ============================================================================
+
+TEST(Section21, Ungetc) {
+  SysCallFixture f;
+  std::string tmp_path = "/tmp/deltahdl_test_ungetc.txt";
+  {
+    std::ofstream ofs(tmp_path);
+    ofs << "XY";
+  }
+  auto* open_expr = MakeSysCall(
+      f.arena, "$fopen",
+      {MakeStrLit(f.arena, tmp_path.c_str()), MakeStrLit(f.arena, "r")});
+  auto fd_val = EvalExpr(open_expr, f.ctx, f.arena);
+  uint64_t fd = fd_val.ToUint64();
+  ASSERT_NE(fd, 0u);
+
+  // Push back 'Z'.
+  auto* ug = MakeSysCall(f.arena, "$ungetc",
+                         {MakeIntLit(f.arena, 'Z'), MakeIntLit(f.arena, fd)});
+  EvalExpr(ug, f.ctx, f.arena);
+
+  // Next read should return 'Z'.
+  auto* getc1 = MakeSysCall(f.arena, "$fgetc", {MakeIntLit(f.arena, fd)});
+  auto ch1 = EvalExpr(getc1, f.ctx, f.arena);
+  EXPECT_EQ(ch1.ToUint64(), static_cast<uint64_t>('Z'));
+
+  // Then 'X' (the original first char).
+  auto* getc2 = MakeSysCall(f.arena, "$fgetc", {MakeIntLit(f.arena, fd)});
+  auto ch2 = EvalExpr(getc2, f.ctx, f.arena);
+  EXPECT_EQ(ch2.ToUint64(), static_cast<uint64_t>('X'));
+
+  auto* close_expr = MakeSysCall(f.arena, "$fclose", {MakeIntLit(f.arena, fd)});
+  EvalExpr(close_expr, f.ctx, f.arena);
+  std::remove(tmp_path.c_str());
+}

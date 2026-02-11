@@ -552,7 +552,8 @@ static bool IsMathSysCall(std::string_view n) {
 
 static bool IsExtFileIOSysCall(std::string_view n) {
   return n == "$fgets" || n == "$fgetc" || n == "$fflush" || n == "$feof" ||
-         n == "$ferror" || n == "$fseek" || n == "$ftell";
+         n == "$ferror" || n == "$fseek" || n == "$ftell" || n == "$rewind" ||
+         n == "$ungetc";
 }
 
 static Logic4Vec EvalTimeSysCall(SimContext& ctx, Arena& arena,
