@@ -447,7 +447,7 @@ ClassDecl* Parser::ParseClassDecl() {
 
   while (!Check(TokenKind::kKwEndclass) && !AtEnd()) {
     if (Match(TokenKind::kSemicolon)) continue;
-    decl->members.push_back(ParseClassMember());
+    ParseClassMembers(decl->members);
   }
   Expect(TokenKind::kKwEndclass);
   if (Match(TokenKind::kColon)) ExpectIdentifier();
@@ -475,7 +475,7 @@ bool Parser::ParseClassQualifiers(ClassMember* m) {
   return proto;
 }
 
-ClassMember* Parser::ParseClassMember() {
+void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
   auto* member = arena_.Create<ClassMember>();
   member->loc = CurrentLoc();
   bool proto = ParseClassQualifiers(member);
@@ -483,45 +483,60 @@ ClassMember* Parser::ParseClassMember() {
   if (Check(TokenKind::kKwFunction)) {
     member->kind = ClassMemberKind::kMethod;
     member->method = ParseFunctionDecl(proto);
-    return member;
+    members.push_back(member);
+    return;
   }
   if (Check(TokenKind::kKwTask)) {
     member->kind = ClassMemberKind::kMethod;
     member->method = ParseTaskDecl(proto);
-    return member;
+    members.push_back(member);
+    return;
   }
-  if (Check(TokenKind::kKwConstraint)) return ParseConstraintStub(member);
-  // §8.5 typedef inside class body (enum, struct, etc.)
+  if (Check(TokenKind::kKwConstraint)) {
+    members.push_back(ParseConstraintStub(member));
+    return;
+  }
   if (Check(TokenKind::kKwTypedef)) {
     member->kind = ClassMemberKind::kProperty;
     member->name = ParseTypedef()->name;
-    return member;
+    members.push_back(member);
+    return;
   }
-  // §8.5 parameter/localparam inside class body
-  if (Check(TokenKind::kKwParameter)) {
+  if (Check(TokenKind::kKwParameter) || Check(TokenKind::kKwLocalparam)) {
     member->kind = ClassMemberKind::kProperty;
     member->name = ParseParamDecl()->name;
-    return member;
-  }
-  if (Check(TokenKind::kKwLocalparam)) {
-    member->kind = ClassMemberKind::kProperty;
-    member->name = ParseParamDecl()->name;
-    return member;
+    members.push_back(member);
+    return;
   }
 
-  // Property: type name [= expr] ;
+  // Property: type name [= expr] {, name [= expr]} ;
+  DataType dtype = ParseDataType();
   member->kind = ClassMemberKind::kProperty;
-  member->data_type = ParseDataType();
+  member->data_type = dtype;
   member->name = Expect(TokenKind::kIdentifier).text;
   if (Match(TokenKind::kEq)) member->init_expr = ParseExpr();
+  members.push_back(member);
+  while (Match(TokenKind::kComma)) {
+    auto* extra = arena_.Create<ClassMember>();
+    extra->loc = CurrentLoc();
+    extra->kind = ClassMemberKind::kProperty;
+    extra->data_type = dtype;
+    extra->is_rand = member->is_rand;
+    extra->is_randc = member->is_randc;
+    extra->is_static = member->is_static;
+    extra->name = Expect(TokenKind::kIdentifier).text;
+    if (Match(TokenKind::kEq)) extra->init_expr = ParseExpr();
+    members.push_back(extra);
+  }
   Expect(TokenKind::kSemicolon);
-  return member;
 }
 
 ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
   member->kind = ClassMemberKind::kConstraint;
   Consume();  // constraint keyword
   member->name = Expect(TokenKind::kIdentifier).text;
+  // §18.5.1: extern/implicit constraint declaration — no body
+  if (Match(TokenKind::kSemicolon)) return member;
   Expect(TokenKind::kLBrace);
   int depth = 1;
   while (depth > 0 && !AtEnd()) {

@@ -44,6 +44,28 @@ Stmt* Parser::ParseRandcaseStmt() {
   return stmt;
 }
 
+// --- §18.17 Randsequence statement ---
+
+Stmt* Parser::ParseRandsequenceStmt() {
+  auto* stmt = arena_.Create<Stmt>();
+  stmt->kind = StmtKind::kRandcase;  // reuse for stub
+  stmt->range.start = CurrentLoc();
+  Expect(TokenKind::kKwRandsequence);
+  // Optional production name: randsequence(name)
+  if (Check(TokenKind::kLParen)) {
+    Consume();
+    if (!Check(TokenKind::kRParen)) Consume();  // production name
+    Expect(TokenKind::kRParen);
+  }
+  // Skip all tokens until endsequence.
+  while (!Check(TokenKind::kKwEndsequence) && !AtEnd()) {
+    Consume();
+  }
+  Expect(TokenKind::kKwEndsequence);
+  stmt->range.end = CurrentLoc();
+  return stmt;
+}
+
 // --- §19 Covergroup declaration ---
 
 // Skip tokens until we see a matching '}' for a '{' that was consumed.

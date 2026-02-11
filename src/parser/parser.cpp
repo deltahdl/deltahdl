@@ -95,16 +95,31 @@ CompilationUnit* Parser::Parse() {
   return unit;
 }
 
+// §18.5.1: out-of-block constraint — constraint class_id::name { ... }
+void Parser::ParseOutOfBlockConstraint(CompilationUnit* unit) {
+  Consume();  // constraint
+  ExpectIdentifier();
+  Expect(TokenKind::kColonColon);
+  ExpectIdentifier();
+  Expect(TokenKind::kLBrace);
+  int depth = 1;
+  while (depth > 0 && !AtEnd()) {
+    if (Match(TokenKind::kLBrace)) {
+      ++depth;
+    } else if (Match(TokenKind::kRBrace)) {
+      --depth;
+    } else {
+      Consume();
+    }
+  }
+  (void)unit;
+}
+
 void Parser::ParseTopLevel(CompilationUnit* unit) {
   if (Match(TokenKind::kSemicolon)) return;  // null item
   ParseAttributes();                         // consume optional (* ... *)
   if (Check(TokenKind::kKwExtern)) {
-    Consume();
-    if (Check(TokenKind::kKwModule)) {
-      unit->modules.push_back(ParseExternModuleDecl());
-    } else {
-      SkipToSemicolon(lexer_);
-    }
+    ParseExternTopLevel(unit);
     return;
   }
   if (Check(TokenKind::kKwModule)) {
@@ -144,8 +159,31 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
     unit->configs.push_back(ParseConfigDecl());
     return;
   }
+  // §3.12.1: compilation-unit scope functions and tasks
+  if (Check(TokenKind::kKwFunction)) {
+    unit->cu_items.push_back(ParseFunctionDecl());
+    return;
+  }
+  if (Check(TokenKind::kKwTask)) {
+    unit->cu_items.push_back(ParseTaskDecl());
+    return;
+  }
+  // §18.5.1: out-of-block constraint definition
+  if (Check(TokenKind::kKwConstraint)) {
+    ParseOutOfBlockConstraint(unit);
+    return;
+  }
   diag_.Error(CurrentLoc(), "expected top-level declaration");
   Consume();
+}
+
+void Parser::ParseExternTopLevel(CompilationUnit* unit) {
+  Consume();  // extern
+  if (Check(TokenKind::kKwModule)) {
+    unit->modules.push_back(ParseExternModuleDecl());
+    return;
+  }
+  SkipToSemicolon(lexer_);
 }
 
 // --- Module parsing ---

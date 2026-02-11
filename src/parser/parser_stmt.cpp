@@ -121,6 +121,8 @@ Stmt* Parser::ParseStmtBody() {
       return ParseWaitOrderStmt();
     case TokenKind::kKwRandcase:
       return ParseRandcaseStmt();
+    case TokenKind::kKwRandsequence:
+      return ParseRandsequenceStmt();
     default:
       return ParseAssignmentOrExprStmt();
   }

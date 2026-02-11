@@ -234,6 +234,27 @@ std::vector<FunctionArg> Parser::ParseFunctionArgs() {
   return args;
 }
 
+// --- Function return type ---
+
+DataType Parser::ParseFunctionReturnType() {
+  if (Check(TokenKind::kKwVoid)) {
+    DataType dt;
+    dt.kind = DataTypeKind::kVoid;
+    Consume();
+    return dt;
+  }
+  if (Check(TokenKind::kLBracket)) {
+    DataType dt;
+    Consume();
+    dt.packed_dim_left = ParseExpr();
+    Expect(TokenKind::kColon);
+    dt.packed_dim_right = ParseExpr();
+    Expect(TokenKind::kRBracket);
+    return dt;
+  }
+  return ParseDataType();
+}
+
 // --- Function declaration ---
 
 ModuleItem* Parser::ParseFunctionDecl(bool prototype_only) {
@@ -243,33 +264,14 @@ ModuleItem* Parser::ParseFunctionDecl(bool prototype_only) {
   Expect(TokenKind::kKwFunction);
 
   // Optional lifetime: automatic or static.
-  if (Match(TokenKind::kKwAutomatic)) {
-    item->is_automatic = true;
-  } else if (Match(TokenKind::kKwStatic)) {
-    item->is_static = true;
-  }
+  item->is_automatic = Match(TokenKind::kKwAutomatic);
+  if (!item->is_automatic) item->is_static = Match(TokenKind::kKwStatic);
 
-  // Return type (may be void or a data type).
-  if (Check(TokenKind::kKwVoid)) {
-    item->return_type.kind = DataTypeKind::kVoid;
-    Consume();
-  } else if (Check(TokenKind::kLBracket)) {
-    // Implicit type with packed dims: function [7:0] name;
-    Consume();
-    item->return_type.packed_dim_left = ParseExpr();
-    Expect(TokenKind::kColon);
-    item->return_type.packed_dim_right = ParseExpr();
-    Expect(TokenKind::kRBracket);
-  } else {
-    item->return_type = ParseDataType();
-  }
+  item->return_type = ParseFunctionReturnType();
 
   // §8.7 constructors use 'new' as function name
-  if (Match(TokenKind::kKwNew)) {
-    item->name = "new";
-  } else {
-    item->name = Expect(TokenKind::kIdentifier).text;
-  }
+  item->name =
+      Match(TokenKind::kKwNew) ? "new" : Expect(TokenKind::kIdentifier).text;
   // §8.24 out-of-block methods: class_name::method_name
   while (Match(TokenKind::kColonColon)) {
     item->name = Expect(TokenKind::kIdentifier).text;
@@ -287,7 +289,11 @@ ModuleItem* Parser::ParseFunctionDecl(bool prototype_only) {
   ParseOldStylePortDecls(item, TokenKind::kKwEndfunction);
 
   while (!Check(TokenKind::kKwEndfunction) && !AtEnd()) {
-    item->func_body_stmts.push_back(ParseStmt());
+    if (IsBlockVarDeclStart()) {
+      ParseBlockVarDecls(item->func_body_stmts);
+    } else {
+      item->func_body_stmts.push_back(ParseStmt());
+    }
   }
   Expect(TokenKind::kKwEndfunction);
   // Optional end label: ": name" (may be 'new' for constructors)
@@ -329,7 +335,11 @@ ModuleItem* Parser::ParseTaskDecl(bool prototype_only) {
   ParseOldStylePortDecls(item, TokenKind::kKwEndtask);
 
   while (!Check(TokenKind::kKwEndtask) && !AtEnd()) {
-    item->func_body_stmts.push_back(ParseStmt());
+    if (IsBlockVarDeclStart()) {
+      ParseBlockVarDecls(item->func_body_stmts);
+    } else {
+      item->func_body_stmts.push_back(ParseStmt());
+    }
   }
   Expect(TokenKind::kKwEndtask);
   // Optional end label: ": name"
@@ -547,12 +557,9 @@ DataType Parser::ParseDataType() {
   }
 
   // vectored/scalared qualifiers (§6.6.9) — net types only
-  if (dtype.is_net) {
-    if (Match(TokenKind::kKwVectored)) {
-      dtype.is_vectored = true;
-    } else if (Match(TokenKind::kKwScalared)) {
-      dtype.is_scalared = true;
-    }
+  dtype.is_vectored = dtype.is_net && Match(TokenKind::kKwVectored);
+  if (dtype.is_net && !dtype.is_vectored) {
+    dtype.is_scalared = Match(TokenKind::kKwScalared);
   }
 
   if (Match(TokenKind::kKwSigned)) {

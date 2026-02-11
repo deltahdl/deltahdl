@@ -737,6 +737,7 @@ struct CompilationUnit {
   std::vector<UdpDecl*> udps;
   std::vector<ModuleDecl*> checkers;  // checker ... endchecker (§17)
   std::vector<ConfigDecl*> configs;   // config ... endconfig (§33)
+  std::vector<ModuleItem*> cu_items;  // top-level functions/tasks (§3.12.1)
 };
 
 }  // namespace delta

@@ -17,6 +17,8 @@ class Parser {
 
  private:
   void ParseTopLevel(CompilationUnit* unit);
+  void ParseExternTopLevel(CompilationUnit* unit);
+  void ParseOutOfBlockConstraint(CompilationUnit* unit);
 
   // Module/package parsing
   ModuleDecl* ParseModuleDecl();
@@ -59,7 +61,7 @@ class Parser {
   bool IsAtClassDecl();
   ClassDecl* ParseClassDecl();
   void ParseClassExtendsClause(ClassDecl* decl);
-  ClassMember* ParseClassMember();
+  void ParseClassMembers(std::vector<ClassMember*>& members);
   bool ParseClassQualifiers(ClassMember* member);
   ClassMember* ParseConstraintStub(ClassMember* member);
 
@@ -79,6 +81,7 @@ class Parser {
   // Verification constructs (parser_verify.cpp — §17/§18/§19)
   ModuleDecl* ParseCheckerDecl();
   Stmt* ParseRandcaseStmt();
+  Stmt* ParseRandsequenceStmt();
   void ParseCovergroupDecl(std::vector<ModuleItem*>& items);
   void SkipCovergroupItem();
 
@@ -117,6 +120,7 @@ class Parser {
   DataType ParseStructOrUnionType();
   DataType ParseStructOrUnionBody(TokenKind kw);
   void ParseStructMembers(DataType& dtype);
+  DataType ParseFunctionReturnType();
   ModuleItem* ParseFunctionDecl(bool prototype_only = false);
   ModuleItem* ParseTaskDecl(bool prototype_only = false);
   std::vector<FunctionArg> ParseFunctionArgs();

@@ -284,9 +284,9 @@ Expr* Parser::ParsePrimaryExpr() {
     case TokenKind::kKwThis:
     case TokenKind::kKwSuper: {                          // §8.11/§8.15
       Expr* result = ParseMemberAccessChain(Consume());
-      if (Check(TokenKind::kLParen)) return ParseCallExpr(result);
-      if (Check(TokenKind::kLBracket)) return ParseSelectExpr(result);
-      return result;
+      if (Check(TokenKind::kLParen)) result = ParseCallExpr(result);
+      if (Check(TokenKind::kLBracket)) result = ParseSelectExpr(result);
+      return ParseWithClause(result);
     }
     case TokenKind::kKwNew: {                            // §8.7
       auto* expr = arena_.Create<Expr>();
@@ -423,11 +423,33 @@ Expr* Parser::ParseCallExpr(Expr* callee) {
   return call;
 }
 
+// Skip a brace-delimited constraint block: { ... }
+static void SkipConstraintBlock(Lexer& lexer) {
+  int depth = 1;
+  while (depth > 0 && !lexer.Peek().Is(TokenKind::kEof)) {
+    if (lexer.Peek().Is(TokenKind::kLBrace)) ++depth;
+    if (lexer.Peek().Is(TokenKind::kRBrace)) --depth;
+    if (depth > 0) lexer.Next();
+  }
+  if (lexer.Peek().Is(TokenKind::kRBrace)) lexer.Next();
+}
+
 Expr* Parser::ParseWithClause(Expr* expr) {
   if (!Match(TokenKind::kKwWith)) return expr;
+  // §18.7: randomize() with { constraint_block }
+  if (Check(TokenKind::kLBrace)) {
+    Consume();
+    SkipConstraintBlock(lexer_);
+    return expr;
+  }
   Expect(TokenKind::kLParen);
   expr->with_expr = ParseExpr();
   Expect(TokenKind::kRParen);
+  // §18.7: randomize() with (id_list) { constraint_block }
+  if (Check(TokenKind::kLBrace)) {
+    Consume();
+    SkipConstraintBlock(lexer_);
+  }
   return expr;
 }
 
