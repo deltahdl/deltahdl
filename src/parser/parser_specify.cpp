@@ -7,7 +7,7 @@ static bool IsTimingCheckName(std::string_view name) {
   return name == "$setup" || name == "$hold" || name == "$setuphold" ||
          name == "$recovery" || name == "$removal" || name == "$recrem" ||
          name == "$width" || name == "$period" || name == "$skew" ||
-         name == "$nochange";
+         name == "$nochange" || name == "$timeskew" || name == "$fullskew";
 }
 
 // Parse: specify ... endspecify
@@ -186,6 +186,8 @@ TimingCheckKind Parser::ParseTimingCheckKind(std::string_view name) {
   if (name == "$period") return TimingCheckKind::kPeriod;
   if (name == "$skew") return TimingCheckKind::kSkew;
   if (name == "$nochange") return TimingCheckKind::kNochange;
+  if (name == "$timeskew") return TimingCheckKind::kTimeskew;
+  if (name == "$fullskew") return TimingCheckKind::kFullskew;
   return TimingCheckKind::kSetup;
 }
 
@@ -200,6 +202,8 @@ static bool NeedsDataSignal(TimingCheckKind kind) {
     case TimingCheckKind::kRecrem:
     case TimingCheckKind::kSkew:
     case TimingCheckKind::kNochange:
+    case TimingCheckKind::kTimeskew:
+    case TimingCheckKind::kFullskew:
       return true;
     case TimingCheckKind::kWidth:
     case TimingCheckKind::kPeriod:

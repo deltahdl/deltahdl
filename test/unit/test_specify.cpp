@@ -327,6 +327,85 @@ TEST_F(SpecifyTest, TimingCheckWithNotifier) {
   EXPECT_EQ(spec->specify_items[0]->timing_check.notifier, "ntfr");
 }
 
+TEST_F(SpecifyTest, SkewTimingCheck) {
+  auto* cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $skew(posedge clk1, negedge clk2, 3);\n"
+      "endspecify\n"
+      "endmodule\n");
+  auto* spec = FirstSpecifyBlock(cu);
+  ASSERT_NE(spec, nullptr);
+  auto& tc = spec->specify_items[0]->timing_check;
+  EXPECT_EQ(tc.check_kind, TimingCheckKind::kSkew);
+  EXPECT_EQ(tc.ref_edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(tc.ref_signal, "clk1");
+  EXPECT_EQ(tc.data_edge, SpecifyEdge::kNegedge);
+  EXPECT_EQ(tc.data_signal, "clk2");
+}
+
+TEST_F(SpecifyTest, NochangeTimingCheck) {
+  auto* cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $nochange(posedge clk, data, 0, 0);\n"
+      "endspecify\n"
+      "endmodule\n");
+  auto* spec = FirstSpecifyBlock(cu);
+  ASSERT_NE(spec, nullptr);
+  auto& tc = spec->specify_items[0]->timing_check;
+  EXPECT_EQ(tc.check_kind, TimingCheckKind::kNochange);
+  ASSERT_GE(tc.limits.size(), 2u);
+}
+
+TEST_F(SpecifyTest, TimeskewTimingCheck) {
+  auto* cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $timeskew(posedge clk1, posedge clk2, 5);\n"
+      "endspecify\n"
+      "endmodule\n");
+  auto* spec = FirstSpecifyBlock(cu);
+  ASSERT_NE(spec, nullptr);
+  auto& tc = spec->specify_items[0]->timing_check;
+  EXPECT_EQ(tc.check_kind, TimingCheckKind::kTimeskew);
+  EXPECT_EQ(tc.ref_edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(tc.ref_signal, "clk1");
+  EXPECT_EQ(tc.data_edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(tc.data_signal, "clk2");
+  ASSERT_EQ(tc.limits.size(), 1u);
+}
+
+TEST_F(SpecifyTest, FullskewTimingCheck) {
+  auto* cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $fullskew(posedge clk1, negedge clk2, 4, 6);\n"
+      "endspecify\n"
+      "endmodule\n");
+  auto* spec = FirstSpecifyBlock(cu);
+  ASSERT_NE(spec, nullptr);
+  auto& tc = spec->specify_items[0]->timing_check;
+  EXPECT_EQ(tc.check_kind, TimingCheckKind::kFullskew);
+  EXPECT_EQ(tc.ref_edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(tc.data_edge, SpecifyEdge::kNegedge);
+  ASSERT_GE(tc.limits.size(), 2u);
+}
+
+TEST_F(SpecifyTest, TimeskewWithNotifier) {
+  auto* cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $timeskew(posedge clk1, posedge clk2, 5, ntfr);\n"
+      "endspecify\n"
+      "endmodule\n");
+  auto* spec = FirstSpecifyBlock(cu);
+  ASSERT_NE(spec, nullptr);
+  auto& tc = spec->specify_items[0]->timing_check;
+  EXPECT_EQ(tc.check_kind, TimingCheckKind::kTimeskew);
+  EXPECT_EQ(tc.notifier, "ntfr");
+}
+
 // =============================================================================
 // §30.4 Pulsestyle and showcancelled
 // =============================================================================

@@ -646,6 +646,8 @@ enum class TimingCheckKind : uint8_t {
   kPeriod,
   kSkew,
   kNochange,
+  kTimeskew,
+  kFullskew,
 };
 
 struct TimingCheckDecl {
