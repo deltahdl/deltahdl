@@ -250,11 +250,24 @@ UdpDecl* Parser::ParseUdpDecl() {
   }
   udp->output_name = Expect(TokenKind::kIdentifier).text;
   while (Match(TokenKind::kComma)) {
-    Expect(TokenKind::kKwInput);
+    Match(TokenKind::kKwInput);  // Optional: input keyword may appear once
     udp->input_names.push_back(Expect(TokenKind::kIdentifier).text);
   }
   Expect(TokenKind::kRParen);
   Expect(TokenKind::kSemicolon);
+
+  // Optional initial statement for sequential UDPs (§29.7).
+  if (Match(TokenKind::kKwInitial)) {
+    udp->has_initial = true;
+    Expect(TokenKind::kIdentifier);  // output reg name
+    Expect(TokenKind::kEq);
+    udp->initial_value = UdpCharFromToken(Consume());
+    // Skip optional size prefix like 1'b in "1'b1".
+    while (!Check(TokenKind::kSemicolon) && !AtEnd()) {
+      udp->initial_value = UdpCharFromToken(Consume());
+    }
+    Expect(TokenKind::kSemicolon);
+  }
 
   // Table block.
   Expect(TokenKind::kKwTable);

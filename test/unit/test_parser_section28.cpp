@@ -400,6 +400,84 @@ TEST(ParserSection29, UdpCoexistsWithModule) {
   ASSERT_EQ(r.cu->modules.size(), 1);
 }
 
+// --- §29.7 Sequential UDP initialization ---
+
+TEST(ParserSection29, SequentialUdpInitial) {
+  auto r = Parse(
+      "primitive srff(output reg q, input s, r);\n"
+      "  initial q = 1'b1;\n"
+      "  table\n"
+      "    1 0 : ? : 1;\n"
+      "    0 1 : ? : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->udps.size(), 1);
+  auto* udp = r.cu->udps[0];
+  EXPECT_TRUE(udp->is_sequential);
+  EXPECT_TRUE(udp->has_initial);
+  EXPECT_EQ(udp->initial_value, '1');
+}
+
+// --- §29.8 UDP instances ---
+
+TEST(ParserSection29, UdpInstance) {
+  auto r = Parse(
+      "primitive inv(output out, input in);\n"
+      "  table\n"
+      "    0 : 1;\n"
+      "    1 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module top;\n"
+      "  wire a, b;\n"
+      "  inv u1(a, b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->udps.size(), 1);
+  ASSERT_EQ(r.cu->modules.size(), 1);
+  auto& items = r.cu->modules[0]->items;
+  // The UDP instance should be parsed as a module instance.
+  bool found = false;
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kModuleInst &&
+        item->inst_module == "inv") {
+      found = true;
+      EXPECT_EQ(item->inst_name, "u1");
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+// --- §29.9 Mixing level-sensitive and edge-sensitive descriptions ---
+
+TEST(ParserSection29, MixedLevelEdgeSensitive) {
+  auto r = Parse(
+      "primitive jk_edge_ff(output reg q, input clock, j, k, preset, clear);\n"
+      "  table\n"
+      "    ? ? ? 0 1 : ? : 1;\n"
+      "    ? ? ? 1 0 : ? : 0;\n"
+      "    r 0 0 0 0 : 0 : 1;\n"
+      "    r 0 0 1 1 : ? : -;\n"
+      "    f ? ? ? ? : ? : -;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->udps.size(), 1);
+  auto* udp = r.cu->udps[0];
+  EXPECT_TRUE(udp->is_sequential);
+  ASSERT_EQ(udp->table.size(), 5);
+  // Level-sensitive entry (no edge chars in inputs)
+  EXPECT_EQ(udp->table[0].inputs[0], '?');
+  EXPECT_EQ(udp->table[0].output, '1');
+  // Edge-sensitive entry
+  EXPECT_EQ(udp->table[2].inputs[0], 'r');
+  EXPECT_EQ(udp->table[2].output, '1');
+  // Falling edge entry with no-change output
+  EXPECT_EQ(udp->table[4].inputs[0], 'f');
+  EXPECT_EQ(udp->table[4].output, '-');
+}
+
 // =============================================================
 // Gate elaboration
 // =============================================================

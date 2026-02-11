@@ -428,6 +428,133 @@ TEST(SysTask, FflushDoesNotCrash) {
   std::remove(tmp.c_str());
 }
 
+TEST(SysTask, RewindResetsPosition) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_test_rewind.txt";
+  {
+    std::ofstream ofs(tmp);
+    ofs << "ABCDEF";
+  }
+
+  auto* open_expr =
+      MkSysCall(f.arena, "$fopen", {MkStr(f.arena, tmp), MkStr(f.arena, "r")});
+  auto fd_val = EvalExpr(open_expr, f.ctx, f.arena);
+  uint64_t fd = fd_val.ToUint64();
+
+  // Read first char.
+  auto* fgetc_expr = MkSysCall(f.arena, "$fgetc", {MkInt(f.arena, fd)});
+  auto ch = EvalExpr(fgetc_expr, f.ctx, f.arena);
+  EXPECT_EQ(ch.ToUint64(), static_cast<uint64_t>('A'));
+
+  // Rewind.
+  auto* rewind_expr = MkSysCall(f.arena, "$rewind", {MkInt(f.arena, fd)});
+  EvalExpr(rewind_expr, f.ctx, f.arena);
+
+  // Re-read first char — should be 'A' again.
+  auto* fgetc2_expr = MkSysCall(f.arena, "$fgetc", {MkInt(f.arena, fd)});
+  auto ch2 = EvalExpr(fgetc2_expr, f.ctx, f.arena);
+  EXPECT_EQ(ch2.ToUint64(), static_cast<uint64_t>('A'));
+
+  auto* close_expr = MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)});
+  EvalExpr(close_expr, f.ctx, f.arena);
+  std::remove(tmp.c_str());
+}
+
+TEST(SysTask, UngetcPushesBack) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_test_ungetc.txt";
+  {
+    std::ofstream ofs(tmp);
+    ofs << "XY";
+  }
+
+  auto* open_expr =
+      MkSysCall(f.arena, "$fopen", {MkStr(f.arena, tmp), MkStr(f.arena, "r")});
+  auto fd_val = EvalExpr(open_expr, f.ctx, f.arena);
+  uint64_t fd = fd_val.ToUint64();
+
+  // Read 'X'.
+  auto* fgetc1 = MkSysCall(f.arena, "$fgetc", {MkInt(f.arena, fd)});
+  auto ch1 = EvalExpr(fgetc1, f.ctx, f.arena);
+  EXPECT_EQ(ch1.ToUint64(), static_cast<uint64_t>('X'));
+
+  // Push back 'Z'.
+  auto* ungetc_expr = MkSysCall(
+      f.arena, "$ungetc",
+      {MkInt(f.arena, static_cast<uint64_t>('Z')), MkInt(f.arena, fd)});
+  EvalExpr(ungetc_expr, f.ctx, f.arena);
+
+  // Next read should return 'Z'.
+  auto* fgetc2 = MkSysCall(f.arena, "$fgetc", {MkInt(f.arena, fd)});
+  auto ch2 = EvalExpr(fgetc2, f.ctx, f.arena);
+  EXPECT_EQ(ch2.ToUint64(), static_cast<uint64_t>('Z'));
+
+  auto* close_expr = MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)});
+  EvalExpr(close_expr, f.ctx, f.arena);
+  std::remove(tmp.c_str());
+}
+
+TEST(SysTask, FscanfReadsFormatted) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_test_fscanf.txt";
+  {
+    std::ofstream ofs(tmp);
+    ofs << "42 ff";
+  }
+
+  auto* open_expr =
+      MkSysCall(f.arena, "$fopen", {MkStr(f.arena, tmp), MkStr(f.arena, "r")});
+  auto fd_val = EvalExpr(open_expr, f.ctx, f.arena);
+  uint64_t fd = fd_val.ToUint64();
+
+  auto* var_d = f.ctx.CreateVariable("v_dec", 32);
+  var_d->value = MakeLogic4VecVal(f.arena, 32, 0);
+  auto* var_h = f.ctx.CreateVariable("v_hex", 32);
+  var_h->value = MakeLogic4VecVal(f.arena, 32, 0);
+
+  auto* fscanf_expr =
+      MkSysCall(f.arena, "$fscanf",
+                {MkInt(f.arena, fd), MkStr(f.arena, "%d %h"),
+                 MkId(f.arena, "v_dec"), MkId(f.arena, "v_hex")});
+  auto result = EvalExpr(fscanf_expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 2u);  // Two items matched.
+  EXPECT_EQ(var_d->value.ToUint64(), 42u);
+  EXPECT_EQ(var_h->value.ToUint64(), 0xFFu);
+
+  auto* close_expr = MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)});
+  EvalExpr(close_expr, f.ctx, f.arena);
+  std::remove(tmp.c_str());
+}
+
+TEST(SysTask, FreadReadsBinary) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_test_fread.txt";
+  {
+    std::ofstream ofs(tmp, std::ios::binary);
+    // Write 4 bytes: 0xDE 0xAD 0xBE 0xEF
+    char data[] = {'\xDE', '\xAD', '\xBE', '\xEF'};
+    ofs.write(data, 4);
+  }
+
+  auto* open_expr =
+      MkSysCall(f.arena, "$fopen", {MkStr(f.arena, tmp), MkStr(f.arena, "rb")});
+  auto fd_val = EvalExpr(open_expr, f.ctx, f.arena);
+  uint64_t fd = fd_val.ToUint64();
+
+  auto* var = f.ctx.CreateVariable("v_read", 32);
+  var->value = MakeLogic4VecVal(f.arena, 32, 0);
+
+  auto* fread_expr = MkSysCall(f.arena, "$fread",
+                               {MkId(f.arena, "v_read"), MkInt(f.arena, fd)});
+  auto result = EvalExpr(fread_expr, f.ctx, f.arena);
+  // $fread returns number of bytes read.
+  EXPECT_EQ(result.ToUint64(), 4u);
+
+  auto* close_expr = MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)});
+  EvalExpr(close_expr, f.ctx, f.arena);
+  std::remove(tmp.c_str());
+}
+
 // ============================================================================
 // $system (section 20.17)
 // ============================================================================

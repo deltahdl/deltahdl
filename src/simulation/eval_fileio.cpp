@@ -185,6 +185,113 @@ static Logic4Vec EvalUngetc(const Expr* expr, SimContext& ctx, Arena& arena) {
 }
 
 // ============================================================================
+// section 21.3 -- $fscanf(fd, format, args...)
+// ============================================================================
+
+static int SpecToBase(char spec) {
+  if (spec == 'd') return 10;
+  if (spec == 'h' || spec == 'x') return 16;
+  if (spec == 'b') return 2;
+  if (spec == 'o') return 8;
+  return 0;
+}
+
+static std::string ReadFileContent(FILE* fp) {
+  std::string content;
+  int c = 0;
+  while ((c = std::fgetc(fp)) != EOF) {
+    content += static_cast<char>(c);
+  }
+  return content;
+}
+
+static std::string ExtractFmtStr(std::string_view text) {
+  if (text.size() >= 2 && text.front() == '"') {
+    return std::string(text.substr(1, text.size() - 2));
+  }
+  return std::string(text);
+}
+
+struct ScanState {
+  size_t input_pos = 0;
+  uint32_t matched = 0;
+};
+
+static bool ScanOneField(const std::string& input, ScanState& state, int base,
+                         Variable* var, Arena& arena) {
+  while (state.input_pos < input.size() && input[state.input_pos] == ' ') {
+    ++state.input_pos;
+  }
+  char* end = nullptr;
+  auto val = std::strtoull(input.c_str() + state.input_pos, &end, base);
+  if (end == input.c_str() + state.input_pos) return false;
+  state.input_pos = static_cast<size_t>(end - input.c_str());
+  if (var) var->value = MakeLogic4VecVal(arena, var->value.width, val);
+  ++state.matched;
+  return true;
+}
+
+static Logic4Vec EvalFscanf(const Expr* expr, SimContext& ctx, Arena& arena) {
+  if (expr->args.size() < 3) return MakeLogic4VecVal(arena, 32, 0);
+  int fd = FdFromArg(expr->args[0], ctx, arena);
+  FILE* fp = ctx.GetFileHandle(fd);
+  if (!fp) return MakeLogic4VecVal(arena, 32, 0);
+
+  long start = std::ftell(fp);
+  std::string input = ReadFileContent(fp);
+  std::fseek(fp, start, SEEK_SET);
+
+  std::string fmt = ExtractFmtStr(expr->args[1]->text);
+  ScanState state;
+  size_t arg_idx = 2;
+
+  for (size_t fi = 0; fi < fmt.size(); ++fi) {
+    if (fmt[fi] != '%' || fi + 1 >= fmt.size()) continue;
+    int base = SpecToBase(fmt[++fi]);
+    if (base == 0 || arg_idx >= expr->args.size()) break;
+    Variable* var = nullptr;
+    if (expr->args[arg_idx]->kind == ExprKind::kIdentifier) {
+      var = ctx.FindVariable(expr->args[arg_idx]->text);
+    }
+    if (!ScanOneField(input, state, base, var, arena)) break;
+    ++arg_idx;
+  }
+  std::fseek(fp, start + static_cast<long>(state.input_pos), SEEK_SET);
+  return MakeLogic4VecVal(arena, 32, state.matched);
+}
+
+// ============================================================================
+// section 21.3 -- $fread(variable, fd [, start [, count]])
+// ============================================================================
+
+static Logic4Vec EvalFread(const Expr* expr, SimContext& ctx, Arena& arena) {
+  if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 32, 0);
+  int fd = FdFromArg(expr->args[1], ctx, arena);
+  FILE* fp = ctx.GetFileHandle(fd);
+  if (!fp) return MakeLogic4VecVal(arena, 32, 0);
+
+  Variable* var = nullptr;
+  if (expr->args[0]->kind == ExprKind::kIdentifier) {
+    var = ctx.FindVariable(expr->args[0]->text);
+  }
+  if (!var) return MakeLogic4VecVal(arena, 32, 0);
+
+  // Read width/8 bytes (rounded up) to fill the variable.
+  uint32_t nbytes = (var->value.width + 7) / 8;
+  auto* buf = new uint8_t[nbytes];
+  size_t nread = std::fread(buf, 1, nbytes, fp);
+
+  // Pack bytes into the variable (big-endian as per LRM).
+  uint64_t val = 0;
+  for (size_t i = 0; i < nread && i < 8; ++i) {
+    val = (val << 8) | buf[i];
+  }
+  var->value = MakeLogic4VecVal(arena, var->value.width, val);
+  delete[] buf;
+  return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(nread));
+}
+
+// ============================================================================
 // Public dispatch: EvalFileIOSysCall
 // ============================================================================
 
@@ -199,6 +306,8 @@ Logic4Vec EvalFileIOSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   if (name == "$ftell") return EvalFtell(expr, ctx, arena);
   if (name == "$rewind") return EvalRewind(expr, ctx, arena);
   if (name == "$ungetc") return EvalUngetc(expr, ctx, arena);
+  if (name == "$fscanf") return EvalFscanf(expr, ctx, arena);
+  if (name == "$fread") return EvalFread(expr, ctx, arena);
   return MakeLogic4VecVal(arena, 1, 0);
 }
 

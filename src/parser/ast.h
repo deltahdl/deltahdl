@@ -700,6 +700,8 @@ struct UdpDecl {
   std::string_view output_name;
   std::vector<std::string_view> input_names;
   bool is_sequential = false;
+  bool has_initial = false;  // §29.7: initial <output> = <value>;
+  char initial_value = 'x';  // '0', '1', or 'x'
   std::vector<UdpTableRow> table;
 };
 
