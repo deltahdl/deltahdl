@@ -288,6 +288,24 @@ Expr* Parser::ParsePrimaryExpr() {
       if (Check(TokenKind::kLBracket)) result = ParseSelectExpr(result);
       return ParseWithClause(result);
     }
+    case TokenKind::kKwTagged: {                          // §11.9
+      auto* expr = arena_.Create<Expr>();
+      expr->kind = ExprKind::kIdentifier;
+      expr->text = "tagged";
+      expr->range.start = Consume().loc;
+      auto member_tok = ExpectIdentifier();
+      auto* member = arena_.Create<Expr>();
+      member->kind = ExprKind::kIdentifier;
+      member->text = member_tok.text;
+      member->range.start = member_tok.loc;
+      expr->rhs = member;
+      if (Check(TokenKind::kLParen)) {
+        Consume();
+        expr->lhs = ParseExpr();
+        Expect(TokenKind::kRParen);
+      }
+      return expr;
+    }
     case TokenKind::kKwNew: {                            // §8.7
       auto* expr = arena_.Create<Expr>();
       expr->kind = ExprKind::kCall;
@@ -313,6 +331,23 @@ Expr* Parser::ParsePrimaryExpr() {
   return err;
 }
 
+// Build a member-access node: consumes '.' or '::' then the member name.
+// Accepts 'new' as member name for super.new() (§8.15).
+Expr* Parser::MakeMemberAccess(Expr* base) {
+  Consume();  // '.' or '::'
+  auto member_tok = Check(TokenKind::kKwNew) ? Consume() : ExpectIdentifier();
+  auto* member_id = arena_.Create<Expr>();
+  member_id->kind = ExprKind::kIdentifier;
+  member_id->text = member_tok.text;
+  member_id->range.start = member_tok.loc;
+  auto* acc = arena_.Create<Expr>();
+  acc->kind = ExprKind::kMemberAccess;
+  acc->lhs = base;
+  acc->rhs = member_id;
+  acc->range.start = base->range.start;
+  return acc;
+}
+
 Expr* Parser::ParseMemberAccessChain(Token tok) {
   auto* id = arena_.Create<Expr>();
   id->kind = ExprKind::kIdentifier;
@@ -320,19 +355,7 @@ Expr* Parser::ParseMemberAccessChain(Token tok) {
   id->range.start = tok.loc;
   Expr* result = id;
   while (Check(TokenKind::kDot) || Check(TokenKind::kColonColon)) {
-    Consume();
-    // Accept 'new' as member name for super.new() (§8.15)
-    auto member_tok = Check(TokenKind::kKwNew) ? Consume() : ExpectIdentifier();
-    auto* member_id = arena_.Create<Expr>();
-    member_id->kind = ExprKind::kIdentifier;
-    member_id->text = member_tok.text;
-    member_id->range.start = member_tok.loc;
-    auto* acc = arena_.Create<Expr>();
-    acc->kind = ExprKind::kMemberAccess;
-    acc->lhs = result;
-    acc->rhs = member_id;
-    acc->range.start = result->range.start;
-    result = acc;
+    result = MakeMemberAccess(result);
   }
   return result;
 }
@@ -368,20 +391,9 @@ Expr* Parser::ParseIdentifierExpr() {
     } else {
       result = ParseSelectExpr(result);
     }
-    // Continue member access chain after call/select
-    if (!Check(TokenKind::kDot) && !Check(TokenKind::kColonColon)) continue;
-    Consume();
-    auto mt = Check(TokenKind::kKwNew) ? Consume() : ExpectIdentifier();
-    auto* mid = arena_.Create<Expr>();
-    mid->kind = ExprKind::kIdentifier;
-    mid->text = mt.text;
-    mid->range.start = mt.loc;
-    auto* acc = arena_.Create<Expr>();
-    acc->kind = ExprKind::kMemberAccess;
-    acc->lhs = result;
-    acc->rhs = mid;
-    acc->range.start = result->range.start;
-    result = acc;
+    if (Check(TokenKind::kDot) || Check(TokenKind::kColonColon)) {
+      result = MakeMemberAccess(result);
+    }
   }
 
   // Postfix increment/decrement (§11.4.2)
@@ -480,9 +492,18 @@ Expr* Parser::ParseSystemCall() {
   call->range.start = tok.loc;
   if (!Match(TokenKind::kLParen)) return call;
   if (!Check(TokenKind::kRParen)) {
-    call->args.push_back(ParseExpr());
-    while (Match(TokenKind::kComma)) {
+    // §20.2/§21.2: system tasks allow empty arguments (,,)
+    if (Check(TokenKind::kComma)) {
+      call->args.push_back(nullptr);
+    } else {
       call->args.push_back(ParseExpr());
+    }
+    while (Match(TokenKind::kComma)) {
+      if (Check(TokenKind::kComma) || Check(TokenKind::kRParen)) {
+        call->args.push_back(nullptr);
+      } else {
+        call->args.push_back(ParseExpr());
+      }
     }
   }
   Expect(TokenKind::kRParen);
@@ -527,6 +548,8 @@ Expr* Parser::ParseConcatenation() {
     cat->elements.push_back(ParseExpr());
   }
   Expect(TokenKind::kRBrace);
+  // §11.4.12: postfix bit-select/part-select on concatenation: {b,c}[5:2]
+  if (Check(TokenKind::kLBracket)) return ParseSelectExpr(cat);
   return cat;
 }
 
@@ -720,9 +743,21 @@ Expr* Parser::ParseStreamingConcat(TokenKind dir) {
   sc->range.start = loc;
   sc->op = dir;  // store direction
 
-  // Optional slice_size (type or expression).
+  // Optional slice_size: type keyword (byte, int, etc.) or expression.
   if (!Check(TokenKind::kLBrace)) {
-    sc->lhs = ParsePrimaryExpr();
+    auto saved = lexer_.SavePos();
+    auto tok = Consume();
+    if (Check(TokenKind::kLBrace)) {
+      // Single token followed by '{' — treat as type-sized slice.
+      auto* type_id = arena_.Create<Expr>();
+      type_id->kind = ExprKind::kIdentifier;
+      type_id->text = tok.text;
+      type_id->range.start = tok.loc;
+      sc->lhs = type_id;
+    } else {
+      lexer_.RestorePos(saved);
+      sc->lhs = ParsePrimaryExpr();
+    }
   }
 
   Expect(TokenKind::kLBrace);

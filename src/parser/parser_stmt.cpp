@@ -123,6 +123,8 @@ Stmt* Parser::ParseStmtBody() {
       return ParseRandcaseStmt();
     case TokenKind::kKwRandsequence:
       return ParseRandsequenceStmt();
+    case TokenKind::kKwExpect:
+      return ParseExpectStmt();
     default:
       return ParseAssignmentOrExprStmt();
   }

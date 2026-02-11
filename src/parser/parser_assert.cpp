@@ -97,6 +97,45 @@ static Expr* SkipPropertySpec(Arena& arena, Lexer& lexer, SourceLoc loc) {
   return expr;
 }
 
+// Check whether the next tokens indicate a deferred immediate assertion
+// (§16.4): assert #0 (...) or assert final (...) at module level.
+static bool IsDeferredImmediate(Lexer& lexer) {
+  if (lexer.Peek().Is(TokenKind::kHash)) return true;
+  if (lexer.Peek().Is(TokenKind::kKwFinal)) return true;
+  return false;
+}
+
+// Parse a deferred immediate assertion as a module-level item (§16.4).
+// Wraps the procedural immediate-assertion parser result.
+static ModuleItem* WrapStmtAsItem(Arena& arena, Stmt* stmt, SourceLoc loc) {
+  auto* item = arena.Create<ModuleItem>();
+  item->kind = ModuleItemKind::kAssertProperty;
+  item->loc = loc;
+  item->body = stmt;
+  return item;
+}
+
+// Parse a §16.4 deferred immediate assertion at module level.
+ModuleItem* Parser::ParseDeferredImmediateItem(SourceLoc loc) {
+  auto* stmt = arena_.Create<Stmt>();
+  stmt->kind = StmtKind::kAssertImmediate;
+  stmt->range.start = loc;
+  stmt->is_deferred = true;
+  if (Match(TokenKind::kHash)) Expect(TokenKind::kIntLiteral);
+  Match(TokenKind::kKwFinal);
+  Expect(TokenKind::kLParen);
+  stmt->assert_expr = ParseExpr();
+  Expect(TokenKind::kRParen);
+  if (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwElse)) {
+    stmt->assert_pass_stmt = ParseStmt();
+  }
+  if (Match(TokenKind::kKwElse)) stmt->assert_fail_stmt = ParseStmt();
+  if (!stmt->assert_pass_stmt && !stmt->assert_fail_stmt) {
+    Expect(TokenKind::kSemicolon);
+  }
+  return WrapStmtAsItem(arena_, stmt, loc);
+}
+
 // Shared logic for assert/assume property (§16.5).
 ModuleItem* Parser::ParsePropertyAssertLike(ModuleItemKind kind,
                                             TokenKind keyword) {
@@ -104,6 +143,10 @@ ModuleItem* Parser::ParsePropertyAssertLike(ModuleItemKind kind,
   item->kind = kind;
   item->loc = CurrentLoc();
   Expect(keyword);
+
+  // §16.4: deferred immediate assertions at module level
+  if (IsDeferredImmediate(lexer_)) return ParseDeferredImmediateItem(item->loc);
+
   Expect(TokenKind::kKwProperty);
   Expect(TokenKind::kLParen);
   item->assert_expr = SkipPropertySpec(arena_, lexer_, CurrentLoc());
@@ -132,11 +175,32 @@ ModuleItem* Parser::ParseAssumeProperty() {
 }
 
 // Parse: cover property ( property_spec ) [pass_stmt] ;
+// Or: cover #0 ( expr ) [pass_stmt] ; / cover final ( expr ) [pass_stmt] ;
 ModuleItem* Parser::ParseCoverProperty() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kCoverProperty;
   item->loc = CurrentLoc();
   Expect(TokenKind::kKwCover);
+
+  // §16.4: deferred immediate cover at module level
+  if (IsDeferredImmediate(lexer_)) {
+    auto* stmt = arena_.Create<Stmt>();
+    stmt->kind = StmtKind::kCoverImmediate;
+    stmt->range.start = item->loc;
+    stmt->is_deferred = true;
+    if (Match(TokenKind::kHash)) Expect(TokenKind::kIntLiteral);
+    Match(TokenKind::kKwFinal);
+    Expect(TokenKind::kLParen);
+    stmt->assert_expr = ParseExpr();
+    Expect(TokenKind::kRParen);
+    if (!Check(TokenKind::kSemicolon)) {
+      stmt->assert_pass_stmt = ParseStmt();
+    } else {
+      Expect(TokenKind::kSemicolon);
+    }
+    return WrapStmtAsItem(arena_, stmt, item->loc);
+  }
+
   Expect(TokenKind::kKwProperty);
   Expect(TokenKind::kLParen);
   item->assert_expr = SkipPropertySpec(arena_, lexer_, CurrentLoc());
@@ -222,6 +286,39 @@ ModuleItem* Parser::ParseSequenceDecl() {
   Expect(TokenKind::kKwEndsequence);
   if (Match(TokenKind::kColon)) ExpectIdentifier();
   return item;
+}
+
+// =============================================================================
+// §16.17 Expect statement
+// =============================================================================
+
+Stmt* Parser::ParseExpectStmt() {
+  auto* stmt = arena_.Create<Stmt>();
+  stmt->kind = StmtKind::kAssertImmediate;  // reuse for stub
+  stmt->range.start = CurrentLoc();
+  Expect(TokenKind::kKwExpect);
+  Expect(TokenKind::kLParen);
+  // Skip property_spec — same balanced-paren approach.
+  int depth = 1;
+  while (depth > 0 && !AtEnd()) {
+    if (Match(TokenKind::kLParen)) {
+      ++depth;
+    } else if (Match(TokenKind::kRParen)) {
+      --depth;
+    } else {
+      Consume();
+    }
+  }
+  // Optional action block
+  if (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwElse)) {
+    stmt->assert_pass_stmt = ParseStmt();
+  }
+  if (Match(TokenKind::kKwElse)) stmt->assert_fail_stmt = ParseStmt();
+  if (!stmt->assert_pass_stmt && !stmt->assert_fail_stmt) {
+    Expect(TokenKind::kSemicolon);
+  }
+  stmt->range.end = CurrentLoc();
+  return stmt;
 }
 
 }  // namespace delta

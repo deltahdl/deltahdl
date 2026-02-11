@@ -912,3 +912,74 @@ TEST(ParserSection11, UnsignedSystemCall) {
   EXPECT_EQ(rhs->kind, ExprKind::kSystemCall);
   EXPECT_EQ(rhs->callee, "$unsigned");
 }
+
+// --- Streaming operator with type-sized slice (§11.4.14) ---
+
+TEST(ParserSection11, StreamingWithTypedSlice) {
+  auto r = Parse(
+      "module t;\n"
+      "  byte a;\n"
+      "  int b;\n"
+      "  initial b = {<< byte {a}};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// --- Tagged union expressions (§11.9) ---
+
+TEST(ParserSection11, TaggedUnionExpr) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    int a;\n"
+      "    a = tagged Invalid;\n"
+      "    a = tagged Valid (42);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// --- Let construct (§11.12) ---
+
+TEST(ParserSection11, LetConstruct) {
+  auto r = Parse(
+      "module t;\n"
+      "  let op(x, y, z) = |((x | y) & z);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// --- Empty args in system calls (§20.2/§21.2) ---
+
+TEST(ParserSection11, SystemCallEmptyArgs) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial $display(5,,2,,3);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserSection11, SystemCallLeadingEmptyArg) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial $display(,\"hello\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// --- Bit-select on concatenation (§11.4.12) ---
+
+TEST(ParserSection11, BitSelectOnConcat) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic [3:0] a, b, c;\n"
+      "  initial a = {b, c}[5:2];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}

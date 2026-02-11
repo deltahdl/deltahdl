@@ -556,6 +556,23 @@ static std::optional<AlwaysKind> TokenToAlwaysKind(TokenKind tk) {
   }
 }
 
+// §11.12: let declaration — let name(args) = expr;
+ModuleItem* Parser::ParseLetDecl() {
+  Consume();  // 'let'
+  auto* item = arena_.Create<ModuleItem>();
+  item->kind = ModuleItemKind::kVarDecl;
+  item->loc = CurrentLoc();
+  item->name = ExpectIdentifier().text;
+  if (Check(TokenKind::kLParen)) {
+    std::vector<Expr*> discard;
+    ParseParenList(discard);
+  }
+  Expect(TokenKind::kEq);
+  item->init_expr = ParseExpr();
+  Expect(TokenKind::kSemicolon);
+  return item;
+}
+
 void Parser::ParseGenvarDecl(std::vector<ModuleItem*>& items) {
   Consume();  // genvar keyword
   do {
@@ -696,6 +713,10 @@ bool Parser::TryParseKeywordItem(std::vector<ModuleItem*>& items) {
   }
   if (Check(TokenKind::kKwTimeunit) || Check(TokenKind::kKwTimeprecision)) {
     ParseTimeunitDecl(current_module_);
+    return true;
+  }
+  if (Check(TokenKind::kKwLet)) {
+    items.push_back(ParseLetDecl());
     return true;
   }
   if (Check(TokenKind::kKwInterconnect)) {

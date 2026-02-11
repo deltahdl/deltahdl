@@ -38,6 +38,7 @@ class Parser {
   bool TryParseProcessBlock(std::vector<ModuleItem*>& items);
   bool TryParseKeywordItem(std::vector<ModuleItem*>& items);
   bool TryParseVerificationItem(std::vector<ModuleItem*>& items);
+  ModuleItem* ParseLetDecl();
   void ParseGenvarDecl(std::vector<ModuleItem*>& items);
   void ParseTimeunitDecl(ModuleDecl* mod = nullptr);
   bool TryParseClockingOrVerification(std::vector<ModuleItem*>& items);
@@ -188,6 +189,8 @@ class Parser {
   Stmt* ParseImmediateAssert();
   Stmt* ParseImmediateAssume();
   Stmt* ParseImmediateAssertLike(StmtKind kind, TokenKind keyword);
+  ModuleItem* ParseDeferredImmediateItem(SourceLoc loc);
+  Stmt* ParseExpectStmt();
   Stmt* ParseImmediateCover();
   ModuleItem* ParseAssertProperty();
   ModuleItem* ParseAssumeProperty();
@@ -206,6 +209,7 @@ class Parser {
   Expr* ParseCallExpr(Expr* callee);
   void ParseNamedArg(Expr* call);
   Expr* ParseMemberAccessChain(Token tok);
+  Expr* MakeMemberAccess(Expr* base);
   Expr* ParseIdentifierExpr();
   Expr* ParseSelectExpr(Expr* base);
   Expr* ParseSystemCall();
