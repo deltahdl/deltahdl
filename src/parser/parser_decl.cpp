@@ -500,6 +500,11 @@ DataType Parser::ParseDataType() {
 
 // --- Unpacked dimensions ---
 
+// Check if current token is a type keyword for associative array index (§7.8).
+static bool IsAssocIndexType(TokenKind tk) {
+  return TokenToTypeKind(tk).has_value() && tk != TokenKind::kKwVoid;
+}
+
 void Parser::ParseUnpackedDims(std::vector<Expr*>& dims) {
   while (Check(TokenKind::kLBracket)) {
     Consume();
@@ -524,6 +529,15 @@ void Parser::ParseUnpackedDims(std::vector<Expr*>& dims) {
       auto* dim = arena_.Create<Expr>();
       dim->kind = ExprKind::kIdentifier;
       dim->text = "*";
+      dims.push_back(dim);
+      Expect(TokenKind::kRBracket);
+      continue;
+    }
+    // Associative array with type index: [string], [int], [byte], etc. (§7.8)
+    if (IsAssocIndexType(CurrentToken().kind)) {
+      auto* dim = arena_.Create<Expr>();
+      dim->kind = ExprKind::kIdentifier;
+      dim->text = Consume().text;
       dims.push_back(dim);
       Expect(TokenKind::kRBracket);
       continue;

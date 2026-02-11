@@ -259,7 +259,7 @@ TEST(ParserSection7, AssocArrayWildcard) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-TEST(ParserSection7, AssocArrayString) {
+TEST(ParserSection7, AssocArrayStringIndex) {
   auto r = Parse(
       "module t;\n"
       "  int scores[string];\n"
@@ -268,7 +268,39 @@ TEST(ParserSection7, AssocArrayString) {
   auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "scores");
-  EXPECT_FALSE(item->unpacked_dims.empty());
+  ASSERT_EQ(item->unpacked_dims.size(), 1u);
+  ASSERT_NE(item->unpacked_dims[0], nullptr);
+  EXPECT_EQ(item->unpacked_dims[0]->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(item->unpacked_dims[0]->text, "string");
+}
+
+TEST(ParserSection7, AssocArrayIntIndex) {
+  auto r = Parse(
+      "module t;\n"
+      "  byte lookup[int];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->name, "lookup");
+  ASSERT_EQ(item->unpacked_dims.size(), 1u);
+  ASSERT_NE(item->unpacked_dims[0], nullptr);
+  EXPECT_EQ(item->unpacked_dims[0]->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(item->unpacked_dims[0]->text, "int");
+}
+
+TEST(ParserSection7, AssocArrayIntegerIndex) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic [7:0] cache[integer];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->name, "cache");
+  ASSERT_EQ(item->unpacked_dims.size(), 1u);
+  ASSERT_NE(item->unpacked_dims[0], nullptr);
+  EXPECT_EQ(item->unpacked_dims[0]->text, "integer");
 }
 
 // =========================================================================
