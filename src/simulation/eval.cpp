@@ -882,6 +882,10 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena) {
     case ExprKind::kIdentifier:
       return EvalIdentifier(expr, ctx, arena);
     case ExprKind::kUnary:
+      if (expr->op == TokenKind::kPlusPlus ||
+          expr->op == TokenKind::kMinusMinus) {
+        return EvalPrefixUnary(expr, ctx, arena);
+      }
       return EvalUnaryOp(expr->op, EvalExpr(expr->lhs, ctx, arena), arena);
     case ExprKind::kBinary:
       if (IsCompoundAssignOp(expr->op)) {

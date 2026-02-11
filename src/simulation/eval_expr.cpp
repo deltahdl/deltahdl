@@ -58,6 +58,20 @@ Logic4Vec EvalReplicate(const Expr* expr, SimContext& ctx, Arena& arena) {
   return result;
 }
 
+// --- Prefix increment/decrement (§11.4.2) ---
+
+Logic4Vec EvalPrefixUnary(const Expr* expr, SimContext& ctx, Arena& arena) {
+  auto old_val = EvalExpr(expr->lhs, ctx, arena);
+  uint64_t v = old_val.ToUint64();
+  uint64_t nv = (expr->op == TokenKind::kPlusPlus) ? v + 1 : v - 1;
+  auto new_val = MakeLogic4VecVal(arena, old_val.width, nv);
+  if (expr->lhs->kind == ExprKind::kIdentifier) {
+    auto* var = ctx.FindVariable(expr->lhs->text);
+    if (var) var->value = new_val;
+  }
+  return new_val;  // Return new value (prefix semantics).
+}
+
 // --- Postfix increment/decrement (§11.4.2) ---
 
 Logic4Vec EvalPostfixUnary(const Expr* expr, SimContext& ctx, Arena& arena) {

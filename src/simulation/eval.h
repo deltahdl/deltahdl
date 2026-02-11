@@ -40,6 +40,7 @@ bool TryEvalEnumMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
 
 // Extended expression evaluators (eval_expr.cpp).
 Logic4Vec EvalReplicate(const Expr* expr, SimContext& ctx, Arena& arena);
+Logic4Vec EvalPrefixUnary(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalPostfixUnary(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena);
