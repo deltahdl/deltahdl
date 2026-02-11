@@ -421,6 +421,11 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
       item->data_type.kind == DataTypeKind::kUnion) {
     var.dtype = &item->data_type;
   }
+  // §8: Mark class-typed variables.
+  if (item->data_type.kind == DataTypeKind::kNamed &&
+      class_names_.count(item->data_type.type_name)) {
+    var.class_type_name = item->data_type.type_name;
+  }
   // §7.4/§7.5: Compute unpacked array element count.
   ComputeUnpackedDims(item->unpacked_dims, var);
   InferDynArraySize(item->unpacked_dims, item->init_expr, var);
@@ -529,6 +534,10 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kDpiImport:
     case ModuleItemKind::kDpiExport:
     case ModuleItemKind::kClassDecl:
+      if (item->class_decl) {
+        class_names_.insert(item->class_decl->name);
+        mod->class_decls.push_back(item->class_decl);
+      }
       break;
   }
 }

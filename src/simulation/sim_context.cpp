@@ -347,6 +347,16 @@ ClassTypeInfo* SimContext::FindClassType(std::string_view name) {
   return (it != class_types_.end()) ? it->second : nullptr;
 }
 
+void SimContext::SetVariableClassType(std::string_view var,
+                                      std::string_view type) {
+  var_class_types_[var] = type;
+}
+
+std::string_view SimContext::GetVariableClassType(std::string_view var) const {
+  auto it = var_class_types_.find(var);
+  return (it != var_class_types_.end()) ? it->second : std::string_view{};
+}
+
 uint64_t SimContext::AllocateClassObject(ClassObject* obj) {
   uint64_t id = next_handle_id_++;
   class_objects_[id] = obj;

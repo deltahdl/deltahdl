@@ -206,6 +206,8 @@ class SimContext {
   // §8: Class type registry and object management.
   void RegisterClassType(std::string_view name, ClassTypeInfo* info);
   ClassTypeInfo* FindClassType(std::string_view name);
+  void SetVariableClassType(std::string_view var, std::string_view type);
+  std::string_view GetVariableClassType(std::string_view var) const;
 
   // Allocate a new class object, returning its handle ID (>0).
   uint64_t AllocateClassObject(ClassObject* obj);
@@ -271,8 +273,9 @@ class SimContext {
   std::unordered_map<std::string_view, MailboxObject*> mailboxes_;
   // §15.5.2: Event triggered timestamps (ticks when last triggered).
   std::unordered_map<std::string_view, uint64_t> event_triggered_;
-  // §8: Class type registry.
+  // §8: Class type registry and variable→class type mapping.
   std::unordered_map<std::string_view, ClassTypeInfo*> class_types_;
+  std::unordered_map<std::string_view, std::string_view> var_class_types_;
   // §8: Object heap — maps handle ID to ClassObject.
   std::unordered_map<uint64_t, ClassObject*> class_objects_;
   uint64_t next_handle_id_ = 1;

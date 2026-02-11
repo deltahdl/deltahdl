@@ -5,6 +5,7 @@
 #include "common/arena.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
+#include "simulation/class_object.h"
 #include "simulation/eval.h"
 #include "simulation/eval_array.h"
 #include "simulation/sim_context.h"
@@ -133,6 +134,12 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto* sinfo = ctx.GetVariableStructType(base_name);
   if (base_var && sinfo)
     return ExtractStructField(base_var, sinfo, field_name, arena);
+  // §8: Class object property access (e.g., obj.a).
+  if (base_var) {
+    auto handle = base_var->value.ToUint64();
+    auto* obj = ctx.GetClassObject(handle);
+    if (obj) return obj->GetProperty(field_name, arena);
+  }
   // §7.12: Array property/method access (e.g., arr.sum, arr.sort).
   Logic4Vec arr_result;
   if (TryEvalArrayProperty(base_name, field_name, ctx, arena, arr_result))

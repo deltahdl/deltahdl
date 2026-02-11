@@ -66,15 +66,16 @@ struct RtlirVariable {
   bool is_string = false;
   bool is_real = false;
   bool is_signed = false;
-  const Expr* init_expr = nullptr;  // Module-level variable initializer.
-  const DataType* dtype = nullptr;  // Full type for struct/union layout.
-  uint32_t unpacked_size = 0;       // §7.4: unpacked array element count.
-  uint32_t unpacked_lo = 0;         // §7.4: unpacked array low index.
-  bool is_descending = false;       // §7.4: true for [hi:lo] range.
-  bool is_queue = false;            // §7.10: queue declared with [$].
-  int32_t queue_max_size = -1;      // §7.10: max queue size (-1=unbounded).
-  bool is_assoc = false;            // §7.8: associative array.
-  bool is_string_index = false;     // §7.8: true if index type is string.
+  const Expr* init_expr = nullptr;   // Module-level variable initializer.
+  const DataType* dtype = nullptr;   // Full type for struct/union layout.
+  uint32_t unpacked_size = 0;        // §7.4: unpacked array element count.
+  uint32_t unpacked_lo = 0;          // §7.4: unpacked array low index.
+  bool is_descending = false;        // §7.4: true for [hi:lo] range.
+  bool is_queue = false;             // §7.10: queue declared with [$].
+  int32_t queue_max_size = -1;       // §7.10: max queue size (-1=unbounded).
+  bool is_assoc = false;             // §7.8: associative array.
+  bool is_string_index = false;      // §7.8: true if index type is string.
+  std::string_view class_type_name;  // §8: class type name for class variables.
 };
 
 // --- Continuous assignment ---
@@ -134,6 +135,7 @@ struct RtlirModule {
   std::vector<RtlirModuleInst> children;
   std::vector<RtlirParamDecl> params;
   std::vector<ModuleItem*> function_decls;
+  std::vector<ClassDecl*> class_decls;  // §8: class declarations in module.
 };
 
 // --- Design (top-level container) ---

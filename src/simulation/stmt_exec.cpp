@@ -13,6 +13,7 @@
 #include "elaboration/type_eval.h"
 #include "parser/ast.h"
 #include "simulation/awaiters.h"
+#include "simulation/class_object.h"
 #include "simulation/eval.h"
 #include "simulation/eval_array.h"
 #include "simulation/process.h"
@@ -104,18 +105,27 @@ static bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
   auto base_name = std::string_view(name).substr(0, dot);
   auto field_name = std::string_view(name).substr(dot + 1);
   auto* base_var = ctx.FindVariable(base_name);
+  if (!base_var) return false;
   auto* info = ctx.GetVariableStructType(base_name);
-  if (!base_var || !info) return false;
-  for (const auto& f : info->fields) {
-    if (f.name != field_name) continue;
-    uint64_t old_val = base_var->value.ToUint64();
-    uint64_t mask =
-        (f.width >= 64) ? ~uint64_t{0} : (uint64_t{1} << f.width) - 1;
-    uint64_t new_bits = (rhs_val.ToUint64() & mask) << f.bit_offset;
-    uint64_t cleared = old_val & ~(mask << f.bit_offset);
-    base_var->value =
-        MakeLogic4VecVal(arena, base_var->value.width, cleared | new_bits);
-    base_var->NotifyWatchers();
+  if (info) {
+    for (const auto& f : info->fields) {
+      if (f.name != field_name) continue;
+      uint64_t old_val = base_var->value.ToUint64();
+      uint64_t mask =
+          (f.width >= 64) ? ~uint64_t{0} : (uint64_t{1} << f.width) - 1;
+      uint64_t new_bits = (rhs_val.ToUint64() & mask) << f.bit_offset;
+      uint64_t cleared = old_val & ~(mask << f.bit_offset);
+      base_var->value =
+          MakeLogic4VecVal(arena, base_var->value.width, cleared | new_bits);
+      base_var->NotifyWatchers();
+      return true;
+    }
+  }
+  // §8: Class object property write (e.g., obj.a = val).
+  auto handle = base_var->value.ToUint64();
+  auto* obj = ctx.GetClassObject(handle);
+  if (obj) {
+    obj->SetProperty(std::string(field_name), rhs_val);
     return true;
   }
   return false;
@@ -430,10 +440,26 @@ static bool TryAssocCopyAssign(const Stmt* stmt, SimContext& ctx) {
   return true;
 }
 
+// §8: Try to handle class `new` in a blocking assignment.
+static bool TryClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  if (!stmt->rhs || stmt->rhs->kind != ExprKind::kCall) return false;
+  if (stmt->rhs->text != "new") return false;
+  if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier) return false;
+  auto type_name = ctx.GetVariableClassType(stmt->lhs->text);
+  if (type_name.empty()) return false;
+  auto handle = EvalClassNew(type_name, stmt->rhs, ctx, arena);
+  auto* var = ctx.FindVariable(stmt->lhs->text);
+  if (var) var->value = handle;
+  return true;
+}
+
 // Execute a blocking assignment with full LHS support.
 static StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
                                          Arena& arena) {
   if (!stmt->lhs) return StmtResult::kDone;
+
+  // §8: Class `new` assignment (test_obj = new).
+  if (TryClassNewAssign(stmt, ctx, arena)) return StmtResult::kDone;
 
   // §7.8: Associative array copy assignment.
   if (TryAssocCopyAssign(stmt, ctx)) return StmtResult::kDone;
@@ -529,8 +555,25 @@ static void CreateBlockArrayElements(const Stmt* stmt, uint32_t elem_width,
   }
 }
 
+// §8: Handle block-level class-typed variable declaration.
+static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
+                                Arena& arena) {
+  auto class_type = stmt->var_decl_type.type_name;
+  if (class_type.empty() || !ctx.FindClassType(class_type)) return false;
+  ctx.CreateVariable(stmt->var_name, 64);
+  ctx.SetVariableClassType(stmt->var_name, class_type);
+  if (!stmt->var_init) return true;
+  if (stmt->var_init->kind != ExprKind::kCall) return true;
+  if (stmt->var_init->text != "new") return true;
+  auto handle = EvalClassNew(class_type, stmt->var_init, ctx, arena);
+  auto* var = ctx.FindVariable(stmt->var_name);
+  if (var) var->value = handle;
+  return true;
+}
+
 static StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx,
                                   Arena& arena) {
+  if (TryExecClassVarDecl(stmt, ctx, arena)) return StmtResult::kDone;
   uint32_t width = EvalTypeWidth(stmt->var_decl_type);
   if (width == 0 && stmt->var_decl_type.kind == DataTypeKind::kString) {
     ctx.CreateVariable(stmt->var_name, 0);

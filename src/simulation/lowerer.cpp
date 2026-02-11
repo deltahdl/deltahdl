@@ -11,6 +11,7 @@
 #include "elaboration/type_eval.h"
 #include "parser/ast.h"
 #include "simulation/awaiters.h"
+#include "simulation/class_object.h"
 #include "simulation/eval.h"
 #include "simulation/net.h"
 #include "simulation/process.h"
@@ -140,7 +141,9 @@ static void CreateArrayElements(const RtlirVariable& var, SimContext& ctx,
 }
 
 void Lowerer::LowerVar(const RtlirVariable& var) {
-  auto* v = ctx_.CreateVariable(var.name, var.width);
+  // §8: Class handles are 64-bit.
+  uint32_t width = var.class_type_name.empty() ? var.width : 64;
+  auto* v = ctx_.CreateVariable(var.name, width);
   if (var.is_event) v->is_event = true;
   if (var.is_signed) v->is_signed = true;
   if (var.is_string) ctx_.RegisterStringVariable(var.name);
@@ -152,6 +155,9 @@ void Lowerer::LowerVar(const RtlirVariable& var) {
     v->value = val;
   }
   RegisterStructInfo(var, ctx_);
+  if (!var.class_type_name.empty()) {
+    ctx_.SetVariableClassType(var.name, var.class_type_name);
+  }
   if (var.is_queue) {
     ctx_.CreateQueue(var.name, var.width, var.queue_max_size);
   } else if (var.is_assoc) {
@@ -159,6 +165,29 @@ void Lowerer::LowerVar(const RtlirVariable& var) {
   } else {
     CreateArrayElements(var, ctx_, arena_);
   }
+}
+
+// §8: Create ClassTypeInfo from a ClassDecl AST node.
+void Lowerer::LowerClassDecl(const ClassDecl* cls) {
+  auto* info = arena_.Create<ClassTypeInfo>();
+  info->name = cls->name;
+  info->decl = cls;
+  info->is_abstract = cls->is_virtual;
+  for (auto* member : cls->members) {
+    if (member->kind == ClassMemberKind::kProperty) {
+      uint32_t w = EvalTypeWidth(member->data_type, {});
+      if (w == 0) w = 32;
+      info->properties.push_back({member->name, w, member->is_static});
+    } else if (member->kind == ClassMemberKind::kMethod && member->method) {
+      std::string name(member->method->name);
+      info->methods[name] = member->method;
+    }
+  }
+  // §8.5: Register class parameters as properties.
+  for (const auto& [pname, pexpr] : cls->params) {
+    info->properties.push_back({pname, 32, false});
+  }
+  ctx_.RegisterClassType(cls->name, info);
 }
 
 void Lowerer::LowerModule(const RtlirModule* mod) {
@@ -185,6 +214,11 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   // Register function declarations.
   for (auto* func : mod->function_decls) {
     ctx_.RegisterFunction(func->name, func);
+  }
+
+  // §8: Register class type declarations.
+  for (auto* cls : mod->class_decls) {
+    LowerClassDecl(cls);
   }
 
   // Lower processes.

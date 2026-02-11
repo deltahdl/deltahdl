@@ -10,6 +10,7 @@
 #include "elaboration/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
+#include "simulation/class_object.h"
 #include "simulation/dpi.h"
 #include "simulation/eval_array.h"
 #include "simulation/sim_context.h"
@@ -1014,6 +1015,27 @@ static void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
 }
 
 // §13: Handle blocking assignment inside function/task body.
+// Write to an indexed LHS inside a function body (array/assoc element).
+static void ExecFuncSelectAssign(const Expr* lhs, const Logic4Vec& val,
+                                 SimContext& ctx, Arena& arena) {
+  if (!lhs->base || lhs->base->kind != ExprKind::kIdentifier) return;
+  auto* aa = ctx.FindAssocArray(lhs->base->text);
+  if (aa && lhs->index) {
+    if (aa->is_string_key) {
+      aa->str_data[FormatValueAsString(EvalExpr(lhs->index, ctx, arena))] = val;
+    } else {
+      auto key =
+          static_cast<int64_t>(EvalExpr(lhs->index, ctx, arena).ToUint64());
+      aa->int_data[key] = val;
+    }
+    return;
+  }
+  auto idx = EvalExpr(lhs->index, ctx, arena).ToUint64();
+  auto name = std::string(lhs->base->text) + "[" + std::to_string(idx) + "]";
+  auto* elem = ctx.FindVariable(name);
+  if (elem) elem->value = val;
+}
+
 static void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
   if (!stmt->lhs) return;
@@ -1021,29 +1043,17 @@ static void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx,
   // Simple identifier LHS.
   if (stmt->lhs->kind == ExprKind::kIdentifier) {
     auto* var = ctx.FindVariable(stmt->lhs->text);
-    if (var) var->value = val;
-    return;
-  }
-  // Select (indexed) LHS: array or assoc array element write.
-  if (stmt->lhs->kind == ExprKind::kSelect && stmt->lhs->base &&
-      stmt->lhs->base->kind == ExprKind::kIdentifier) {
-    auto* aa = ctx.FindAssocArray(stmt->lhs->base->text);
-    if (aa && stmt->lhs->index) {
-      if (aa->is_string_key) {
-        auto key = FormatValueAsString(EvalExpr(stmt->lhs->index, ctx, arena));
-        aa->str_data[key] = val;
-      } else {
-        auto key = static_cast<int64_t>(
-            EvalExpr(stmt->lhs->index, ctx, arena).ToUint64());
-        aa->int_data[key] = val;
-      }
+    if (var) {
+      var->value = val;
       return;
     }
-    auto idx = EvalExpr(stmt->lhs->index, ctx, arena).ToUint64();
-    auto name =
-        std::string(stmt->lhs->base->text) + "[" + std::to_string(idx) + "]";
-    auto* elem = ctx.FindVariable(name);
-    if (elem) elem->value = val;
+    // §8.7: Inside constructor, write to class property via `this`.
+    auto* self = ctx.CurrentThis();
+    if (self) self->SetProperty(std::string(stmt->lhs->text), val);
+    return;
+  }
+  if (stmt->lhs->kind == ExprKind::kSelect) {
+    ExecFuncSelectAssign(stmt->lhs, val, ctx, arena);
   }
 }
 
@@ -1107,6 +1117,34 @@ static void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
   for (auto* s : func->func_body_stmts) {
     if (ExecFuncStmt(s, ret_var, ctx, arena)) return;
   }
+}
+
+// §8.7: Allocate a new class object, execute constructor, return handle.
+Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
+                       SimContext& ctx, Arena& arena) {
+  auto* info = ctx.FindClassType(class_type);
+  if (!info) return MakeLogic4VecVal(arena, 64, kNullClassHandle);
+  auto* obj = arena.Create<ClassObject>();
+  obj->type = info;
+  // Initialize properties with default zero values.
+  for (const auto& prop : info->properties) {
+    obj->properties[std::string(prop.name)] =
+        MakeLogic4VecVal(arena, prop.width, 0);
+  }
+  auto handle = ctx.AllocateClassObject(obj);
+  // Execute constructor if present.
+  auto it = info->methods.find("new");
+  if (it != info->methods.end() && it->second) {
+    ctx.PushScope();
+    ctx.PushThis(obj);
+    // Bind constructor arguments.
+    if (new_expr) BindFunctionArgs(it->second, new_expr, ctx, arena);
+    Variable dummy;
+    ExecFunctionBody(it->second, &dummy, ctx, arena);
+    ctx.PopThis();
+    ctx.PopScope();
+  }
+  return MakeLogic4VecVal(arena, 64, handle);
 }
 
 static Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {

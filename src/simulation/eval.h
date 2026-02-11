@@ -63,6 +63,10 @@ Logic4Vec EvalAssignmentPattern(const Expr* expr, SimContext& ctx,
                                 Arena& arena);
 Logic4Vec EvalMatches(const Expr* expr, SimContext& ctx, Arena& arena);
 
+// §8.7: Allocate a class object and execute constructor. Returns handle.
+Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
+                       SimContext& ctx, Arena& arena);
+
 // String <-> Logic4Vec conversion (eval_string.cpp).
 Logic4Vec StringToLogic4Vec(Arena& arena, std::string_view str);
 
