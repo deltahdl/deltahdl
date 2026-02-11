@@ -586,6 +586,19 @@ static bool IsUtilitySysCall(std::string_view n) {
          n == "$bitstoreal" || n == "$realtobits" || n == "$countbits";
 }
 
+static bool IsArrayQuerySysCall(std::string_view n) {
+  return n == "$dimensions" || n == "$unpacked_dimensions" || n == "$left" ||
+         n == "$right" || n == "$low" || n == "$high" || n == "$increment" ||
+         n == "$size";
+}
+
+static bool IsVerifSysCall(std::string_view n) {
+  return n == "$sampled" || n == "$rose" || n == "$fell" || n == "$stable" ||
+         n == "$past" || n == "$changed" || n.starts_with("$assert") ||
+         n.starts_with("$coverage") || n.starts_with("$q_") ||
+         n.starts_with("$async$") || n.starts_with("$sync$");
+}
+
 static bool IsIOSysCall(std::string_view n) {
   return n == "$fopen" || n == "$fclose" || n == "$fwrite" ||
          n == "$fdisplay" || n == "$readmemh" || n == "$readmemb" ||
@@ -617,6 +630,9 @@ static Logic4Vec EvalMiscSysCall(const Expr* expr, SimContext& ctx,
   if (IsIOSysCall(name)) return EvalIOSysCall(expr, ctx, arena, name);
   if (IsExtFileIOSysCall(name))
     return EvalFileIOSysCall(expr, ctx, arena, name);
+  if (IsArrayQuerySysCall(name))
+    return EvalArrayQuerySysCall(expr, ctx, arena, name);
+  if (IsVerifSysCall(name)) return EvalVerifSysCall(expr, ctx, arena, name);
   return EvalPrngCall(expr, ctx, arena, name);
 }
 

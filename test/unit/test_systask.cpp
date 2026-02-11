@@ -753,3 +753,215 @@ TEST(SysTask, FerrorReturns0OnGoodFd) {
   EvalExpr(close_expr, f.ctx, f.arena);
   std::remove(tmp.c_str());
 }
+
+// ============================================================================
+// §20.7 Array query functions
+// ============================================================================
+
+TEST(SysTask, DimensionsReturnsOne) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$dimensions", {MkInt(f.arena, 0)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
+TEST(SysTask, LeftReturnsUpperBound) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$left", {MkInt(f.arena, 0)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 32u);
+}
+
+TEST(SysTask, RightReturnsZero) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$right", {MkInt(f.arena, 0)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+TEST(SysTask, SizeReturnsWidth) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$size", {MkInt(f.arena, 0)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_GE(result.ToUint64(), 1u);
+}
+
+TEST(SysTask, LowReturnsZero) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$low", {MkInt(f.arena, 0)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+TEST(SysTask, HighReturnsUpperBound) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$high", {MkInt(f.arena, 0)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_GE(result.ToUint64(), 0u);
+}
+
+TEST(SysTask, IncrementReturns) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$increment", {MkInt(f.arena, 0)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 32u);
+}
+
+TEST(SysTask, UnpackedDimensionsReturnsZero) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$unpacked_dimensions", {MkInt(f.arena, 0)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+// ============================================================================
+// §20.11 Assertion control system tasks
+// ============================================================================
+
+TEST(SysTask, AssertOnDoesNotCrash) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$asserton", {});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 1u);
+}
+
+TEST(SysTask, AssertOffDoesNotCrash) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$assertoff", {});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 1u);
+}
+
+TEST(SysTask, AssertKillDoesNotCrash) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$assertkill", {});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 1u);
+}
+
+TEST(SysTask, AssertControlDoesNotCrash) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$assertcontrol", {MkInt(f.arena, 3)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 1u);
+}
+
+// ============================================================================
+// §20.12 Sampled value system functions
+// ============================================================================
+
+TEST(SysTask, SampledReturnsInput) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$sampled", {MkInt(f.arena, 42)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 42u);
+}
+
+TEST(SysTask, RoseReturnsZeroOrOne) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$rose", {MkInt(f.arena, 1)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_LE(result.ToUint64(), 1u);
+}
+
+TEST(SysTask, FellReturnsZeroOrOne) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$fell", {MkInt(f.arena, 0)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_LE(result.ToUint64(), 1u);
+}
+
+TEST(SysTask, StableReturnsZeroOrOne) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$stable", {MkInt(f.arena, 1)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_LE(result.ToUint64(), 1u);
+}
+
+TEST(SysTask, PastReturnsValue) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$past", {MkInt(f.arena, 7)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 32u);
+}
+
+TEST(SysTask, ChangedReturnsZeroOrOne) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$changed", {MkInt(f.arena, 1)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_LE(result.ToUint64(), 1u);
+}
+
+// ============================================================================
+// §20.13 Coverage system functions
+// ============================================================================
+
+TEST(SysTask, CoverageControlReturnsZero) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$coverage_control",
+                         {MkInt(f.arena, 1), MkInt(f.arena, 1),
+                          MkInt(f.arena, 0), MkInt(f.arena, 0)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+TEST(SysTask, CoverageGetMaxReturnsZero) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$coverage_get_max",
+                         {MkInt(f.arena, 1), MkInt(f.arena, 0)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+TEST(SysTask, CoverageGetReturnsZero) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$coverage_get",
+                         {MkInt(f.arena, 1), MkInt(f.arena, 0)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+TEST(SysTask, CoverageMergeReturnsZero) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$coverage_merge", {});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+TEST(SysTask, CoverageSaveReturnsZero) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$coverage_save", {});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+// ============================================================================
+// §20.15 Stochastic analysis tasks
+// ============================================================================
+
+TEST(SysTask, QInitializeReturnsZero) {
+  SysTaskFixture f;
+  auto* expr =
+      MkSysCall(f.arena, "$q_initialize",
+                {MkInt(f.arena, 1), MkInt(f.arena, 1), MkInt(f.arena, 100)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+TEST(SysTask, QFullReturnsZero) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$q_full", {MkInt(f.arena, 1)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+// ============================================================================
+// §20.16 PLA modeling system tasks
+// ============================================================================
+
+TEST(SysTask, AsyncAndArrayReturnsZero) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$async$and$array", {});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}

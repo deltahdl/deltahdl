@@ -30,6 +30,14 @@ Logic4Vec EvalMathSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
 Logic4Vec EvalFileIOSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                             std::string_view name);
 
+// §20.7 Array query functions ($dimensions, $left, $right, etc.)
+Logic4Vec EvalArrayQuerySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                                std::string_view name);
+
+// §20.11-20.16 Assertion control, sampled values, coverage, stochastic, PLA.
+Logic4Vec EvalVerifSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                           std::string_view name);
+
 // §6.16 String method dispatch (eval_string.cpp).
 bool TryEvalStringMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                              Logic4Vec& out);

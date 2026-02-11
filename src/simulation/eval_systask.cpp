@@ -261,6 +261,59 @@ static Logic4Vec EvalCountbits(const Expr* expr, SimContext& ctx,
 }
 
 // ============================================================================
+// §20.7 Array query functions
+// ============================================================================
+
+Logic4Vec EvalArrayQuerySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                                std::string_view name) {
+  uint32_t width = 32;
+  if (!expr->args.empty()) {
+    auto val = EvalExpr(expr->args[0], ctx, arena);
+    width = val.width;
+  }
+  if (name == "$dimensions") return MakeLogic4VecVal(arena, 32, 1);
+  if (name == "$unpacked_dimensions") return MakeLogic4VecVal(arena, 32, 0);
+  if (name == "$left") return MakeLogic4VecVal(arena, 32, width - 1);
+  if (name == "$right") return MakeLogic4VecVal(arena, 32, 0);
+  if (name == "$low") return MakeLogic4VecVal(arena, 32, 0);
+  if (name == "$high") return MakeLogic4VecVal(arena, 32, width - 1);
+  if (name == "$increment") {
+    uint64_t inc = (width > 1) ? 1 : static_cast<uint64_t>(-1);
+    return MakeLogic4VecVal(arena, 32, inc);
+  }
+  return MakeLogic4VecVal(arena, 32, width);
+}
+
+// ============================================================================
+// §20.11-20.16 Verification system calls
+// ============================================================================
+
+Logic4Vec EvalVerifSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                           std::string_view name) {
+  // §20.12 sampled value functions.
+  if (name == "$sampled") {
+    if (expr->args.empty()) return MakeLogic4VecVal(arena, 1, 0);
+    return EvalExpr(expr->args[0], ctx, arena);
+  }
+  if (name == "$past") {
+    if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
+    return EvalExpr(expr->args[0], ctx, arena);
+  }
+  if (name == "$rose" || name == "$fell" || name == "$stable" ||
+      name == "$changed") {
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
+  // §20.11 assertion control.
+  if (name.starts_with("$assert")) return MakeLogic4VecVal(arena, 1, 0);
+  // §20.13 coverage.
+  if (name.starts_with("$coverage")) return MakeLogic4VecVal(arena, 32, 0);
+  // §20.15 stochastic analysis.
+  if (name.starts_with("$q_")) return MakeLogic4VecVal(arena, 32, 0);
+  // §20.16 PLA modeling.
+  return MakeLogic4VecVal(arena, 32, 0);
+}
+
+// ============================================================================
 // §20 dispatch
 // ============================================================================
 
