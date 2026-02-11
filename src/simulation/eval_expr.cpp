@@ -139,6 +139,12 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
     return arr_result;
   if (TryExecArrayPropertyStmt(base_name, field_name, ctx, arena))
     return MakeLogic4VecVal(arena, 1, 0);
+  // §7.10: Queue property access (e.g., q.size).
+  Logic4Vec queue_result;
+  if (TryEvalQueueProperty(base_name, field_name, ctx, arena, queue_result))
+    return queue_result;
+  if (TryExecQueuePropertyStmt(base_name, field_name, ctx, arena))
+    return MakeLogic4VecVal(arena, 1, 0);
   return MakeLogic4Vec(arena, 1);
 }
 

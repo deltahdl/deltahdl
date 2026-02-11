@@ -23,4 +23,13 @@ bool TryEvalArrayProperty(std::string_view var_name, std::string_view prop,
 bool TryExecArrayPropertyStmt(std::string_view var_name, std::string_view prop,
                               SimContext& ctx, Arena& arena);
 
+// §7.10: Queue method dispatch.
+bool TryEvalQueueMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                            Logic4Vec& out);
+bool TryExecQueueMethodStmt(const Expr* expr, SimContext& ctx, Arena& arena);
+bool TryEvalQueueProperty(std::string_view var_name, std::string_view prop,
+                          SimContext& ctx, Arena& arena, Logic4Vec& out);
+bool TryExecQueuePropertyStmt(std::string_view var_name, std::string_view prop,
+                              SimContext& ctx, Arena& arena);
+
 }  // namespace delta

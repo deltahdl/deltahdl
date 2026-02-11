@@ -11,6 +11,7 @@
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/dpi.h"
+#include "simulation/eval_array.h"
 #include "simulation/sim_context.h"
 #include "simulation/vcd_writer.h"
 
@@ -685,6 +686,9 @@ static Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
         std::string(expr->base->text) + "[" + std::to_string(idx) + "]";
     auto* elem = ctx.FindVariable(elem_name);
     if (elem) return elem->value;
+    // §7.10: Queue indexed access.
+    auto* q = ctx.FindQueue(expr->base->text);
+    if (q && idx < q->elements.size()) return q->elements[idx];
   }
 
   auto base_val = EvalExpr(expr->base, ctx, arena);
@@ -867,23 +871,21 @@ static Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, 32, result);
 }
 
+// Try dispatching to built-in type methods (enum, string, array, queue).
+static bool TryBuiltinMethodCall(const Expr* expr, SimContext& ctx,
+                                 Arena& arena, Logic4Vec& out) {
+  if (TryEvalEnumMethodCall(expr, ctx, arena, out)) return true;
+  if (TryEvalStringMethodCall(expr, ctx, arena, out)) return true;
+  if (TryEvalArrayMethodCall(expr, ctx, arena, out)) return true;
+  return TryEvalQueueMethodCall(expr, ctx, arena, out);
+}
+
 // §13: Dispatch function calls with lifetime and void support.
 static Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx,
                                   Arena& arena) {
-  // §6.19: Try enum method dispatch first (e.g., my_enum.first()).
-  Logic4Vec enum_result;
-  if (TryEvalEnumMethodCall(expr, ctx, arena, enum_result)) {
-    return enum_result;
-  }
-  // §6.16: Try string method dispatch (e.g., my_str.len()).
-  Logic4Vec string_result;
-  if (TryEvalStringMethodCall(expr, ctx, arena, string_result)) {
-    return string_result;
-  }
-  // §7.12: Try array method dispatch (e.g., arr.sum()).
-  Logic4Vec array_result;
-  if (TryEvalArrayMethodCall(expr, ctx, arena, array_result)) {
-    return array_result;
+  Logic4Vec method_result;
+  if (TryBuiltinMethodCall(expr, ctx, arena, method_result)) {
+    return method_result;
   }
 
   auto* func = ctx.FindFunction(expr->callee);

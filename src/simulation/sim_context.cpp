@@ -219,6 +219,22 @@ const ArrayInfo* SimContext::FindArrayInfo(std::string_view name) const {
   return (it != array_infos_.end()) ? &it->second : nullptr;
 }
 
+// --- §7.10: Queue management ---
+
+QueueObject* SimContext::CreateQueue(std::string_view name, uint32_t elem_width,
+                                     int32_t max_size) {
+  auto* q = arena_.Create<QueueObject>();
+  q->elem_width = elem_width;
+  q->max_size = max_size;
+  queues_[name] = q;
+  return q;
+}
+
+QueueObject* SimContext::FindQueue(std::string_view name) {
+  auto it = queues_.find(name);
+  return (it != queues_.end()) ? it->second : nullptr;
+}
+
 // --- §7.3.2: Tagged union tag management ---
 
 void SimContext::SetVariableTag(std::string_view var_name,

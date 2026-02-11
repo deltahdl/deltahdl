@@ -268,4 +268,128 @@ bool TryExecArrayPropertyStmt(std::string_view var_name, std::string_view prop,
   return false;
 }
 
+// --- §7.10: Queue method dispatch ---
+
+// §7.10.2: Eval-returning queue methods (size, pop_front, pop_back).
+static bool DispatchQueueEval(std::string_view method, QueueObject* q,
+                              Arena& arena, Logic4Vec& out) {
+  if (method == "size") {
+    out = MakeLogic4VecVal(arena, 32, q->elements.size());
+    return true;
+  }
+  if (method == "pop_front") {
+    if (q->elements.empty()) {
+      out = MakeLogic4VecVal(arena, q->elem_width, 0);
+    } else {
+      out = q->elements.front();
+      q->elements.erase(q->elements.begin());
+    }
+    return true;
+  }
+  if (method == "pop_back") {
+    if (q->elements.empty()) {
+      out = MakeLogic4VecVal(arena, q->elem_width, 0);
+    } else {
+      out = q->elements.back();
+      q->elements.pop_back();
+    }
+    return true;
+  }
+  return false;
+}
+
+// §7.10.2: Queue push/insert methods.
+static bool DispatchQueuePush(std::string_view method, QueueObject* q,
+                              const Expr* expr, SimContext& ctx, Arena& arena) {
+  if (method == "push_back" && !expr->args.empty()) {
+    auto val = EvalExpr(expr->args[0], ctx, arena);
+    bool has_room = (q->max_size < 0) ||
+                    (static_cast<int32_t>(q->elements.size()) < q->max_size);
+    if (has_room) q->elements.push_back(val);
+    return true;
+  }
+  if (method == "push_front" && !expr->args.empty()) {
+    auto val = EvalExpr(expr->args[0], ctx, arena);
+    bool has_room = (q->max_size < 0) ||
+                    (static_cast<int32_t>(q->elements.size()) < q->max_size);
+    if (has_room) q->elements.insert(q->elements.begin(), val);
+    return true;
+  }
+  if (method == "insert" && expr->args.size() >= 2) {
+    auto idx =
+        static_cast<size_t>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
+    auto val = EvalExpr(expr->args[1], ctx, arena);
+    if (idx <= q->elements.size()) {
+      q->elements.insert(q->elements.begin() + static_cast<ptrdiff_t>(idx),
+                         val);
+    }
+    return true;
+  }
+  return false;
+}
+
+// §7.10.2: Queue delete method.
+static bool DispatchQueueDelete(std::string_view method, QueueObject* q,
+                                const Expr* expr, SimContext& ctx,
+                                Arena& arena) {
+  if (method != "delete") return false;
+  if (!expr->args.empty()) {
+    auto idx =
+        static_cast<size_t>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
+    if (idx < q->elements.size()) {
+      q->elements.erase(q->elements.begin() + static_cast<ptrdiff_t>(idx));
+    }
+  } else {
+    q->elements.clear();
+  }
+  return true;
+}
+
+bool TryEvalQueueMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                            Logic4Vec& out) {
+  MethodCallParts parts;
+  if (!ExtractMethodCallParts(expr, parts)) return false;
+  auto* q = ctx.FindQueue(parts.var_name);
+  if (!q) return false;
+  if (DispatchQueueEval(parts.method_name, q, arena, out)) return true;
+  // Mutating methods also return via out (e.g., pop used in expression).
+  if (DispatchQueuePush(parts.method_name, q, expr, ctx, arena)) {
+    out = MakeLogic4VecVal(arena, 1, 0);
+    return true;
+  }
+  if (DispatchQueueDelete(parts.method_name, q, expr, ctx, arena)) {
+    out = MakeLogic4VecVal(arena, 1, 0);
+    return true;
+  }
+  return false;
+}
+
+bool TryExecQueueMethodStmt(const Expr* expr, SimContext& ctx, Arena& arena) {
+  MethodCallParts parts;
+  if (!ExtractMethodCallParts(expr, parts)) return false;
+  auto* q = ctx.FindQueue(parts.var_name);
+  if (!q) return false;
+  if (DispatchQueuePush(parts.method_name, q, expr, ctx, arena)) return true;
+  return DispatchQueueDelete(parts.method_name, q, expr, ctx, arena);
+}
+
+bool TryEvalQueueProperty(std::string_view var_name, std::string_view prop,
+                          SimContext& ctx, Arena& arena, Logic4Vec& out) {
+  auto* q = ctx.FindQueue(var_name);
+  if (!q) return false;
+  // Use the same dispatch as method calls for eval-returning methods.
+  return DispatchQueueEval(prop, q, arena, out);
+}
+
+bool TryExecQueuePropertyStmt(std::string_view var_name, std::string_view prop,
+                              SimContext& ctx, Arena& /*arena*/) {
+  auto* q = ctx.FindQueue(var_name);
+  if (!q) return false;
+  if (prop == "delete") {
+    q->elements.clear();
+    return true;
+  }
+  return false;
+}
+
 }  // namespace delta

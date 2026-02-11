@@ -309,30 +309,46 @@ static void ElaborateGateInst(ModuleItem* item, RtlirModule* mod,
 }
 
 // §7.5: Check for dynamic array [] with init to infer size from elements.
-static void InferDynArraySize(const std::vector<Expr*>& dims,
-                              const Expr* init, RtlirVariable& var) {
+static void InferDynArraySize(const std::vector<Expr*>& dims, const Expr* init,
+                              RtlirVariable& var) {
   if (dims.empty() || dims[0] != nullptr) return;  // Not a dynamic array.
   if (!init || init->elements.empty()) return;
   var.unpacked_size = static_cast<uint32_t>(init->elements.size());
 }
 
 // §7.4: Extract unpacked array size from dimension expressions.
+// §7.10: Detect queue [$] or [$:N].
+static bool TryParseQueueDim(const Expr* dim, RtlirVariable& var) {
+  if (dim->kind != ExprKind::kIdentifier || dim->text != "$") return false;
+  var.is_queue = true;
+  if (dim->rhs) {
+    auto max_val = ConstEvalInt(dim->rhs);
+    if (max_val) var.queue_max_size = static_cast<int32_t>(*max_val + 1);
+  }
+  return true;
+}
+
+// §7.4: Parse range dimension [hi:lo] or [lo:hi].
+static bool TryParseRangeDim(const Expr* dim, RtlirVariable& var) {
+  if (dim->kind != ExprKind::kBinary || dim->op != TokenKind::kColon)
+    return false;
+  auto lval = ConstEvalInt(dim->lhs);
+  auto rval = ConstEvalInt(dim->rhs);
+  if (!lval || !rval) return false;
+  auto lo = std::min(*lval, *rval);
+  auto hi = std::max(*lval, *rval);
+  var.unpacked_lo = static_cast<uint32_t>(lo);
+  var.unpacked_size = static_cast<uint32_t>(hi - lo + 1);
+  var.is_descending = (*lval > *rval);
+  return true;
+}
+
 static void ComputeUnpackedDims(const std::vector<Expr*>& dims,
                                 RtlirVariable& var) {
   if (dims.empty() || !dims[0]) return;
   auto* dim = dims[0];
-  // Range syntax [hi:lo] — parsed as kBinary with kColon operator.
-  if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
-    auto lval = ConstEvalInt(dim->lhs);
-    auto rval = ConstEvalInt(dim->rhs);
-    if (lval && rval) {
-      auto lo = std::min(*lval, *rval);
-      auto hi = std::max(*lval, *rval);
-      var.unpacked_lo = static_cast<uint32_t>(lo);
-      var.unpacked_size = static_cast<uint32_t>(hi - lo + 1);
-    }
-    return;
-  }
+  if (TryParseQueueDim(dim, var)) return;
+  if (TryParseRangeDim(dim, var)) return;
   // Simple size [N] — creates N elements indexed from 0.
   auto size_val = ConstEvalInt(dim);
   if (size_val && *size_val > 0) {

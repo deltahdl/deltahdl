@@ -126,13 +126,16 @@ static void CreateArrayElements(const RtlirVariable& var, SimContext& ctx,
   info.lo = var.unpacked_lo;
   info.size = var.unpacked_size;
   info.elem_width = var.width;
+  info.is_descending = var.is_descending;
   ctx.RegisterArray(var.name, info);
   for (uint32_t i = 0; i < var.unpacked_size; ++i) {
     uint32_t idx = var.unpacked_lo + i;
     auto elem_name = std::string(var.name) + "[" + std::to_string(idx) + "]";
     auto* stored = arena.Create<std::string>(std::move(elem_name));
     auto* elem = ctx.CreateVariable(*stored, var.width);
-    InitArrayElement(var, i, elem, ctx, arena);
+    // §7.4: For descending [hi:lo], pattern element 0 maps to highest index.
+    uint32_t pat_idx = var.is_descending ? (var.unpacked_size - 1 - i) : i;
+    InitArrayElement(var, pat_idx, elem, ctx, arena);
   }
 }
 
@@ -149,7 +152,11 @@ void Lowerer::LowerVar(const RtlirVariable& var) {
     v->value = val;
   }
   RegisterStructInfo(var, ctx_);
-  CreateArrayElements(var, ctx_, arena_);
+  if (var.is_queue) {
+    ctx_.CreateQueue(var.name, var.width, var.queue_max_size);
+  } else {
+    CreateArrayElements(var, ctx_, arena_);
+  }
 }
 
 void Lowerer::LowerModule(const RtlirModule* mod) {

@@ -52,13 +52,21 @@ struct StructTypeInfo {
   bool is_packed = false;
 };
 
+// §7.10: Queue runtime storage.
+struct QueueObject {
+  std::vector<Logic4Vec> elements;
+  uint32_t elem_width = 32;
+  int32_t max_size = -1;  // -1 = unbounded.
+};
+
 // §7.4/§7.5/§7.10: Array metadata for method dispatch.
 struct ArrayInfo {
-  uint32_t lo = 0;           // Low index of unpacked dimension.
-  uint32_t size = 0;         // Number of elements.
-  uint32_t elem_width = 32;  // Width of each element in bits.
-  bool is_dynamic = false;   // §7.5: dynamic array (new/delete).
-  bool is_queue = false;     // §7.10: queue ($).
+  uint32_t lo = 0;             // Low index of unpacked dimension.
+  uint32_t size = 0;           // Number of elements.
+  uint32_t elem_width = 32;    // Width of each element in bits.
+  bool is_descending = false;  // §7.4: true for [hi:lo] range.
+  bool is_dynamic = false;     // §7.5: dynamic array (new/delete).
+  bool is_queue = false;       // §7.10: queue ($).
 };
 
 class SimContext {
@@ -146,6 +154,11 @@ class SimContext {
   ArrayInfo* FindArrayInfo(std::string_view name);
   const ArrayInfo* FindArrayInfo(std::string_view name) const;
 
+  // §7.10: Queue management.
+  QueueObject* CreateQueue(std::string_view name, uint32_t elem_width,
+                           int32_t max_size = -1);
+  QueueObject* FindQueue(std::string_view name);
+
   // §7.3.2: Tagged union tag management.
   void SetVariableTag(std::string_view var_name, std::string_view tag);
   std::string_view GetVariableTag(std::string_view var_name) const;
@@ -227,6 +240,8 @@ class SimContext {
   std::unordered_map<std::string_view, std::string_view> var_struct_types_;
   // §7.4/§7.5/§7.10: Array metadata.
   std::unordered_map<std::string_view, ArrayInfo> array_infos_;
+  // §7.10: Queue runtime objects.
+  std::unordered_map<std::string_view, QueueObject*> queues_;
   // §7.3.2: Tagged union tag tracking (variable name → active tag).
   std::unordered_map<std::string_view, std::string> var_tags_;
   // §15.3: Semaphore objects.

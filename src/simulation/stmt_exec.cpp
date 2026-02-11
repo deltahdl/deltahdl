@@ -1,5 +1,6 @@
 #include "simulation/stmt_exec.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -12,6 +13,7 @@
 #include "parser/ast.h"
 #include "simulation/awaiters.h"
 #include "simulation/eval.h"
+#include "simulation/eval_array.h"
 #include "simulation/process.h"
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
@@ -131,6 +133,87 @@ static Logic4Vec ResizeToWidth(Logic4Vec val, uint32_t target_width,
   return MakeLogic4VecVal(arena, target_width, v);
 }
 
+// §7.6: Copy elements from one array to another (B = A).
+static void CopyArrayElements(std::string_view dst_name, const ArrayInfo& dst,
+                              std::string_view src_name, const ArrayInfo& src,
+                              SimContext& ctx) {
+  uint32_t n = std::min(dst.size, src.size);
+  for (uint32_t i = 0; i < n; ++i) {
+    // Map by logical position: descending arrays count from hi end.
+    uint32_t si =
+        src.is_descending ? (src.lo + src.size - 1 - i) : (src.lo + i);
+    uint32_t di =
+        dst.is_descending ? (dst.lo + dst.size - 1 - i) : (dst.lo + i);
+    auto sn = std::string(src_name) + "[" + std::to_string(si) + "]";
+    auto dn = std::string(dst_name) + "[" + std::to_string(di) + "]";
+    auto* sv = ctx.FindVariable(sn);
+    auto* dv = ctx.FindVariable(dn);
+    if (sv && dv) {
+      dv->value = sv->value;
+      dv->NotifyWatchers();
+    }
+  }
+}
+
+// §7.4: Distribute assignment pattern elements to array element variables.
+static void DistributePatternToArray(std::string_view arr_name,
+                                     const ArrayInfo& info, const Expr* rhs,
+                                     SimContext& ctx, Arena& arena) {
+  for (uint32_t i = 0; i < info.size; ++i) {
+    // §7.4: For descending [hi:lo], element 0 maps to highest index.
+    uint32_t idx =
+        info.is_descending ? (info.lo + info.size - 1 - i) : (info.lo + i);
+    auto name = std::string(arr_name) + "[" + std::to_string(idx) + "]";
+    auto* elem = ctx.FindVariable(name);
+    if (!elem) continue;
+    if (i < rhs->elements.size()) {
+      auto val = EvalExpr(rhs->elements[i], ctx, arena);
+      elem->value = ResizeToWidth(val, info.elem_width, arena);
+    } else {
+      elem->value = MakeLogic4VecVal(arena, info.elem_width, 0);
+    }
+    elem->NotifyWatchers();
+  }
+}
+
+// §7.4/§7.6: Try array-level blocking assignment (pattern or copy).
+static bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx,
+                                   Arena& arena) {
+  if (stmt->lhs->kind != ExprKind::kIdentifier) return false;
+  // Assignment pattern: arr = '{1, 2, 3}
+  if (stmt->rhs && stmt->rhs->kind == ExprKind::kAssignmentPattern) {
+    auto* ainfo = ctx.FindArrayInfo(stmt->lhs->text);
+    if (ainfo) {
+      DistributePatternToArray(stmt->lhs->text, *ainfo, stmt->rhs, ctx, arena);
+      return true;
+    }
+  }
+  // Whole-array copy: B = A
+  if (stmt->rhs->kind == ExprKind::kIdentifier) {
+    auto* dst = ctx.FindArrayInfo(stmt->lhs->text);
+    auto* src = ctx.FindArrayInfo(stmt->rhs->text);
+    if (dst && src) {
+      CopyArrayElements(stmt->lhs->text, *dst, stmt->rhs->text, *src, ctx);
+      return true;
+    }
+  }
+  return false;
+}
+
+// §7.10: Queue indexed write (q[i] = val).
+static bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
+                                 SimContext& ctx, Arena& /*arena*/) {
+  if (!lhs->base || lhs->base->kind != ExprKind::kIdentifier) return false;
+  auto* q = ctx.FindQueue(lhs->base->text);
+  if (!q || !lhs->index) return false;
+  auto idx = EvalExpr(lhs->index, ctx, ctx.GetArena()).ToUint64();
+  if (idx < q->elements.size()) {
+    q->elements[idx] = rhs_val;
+    return true;
+  }
+  return false;
+}
+
 // Execute a blocking assignment with full LHS support.
 static StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
                                          Arena& arena) {
@@ -145,6 +228,10 @@ static StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
       elem->NotifyWatchers();
       return StmtResult::kDone;
     }
+    // §7.10: Queue indexed write (q[i] = val).
+    if (TryQueueIndexedWrite(stmt->lhs, rhs_val, ctx, arena)) {
+      return StmtResult::kDone;
+    }
     auto* var = ResolveLhsVariable(stmt->lhs, ctx);
     if (var) {
       WriteBitSelect(var, stmt->lhs, rhs_val, ctx, arena);
@@ -152,6 +239,8 @@ static StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
     }
     return StmtResult::kDone;
   }
+
+  if (TryArrayBlockingAssign(stmt, ctx, arena)) return StmtResult::kDone;
 
   // Identifier or MemberAccess: whole-variable assign.
   auto* var = ResolveLhsVariable(stmt->lhs, ctx);
