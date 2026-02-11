@@ -36,18 +36,6 @@ static bool HasUnknownBits(const Logic4Vec& val) {
   return false;
 }
 
-static Logic4Vec StringToLogic4Vec(Arena& arena, const std::string& str) {
-  uint32_t width = static_cast<uint32_t>(str.size()) * 8;
-  if (width == 0) width = 8;
-  auto vec = MakeLogic4Vec(arena, width);
-  for (size_t i = 0; i < str.size(); ++i) {
-    auto byte_idx = static_cast<uint32_t>(str.size() - 1 - i);
-    uint32_t word = (byte_idx * 8) / 64;
-    uint32_t bit = (byte_idx * 8) % 64;
-    vec.words[word].aval |= static_cast<uint64_t>(str[i]) << bit;
-  }
-  return vec;
-}
 
 // ============================================================================
 // §20 — $clog2

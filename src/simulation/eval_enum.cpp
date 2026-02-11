@@ -1,4 +1,3 @@
-#include <string>
 #include <string_view>
 
 #include "common/arena.h"
@@ -130,24 +129,17 @@ static bool DispatchEnumMethod(std::string_view method,
 // Returns true and sets `out` if the call is an enum method.
 bool TryEvalEnumMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                            Logic4Vec& out) {
-  // Enum method calls appear as kCall where lhs is a kMemberAccess.
-  if (!expr->lhs || expr->lhs->kind != ExprKind::kMemberAccess) return false;
+  MethodCallParts parts;
+  if (!ExtractMethodCallParts(expr, parts)) return false;
 
-  auto* access = expr->lhs;
-  if (!access->lhs || access->lhs->kind != ExprKind::kIdentifier) return false;
-  if (!access->rhs || access->rhs->kind != ExprKind::kIdentifier) return false;
-
-  auto var_name = access->lhs->text;
-  auto method_name = access->rhs->text;
-
-  const auto* info = ctx.GetVariableEnumType(var_name);
+  const auto* info = ctx.GetVariableEnumType(parts.var_name);
   if (!info) return false;
 
-  auto* var = ctx.FindVariable(var_name);
+  auto* var = ctx.FindVariable(parts.var_name);
   uint64_t current = var ? var->value.ToUint64() : 0;
 
   EnumMethodArgs args{*info, current, expr, ctx, arena};
-  return DispatchEnumMethod(method_name, args, out);
+  return DispatchEnumMethod(parts.method_name, args, out);
 }
 
 }  // namespace delta

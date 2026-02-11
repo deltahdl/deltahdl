@@ -10,6 +10,18 @@
 
 namespace delta {
 
+// --- Method call extraction ---
+
+bool ExtractMethodCallParts(const Expr* expr, MethodCallParts& out) {
+  if (!expr->lhs || expr->lhs->kind != ExprKind::kMemberAccess) return false;
+  auto* access = expr->lhs;
+  if (!access->lhs || access->lhs->kind != ExprKind::kIdentifier) return false;
+  if (!access->rhs || access->rhs->kind != ExprKind::kIdentifier) return false;
+  out.var_name = access->lhs->text;
+  out.method_name = access->rhs->text;
+  return true;
+}
+
 // --- Replication ({n{expr}}) ---
 
 Logic4Vec EvalReplicate(const Expr* expr, SimContext& ctx, Arena& arena) {

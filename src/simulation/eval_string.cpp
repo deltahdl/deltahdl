@@ -32,7 +32,7 @@ static std::string Logic4VecToString(const Logic4Vec& vec) {
   return result;
 }
 
-static Logic4Vec StringToLogic4Vec(Arena& arena, std::string_view str) {
+Logic4Vec StringToLogic4Vec(Arena& arena, std::string_view str) {
   uint32_t width = static_cast<uint32_t>(str.size()) * 8;
   if (width == 0) width = 8;
   auto vec = MakeLogic4Vec(arena, width);
@@ -297,24 +297,17 @@ static bool DispatchMutatingMethod(std::string_view method,
 // Returns true and sets `out` if the call is a string method.
 bool TryEvalStringMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                              Logic4Vec& out) {
-  // String method calls appear as kCall where lhs is a kMemberAccess.
-  if (!expr->lhs || expr->lhs->kind != ExprKind::kMemberAccess) return false;
+  MethodCallParts parts;
+  if (!ExtractMethodCallParts(expr, parts)) return false;
 
-  auto* access = expr->lhs;
-  if (!access->lhs || access->lhs->kind != ExprKind::kIdentifier) return false;
-  if (!access->rhs || access->rhs->kind != ExprKind::kIdentifier) return false;
+  if (!ctx.IsStringVariable(parts.var_name)) return false;
 
-  auto var_name = access->lhs->text;
-  auto method_name = access->rhs->text;
-
-  if (!ctx.IsStringVariable(var_name)) return false;
-
-  auto* var = ctx.FindVariable(var_name);
+  auto* var = ctx.FindVariable(parts.var_name);
   std::string str = var ? Logic4VecToString(var->value) : "";
 
   StringMethodArgs args{var, str, expr, ctx, arena};
-  if (DispatchReturningMethod(method_name, args, out)) return true;
-  return DispatchMutatingMethod(method_name, args, out);
+  if (DispatchReturningMethod(parts.method_name, args, out)) return true;
+  return DispatchMutatingMethod(parts.method_name, args, out);
 }
 
 }  // namespace delta

@@ -46,6 +46,17 @@ Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalInside(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena);
 
+// String <-> Logic4Vec conversion (eval_string.cpp).
+Logic4Vec StringToLogic4Vec(Arena& arena, std::string_view str);
+
+// Extract var_name and method_name from a kCall with kMemberAccess lhs.
+// Returns false if the expression is not a method call pattern.
+struct MethodCallParts {
+  std::string_view var_name;
+  std::string_view method_name;
+};
+bool ExtractMethodCallParts(const Expr* expr, MethodCallParts& out);
+
 // Shared formatting helper (used by eval.cpp and eval_systask.cpp).
 std::string FormatDisplay(const std::string& fmt,
                           const std::vector<Logic4Vec>& vals);
