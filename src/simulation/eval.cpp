@@ -909,6 +909,9 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena) {
       if (IsCompoundAssignOp(expr->op)) {
         return EvalCompoundAssign(expr, ctx, arena);
       }
+      if (expr->op == TokenKind::kKwMatches) {
+        return EvalMatches(expr, ctx, arena);
+      }
       return EvalBinaryOp(expr->op, EvalExpr(expr->lhs, ctx, arena),
                           EvalExpr(expr->rhs, ctx, arena), arena);
     case ExprKind::kTernary:
@@ -933,6 +936,8 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena) {
       return EvalInside(expr, ctx, arena);
     case ExprKind::kStreamingConcat:
       return EvalStreamingConcat(expr, ctx, arena);
+    case ExprKind::kAssignmentPattern:
+      return EvalAssignmentPattern(expr, ctx, arena);
     default:
       return MakeLogic4Vec(arena, 1);
   }

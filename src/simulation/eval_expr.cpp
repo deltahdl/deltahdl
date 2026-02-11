@@ -184,4 +184,59 @@ Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, total_width, concat_val);
 }
 
+// --- Assignment pattern (§10.9) ---
+
+Logic4Vec EvalAssignmentPattern(const Expr* expr, SimContext& ctx,
+                                Arena& arena) {
+  if (expr->elements.empty()) return MakeLogic4Vec(arena, 0);
+
+  // Evaluate all elements and compute total width.
+  std::vector<Logic4Vec> parts;
+  uint32_t total_width = 0;
+  for (auto* elem : expr->elements) {
+    parts.push_back(EvalExpr(elem, ctx, arena));
+    total_width += parts.back().width;
+  }
+  if (total_width == 0) return MakeLogic4Vec(arena, 0);
+
+  // Pack elements MSB-first (left-to-right = most significant first),
+  // same as concatenation per IEEE 1800-2023 §10.9.1.
+  auto result = MakeLogic4Vec(arena, total_width);
+  uint32_t bit_pos = 0;
+  for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
+    uint64_t val = it->ToUint64();
+    uint32_t w = it->width;
+    if (w > 64) w = 64;
+    uint32_t word = bit_pos / 64;
+    uint32_t bit = bit_pos % 64;
+    if (word < result.nwords) {
+      result.words[word].aval |= val << bit;
+      if (bit + w > 64 && word + 1 < result.nwords) {
+        result.words[word + 1].aval |= val >> (64 - bit);
+      }
+    }
+    bit_pos += it->width;
+  }
+  return result;
+}
+
+// --- Matches operator (§12.6) ---
+
+Logic4Vec EvalMatches(const Expr* expr, SimContext& ctx, Arena& arena) {
+  auto lhs_val = EvalExpr(expr->lhs, ctx, arena);
+  auto rhs_val = EvalExpr(expr->rhs, ctx, arena);
+
+  // §12.6: The matches operator compares the expression against a pattern.
+  // For scalar/vector patterns, this is equality comparison.
+  // X/Z bits in the pattern act as wildcards (don't-care).
+  uint64_t la = lhs_val.ToUint64();
+  uint64_t ra = rhs_val.ToUint64();
+  uint64_t rb = (rhs_val.nwords > 0) ? rhs_val.words[0].bval : 0;
+
+  // Mask out bits where the pattern has X or Z.
+  uint64_t mask = ~rb;
+  bool match = (la & mask) == (ra & mask);
+  return MakeLogic4VecVal(arena, 1, match ? 1 : 0);
+}
+
 }  // namespace delta

@@ -37,6 +37,21 @@ struct EnumTypeInfo {
   std::vector<EnumMemberInfo> members;
 };
 
+// §7.2: Struct field descriptor for packed struct layout.
+struct StructFieldInfo {
+  std::string_view name;
+  uint32_t bit_offset = 0;  // Starting bit position within the struct
+  uint32_t width = 0;       // Width in bits
+};
+
+// §7.2: Struct type descriptor for field-level access.
+struct StructTypeInfo {
+  std::string_view type_name;
+  std::vector<StructFieldInfo> fields;
+  uint32_t total_width = 0;
+  bool is_packed = false;
+};
+
 class SimContext {
  public:
   SimContext(Scheduler& sched, Arena& arena, DiagEngine& diag,
@@ -110,6 +125,17 @@ class SimContext {
                            std::string_view type_name);
   const EnumTypeInfo* GetVariableEnumType(std::string_view var_name) const;
 
+  // §7.2: Struct type registration and lookup.
+  void RegisterStructType(std::string_view name, const StructTypeInfo& info);
+  const StructTypeInfo* FindStructType(std::string_view name) const;
+  void SetVariableStructType(std::string_view var_name,
+                             std::string_view type_name);
+  const StructTypeInfo* GetVariableStructType(std::string_view var_name) const;
+
+  // §7.3.2: Tagged union tag management.
+  void SetVariableTag(std::string_view var_name, std::string_view tag);
+  std::string_view GetVariableTag(std::string_view var_name) const;
+
   // Plus-args (§20.11)
   void AddPlusArg(std::string arg);
   const std::vector<std::string>& GetPlusArgs() const { return plus_args_; }
@@ -182,6 +208,11 @@ class SimContext {
   // §6.19: Enum type info and variable-to-enum-type mapping.
   std::unordered_map<std::string_view, EnumTypeInfo> enum_types_;
   std::unordered_map<std::string_view, std::string_view> var_enum_types_;
+  // §7.2: Struct type info and variable-to-struct-type mapping.
+  std::unordered_map<std::string_view, StructTypeInfo> struct_types_;
+  std::unordered_map<std::string_view, std::string_view> var_struct_types_;
+  // §7.3.2: Tagged union tag tracking (variable name → active tag).
+  std::unordered_map<std::string_view, std::string> var_tags_;
   // §15.3: Semaphore objects.
   std::unordered_map<std::string_view, SemaphoreObject*> semaphores_;
   // §15.4: Mailbox objects.

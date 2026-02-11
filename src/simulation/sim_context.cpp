@@ -179,6 +179,43 @@ const EnumTypeInfo* SimContext::GetVariableEnumType(
   return FindEnumType(it->second);
 }
 
+// --- §7.2: Struct type management ---
+
+void SimContext::RegisterStructType(std::string_view name,
+                                    const StructTypeInfo& info) {
+  struct_types_[name] = info;
+}
+
+const StructTypeInfo* SimContext::FindStructType(std::string_view name) const {
+  auto it = struct_types_.find(name);
+  return (it != struct_types_.end()) ? &it->second : nullptr;
+}
+
+void SimContext::SetVariableStructType(std::string_view var_name,
+                                       std::string_view type_name) {
+  var_struct_types_[var_name] = type_name;
+}
+
+const StructTypeInfo* SimContext::GetVariableStructType(
+    std::string_view var_name) const {
+  auto it = var_struct_types_.find(var_name);
+  if (it == var_struct_types_.end()) return nullptr;
+  return FindStructType(it->second);
+}
+
+// --- §7.3.2: Tagged union tag management ---
+
+void SimContext::SetVariableTag(std::string_view var_name,
+                                std::string_view tag) {
+  var_tags_[var_name] = std::string(tag);
+}
+
+std::string_view SimContext::GetVariableTag(std::string_view var_name) const {
+  auto it = var_tags_.find(var_name);
+  if (it == var_tags_.end()) return {};
+  return it->second;
+}
+
 int SimContext::OpenFile(std::string_view filename, std::string_view mode) {
   std::string fname(filename);
   std::string fmode(mode);

@@ -54,6 +54,9 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalInside(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena);
+Logic4Vec EvalAssignmentPattern(const Expr* expr, SimContext& ctx,
+                                Arena& arena);
+Logic4Vec EvalMatches(const Expr* expr, SimContext& ctx, Arena& arena);
 
 // String <-> Logic4Vec conversion (eval_string.cpp).
 Logic4Vec StringToLogic4Vec(Arena& arena, std::string_view str);

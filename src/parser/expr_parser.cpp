@@ -721,8 +721,14 @@ bool Parser::ParseFirstPatternElement(Expr* pat, bool& named) {
     return true;
   }
   auto* id = arena_.Create<Expr>();
-  id->kind = ExprKind::kIdentifier;
-  id->text = first.text;
+  if (first.kind == TokenKind::kIntLiteral) {
+    id->kind = ExprKind::kIntegerLiteral;
+    id->text = first.text;
+    id->int_val = ParseIntText(first.text);
+  } else {
+    id->kind = ExprKind::kIdentifier;
+    id->text = first.text;
+  }
   id->range.start = first.loc;
   pat->elements.push_back(ParseInfixBp(id, 0));
   return true;
