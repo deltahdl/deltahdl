@@ -536,9 +536,27 @@ static ScanResult ScanOneValue(const std::string& input, size_t pos, int base) {
   return sr;
 }
 
+// Extract a runtime string value from an expression.
+static std::string EvalStringArg(const Expr* arg, SimContext& ctx,
+                                 Arena& arena) {
+  if (arg->kind == ExprKind::kStringLiteral) return ExtractStrArg(arg);
+  auto val = EvalExpr(arg, ctx, arena);
+  uint32_t nbytes = val.width / 8;
+  std::string result;
+  for (uint32_t i = nbytes; i > 0; --i) {
+    uint32_t byte_idx = i - 1;
+    uint32_t word = (byte_idx * 8) / 64;
+    uint32_t bit = (byte_idx * 8) % 64;
+    if (word >= val.nwords) continue;
+    auto ch = static_cast<char>((val.words[word].aval >> bit) & 0xFF);
+    if (ch != 0) result += ch;
+  }
+  return result;
+}
+
 static Logic4Vec EvalSscanf(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.size() < 3) return MakeLogic4VecVal(arena, 32, 0);
-  std::string input = ExtractStrArg(expr->args[0]);
+  std::string input = EvalStringArg(expr->args[0], ctx, arena);
   std::string fmt = ExtractStrArg(expr->args[1]);
 
   uint32_t matched = 0;

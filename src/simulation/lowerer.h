@@ -25,6 +25,7 @@ class Lowerer {
  private:
   void LowerModule(const RtlirModule* mod);
   void LowerVar(const RtlirVariable& var);
+  void LowerVarAggregate(const RtlirVariable& var);
   void LowerProcess(const RtlirProcess& proc);
   void LowerContAssign(const RtlirContAssign& ca);
   void LowerClassDecl(const ClassDecl* cls);

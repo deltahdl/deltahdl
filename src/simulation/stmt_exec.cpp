@@ -575,12 +575,17 @@ static StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx,
                                   Arena& arena) {
   if (TryExecClassVarDecl(stmt, ctx, arena)) return StmtResult::kDone;
   uint32_t width = EvalTypeWidth(stmt->var_decl_type);
+  bool is_real = (stmt->var_decl_type.kind == DataTypeKind::kReal ||
+                  stmt->var_decl_type.kind == DataTypeKind::kShortreal ||
+                  stmt->var_decl_type.kind == DataTypeKind::kRealtime);
   if (width == 0 && stmt->var_decl_type.kind == DataTypeKind::kString) {
     ctx.CreateVariable(stmt->var_name, 0);
     ctx.RegisterStringVariable(stmt->var_name);
   } else {
-    if (width == 0) width = 32;  // Default to int-sized.
+    if (width == 0) width = 32;
+    if (is_real && width < 64) width = 64;
     ctx.CreateVariable(stmt->var_name, width);
+    if (is_real) ctx.RegisterRealVariable(stmt->var_name);
     CreateBlockArrayElements(stmt, width, ctx, arena);
   }
   if (stmt->var_init) {

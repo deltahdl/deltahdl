@@ -174,25 +174,8 @@ static void ApplyStructMemberDefaults(const RtlirVariable& var, Variable* v,
   }
 }
 
-void Lowerer::LowerVar(const RtlirVariable& var) {
-  // §8: Class handles are 64-bit.
-  uint32_t width = var.class_type_name.empty() ? var.width : 64;
-  auto* v = ctx_.CreateVariable(var.name, width);
-  if (var.is_event) v->is_event = true;
-  if (var.is_signed) v->is_signed = true;
-  if (var.is_string) ctx_.RegisterStringVariable(var.name);
-  if (var.is_real) ctx_.RegisterRealVariable(var.name);
-  if (var.init_expr) {
-    auto val = EvalExpr(var.init_expr, ctx_, arena_);
-    if (val.width != var.width)
-      val = MakeLogic4VecVal(arena_, var.width, val.ToUint64());
-    v->value = val;
-  }
-  RegisterStructInfo(var, ctx_);
-  if (!var.init_expr) ApplyStructMemberDefaults(var, v, ctx_, arena_);
-  if (!var.class_type_name.empty()) {
-    ctx_.SetVariableClassType(var.name, var.class_type_name);
-  }
+// §7/§8: Lower aggregate (queue/assoc/array) storage for a variable.
+void Lowerer::LowerVarAggregate(const RtlirVariable& var) {
   if (var.is_queue) {
     ctx_.CreateQueue(var.name, var.width, var.queue_max_size);
   } else if (var.is_assoc) {
@@ -201,6 +184,28 @@ void Lowerer::LowerVar(const RtlirVariable& var) {
   } else {
     CreateArrayElements(var, ctx_, arena_);
   }
+}
+
+void Lowerer::LowerVar(const RtlirVariable& var) {
+  // §8: Class handles are 64-bit. §6.12: Real/shortreal store as 64-bit double.
+  uint32_t width = var.class_type_name.empty() ? var.width : 64;
+  if (var.is_real && width < 64) width = 64;
+  auto* v = ctx_.CreateVariable(var.name, width);
+  if (var.is_event) v->is_event = true;
+  if (var.is_signed) v->is_signed = true;
+  if (var.is_string) ctx_.RegisterStringVariable(var.name);
+  if (var.is_real) ctx_.RegisterRealVariable(var.name);
+  if (var.init_expr) {
+    auto val = EvalExpr(var.init_expr, ctx_, arena_);
+    if (val.width != width && !var.is_real && !var.is_string)
+      val = MakeLogic4VecVal(arena_, width, val.ToUint64());
+    v->value = val;
+  }
+  RegisterStructInfo(var, ctx_);
+  if (!var.init_expr) ApplyStructMemberDefaults(var, v, ctx_, arena_);
+  if (!var.class_type_name.empty())
+    ctx_.SetVariableClassType(var.name, var.class_type_name);
+  LowerVarAggregate(var);
 }
 
 // §8: Create ClassTypeInfo from a ClassDecl AST node.

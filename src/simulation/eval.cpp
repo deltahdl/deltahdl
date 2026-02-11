@@ -1104,9 +1104,11 @@ static bool ExecFuncStmt(const Stmt* stmt, Variable* ret_var, SimContext& ctx,
       EvalExpr(stmt->expr, ctx, arena);
       return false;
     case StmtKind::kVarDecl: {
+      // §13.3.1: Static variables persist across calls — skip re-init.
+      if (ctx.FindLocalVariable(stmt->var_name)) return false;
       uint32_t w = EvalTypeWidth(stmt->var_decl_type);
       if (w == 0) w = 32;
-      auto* v = ctx.CreateVariable(stmt->var_name, w);
+      auto* v = ctx.CreateLocalVariable(stmt->var_name, w);
       if (stmt->var_init) v->value = EvalExpr(stmt->var_init, ctx, arena);
       return false;
     }
