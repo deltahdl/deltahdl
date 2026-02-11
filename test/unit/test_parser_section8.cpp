@@ -546,6 +546,40 @@ TEST(ParserSection8, SuperNewExpression) {
   ASSERT_EQ(r.cu->classes.size(), 2u);
 }
 
+// §8.25.1 — Parameterized class scope resolution: ClassName#(params)::member
+TEST(ParserSection8, ParameterizedClassScopeResolution) {
+  auto r = Parse(
+      "module m;\n"
+      "  class par_cls #(parameter int a = 25);\n"
+      "    parameter int b = 23;\n"
+      "  endclass\n"
+      "  initial begin\n"
+      "    $display(par_cls#()::b);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
+// §8.8 — Typed constructor with parameterized scope: ClassName#(params)::new
+TEST(ParserSection8, ParameterizedClassScopeNew) {
+  auto r = Parse(
+      "module m;\n"
+      "  class test_cls #(parameter int t = 12);\n"
+      "    int a;\n"
+      "    function new(int def = 42);\n"
+      "      a = def - t;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  test_cls obj;\n"
+      "  initial begin\n"
+      "    obj = test_cls#(.t(23))::new(.def(41));\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
 // §8.26.3 — Interface class with typedef member
 TEST(ParserSection8, InterfaceClassWithTypedef) {
   auto r = Parse(

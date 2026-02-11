@@ -212,6 +212,8 @@ class Parser {
   void ParseNamedArg(Expr* call);
   Expr* ParseMemberAccessChain(Token tok);
   Expr* MakeMemberAccess(Expr* base);
+  Expr* ParseParameterizedScope(Expr* base);
+  Expr* TryParseUserTypeCast(const Token& tok);
   Expr* ParseIdentifierExpr();
   Expr* ParseSelectExpr(Expr* base);
   Expr* ParseSystemCall();

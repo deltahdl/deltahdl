@@ -175,6 +175,9 @@ bool Parser::IsBlockVarDeclStart() {
   if (tk == TokenKind::kKwAutomatic || tk == TokenKind::kKwStatic) {
     return true;  // §6.21 explicit lifetime qualifier
   }
+  if (tk == TokenKind::kKwParameter || tk == TokenKind::kKwLocalparam) {
+    return true;  // §6.20.1 block-level parameter declarations
+  }
   if (tk == TokenKind::kKwStruct || tk == TokenKind::kKwUnion ||
       tk == TokenKind::kKwEnum || tk == TokenKind::kKwVar) {
     return true;
@@ -193,6 +196,18 @@ bool Parser::IsBlockVarDeclStart() {
 
 // LRM section 9.3.1 -- block-level variable declarations
 void Parser::ParseBlockVarDecls(std::vector<Stmt*>& stmts) {
+  // §6.20.1: parameter/localparam as block-level declarations
+  if (Check(TokenKind::kKwParameter) || Check(TokenKind::kKwLocalparam)) {
+    auto* s = arena_.Create<Stmt>();
+    s->kind = StmtKind::kVarDecl;
+    s->range.start = CurrentLoc();
+    auto* param = ParseParamDecl();
+    s->var_decl_type = param->data_type;
+    s->var_name = param->name;
+    s->var_init = param->init_expr;
+    stmts.push_back(s);
+    return;
+  }
   bool is_automatic = Match(TokenKind::kKwAutomatic);             // §6.21
   bool is_static = !is_automatic && Match(TokenKind::kKwStatic);  // §6.21
   Match(TokenKind::kKwVar);  // optional 'var' prefix (§6.8)

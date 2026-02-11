@@ -349,7 +349,22 @@ Expr* Parser::ParsePrimaryExpr() {
   }
   // clang-format on
 
-  if (IsCastTypeToken(tok.kind)) return ParseCastExpr();
+  // §6.24 type cast: type'(expr) — only if followed by apostrophe.
+  // Bare type keywords (e.g., $typename(logic)) are valid identifiers.
+  if (IsCastTypeToken(tok.kind)) {
+    auto saved = lexer_.SavePos();
+    auto type_tok = Consume();
+    if (Check(TokenKind::kApostrophe)) {
+      lexer_.RestorePos(saved);
+      return ParseCastExpr();
+    }
+    // Bare type keyword in expression context (§20.6 $typename(type))
+    auto* id = arena_.Create<Expr>();
+    id->kind = ExprKind::kIdentifier;
+    id->text = type_tok.text;
+    id->range.start = type_tok.loc;
+    return id;
+  }
 
   diag_.Error(tok.loc, "expected expression");
   Consume();
@@ -403,29 +418,56 @@ Expr* Parser::ParseMemberAccessChain(Token tok) {
   return result;
 }
 
+// §8.25.1: ClassName#(params)::member — parameterized class scope resolution.
+// Consumes #(balanced-parens), then continues with :: / . member chain.
+Expr* Parser::ParseParameterizedScope(Expr* base) {
+  Consume();  // #
+  if (!Check(TokenKind::kLParen)) return base;
+  Consume();  // (
+  int depth = 1;
+  while (depth > 0 && !AtEnd()) {
+    auto t = Consume();
+    if (t.kind == TokenKind::kLParen) ++depth;
+    if (t.kind == TokenKind::kRParen) --depth;
+  }
+  while (Check(TokenKind::kDot) || Check(TokenKind::kColonColon)) {
+    base = MakeMemberAccess(base);
+  }
+  return base;
+}
+
+// §6.19.4, §6.24: try to parse type_name'(expr) cast.
+// Returns the cast Expr on success, or nullptr if not a cast.
+Expr* Parser::TryParseUserTypeCast(const Token& tok) {
+  if (known_types_.count(tok.text) == 0) return nullptr;
+  if (!Check(TokenKind::kApostrophe)) return nullptr;
+  auto saved = lexer_.SavePos();
+  Consume();  // '
+  if (!Check(TokenKind::kLParen)) {
+    lexer_.RestorePos(saved);
+    return nullptr;
+  }
+  Consume();  // (
+  auto* cast = arena_.Create<Expr>();
+  cast->kind = ExprKind::kCast;
+  cast->text = tok.text;
+  cast->range.start = tok.loc;
+  cast->lhs = ParseExpr();
+  Expect(TokenKind::kRParen);
+  return cast;
+}
+
 Expr* Parser::ParseIdentifierExpr() {
   auto tok = Consume();
 
-  // User-defined type cast: type_name'(expr) (§6.19.4, §6.24)
-  bool is_cast =
-      known_types_.count(tok.text) != 0 && Check(TokenKind::kApostrophe);
-  if (is_cast) {
-    auto saved = lexer_.SavePos();
-    Consume();  // '
-    if (Check(TokenKind::kLParen)) {
-      Consume();  // (
-      auto* cast = arena_.Create<Expr>();
-      cast->kind = ExprKind::kCast;
-      cast->text = tok.text;
-      cast->range.start = tok.loc;
-      cast->lhs = ParseExpr();
-      Expect(TokenKind::kRParen);
-      return cast;
-    }
-    lexer_.RestorePos(saved);
-  }
+  if (auto* cast = TryParseUserTypeCast(tok)) return cast;
 
   Expr* result = ParseMemberAccessChain(tok);
+
+  // §8.25.1: ClassName#(params)::member — parameterized class scope
+  if (Check(TokenKind::kHash) && known_types_.count(tok.text) != 0) {
+    result = ParseParameterizedScope(result);
+  }
 
   // Postfix chain: calls, selects, and member access (§8.22 arr[0].method())
   while (Check(TokenKind::kLParen) || Check(TokenKind::kLBracket)) {

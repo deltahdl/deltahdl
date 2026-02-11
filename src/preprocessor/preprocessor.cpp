@@ -16,6 +16,29 @@ Preprocessor::Preprocessor(SourceManager& src_mgr, DiagEngine& diag,
     def.body = value;
     macros_.Define(std::move(def));
   }
+  // IEEE 1800-2023 Table 22-2: predefined coverage macros.
+  DefinePredefined("SV_COV_START", "0");
+  DefinePredefined("SV_COV_STOP", "1");
+  DefinePredefined("SV_COV_RESET", "2");
+  DefinePredefined("SV_COV_CHECK", "3");
+  DefinePredefined("SV_COV_MODULE", "10");
+  DefinePredefined("SV_COV_HIER", "11");
+  DefinePredefined("SV_COV_ASSERTION", "20");
+  DefinePredefined("SV_COV_FSM_STATE", "21");
+  DefinePredefined("SV_COV_STATEMENT", "22");
+  DefinePredefined("SV_COV_TOGGLE", "23");
+  DefinePredefined("SV_COV_OVERFLOW", "-2");
+  DefinePredefined("SV_COV_ERROR", "-1");
+  DefinePredefined("SV_COV_NOCOV", "0");
+  DefinePredefined("SV_COV_OK", "1");
+  DefinePredefined("SV_COV_PARTIAL", "2");
+}
+
+void Preprocessor::DefinePredefined(std::string name, std::string body) {
+  MacroDef def;
+  def.name = std::move(name);
+  def.body = std::move(body);
+  macros_.Define(std::move(def));
 }
 
 std::string Preprocessor::Preprocess(uint32_t file_id) {

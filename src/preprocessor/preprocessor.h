@@ -67,6 +67,7 @@ class Preprocessor {
                                  std::string& result);
   std::string ExpandMacro(const MacroDef& macro, std::string_view args_text);
   std::string ResolveInclude(std::string_view filename);
+  void DefinePredefined(std::string name, std::string body);
 
   static std::vector<std::string> ParseMacroParams(
       std::string_view params, std::vector<std::string>& defaults);
