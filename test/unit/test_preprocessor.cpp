@@ -573,3 +573,46 @@ TEST(Preprocessor, UndefineAll) {
       f);
   EXPECT_EQ(result.find("visible"), std::string::npos);
 }
+
+// §22.12: `line directive validation
+TEST(Preprocessor, Line_IllegalLevel) {
+  PreprocFixture f;
+  Preprocess("`line 1 \"somefile\" 3\n", f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, Line_NonStringFilename) {
+  PreprocFixture f;
+  Preprocess("`line 1 somefile 2\n", f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, Line_NegativeLineNumber) {
+  PreprocFixture f;
+  Preprocess("`line -12 \"somefile\" 3\n", f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, Line_MissingLevel) {
+  PreprocFixture f;
+  Preprocess("`line 1 \"somefile\"\n", f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, Line_MissingFilename) {
+  PreprocFixture f;
+  Preprocess("`line 1\n", f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §22.3: `resetall shall not affect text macros
+TEST(Preprocessor, ResetAll_PreservesTextMacros) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define FOO bar\n"
+      "`resetall\n"
+      "int x = `FOO;\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("bar"), std::string::npos);
+}

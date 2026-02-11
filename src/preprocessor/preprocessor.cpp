@@ -122,7 +122,7 @@ bool Preprocessor::ProcessStateDirective(std::string_view line, SourceLoc loc) {
     return true;
   }
   if (StartsWithDirective(line, "resetall")) {
-    macros_.UndefineAll();
+    // §22.3: `resetall does NOT affect text macros.
     default_net_type_ = NetType::kWire;
     in_celldefine_ = false;
     unconnected_drive_ = NetType::kWire;
@@ -738,7 +738,7 @@ void Preprocessor::HandleUnconnectedDrive(std::string_view rest,
 }
 
 void Preprocessor::HandleLine(std::string_view rest, SourceLoc loc) {
-  // Format: number "filename" level
+  // Format: number "filename" level  (§22.12)
   auto trimmed = Trim(rest);
   size_t i = 0;
   while (i < trimmed.size() &&
@@ -746,13 +746,39 @@ void Preprocessor::HandleLine(std::string_view rest, SourceLoc loc) {
     ++i;
   }
   if (i == 0) {
-    diag_.Warning(loc, "invalid `line directive: missing line number");
+    diag_.Error(loc, "invalid `line directive: missing or invalid line number");
     return;
   }
   uint32_t new_line = 0;
   for (size_t j = 0; j < i; ++j) {
     new_line = new_line * 10 + (trimmed[j] - '0');
   }
+
+  // Parse required filename (must be a string literal).
+  auto after_num = Trim(trimmed.substr(i));
+  if (after_num.empty() || after_num[0] != '"') {
+    diag_.Error(loc, "`line directive requires a quoted filename");
+    return;
+  }
+  auto end_quote = after_num.find('"', 1);
+  if (end_quote == std::string_view::npos) {
+    diag_.Error(loc, "unterminated string in `line directive");
+    return;
+  }
+
+  // Parse required level (must be 0, 1, or 2).
+  auto after_file = Trim(after_num.substr(end_quote + 1));
+  if (after_file.empty() ||
+      !std::isdigit(static_cast<unsigned char>(after_file[0]))) {
+    diag_.Error(loc, "`line directive requires a level (0, 1, or 2)");
+    return;
+  }
+  int level = after_file[0] - '0';
+  if (level > 2) {
+    diag_.Error(loc, "`line level must be 0, 1, or 2");
+    return;
+  }
+
   line_offset_ = new_line;
   line_override_src_line_ = loc.line;
   has_line_override_ = true;

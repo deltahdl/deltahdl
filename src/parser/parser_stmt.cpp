@@ -243,24 +243,28 @@ Stmt* Parser::ParseCaseStmt(TokenKind case_kind) {
   if (Match(TokenKind::kKwInside)) {
     stmt->case_inside = true;
   }
+  // §12.6: "case (expr) matches"
+  Match(TokenKind::kKwMatches);
   while (!Check(TokenKind::kKwEndcase) && !AtEnd()) {
-    stmt->case_items.push_back(ParseCaseItem());
+    stmt->case_items.push_back(ParseCaseItem(stmt->case_inside));
   }
   Expect(TokenKind::kKwEndcase);
   return stmt;
 }
 
-CaseItem Parser::ParseCaseItem() {
+CaseItem Parser::ParseCaseItem(bool inside) {
   CaseItem item;
   if (Match(TokenKind::kKwDefault)) {
     item.is_default = true;
+    Match(TokenKind::kColon);  // §12.5: colon is optional after default
   } else {
-    item.patterns.push_back(ParseExpr());
+    // §12.5.4: case inside items may use [lo:hi] range syntax.
+    item.patterns.push_back(inside ? ParseInsideValueRange() : ParseExpr());
     while (Match(TokenKind::kComma)) {
-      item.patterns.push_back(ParseExpr());
+      item.patterns.push_back(inside ? ParseInsideValueRange() : ParseExpr());
     }
+    Expect(TokenKind::kColon);
   }
-  Expect(TokenKind::kColon);
   item.body = ParseStmt();
   return item;
 }

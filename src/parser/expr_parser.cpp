@@ -189,6 +189,18 @@ Expr* Parser::ParseInfixBp(Expr* lhs, int min_bp) {
       continue;
     }
 
+    // §12.6: matches expression — expr matches pattern
+    if (tok.kind == TokenKind::kKwMatches && min_bp <= 1) {
+      Consume();
+      auto* bin = arena_.Create<Expr>();
+      bin->kind = ExprKind::kBinary;
+      bin->op = TokenKind::kKwMatches;
+      bin->lhs = lhs;
+      bin->rhs = ParseExprBp(2);
+      lhs = bin;
+      continue;
+    }
+
     auto [lbp, rbp] = InfixBp(tok.kind);
     if (lbp < 0 || lbp < min_bp) {
       break;
@@ -303,6 +315,8 @@ Expr* Parser::ParsePrimaryExpr() {
         Consume();
         expr->lhs = ParseExpr();
         Expect(TokenKind::kRParen);
+      } else if (Check(TokenKind::kApostropheLBrace)) {
+        expr->lhs = ParseAssignmentPattern();
       }
       return expr;
     }
@@ -601,6 +615,18 @@ Expr* Parser::ParsePatternReplication(Expr* count, SourceLoc loc) {
 }
 
 bool Parser::ParseFirstPatternElement(Expr* pat, bool& named) {
+  // §12.6: .variable_identifier is a pattern binding
+  if (Check(TokenKind::kDot)) {
+    auto loc = CurrentLoc();
+    Consume();
+    auto name = ExpectIdentifier();
+    auto* id = arena_.Create<Expr>();
+    id->kind = ExprKind::kIdentifier;
+    id->text = name.text;
+    id->range.start = loc;
+    pat->elements.push_back(id);
+    return true;
+  }
   auto first = CurrentToken();
   if (!IsAssignmentPatternKey(first.kind)) {
     pat->elements.push_back(ParseExpr());
@@ -652,7 +678,18 @@ Expr* Parser::ParseAssignmentPattern() {
       pat->pattern_keys.push_back(key_tok.text);
       Expect(TokenKind::kColon);
     }
-    pat->elements.push_back(ParseExpr());
+    // §12.6: .variable_identifier is a pattern binding
+    if (Check(TokenKind::kDot)) {
+      Consume();
+      auto name = ExpectIdentifier();
+      auto* id = arena_.Create<Expr>();
+      id->kind = ExprKind::kIdentifier;
+      id->text = name.text;
+      id->range.start = name.loc;
+      pat->elements.push_back(id);
+    } else {
+      pat->elements.push_back(ParseExpr());
+    }
   }
 
   Expect(TokenKind::kRBrace);

@@ -150,7 +150,7 @@ class Parser {
   Stmt* ParseBlockStmt();
   Stmt* ParseIfStmt();
   Stmt* ParseCaseStmt(TokenKind case_kind);
-  CaseItem ParseCaseItem();
+  CaseItem ParseCaseItem(bool inside = false);
   Stmt* ParseForStmt();
   Stmt* ParseWhileStmt();
   Stmt* ParseForeverStmt();
