@@ -101,8 +101,9 @@ uint32_t EvalTypeWidth(const DataType& dtype) {
     case DataTypeKind::kVoid:
     case DataTypeKind::kNamed:
     case DataTypeKind::kEvent:
-    case DataTypeKind::kChandle:
       return 0;
+    case DataTypeKind::kChandle:
+      return 64;  // §6.14: Platform-dependent, at least pointer-sized.
     case DataTypeKind::kWire:
     case DataTypeKind::kTri:
     case DataTypeKind::kWand:
