@@ -163,6 +163,10 @@ class SimContext {
   void SetVariableTag(std::string_view var_name, std::string_view tag);
   std::string_view GetVariableTag(std::string_view var_name) const;
 
+  // §20.6.2: Type name to bit width, for $bits(type).
+  void RegisterTypeWidth(std::string_view name, uint32_t width);
+  uint32_t FindTypeWidth(std::string_view name) const;
+
   // Plus-args (§20.11)
   void AddPlusArg(std::string arg);
   const std::vector<std::string>& GetPlusArgs() const { return plus_args_; }
@@ -257,6 +261,8 @@ class SimContext {
   uint64_t next_handle_id_ = 1;
   // §8.11: Stack of `this` pointers for nested method calls.
   std::vector<ClassObject*> this_stack_;
+  // §20.6.2: Type name → bit width for $bits(type).
+  std::unordered_map<std::string_view, uint32_t> type_widths_;
   // §14: Clocking manager.
   class ClockingManager* clocking_mgr_ = nullptr;
   // §19: Coverage database.

@@ -139,6 +139,8 @@ struct RtlirModule {
 struct RtlirDesign {
   std::vector<RtlirModule*> top_modules;
   std::unordered_map<std::string_view, RtlirModule*> all_modules;
+  // §20.6.2: type name → bit width, populated from typedefs for $bits(type).
+  std::unordered_map<std::string_view, uint32_t> type_widths;
 };
 
 }  // namespace delta

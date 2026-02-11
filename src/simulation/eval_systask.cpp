@@ -60,7 +60,13 @@ static Logic4Vec EvalClog2(const Expr* expr, SimContext& ctx, Arena& arena) {
 
 static Logic4Vec EvalBits(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
-  auto val = EvalExpr(expr->args[0], ctx, arena);
+  // §20.6.2: $bits can accept a type name or an expression.
+  auto* arg = expr->args[0];
+  if (arg->kind == ExprKind::kIdentifier) {
+    uint32_t tw = ctx.FindTypeWidth(arg->text);
+    if (tw > 0) return MakeLogic4VecVal(arena, 32, tw);
+  }
+  auto val = EvalExpr(arg, ctx, arena);
   return MakeLogic4VecVal(arena, 32, val.width);
 }
 

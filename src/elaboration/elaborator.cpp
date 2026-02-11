@@ -64,6 +64,10 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
 
   design->top_modules.push_back(top);
   design->all_modules[top->name] = top;
+  // §20.6.2: Populate type widths for $bits(type) support.
+  for (const auto& [name, dtype] : typedefs_) {
+    design->type_widths[name] = EvalTypeWidth(dtype, typedefs_);
+  }
   return design;
 }
 

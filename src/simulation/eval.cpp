@@ -47,8 +47,79 @@ static Logic4Vec EvalUnbasedUnsized(const Expr* expr, Arena& arena) {
   return MakeLogic4VecVal(arena, 1, expr->int_val);
 }
 
+// Check if a based literal's digit string contains x/z characters.
+static bool TextHasXZ(std::string_view text) {
+  auto tick = text.find('\'');
+  if (tick == std::string_view::npos) return false;
+  for (size_t i = tick + 1; i < text.size(); ++i) {
+    char c = text[i];
+    if (c == 'x' || c == 'X' || c == 'z' || c == 'Z' || c == '?') return true;
+  }
+  return false;
+}
+
+// Bits per digit for each base letter.
+static int BitsPerDigit(char base_letter) {
+  switch (base_letter) {
+    case 'h': case 'H': return 4;
+    case 'o': case 'O': return 3;
+    case 'b': case 'B': return 1;
+    default: return 0;
+  }
+}
+
+// Parse a digit's numeric value (0-15), or -1 for x/z.
+static int DigitValue(char c) {
+  if (c >= '0' && c <= '9') return c - '0';
+  if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+  if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+  return -1;
+}
+
+// Set bit_count bits starting at bit_pos in vec for an x/z/normal digit.
+static void SetDigitBits(Logic4Vec& vec, uint32_t& bit_pos, int bit_count,
+                         char digit, uint32_t width) {
+  bool is_x = (digit == 'x' || digit == 'X');
+  bool is_z = (digit == 'z' || digit == 'Z' || digit == '?');
+  int dval = DigitValue(digit);
+  for (int b = 0; b < bit_count && bit_pos < width; ++b, ++bit_pos) {
+    uint32_t word = bit_pos / 64;
+    uint64_t mask = uint64_t{1} << (bit_pos % 64);
+    if (is_x) {
+      vec.words[word].aval |= mask;
+      vec.words[word].bval |= mask;
+    } else if (is_z) {
+      vec.words[word].bval |= mask;
+    } else if (dval >= 0 && (dval & (1 << b))) {
+      vec.words[word].aval |= mask;
+    }
+  }
+}
+
+// Parse a based literal with x/z digits into a Logic4Vec.
+static Logic4Vec ParseBasedXZLiteral(std::string_view text, uint32_t width,
+                                     Arena& arena) {
+  auto vec = MakeLogic4Vec(arena, width);
+  std::string buf;
+  buf.reserve(text.size());
+  for (char c : text)
+    if (c != '_') buf.push_back(c);
+  auto tick = buf.find('\'');
+  if (tick == std::string::npos) return vec;
+  size_t i = tick + 1;
+  if (i < buf.size() && (buf[i] == 's' || buf[i] == 'S')) ++i;
+  int bpd = (i < buf.size()) ? BitsPerDigit(buf[i]) : 0;
+  if (bpd == 0) return vec;  // Decimal x/z: leave as zero.
+  ++i;
+  uint32_t bit_pos = 0;
+  for (auto j = buf.size(); j > i && bit_pos < width; --j)
+    SetDigitBits(vec, bit_pos, bpd, buf[j - 1], width);
+  return vec;
+}
+
 static Logic4Vec EvalIntLiteral(const Expr* expr, Arena& arena) {
   uint32_t width = LiteralWidth(expr->text, expr->int_val);
+  if (TextHasXZ(expr->text)) return ParseBasedXZLiteral(expr->text, width, arena);
   return MakeLogic4VecVal(arena, width, expr->int_val);
 }
 

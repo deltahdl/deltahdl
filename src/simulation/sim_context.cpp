@@ -203,6 +203,17 @@ const StructTypeInfo* SimContext::GetVariableStructType(
   return FindStructType(it->second);
 }
 
+// --- §20.6.2: Type width registry ---
+
+void SimContext::RegisterTypeWidth(std::string_view name, uint32_t width) {
+  type_widths_[name] = width;
+}
+
+uint32_t SimContext::FindTypeWidth(std::string_view name) const {
+  auto it = type_widths_.find(name);
+  return (it != type_widths_.end()) ? it->second : 0;
+}
+
 // --- §7.4/§7.5/§7.10: Array metadata ---
 
 void SimContext::RegisterArray(std::string_view name, const ArrayInfo& info) {

@@ -255,6 +255,9 @@ void Lowerer::LowerContAssign(const RtlirContAssign& ca) {
 
 void Lowerer::Lower(const RtlirDesign* design) {
   if (!design) return;
+  for (const auto& [name, width] : design->type_widths) {
+    ctx_.RegisterTypeWidth(name, width);
+  }
   for (auto* mod : design->top_modules) {
     LowerModule(mod);
   }
