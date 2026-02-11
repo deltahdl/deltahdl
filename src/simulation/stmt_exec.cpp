@@ -201,6 +201,31 @@ static bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx,
   return false;
 }
 
+// §7.8: Associative array indexed write (aa[key] = val).
+static bool TryAssocIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
+                                 SimContext& ctx, Arena& arena) {
+  if (!lhs->base || lhs->base->kind != ExprKind::kIdentifier) return false;
+  auto* aa = ctx.FindAssocArray(lhs->base->text);
+  if (!aa || !lhs->index) return false;
+  if (aa->is_string_key) {
+    auto key_vec = EvalExpr(lhs->index, ctx, arena);
+    uint32_t nb = key_vec.width / 8;
+    std::string s;
+    s.reserve(nb);
+    for (uint32_t i = nb; i > 0; --i) {
+      uint32_t bi = i - 1;
+      auto ch = static_cast<char>(
+          (key_vec.words[(bi * 8) / 64].aval >> ((bi * 8) % 64)) & 0xFF);
+      if (ch != 0) s.push_back(ch);
+    }
+    aa->str_data[s] = rhs_val;
+  } else {
+    auto key = static_cast<int64_t>(EvalExpr(lhs->index, ctx, arena).ToUint64());
+    aa->int_data[key] = rhs_val;
+  }
+  return true;
+}
+
 // §7.10: Queue indexed write (q[i] = val).
 static bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
                                  SimContext& ctx, Arena& /*arena*/) {
@@ -284,6 +309,8 @@ static void CollectQueueElements(const Expr* expr, SimContext& ctx,
       return;
     }
   }
+  // §7.12.1: Locator method call (e.g., s.find with (item == "sad")).
+  if (TryCollectLocatorResult(expr, ctx, arena, out)) return;
   out.push_back(EvalExpr(expr, ctx, arena));
 }
 
@@ -297,6 +324,14 @@ static bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx,
   if (stmt->rhs->kind == ExprKind::kConcatenation &&
       stmt->rhs->elements.empty()) {
     q->elements.clear();
+    return true;
+  }
+  // §7.5.1: Dynamic array new[N] — resize queue to N zero-initialized elements.
+  if (stmt->rhs->kind == ExprKind::kCall && stmt->rhs->text == "new" &&
+      !stmt->rhs->args.empty()) {
+    auto sz = EvalExpr(stmt->rhs->args[0], ctx, arena).ToUint64();
+    q->elements.resize(static_cast<size_t>(sz),
+                        MakeLogic4VecVal(arena, q->elem_width, 0));
     return true;
   }
   std::vector<Logic4Vec> elems;
@@ -329,6 +364,10 @@ static StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
     }
     // §7.10: Queue indexed write (q[i] = val).
     if (TryQueueIndexedWrite(stmt->lhs, rhs_val, ctx, arena)) {
+      return StmtResult::kDone;
+    }
+    // §7.8: Associative array indexed write (aa[key] = val).
+    if (TryAssocIndexedWrite(stmt->lhs, rhs_val, ctx, arena)) {
       return StmtResult::kDone;
     }
     auto* var = ResolveLhsVariable(stmt->lhs, ctx);

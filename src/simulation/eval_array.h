@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "common/types.h"
 
 namespace delta {
@@ -31,5 +33,18 @@ bool TryEvalQueueProperty(std::string_view var_name, std::string_view prop,
                           SimContext& ctx, Arena& arena, Logic4Vec& out);
 bool TryExecQueuePropertyStmt(std::string_view var_name, std::string_view prop,
                               SimContext& ctx, Arena& arena);
+
+// §7.8: Associative array method dispatch.
+bool TryEvalAssocMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                            Logic4Vec& out);
+bool TryExecAssocMethodStmt(const Expr* expr, SimContext& ctx, Arena& arena);
+bool TryEvalAssocProperty(std::string_view var_name, std::string_view prop,
+                          SimContext& ctx, Arena& arena, Logic4Vec& out);
+bool TryExecAssocPropertyStmt(std::string_view var_name, std::string_view prop,
+                              SimContext& ctx, Arena& arena);
+
+// §7.12.1: Locator method dispatch — returns elements/indices into a vector.
+bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
+                             std::vector<Logic4Vec>& out);
 
 }  // namespace delta

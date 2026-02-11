@@ -316,8 +316,13 @@ static void ElaborateGateInst(ModuleItem* item, RtlirModule* mod,
 static void InferDynArraySize(const std::vector<Expr*>& dims, const Expr* init,
                               RtlirVariable& var) {
   if (dims.empty() || dims[0] != nullptr) return;  // Not a dynamic array.
-  if (!init || init->elements.empty()) return;
-  var.unpacked_size = static_cast<uint32_t>(init->elements.size());
+  if (var.is_queue || var.is_assoc) return;         // Already classified.
+  if (init && !init->elements.empty()) {
+    var.unpacked_size = static_cast<uint32_t>(init->elements.size());
+    return;
+  }
+  // §7.5: Uninitialized dynamic array — treat as queue for runtime resize.
+  var.is_queue = true;
 }
 
 // §7.4: Extract unpacked array size from dimension expressions.
@@ -347,11 +352,25 @@ static bool TryParseRangeDim(const Expr* dim, RtlirVariable& var) {
   return true;
 }
 
+// §7.8: Detect associative array index type [string], [int], [*], etc.
+static bool TryParseAssocDim(const Expr* dim, RtlirVariable& var) {
+  if (dim->kind != ExprKind::kIdentifier) return false;
+  auto t = dim->text;
+  if (t == "string" || t == "int" || t == "integer" || t == "byte" ||
+      t == "shortint" || t == "longint" || t == "*") {
+    var.is_assoc = true;
+    var.is_string_index = (t == "string");
+    return true;
+  }
+  return false;
+}
+
 static void ComputeUnpackedDims(const std::vector<Expr*>& dims,
                                 RtlirVariable& var) {
   if (dims.empty() || !dims[0]) return;
   auto* dim = dims[0];
   if (TryParseQueueDim(dim, var)) return;
+  if (TryParseAssocDim(dim, var)) return;
   if (TryParseRangeDim(dim, var)) return;
   // Simple size [N] — creates N elements indexed from 0.
   auto size_val = ConstEvalInt(dim);

@@ -154,6 +154,8 @@ void Lowerer::LowerVar(const RtlirVariable& var) {
   RegisterStructInfo(var, ctx_);
   if (var.is_queue) {
     ctx_.CreateQueue(var.name, var.width, var.queue_max_size);
+  } else if (var.is_assoc) {
+    ctx_.CreateAssocArray(var.name, var.width, var.is_string_index);
   } else {
     CreateArrayElements(var, ctx_, arena_);
   }

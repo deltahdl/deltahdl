@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <map>
 #include <random>
 #include <string>
 #include <string_view>
@@ -57,6 +58,15 @@ struct QueueObject {
   std::vector<Logic4Vec> elements;
   uint32_t elem_width = 32;
   int32_t max_size = -1;  // -1 = unbounded.
+};
+
+// §7.8: Associative array runtime storage.
+struct AssocArrayObject {
+  std::map<int64_t, Logic4Vec> int_data;
+  std::map<std::string, Logic4Vec> str_data;
+  uint32_t elem_width = 32;
+  bool is_string_key = false;
+  uint32_t Size() const;
 };
 
 // §7.4/§7.5/§7.10: Array metadata for method dispatch.
@@ -159,6 +169,11 @@ class SimContext {
                            int32_t max_size = -1);
   QueueObject* FindQueue(std::string_view name);
 
+  // §7.8: Associative array management.
+  AssocArrayObject* CreateAssocArray(std::string_view name, uint32_t elem_width,
+                                     bool is_string_key);
+  AssocArrayObject* FindAssocArray(std::string_view name);
+
   // §7.3.2: Tagged union tag management.
   void SetVariableTag(std::string_view var_name, std::string_view tag);
   std::string_view GetVariableTag(std::string_view var_name) const;
@@ -246,6 +261,8 @@ class SimContext {
   std::unordered_map<std::string_view, ArrayInfo> array_infos_;
   // §7.10: Queue runtime objects.
   std::unordered_map<std::string_view, QueueObject*> queues_;
+  // §7.8: Associative array runtime objects.
+  std::unordered_map<std::string_view, AssocArrayObject*> assoc_arrays_;
   // §7.3.2: Tagged union tag tracking (variable name → active tag).
   std::unordered_map<std::string_view, std::string> var_tags_;
   // §15.3: Semaphore objects.

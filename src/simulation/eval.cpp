@@ -795,9 +795,40 @@ static Logic4Vec EvalPartSelect(const Logic4Vec& base_val, uint64_t idx,
   return MakeLogic4VecVal(arena, width, val & mask);
 }
 
+// §7.8: Try associative array indexed access. Returns true if handled.
+static bool TryAssocSelect(const Expr* expr, SimContext& ctx, Arena& arena,
+                           Logic4Vec& out) {
+  if (!expr->base || expr->base->kind != ExprKind::kIdentifier) return false;
+  if (expr->index_end) return false;
+  auto* aa = ctx.FindAssocArray(expr->base->text);
+  if (!aa) return false;
+  if (aa->is_string_key) {
+    auto key = EvalExpr(expr->index, ctx, arena);
+    uint32_t nb = key.width / 8;
+    std::string s;
+    s.reserve(nb);
+    for (uint32_t i = nb; i > 0; --i) {
+      uint32_t bi = i - 1;
+      auto ch = static_cast<char>((key.words[(bi * 8) / 64].aval >>
+                                   ((bi * 8) % 64)) & 0xFF);
+      if (ch != 0) s.push_back(ch);
+    }
+    auto it = aa->str_data.find(s);
+    out = (it != aa->str_data.end()) ? it->second
+                                     : MakeLogic4VecVal(arena, aa->elem_width, 0);
+  } else {
+    auto key = static_cast<int64_t>(EvalExpr(expr->index, ctx, arena).ToUint64());
+    auto it = aa->int_data.find(key);
+    out = (it != aa->int_data.end()) ? it->second
+                                     : MakeLogic4VecVal(arena, aa->elem_width, 0);
+  }
+  return true;
+}
+
 static Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec result;
   if (TryQueueSelect(expr, ctx, arena, result)) return result;
+  if (TryAssocSelect(expr, ctx, arena, result)) return result;
 
   auto idx_val = EvalExpr(expr->index, ctx, arena);
   uint64_t idx = idx_val.ToUint64();
@@ -979,7 +1010,8 @@ static bool TryBuiltinMethodCall(const Expr* expr, SimContext& ctx,
   if (TryEvalEnumMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalStringMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalArrayMethodCall(expr, ctx, arena, out)) return true;
-  return TryEvalQueueMethodCall(expr, ctx, arena, out);
+  if (TryEvalQueueMethodCall(expr, ctx, arena, out)) return true;
+  return TryEvalAssocMethodCall(expr, ctx, arena, out);
 }
 
 // §13: Dispatch function calls with lifetime and void support.

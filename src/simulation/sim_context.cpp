@@ -246,6 +246,28 @@ QueueObject* SimContext::FindQueue(std::string_view name) {
   return (it != queues_.end()) ? it->second : nullptr;
 }
 
+// --- §7.8: Associative array management ---
+
+uint32_t AssocArrayObject::Size() const {
+  return static_cast<uint32_t>(is_string_key ? str_data.size()
+                                             : int_data.size());
+}
+
+AssocArrayObject* SimContext::CreateAssocArray(std::string_view name,
+                                               uint32_t elem_width,
+                                               bool is_string_key) {
+  auto* aa = arena_.Create<AssocArrayObject>();
+  aa->elem_width = elem_width;
+  aa->is_string_key = is_string_key;
+  assoc_arrays_[name] = aa;
+  return aa;
+}
+
+AssocArrayObject* SimContext::FindAssocArray(std::string_view name) {
+  auto it = assoc_arrays_.find(name);
+  return (it != assoc_arrays_.end()) ? it->second : nullptr;
+}
+
 // --- §7.3.2: Tagged union tag management ---
 
 void SimContext::SetVariableTag(std::string_view var_name,

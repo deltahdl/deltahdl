@@ -145,6 +145,12 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
     return queue_result;
   if (TryExecQueuePropertyStmt(base_name, field_name, ctx, arena))
     return MakeLogic4VecVal(arena, 1, 0);
+  // §7.8: Associative array property access (e.g., aa.size).
+  Logic4Vec assoc_result;
+  if (TryEvalAssocProperty(base_name, field_name, ctx, arena, assoc_result))
+    return assoc_result;
+  if (TryExecAssocPropertyStmt(base_name, field_name, ctx, arena))
+    return MakeLogic4VecVal(arena, 1, 0);
   return MakeLogic4Vec(arena, 1);
 }
 
