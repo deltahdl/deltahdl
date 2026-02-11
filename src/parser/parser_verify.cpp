@@ -68,17 +68,6 @@ Stmt* Parser::ParseRandsequenceStmt() {
 
 // --- §19 Covergroup declaration ---
 
-// Skip tokens until we see a matching '}' for a '{' that was consumed.
-static void SkipBraceBlock(Lexer& lexer) {
-  int depth = 1;
-  while (depth > 0 && !lexer.Peek().Is(TokenKind::kEof)) {
-    if (lexer.Peek().Is(TokenKind::kLBrace)) ++depth;
-    if (lexer.Peek().Is(TokenKind::kRBrace)) --depth;
-    if (depth > 0) lexer.Next();
-  }
-  if (lexer.Peek().Is(TokenKind::kRBrace)) lexer.Next();
-}
-
 // Skip a coverpoint or cross definition including optional bin block.
 static void SkipCoverpointBody(Lexer& lexer) {
   // Skip until ';' or '{'.

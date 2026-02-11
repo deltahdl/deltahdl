@@ -520,23 +520,12 @@ Expr* Parser::ParseCallExpr(Expr* callee) {
   return call;
 }
 
-// Skip a brace-delimited constraint block: { ... }
-static void SkipConstraintBlock(Lexer& lexer) {
-  int depth = 1;
-  while (depth > 0 && !lexer.Peek().Is(TokenKind::kEof)) {
-    if (lexer.Peek().Is(TokenKind::kLBrace)) ++depth;
-    if (lexer.Peek().Is(TokenKind::kRBrace)) --depth;
-    if (depth > 0) lexer.Next();
-  }
-  if (lexer.Peek().Is(TokenKind::kRBrace)) lexer.Next();
-}
-
 Expr* Parser::ParseWithClause(Expr* expr) {
   if (!Match(TokenKind::kKwWith)) return expr;
   // §18.7: randomize() with { constraint_block }
   if (Check(TokenKind::kLBrace)) {
     Consume();
-    SkipConstraintBlock(lexer_);
+    SkipBraceBlock(lexer_);
     return expr;
   }
   // §11.4.14.4: streaming with [ array_range_expression ]
@@ -556,7 +545,7 @@ Expr* Parser::ParseWithClause(Expr* expr) {
   // §18.7: randomize() with (id_list) { constraint_block }
   if (Check(TokenKind::kLBrace)) {
     Consume();
-    SkipConstraintBlock(lexer_);
+    SkipBraceBlock(lexer_);
   }
   return expr;
 }

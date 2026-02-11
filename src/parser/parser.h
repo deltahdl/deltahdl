@@ -267,4 +267,16 @@ class Parser {
   ModuleDecl* current_module_ = nullptr;  // Set during module body parsing
 };
 
+// Skip a brace-delimited block: consume tokens until matching '}'.
+// The opening '{' must already have been consumed before calling this.
+inline void SkipBraceBlock(Lexer& lexer) {
+  int depth = 1;
+  while (depth > 0 && !lexer.Peek().Is(TokenKind::kEof)) {
+    if (lexer.Peek().Is(TokenKind::kLBrace)) ++depth;
+    if (lexer.Peek().Is(TokenKind::kRBrace)) --depth;
+    if (depth > 0) lexer.Next();
+  }
+  if (lexer.Peek().Is(TokenKind::kRBrace)) lexer.Next();
+}
+
 }  // namespace delta
