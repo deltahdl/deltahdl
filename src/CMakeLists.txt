@@ -54,6 +54,7 @@ add_library(deltahdl_lib STATIC
     simulation/mt_sim.cpp
     simulation/constraint_solver.cpp
     simulation/specify.cpp
+    simulation/udp_eval.cpp
     synthesis/aig.cpp
     synthesis/synth_lower.cpp
     synthesis/aig_opt.cpp
