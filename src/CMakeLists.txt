@@ -4,6 +4,7 @@ add_library(deltahdl_lib STATIC
     common/source_mgr.cpp
     preprocessor/macro_table.cpp
     preprocessor/preprocessor.cpp
+    preprocessor/preprocessor_directives.cpp
     lexer/keywords.cpp
     lexer/lexer.cpp
     lexer/string_escape.cpp
@@ -32,6 +33,7 @@ add_library(deltahdl_lib STATIC
     simulation/sim_context.cpp
     simulation/class_object.cpp
     simulation/eval.cpp
+    simulation/eval_function.cpp
     simulation/eval_systask.cpp
     simulation/eval_expr.cpp
     simulation/eval_enum.cpp
@@ -41,6 +43,7 @@ add_library(deltahdl_lib STATIC
     simulation/eval_fileio.cpp
     simulation/eval_format.cpp
     simulation/stmt_exec.cpp
+    simulation/stmt_assign.cpp
     simulation/lowerer.cpp
     simulation/vcd_writer.cpp
     simulation/adv_sim.cpp
