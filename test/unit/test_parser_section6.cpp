@@ -508,6 +508,18 @@ TEST(ParserSection6, TypeOperatorExpr) {
   EXPECT_EQ(rhs->lhs->text, "y");
 }
 
+TEST(ParserSection6, TypeRefInferWidth) {
+  // §6.23: InferExprWidth on type(expr) returns inner expression's width.
+  Arena arena;
+  auto* inner = arena.Create<Expr>();
+  inner->kind = ExprKind::kIntegerLiteral;  // 32-bit default.
+  auto* ref = arena.Create<Expr>();
+  ref->kind = ExprKind::kTypeRef;
+  ref->lhs = inner;
+  TypedefMap typedefs;
+  EXPECT_EQ(InferExprWidth(ref, typedefs), 32u);
+}
+
 TEST(ParserSection6, TypeOperatorInDataType) {
   auto r = Parse(
       "module t;\n"

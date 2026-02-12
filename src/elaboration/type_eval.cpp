@@ -283,12 +283,13 @@ uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs) {
       }
       return count ? static_cast<uint32_t>(*count) * inner : inner;
     }
+    case ExprKind::kTypeRef:
+      return InferExprWidth(expr->lhs, typedefs);
     case ExprKind::kSelect:
     case ExprKind::kMemberAccess:
     case ExprKind::kCall:
     case ExprKind::kAssignmentPattern:
     case ExprKind::kCast:
-    case ExprKind::kTypeRef:
     case ExprKind::kPostfixUnary:
     case ExprKind::kInside:
     case ExprKind::kStreamingConcat:
