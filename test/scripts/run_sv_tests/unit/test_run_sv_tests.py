@@ -376,7 +376,7 @@ class TestBuildResult:
             patch("run_sv_tests.subprocess.run", return_value=mock_result),
             patch("run_sv_tests.TEST_DIR", tmp_path),
         ):
-            result, ok = run_sv_tests.build_result(str(sv))
+            result, _ = run_sv_tests.build_result(str(sv))
         assert result["name"] == "7.4.3--arrays/unpacked/slice.sv"
 
     def test_name_skips_clause_when_already_present(self, tmp_path):
@@ -388,7 +388,7 @@ class TestBuildResult:
         )
         mock_result = MagicMock(returncode=0, stderr="")
         with patch("run_sv_tests.subprocess.run", return_value=mock_result):
-            result, ok = run_sv_tests.build_result(str(sv))
+            result, _ = run_sv_tests.build_result(str(sv))
         assert result["name"] == "5.6.4--compiler-directives-define.sv"
 
     def test_name_omits_clause_when_no_tags(self, tmp_path):
@@ -398,7 +398,7 @@ class TestBuildResult:
         sv.write_text("/*\n:name: bare\n*/\nmodule m; endmodule\n")
         mock_result = MagicMock(returncode=0, stderr="")
         with patch("run_sv_tests.subprocess.run", return_value=mock_result):
-            result, ok = run_sv_tests.build_result(str(sv))
+            result, _ = run_sv_tests.build_result(str(sv))
         assert result["name"] == "bare.sv"
 
 
