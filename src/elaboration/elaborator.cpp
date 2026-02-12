@@ -491,6 +491,11 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       break;
     case ModuleItemKind::kParamDecl: {
       // §6.20: Body-level parameter/localparam declarations.
+      // §6.20.3: Type parameters register as typedefs.
+      if (item->data_type.kind == DataTypeKind::kVoid &&
+          item->typedef_type.kind != DataTypeKind::kImplicit) {
+        typedefs_[item->name] = item->typedef_type;
+      }
       RtlirParamDecl pd;
       pd.name = item->name;
       pd.default_value = item->init_expr;
