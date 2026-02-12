@@ -140,6 +140,130 @@ TEST(ParserSection6, SignedVector) {
 }
 
 // =========================================================================
+// §6.11.3: Default signedness per Table 6-8
+// =========================================================================
+
+TEST(ParserSection6, IntDefaultSigned) {
+  auto r = Parse(
+      "module t;\n"
+      "  int x;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
+  EXPECT_TRUE(item->data_type.is_signed) << "int is signed by default";
+}
+
+TEST(ParserSection6, IntExplicitUnsigned) {
+  auto r = Parse(
+      "module t;\n"
+      "  int unsigned x;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
+  EXPECT_FALSE(item->data_type.is_signed) << "int unsigned is unsigned";
+}
+
+TEST(ParserSection6, ByteDefaultSigned) {
+  auto r = Parse(
+      "module t;\n"
+      "  byte b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kByte);
+  EXPECT_TRUE(item->data_type.is_signed) << "byte is signed by default";
+}
+
+TEST(ParserSection6, ShortintDefaultSigned) {
+  auto r = Parse(
+      "module t;\n"
+      "  shortint s;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kShortint);
+  EXPECT_TRUE(item->data_type.is_signed) << "shortint is signed by default";
+}
+
+TEST(ParserSection6, LongintDefaultSigned) {
+  auto r = Parse(
+      "module t;\n"
+      "  longint l;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLongint);
+  EXPECT_TRUE(item->data_type.is_signed) << "longint is signed by default";
+}
+
+TEST(ParserSection6, IntegerDefaultSigned) {
+  auto r = Parse(
+      "module t;\n"
+      "  integer i;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInteger);
+  EXPECT_TRUE(item->data_type.is_signed) << "integer is signed by default";
+}
+
+TEST(ParserSection6, TimeDefaultUnsigned) {
+  auto r = Parse(
+      "module t;\n"
+      "  time t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTime);
+  EXPECT_FALSE(item->data_type.is_signed) << "time is unsigned by default";
+}
+
+TEST(ParserSection6, LogicDefaultUnsigned) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic l;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
+  EXPECT_FALSE(item->data_type.is_signed) << "logic is unsigned by default";
+}
+
+TEST(ParserSection6, BitDefaultUnsigned) {
+  auto r = Parse(
+      "module t;\n"
+      "  bit b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kBit);
+  EXPECT_FALSE(item->data_type.is_signed) << "bit is unsigned by default";
+}
+
+TEST(ParserSection6, RegDefaultUnsigned) {
+  auto r = Parse(
+      "module t;\n"
+      "  reg r;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kReg);
+  EXPECT_FALSE(item->data_type.is_signed) << "reg is unsigned by default";
+}
+
+// =========================================================================
 // §6.12: Real, shortreal, and realtime data types
 // =========================================================================
 

@@ -460,6 +460,20 @@ static std::optional<DataTypeKind> TokenToTypeKind(TokenKind tk) {
 }
 // clang-format on
 
+// §6.11.3 Table 6-8: Types that are signed by default.
+static bool IsDefaultSigned(DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kByte:
+    case DataTypeKind::kShortint:
+    case DataTypeKind::kInt:
+    case DataTypeKind::kLongint:
+    case DataTypeKind::kInteger:
+      return true;
+    default:
+      return false;
+  }
+}
+
 // §6.3.2.2: Check if a token is a drive strength keyword.
 static bool IsStrengthToken(TokenKind k) {
   switch (k) {
@@ -601,6 +615,8 @@ DataType Parser::ParseDataType() {
   if (!kind) return dtype;
   dtype.kind = *kind;
   dtype.is_net = IsNetTypeToken(tok_kind);
+  // §6.11.3 Table 6-8: Apply default signedness per type.
+  dtype.is_signed = IsDefaultSigned(dtype.kind);
   Consume();
 
   // §6.3.2: Parse charge or drive strength for net types.
@@ -612,6 +628,7 @@ DataType Parser::ParseDataType() {
     dtype.is_scalared = Match(TokenKind::kKwScalared);
   }
 
+  // §6.11.3: Explicit signed/unsigned overrides the default.
   if (Match(TokenKind::kKwSigned)) {
     dtype.is_signed = true;
   } else if (Match(TokenKind::kKwUnsigned)) {
