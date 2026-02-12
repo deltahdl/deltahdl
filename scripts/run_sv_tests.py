@@ -244,8 +244,11 @@ def write_junit_xml(results, elapsed, filepath):
 
 def build_result(path):
     """Run one sv-test and return (result_dict, ok_int). Does not print."""
-    name = Path(path).name
     chapter = chapter_from_path(path)
+    try:
+        name = str(Path(path).relative_to(TEST_DIR / chapter))
+    except ValueError:
+        name = Path(path).name
     metadata = parse_metadata(path)
     simulate = "simulation" in metadata.get("type", "").split()
     should_fail = bool(metadata.get("should_fail_because"))
