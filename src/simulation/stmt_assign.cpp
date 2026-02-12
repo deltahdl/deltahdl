@@ -389,6 +389,7 @@ static bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx,
   if (stmt->rhs->kind == ExprKind::kConcatenation &&
       stmt->rhs->elements.empty()) {
     q->elements.clear();
+    ++q->generation;
     return true;
   }
   if (stmt->rhs->kind == ExprKind::kCall && stmt->rhs->text == "new" &&
@@ -397,6 +398,7 @@ static bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx,
     q->elements.resize(static_cast<size_t>(sz),
                        MakeLogic4VecVal(arena, q->elem_width, 0));
     CopyNewInit(stmt->rhs, q, ctx, arena);
+    ++q->generation;
     return true;
   }
   std::vector<Logic4Vec> elems;
@@ -405,6 +407,7 @@ static bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx,
     elems.resize(static_cast<size_t>(q->max_size));
   }
   q->elements = std::move(elems);
+  ++q->generation;
   return true;
 }
 

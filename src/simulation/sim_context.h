@@ -61,7 +61,8 @@ struct StructTypeInfo {
 struct QueueObject {
   std::vector<Logic4Vec> elements;
   uint32_t elem_width = 32;
-  int32_t max_size = -1;  // -1 = unbounded.
+  int32_t max_size = -1;    // -1 = unbounded.
+  uint32_t generation = 0;  // §7.10.3: mutation counter for ref persistence.
 };
 
 // §7.8: Associative array runtime storage.

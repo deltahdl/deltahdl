@@ -313,6 +313,7 @@ static bool DispatchQueueEval(std::string_view method, QueueObject* q,
     } else {
       out = q->elements.front();
       q->elements.erase(q->elements.begin());
+      ++q->generation;
     }
     return true;
   }
@@ -322,6 +323,7 @@ static bool DispatchQueueEval(std::string_view method, QueueObject* q,
     } else {
       out = q->elements.back();
       q->elements.pop_back();
+      ++q->generation;
     }
     return true;
   }
@@ -335,14 +337,20 @@ static bool DispatchQueuePush(std::string_view method, QueueObject* q,
     auto val = EvalExpr(expr->args[0], ctx, arena);
     bool has_room = (q->max_size < 0) ||
                     (static_cast<int32_t>(q->elements.size()) < q->max_size);
-    if (has_room) q->elements.push_back(val);
+    if (has_room) {
+      q->elements.push_back(val);
+      ++q->generation;
+    }
     return true;
   }
   if (method == "push_front" && !expr->args.empty()) {
     auto val = EvalExpr(expr->args[0], ctx, arena);
     bool has_room = (q->max_size < 0) ||
                     (static_cast<int32_t>(q->elements.size()) < q->max_size);
-    if (has_room) q->elements.insert(q->elements.begin(), val);
+    if (has_room) {
+      q->elements.insert(q->elements.begin(), val);
+      ++q->generation;
+    }
     return true;
   }
   if (method == "insert" && expr->args.size() >= 2) {
@@ -352,6 +360,7 @@ static bool DispatchQueuePush(std::string_view method, QueueObject* q,
     if (idx <= q->elements.size()) {
       q->elements.insert(q->elements.begin() + static_cast<ptrdiff_t>(idx),
                          val);
+      ++q->generation;
     }
     return true;
   }
@@ -368,9 +377,11 @@ static bool DispatchQueueDelete(std::string_view method, QueueObject* q,
         static_cast<size_t>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
     if (idx < q->elements.size()) {
       q->elements.erase(q->elements.begin() + static_cast<ptrdiff_t>(idx));
+      ++q->generation;
     }
   } else {
     q->elements.clear();
+    ++q->generation;
   }
   return true;
 }
@@ -417,6 +428,7 @@ bool TryExecQueuePropertyStmt(std::string_view var_name, std::string_view prop,
   if (!q) return false;
   if (prop == "delete") {
     q->elements.clear();
+    ++q->generation;
     return true;
   }
   if (prop == "sort") {
@@ -424,6 +436,7 @@ bool TryExecQueuePropertyStmt(std::string_view var_name, std::string_view prop,
               [](const Logic4Vec& a, const Logic4Vec& b) {
                 return a.ToUint64() < b.ToUint64();
               });
+    ++q->generation;
     return true;
   }
   if (prop == "rsort") {
@@ -431,10 +444,12 @@ bool TryExecQueuePropertyStmt(std::string_view var_name, std::string_view prop,
               [](const Logic4Vec& a, const Logic4Vec& b) {
                 return a.ToUint64() > b.ToUint64();
               });
+    ++q->generation;
     return true;
   }
   if (prop == "reverse") {
     std::reverse(q->elements.begin(), q->elements.end());
+    ++q->generation;
     return true;
   }
   if (prop == "shuffle") {
@@ -443,6 +458,7 @@ bool TryExecQueuePropertyStmt(std::string_view var_name, std::string_view prop,
       size_t j = ctx.Urandom32() % i;
       std::swap(elems[i - 1], elems[j]);
     }
+    ++q->generation;
     return true;
   }
   return false;
