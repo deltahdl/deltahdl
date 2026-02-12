@@ -320,8 +320,7 @@ Expr* Parser::ParseNewExpr() {
 
 Expr* Parser::ParseTaggedExpr() {
   auto* expr = arena_.Create<Expr>();
-  expr->kind = ExprKind::kIdentifier;
-  expr->text = "tagged";
+  expr->kind = ExprKind::kTagged;
   expr->range.start = Consume().loc;
   auto member_tok = ExpectIdentifier();
   auto* member = arena_.Create<Expr>();
@@ -335,6 +334,10 @@ Expr* Parser::ParseTaggedExpr() {
     Expect(TokenKind::kRParen);
   } else if (Check(TokenKind::kApostropheLBrace)) {
     expr->lhs = ParseAssignmentPattern();
+  } else if (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kComma) &&
+             !Check(TokenKind::kRParen) && !Check(TokenKind::kRBrace) &&
+             !Check(TokenKind::kColon) && !Check(TokenKind::kEof)) {
+    expr->lhs = ParseExpr();
   }
   return expr;
 }

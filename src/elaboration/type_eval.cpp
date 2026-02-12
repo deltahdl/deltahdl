@@ -294,6 +294,7 @@ uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs) {
     case ExprKind::kInside:
     case ExprKind::kStreamingConcat:
     case ExprKind::kMinTypMax:
+    case ExprKind::kTagged:
       return 0;
   }
   return 0;

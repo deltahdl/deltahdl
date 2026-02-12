@@ -42,6 +42,7 @@ enum class ExprKind : uint8_t {
   kInside,             // expr inside { range_list }  (§11.4.13)
   kStreamingConcat,    // {<< [size] {exprs}} / {>> [size] {exprs}} (§11.4.14)
   kMinTypMax,          // expr : expr : expr  (§11.11)
+  kTagged,             // tagged member [expr]  (§7.3.2/§11.9)
 };
 
 struct Expr {

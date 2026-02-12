@@ -832,6 +832,15 @@ static Logic4Vec EvalBinaryExpr(const Expr* expr, SimContext& ctx,
                       EvalExpr(expr->rhs, ctx, arena), arena);
 }
 
+// §7.3.2/§11.9: Evaluate tagged union expression — return member value.
+static Logic4Vec EvalTaggedExpr(const Expr* expr, SimContext& ctx,
+                                Arena& arena) {
+  // expr->rhs = member name identifier, expr->lhs = optional value.
+  if (expr->lhs) return EvalExpr(expr->lhs, ctx, arena);
+  // Void member (no value) — return 0.
+  return MakeLogic4VecVal(arena, 1, 0);
+}
+
 // --- Main dispatch ---
 
 Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena) {
@@ -891,6 +900,8 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena) {
       return EvalStreamingConcat(expr, ctx, arena);
     case ExprKind::kAssignmentPattern:
       return EvalAssignmentPattern(expr, ctx, arena);
+    case ExprKind::kTagged:
+      return EvalTaggedExpr(expr, ctx, arena);
     default:
       return MakeLogic4Vec(arena, 1);
   }

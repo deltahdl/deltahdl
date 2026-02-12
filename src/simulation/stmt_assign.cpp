@@ -497,6 +497,9 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
     rhs_val = ResizeToWidth(rhs_val, var->value.width, arena);
     var->value = rhs_val;
     var->NotifyWatchers();
+    // §7.3.2: Set tag when RHS is a tagged expression.
+    if (stmt->rhs && stmt->rhs->kind == ExprKind::kTagged && stmt->rhs->rhs)
+      ctx.SetVariableTag(stmt->lhs->text, stmt->rhs->rhs->text);
   } else if (stmt->lhs->kind == ExprKind::kMemberAccess) {
     WriteStructField(stmt->lhs, rhs_val, ctx, arena);
   }
