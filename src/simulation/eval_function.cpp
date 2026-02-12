@@ -1,9 +1,11 @@
+#include <algorithm>
 #include <cstdlib>
 #include <iostream>
 #include <string>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
 #include "elaboration/type_eval.h"
 #include "parser/ast.h"
 #include "simulation/class_object.h"
@@ -268,6 +270,52 @@ static bool TryBindRefArg(const Expr* expr, int arg_index,
   return true;
 }
 
+// §7.10.3: Try to bind a queue element (q[i]) by reference.
+// Creates a local variable with the current value; records a QueueRefBinding
+// for writeback on function return.
+static bool TryBindQueueElementRef(const Expr* expr, int arg_index,
+                                   const FunctionArg& param, SimContext& ctx,
+                                   Arena& arena) {
+  if (arg_index < 0) return false;
+  auto* call_arg = expr->args[static_cast<size_t>(arg_index)];
+  if (call_arg->kind != ExprKind::kSelect) return false;
+  if (!call_arg->base || call_arg->base->kind != ExprKind::kIdentifier)
+    return false;
+  auto* q = ctx.FindQueue(call_arg->base->text);
+  if (!q || !call_arg->index) return false;
+  auto idx = EvalExpr(call_arg->index, ctx, arena).ToUint64();
+  if (idx >= q->elements.size()) return false;
+  // §6.22.2: Width must match for ref binding (skip for implicit types).
+  if (param.data_type.kind != DataTypeKind::kImplicit) {
+    uint32_t param_width = EvalTypeWidth(param.data_type);
+    if (param_width != q->elem_width) return false;
+  }
+  // Create a local variable initialized with the current element value.
+  auto* var = ctx.CreateLocalVariable(param.name, q->elem_width);
+  var->value = q->elements[idx];
+  // Record binding for writeback: capture the element's unique ID.
+  if (idx < q->element_ids.size()) {
+    ctx.RecordQueueRef({q, q->element_ids[idx], var});
+  }
+  return true;
+}
+
+// §7.10.3: Write back queue ref bindings. For each binding, search for the
+// captured element ID in the queue. If found, write back; otherwise the ref
+// is outdated (§13.5.2) and the write is suppressed.
+static void WritebackQueueRefs(SimContext& ctx) {
+  auto bindings = ctx.PopQueueRefFrame();
+  for (const auto& b : bindings) {
+    auto& ids = b.queue->element_ids;
+    auto it = std::find(ids.begin(), ids.end(), b.element_id);
+    if (it == ids.end()) continue;
+    auto pos = static_cast<size_t>(it - ids.begin());
+    if (pos < b.queue->elements.size()) {
+      b.queue->elements[pos] = b.local_var->value;
+    }
+  }
+}
+
 // §13.5.3: Evaluate call-site arg, use default value, or X.
 static Logic4Vec ResolveArgValue(const FunctionArg& param, const Expr* expr,
                                  int arg_index, SimContext& ctx, Arena& arena) {
@@ -322,9 +370,10 @@ static void BindFunctionArgs(const ModuleItem* func, const Expr* expr,
   for (size_t i = 0; i < func->func_args.size(); ++i) {
     int ai = ResolveArgIndex(func, expr, i);
     auto dir = func->func_args[i].direction;
-    if (dir == Direction::kRef &&
-        TryBindRefArg(expr, ai, func->func_args[i].name, ctx)) {
-      continue;
+    if (dir == Direction::kRef) {
+      if (TryBindRefArg(expr, ai, func->func_args[i].name, ctx)) continue;
+      if (TryBindQueueElementRef(expr, ai, func->func_args[i], ctx, arena))
+        continue;
     }
     if (ai >= 0 && TryBindArrayArg(expr->args[static_cast<size_t>(ai)],
                                    func->func_args[i].name, ctx, arena)) {
@@ -515,12 +564,14 @@ static bool TryEvalClassMethodCall(const Expr* expr, SimContext& ctx,
   bool is_void = (method->return_type.kind == DataTypeKind::kVoid);
   ctx.PushScope();
   ctx.PushThis(obj);
+  ctx.PushQueueRefFrame();
   BindFunctionArgs(method, expr, ctx, arena);
   Variable dummy_ret;
   Variable* ret_var = &dummy_ret;
   if (!is_void) ret_var = ctx.CreateLocalVariable(method->name, 32);
   ExecFunctionBody(method, ret_var, ctx, arena);
   WritebackOutputArgs(method, expr, ctx);
+  WritebackQueueRefs(ctx);
   out = is_void ? MakeLogic4VecVal(arena, 1, 0) : ret_var->value;
   ctx.PopThis();
   ctx.PopScope();
@@ -560,6 +611,7 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
     ctx.PushScope();
   }
 
+  ctx.PushQueueRefFrame();
   BindFunctionArgs(func, expr, ctx, arena);
 
   // §13.4.1: Void functions have no implicit return variable.
@@ -573,6 +625,7 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
 
   ExecFunctionBody(func, ret_var, ctx, arena);
   WritebackOutputArgs(func, expr, ctx);
+  WritebackQueueRefs(ctx);
   auto result = is_void ? MakeLogic4VecVal(arena, 1, 0) : ret_var->value;
 
   if (is_static) {
@@ -581,6 +634,20 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
     ctx.PopScope();
   }
   return result;
+}
+
+// §6.21: Reject ref arguments in static subroutines.
+void ValidateRefLifetime(const ModuleItem* func, DiagEngine& diag) {
+  if (!func) return;
+  bool is_static = func->is_static && !func->is_automatic;
+  if (!is_static) return;
+  for (const auto& arg : func->func_args) {
+    if (arg.direction == Direction::kRef) {
+      diag.Error({}, "ref argument '" + std::string(arg.name) +
+                         "' not allowed in static subroutine '" +
+                         std::string(func->name) + "'");
+    }
+  }
 }
 
 }  // namespace delta

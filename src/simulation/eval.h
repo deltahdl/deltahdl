@@ -79,6 +79,11 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
                        SimContext& ctx, Arena& arena);
 
+// §6.21: Validate that ref arguments are not used in static subroutines.
+class DiagEngine;
+struct ModuleItem;
+void ValidateRefLifetime(const ModuleItem* func, DiagEngine& diag);
+
 // String <-> Logic4Vec conversion (eval_string.cpp).
 Logic4Vec StringToLogic4Vec(Arena& arena, std::string_view str);
 

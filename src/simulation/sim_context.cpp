@@ -101,6 +101,19 @@ void SimContext::AliasLocalVariable(std::string_view name, Variable* var) {
   }
 }
 
+void SimContext::PushQueueRefFrame() { queue_ref_stack_.emplace_back(); }
+
+void SimContext::RecordQueueRef(const QueueRefBinding& binding) {
+  if (!queue_ref_stack_.empty()) queue_ref_stack_.back().push_back(binding);
+}
+
+std::vector<QueueRefBinding> SimContext::PopQueueRefFrame() {
+  if (queue_ref_stack_.empty()) return {};
+  auto frame = std::move(queue_ref_stack_.back());
+  queue_ref_stack_.pop_back();
+  return frame;
+}
+
 void SimContext::RegisterFinalProcess(Process* proc) {
   final_processes_.push_back(proc);
 }
@@ -239,6 +252,11 @@ const ArrayInfo* SimContext::FindArrayInfo(std::string_view name) const {
 }
 
 // --- §7.10: Queue management ---
+
+void QueueObject::AssignFreshIds() {
+  element_ids.resize(elements.size());
+  for (auto& id : element_ids) id = AllocateId();
+}
 
 QueueObject* SimContext::CreateQueue(std::string_view name, uint32_t elem_width,
                                      int32_t max_size) {

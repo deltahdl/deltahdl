@@ -60,9 +60,26 @@ struct StructTypeInfo {
 // §7.10: Queue runtime storage.
 struct QueueObject {
   std::vector<Logic4Vec> elements;
+  std::vector<uint64_t> element_ids;  // §7.10.3: per-element identity tracking.
   uint32_t elem_width = 32;
   int32_t max_size = -1;    // -1 = unbounded.
   uint32_t generation = 0;  // §7.10.3: mutation counter for ref persistence.
+
+  // §7.10.3: Allocate a unique monotonic element ID.
+  uint64_t AllocateId() { return ++next_elem_id_; }
+
+  // §7.10.3: Assign fresh IDs to all current elements (e.g. after bulk load).
+  void AssignFreshIds();
+
+ private:
+  uint64_t next_elem_id_ = 0;
+};
+
+// §7.10.3/§13.5.2: Tracks a ref binding to a queue element for writeback.
+struct QueueRefBinding {
+  QueueObject* queue = nullptr;
+  uint64_t element_id = 0;        // Captured ID at bind time.
+  Variable* local_var = nullptr;  // Function-local variable holding the value.
 };
 
 // §7.8: Associative array runtime storage.
@@ -126,6 +143,11 @@ class SimContext {
   Variable* CreateLocalVariable(std::string_view name, uint32_t width);
   // §13.5.2: Alias an existing variable into the current scope (pass by ref).
   void AliasLocalVariable(std::string_view name, Variable* var);
+
+  // §7.10.3: Queue ref frame management for function calls.
+  void PushQueueRefFrame();
+  void RecordQueueRef(const QueueRefBinding& binding);
+  std::vector<QueueRefBinding> PopQueueRefFrame();
 
   void SetVcdWriter(VcdWriter* vcd) { vcd_writer_ = vcd; }
   VcdWriter* GetVcdWriter() { return vcd_writer_; }
@@ -295,6 +317,8 @@ class SimContext {
   uint64_t next_handle_id_ = 1;
   // §8.11: Stack of `this` pointers for nested method calls.
   std::vector<ClassObject*> this_stack_;
+  // §7.10.3: Stack of queue ref binding frames for nested function calls.
+  std::vector<std::vector<QueueRefBinding>> queue_ref_stack_;
   // §20.6.2: Type name → bit width for $bits(type).
   std::unordered_map<std::string_view, uint32_t> type_widths_;
   // §14: Clocking manager.

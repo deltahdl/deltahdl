@@ -313,6 +313,7 @@ static bool DispatchQueueEval(std::string_view method, QueueObject* q,
     } else {
       out = q->elements.front();
       q->elements.erase(q->elements.begin());
+      if (!q->element_ids.empty()) q->element_ids.erase(q->element_ids.begin());
       ++q->generation;
     }
     return true;
@@ -323,6 +324,7 @@ static bool DispatchQueueEval(std::string_view method, QueueObject* q,
     } else {
       out = q->elements.back();
       q->elements.pop_back();
+      if (!q->element_ids.empty()) q->element_ids.pop_back();
       ++q->generation;
     }
     return true;
@@ -339,6 +341,7 @@ static bool DispatchQueuePush(std::string_view method, QueueObject* q,
                     (static_cast<int32_t>(q->elements.size()) < q->max_size);
     if (has_room) {
       q->elements.push_back(val);
+      q->element_ids.push_back(q->AllocateId());
       ++q->generation;
     }
     return true;
@@ -349,6 +352,7 @@ static bool DispatchQueuePush(std::string_view method, QueueObject* q,
                     (static_cast<int32_t>(q->elements.size()) < q->max_size);
     if (has_room) {
       q->elements.insert(q->elements.begin(), val);
+      q->element_ids.insert(q->element_ids.begin(), q->AllocateId());
       ++q->generation;
     }
     return true;
@@ -360,6 +364,9 @@ static bool DispatchQueuePush(std::string_view method, QueueObject* q,
     if (idx <= q->elements.size()) {
       q->elements.insert(q->elements.begin() + static_cast<ptrdiff_t>(idx),
                          val);
+      q->element_ids.insert(
+          q->element_ids.begin() + static_cast<ptrdiff_t>(idx),
+          q->AllocateId());
       ++q->generation;
     }
     return true;
@@ -377,10 +384,14 @@ static bool DispatchQueueDelete(std::string_view method, QueueObject* q,
         static_cast<size_t>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
     if (idx < q->elements.size()) {
       q->elements.erase(q->elements.begin() + static_cast<ptrdiff_t>(idx));
+      if (idx < q->element_ids.size())
+        q->element_ids.erase(q->element_ids.begin() +
+                             static_cast<ptrdiff_t>(idx));
       ++q->generation;
     }
   } else {
     q->elements.clear();
+    q->element_ids.clear();
     ++q->generation;
   }
   return true;
@@ -422,43 +433,65 @@ bool TryEvalQueueProperty(std::string_view var_name, std::string_view prop,
   return DispatchQueueEval(prop, q, arena, out);
 }
 
+// §7.10.3: Sort queue elements and IDs together, preserving ID-element pairing.
+static void SortQueueWithIds(QueueObject* q, bool ascending) {
+  auto& elems = q->elements;
+  auto& ids = q->element_ids;
+  std::vector<size_t> order(elems.size());
+  for (size_t i = 0; i < order.size(); ++i) order[i] = i;
+  std::sort(order.begin(), order.end(), [&](size_t a, size_t b) {
+    return ascending ? elems[a].ToUint64() < elems[b].ToUint64()
+                     : elems[a].ToUint64() > elems[b].ToUint64();
+  });
+  std::vector<Logic4Vec> sorted_elems(elems.size());
+  std::vector<uint64_t> sorted_ids(ids.size());
+  for (size_t i = 0; i < order.size(); ++i) {
+    sorted_elems[i] = elems[order[i]];
+    if (i < ids.size()) sorted_ids[i] = ids[order[i]];
+  }
+  elems = std::move(sorted_elems);
+  ids = std::move(sorted_ids);
+  ++q->generation;
+}
+
+// §7.10.3: Shuffle queue elements and IDs together.
+static void ShuffleQueueWithIds(QueueObject* q, SimContext& ctx) {
+  auto& elems = q->elements;
+  auto& ids = q->element_ids;
+  for (size_t i = elems.size(); i > 1; --i) {
+    size_t j = ctx.Urandom32() % i;
+    std::swap(elems[i - 1], elems[j]);
+    if (i - 1 < ids.size() && j < ids.size()) std::swap(ids[i - 1], ids[j]);
+  }
+  ++q->generation;
+}
+
 bool TryExecQueuePropertyStmt(std::string_view var_name, std::string_view prop,
                               SimContext& ctx, Arena& /*arena*/) {
   auto* q = ctx.FindQueue(var_name);
   if (!q) return false;
   if (prop == "delete") {
     q->elements.clear();
+    q->element_ids.clear();
     ++q->generation;
     return true;
   }
   if (prop == "sort") {
-    std::sort(q->elements.begin(), q->elements.end(),
-              [](const Logic4Vec& a, const Logic4Vec& b) {
-                return a.ToUint64() < b.ToUint64();
-              });
-    ++q->generation;
+    SortQueueWithIds(q, true);
     return true;
   }
   if (prop == "rsort") {
-    std::sort(q->elements.begin(), q->elements.end(),
-              [](const Logic4Vec& a, const Logic4Vec& b) {
-                return a.ToUint64() > b.ToUint64();
-              });
-    ++q->generation;
+    SortQueueWithIds(q, false);
     return true;
   }
   if (prop == "reverse") {
     std::reverse(q->elements.begin(), q->elements.end());
+    std::reverse(q->element_ids.begin(), q->element_ids.end());
     ++q->generation;
     return true;
   }
   if (prop == "shuffle") {
-    auto& elems = q->elements;
-    for (size_t i = elems.size(); i > 1; --i) {
-      size_t j = ctx.Urandom32() % i;
-      std::swap(elems[i - 1], elems[j]);
-    }
-    ++q->generation;
+    ShuffleQueueWithIds(q, ctx);
     return true;
   }
   return false;
