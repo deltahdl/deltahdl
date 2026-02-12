@@ -183,10 +183,10 @@ class Elaborator {
   std::unordered_set<std::string_view> specparam_names_;
   std::unordered_set<std::string_view> enum_var_names_;
   std::unordered_set<std::string_view> enum_member_names_;
-  std::unordered_set<std::string_view> const_names_;    // §6.20.6: const vars
-  std::unordered_set<std::string_view> class_names_;    // §8: known class names
-  std::unordered_set<std::string_view> nettype_names_;  // §6.6.7: nettypes
-  std::unordered_set<std::string_view> interconnect_names_;  // §6.6.8
+  std::unordered_set<std::string_view> const_names_;
+  std::unordered_set<std::string_view> class_names_;
+  std::unordered_set<std::string_view> nettype_names_;
+  std::unordered_set<std::string_view> interconnect_names_;
 };
 
 }  // namespace delta
