@@ -138,6 +138,11 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
 
 void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
   for (const auto& port : decl->ports) {
+    // §6.14: chandle cannot be used as a port type.
+    if (port.data_type.kind == DataTypeKind::kChandle) {
+      diag_.Error(port.loc, "chandle cannot be used as a port type");
+      continue;
+    }
     RtlirPort rp;
     rp.name = port.name;
     rp.direction = port.direction;

@@ -123,6 +123,12 @@ class Elaborator {
   /// Per-item validation within ValidateModuleConstraints.
   void ValidateItemConstraints(const ModuleItem* item);
 
+  /// §6.14: chandle cannot be used in continuous assignment.
+  void ValidateChandleContAssign(const ModuleItem* item);
+
+  /// §6.14: chandle cannot appear in event expression.
+  void ValidateChandleSensitivity(const ModuleItem* item);
+
   /// Check for mixed continuous/procedural assignments (§6.5).
   void ValidateMixedAssignments();
 

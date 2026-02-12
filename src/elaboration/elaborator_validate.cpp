@@ -124,6 +124,30 @@ void Elaborator::ValidateEdgeOnReal(const ModuleItem* item) {
   }
 }
 
+static bool IsChandleVar(const Expr* e, const TypeMap& types) {
+  auto name = ExprIdent(e);
+  if (name.empty()) return false;
+  auto it = types.find(name);
+  return it != types.end() && it->second == DataTypeKind::kChandle;
+}
+
+void Elaborator::ValidateChandleContAssign(const ModuleItem* item) {
+  if (item->kind != ModuleItemKind::kContAssign) return;
+  if (IsChandleVar(item->assign_lhs, var_types_) ||
+      IsChandleVar(item->assign_rhs, var_types_)) {
+    diag_.Error(item->loc, "chandle cannot be used in continuous assignment");
+  }
+}
+
+void Elaborator::ValidateChandleSensitivity(const ModuleItem* item) {
+  if (item->kind != ModuleItemKind::kAlwaysBlock) return;
+  for (const auto& ev : item->sensitivity) {
+    if (IsChandleVar(ev.signal, var_types_)) {
+      diag_.Error(item->loc, "chandle cannot appear in event expression");
+    }
+  }
+}
+
 void Elaborator::ValidateItemConstraints(const ModuleItem* item) {
   bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
                  item->kind == ModuleItemKind::kInitialBlock;
@@ -131,6 +155,8 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item) {
     CollectProcTargets(item->body, proc_assign_targets_);
   }
   ValidateEdgeOnReal(item);
+  ValidateChandleContAssign(item);
+  ValidateChandleSensitivity(item);
   if (item->kind == ModuleItemKind::kContAssign) {
     CheckRealSelect(item->assign_rhs, var_types_, diag_);
   }
