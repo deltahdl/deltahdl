@@ -551,6 +551,15 @@ static uint64_t ResolveQueueIdx(const Expr* idx_expr, QueueObject* q,
   return val.ToUint64();
 }
 
+// §7.4.5: Create an all-X Logic4Vec (out-of-bounds result).
+static Logic4Vec MakeAllX(Arena& arena, uint32_t width) {
+  auto vec = MakeLogic4Vec(arena, width);
+  for (uint32_t i = 0; i < vec.nwords; ++i) {
+    vec.words[i] = {~uint64_t{0}, ~uint64_t{0}};
+  }
+  return vec;
+}
+
 // §7.10: Try queue indexed access with $ support. Returns true if handled.
 static bool TryQueueSelect(const Expr* expr, SimContext& ctx, Arena& arena,
                            Logic4Vec& out) {
@@ -560,19 +569,25 @@ static bool TryQueueSelect(const Expr* expr, SimContext& ctx, Arena& arena,
   if (!q) return false;
   auto idx = ResolveQueueIdx(expr->index, q, ctx, arena);
   out = (idx < q->elements.size()) ? q->elements[idx]
-                                   : MakeLogic4VecVal(arena, q->elem_width, 0);
+                                   : MakeAllX(arena, q->elem_width);
   return true;
 }
 
 // §7.4: Try unpacked array element access. Returns true if handled.
 static bool TryArrayElementSelect(const Expr* expr, uint64_t idx,
-                                  SimContext& ctx, Logic4Vec& out) {
+                                  SimContext& ctx, Arena& arena,
+                                  Logic4Vec& out) {
   if (!expr->base || expr->base->kind != ExprKind::kIdentifier) return false;
   if (expr->index_end) return false;
+  auto* info = ctx.FindArrayInfo(expr->base->text);
+  if (!info) return false;
   auto elem_name =
       std::string(expr->base->text) + "[" + std::to_string(idx) + "]";
   auto* elem = ctx.FindVariable(elem_name);
-  if (!elem) return false;
+  if (!elem) {
+    out = MakeAllX(arena, info->elem_width);
+    return true;
+  }
   out = elem->value;
   return true;
 }
@@ -635,16 +650,12 @@ static std::string ExtractStringKey(const Logic4Vec& key) {
   return s;
 }
 
-// §7.8.6: Read assoc array, returning value or default (with warning on miss).
-static Logic4Vec AssocReadOrDefault(const AssocArrayObject* aa, bool found,
-                                    Logic4Vec found_val,
-                                    std::string_view arr_name, SimContext& ctx,
-                                    Arena& arena) {
-  if (found) return found_val;
+// §7.8.6: Warn on read of non-existent associative array index.
+static void WarnAssocMiss(const AssocArrayObject* aa, std::string_view name,
+                          SimContext& ctx) {
   if (!aa->has_default)
-    ctx.GetDiag().Warning({}, "associative array '" + std::string(arr_name) +
+    ctx.GetDiag().Warning({}, "associative array '" + std::string(name) +
                                   "': read of non-existent index");
-  return AssocDefault(aa, arena);
 }
 
 // §7.8: Read from assoc array by string key.
@@ -653,9 +664,9 @@ static Logic4Vec AssocReadStr(AssocArrayObject* aa, const Expr* idx_expr,
                               Arena& arena) {
   auto s = ExtractStringKey(EvalExpr(idx_expr, ctx, arena));
   auto it = aa->str_data.find(s);
-  bool hit = (it != aa->str_data.end());
-  return AssocReadOrDefault(aa, hit, hit ? it->second : Logic4Vec{}, name, ctx,
-                            arena);
+  if (it != aa->str_data.end()) return it->second;
+  WarnAssocMiss(aa, name, ctx);
+  return AssocDefault(aa, arena);
 }
 
 // §7.8: Read from assoc array by integer key.
@@ -664,9 +675,9 @@ static Logic4Vec AssocReadInt(AssocArrayObject* aa, const Expr* idx_expr,
                               Arena& arena) {
   auto key = static_cast<int64_t>(EvalExpr(idx_expr, ctx, arena).ToUint64());
   auto it = aa->int_data.find(key);
-  bool hit = (it != aa->int_data.end());
-  return AssocReadOrDefault(aa, hit, hit ? it->second : Logic4Vec{}, name, ctx,
-                            arena);
+  if (it != aa->int_data.end()) return it->second;
+  WarnAssocMiss(aa, name, ctx);
+  return AssocDefault(aa, arena);
 }
 
 // §7.8: Try associative array indexed access. Returns true if handled.
@@ -690,7 +701,7 @@ static Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto idx_val = EvalExpr(expr->index, ctx, arena);
   uint64_t idx = idx_val.ToUint64();
 
-  if (TryArrayElementSelect(expr, idx, ctx, result)) return result;
+  if (TryArrayElementSelect(expr, idx, ctx, arena, result)) return result;
   if (TryCompoundArraySelect(expr, ctx, arena, result)) return result;
 
   auto base_val = EvalExpr(expr->base, ctx, arena);
