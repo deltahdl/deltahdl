@@ -277,7 +277,7 @@ class TestBuildResult:
             result, ok = run_sv_tests.build_result(str(sv))
         assert (
             ok == 1
-            and result["name"] == "foo.sv"
+            and result["name"] == "5.10--foo.sv"
             and result["chapter"] == "chapter-5"
             and result["status"] == "pass"
         )
@@ -365,6 +365,41 @@ class TestBuildResult:
             and result["status"] == "pass"
             and "--lint-only" not in mock_run.call_args[0][0]
         )
+
+    def test_name_includes_clause_number_from_tags(self, tmp_path):
+        """build_result() should prepend first tag when name lacks clause number."""
+        sv = tmp_path / "chapter-7" / "arrays" / "unpacked" / "slice.sv"
+        sv.parent.mkdir(parents=True)
+        sv.write_text("/*\n:name: slice\n:tags: 7.4.3\n*/\nmodule m; endmodule\n")
+        mock_result = MagicMock(returncode=0, stderr="")
+        with (
+            patch("run_sv_tests.subprocess.run", return_value=mock_result),
+            patch("run_sv_tests.TEST_DIR", tmp_path),
+        ):
+            result, ok = run_sv_tests.build_result(str(sv))
+        assert result["name"] == "7.4.3--arrays/unpacked/slice.sv"
+
+    def test_name_skips_clause_when_already_present(self, tmp_path):
+        """build_result() should not double-prefix when filename starts with clause."""
+        sv = tmp_path / "chapter-5" / "5.6.4--compiler-directives-define.sv"
+        sv.parent.mkdir(parents=True)
+        sv.write_text(
+            "/*\n:name: define\n:tags: 5.6.4\n*/\nmodule m; endmodule\n"
+        )
+        mock_result = MagicMock(returncode=0, stderr="")
+        with patch("run_sv_tests.subprocess.run", return_value=mock_result):
+            result, ok = run_sv_tests.build_result(str(sv))
+        assert result["name"] == "5.6.4--compiler-directives-define.sv"
+
+    def test_name_omits_clause_when_no_tags(self, tmp_path):
+        """build_result() should use bare path when no tags metadata."""
+        sv = tmp_path / "chapter-5" / "bare.sv"
+        sv.parent.mkdir(parents=True)
+        sv.write_text("/*\n:name: bare\n*/\nmodule m; endmodule\n")
+        mock_result = MagicMock(returncode=0, stderr="")
+        with patch("run_sv_tests.subprocess.run", return_value=mock_result):
+            result, ok = run_sv_tests.build_result(str(sv))
+        assert result["name"] == "bare.sv"
 
 
 class TestPrintStatus:

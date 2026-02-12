@@ -250,6 +250,9 @@ def build_result(path):
     except ValueError:
         name = Path(path).name
     metadata = parse_metadata(path)
+    tags = metadata.get("tags", "").split()
+    if tags and not re.match(r"^\d+\.", name):
+        name = f"{tags[0]}--{name}"
     simulate = "simulation" in metadata.get("type", "").split()
     should_fail = bool(metadata.get("should_fail_because"))
     defines = metadata.get("defines", "").split()
