@@ -619,6 +619,31 @@ static bool TryCompoundArraySelect(const Expr* expr, SimContext& ctx,
   return true;
 }
 
+// §7.4.5: Try unpacked array slice select. Returns true if handled.
+static bool TryArraySliceSelect(const Expr* expr, SimContext& ctx, Arena& arena,
+                                Logic4Vec& out) {
+  if (!expr->index_end || !expr->base) return false;
+  if (expr->base->kind != ExprKind::kIdentifier) return false;
+  auto* info = ctx.FindArrayInfo(expr->base->text);
+  if (!info) return false;
+  auto hi_val = EvalExpr(expr->index, ctx, arena).ToUint64();
+  auto lo_val = EvalExpr(expr->index_end, ctx, arena).ToUint64();
+  auto lo = std::min(hi_val, lo_val);
+  auto hi = std::max(hi_val, lo_val);
+  auto count = static_cast<uint32_t>(hi - lo + 1);
+  uint32_t ew = info->elem_width;
+  out = MakeLogic4Vec(arena, count * ew);
+  for (uint32_t i = 0; i < count; ++i) {
+    auto n = std::string(expr->base->text) + "[" + std::to_string(lo + i) + "]";
+    auto* v = ctx.FindVariable(n);
+    auto val = v ? v->value.ToUint64() : 0;
+    uint32_t bit_off = i * ew;
+    out.words[bit_off / 64].aval |= (val & ((1ULL << ew) - 1))
+                                    << (bit_off % 64);
+  }
+  return true;
+}
+
 // Evaluate a packed part-select: base[hi:lo].
 static Logic4Vec EvalPartSelect(const Logic4Vec& base_val, uint64_t idx,
                                 uint64_t end_idx, Arena& arena) {
@@ -693,6 +718,23 @@ static bool TryAssocSelect(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
+// §7.4.5: Packed part-select with +:/−: support.
+static Logic4Vec EvalPackedPartSelect(const Expr* expr, const Logic4Vec& base,
+                                      uint64_t idx, SimContext& ctx,
+                                      Arena& arena) {
+  auto end_val = EvalExpr(expr->index_end, ctx, arena).ToUint64();
+  if (expr->is_part_select_plus) {
+    auto w = static_cast<uint32_t>(end_val);
+    return EvalPartSelect(base, idx, idx + w - 1, arena);
+  }
+  if (expr->is_part_select_minus) {
+    auto w = static_cast<uint32_t>(end_val);
+    uint64_t lo = (idx >= w - 1) ? idx - w + 1 : 0;
+    return EvalPartSelect(base, lo, idx, arena);
+  }
+  return EvalPartSelect(base, idx, end_val, arena);
+}
+
 static Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec result;
   if (TryQueueSelect(expr, ctx, arena, result)) return result;
@@ -703,23 +745,11 @@ static Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
 
   if (TryArrayElementSelect(expr, idx, ctx, arena, result)) return result;
   if (TryCompoundArraySelect(expr, ctx, arena, result)) return result;
+  if (TryArraySliceSelect(expr, ctx, arena, result)) return result;
 
   auto base_val = EvalExpr(expr->base, ctx, arena);
-  if (expr->index_end) {
-    auto end_val = EvalExpr(expr->index_end, ctx, arena).ToUint64();
-    if (expr->is_part_select_plus) {
-      // §7.4.5: base[idx +: width] → extract `width` bits from bit `idx`.
-      auto w = static_cast<uint32_t>(end_val);
-      return EvalPartSelect(base_val, idx, idx + w - 1, arena);
-    }
-    if (expr->is_part_select_minus) {
-      // §7.4.5: base[idx -: width] → extract `width` bits ending at `idx`.
-      auto w = static_cast<uint32_t>(end_val);
-      uint64_t lo = (idx >= w - 1) ? idx - w + 1 : 0;
-      return EvalPartSelect(base_val, lo, idx, arena);
-    }
-    return EvalPartSelect(base_val, idx, end_val, arena);
-  }
+  if (expr->index_end)
+    return EvalPackedPartSelect(expr, base_val, idx, ctx, arena);
   // Single bit select.
   return MakeLogic4VecVal(arena, 1, (base_val.ToUint64() >> idx) & 1);
 }
