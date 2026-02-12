@@ -104,6 +104,7 @@ struct RtlirParamDecl {
   int64_t resolved_value = 0;
   bool is_resolved = false;
   bool from_override = false;  // True when set via instance #(...) override.
+  bool is_unbounded = false;   // §6.20.7: parameter assigned $.
 };
 
 // --- Port binding (for module instances) ---

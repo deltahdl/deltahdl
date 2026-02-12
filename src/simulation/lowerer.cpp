@@ -269,6 +269,12 @@ void Lowerer::LowerProcesses(const std::vector<RtlirProcess>& procs) {
 void Lowerer::LowerModule(const RtlirModule* mod) {
   // Create variables for resolved parameters (§6.20).
   for (const auto& p : mod->params) {
+    // §6.20.7: track unbounded parameters for $isunbounded().
+    if (p.is_unbounded) {
+      ctx_.RegisterUnboundedParam(p.name);
+      ctx_.CreateVariable(p.name, 32);
+      continue;
+    }
     if (!p.is_resolved) continue;
     auto* var = ctx_.CreateVariable(p.name, 32);
     var->value =

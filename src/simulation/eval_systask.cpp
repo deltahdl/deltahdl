@@ -365,6 +365,16 @@ static Logic4Vec EvalConversionSysCall(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
+// §6.20.7: $isunbounded(param) — returns 1 if parameter has $ value.
+static Logic4Vec EvalIsunbounded(const Expr* expr, SimContext& ctx,
+                                 Arena& arena) {
+  if (!expr->args.empty() && expr->args[0]->kind == ExprKind::kIdentifier) {
+    bool ub = ctx.IsUnboundedParam(expr->args[0]->text);
+    return MakeLogic4VecVal(arena, 1, ub ? 1 : 0);
+  }
+  return MakeLogic4VecVal(arena, 1, 0);
+}
+
 Logic4Vec EvalUtilitySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                              std::string_view name) {
   if (name == "$clog2") return EvalClog2(expr, ctx, arena);
@@ -375,6 +385,7 @@ Logic4Vec EvalUtilitySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   if (name == "$onehot") return EvalOnehot(expr, ctx, arena);
   if (name == "$onehot0") return EvalOnehot0(expr, ctx, arena);
   if (name == "$isunknown") return EvalIsunknown(expr, ctx, arena);
+  if (name == "$isunbounded") return EvalIsunbounded(expr, ctx, arena);
   if (name == "$test$plusargs") return EvalTestPlusargs(expr, ctx, arena);
   if (name == "$value$plusargs") return EvalValuePlusargs(expr, ctx, arena);
   if (name == "$typename") return EvalTypename(expr, ctx, arena);

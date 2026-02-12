@@ -147,6 +147,10 @@ class SimContext {
   void RegisterStringVariable(std::string_view name);
   bool IsStringVariable(std::string_view name) const;
 
+  // §6.20.7: Unbounded parameter ($) tracking.
+  void RegisterUnboundedParam(std::string_view name);
+  bool IsUnboundedParam(std::string_view name) const;
+
   // §6.19: Enum type registration and lookup.
   void RegisterEnumType(std::string_view name, const EnumTypeInfo& info);
   const EnumTypeInfo* FindEnumType(std::string_view name) const;
@@ -255,6 +259,8 @@ class SimContext {
   std::unordered_set<std::string_view> real_vars_;
   // §6.16: String variable tracking.
   std::unordered_set<std::string_view> string_vars_;
+  // §6.20.7: Unbounded parameter tracking.
+  std::unordered_set<std::string_view> unbounded_params_;
   // §6.19: Enum type info and variable-to-enum-type mapping.
   std::unordered_map<std::string_view, EnumTypeInfo> enum_types_;
   std::unordered_map<std::string_view, std::string_view> var_enum_types_;

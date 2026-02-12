@@ -157,6 +157,14 @@ bool SimContext::IsStringVariable(std::string_view name) const {
   return string_vars_.count(name) != 0;
 }
 
+void SimContext::RegisterUnboundedParam(std::string_view name) {
+  unbounded_params_.insert(name);
+}
+
+bool SimContext::IsUnboundedParam(std::string_view name) const {
+  return unbounded_params_.count(name) != 0;
+}
+
 void SimContext::RegisterEnumType(std::string_view name,
                                   const EnumTypeInfo& info) {
   enum_types_[name] = info;

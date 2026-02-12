@@ -520,7 +520,11 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   RtlirParamDecl pd;
   pd.name = item->name;
   pd.default_value = item->init_expr;
-  if (item->init_expr) {
+  // §6.20.7: detect $ as unbounded parameter value.
+  if (item->init_expr && item->init_expr->kind == ExprKind::kIdentifier &&
+      item->init_expr->text == "$") {
+    pd.is_unbounded = true;
+  } else if (item->init_expr) {
     auto scope = BuildParamScope(mod);
     auto val = ConstEvalInt(item->init_expr, scope);
     if (val) {
