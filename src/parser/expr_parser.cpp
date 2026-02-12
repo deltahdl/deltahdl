@@ -98,9 +98,7 @@ static bool HasXZDigits(std::string_view text) {
   return false;
 }
 
-// Parse a SystemVerilog real or time literal text into a double value.
-// Handles: fixed "3.14", exponent "1e10", underscore "1_000.5".
-// For time literals (e.g., "100ns"), strtod stops at the suffix.
+// Parse a real/time literal into a double (strips underscores, uses strtod).
 static double ParseRealText(std::string_view text) {
   std::string buf;
   buf.reserve(text.size());
@@ -110,9 +108,7 @@ static double ParseRealText(std::string_view text) {
   return std::strtod(buf.c_str(), nullptr);
 }
 
-// Pratt parser: binding powers for SystemVerilog operators (IEEE 1800-2023 §11)
-// Higher binding power = tighter binding
-
+// Pratt parser: operator binding powers (IEEE 1800-2023 §11).
 static std::pair<int, int> InfixBp(TokenKind kind) {
   switch (kind) {
     case TokenKind::kPipeDashGt:
@@ -322,12 +318,11 @@ Expr* Parser::ParseTaggedExpr() {
   auto* expr = arena_.Create<Expr>();
   expr->kind = ExprKind::kTagged;
   expr->range.start = Consume().loc;
-  auto member_tok = ExpectIdentifier();
-  auto* member = arena_.Create<Expr>();
-  member->kind = ExprKind::kIdentifier;
-  member->text = member_tok.text;
-  member->range.start = member_tok.loc;
-  expr->rhs = member;
+  auto mt = ExpectIdentifier();
+  expr->rhs = arena_.Create<Expr>();
+  expr->rhs->kind = ExprKind::kIdentifier;
+  expr->rhs->text = mt.text;
+  expr->rhs->range.start = mt.loc;
   if (Check(TokenKind::kLParen)) {
     Consume();
     expr->lhs = ParseExpr();
