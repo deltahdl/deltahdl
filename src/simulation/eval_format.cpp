@@ -9,6 +9,13 @@
 
 namespace delta {
 
+// Groups the argument-side state for format processing.
+struct FormatArgs {
+  const std::vector<Logic4Vec>& vals;
+  size_t vi = 0;
+  const std::vector<std::string>& p_fmts;
+};
+
 std::string FormatValueAsString(const Logic4Vec& val) {
   std::string result;
   uint32_t nbytes = (val.width + 7) / 8;
@@ -120,9 +127,7 @@ static void AppendLiteralChar(const std::string& fmt, size_t& i,
 // Process a single format specifier starting at '%'.
 // Advances i past the specifier and returns true if an arg was consumed.
 static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
-                              const std::vector<Logic4Vec>& vals, size_t& vi,
-                              std::string& out,
-                              const std::vector<std::string>& p_fmts) {
+                              FormatArgs& args, std::string& out) {
   // Handle %m (hierarchical name -- no arg consumed).
   if (fmt[i + 1] == 'm') {
     out += "<module>";
@@ -140,14 +145,15 @@ static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
   while (j < fmt.size() && (fmt[j] >= '0' && fmt[j] <= '9')) ++j;
   char spec = (j < fmt.size()) ? fmt[j] : 'd';
   // §21.2.1.6: %p uses pre-computed assignment pattern format.
-  if (spec == 'p' && vi < p_fmts.size() && !p_fmts[vi].empty()) {
-    out += p_fmts[vi];
-    ++vi;
+  if (spec == 'p' && args.vi < args.p_fmts.size() &&
+      !args.p_fmts[args.vi].empty()) {
+    out += args.p_fmts[args.vi];
+    ++args.vi;
     i = j;
     return true;
   }
-  if (vi < vals.size()) {
-    out += FormatArg(vals[vi++], spec);
+  if (args.vi < args.vals.size()) {
+    out += FormatArg(args.vals[args.vi++], spec);
   }
   i = j;
   return true;
@@ -157,13 +163,13 @@ std::string FormatDisplay(const std::string& fmt,
                           const std::vector<Logic4Vec>& vals,
                           const std::vector<std::string>& p_fmts) {
   std::string out;
-  size_t vi = 0;
+  FormatArgs args{vals, 0, p_fmts};
   for (size_t i = 0; i < fmt.size(); ++i) {
     if (fmt[i] != '%' || i + 1 >= fmt.size()) {
       AppendLiteralChar(fmt, i, out);
       continue;
     }
-    ProcessFormatSpec(fmt, i, vals, vi, out, p_fmts);
+    ProcessFormatSpec(fmt, i, args, out);
   }
   return out;
 }
