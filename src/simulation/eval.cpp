@@ -490,17 +490,10 @@ static Logic4Vec EvalCompoundAssign(const Expr* expr, SimContext& ctx,
   return result;
 }
 
-// --- Concatenation ---
+// --- Concatenation assembly (shared with eval_expr.cpp) ---
 
-static Logic4Vec EvalConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
-  uint32_t total_width = 0;
-  std::vector<Logic4Vec> parts;
-  for (auto* elem : expr->elements) {
-    parts.push_back(EvalExpr(elem, ctx, arena));
-    total_width += parts.back().width;
-  }
-  if (total_width == 0) return MakeLogic4Vec(arena, 1);
-
+Logic4Vec AssembleConcatParts(const std::vector<Logic4Vec>& parts,
+                              uint32_t total_width, Arena& arena) {
   auto result = MakeLogic4Vec(arena, total_width);
   uint32_t bit_pos = 0;
   for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
@@ -518,6 +511,19 @@ static Logic4Vec EvalConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
     bit_pos += it->width;
   }
   return result;
+}
+
+// --- Concatenation ---
+
+static Logic4Vec EvalConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
+  uint32_t total_width = 0;
+  std::vector<Logic4Vec> parts;
+  for (auto* elem : expr->elements) {
+    parts.push_back(EvalExpr(elem, ctx, arena));
+    total_width += parts.back().width;
+  }
+  if (total_width == 0) return MakeLogic4Vec(arena, 1);
+  return AssembleConcatParts(parts, total_width, arena);
 }
 
 // --- Select (bit/part) ---

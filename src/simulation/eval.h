@@ -51,6 +51,10 @@ bool TryEvalArrayMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                             Logic4Vec& out);
 bool TryExecArrayMethodStmt(const Expr* expr, SimContext& ctx, Arena& arena);
 
+// Assemble a vector of Logic4Vec parts into a single value (MSB-first).
+Logic4Vec AssembleConcatParts(const std::vector<Logic4Vec>& parts,
+                              uint32_t total_width, Arena& arena);
+
 // Extended expression evaluators (eval_expr.cpp).
 Logic4Vec EvalReplicate(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalPrefixUnary(const Expr* expr, SimContext& ctx, Arena& arena);

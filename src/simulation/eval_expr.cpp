@@ -335,23 +335,7 @@ Logic4Vec EvalAssignmentPattern(const Expr* expr, SimContext& ctx,
 
   // Pack elements MSB-first (left-to-right = most significant first),
   // same as concatenation per IEEE 1800-2023 §10.9.1.
-  auto result = MakeLogic4Vec(arena, total_width);
-  uint32_t bit_pos = 0;
-  for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
-    uint64_t val = it->ToUint64();
-    uint32_t w = it->width;
-    if (w > 64) w = 64;
-    uint32_t word = bit_pos / 64;
-    uint32_t bit = bit_pos % 64;
-    if (word < result.nwords) {
-      result.words[word].aval |= val << bit;
-      if (bit + w > 64 && word + 1 < result.nwords) {
-        result.words[word + 1].aval |= val >> (64 - bit);
-      }
-    }
-    bit_pos += it->width;
-  }
-  return result;
+  return AssembleConcatParts(parts, total_width, arena);
 }
 
 // --- Matches operator (§12.6) ---
