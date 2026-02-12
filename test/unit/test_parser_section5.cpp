@@ -47,6 +47,23 @@ static bool ParseOk5(const std::string& src) {
   return !diag.HasErrors();
 }
 
+struct ParseDiag5 {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine* diag = nullptr;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseDiag5 ParseWithDiag(const std::string& src) {
+  ParseDiag5 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  result.diag = new DiagEngine(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, *result.diag);
+  Parser parser(lexer, result.arena, *result.diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
 // --- §5.10/§5.11: Assignment patterns ---
 
 TEST(ParserSection5, AssignmentPatternPositional) {
@@ -334,4 +351,42 @@ TEST(ParserSection5, BlockVarDecl_FullStructReplication) {
                "    v1 = '{2{'{3{'{a,'{2{b,c}}}}}}};\n"
                "  end\n"
                "endmodule\n"));
+}
+
+// --- §5.7.1: Sized literal overflow warning ---
+
+TEST(ParserSection5, SizedLiteral_NoOverflow) {
+  auto r = ParseWithDiag(
+      "module t;\n"
+      "  initial x = 4'hF;\n"
+      "endmodule\n");
+  EXPECT_EQ(r.diag->WarningCount(), 0u);
+  delete r.diag;
+}
+
+TEST(ParserSection5, SizedLiteral_Overflow_Warning) {
+  auto r = ParseWithDiag(
+      "module t;\n"
+      "  initial x = 4'hFF;\n"
+      "endmodule\n");
+  EXPECT_GE(r.diag->WarningCount(), 1u);
+  delete r.diag;
+}
+
+TEST(ParserSection5, SizedLiteral_ExactFit) {
+  auto r = ParseWithDiag(
+      "module t;\n"
+      "  initial x = 8'hFF;\n"
+      "endmodule\n");
+  EXPECT_EQ(r.diag->WarningCount(), 0u);
+  delete r.diag;
+}
+
+TEST(ParserSection5, SizedLiteral_OneBitOverflow) {
+  auto r = ParseWithDiag(
+      "module t;\n"
+      "  initial x = 3'b1111;\n"
+      "endmodule\n");
+  EXPECT_GE(r.diag->WarningCount(), 1u);
+  delete r.diag;
 }

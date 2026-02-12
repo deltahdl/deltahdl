@@ -73,6 +73,35 @@ static uint64_t ParseIntText(std::string_view text) {
   return val;
 }
 
+// Extract the declared bit-width from a sized literal (digits before ').
+// Returns 0 for unsized literals.
+static uint32_t ExtractLiteralSize(std::string_view text) {
+  auto tick = text.find('\'');
+  if (tick == std::string_view::npos || tick == 0) return 0;
+  // Parse decimal digits before the tick (skip underscores).
+  uint64_t size = 0;
+  for (size_t i = 0; i < tick; ++i) {
+    char c = text[i];
+    if (c == '_' || c == ' ' || c == '\t') continue;
+    if (c < '0' || c > '9') return 0;
+    size = size * 10 + (c - '0');
+  }
+  return static_cast<uint32_t>(size);
+}
+
+// Check if the value digits contain x/z/? (which means value is indeterminate).
+static bool HasXZDigits(std::string_view text) {
+  auto tick = text.find('\'');
+  if (tick == std::string_view::npos) return false;
+  for (size_t i = tick + 1; i < text.size(); ++i) {
+    char c = text[i];
+    if (c == 'x' || c == 'X' || c == 'z' || c == 'Z' || c == '?') {
+      return true;
+    }
+  }
+  return false;
+}
+
 // Parse a SystemVerilog real or time literal text into a double value.
 // Handles: fixed "3.14", exponent "1e10", underscore "1_000.5".
 // For time literals (e.g., "100ns"), strtod stops at the suffix.
@@ -257,10 +286,21 @@ Expr* Parser::MakeLiteral(ExprKind kind, const Token& tok) {
   lit->range.start = tok.loc;
   if (kind == ExprKind::kIntegerLiteral) {
     lit->int_val = ParseIntText(tok.text);
+    WarnSizedOverflow(tok);
   } else if (kind == ExprKind::kRealLiteral || kind == ExprKind::kTimeLiteral) {
     lit->real_val = ParseRealText(tok.text);
   }
   return lit;
+}
+
+void Parser::WarnSizedOverflow(const Token& tok) {
+  uint32_t size = ExtractLiteralSize(tok.text);
+  if (size == 0 || size >= 64) return;
+  if (HasXZDigits(tok.text)) return;
+  uint64_t val = ParseIntText(tok.text);
+  if (val >= (1ULL << size)) {
+    diag_.Warning(tok.loc, "value exceeds size of literal");
+  }
 }
 
 Expr* Parser::ParseNewExpr() {

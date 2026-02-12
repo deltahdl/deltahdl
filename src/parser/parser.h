@@ -214,6 +214,7 @@ class Parser {
   Expr* ParsePrefixExpr();
   Expr* ParsePrimaryExpr();
   Expr* MakeLiteral(ExprKind kind, const Token& tok);
+  void WarnSizedOverflow(const Token& tok);
   Expr* ParseCallExpr(Expr* callee);
   void ParseNamedArg(Expr* call);
   Expr* ParseMemberAccessChain(Token tok);
