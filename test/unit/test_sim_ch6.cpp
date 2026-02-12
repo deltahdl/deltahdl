@@ -272,3 +272,58 @@ TEST(SimCh6, IsunboundedFalse) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
+
+// §6.24.2: $cast function form returns 1 on valid enum cast.
+TEST(SimCh6, CastEnumSuccess) {
+  SimCh6Fixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef enum {RED, GREEN, BLUE} color_t;\n"
+      "  color_t c;\n"
+      "  int ok;\n"
+      "  initial begin\n"
+      "    ok = $cast(c, 1);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* ok = f.ctx.FindVariable("ok");
+  ASSERT_NE(ok, nullptr);
+  EXPECT_EQ(ok->value.ToUint64(), 1u);
+  auto* c = f.ctx.FindVariable("c");
+  ASSERT_NE(c, nullptr);
+  EXPECT_EQ(c->value.ToUint64(), 1u);
+}
+
+// §6.24.2: $cast function form returns 0 on invalid enum cast.
+TEST(SimCh6, CastEnumFailure) {
+  SimCh6Fixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef enum {RED, GREEN, BLUE} color_t;\n"
+      "  color_t c;\n"
+      "  int ok;\n"
+      "  initial begin\n"
+      "    ok = $cast(c, 10);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* ok = f.ctx.FindVariable("ok");
+  ASSERT_NE(ok, nullptr);
+  EXPECT_EQ(ok->value.ToUint64(), 0u);
+  // c should remain unchanged (default 0).
+  auto* c = f.ctx.FindVariable("c");
+  ASSERT_NE(c, nullptr);
+  EXPECT_EQ(c->value.ToUint64(), 0u);
+}

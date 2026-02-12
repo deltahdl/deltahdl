@@ -32,6 +32,8 @@ class Lowerer {
   void LowerContAssign(const RtlirContAssign& ca);
   void LowerClassDecl(const ClassDecl* cls);
   void InitAssocDefault(const Expr* init, AssocArrayObject* aa);
+  void RegisterEnumForCast(const RtlirVariable& var);
+  void RegisterEnumTypes(const RtlirModule* mod);
 
   SimContext& ctx_;
   Arena& arena_;

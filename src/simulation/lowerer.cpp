@@ -231,7 +231,28 @@ void Lowerer::LowerVar(const RtlirVariable& var) {
   if (!var.init_expr) ApplyStructMemberDefaults(var, v, ctx_, arena_);
   if (!var.class_type_name.empty())
     ctx_.SetVariableClassType(var.name, var.class_type_name);
+  // §6.24.2: Register enum type info for $cast validation.
+  if (!var.enum_type_name.empty() && var.dtype) {
+    RegisterEnumForCast(var);
+  }
   LowerVarAggregate(var);
+}
+
+// §6.24.2: Register enum type info and variable mapping for $cast.
+void Lowerer::RegisterEnumForCast(const RtlirVariable& var) {
+  ctx_.SetVariableEnumType(var.name, var.enum_type_name);
+}
+
+void Lowerer::RegisterEnumTypes(const RtlirModule* mod) {
+  for (const auto& [name, members] : mod->enum_types) {
+    if (ctx_.FindEnumType(name)) continue;
+    EnumTypeInfo info;
+    info.type_name = name;
+    for (const auto& m : members) {
+      info.members.push_back({m.name, static_cast<uint64_t>(m.value)});
+    }
+    ctx_.RegisterEnumType(name, info);
+  }
 }
 
 // §8: Create ClassTypeInfo from a ClassDecl AST node.
@@ -285,6 +306,8 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
     ctx_.CreateNet(net.name, net.net_type, net.width, net.charge_strength,
                    net.decay_ticks);
   }
+  // §6.24.2: Register enum types before variables so $cast can look them up.
+  RegisterEnumTypes(mod);
   for (const auto& var : mod->variables) LowerVar(var);
   // Create variables for output ports.
   for (const auto& port : mod->ports) {

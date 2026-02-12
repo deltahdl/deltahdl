@@ -76,6 +76,7 @@ struct RtlirVariable {
   bool is_assoc = false;             // §7.8: associative array.
   bool is_string_index = false;      // §7.8: true if index type is string.
   std::string_view class_type_name;  // §8: class type name for class variables.
+  std::string_view enum_type_name;   // §6.19: enum type name for $cast.
 };
 
 // --- Continuous assignment ---
@@ -127,6 +128,12 @@ struct RtlirModuleInst {
 
 // --- Module ---
 
+// §6.19: Enum member info for lowerer → SimContext registration.
+struct RtlirEnumMember {
+  std::string_view name;
+  int64_t value = 0;
+};
+
 struct RtlirModule {
   std::string_view name;
 
@@ -139,6 +146,8 @@ struct RtlirModule {
   std::vector<RtlirParamDecl> params;
   std::vector<ModuleItem*> function_decls;
   std::vector<ClassDecl*> class_decls;  // §8: class declarations in module.
+  // §6.19/§6.24.2: enum type → members, for $cast and enum methods.
+  std::unordered_map<std::string_view, std::vector<RtlirEnumMember>> enum_types;
 };
 
 // --- Design (top-level container) ---

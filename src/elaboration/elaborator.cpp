@@ -466,6 +466,17 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
       class_names_.count(item->data_type.type_name)) {
     var.class_type_name = item->data_type.type_name;
   }
+  // §6.19/§6.24.2: Track enum type for $cast validation.
+  if (item->data_type.kind == DataTypeKind::kEnum) {
+    var.enum_type_name = item->name;
+    var.dtype = &item->data_type;
+  } else if (item->data_type.kind == DataTypeKind::kNamed) {
+    auto it = typedefs_.find(item->data_type.type_name);
+    if (it != typedefs_.end() && it->second.kind == DataTypeKind::kEnum) {
+      var.enum_type_name = item->data_type.type_name;
+      var.dtype = &it->second;
+    }
+  }
   // §7.4/§7.5: Compute unpacked array element count.
   ComputeUnpackedDims(item->unpacked_dims, var);
   InferDynArraySize(item->unpacked_dims, item->init_expr, var);
@@ -644,11 +655,13 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
   if (item->typedef_type.kind != DataTypeKind::kEnum) return;
   ValidateEnumDecl(item->typedef_type, item->loc);
   int64_t next_val = 0;
+  std::vector<RtlirEnumMember> members;
   for (const auto& member : item->typedef_type.enum_members) {
     enum_member_names_.insert(member.name);
     if (member.value) {
       next_val = ConstEvalInt(member.value).value_or(next_val);
     }
+    members.push_back({member.name, next_val});
     RtlirVariable var;
     var.name = member.name;
     var.width = EvalTypeWidth(item->typedef_type, typedefs_);
@@ -656,6 +669,7 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
     mod->variables.push_back(var);
     ++next_val;
   }
+  mod->enum_types[item->name] = std::move(members);
 }
 
 void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {

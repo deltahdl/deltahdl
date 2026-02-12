@@ -151,11 +151,11 @@ static Logic4Vec EvalSystemCommand(const Expr* expr, Arena& arena) {
 static bool IsUtilitySysCall(std::string_view n) {
   return n == "$clog2" || n == "$bits" || n == "$unsigned" || n == "$signed" ||
          n == "$countones" || n == "$onehot" || n == "$onehot0" ||
-         n == "$isunknown" || n == "$isunbounded" || n == "$test$plusargs" ||
-         n == "$value$plusargs" || n == "$typename" || n == "$sformatf" ||
-         n == "$itor" || n == "$rtoi" || n == "$bitstoreal" ||
-         n == "$realtobits" || n == "$countbits" || n == "$shortrealtobits" ||
-         n == "$bitstoshortreal";
+         n == "$isunknown" || n == "$isunbounded" || n == "$cast" ||
+         n == "$test$plusargs" || n == "$value$plusargs" || n == "$typename" ||
+         n == "$sformatf" || n == "$itor" || n == "$rtoi" ||
+         n == "$bitstoreal" || n == "$realtobits" || n == "$countbits" ||
+         n == "$shortrealtobits" || n == "$bitstoshortreal";
 }
 
 static bool IsArrayQuerySysCall(std::string_view n) {

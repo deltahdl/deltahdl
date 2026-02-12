@@ -375,6 +375,36 @@ static Logic4Vec EvalIsunbounded(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
+// §6.24.2: $cast(dest, source) — dynamic cast, returns 1 on success.
+static Logic4Vec EvalCastSysFunc(const Expr* expr, SimContext& ctx,
+                                 Arena& arena) {
+  if (expr->args.size() < 2 || !expr->args[0]) {
+    return MakeLogic4VecVal(arena, 32, 0);
+  }
+  auto* dest_expr = expr->args[0];
+  auto src = EvalExpr(expr->args[1], ctx, arena);
+  uint64_t src_val = src.ToUint64();
+  if (dest_expr->kind != ExprKind::kIdentifier) {
+    return MakeLogic4VecVal(arena, 32, 0);
+  }
+  auto dest_name = dest_expr->text;
+  // §6.24.2 enum cast: check if source value is a valid enum member.
+  auto* enum_info = ctx.GetVariableEnumType(dest_name);
+  if (enum_info) {
+    for (const auto& m : enum_info->members) {
+      if (m.value != src_val) continue;
+      auto* var = ctx.FindVariable(dest_name);
+      if (var) var->value = MakeLogic4VecVal(arena, var->value.width, src_val);
+      return MakeLogic4VecVal(arena, 32, 1);
+    }
+    return MakeLogic4VecVal(arena, 32, 0);
+  }
+  // Non-enum: simple assignment (always succeeds).
+  auto* var = ctx.FindVariable(dest_name);
+  if (var) var->value = MakeLogic4VecVal(arena, var->value.width, src_val);
+  return MakeLogic4VecVal(arena, 32, 1);
+}
+
 Logic4Vec EvalUtilitySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                              std::string_view name) {
   if (name == "$clog2") return EvalClog2(expr, ctx, arena);
@@ -386,6 +416,7 @@ Logic4Vec EvalUtilitySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   if (name == "$onehot0") return EvalOnehot0(expr, ctx, arena);
   if (name == "$isunknown") return EvalIsunknown(expr, ctx, arena);
   if (name == "$isunbounded") return EvalIsunbounded(expr, ctx, arena);
+  if (name == "$cast") return EvalCastSysFunc(expr, ctx, arena);
   if (name == "$test$plusargs") return EvalTestPlusargs(expr, ctx, arena);
   if (name == "$value$plusargs") return EvalValuePlusargs(expr, ctx, arena);
   if (name == "$typename") return EvalTypename(expr, ctx, arena);
