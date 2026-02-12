@@ -277,6 +277,15 @@ static Logic4Vec EvalCountbits(const Expr* expr, SimContext& ctx,
 // §20.7 Array query functions
 // ============================================================================
 
+// §7.11/§20.7: Determine whether the argument names an aggregate object.
+static bool HasUnpackedDim(const Expr* arg, SimContext& ctx) {
+  if (!arg || arg->kind != ExprKind::kIdentifier) return false;
+  if (ctx.FindArrayInfo(arg->text)) return true;
+  if (ctx.FindQueue(arg->text)) return true;
+  if (ctx.FindAssocArray(arg->text)) return true;
+  return false;
+}
+
 Logic4Vec EvalArrayQuerySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                 std::string_view name) {
   uint32_t width = 32;
@@ -284,8 +293,13 @@ Logic4Vec EvalArrayQuerySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
     auto val = EvalExpr(expr->args[0], ctx, arena);
     width = val.width;
   }
-  if (name == "$dimensions") return MakeLogic4VecVal(arena, 32, 1);
-  if (name == "$unpacked_dimensions") return MakeLogic4VecVal(arena, 32, 0);
+  bool has_unpacked = !expr->args.empty() && HasUnpackedDim(expr->args[0], ctx);
+  uint32_t unpacked_dims = has_unpacked ? 1 : 0;
+  uint32_t packed_dims = (width > 0) ? 1 : 0;
+  if (name == "$dimensions")
+    return MakeLogic4VecVal(arena, 32, packed_dims + unpacked_dims);
+  if (name == "$unpacked_dimensions")
+    return MakeLogic4VecVal(arena, 32, unpacked_dims);
   if (name == "$left") return MakeLogic4VecVal(arena, 32, width - 1);
   if (name == "$right") return MakeLogic4VecVal(arena, 32, 0);
   if (name == "$low") return MakeLogic4VecVal(arena, 32, 0);

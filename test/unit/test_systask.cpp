@@ -815,6 +815,67 @@ TEST(SysTask, UnpackedDimensionsReturnsZero) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
+// §7.11 / §20.7: $dimensions and $unpacked_dimensions on arrays.
+TEST(SysTask, DimensionsOfUnpackedArray) {
+  SysTaskFixture f;
+  // Register an array: int arr [0:3] → 4 elements, 32-bit each.
+  ArrayInfo info;
+  info.lo = 0;
+  info.size = 4;
+  info.elem_width = 32;
+  f.ctx.RegisterArray("arr", info);
+  f.ctx.CreateVariable("arr", 32);
+  // $dimensions(arr) → 2 (1 packed + 1 unpacked).
+  auto* expr = MkSysCall(f.arena, "$dimensions", {MkId(f.arena, "arr")});
+  EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 2u);
+}
+
+TEST(SysTask, UnpackedDimensionsOfArray) {
+  SysTaskFixture f;
+  ArrayInfo info;
+  info.lo = 0;
+  info.size = 4;
+  info.elem_width = 32;
+  f.ctx.RegisterArray("arr", info);
+  f.ctx.CreateVariable("arr", 32);
+  // $unpacked_dimensions(arr) → 1.
+  auto* expr =
+      MkSysCall(f.arena, "$unpacked_dimensions", {MkId(f.arena, "arr")});
+  EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 1u);
+}
+
+TEST(SysTask, DimensionsOfScalar) {
+  SysTaskFixture f;
+  f.ctx.CreateVariable("x", 8);
+  // $dimensions(x) → 1 (simple bit vector).
+  auto* expr = MkSysCall(f.arena, "$dimensions", {MkId(f.arena, "x")});
+  EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 1u);
+}
+
+TEST(SysTask, UnpackedDimensionsOfScalar) {
+  SysTaskFixture f;
+  f.ctx.CreateVariable("x", 8);
+  // $unpacked_dimensions(x) → 0.
+  auto* expr = MkSysCall(f.arena, "$unpacked_dimensions", {MkId(f.arena, "x")});
+  EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 0u);
+}
+
+TEST(SysTask, DimensionsOfQueue) {
+  SysTaskFixture f;
+  f.ctx.CreateQueue("q", 16, -1);
+  // $dimensions(q) → 2 (1 packed + 1 unpacked/queue).
+  auto* expr = MkSysCall(f.arena, "$dimensions", {MkId(f.arena, "q")});
+  EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 2u);
+}
+
+TEST(SysTask, UnpackedDimensionsOfQueue) {
+  SysTaskFixture f;
+  f.ctx.CreateQueue("q", 16, -1);
+  // $unpacked_dimensions(q) → 1.
+  auto* expr = MkSysCall(f.arena, "$unpacked_dimensions", {MkId(f.arena, "q")});
+  EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 1u);
+}
+
 // ============================================================================
 // §20.11 Assertion control system tasks
 // ============================================================================
