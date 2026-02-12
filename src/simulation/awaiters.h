@@ -54,13 +54,21 @@ struct EventAwaiter {
       if (!var) continue;
       // Named events: resume unconditionally on trigger (no edge check).
       if (var->is_event) {
-        var->AddWatcher([h]() mutable { h.resume(); });
+        var->AddWatcher([h]() mutable {
+          h.resume();
+          return true;
+        });
         continue;
       }
       var->prev_value = var->value;
       Edge edge = ev.edge;
       var->AddWatcher([h, var, edge]() mutable {
-        if (CheckEdge(var, edge)) h.resume();
+        if (!CheckEdge(var, edge)) {
+          var->prev_value = var->value;
+          return false;  // Keep watcher; edge not detected.
+        }
+        h.resume();
+        return true;
       });
     }
   }
@@ -88,7 +96,10 @@ struct NamedEventAwaiter {
   void await_suspend(std::coroutine_handle<> h) {
     auto* var = ctx.FindVariable(event_name);
     if (!var) return;
-    var->AddWatcher([h]() mutable { h.resume(); });
+    var->AddWatcher([h]() mutable {
+      h.resume();
+      return true;
+    });
   }
 
   void await_resume() const noexcept {}
@@ -107,7 +118,10 @@ struct AnyChangeAwaiter {
       auto* var = ctx.FindVariable(name);
       if (!var) continue;
       var->prev_value = var->value;
-      var->AddWatcher([h]() mutable { h.resume(); });
+      var->AddWatcher([h]() mutable {
+        h.resume();
+        return true;
+      });
     }
   }
 

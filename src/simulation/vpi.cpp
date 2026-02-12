@@ -258,6 +258,7 @@ void VpiContext::RegisterCbValueChange(const VpiCbData& data) {
   void* user_data = data.user_data;
   data.obj->var->AddWatcher([user_data]() {
     if (user_data) *static_cast<bool*>(user_data) = true;
+    return true;
   });
 }
 

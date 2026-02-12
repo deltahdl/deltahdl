@@ -386,7 +386,10 @@ TEST(ClockingSim, ClockingBlockEvent) {
   cmgr.Attach(f.ctx, f.scheduler);
 
   bool triggered = false;
-  cb_event->AddWatcher([&triggered]() { triggered = true; });
+  cb_event->AddWatcher([&triggered]() {
+    triggered = true;
+    return true;
+  });
 
   SchedulePosedge(f, clk, 10);
   f.scheduler.Run();

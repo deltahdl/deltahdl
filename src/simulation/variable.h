@@ -20,17 +20,17 @@ struct Variable {
   bool is_event = false;
   bool is_signed = false;
 
-  std::vector<std::function<void()>> watchers;
+  // Watchers return true if consumed (should be removed), false to keep.
+  std::vector<std::function<bool()>> watchers;
 
-  void AddWatcher(std::function<void()> cb) {
+  void AddWatcher(std::function<bool()> cb) {
     watchers.push_back(std::move(cb));
   }
 
   void NotifyWatchers() {
     auto pending = std::move(watchers);
-    watchers.clear();
     for (auto& cb : pending) {
-      cb();
+      if (!cb()) watchers.push_back(std::move(cb));
     }
   }
 };

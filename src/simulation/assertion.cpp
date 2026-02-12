@@ -30,8 +30,8 @@ static void RegisterAssertionWatcher(AssertionMonitor* monitor, Variable* var,
       monitor->Evaluate(prop_name, val);
     };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kObserved, ev);
-    // Re-register: watchers are one-shot.
     RegisterAssertionWatcher(monitor, var, prop_name, sched);
+    return true;
   });
 }
 

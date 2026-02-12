@@ -83,13 +83,14 @@ static void RegisterClockWatcher(ClockingManager* mgr, Variable* clk_var,
         if (!CheckClockEdge(clk_var, edge)) {
           auto* blk = mgr->Find(block_name);
           if (blk) RegisterClockWatcher(mgr, clk_var, *blk, ctx, sched);
-          return;
+          return true;
         }
         SampleBlockInputs(mgr, block_name, signals, ctx);
         mgr->NotifyBlockEvent(block_name);
         mgr->InvokeEdgeCallbacks(block_name);
         auto* blk = mgr->Find(block_name);
         if (blk) RegisterClockWatcher(mgr, clk_var, *blk, ctx, sched);
+        return true;
       });
 }
 
