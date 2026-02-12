@@ -125,6 +125,9 @@ class Elaborator {
   /// Validate enum declaration constraints (§6.19).
   void ValidateEnumDecl(const DataType& dtype, SourceLoc loc);
 
+  /// Validate packed struct default member values (§7.2.2).
+  void ValidatePackedStructDefaults(const DataType& dtype, SourceLoc loc);
+
   /// Validate packed union constraints (§7.3.1).
   void ValidatePackedUnion(const DataType& dtype, SourceLoc loc);
 

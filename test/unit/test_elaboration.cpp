@@ -838,3 +838,55 @@ TEST(Elaboration, SoftPackedUnion_DifferentWidth_OK) {
       f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
+
+// §7.2.2: Packed struct members shall not have individual default values.
+TEST(Elaboration, PackedStructMemberDefault_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  struct packed { bit [3:0] lo = 5; bit [3:0] hi; } s;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Elaboration, UnpackedStructMemberDefault_Allowed) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  struct { int a = 1; int b = 2; } s;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §7.9.8: Assoc array index width propagated to RtlirVariable.
+TEST(Elaboration, AssocArrayByteIndexWidth) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  int map[byte];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto& vars = design->top_modules[0]->variables;
+  ASSERT_FALSE(vars.empty());
+  EXPECT_TRUE(vars[0].is_assoc);
+  EXPECT_EQ(vars[0].assoc_index_width, 8u);
+}
+
+TEST(Elaboration, AssocArrayIntIndexWidth) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  int map[int];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto& vars = design->top_modules[0]->variables;
+  ASSERT_FALSE(vars.empty());
+  EXPECT_TRUE(vars[0].is_assoc);
+  EXPECT_EQ(vars[0].assoc_index_width, 32u);
+}

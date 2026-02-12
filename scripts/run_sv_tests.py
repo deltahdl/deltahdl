@@ -108,6 +108,14 @@ def eval_node(node):
     raise ValueError(f"Unsupported node: {type(node).__name__}")
 
 
+def _try_string_equality(expr):
+    """Fallback: regex-based string equality for SV-style quoting."""
+    m = re.match(r"\(\s*'(.*)'\s*==\s*'(.*)'\s*\)$", expr)
+    if m:
+        return m.group(1) == m.group(2)
+    return None
+
+
 def check_assertions(stdout):
     """Evaluate :assert: patterns in simulation output."""
     for line in stdout.splitlines():
@@ -119,8 +127,12 @@ def check_assertions(stdout):
             tree = ast.parse(expr, mode="eval")
             if not eval_node(tree.body):
                 return False, f"Assertion failed: {expr}"
-        except (SyntaxError, ValueError) as exc:
-            return False, f"Assertion error: {expr}: {exc}"
+        except (SyntaxError, ValueError):
+            result = _try_string_equality(expr)
+            if result is None:
+                return False, f"Assertion parse error: {expr}"
+            if not result:
+                return False, f"Assertion failed: {expr}"
     return True, ""
 
 

@@ -9,6 +9,7 @@
 namespace delta {
 
 struct Expr;
+struct ModuleItem;
 struct StructTypeInfo;
 class SimContext;
 class Arena;
@@ -75,6 +76,14 @@ Logic4Vec EvalMatches(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena);
 
+// §13: Set up a task call scope (push scope, bind args, push queue ref frame).
+// Returns the task's ModuleItem on success, or nullptr if not a task call.
+// Caller must execute task body, then call TeardownTaskCall().
+const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
+                                Arena& arena);
+void TeardownTaskCall(const ModuleItem* func, const Expr* expr,
+                      SimContext& ctx);
+
 // §8.7: Allocate a class object and execute constructor. Returns handle.
 Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
                        SimContext& ctx, Arena& arena);
@@ -97,7 +106,8 @@ bool ExtractMethodCallParts(const Expr* expr, MethodCallParts& out);
 
 // Shared formatting helpers (eval_format.cpp).
 std::string FormatDisplay(const std::string& fmt,
-                          const std::vector<Logic4Vec>& vals);
+                          const std::vector<Logic4Vec>& vals,
+                          const std::vector<std::string>& p_fmts = {});
 std::string FormatArg(const Logic4Vec& val, char spec);
 std::string FormatValueAsString(const Logic4Vec& val);
 std::string ExtractFormatString(const Expr* first_arg);

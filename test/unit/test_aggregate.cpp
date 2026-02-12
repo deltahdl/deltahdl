@@ -687,4 +687,162 @@ TEST(AssocTraversal, FirstReturnsOneWhenWidthSufficient) {
   EXPECT_EQ(ref->value.ToUint64(), 42u);
 }
 
+TEST(AssocTraversal, ByteIndexFirstReturnsOneForByteRef) {
+  AggFixture f;
+  // byte index type → index_width should be 8.
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
+  aa->index_width = 8;
+  aa->int_data[200] = MakeLogic4VecVal(f.arena, 32, 99);
+  auto* ref = f.ctx.CreateVariable("ix", 8);
+  ref->value = MakeLogic4VecVal(f.arena, 8, 0);
+  Logic4Vec out{};
+  auto* call = MkAssocCall(f.arena, "aa", "first", "ix");
+  bool ok = TryEvalAssocMethodCall(call, f.ctx, f.arena, out);
+  ASSERT_TRUE(ok);
+  // ref width (8) >= index_width (8) → returns 1 (no truncation).
+  EXPECT_EQ(out.ToUint64(), 1u);
+  EXPECT_EQ(ref->value.ToUint64(), 200u);
+}
+
+// =============================================================================
+// Phase 1: §7.12 Dynamic array method dispatch via ArrayInfo
+// =============================================================================
+
+// Helper: register dynamic array with elements via QueueObject + ArrayInfo.
+static void MakeDynArray(AggFixture& f, std::string_view name,
+                         const std::vector<uint64_t>& vals) {
+  auto* q = f.ctx.CreateQueue(name, 32);
+  for (auto v : vals) {
+    q->elements.push_back(MakeLogic4VecVal(f.arena, 32, v));
+  }
+  ArrayInfo info;
+  info.is_dynamic = true;
+  info.elem_width = 32;
+  info.size = static_cast<uint32_t>(vals.size());
+  f.ctx.RegisterArray(name, info);
+}
+
+TEST(DynArrayMethod, SumReduction) {
+  AggFixture f;
+  MakeDynArray(f, "d", {10, 20, 30, 40});
+  Logic4Vec out{};
+  bool ok = TryEvalArrayProperty("d", "sum", f.ctx, f.arena, out);
+  ASSERT_TRUE(ok);
+  EXPECT_EQ(out.ToUint64(), 100u);
+}
+
+TEST(DynArrayMethod, SizeProperty) {
+  AggFixture f;
+  MakeDynArray(f, "d", {1, 2, 3});
+  Logic4Vec out{};
+  bool ok = TryEvalArrayProperty("d", "size", f.ctx, f.arena, out);
+  ASSERT_TRUE(ok);
+  EXPECT_EQ(out.ToUint64(), 3u);
+}
+
+TEST(DynArrayMethod, MinReduction) {
+  AggFixture f;
+  MakeDynArray(f, "d", {50, 10, 30});
+  Logic4Vec out{};
+  bool ok = TryEvalArrayProperty("d", "min", f.ctx, f.arena, out);
+  ASSERT_TRUE(ok);
+  EXPECT_EQ(out.ToUint64(), 10u);
+}
+
+TEST(DynArrayMethod, MaxReduction) {
+  AggFixture f;
+  MakeDynArray(f, "d", {50, 10, 30});
+  Logic4Vec out{};
+  bool ok = TryEvalArrayProperty("d", "max", f.ctx, f.arena, out);
+  ASSERT_TRUE(ok);
+  EXPECT_EQ(out.ToUint64(), 50u);
+}
+
+// =============================================================================
+// Phase 3: §21.2.1 FormatArg specifiers
+// =============================================================================
+
+TEST(FormatArg, DecimalUnsigned) {
+  Arena arena;
+  auto val = MakeLogic4VecVal(arena, 8, 42);
+  EXPECT_EQ(FormatArg(val, 'd'), "42");
+}
+
+TEST(FormatArg, HexLeadingZeros) {
+  Arena arena;
+  auto val = MakeLogic4VecVal(arena, 8, 0x0A);
+  // %h for 8-bit value should be 2 hex digits.
+  EXPECT_EQ(FormatArg(val, 'h'), "0a");
+}
+
+TEST(FormatArg, OctalLeadingZeros) {
+  Arena arena;
+  auto val = MakeLogic4VecVal(arena, 8, 5);
+  // %o for 8-bit value: ceil(8/3) = 3 octal digits.
+  EXPECT_EQ(FormatArg(val, 'o'), "005");
+}
+
+TEST(FormatArg, BinaryReturnsToString) {
+  Arena arena;
+  auto val = MakeLogic4VecVal(arena, 4, 0b1010);
+  EXPECT_EQ(FormatArg(val, 'b'), "1010");
+}
+
+TEST(FormatArg, StringFromAscii) {
+  Arena arena;
+  // 'A' = 0x41 = 65
+  auto val = MakeLogic4VecVal(arena, 8, 65);
+  EXPECT_EQ(FormatValueAsString(val), "A");
+}
+
+// =============================================================================
+// Phase 6: §13 Task call setup/teardown
+// =============================================================================
+
+TEST(TaskCall, SetupReturnsTaskItem) {
+  AggFixture f;
+  // Create a task declaration node.
+  auto* task = f.arena.Create<ModuleItem>();
+  task->kind = ModuleItemKind::kTaskDecl;
+  task->name = "my_task";
+  f.ctx.RegisterFunction("my_task", task);
+
+  // Build a kCall expression targeting the task.
+  auto* call = f.arena.Create<Expr>();
+  call->kind = ExprKind::kCall;
+  call->callee = "my_task";
+
+  auto* result = SetupTaskCall(call, f.ctx, f.arena);
+  ASSERT_NE(result, nullptr);
+  EXPECT_EQ(result->name, "my_task");
+  // Clean up scope pushed by SetupTaskCall.
+  TeardownTaskCall(result, call, f.ctx);
+}
+
+TEST(TaskCall, SetupReturnsNullForFunction) {
+  AggFixture f;
+  // Create a function (not task) declaration.
+  auto* func = f.arena.Create<ModuleItem>();
+  func->kind = ModuleItemKind::kFunctionDecl;
+  func->name = "my_func";
+  f.ctx.RegisterFunction("my_func", func);
+
+  auto* call = f.arena.Create<Expr>();
+  call->kind = ExprKind::kCall;
+  call->callee = "my_func";
+
+  auto* result = SetupTaskCall(call, f.ctx, f.arena);
+  EXPECT_EQ(result, nullptr);
+}
+
+TEST(TaskCall, SetupReturnsNullForUnknown) {
+  AggFixture f;
+  auto* call = f.arena.Create<Expr>();
+  call->kind = ExprKind::kCall;
+  call->callee = "nonexistent";
+
+  auto* result = SetupTaskCall(call, f.ctx, f.arena);
+  EXPECT_EQ(result, nullptr);
+}
+
 }  // namespace

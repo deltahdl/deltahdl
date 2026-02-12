@@ -18,6 +18,14 @@ namespace delta {
 static std::vector<uint64_t> CollectElements(std::string_view var_name,
                                              const ArrayInfo& info,
                                              SimContext& ctx) {
+  if (info.is_dynamic) {
+    auto* q = ctx.FindQueue(var_name);
+    if (!q) return {};
+    std::vector<uint64_t> vals;
+    vals.reserve(q->elements.size());
+    for (const auto& e : q->elements) vals.push_back(e.ToUint64());
+    return vals;
+  }
   std::vector<uint64_t> vals;
   vals.reserve(info.size);
   for (uint32_t i = 0; i < info.size; ++i) {
@@ -33,6 +41,15 @@ static std::vector<uint64_t> CollectElements(std::string_view var_name,
 static void WriteElements(std::string_view var_name, const ArrayInfo& info,
                           const std::vector<uint64_t>& vals, SimContext& ctx,
                           Arena& arena) {
+  if (info.is_dynamic) {
+    auto* q = ctx.FindQueue(var_name);
+    if (!q) return;
+    q->elements.resize(vals.size());
+    for (size_t i = 0; i < vals.size(); ++i)
+      q->elements[i] = MakeLogic4VecVal(arena, q->elem_width, vals[i]);
+    ++q->generation;
+    return;
+  }
   for (uint32_t i = 0; i < info.size && i < vals.size(); ++i) {
     uint32_t idx = info.lo + i;
     auto name = std::string(var_name) + "[" + std::to_string(idx) + "]";
@@ -46,6 +63,11 @@ static std::vector<Logic4Vec> CollectVecElements(std::string_view var_name,
                                                  const ArrayInfo& info,
                                                  SimContext& ctx,
                                                  Arena& arena) {
+  if (info.is_dynamic) {
+    auto* q = ctx.FindQueue(var_name);
+    if (!q) return {};
+    return q->elements;
+  }
   std::vector<Logic4Vec> vals;
   vals.reserve(info.size);
   for (uint32_t i = 0; i < info.size; ++i) {
@@ -101,7 +123,12 @@ static Logic4Vec ArrayXor(std::string_view var_name, const ArrayInfo& info,
 
 // --- Size method ---
 
-static Logic4Vec ArraySize(const ArrayInfo& info, Arena& arena) {
+static Logic4Vec ArraySize(std::string_view var_name, const ArrayInfo& info,
+                           SimContext& ctx, Arena& arena) {
+  if (info.is_dynamic) {
+    auto* q = ctx.FindQueue(var_name);
+    return MakeLogic4VecVal(arena, 32, q ? q->elements.size() : 0);
+  }
   return MakeLogic4VecVal(arena, 32, info.size);
 }
 
@@ -163,7 +190,7 @@ static bool DispatchReduction(std::string_view method, const ArrayCtx& ac,
 static bool DispatchQuery(std::string_view method, const ArrayCtx& ac,
                           Logic4Vec& out) {
   if (method == "size") {
-    out = ArraySize(ac.info, ac.arena);
+    out = ArraySize(ac.var_name, ac.info, ac.ctx, ac.arena);
     return true;
   }
   if (method == "min") {
@@ -214,6 +241,14 @@ static void ArrayRsort(std::string_view var_name, const ArrayInfo& info,
 static void WriteVecElements(std::string_view var_name, const ArrayInfo& info,
                              const std::vector<Logic4Vec>& vals,
                              SimContext& ctx) {
+  if (info.is_dynamic) {
+    auto* q = ctx.FindQueue(var_name);
+    if (!q) return;
+    q->elements.resize(vals.size());
+    for (size_t i = 0; i < vals.size(); ++i) q->elements[i] = vals[i];
+    ++q->generation;
+    return;
+  }
   for (uint32_t i = 0; i < info.size && i < vals.size(); ++i) {
     uint32_t idx = info.lo + i;
     auto name = std::string(var_name) + "[" + std::to_string(idx) + "]";
@@ -747,6 +782,7 @@ bool TryExecAssocPropertyStmt(std::string_view var_name, std::string_view prop,
 // Check if any element of an unpacked array is a string variable.
 static bool IsStringArray(std::string_view var_name, const ArrayInfo& info,
                           SimContext& ctx) {
+  if (info.is_dynamic) return ctx.IsStringVariable(var_name);
   auto name = std::string(var_name) + "[" + std::to_string(info.lo) + "]";
   return ctx.IsStringVariable(name);
 }

@@ -179,7 +179,10 @@ void Lowerer::LowerDynArrayInit(const RtlirVariable& var) {
   if (!var.init_expr) return;
   auto* q = ctx_.FindQueue(var.name);
   if (!q) return;
-  if (var.init_expr->kind != ExprKind::kAssignmentPattern) return;
+  // Accept both '{...} (assignment pattern) and {...} (concatenation) syntax.
+  if (var.init_expr->kind != ExprKind::kAssignmentPattern &&
+      var.init_expr->kind != ExprKind::kConcatenation)
+    return;
   for (auto* elem : var.init_expr->elements) {
     q->elements.push_back(EvalExpr(elem, ctx_, arena_));
   }
@@ -234,8 +237,14 @@ void Lowerer::LowerVarAggregate(const RtlirVariable& var) {
     // §7.5: Dynamic arrays use queue storage for resize support.
     ctx_.CreateQueue(var.name, var.width);
     LowerDynArrayInit(var);
+    // §7.12: Register ArrayInfo so reduction/ordering/locator methods dispatch.
+    ArrayInfo info;
+    info.is_dynamic = true;
+    info.elem_width = var.width;
+    ctx_.RegisterArray(var.name, info);
   } else if (var.is_assoc) {
-    auto* aa = ctx_.CreateAssocArray(var.name, var.width, var.is_string_index);
+    auto* aa = ctx_.CreateAssocArray(var.name, var.width, var.is_string_index,
+                                     var.assoc_index_width);
     InitAssocDefault(var.init_expr, aa);
   } else {
     CreateArrayElements(var, ctx_, arena_);

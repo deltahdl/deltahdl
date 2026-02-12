@@ -45,18 +45,30 @@ static Logic4Vec EvalPrngCall(const Expr* expr, SimContext& ctx, Arena& arena,
 
 // --- System call evaluation ---
 
+// §21.2.1.6: Build %p format string for a tagged union variable.
+static std::string BuildFormatP(const Expr* arg, SimContext& ctx) {
+  if (arg->kind != ExprKind::kIdentifier) return "";
+  auto tag = ctx.GetVariableTag(arg->text);
+  if (tag.empty()) return "";
+  auto* var = ctx.FindVariable(arg->text);
+  uint64_t val = var ? var->value.ToUint64() : 0;
+  return "'{" + std::string(tag) + ":" + std::to_string(val) + "}";
+}
+
 static void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena) {
   std::string fmt;
   std::vector<Logic4Vec> arg_vals;
+  std::vector<std::string> p_fmts;
   for (size_t i = 0; i < expr->args.size(); ++i) {
     auto val = EvalExpr(expr->args[i], ctx, arena);
     if (i == 0 && expr->args[i]->kind == ExprKind::kStringLiteral) {
       fmt = ExtractFormatString(expr->args[i]);
     } else {
       arg_vals.push_back(val);
+      p_fmts.push_back(BuildFormatP(expr->args[i], ctx));
     }
   }
-  std::string output = fmt.empty() ? "" : FormatDisplay(fmt, arg_vals);
+  std::string output = fmt.empty() ? "" : FormatDisplay(fmt, arg_vals, p_fmts);
   std::cout << output;
   if (expr->callee == "$display") std::cout << "\n";
 }
@@ -634,6 +646,25 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
     ctx.PopScope();
   }
   return result;
+}
+
+// §13: Set up task call scope for coroutine-based execution.
+const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
+                                Arena& arena) {
+  if (!expr || expr->kind != ExprKind::kCall) return nullptr;
+  auto* func = ctx.FindFunction(expr->callee);
+  if (!func || func->kind != ModuleItemKind::kTaskDecl) return nullptr;
+  ctx.PushScope();
+  ctx.PushQueueRefFrame();
+  BindFunctionArgs(func, expr, ctx, arena);
+  return func;
+}
+
+void TeardownTaskCall(const ModuleItem* func, const Expr* expr,
+                      SimContext& ctx) {
+  WritebackOutputArgs(func, expr, ctx);
+  WritebackQueueRefs(ctx);
+  ctx.PopScope();
 }
 
 // §6.21: Reject ref arguments in static subroutines.

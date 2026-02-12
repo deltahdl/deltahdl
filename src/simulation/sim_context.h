@@ -205,7 +205,8 @@ class SimContext {
 
   // §7.8: Associative array management.
   AssocArrayObject* CreateAssocArray(std::string_view name, uint32_t elem_width,
-                                     bool is_string_key);
+                                     bool is_string_key,
+                                     uint32_t index_width = 32);
   AssocArrayObject* FindAssocArray(std::string_view name);
 
   // §7.3.2: Tagged union tag management.

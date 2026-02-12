@@ -76,6 +76,7 @@ struct RtlirVariable {
   int32_t queue_max_size = -1;       // §7.10: max queue size (-1=unbounded).
   bool is_assoc = false;             // §7.8: associative array.
   bool is_string_index = false;      // §7.8: true if index type is string.
+  uint32_t assoc_index_width = 32;   // §7.9.8: width of assoc index type.
   std::string_view class_type_name;  // §8: class type name for class variables.
   std::string_view enum_type_name;   // §6.19: enum type name for $cast.
 };

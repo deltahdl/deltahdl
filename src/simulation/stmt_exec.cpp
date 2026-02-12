@@ -419,6 +419,23 @@ static ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx,
   co_return StmtResult::kDone;
 }
 
+// §13: Inline task call — executes task body through coroutine dispatcher.
+static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
+                                   Arena& arena) {
+  auto* expr = stmt->expr;
+  auto* func = SetupTaskCall(expr, ctx, arena);
+  if (!func) {
+    EvalExpr(expr, ctx, arena);
+    co_return StmtResult::kDone;
+  }
+  for (auto* s : func->func_body_stmts) {
+    auto result = co_await ExecStmt(s, ctx, arena);
+    if (result == StmtResult::kReturn) break;
+  }
+  TeardownTaskCall(func, expr, ctx);
+  co_return StmtResult::kDone;
+}
+
 // --- Main dispatch ---
 
 ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
@@ -450,7 +467,7 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     case StmtKind::kNonblockingAssign:
       return ExecTask::Immediate(ExecNonblockingAssignImpl(stmt, ctx, arena));
     case StmtKind::kExprStmt:
-      return ExecTask::Immediate(ExecExprStmtImpl(stmt, ctx, arena));
+      return ExecInlineTaskCall(stmt, ctx, arena);
     case StmtKind::kDelay:
       return ExecDelay(stmt, ctx, arena);
     case StmtKind::kEventControl:

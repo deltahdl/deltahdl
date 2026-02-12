@@ -36,6 +36,13 @@ uint32_t EvalStructMemberWidth(const StructMember& m) {
   }
 }
 
+// §7.3.2: Compute ⌈log₂(n)⌉ tag bits for a tagged packed union.
+static uint32_t TagBitWidth(uint32_t num_members) {
+  uint32_t bits = 0;
+  while ((1u << bits) < num_members) ++bits;
+  return bits;
+}
+
 // §7.2/§7.3: Compute total width of a packed struct or union from members.
 static uint32_t EvalStructOrUnionWidth(const DataType& dtype) {
   if (dtype.struct_members.empty()) return 0;
@@ -44,6 +51,9 @@ static uint32_t EvalStructOrUnionWidth(const DataType& dtype) {
     for (const auto& m : dtype.struct_members) {
       max_w = std::max(max_w, EvalStructMemberWidth(m));
     }
+    // §7.3.2: Tagged packed unions include tag bits.
+    if (dtype.is_tagged && dtype.is_packed)
+      max_w += TagBitWidth(static_cast<uint32_t>(dtype.struct_members.size()));
     return max_w;
   }
   uint32_t total = 0;

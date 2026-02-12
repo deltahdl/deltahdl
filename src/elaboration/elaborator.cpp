@@ -356,6 +356,14 @@ static bool TryParseRangeDim(const Expr* dim, RtlirVariable& var) {
 }
 
 // §7.8: Detect associative array index type [string], [int], [*], etc.
+// §7.9.8: Map index type name to its bit-width for traversal validation.
+static uint32_t AssocIndexWidth(std::string_view t) {
+  if (t == "byte") return 8;
+  if (t == "shortint") return 16;
+  if (t == "longint") return 64;
+  return 32;  // int, integer, *, default
+}
+
 static bool TryParseAssocDim(const Expr* dim, RtlirVariable& var) {
   if (dim->kind != ExprKind::kIdentifier) return false;
   auto t = dim->text;
@@ -363,6 +371,7 @@ static bool TryParseAssocDim(const Expr* dim, RtlirVariable& var) {
       t == "shortint" || t == "longint" || t == "*") {
     var.is_assoc = true;
     var.is_string_index = (t == "string");
+    var.assoc_index_width = AssocIndexWidth(t);
     return true;
   }
   return false;
@@ -516,6 +525,9 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   TrackEnumVariable(item);
   if (item->data_type.kind == DataTypeKind::kEnum) {
     ValidateEnumDecl(item->data_type, item->loc);
+  }
+  if (item->data_type.kind == DataTypeKind::kStruct) {
+    ValidatePackedStructDefaults(item->data_type, item->loc);
   }
   if (item->data_type.kind == DataTypeKind::kUnion) {
     ValidatePackedUnion(item->data_type, item->loc);
@@ -689,6 +701,9 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
 
 void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
   typedefs_[item->name] = item->typedef_type;
+  if (item->typedef_type.kind == DataTypeKind::kStruct) {
+    ValidatePackedStructDefaults(item->typedef_type, item->loc);
+  }
   if (item->typedef_type.kind == DataTypeKind::kUnion) {
     ValidatePackedUnion(item->typedef_type, item->loc);
   }

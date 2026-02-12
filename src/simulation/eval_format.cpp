@@ -121,7 +121,8 @@ static void AppendLiteralChar(const std::string& fmt, size_t& i,
 // Advances i past the specifier and returns true if an arg was consumed.
 static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
                               const std::vector<Logic4Vec>& vals, size_t& vi,
-                              std::string& out) {
+                              std::string& out,
+                              const std::vector<std::string>& p_fmts) {
   // Handle %m (hierarchical name -- no arg consumed).
   if (fmt[i + 1] == 'm') {
     out += "<module>";
@@ -138,6 +139,13 @@ static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
   size_t j = i + 1;
   while (j < fmt.size() && (fmt[j] >= '0' && fmt[j] <= '9')) ++j;
   char spec = (j < fmt.size()) ? fmt[j] : 'd';
+  // §21.2.1.6: %p uses pre-computed assignment pattern format.
+  if (spec == 'p' && vi < p_fmts.size() && !p_fmts[vi].empty()) {
+    out += p_fmts[vi];
+    ++vi;
+    i = j;
+    return true;
+  }
   if (vi < vals.size()) {
     out += FormatArg(vals[vi++], spec);
   }
@@ -146,7 +154,8 @@ static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
 }
 
 std::string FormatDisplay(const std::string& fmt,
-                          const std::vector<Logic4Vec>& vals) {
+                          const std::vector<Logic4Vec>& vals,
+                          const std::vector<std::string>& p_fmts) {
   std::string out;
   size_t vi = 0;
   for (size_t i = 0; i < fmt.size(); ++i) {
@@ -154,7 +163,7 @@ std::string FormatDisplay(const std::string& fmt,
       AppendLiteralChar(fmt, i, out);
       continue;
     }
-    ProcessFormatSpec(fmt, i, vals, vi, out);
+    ProcessFormatSpec(fmt, i, vals, vi, out, p_fmts);
   }
   return out;
 }

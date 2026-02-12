@@ -540,6 +540,20 @@ bool Elaborator::ResolveParameterizedType(DataType& dtype) {
   return true;
 }
 
+// §7.2.2: Packed struct members shall not have individual default values.
+void Elaborator::ValidatePackedStructDefaults(const DataType& dtype,
+                                              SourceLoc loc) {
+  if (dtype.kind != DataTypeKind::kStruct || !dtype.is_packed) return;
+  for (const auto& m : dtype.struct_members) {
+    if (m.init_expr) {
+      diag_.Error(loc,
+                  "members of packed structures shall not be assigned "
+                  "individual default member values");
+      return;
+    }
+  }
+}
+
 // §7.3.1: Validate packed union member constraints.
 void Elaborator::ValidatePackedUnion(const DataType& dtype, SourceLoc loc) {
   if (dtype.kind != DataTypeKind::kUnion) return;

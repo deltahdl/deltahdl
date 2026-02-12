@@ -4,9 +4,11 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
 #include "elaboration/type_eval.h"
 #include "parser/ast.h"
 #include "simulation/class_object.h"
@@ -136,33 +138,33 @@ static void WritePartSelect(Variable* var, uint32_t lo, uint32_t width,
 static void WriteBitSelect(Variable* var, const Expr* lhs,
                            const Logic4Vec& rhs_val, SimContext& ctx,
                            Arena& arena) {
-  auto idx_val = EvalExpr(lhs->index, ctx, arena);
-  auto idx = static_cast<uint32_t>(idx_val.ToUint64());
-
-  if (lhs->index_end) {
-    if (lhs->is_part_select_plus) {
-      auto w = static_cast<uint32_t>(
-          EvalExpr(lhs->index_end, ctx, arena).ToUint64());
-      WritePartSelect(var, idx, w, rhs_val, arena);
-    } else if (lhs->is_part_select_minus) {
-      auto w = static_cast<uint32_t>(
-          EvalExpr(lhs->index_end, ctx, arena).ToUint64());
-      uint32_t lo = (idx >= w - 1) ? idx - w + 1 : 0;
-      WritePartSelect(var, lo, w, rhs_val, arena);
-    } else {
-      auto end_idx = static_cast<uint32_t>(
-          EvalExpr(lhs->index_end, ctx, arena).ToUint64());
-      auto lo = std::min(idx, end_idx);
-      auto hi = std::max(idx, end_idx);
-      WritePartSelect(var, lo, hi - lo + 1, rhs_val, arena);
-    }
-  } else {
+  auto idx = static_cast<uint32_t>(EvalExpr(lhs->index, ctx, arena).ToUint64());
+  if (!lhs->index_end) {
     uint64_t old_val = var->value.ToUint64();
     uint64_t bit = rhs_val.ToUint64() & 1;
     uint64_t cleared = old_val & ~(uint64_t{1} << idx);
     var->value =
         MakeLogic4VecVal(arena, var->value.width, cleared | (bit << idx));
+    return;
   }
+  // Part-select: compute (lo, width).
+  uint32_t lo = idx;
+  auto end_val =
+      static_cast<uint32_t>(EvalExpr(lhs->index_end, ctx, arena).ToUint64());
+  uint32_t w = end_val;
+  if (lhs->is_part_select_plus) {
+    // [idx +: w] — lo stays idx.
+  } else if (lhs->is_part_select_minus) {
+    lo = (idx >= w - 1) ? idx - w + 1 : 0;
+  } else {
+    lo = std::min(idx, end_val);
+    w = std::max(idx, end_val) - lo + 1;
+  }
+  if (w == 0) {
+    ctx.GetDiag().Error({}, "zero-width part-select is not allowed");
+    return;
+  }
+  WritePartSelect(var, lo, w, rhs_val, arena);
 }
 
 // §11.8.2: Resize value to target width, sign-extending when signed.
@@ -481,6 +483,103 @@ static Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
   return EvalStructPattern(stmt->rhs, sinfo, ctx, arena);
 }
 
+// §7.4.3: Compute (lo, count) for an unpacked array slice expression.
+static std::pair<uint32_t, uint32_t> ComputeSliceRange(const Expr* expr,
+                                                       SimContext& ctx,
+                                                       Arena& arena) {
+  auto start =
+      static_cast<uint32_t>(EvalExpr(expr->index, ctx, arena).ToUint64());
+  auto end_val =
+      static_cast<uint32_t>(EvalExpr(expr->index_end, ctx, arena).ToUint64());
+  if (expr->is_part_select_plus) return {start, end_val};
+  if (expr->is_part_select_minus) return {start - end_val + 1, end_val};
+  auto lo = std::min(start, end_val);
+  return {lo, std::max(start, end_val) - lo + 1};
+}
+
+// §7.4.3: Collect elements from a source unpacked array slice.
+static void CollectSliceSourceElements(const Expr* rhs, SimContext& ctx,
+                                       Arena& arena,
+                                       std::vector<Logic4Vec>& out) {
+  if (rhs->kind != ExprKind::kSelect || !rhs->index_end) return;
+  if (!rhs->base || rhs->base->kind != ExprKind::kIdentifier) return;
+  auto* info = ctx.FindArrayInfo(rhs->base->text);
+  if (!info) return;
+  auto [lo, count] = ComputeSliceRange(rhs, ctx, arena);
+  for (uint32_t i = 0; i < count; ++i) {
+    auto n = std::string(rhs->base->text) + "[" + std::to_string(lo + i) + "]";
+    auto* v = ctx.FindVariable(n);
+    out.push_back(v ? v->value : MakeLogic4VecVal(arena, info->elem_width, 0));
+  }
+}
+
+// §7.4.3/§7.4.6: Unpacked array slice assignment (arr_b[5:3] = arr_a[2:0]).
+static bool TryUnpackedSliceAssign(const Stmt* stmt, SimContext& ctx,
+                                   Arena& arena) {
+  auto* lhs = stmt->lhs;
+  if (lhs->kind != ExprKind::kSelect || !lhs->index_end) return false;
+  if (!lhs->base || lhs->base->kind != ExprKind::kIdentifier) return false;
+  auto* dst_info = ctx.FindArrayInfo(lhs->base->text);
+  if (!dst_info) return false;
+  auto [dst_lo, dst_count] = ComputeSliceRange(lhs, ctx, arena);
+  std::vector<Logic4Vec> src;
+  CollectSliceSourceElements(stmt->rhs, ctx, arena, src);
+  if (src.empty()) {
+    auto val = EvalExpr(stmt->rhs, ctx, arena);
+    uint32_t ew = dst_info->elem_width;
+    uint64_t mask = (ew >= 64) ? ~uint64_t{0} : (uint64_t{1} << ew) - 1;
+    for (uint32_t i = 0; i < dst_count; ++i)
+      src.push_back(
+          MakeLogic4VecVal(arena, ew, (val.ToUint64() >> (i * ew)) & mask));
+  }
+  for (uint32_t i = 0; i < dst_count && i < src.size(); ++i) {
+    auto n =
+        std::string(lhs->base->text) + "[" + std::to_string(dst_lo + i) + "]";
+    auto* var = ctx.FindVariable(n);
+    if (!var) continue;
+    var->value = ResizeToWidth(src[i], var->value.width, arena);
+    var->NotifyWatchers();
+  }
+  return true;
+}
+
+// Find or lazily create a compound element variable.
+static Variable* FindOrCreateElement(const std::string& name, uint32_t width,
+                                     SimContext& ctx, Arena& arena) {
+  auto* var = ctx.FindVariable(name);
+  if (var) return var;
+  return ctx.CreateVariable(*arena.Create<std::string>(name), width);
+}
+
+// §7.4.5: Check if an expression is a compound array select (e.g., A[0][2]).
+static bool IsCompoundSelect(const Expr* expr) {
+  return expr && expr->kind == ExprKind::kSelect && expr->base &&
+         expr->base->kind == ExprKind::kSelect && !expr->index_end;
+}
+
+// §7.4.5: Multi-dimensional sub-array copy (B[1][1] = A[0][2]).
+static bool TrySubarrayAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  if (!IsCompoundSelect(stmt->lhs) || !IsCompoundSelect(stmt->rhs))
+    return false;
+  std::string dst_prefix, src_prefix;
+  if (!BuildCompoundLhsName(stmt->lhs, ctx, arena, dst_prefix)) return false;
+  if (!BuildCompoundLhsName(stmt->rhs, ctx, arena, src_prefix)) return false;
+  std::string match = src_prefix + "[";
+  std::vector<std::pair<std::string, Logic4Vec>> elems;
+  for (const auto& [vname, vptr] : ctx.GetVariables()) {
+    if (vname.starts_with(match))
+      elems.emplace_back(std::string(vname.substr(src_prefix.size())),
+                         vptr->value);
+  }
+  if (elems.empty()) return false;
+  for (const auto& [suffix, val] : elems) {
+    auto* dst = FindOrCreateElement(dst_prefix + suffix, val.width, ctx, arena);
+    dst->value = val;
+    dst->NotifyWatchers();
+  }
+  return true;
+}
+
 StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
                                   Arena& arena) {
   if (!stmt->lhs) return StmtResult::kDone;
@@ -488,6 +587,10 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
   if (TryClassNewAssign(stmt, ctx, arena)) return StmtResult::kDone;
   if (TryAssocCopyAssign(stmt, ctx)) return StmtResult::kDone;
   if (TryQueueBlockingAssign(stmt, ctx, arena)) return StmtResult::kDone;
+  // §7.4.3: Unpacked array slice assignment (arr_b[5:3] = arr_a[2:0]).
+  if (TryUnpackedSliceAssign(stmt, ctx, arena)) return StmtResult::kDone;
+  // §7.4.5: Multi-dimensional sub-array copy (B[1][1] = A[0][2]).
+  if (TrySubarrayAssign(stmt, ctx, arena)) return StmtResult::kDone;
 
   auto rhs_val = EvalRhsWithStructContext(stmt, ctx, arena);
 
