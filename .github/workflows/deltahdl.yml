@@ -79,6 +79,31 @@ jobs:
           && github.event.workflow_run.event == 'push'
         name: Publish to GitHub Pages
         uses: actions/deploy-pages@v4
+  build-asan-ubsan:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Install Clang
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-18
+      - name: Build
+        run: |
+          cmake -B build \
+            -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_C_COMPILER=clang-18 \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DDELTAHDL_SANITIZERS=ON
+          cmake --build build --parallel --target deltahdl
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-asan-ubsan
+          path: build/
+          retention-days: 1
   build-coverage:
     needs: static-analysis
     runs-on: ubuntu-24.04
@@ -122,31 +147,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-macos-26-arm64-clang
-          path: build/
-          retention-days: 1
-  build-asan-ubsan:
-    needs: static-analysis
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-      - name: Install Clang
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang-18
-      - name: Build
-        run: |
-          cmake -B build \
-            -DCMAKE_CXX_COMPILER=clang++-18 \
-            -DCMAKE_C_COMPILER=clang-18 \
-            -DCMAKE_BUILD_TYPE=Debug \
-            -DDELTAHDL_SANITIZERS=ON
-          cmake --build build --parallel --target deltahdl
-      - name: Upload build
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-asan-ubsan
           path: build/
           retention-days: 1
   build-tsan:
@@ -272,6 +272,25 @@ jobs:
           gh variable set SV_TESTS_SHA
           --body "${{ steps.sv-tests-ref.outputs.sha }}"
           --repo "${{ github.repository }}"
+  e2e-test-asan-ubsan:
+    env:
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+    needs: integration-test-asan-ubsan
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-asan-ubsan
+          path: build/
+      - name: Fix permissions
+        run: chmod +x build/src/deltahdl
+      - name: E2E tests
+        run: python3 scripts/run_sim_tests.py
   e2e-test-coverage:
     env:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
@@ -307,25 +326,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: build-macos-26-arm64-clang
-          path: build/
-      - name: Fix permissions
-        run: chmod +x build/src/deltahdl
-      - name: E2E tests
-        run: python3 scripts/run_sim_tests.py
-  e2e-test-asan-ubsan:
-    env:
-      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
-      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-    needs: integration-test-asan-ubsan
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-      - name: Download build
-        uses: actions/download-artifact@v4
-        with:
-          name: build-asan-ubsan
           path: build/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
@@ -388,6 +388,31 @@ jobs:
   # Each integration-test job runs on a fresh runner with an empty
   # filesystem, so cache/restore is always needed to download sv-tests
   # from persistent storage — even though cache-sv-tests already saved it.
+  integration-test-asan-ubsan:
+    env:
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+    needs: cache-sv-tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Restore sv-tests cache
+        uses: actions/cache/restore@v4
+        with:
+          fail-on-cache-miss: true
+          key: sv-tests-${{ needs.cache-sv-tests.outputs.sv-tests-sha }}
+          path: third_party/sv-tests
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-asan-ubsan
+          path: build/
+      - name: Fix permissions
+        run: chmod +x build/src/deltahdl
+      - name: Integration tests
+        run: python3 scripts/run_sv_tests.py
   integration-test-coverage:
     env:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
@@ -435,31 +460,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: build-macos-26-arm64-clang
-          path: build/
-      - name: Fix permissions
-        run: chmod +x build/src/deltahdl
-      - name: Integration tests
-        run: python3 scripts/run_sv_tests.py
-  integration-test-asan-ubsan:
-    env:
-      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
-      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-    needs: cache-sv-tests
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-      - name: Restore sv-tests cache
-        uses: actions/cache/restore@v4
-        with:
-          fail-on-cache-miss: true
-          key: sv-tests-${{ needs.cache-sv-tests.outputs.sv-tests-sha }}
-          path: third_party/sv-tests
-      - name: Download build
-        uses: actions/download-artifact@v4
-        with:
-          name: build-asan-ubsan
           path: build/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
@@ -646,6 +646,29 @@ jobs:
           -extra-arg=-w
           -warnings-as-errors='*'
           'src/.*\.cpp$'
+  unit-test-asan-ubsan:
+    env:
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+    needs: build-asan-ubsan
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-asan-ubsan
+          path: build/
+      - name: Install Clang
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-18
+      - name: Build tests
+        run: cmake --build build --parallel 2
+      - name: Unit tests
+        run: ctest --test-dir build --output-on-failure --label-exclude e2e
   unit-test-coverage:
     env:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
@@ -686,29 +709,6 @@ jobs:
         with:
           name: build-macos-26-arm64-clang
           path: build/
-      - name: Build tests
-        run: cmake --build build --parallel 2
-      - name: Unit tests
-        run: ctest --test-dir build --output-on-failure --label-exclude e2e
-  unit-test-asan-ubsan:
-    env:
-      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
-      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-    needs: build-asan-ubsan
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-      - name: Download build
-        uses: actions/download-artifact@v4
-        with:
-          name: build-asan-ubsan
-          path: build/
-      - name: Install Clang
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang-18
       - name: Build tests
         run: cmake --build build --parallel 2
       - name: Unit tests
