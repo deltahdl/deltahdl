@@ -596,8 +596,8 @@ static bool TryCompoundArraySelect(const Expr* expr, SimContext& ctx,
 // Evaluate a packed part-select: base[hi:lo].
 static Logic4Vec EvalPartSelect(const Logic4Vec& base_val, uint64_t idx,
                                 uint64_t end_idx, Arena& arena) {
-  uint32_t lo = static_cast<uint32_t>(std::min(idx, end_idx));
-  uint32_t hi = static_cast<uint32_t>(std::max(idx, end_idx));
+  auto lo = static_cast<uint32_t>(std::min(idx, end_idx));
+  auto hi = static_cast<uint32_t>(std::max(idx, end_idx));
   uint32_t width = hi - lo + 1;
   uint64_t val = base_val.ToUint64() >> lo;
   uint64_t mask = (width >= 64) ? ~uint64_t{0} : (uint64_t{1} << width) - 1;

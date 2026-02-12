@@ -52,6 +52,7 @@ class Elaborator {
 
   /// Elaborate a single module item into RTLIR.
   void ElaborateItem(ModuleItem* item, RtlirModule* mod);
+  void ElaborateParamDecl(ModuleItem* item, RtlirModule* mod);
   void ElaborateNetDecl(ModuleItem* item, RtlirModule* mod);
   void ElaborateVarDecl(ModuleItem* item, RtlirModule* mod);
   void ElaborateContAssign(ModuleItem* item, RtlirModule* mod);

@@ -463,6 +463,26 @@ void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
   mod->assigns.push_back(ca);
 }
 
+void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
+  // §6.20.3: Type parameters register as typedefs.
+  if (item->data_type.kind == DataTypeKind::kVoid &&
+      item->typedef_type.kind != DataTypeKind::kImplicit) {
+    typedefs_[item->name] = item->typedef_type;
+  }
+  RtlirParamDecl pd;
+  pd.name = item->name;
+  pd.default_value = item->init_expr;
+  if (item->init_expr) {
+    auto scope = BuildParamScope(mod);
+    auto val = ConstEvalInt(item->init_expr, scope);
+    if (val) {
+      pd.resolved_value = *val;
+      pd.is_resolved = true;
+    }
+  }
+  mod->params.push_back(pd);
+}
+
 void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
   switch (item->kind) {
     case ModuleItemKind::kNetDecl:
@@ -489,27 +509,9 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kModuleInst:
       ElaborateModuleInst(item, mod);
       break;
-    case ModuleItemKind::kParamDecl: {
-      // §6.20: Body-level parameter/localparam declarations.
-      // §6.20.3: Type parameters register as typedefs.
-      if (item->data_type.kind == DataTypeKind::kVoid &&
-          item->typedef_type.kind != DataTypeKind::kImplicit) {
-        typedefs_[item->name] = item->typedef_type;
-      }
-      RtlirParamDecl pd;
-      pd.name = item->name;
-      pd.default_value = item->init_expr;
-      if (item->init_expr) {
-        auto scope = BuildParamScope(mod);
-        auto val = ConstEvalInt(item->init_expr, scope);
-        if (val) {
-          pd.resolved_value = *val;
-          pd.is_resolved = true;
-        }
-      }
-      mod->params.push_back(pd);
+    case ModuleItemKind::kParamDecl:
+      ElaborateParamDecl(item, mod);
       break;
-    }
     case ModuleItemKind::kGenerateIf:
       ElaborateGenerateIf(item, mod, BuildParamScope(mod));
       break;

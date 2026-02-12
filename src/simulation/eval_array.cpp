@@ -125,47 +125,53 @@ static Logic4Vec ArrayMax(std::string_view var_name, const ArrayInfo& info,
 
 // --- Dispatch ---
 
+// Bundles common array method arguments to stay within 5-parameter limit.
+struct ArrayCtx {
+  std::string_view var_name;
+  const ArrayInfo& info;
+  SimContext& ctx;
+  Arena& arena;
+};
+
 // §7.12.3: Reduction method dispatch.
-static bool DispatchReduction(std::string_view method,
-                              std::string_view var_name, const ArrayInfo& info,
-                              SimContext& ctx, Arena& arena, Logic4Vec& out) {
+static bool DispatchReduction(std::string_view method, const ArrayCtx& ac,
+                              Logic4Vec& out) {
   if (method == "sum") {
-    out = ArraySum(var_name, info, ctx, arena);
+    out = ArraySum(ac.var_name, ac.info, ac.ctx, ac.arena);
     return true;
   }
   if (method == "product") {
-    out = ArrayProduct(var_name, info, ctx, arena);
+    out = ArrayProduct(ac.var_name, ac.info, ac.ctx, ac.arena);
     return true;
   }
   if (method == "and") {
-    out = ArrayAnd(var_name, info, ctx, arena);
+    out = ArrayAnd(ac.var_name, ac.info, ac.ctx, ac.arena);
     return true;
   }
   if (method == "or") {
-    out = ArrayOr(var_name, info, ctx, arena);
+    out = ArrayOr(ac.var_name, ac.info, ac.ctx, ac.arena);
     return true;
   }
   if (method == "xor") {
-    out = ArrayXor(var_name, info, ctx, arena);
+    out = ArrayXor(ac.var_name, ac.info, ac.ctx, ac.arena);
     return true;
   }
   return false;
 }
 
 // §7.12.1: Locator and query method dispatch.
-static bool DispatchQuery(std::string_view method, std::string_view var_name,
-                          const ArrayInfo& info, SimContext& ctx, Arena& arena,
+static bool DispatchQuery(std::string_view method, const ArrayCtx& ac,
                           Logic4Vec& out) {
   if (method == "size") {
-    out = ArraySize(info, arena);
+    out = ArraySize(ac.info, ac.arena);
     return true;
   }
   if (method == "min") {
-    out = ArrayMin(var_name, info, ctx, arena);
+    out = ArrayMin(ac.var_name, ac.info, ac.ctx, ac.arena);
     return true;
   }
   if (method == "max") {
-    out = ArrayMax(var_name, info, ctx, arena);
+    out = ArrayMax(ac.var_name, ac.info, ac.ctx, ac.arena);
     return true;
   }
   return false;
@@ -177,14 +183,9 @@ bool TryEvalArrayMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   if (!ExtractMethodCallParts(expr, parts)) return false;
   auto* info = ctx.FindArrayInfo(parts.var_name);
   if (!info) return false;
-  if (DispatchReduction(parts.method_name, parts.var_name, *info, ctx, arena,
-                        out)) {
-    return true;
-  }
-  if (DispatchQuery(parts.method_name, parts.var_name, *info, ctx, arena,
-                    out)) {
-    return true;
-  }
+  ArrayCtx ac{parts.var_name, *info, ctx, arena};
+  if (DispatchReduction(parts.method_name, ac, out)) return true;
+  if (DispatchQuery(parts.method_name, ac, out)) return true;
   // Mutating methods return void; set out to 0 on success.
   if (TryExecArrayMethodStmt(expr, ctx, arena)) {
     out = MakeLogic4VecVal(arena, 1, 0);
@@ -268,8 +269,9 @@ bool TryEvalArrayProperty(std::string_view var_name, std::string_view prop,
                           SimContext& ctx, Arena& arena, Logic4Vec& out) {
   auto* info = ctx.FindArrayInfo(var_name);
   if (!info) return false;
-  if (DispatchReduction(prop, var_name, *info, ctx, arena, out)) return true;
-  return DispatchQuery(prop, var_name, *info, ctx, arena, out);
+  ArrayCtx ac{var_name, *info, ctx, arena};
+  if (DispatchReduction(prop, ac, out)) return true;
+  return DispatchQuery(prop, ac, out);
 }
 
 // §7.12: Mutating property access (arr.sort, arr.reverse).
@@ -590,18 +592,17 @@ static bool AssocIntTraversal(AssocArrayObject* aa, std::string_view method,
   return true;
 }
 
-// §7.8.6: first/last/next/prev — extract ref arg and dispatch.
-static bool AssocTraversal(AssocArrayObject* aa, std::string_view method,
-                           const Expr* expr, SimContext& ctx, Arena& arena,
-                           Logic4Vec& out) {
-  if (expr->args.empty()) {
-    out = MakeLogic4VecVal(arena, 32, 0);
-    return true;
-  }
+// Resolve the ref argument for traversal methods.
+static Variable* ResolveTraversalRef(const Expr* expr, SimContext& ctx) {
+  if (expr->args.empty()) return nullptr;
   auto* ref_expr = expr->args[0];
-  if (ref_expr->kind != ExprKind::kIdentifier) return false;
-  auto* ref_var = ctx.FindVariable(ref_expr->text);
-  if (!ref_var) return false;
+  if (ref_expr->kind != ExprKind::kIdentifier) return nullptr;
+  return ctx.FindVariable(ref_expr->text);
+}
+
+// §7.8.6: first/last/next/prev — dispatch to string or int traversal.
+static bool AssocTraversal(AssocArrayObject* aa, std::string_view method,
+                           Variable* ref_var, Arena& arena, Logic4Vec& out) {
   if (aa->is_string_key)
     return AssocStrTraversal(aa, method, ref_var, arena, out);
   return AssocIntTraversal(aa, method, ref_var, arena, out);
@@ -626,7 +627,12 @@ bool TryEvalAssocMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   }
   if (parts.method_name == "first" || parts.method_name == "last" ||
       parts.method_name == "next" || parts.method_name == "prev") {
-    return AssocTraversal(aa, parts.method_name, expr, ctx, arena, out);
+    auto* ref_var = ResolveTraversalRef(expr, ctx);
+    if (!ref_var) {
+      out = MakeLogic4VecVal(arena, 32, 0);
+      return true;
+    }
+    return AssocTraversal(aa, parts.method_name, ref_var, arena, out);
   }
   return false;
 }
@@ -688,23 +694,6 @@ static bool IsStringArray(std::string_view var_name, const ArrayInfo& info,
   return ctx.IsStringVariable(name);
 }
 
-// Evaluate a with-clause predicate with 'item' bound to a value.
-static bool EvalWithPredicate(const Expr* with_expr, const Logic4Vec& item_val,
-                              bool is_string, size_t item_index,
-                              SimContext& ctx, Arena& arena) {
-  ctx.PushScope();
-  auto* item_var = ctx.CreateLocalVariable("item", item_val.width);
-  item_var->value = item_val;
-  if (is_string) ctx.RegisterStringVariable("item");
-  // §7.12.4: item.index provides the array index of the current element.
-  auto* idx_var = ctx.CreateLocalVariable("item.index", 32);
-  idx_var->value =
-      MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(item_index));
-  auto result = EvalExpr(with_expr, ctx, arena).ToUint64();
-  ctx.PopScope();
-  return result != 0;
-}
-
 // §7.12.1: Check if a method name is a locator method.
 static bool IsLocatorMethod(std::string_view name) {
   return name == "find" || name == "find_first" || name == "find_last" ||
@@ -712,58 +701,69 @@ static bool IsLocatorMethod(std::string_view name) {
          name == "unique" || name == "unique_index";
 }
 
+// Bundles common locator method arguments to stay within 5-parameter limit.
+struct LocatorCtx {
+  const std::vector<Logic4Vec>& elems;
+  bool is_string;
+  const Expr* with_expr;
+  SimContext& ctx;
+  Arena& arena;
+};
+
+// Evaluate a with-clause predicate with 'item' bound to a value.
+static bool EvalLocatorPredicate(const LocatorCtx& lc,
+                                 const Logic4Vec& item_val, size_t item_index) {
+  lc.ctx.PushScope();
+  auto* item_var = lc.ctx.CreateLocalVariable("item", item_val.width);
+  item_var->value = item_val;
+  if (lc.is_string) lc.ctx.RegisterStringVariable("item");
+  auto* idx_var = lc.ctx.CreateLocalVariable("item.index", 32);
+  idx_var->value =
+      MakeLogic4VecVal(lc.arena, 32, static_cast<uint64_t>(item_index));
+  auto result = EvalExpr(lc.with_expr, lc.ctx, lc.arena).ToUint64();
+  lc.ctx.PopScope();
+  return result != 0;
+}
+
 // §7.12.1: find/find_first/find_last with predicate.
-static void LocatorFind(std::string_view method,
-                        const std::vector<Logic4Vec>& elems, bool is_string,
-                        const Expr* with_expr, SimContext& ctx, Arena& arena,
+static void LocatorFind(std::string_view method, const LocatorCtx& lc,
                         std::vector<Logic4Vec>& out) {
-  for (size_t i = 0; i < elems.size(); ++i) {
-    if (!EvalWithPredicate(with_expr, elems[i], is_string, i, ctx, arena))
-      continue;
-    out.push_back(elems[i]);
+  for (size_t i = 0; i < lc.elems.size(); ++i) {
+    if (!EvalLocatorPredicate(lc, lc.elems[i], i)) continue;
+    out.push_back(lc.elems[i]);
     if (method == "find_first" || method == "find_last") break;
   }
 }
 
 // §7.12.1: find/find_last — process in appropriate order.
-static void LocatorFindDispatch(std::string_view method,
-                                const std::vector<Logic4Vec>& elems,
-                                bool is_string, const Expr* with_expr,
-                                SimContext& ctx, Arena& arena,
+static void LocatorFindDispatch(std::string_view method, const LocatorCtx& lc,
                                 std::vector<Logic4Vec>& out) {
   if (method == "find_last") {
-    for (size_t i = elems.size(); i > 0; --i) {
-      if (!EvalWithPredicate(with_expr, elems[i - 1], is_string, i - 1, ctx,
-                             arena))
-        continue;
-      out.push_back(elems[i - 1]);
+    for (size_t i = lc.elems.size(); i > 0; --i) {
+      if (!EvalLocatorPredicate(lc, lc.elems[i - 1], i - 1)) continue;
+      out.push_back(lc.elems[i - 1]);
       break;
     }
     return;
   }
-  LocatorFind(method, elems, is_string, with_expr, ctx, arena, out);
+  LocatorFind(method, lc, out);
 }
 
 // §7.12.1: find_index/find_last_index with predicate.
-static void LocatorFindIndex(std::string_view method,
-                             const std::vector<Logic4Vec>& elems,
-                             bool is_string, const Expr* with_expr,
-                             SimContext& ctx, Arena& arena,
+static void LocatorFindIndex(std::string_view method, const LocatorCtx& lc,
                              std::vector<Logic4Vec>& out) {
   if (method == "find_last_index") {
-    for (size_t i = elems.size(); i > 0; --i) {
-      if (!EvalWithPredicate(with_expr, elems[i - 1], is_string, i - 1, ctx,
-                             arena))
-        continue;
-      out.push_back(MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(i - 1)));
+    for (size_t i = lc.elems.size(); i > 0; --i) {
+      if (!EvalLocatorPredicate(lc, lc.elems[i - 1], i - 1)) continue;
+      out.push_back(
+          MakeLogic4VecVal(lc.arena, 32, static_cast<uint64_t>(i - 1)));
       break;
     }
     return;
   }
-  for (size_t i = 0; i < elems.size(); ++i) {
-    if (!EvalWithPredicate(with_expr, elems[i], is_string, i, ctx, arena))
-      continue;
-    out.push_back(MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(i)));
+  for (size_t i = 0; i < lc.elems.size(); ++i) {
+    if (!EvalLocatorPredicate(lc, lc.elems[i], i)) continue;
+    out.push_back(MakeLogic4VecVal(lc.arena, 32, static_cast<uint64_t>(i)));
   }
 }
 
@@ -845,13 +845,12 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
   // All other locator methods require a with clause.
   if (!expr->with_expr) return false;
 
+  LocatorCtx lc{elems, is_str, expr->with_expr, ctx, arena};
   if (parts.method_name == "find_index" ||
       parts.method_name == "find_last_index") {
-    LocatorFindIndex(parts.method_name, elems, is_str, expr->with_expr, ctx,
-                     arena, out);
+    LocatorFindIndex(parts.method_name, lc, out);
   } else {
-    LocatorFindDispatch(parts.method_name, elems, is_str, expr->with_expr, ctx,
-                        arena, out);
+    LocatorFindDispatch(parts.method_name, lc, out);
   }
   return true;
 }
