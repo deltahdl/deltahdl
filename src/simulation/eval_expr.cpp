@@ -1,4 +1,6 @@
 #include <algorithm>
+#include <cmath>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -178,6 +180,17 @@ static uint32_t CastWidth(std::string_view type_name) {
   return 32;                            // Default to 32-bit.
 }
 
+static bool IsRealCastTarget(std::string_view name) {
+  return name == "real" || name == "realtime" || name == "shortreal";
+}
+
+static double ExtractDouble(const Logic4Vec& vec) {
+  double d = 0.0;
+  uint64_t bits = vec.ToUint64();
+  std::memcpy(&d, &bits, sizeof(double));
+  return d;
+}
+
 Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto inner = EvalExpr(expr->lhs, ctx, arena);
   std::string_view type_name = expr->text;
@@ -191,6 +204,24 @@ Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
     return inner;
   }
   uint32_t target_width = CastWidth(type_name);
+  // §6.12.1: real→integer rounds to nearest (ties away from zero).
+  if (inner.is_real && !IsRealCastTarget(type_name)) {
+    auto val = static_cast<uint64_t>(
+        static_cast<int64_t>(std::llround(ExtractDouble(inner))));
+    if (target_width < 64) {
+      val &= (uint64_t{1} << target_width) - 1;
+    }
+    return MakeLogic4VecVal(arena, target_width, val);
+  }
+  // §6.12.1: integer→real conversion.
+  if (!inner.is_real && IsRealCastTarget(type_name)) {
+    auto d = static_cast<double>(inner.ToUint64());
+    uint64_t bits = 0;
+    std::memcpy(&bits, &d, sizeof(double));
+    auto result = MakeLogic4VecVal(arena, target_width, bits);
+    result.is_real = true;
+    return result;
+  }
   uint64_t val = inner.ToUint64();
   // Truncate or zero-extend to target width.
   if (target_width < 64) {

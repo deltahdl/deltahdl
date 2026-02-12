@@ -223,6 +223,16 @@ static Logic4Vec EvalUnaryOp(TokenKind op, Logic4Vec operand, Arena& arena) {
       return MakeLogic4VecVal(arena, 1, val == 0 ? 1 : 0);
     }
     case TokenKind::kMinus: {
+      if (operand.is_real) {
+        double d = 0.0;
+        uint64_t bits = operand.ToUint64();
+        std::memcpy(&d, &bits, sizeof(double));
+        d = -d;
+        std::memcpy(&bits, &d, sizeof(double));
+        auto r = MakeLogic4VecVal(arena, operand.width, bits);
+        r.is_real = true;
+        return r;
+      }
       uint64_t val = operand.ToUint64();
       return MakeLogic4VecVal(arena, operand.width, -val);
     }
@@ -732,7 +742,9 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena) {
     case ExprKind::kRealLiteral: {
       uint64_t bits = 0;
       std::memcpy(&bits, &expr->real_val, sizeof(double));
-      return MakeLogic4VecVal(arena, 64, bits);
+      auto rv = MakeLogic4VecVal(arena, 64, bits);
+      rv.is_real = true;
+      return rv;
     }
     case ExprKind::kIdentifier:
       return EvalIdentifier(expr, ctx, arena);
