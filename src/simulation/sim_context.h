@@ -53,6 +53,8 @@ struct StructTypeInfo {
   std::vector<StructFieldInfo> fields;
   uint32_t total_width = 0;
   bool is_packed = false;
+  bool is_union = false;  // §7.3: true for union types.
+  bool is_soft = false;   // §7.3.1: soft packed union.
 };
 
 // §7.10: Queue runtime storage.

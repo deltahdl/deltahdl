@@ -540,4 +540,26 @@ bool Elaborator::ResolveParameterizedType(DataType& dtype) {
   return true;
 }
 
+// §7.3.1: Validate packed union member constraints.
+void Elaborator::ValidatePackedUnion(const DataType& dtype, SourceLoc loc) {
+  if (dtype.kind != DataTypeKind::kUnion) return;
+  if (!dtype.is_packed && !dtype.is_soft) return;
+  if (dtype.struct_members.empty()) return;
+
+  // Hard packed union: all members must be the same width.
+  if (!dtype.is_soft) {
+    uint32_t first_w = EvalStructMemberWidth(dtype.struct_members[0]);
+    for (size_t i = 1; i < dtype.struct_members.size(); ++i) {
+      uint32_t w = EvalStructMemberWidth(dtype.struct_members[i]);
+      if (w != first_w) {
+        diag_.Error(loc,
+                    std::format("packed union member '{}' has width {} but "
+                                "first member '{}' has width {}",
+                                dtype.struct_members[i].name, w,
+                                dtype.struct_members[0].name, first_w));
+      }
+    }
+  }
+}
+
 }  // namespace delta

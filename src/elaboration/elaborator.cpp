@@ -504,6 +504,9 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   if (item->data_type.kind == DataTypeKind::kEnum) {
     ValidateEnumDecl(item->data_type, item->loc);
   }
+  if (item->data_type.kind == DataTypeKind::kUnion) {
+    ValidatePackedUnion(item->data_type, item->loc);
+  }
 }
 
 // §6.20.5: Elaborate a specparam as a simulation-accessible constant variable.
@@ -673,6 +676,9 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
 
 void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
   typedefs_[item->name] = item->typedef_type;
+  if (item->typedef_type.kind == DataTypeKind::kUnion) {
+    ValidatePackedUnion(item->typedef_type, item->loc);
+  }
   if (item->typedef_type.kind != DataTypeKind::kEnum) return;
   ValidateEnumDecl(item->typedef_type, item->loc);
   int64_t next_val = 0;
