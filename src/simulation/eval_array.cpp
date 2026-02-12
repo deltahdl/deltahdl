@@ -547,24 +547,33 @@ static bool AssocStrTraversal(AssocArrayObject* aa, std::string_view method,
   return true;
 }
 
+// §7.9.8: Write a traversal key, returning -1 if truncation is needed.
+static int WriteTraversalKey(Variable* ref, int64_t key, uint32_t idx_width,
+                             Arena& arena) {
+  uint32_t w = ref->value.width;
+  if (w == 0) w = 32;
+  ref->value = MakeLogic4VecVal(arena, w, static_cast<uint64_t>(key));
+  return (w < idx_width) ? -1 : 1;
+}
+
 // §7.8.6: Traversal on integer-keyed assoc arrays.
 static bool AssocIntTraversal(AssocArrayObject* aa, std::string_view method,
                               Variable* ref_var, Arena& arena, Logic4Vec& out) {
   auto& m = aa->int_data;
-  uint32_t w = ref_var->value.width;
-  if (w == 0) w = 32;
   if (m.empty()) {
     out = MakeLogic4VecVal(arena, 32, 0);
     return true;
   }
   if (method == "first") {
-    ref_var->value = MakeLogic4VecVal(arena, w, m.begin()->first);
-    out = MakeLogic4VecVal(arena, 32, 1);
+    auto r =
+        WriteTraversalKey(ref_var, m.begin()->first, aa->index_width, arena);
+    out = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(r));
     return true;
   }
   if (method == "last") {
-    ref_var->value = MakeLogic4VecVal(arena, w, m.rbegin()->first);
-    out = MakeLogic4VecVal(arena, 32, 1);
+    auto r =
+        WriteTraversalKey(ref_var, m.rbegin()->first, aa->index_width, arena);
+    out = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(r));
     return true;
   }
   auto cur_key = static_cast<int64_t>(ref_var->value.ToUint64());
@@ -579,16 +588,15 @@ static bool AssocIntTraversal(AssocArrayObject* aa, std::string_view method,
       out = MakeLogic4VecVal(arena, 32, 0);
       return true;
     }
-    ref_var->value = MakeLogic4VecVal(arena, w, it->first);
   } else {
     if (it == m.begin()) {
       out = MakeLogic4VecVal(arena, 32, 0);
       return true;
     }
     --it;
-    ref_var->value = MakeLogic4VecVal(arena, w, it->first);
   }
-  out = MakeLogic4VecVal(arena, 32, 1);
+  auto r = WriteTraversalKey(ref_var, it->first, aa->index_width, arena);
+  out = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(r));
   return true;
 }
 
