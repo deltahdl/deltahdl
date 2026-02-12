@@ -838,11 +838,13 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items) {
     if (Check(TokenKind::kKwType)) {
       Consume();  // type
       Expect(TokenKind::kLParen);
-      ParseExpr();  // type expression (not semantically tracked yet)
+      auto* type_expr = ParseExpr();
       Expect(TokenKind::kRParen);
       auto* item = arena_.Create<ModuleItem>();
       item->kind = ModuleItemKind::kVarDecl;
       item->loc = CurrentLoc();
+      // §6.23: Store the type reference for elaboration.
+      item->data_type.type_ref_expr = type_expr;
       item->name = ExpectIdentifier().text;
       ParseUnpackedDims(item->unpacked_dims);
       Expect(TokenKind::kSemicolon);

@@ -226,6 +226,32 @@ TEST(SimCh6, IsunboundedTrue) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+// §6.23: type(expr) in variable declaration resolves type.
+TEST(SimCh6, TypeRefVarDecl) {
+  SimCh6Fixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int a;\n"
+      "  var type(a) b;\n"
+      "  initial begin\n"
+      "    a = 42;\n"
+      "    b = 100;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("b");
+  ASSERT_NE(var, nullptr);
+  // type(a) = int → 32-bit width
+  EXPECT_EQ(var->value.width, 32u);
+  EXPECT_EQ(var->value.ToUint64(), 100u);
+}
+
 // §6.20.7: $isunbounded returns 0 for parameter with numeric value.
 TEST(SimCh6, IsunboundedFalse) {
   SimCh6Fixture f;

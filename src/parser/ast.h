@@ -175,6 +175,7 @@ struct DataType {
   std::string_view type_name;
   std::string_view scope_name;    // Package/class scope prefix (§6.25)
   std::string_view modport_name;  // virtual interface modport (§25.9)
+  Expr* type_ref_expr = nullptr;  // §6.23: type(expr) reference
   std::vector<EnumMember> enum_members;
   std::vector<StructMember> struct_members;
 };

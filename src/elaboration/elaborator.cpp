@@ -405,7 +405,33 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   mod->nets.push_back(net);
 }
 
+// §6.23: Resolve type(expr) to concrete type kind from declared variables.
+void Elaborator::ResolveTypeRef(ModuleItem* item, const RtlirModule* mod) {
+  if (!item->data_type.type_ref_expr) return;
+  auto* ref = item->data_type.type_ref_expr;
+  if (ref->kind != ExprKind::kIdentifier) {
+    // For complex expressions, infer width from expression.
+    item->data_type.kind = DataTypeKind::kLogic;
+    item->data_type.type_ref_expr = nullptr;
+    return;
+  }
+  // Look up the referenced variable's type in the module.
+  for (const auto& v : mod->variables) {
+    if (v.name != ref->text) continue;
+    item->data_type.kind = var_types_[ref->text];
+    item->data_type.is_signed = v.is_signed;
+    item->data_type.type_ref_expr = nullptr;
+    return;
+  }
+  auto it = var_types_.find(ref->text);
+  if (it != var_types_.end()) {
+    item->data_type.kind = it->second;
+    item->data_type.type_ref_expr = nullptr;
+  }
+}
+
 void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
+  ResolveTypeRef(item, mod);
   if (!declared_names_.insert(item->name).second) {
     diag_.Error(item->loc, std::format("redeclaration of '{}'", item->name));
   }

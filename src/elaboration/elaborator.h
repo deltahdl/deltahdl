@@ -104,6 +104,9 @@ class Elaborator {
   /// Return a scoped name (prefixed during generate-for expansion).
   std::string_view ScopedName(std::string_view base);
 
+  /// §6.23: Resolve type(expr) to concrete type kind.
+  void ResolveTypeRef(ModuleItem* item, const RtlirModule* mod);
+
   /// Validate array assignment pattern element count (§5.11).
   void ValidateArrayInitPattern(const ModuleItem* item);
 
