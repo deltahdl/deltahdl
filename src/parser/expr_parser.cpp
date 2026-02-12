@@ -78,7 +78,6 @@ static uint64_t ParseIntText(std::string_view text) {
 static uint32_t ExtractLiteralSize(std::string_view text) {
   auto tick = text.find('\'');
   if (tick == std::string_view::npos || tick == 0) return 0;
-  // Parse decimal digits before the tick (skip underscores).
   uint64_t size = 0;
   for (size_t i = 0; i < tick; ++i) {
     char c = text[i];
@@ -89,15 +88,12 @@ static uint32_t ExtractLiteralSize(std::string_view text) {
   return static_cast<uint32_t>(size);
 }
 
-// Check if the value digits contain x/z/? (which means value is indeterminate).
 static bool HasXZDigits(std::string_view text) {
   auto tick = text.find('\'');
   if (tick == std::string_view::npos) return false;
   for (size_t i = tick + 1; i < text.size(); ++i) {
     char c = text[i];
-    if (c == 'x' || c == 'X' || c == 'z' || c == 'Z' || c == '?') {
-      return true;
-    }
+    if (c == 'x' || c == 'X' || c == 'z' || c == 'Z' || c == '?') return true;
   }
   return false;
 }
@@ -847,8 +843,6 @@ Expr* Parser::ParseTypeRefExpr() {
   return ref;
 }
 
-// --- Min:Typ:Max expression (§11.11) ---
-
 Expr* Parser::ParseMinTypMaxExpr() {
   auto* expr = ParseExpr();
   if (!Check(TokenKind::kColon)) return expr;
@@ -864,8 +858,6 @@ Expr* Parser::ParseMinTypMaxExpr() {
   mtm->rhs = max;        // max
   return mtm;
 }
-
-// --- Inside expression (§11.4.13) ---
 
 Expr* Parser::ParseInsideExpr(Expr* lhs) {
   Consume();  // 'inside'
@@ -903,8 +895,6 @@ Expr* Parser::ParseInsideValueRange() {
   return ParseExpr();
 }
 
-// --- Streaming concatenation (§11.4.14) ---
-
 Expr* Parser::ParseStreamingConcat(TokenKind dir) {
   auto loc = CurrentLoc();
   Consume();  // << or >>
@@ -939,8 +929,6 @@ Expr* Parser::ParseStreamingConcat(TokenKind dir) {
   return sc;
 }
 
-// --- Named argument (§13.5.4) ---
-
 void Parser::ParseNamedArg(Expr* call) {
   Expect(TokenKind::kDot);
   auto name_tok = Expect(TokenKind::kIdentifier);
@@ -953,8 +941,6 @@ void Parser::ParseNamedArg(Expr* call) {
   call->arg_names.push_back(name_tok.text);
   call->args.push_back(value);
 }
-
-// --- Compound assignment expression (§11.4.1) ---
 
 Expr* Parser::ParseCompoundAssignExpr(Expr* lhs) {
   auto op_tok = Consume();
