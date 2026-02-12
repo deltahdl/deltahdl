@@ -170,15 +170,15 @@ ModuleItem* Parser::ParseTypedef() {
 
 ModuleItem* Parser::ParseNettypeDecl() {
   auto* item = arena_.Create<ModuleItem>();
-  item->kind = ModuleItemKind::kTypedef;
+  item->kind = ModuleItemKind::kNettypeDecl;
   item->loc = CurrentLoc();
   Expect(TokenKind::kKwNettype);
   item->typedef_type = ParseDataType();
   item->name = Expect(TokenKind::kIdentifier).text;
-  // Optional "with resolve_fn" clause — consume but ignore.
+  // §6.6.7: Optional "with resolve_fn" clause.
   if (Check(TokenKind::kKwWith)) {
     Consume();
-    Consume();  // resolution function identifier
+    item->nettype_resolve_func = Expect(TokenKind::kIdentifier).text;
   }
   known_types_.insert(item->name);
   Expect(TokenKind::kSemicolon);

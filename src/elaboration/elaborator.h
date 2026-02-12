@@ -61,6 +61,9 @@ class Elaborator {
   /// Elaborate a typedef item (e.g. enum constants).
   void ElaborateTypedef(ModuleItem* item, RtlirModule* mod);
 
+  /// §6.6.7: Elaborate a nettype declaration.
+  void ElaborateNettypeDecl(ModuleItem* item, RtlirModule* mod);
+
   /// Walk module items and populate nets, vars, assigns, processes.
   void ElaborateItems(const ModuleDecl* decl, RtlirModule* mod);
 
@@ -174,8 +177,9 @@ class Elaborator {
   std::unordered_set<std::string_view> specparam_names_;
   std::unordered_set<std::string_view> enum_var_names_;
   std::unordered_set<std::string_view> enum_member_names_;
-  std::unordered_set<std::string_view> const_names_;  // §6.20.6: const vars
-  std::unordered_set<std::string_view> class_names_;  // §8: known class names
+  std::unordered_set<std::string_view> const_names_;    // §6.20.6: const vars
+  std::unordered_set<std::string_view> class_names_;    // §8: known class names
+  std::unordered_set<std::string_view> nettype_names_;  // §6.6.7: user nettypes
 };
 
 }  // namespace delta

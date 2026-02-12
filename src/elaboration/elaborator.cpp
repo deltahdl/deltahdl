@@ -430,8 +430,32 @@ void Elaborator::ResolveTypeRef(ModuleItem* item, const RtlirModule* mod) {
   }
 }
 
+// §6.19/§6.24.2: Set enum type name on variable for $cast validation.
+static void SetEnumTypeInfo(const ModuleItem* item, RtlirVariable& var,
+                            const TypedefMap& typedefs) {
+  if (item->data_type.kind == DataTypeKind::kEnum) {
+    var.enum_type_name = item->name;
+    var.dtype = &item->data_type;
+    return;
+  }
+  if (item->data_type.kind != DataTypeKind::kNamed) return;
+  auto it = typedefs.find(item->data_type.type_name);
+  if (it != typedefs.end() && it->second.kind == DataTypeKind::kEnum) {
+    var.enum_type_name = item->data_type.type_name;
+    var.dtype = &it->second;
+  }
+}
+
 void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   ResolveTypeRef(item, mod);
+  // §6.6.7: If the type is a user-defined nettype, create a net.
+  if (item->data_type.kind == DataTypeKind::kNamed &&
+      nettype_names_.count(item->data_type.type_name)) {
+    item->data_type.is_net = true;
+    item->kind = ModuleItemKind::kNetDecl;
+    ElaborateNetDecl(item, mod);
+    return;
+  }
   if (!declared_names_.insert(item->name).second) {
     diag_.Error(item->loc, std::format("redeclaration of '{}'", item->name));
   }
@@ -467,16 +491,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
     var.class_type_name = item->data_type.type_name;
   }
   // §6.19/§6.24.2: Track enum type for $cast validation.
-  if (item->data_type.kind == DataTypeKind::kEnum) {
-    var.enum_type_name = item->name;
-    var.dtype = &item->data_type;
-  } else if (item->data_type.kind == DataTypeKind::kNamed) {
-    auto it = typedefs_.find(item->data_type.type_name);
-    if (it != typedefs_.end() && it->second.kind == DataTypeKind::kEnum) {
-      var.enum_type_name = item->data_type.type_name;
-      var.dtype = &it->second;
-    }
-  }
+  SetEnumTypeInfo(item, var, typedefs_);
   // §7.4/§7.5: Compute unpacked array element count.
   ComputeUnpackedDims(item->unpacked_dims, var);
   InferDynArraySize(item->unpacked_dims, item->init_expr, var);
@@ -613,6 +628,9 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kTypedef:
       ElaborateTypedef(item, mod);
       break;
+    case ModuleItemKind::kNettypeDecl:
+      ElaborateNettypeDecl(item, mod);
+      break;
     case ModuleItemKind::kFunctionDecl:
       ValidateFunctionBody(item);
       mod->function_decls.push_back(item);
@@ -670,6 +688,12 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
     ++next_val;
   }
   mod->enum_types[item->name] = std::move(members);
+}
+
+// §6.6.7: Register a user-defined nettype so declarations using it create nets.
+void Elaborator::ElaborateNettypeDecl(ModuleItem* item, RtlirModule* /*mod*/) {
+  typedefs_[item->name] = item->typedef_type;
+  nettype_names_.insert(item->name);
 }
 
 void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {

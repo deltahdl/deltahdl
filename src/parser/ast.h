@@ -363,6 +363,7 @@ enum class ModuleItemKind : uint8_t {
   kDpiImport,       // import "DPI-C" function/task (§35)
   kDpiExport,       // export "DPI-C" function/task (§35)
   kClassDecl,       // class ... endclass inside module (§8.3)
+  kNettypeDecl,     // nettype <type> <name> [with <func>] (§6.6.7)
 };
 
 // clang-format off
@@ -467,8 +468,9 @@ struct ModuleItem {
   Expr* inst_range_left = nullptr;   // Instance array left bound (§23.3.2)
   Expr* inst_range_right = nullptr;  // Instance array right bound (§23.3.2)
 
-  // Typedef
+  // Typedef / Nettype
   DataType typedef_type;
+  std::string_view nettype_resolve_func;  // §6.6.7: resolution function name
 
   // Generate
   Stmt* gen_init = nullptr;

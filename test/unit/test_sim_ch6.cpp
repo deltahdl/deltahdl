@@ -381,3 +381,59 @@ TEST(SimCh6, BitStreamShortArrayToInt) {
   // 0xCAFE at MSBs, 0xBABE at LSBs → 0xCAFEBABE.
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEBABEu);
 }
+
+// §6.6.7: User-defined nettype creates a net with correct width.
+TEST(SimCh6, NettypeCreatesNet) {
+  SimCh6Fixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  nettype logic [7:0] byte_net;\n"
+      "  byte_net x;\n"
+      "  assign x = 8'hAB;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  // Check RTLIR: x should be in mod->nets, not mod->variables.
+  ASSERT_FALSE(design->top_modules.empty());
+  auto* mod = design->top_modules[0];
+  bool found_net = false;
+  for (const auto& n : mod->nets) {
+    if (n.name == "x") {
+      found_net = true;
+      EXPECT_EQ(n.width, 8u);
+    }
+  }
+  EXPECT_TRUE(found_net) << "x should be elaborated as a net, not a variable";
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* net = f.ctx.FindNet("x");
+  ASSERT_NE(net, nullptr);
+}
+
+// §6.6.7: Nettype with 16-bit type creates correctly-sized net.
+TEST(SimCh6, NettypeWideNet) {
+  SimCh6Fixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  nettype logic [15:0] wide_net;\n"
+      "  wide_net y;\n"
+      "  assign y = 16'hBEEF;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  ASSERT_FALSE(design->top_modules.empty());
+  auto* mod = design->top_modules[0];
+  bool found_net = false;
+  for (const auto& n : mod->nets) {
+    if (n.name == "y") {
+      found_net = true;
+      EXPECT_EQ(n.width, 16u);
+    }
+  }
+  EXPECT_TRUE(found_net) << "y should be elaborated as a net";
+}
