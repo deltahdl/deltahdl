@@ -124,7 +124,7 @@ jobs:
           name: build-macos-26-arm64-clang
           path: build/
           retention-days: 1
-  build-sanitize:
+  build-asan-ubsan:
     needs: static-analysis
     runs-on: ubuntu-24.04
     steps:
@@ -146,7 +146,7 @@ jobs:
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
-          name: build-sanitize
+          name: build-asan-ubsan
           path: build/
           retention-days: 1
   build-tsan:
@@ -231,7 +231,7 @@ jobs:
     needs:
       - unit-test-coverage
       - unit-test-macos-26-arm64-clang
-      - unit-test-sanitize
+      - unit-test-asan-ubsan
       - unit-test-tsan
       - unit-test-ubuntu-24-04-x86-64-clang
       - unit-test-ubuntu-24-04-x86-64-gcc
@@ -312,11 +312,11 @@ jobs:
         run: chmod +x build/src/deltahdl
       - name: E2E tests
         run: python3 scripts/run_sim_tests.py
-  e2e-test-sanitize:
+  e2e-test-asan-ubsan:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-    needs: integration-test-sanitize
+    needs: integration-test-asan-ubsan
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -325,7 +325,7 @@ jobs:
       - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-sanitize
+          name: build-asan-ubsan
           path: build/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
@@ -440,7 +440,7 @@ jobs:
         run: chmod +x build/src/deltahdl
       - name: Integration tests
         run: python3 scripts/run_sv_tests.py
-  integration-test-sanitize:
+  integration-test-asan-ubsan:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
@@ -459,7 +459,7 @@ jobs:
       - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-sanitize
+          name: build-asan-ubsan
           path: build/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
@@ -540,7 +540,7 @@ jobs:
     needs:
       - assert-coverage
       - e2e-test-macos-26-arm64-clang
-      - e2e-test-sanitize
+      - e2e-test-asan-ubsan
       - e2e-test-tsan
       - e2e-test-ubuntu-24-04-x86-64-clang
       - e2e-test-ubuntu-24-04-x86-64-gcc
@@ -690,11 +690,11 @@ jobs:
         run: cmake --build build --parallel 2
       - name: Unit tests
         run: ctest --test-dir build --output-on-failure --label-exclude e2e
-  unit-test-sanitize:
+  unit-test-asan-ubsan:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-    needs: build-sanitize
+    needs: build-asan-ubsan
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -703,7 +703,7 @@ jobs:
       - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-sanitize
+          name: build-asan-ubsan
           path: build/
       - name: Install Clang
         run: |

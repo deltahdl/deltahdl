@@ -414,7 +414,7 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
 // §6.23: Resolve type(expr) to concrete type kind from declared variables.
 // §6.19/§6.24.2: Set enum type name on variable for $cast validation.
 static void SetEnumTypeInfo(const ModuleItem* item, RtlirVariable& var,
-                            const TypedefMap& typedefs) {
+                            const TypedefMap& typedefs, Arena& arena) {
   if (item->data_type.kind == DataTypeKind::kEnum) {
     var.enum_type_name = item->name;
     var.dtype = &item->data_type;
@@ -424,7 +424,9 @@ static void SetEnumTypeInfo(const ModuleItem* item, RtlirVariable& var,
   auto it = typedefs.find(item->data_type.type_name);
   if (it != typedefs.end() && it->second.kind == DataTypeKind::kEnum) {
     var.enum_type_name = item->data_type.type_name;
-    var.dtype = &it->second;
+    // Arena-allocate copy: typedefs_ map is destroyed with the Elaborator,
+    // but var.dtype must survive until after lowering.
+    var.dtype = arena.Create<DataType>(it->second);
   }
 }
 
@@ -491,7 +493,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
     var.class_type_name = item->data_type.type_name;
   }
   // §6.19/§6.24.2: Track enum type for $cast validation.
-  SetEnumTypeInfo(item, var, typedefs_);
+  SetEnumTypeInfo(item, var, typedefs_, arena_);
   // §7.4/§7.5: Compute unpacked array element count.
   ComputeUnpackedDims(item->unpacked_dims, var);
   InferDynArraySize(item->unpacked_dims, item->init_expr, var);
