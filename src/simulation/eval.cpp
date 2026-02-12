@@ -777,9 +777,45 @@ static Logic4Vec EvalAssignInExpr(const Expr* expr, SimContext& ctx,
   return rhs_val;
 }
 
+// §7.4.6: Compare two unpacked arrays element-by-element.
+static bool ArrayElementsEqual(std::string_view a, const ArrayInfo* ai,
+                               std::string_view b, SimContext& ctx) {
+  for (uint32_t i = 0; i < ai->size; ++i) {
+    auto an = std::string(a) + "[" + std::to_string(ai->lo + i) + "]";
+    auto bn = std::string(b) + "[" + std::to_string(ai->lo + i) + "]";
+    auto* av = ctx.FindVariable(an);
+    auto* bv = ctx.FindVariable(bn);
+    if (!av || !bv) return false;
+    if (av->value.ToUint64() != bv->value.ToUint64()) return false;
+  }
+  return true;
+}
+
+// §7.4.6: Try element-by-element unpacked array equality/inequality.
+static bool TryArrayEqualityOp(const Expr* expr, SimContext& ctx, Arena& arena,
+                               Logic4Vec& out) {
+  if (expr->op != TokenKind::kEqEq && expr->op != TokenKind::kBangEq)
+    return false;
+  if (!expr->lhs || !expr->rhs) return false;
+  if (expr->lhs->kind != ExprKind::kIdentifier) return false;
+  if (expr->rhs->kind != ExprKind::kIdentifier) return false;
+  auto* la = ctx.FindArrayInfo(expr->lhs->text);
+  auto* ra = ctx.FindArrayInfo(expr->rhs->text);
+  if (!la || !ra) return false;
+  bool eq = (la->size == ra->size && la->elem_width == ra->elem_width);
+  if (eq) eq = ArrayElementsEqual(expr->lhs->text, la, expr->rhs->text, ctx);
+  uint64_t val = (expr->op == TokenKind::kEqEq) == eq ? 1 : 0;
+  out = MakeLogic4VecVal(arena, 1, val);
+  return true;
+}
+
 static Logic4Vec EvalBinaryExpr(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
   if (expr->op == TokenKind::kEq) return EvalAssignInExpr(expr, ctx, arena);
+  {
+    Logic4Vec arr_result;
+    if (TryArrayEqualityOp(expr, ctx, arena, arr_result)) return arr_result;
+  }
   if (expr->op == TokenKind::kAmpAmp) {
     auto l = EvalExpr(expr->lhs, ctx, arena);
     if (l.ToUint64() == 0) return MakeLogic4VecVal(arena, 1, 0);
