@@ -436,6 +436,53 @@ void Elaborator::ResolveTypeRef(ModuleItem* item, const RtlirModule* mod) {
   }
 }
 
+// §6.25: Find a ClassDecl by name in the compilation unit or module classes.
+static const ClassDecl* FindClassDecl(std::string_view name,
+                                      const CompilationUnit* unit) {
+  for (const auto* cls : unit->classes) {
+    if (cls->name == name) return cls;
+  }
+  return nullptr;
+}
+
+// §6.25: Find a typedef member inside a class declaration.
+static const ModuleItem* FindClassTypedef(const ClassDecl* cls,
+                                          std::string_view member_name) {
+  for (const auto* m : cls->members) {
+    if (m->kind == ClassMemberKind::kTypedef && m->name == member_name) {
+      return m->typedef_item;
+    }
+  }
+  return nullptr;
+}
+
+bool Elaborator::ResolveParameterizedType(DataType& dtype) {
+  if (dtype.scope_name.empty() || dtype.type_params.empty()) return false;
+  const auto* cls = FindClassDecl(dtype.scope_name, unit_);
+  if (!cls) return false;
+  const auto* td = FindClassTypedef(cls, dtype.type_name);
+  if (!td) return false;
+  // Build substitution map: param_name → provided type.
+  std::unordered_map<std::string_view, const DataType*> subst;
+  for (size_t i = 0; i < cls->params.size() && i < dtype.type_params.size();
+       ++i) {
+    subst[cls->params[i].first] = &dtype.type_params[i];
+  }
+  // The typedef references a type parameter (e.g. typedef T my_type).
+  auto it = subst.find(td->typedef_type.type_name);
+  if (it == subst.end()) return false;
+  const DataType& resolved = *it->second;
+  dtype.kind = resolved.kind;
+  dtype.is_signed = resolved.is_signed;
+  dtype.packed_dim_left = resolved.packed_dim_left;
+  dtype.packed_dim_right = resolved.packed_dim_right;
+  dtype.extra_packed_dims = resolved.extra_packed_dims;
+  dtype.type_name = resolved.type_name;
+  dtype.scope_name = {};
+  dtype.type_params.clear();
+  return true;
+}
+
 // §6.19/§6.24.2: Set enum type name on variable for $cast validation.
 static void SetEnumTypeInfo(const ModuleItem* item, RtlirVariable& var,
                             const TypedefMap& typedefs) {
@@ -454,6 +501,8 @@ static void SetEnumTypeInfo(const ModuleItem* item, RtlirVariable& var,
 
 void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   ResolveTypeRef(item, mod);
+  // §6.25: Resolve parameterized class scope types (cls#(T)::member).
+  ResolveParameterizedType(item->data_type);
   // §6.6.7: If the type is a user-defined nettype, create a net.
   if (item->data_type.kind == DataTypeKind::kNamed &&
       nettype_names_.count(item->data_type.type_name)) {

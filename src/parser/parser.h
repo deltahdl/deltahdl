@@ -149,7 +149,8 @@ class Parser {
   void ParsePortConnection(ModuleItem* item);
   void ParseUnpackedDims(std::vector<Expr*>& dims);
   void ParseParenList(std::vector<Expr*>& out);
-  void ParseTypeParamList();
+  std::vector<DataType> ParseTypeParamList();
+  DataType ParseNamedType();
 
   // Statements (parser_stmt.cpp)
   Stmt* ParseStmt();

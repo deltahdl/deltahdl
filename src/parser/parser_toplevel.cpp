@@ -513,8 +513,9 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
     return;
   }
   if (Check(TokenKind::kKwTypedef)) {
-    member->kind = ClassMemberKind::kProperty;
-    member->name = ParseTypedef()->name;
+    member->kind = ClassMemberKind::kTypedef;
+    member->typedef_item = ParseTypedef();
+    member->name = member->typedef_item->name;
     members.push_back(member);
     return;
   }

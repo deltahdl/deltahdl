@@ -910,7 +910,7 @@ TEST(Parser, NettypeDeclaration) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
   EXPECT_EQ(item->name, "mynet");
 }
 
@@ -921,8 +921,9 @@ TEST(Parser, NettypeWithResolutionFunction) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
   EXPECT_EQ(item->name, "mynet");
+  EXPECT_EQ(item->nettype_resolve_func, "resolve_fn");
 }
 
 TEST(Parser, NettypeUsedInDecl) {

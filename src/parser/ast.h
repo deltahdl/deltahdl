@@ -179,6 +179,7 @@ struct DataType {
   Expr* type_ref_expr = nullptr;  // §6.23: type(expr) reference
   std::vector<EnumMember> enum_members;
   std::vector<StructMember> struct_members;
+  std::vector<DataType> type_params;  // §6.25: #(type_arg, ...) for cls#(T)::m
 };
 
 // --- Statements ---
@@ -583,6 +584,7 @@ enum class ClassMemberKind : uint8_t {
   kProperty,
   kMethod,
   kConstraint,
+  kTypedef,  // §6.25: class-scope typedef
 };
 
 struct ClassMember {
@@ -606,6 +608,7 @@ struct ClassMember {
 
   // Method (reuses ModuleItem for function/task)
   ModuleItem* method = nullptr;
+  ModuleItem* typedef_item = nullptr;  // §6.25: class-scope typedef
 };
 
 struct ClassDecl {

@@ -110,6 +110,9 @@ class Elaborator {
   /// §6.23: Resolve type(expr) to concrete type kind.
   void ResolveTypeRef(ModuleItem* item, const RtlirModule* mod);
 
+  /// §6.25: Resolve cls#(type_arg)::member to a concrete DataType.
+  bool ResolveParameterizedType(DataType& dtype);
+
   /// Validate array assignment pattern element count (§5.11).
   void ValidateArrayInitPattern(const ModuleItem* item);
 

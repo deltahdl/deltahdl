@@ -550,17 +550,25 @@ void Parser::ParsePackedDims(DataType& dtype) {
 }
 
 // §8.25: parse type parameter list — each element is a type or expression.
-void Parser::ParseTypeParamList() {
+std::vector<DataType> Parser::ParseTypeParamList() {
+  std::vector<DataType> result;
   Expect(TokenKind::kLParen);
   if (!Check(TokenKind::kRParen)) {
     auto dt = ParseDataType();
-    if (dt.kind == DataTypeKind::kImplicit) ParseExpr();
+    if (dt.kind == DataTypeKind::kImplicit) {
+      ParseExpr();
+    }
+    result.push_back(dt);
     while (Match(TokenKind::kComma)) {
       dt = ParseDataType();
-      if (dt.kind == DataTypeKind::kImplicit) ParseExpr();
+      if (dt.kind == DataTypeKind::kImplicit) {
+        ParseExpr();
+      }
+      result.push_back(dt);
     }
   }
   Expect(TokenKind::kRParen);
+  return result;
 }
 
 // §6.3.2: Parse charge strength (trireg) or drive strength (other nets).
@@ -580,6 +588,28 @@ void Parser::ParseNetStrength(DataType& dtype) {
   }
 }
 
+// §6.25/§8.26.3: Parse a named type with optional #(params) and :: scoping.
+DataType Parser::ParseNamedType() {
+  DataType dtype;
+  dtype.kind = DataTypeKind::kNamed;
+  dtype.type_name = Consume().text;
+  // §6.25/§8.25: parameterized class type params come before ::
+  if (Check(TokenKind::kHash)) {
+    Consume();
+    dtype.type_params = ParseTypeParamList();
+  }
+  // §8.26.3 scope-resolved types: class_name::type_name
+  while (Match(TokenKind::kColonColon)) {
+    dtype.scope_name = dtype.type_name;
+    dtype.type_name = ExpectIdentifier().text;
+    if (Check(TokenKind::kHash)) {
+      Consume();
+      dtype.type_params = ParseTypeParamList();
+    }
+  }
+  return dtype;
+}
+
 DataType Parser::ParseDataType() {
   DataType dtype;
 
@@ -595,19 +625,9 @@ DataType Parser::ParseDataType() {
   bool is_named = CurrentToken().Is(TokenKind::kIdentifier) &&
                   known_types_.count(CurrentToken().text) != 0;
   if (is_named) {
-    dtype.kind = DataTypeKind::kNamed;
-    dtype.type_name = Consume().text;
-    // §8.26.3 scope-resolved types: class_name::type_name
-    while (Match(TokenKind::kColonColon)) {
-      dtype.scope_name = dtype.type_name;
-      dtype.type_name = ExpectIdentifier().text;
-    }
-    // §8.25 parameterized class type: cls #(params)
-    if (Check(TokenKind::kHash)) {
-      Consume();
-      ParseTypeParamList();
-    }
-    return dtype;
+    auto named = ParseNamedType();
+    named.is_const = dtype.is_const;
+    return named;
   }
 
   auto tok_kind = CurrentToken().kind;
