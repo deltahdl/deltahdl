@@ -717,6 +717,7 @@ static bool IsAssignmentPatternKey(TokenKind k) {
     case TokenKind::kKwShortreal:
     case TokenKind::kKwInteger:
     case TokenKind::kKwString:
+    case TokenKind::kStringLiteral:
       return true;
     default:
       return false;

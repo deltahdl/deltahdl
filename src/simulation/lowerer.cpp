@@ -167,15 +167,29 @@ static void CreateArrayElements(const RtlirVariable& var, SimContext& ctx,
   }
 }
 
-// §7.8: Set default value for an assoc array from '{default: val} pattern.
+// §7.9.11: Strip surrounding quotes from a string literal key.
+static std::string StripQuotes(std::string_view s) {
+  if (s.size() >= 2 && s.front() == '"' && s.back() == '"')
+    return std::string(s.substr(1, s.size() - 2));
+  return std::string(s);
+}
+
+// §7.9.11: Initialize assoc array from '{key:val, default:val} literal.
 void Lowerer::InitAssocDefault(const Expr* init, AssocArrayObject* aa) {
   if (!init || init->kind != ExprKind::kAssignmentPattern) return;
   for (size_t i = 0; i < init->pattern_keys.size(); ++i) {
-    if (init->pattern_keys[i] != "default") continue;
     if (i >= init->elements.size()) break;
-    aa->has_default = true;
-    aa->default_value = EvalExpr(init->elements[i], ctx_, arena_);
-    return;
+    auto key = init->pattern_keys[i];
+    auto val = EvalExpr(init->elements[i], ctx_, arena_);
+    if (key == "default") {
+      aa->has_default = true;
+      aa->default_value = val;
+    } else if (aa->is_string_key) {
+      aa->str_data[StripQuotes(key)] = val;
+    } else {
+      auto ikey = static_cast<int64_t>(std::stoll(std::string(key)));
+      aa->int_data[ikey] = val;
+    }
   }
 }
 
