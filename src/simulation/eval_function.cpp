@@ -497,6 +497,36 @@ static Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, 32, result);
 }
 
+// §8: Dispatch a method call on a class object instance.
+static bool TryEvalClassMethodCall(const Expr* expr, SimContext& ctx,
+                                   Arena& arena, Logic4Vec& out) {
+  MethodCallParts parts;
+  if (!ExtractMethodCallParts(expr, parts)) return false;
+  auto class_type = ctx.GetVariableClassType(parts.var_name);
+  if (class_type.empty()) return false;
+  auto* var = ctx.FindVariable(parts.var_name);
+  if (!var) return false;
+  auto handle = var->value.ToUint64();
+  if (handle == kNullClassHandle) return false;
+  auto* obj = ctx.GetClassObject(handle);
+  if (!obj) return false;
+  auto* method = obj->ResolveMethod(parts.method_name);
+  if (!method) return false;
+  bool is_void = (method->return_type.kind == DataTypeKind::kVoid);
+  ctx.PushScope();
+  ctx.PushThis(obj);
+  BindFunctionArgs(method, expr, ctx, arena);
+  Variable dummy_ret;
+  Variable* ret_var = &dummy_ret;
+  if (!is_void) ret_var = ctx.CreateLocalVariable(method->name, 32);
+  ExecFunctionBody(method, ret_var, ctx, arena);
+  WritebackOutputArgs(method, expr, ctx);
+  out = is_void ? MakeLogic4VecVal(arena, 1, 0) : ret_var->value;
+  ctx.PopThis();
+  ctx.PopScope();
+  return true;
+}
+
 // Try dispatching to built-in type methods (enum, string, array, queue).
 static bool TryBuiltinMethodCall(const Expr* expr, SimContext& ctx,
                                  Arena& arena, Logic4Vec& out) {
@@ -511,6 +541,9 @@ static bool TryBuiltinMethodCall(const Expr* expr, SimContext& ctx,
 Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec method_result;
   if (TryBuiltinMethodCall(expr, ctx, arena, method_result)) {
+    return method_result;
+  }
+  if (TryEvalClassMethodCall(expr, ctx, arena, method_result)) {
     return method_result;
   }
 
