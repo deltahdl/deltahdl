@@ -33,6 +33,7 @@ class Lowerer {
   void LowerProcess(const RtlirProcess& proc);
   void LowerContAssign(const RtlirContAssign& ca);
   void LowerClassDecl(const ClassDecl* cls);
+  void LowerDynArrayInit(const RtlirVariable& var);
   void InitAssocDefault(const Expr* init, AssocArrayObject* aa);
   void RegisterEnumForCast(const RtlirVariable& var);
   void RegisterEnumTypes(const RtlirModule* mod);

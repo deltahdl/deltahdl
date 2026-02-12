@@ -352,6 +352,16 @@ static void CollectQueueElements(const Expr* expr, SimContext& ctx,
   out.push_back(EvalExpr(expr, ctx, arena));
 }
 
+// §7.5.1: Copy source array into new[size](src) target.
+static void CopyNewInit(const Expr* rhs, QueueObject* q, SimContext& ctx,
+                        Arena& /*arena*/) {
+  if (!rhs->lhs || rhs->lhs->kind != ExprKind::kIdentifier) return;
+  auto* src = ctx.FindQueue(rhs->lhs->text);
+  if (!src) return;
+  size_t copy_len = std::min(q->elements.size(), src->elements.size());
+  for (size_t i = 0; i < copy_len; ++i) q->elements[i] = src->elements[i];
+}
+
 // §7.10.4: Queue assignment from concatenation, slice, or literal.
 static bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
@@ -368,6 +378,7 @@ static bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx,
     auto sz = EvalExpr(stmt->rhs->args[0], ctx, arena).ToUint64();
     q->elements.resize(static_cast<size_t>(sz),
                        MakeLogic4VecVal(arena, q->elem_width, 0));
+    CopyNewInit(stmt->rhs, q, ctx, arena);
     return true;
   }
   std::vector<Logic4Vec> elems;

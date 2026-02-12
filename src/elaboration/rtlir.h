@@ -71,6 +71,7 @@ struct RtlirVariable {
   uint32_t unpacked_size = 0;        // §7.4: unpacked array element count.
   uint32_t unpacked_lo = 0;          // §7.4: unpacked array low index.
   bool is_descending = false;        // §7.4: true for [hi:lo] range.
+  bool is_dynamic = false;           // §7.5: dynamic array declared with [].
   bool is_queue = false;             // §7.10: queue declared with [$].
   int32_t queue_max_size = -1;       // §7.10: max queue size (-1=unbounded).
   bool is_assoc = false;             // §7.8: associative array.

@@ -322,12 +322,10 @@ static void InferDynArraySize(const std::vector<Expr*>& dims, const Expr* init,
                               RtlirVariable& var) {
   if (dims.empty() || dims[0] != nullptr) return;  // Not a dynamic array.
   if (var.is_queue || var.is_assoc) return;        // Already classified.
+  var.is_dynamic = true;
   if (init && !init->elements.empty()) {
     var.unpacked_size = static_cast<uint32_t>(init->elements.size());
-    return;
   }
-  // §7.5: Uninitialized dynamic array — treat as queue for runtime resize.
-  var.is_queue = true;
 }
 
 // §7.4: Extract unpacked array size from dimension expressions.

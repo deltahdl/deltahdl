@@ -174,6 +174,17 @@ static std::string StripQuotes(std::string_view s) {
   return std::string(s);
 }
 
+// §7.5: Initialize dynamic array from init expression.
+void Lowerer::LowerDynArrayInit(const RtlirVariable& var) {
+  if (!var.init_expr) return;
+  auto* q = ctx_.FindQueue(var.name);
+  if (!q) return;
+  if (var.init_expr->kind != ExprKind::kAssignmentPattern) return;
+  for (auto* elem : var.init_expr->elements) {
+    q->elements.push_back(EvalExpr(elem, ctx_, arena_));
+  }
+}
+
 // §7.9.11: Initialize assoc array from '{key:val, default:val} literal.
 void Lowerer::InitAssocDefault(const Expr* init, AssocArrayObject* aa) {
   if (!init || init->kind != ExprKind::kAssignmentPattern) return;
@@ -219,6 +230,10 @@ static void ApplyStructMemberDefaults(const RtlirVariable& var, Variable* v,
 void Lowerer::LowerVarAggregate(const RtlirVariable& var) {
   if (var.is_queue) {
     ctx_.CreateQueue(var.name, var.width, var.queue_max_size);
+  } else if (var.is_dynamic) {
+    // §7.5: Dynamic arrays use queue storage for resize support.
+    ctx_.CreateQueue(var.name, var.width);
+    LowerDynArrayInit(var);
   } else if (var.is_assoc) {
     auto* aa = ctx_.CreateAssocArray(var.name, var.width, var.is_string_index);
     InitAssocDefault(var.init_expr, aa);
