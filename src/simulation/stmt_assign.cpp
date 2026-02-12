@@ -332,6 +332,18 @@ static bool CollectFromQueueElem(const Expr* expr, SimContext& ctx,
 }
 
 // §7.10: Collect elements from an expression for queue assignment.
+// §7.6: Collect elements from a fixed-size array for cross-type assignment.
+static void CollectFixedArrayElements(std::string_view name,
+                                      const ArrayInfo& ai, SimContext& ctx,
+                                      std::vector<Logic4Vec>& out) {
+  for (uint32_t i = 0; i < ai.size; ++i) {
+    uint32_t idx = ai.lo + i;
+    auto ename = std::string(name) + "[" + std::to_string(idx) + "]";
+    auto* v = ctx.FindVariable(ename);
+    if (v) out.push_back(v->value);
+  }
+}
+
 static void CollectQueueElements(const Expr* expr, SimContext& ctx,
                                  Arena& arena, std::vector<Logic4Vec>& out) {
   if (expr->kind == ExprKind::kConcatenation) {
@@ -345,6 +357,12 @@ static void CollectQueueElements(const Expr* expr, SimContext& ctx,
     auto* q = ctx.FindQueue(expr->text);
     if (q) {
       out.insert(out.end(), q->elements.begin(), q->elements.end());
+      return;
+    }
+    // §7.6: Fixed-size array → queue/dynamic array assignment.
+    auto* ai = ctx.FindArrayInfo(expr->text);
+    if (ai) {
+      CollectFixedArrayElements(expr->text, *ai, ctx, out);
       return;
     }
   }
