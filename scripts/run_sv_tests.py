@@ -319,14 +319,20 @@ def main():
         sys.exit(1)
 
     results = []
-    passed = 0
+    ok_flags = []
     suite_start = time.monotonic()
 
     with ThreadPoolExecutor(max_workers=os.cpu_count()) as pool:
         for result, ok in pool.map(build_result, tests):
-            print_status(result, ok)
             results.append(result)
-            passed += ok
+            ok_flags.append(ok)
+
+    # Sort results by clause-number prefix for hierarchical display.
+    pairs = sorted(zip(results, ok_flags), key=lambda p: _natural_sort_key(p[0]["name"]))
+    passed = 0
+    for result, ok in pairs:
+        print_status(result, ok)
+        passed += ok
 
     failed = len(results) - passed
     pct = 100.0 * passed / len(results)
