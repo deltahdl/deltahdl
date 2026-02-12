@@ -148,6 +148,18 @@ void Elaborator::ValidateChandleSensitivity(const ModuleItem* item) {
   }
 }
 
+// §6.6.8: interconnect nets cannot appear in continuous assignments.
+void Elaborator::ValidateInterconnectContAssign(const ModuleItem* item) {
+  if (item->kind != ModuleItemKind::kContAssign) return;
+  if (!item->assign_lhs || item->assign_lhs->kind != ExprKind::kIdentifier) {
+    return;
+  }
+  if (interconnect_names_.count(item->assign_lhs->text)) {
+    diag_.Error(item->loc,
+                "interconnect net cannot be used in continuous assignment");
+  }
+}
+
 void Elaborator::ValidateItemConstraints(const ModuleItem* item) {
   bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
                  item->kind == ModuleItemKind::kInitialBlock;
@@ -157,6 +169,7 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item) {
   ValidateEdgeOnReal(item);
   ValidateChandleContAssign(item);
   ValidateChandleSensitivity(item);
+  ValidateInterconnectContAssign(item);
   if (item->kind == ModuleItemKind::kContAssign) {
     CheckRealSelect(item->assign_rhs, var_types_, diag_);
   }

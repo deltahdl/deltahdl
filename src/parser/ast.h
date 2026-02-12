@@ -161,13 +161,14 @@ struct DataType {
   bool is_signed = false;
   bool is_packed = false;
   bool is_const = false;
-  bool is_net = false;       // True for wire/tri/wand/wor/supply/uwire types.
-  bool is_tagged = false;    // union tagged (§7.3.2)
-  bool is_soft = false;      // union soft (§7.3.1)
-  bool is_vectored = false;  // vectored qualifier (§6.6.9)
-  bool is_scalared = false;  // scalared qualifier (§6.6.9)
-  uint8_t charge_strength = 0;  // §6.6.4: 1=small, 2=medium, 4=large
-  uint8_t drive_strength0 = 0;  // §6.3.2.2: 0=none,...,5=supply
+  bool is_net = false;           // True for wire/tri/wand/wor/supply/uwire.
+  bool is_interconnect = false;  // §6.6.8: typeless generic net.
+  bool is_tagged = false;        // union tagged (§7.3.2)
+  bool is_soft = false;          // union soft (§7.3.1)
+  bool is_vectored = false;      // vectored qualifier (§6.6.9)
+  bool is_scalared = false;      // scalared qualifier (§6.6.9)
+  uint8_t charge_strength = 0;   // §6.6.4: 1=small, 2=medium, 4=large
+  uint8_t drive_strength0 = 0;   // §6.3.2.2: 0=none,...,5=supply
   uint8_t drive_strength1 = 0;
   Expr* packed_dim_left = nullptr;
   Expr* packed_dim_right = nullptr;

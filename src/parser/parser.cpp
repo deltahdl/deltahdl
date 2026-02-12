@@ -738,6 +738,7 @@ bool Parser::TryParseKeywordItem(std::vector<ModuleItem*>& items) {
     DataType dtype;
     dtype.kind = DataTypeKind::kWire;
     dtype.is_net = true;
+    dtype.is_interconnect = true;
     ParseVarDeclList(items, dtype);
     return true;
   }

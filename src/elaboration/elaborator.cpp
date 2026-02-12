@@ -391,7 +391,13 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   var_types_[item->name] = item->data_type.kind;
   RtlirNet net;
   net.name = ScopedName(item->name);
-  net.net_type = DataTypeToNetType(item->data_type.kind);
+  // §6.6.8: interconnect nets are typeless generic nets.
+  if (item->data_type.is_interconnect) {
+    net.net_type = NetType::kInterconnect;
+    interconnect_names_.insert(item->name);
+  } else {
+    net.net_type = DataTypeToNetType(item->data_type.kind);
+  }
   net.width = EvalTypeWidth(item->data_type, typedefs_);
   // §6.6.4: Extract charge strength and decay time for trireg nets.
   if (item->data_type.charge_strength != 0) {
@@ -705,6 +711,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   enum_var_names_.clear();
   enum_member_names_.clear();
   const_names_.clear();
+  interconnect_names_.clear();
   for (auto* item : decl->items) {
     ElaborateItem(item, mod);
   }

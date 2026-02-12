@@ -135,6 +135,9 @@ class Elaborator {
   /// §6.14: chandle cannot appear in event expression.
   void ValidateChandleSensitivity(const ModuleItem* item);
 
+  /// §6.6.8: interconnect net cannot appear in continuous assignment.
+  void ValidateInterconnectContAssign(const ModuleItem* item);
+
   /// Check for mixed continuous/procedural assignments (§6.5).
   void ValidateMixedAssignments();
 
@@ -179,7 +182,8 @@ class Elaborator {
   std::unordered_set<std::string_view> enum_member_names_;
   std::unordered_set<std::string_view> const_names_;    // §6.20.6: const vars
   std::unordered_set<std::string_view> class_names_;    // §8: known class names
-  std::unordered_set<std::string_view> nettype_names_;  // §6.6.7: user nettypes
+  std::unordered_set<std::string_view> nettype_names_;  // §6.6.7: nettypes
+  std::unordered_set<std::string_view> interconnect_names_;  // §6.6.8
 };
 
 }  // namespace delta
