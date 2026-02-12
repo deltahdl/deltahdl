@@ -207,13 +207,34 @@ Token Lexer::LexUnbasedUnsized(SourceLoc loc, uint32_t start) {
   return tok;
 }
 
+void Lexer::ValidateDecimalXZ(SourceLoc loc, char base_letter,
+                              uint32_t digit_start) {
+  if (base_letter != 'd' && base_letter != 'D') return;
+  // §5.7.1: In a decimal literal, x/z/? is only valid as the sole digit.
+  uint32_t digit_count = 0;
+  bool has_xz = false;
+  for (uint32_t i = digit_start; i < pos_; ++i) {
+    char c = source_[i];
+    if (c == '_') continue;
+    ++digit_count;
+    if (c == 'x' || c == 'X' || c == 'z' || c == 'Z' || c == '?') {
+      has_xz = true;
+    }
+  }
+  if (has_xz && digit_count > 1) {
+    diag_.Error(loc, "x, z, or ? in decimal literal must be the only digit");
+  }
+}
+
 Token Lexer::LexBasedNumber(SourceLoc loc, uint32_t start) {
   Advance();  // skip '
   // Optional signed specifier: 's' or 'S'.
   if (!AtEnd() && (Current() == 's' || Current() == 'S')) {
     Advance();
   }
+  char base_letter = '\0';
   if (!AtEnd()) {
+    base_letter = Current();
     Advance();  // base letter (h/d/b/o)
   }
   // Skip optional whitespace after base letter (IEEE §5.7.1).
@@ -230,6 +251,7 @@ Token Lexer::LexBasedNumber(SourceLoc loc, uint32_t start) {
   if (pos_ == before_digits) {
     diag_.Error(loc, "missing value digits after base specifier");
   }
+  ValidateDecimalXZ(loc, base_letter, before_digits);
   Token tok;
   tok.kind = TokenKind::kIntLiteral;
   tok.loc = loc;
@@ -345,7 +367,9 @@ Token Lexer::LexStringLiteral() {
     Advance();
     Advance();
     Advance();  // skip opening """
-    LexTripleQuotedBody();
+    if (!LexTripleQuotedBody()) {
+      diag_.Error(loc, "unterminated triple-quoted string");
+    }
   } else {
     Advance();  // skip opening "
     LexQuotedBody();
@@ -369,20 +393,21 @@ void Lexer::LexQuotedBody() {
   }
 }
 
-void Lexer::LexTripleQuotedBody() {
+bool Lexer::LexTripleQuotedBody() {
   while (!AtEnd()) {
     if (Current() == '"' && PeekChar() == '"' && pos_ + 2 < source_.size() &&
         source_[pos_ + 2] == '"') {
       Advance();
       Advance();
       Advance();  // skip closing """
-      return;
+      return true;
     }
     if (Current() == '\\') {
       Advance();  // skip escape character
     }
     Advance();
   }
+  return false;
 }
 
 Token Lexer::LexSystemIdentifier() {

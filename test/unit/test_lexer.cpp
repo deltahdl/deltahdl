@@ -718,3 +718,49 @@ TEST(Lexer, UnterminatedBlockComment_Error) {
   lexer.LexAll();
   EXPECT_TRUE(diag.HasErrors());
 }
+
+// --- §5.9: Unterminated triple-quoted string ---
+
+TEST(Lexer, UnterminatedTripleQuotedString_Error) {
+  std::string src = R"("""no closing triple)";
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<test>", src);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  lexer.LexAll();
+  EXPECT_TRUE(diag.HasErrors());
+}
+
+// --- §5.7.1: Decimal x/z validation ---
+
+TEST(Lexer, DecimalXZ_SingleDigit_Valid) {
+  // 8'dx, 8'dz, 8'd? — single x/z/? is valid (all bits)
+  for (const char* src : {"8'dx", "8'dz", "8'd?"}) {
+    SourceManager mgr;
+    DiagEngine diag(mgr);
+    auto fid = mgr.AddFile("<test>", src);
+    Lexer lexer(mgr.FileContent(fid), fid, diag);
+    lexer.LexAll();
+    EXPECT_FALSE(diag.HasErrors()) << "should be valid: " << src;
+  }
+}
+
+TEST(Lexer, DecimalXZ_Mixed_Error) {
+  // 8'd1x — mixed decimal digits with x/z/? is invalid
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<test>", "8'd1x");
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  lexer.LexAll();
+  EXPECT_TRUE(diag.HasErrors());
+}
+
+TEST(Lexer, DecimalXZ_MultiXZ_Error) {
+  // 8'dxz — multiple x/z digits in decimal is invalid
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<test>", "8'dxz");
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  lexer.LexAll();
+  EXPECT_TRUE(diag.HasErrors());
+}

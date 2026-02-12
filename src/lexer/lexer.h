@@ -53,7 +53,7 @@ class Lexer {
   Token LexNumber();
   Token LexStringLiteral();
   void LexQuotedBody();
-  void LexTripleQuotedBody();
+  bool LexTripleQuotedBody();
   Token LexSystemIdentifier();
   Token LexEscapedIdentifier();
   Token LexApostrophe();
@@ -62,6 +62,7 @@ class Lexer {
   // Number sub-helpers
   Token LexUnbasedUnsized(SourceLoc loc, uint32_t start);
   Token LexBasedNumber(SourceLoc loc, uint32_t start);
+  void ValidateDecimalXZ(SourceLoc loc, char base_letter, uint32_t digit_start);
   void LexRealSuffix();
   void LexFractionalPart();
   void LexExponentPart();
