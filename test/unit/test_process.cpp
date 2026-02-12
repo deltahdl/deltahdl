@@ -97,9 +97,7 @@ TEST(Process, CoroutineRelease) {
 }
 
 TEST(Process, CoroutineDestroyOnScopeExit) {
-  // §9.5: Coroutine resources cleaned up on destruction.
-  {
-    SimCoroutine coro = MakeTestCoroutine();
-  }
-  // No leak if sanitizer passes.
+  // Coroutine resources cleaned up on destruction (§9.5).
+  SimCoroutine coro = MakeTestCoroutine();
+  // Immediately destroyed — no leak if sanitizer passes.
 }
