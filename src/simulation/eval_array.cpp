@@ -702,11 +702,11 @@ static bool IsStringArray(std::string_view var_name, const ArrayInfo& info,
   return ctx.IsStringVariable(name);
 }
 
-// §7.12.1: Check if a method name is a locator method.
+// §7.12.1/§7.12.5: Check if a method name is a locator or map method.
 static bool IsLocatorMethod(std::string_view name) {
   return name == "find" || name == "find_first" || name == "find_last" ||
          name == "find_index" || name == "find_last_index" ||
-         name == "unique" || name == "unique_index";
+         name == "unique" || name == "unique_index" || name == "map";
 }
 
 // Bundles common locator method arguments to stay within 5-parameter limit.
@@ -772,6 +772,20 @@ static void LocatorFindIndex(std::string_view method, const LocatorCtx& lc,
   for (size_t i = 0; i < lc.elems.size(); ++i) {
     if (!EvalLocatorPredicate(lc, lc.elems[i], i)) continue;
     out.push_back(MakeLogic4VecVal(lc.arena, 32, static_cast<uint64_t>(i)));
+  }
+}
+
+// §7.12.5: map — transform each element via with-clause.
+static void LocatorMap(const LocatorCtx& lc, std::vector<Logic4Vec>& out) {
+  for (size_t i = 0; i < lc.elems.size(); ++i) {
+    lc.ctx.PushScope();
+    auto* item_var = lc.ctx.CreateLocalVariable("item", lc.elems[i].width);
+    item_var->value = lc.elems[i];
+    if (lc.is_string) lc.ctx.RegisterStringVariable("item");
+    auto* idx_var = lc.ctx.CreateLocalVariable("item.index", 32);
+    idx_var->value = MakeLogic4VecVal(lc.arena, 32, static_cast<uint64_t>(i));
+    out.push_back(EvalExpr(lc.with_expr, lc.ctx, lc.arena));
+    lc.ctx.PopScope();
   }
 }
 
@@ -854,8 +868,10 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
   if (!expr->with_expr) return false;
 
   LocatorCtx lc{elems, is_str, expr->with_expr, ctx, arena};
-  if (parts.method_name == "find_index" ||
-      parts.method_name == "find_last_index") {
+  if (parts.method_name == "map") {
+    LocatorMap(lc, out);
+  } else if (parts.method_name == "find_index" ||
+             parts.method_name == "find_last_index") {
     LocatorFindIndex(parts.method_name, lc, out);
   } else {
     LocatorFindDispatch(parts.method_name, lc, out);
