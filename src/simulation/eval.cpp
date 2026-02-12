@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
 #include "elaboration/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
@@ -634,6 +635,40 @@ static std::string ExtractStringKey(const Logic4Vec& key) {
   return s;
 }
 
+// §7.8.6: Read assoc array, returning value or default (with warning on miss).
+static Logic4Vec AssocReadOrDefault(const AssocArrayObject* aa, bool found,
+                                    Logic4Vec found_val,
+                                    std::string_view arr_name, SimContext& ctx,
+                                    Arena& arena) {
+  if (found) return found_val;
+  if (!aa->has_default)
+    ctx.GetDiag().Warning({}, "associative array '" + std::string(arr_name) +
+                                  "': read of non-existent index");
+  return AssocDefault(aa, arena);
+}
+
+// §7.8: Read from assoc array by string key.
+static Logic4Vec AssocReadStr(AssocArrayObject* aa, const Expr* idx_expr,
+                              std::string_view name, SimContext& ctx,
+                              Arena& arena) {
+  auto s = ExtractStringKey(EvalExpr(idx_expr, ctx, arena));
+  auto it = aa->str_data.find(s);
+  bool hit = (it != aa->str_data.end());
+  return AssocReadOrDefault(aa, hit, hit ? it->second : Logic4Vec{}, name, ctx,
+                            arena);
+}
+
+// §7.8: Read from assoc array by integer key.
+static Logic4Vec AssocReadInt(AssocArrayObject* aa, const Expr* idx_expr,
+                              std::string_view name, SimContext& ctx,
+                              Arena& arena) {
+  auto key = static_cast<int64_t>(EvalExpr(idx_expr, ctx, arena).ToUint64());
+  auto it = aa->int_data.find(key);
+  bool hit = (it != aa->int_data.end());
+  return AssocReadOrDefault(aa, hit, hit ? it->second : Logic4Vec{}, name, ctx,
+                            arena);
+}
+
 // §7.8: Try associative array indexed access. Returns true if handled.
 static bool TryAssocSelect(const Expr* expr, SimContext& ctx, Arena& arena,
                            Logic4Vec& out) {
@@ -641,16 +676,9 @@ static bool TryAssocSelect(const Expr* expr, SimContext& ctx, Arena& arena,
   if (expr->index_end) return false;
   auto* aa = ctx.FindAssocArray(expr->base->text);
   if (!aa) return false;
-  if (aa->is_string_key) {
-    auto s = ExtractStringKey(EvalExpr(expr->index, ctx, arena));
-    auto it = aa->str_data.find(s);
-    out = (it != aa->str_data.end()) ? it->second : AssocDefault(aa, arena);
-  } else {
-    auto key =
-        static_cast<int64_t>(EvalExpr(expr->index, ctx, arena).ToUint64());
-    auto it = aa->int_data.find(key);
-    out = (it != aa->int_data.end()) ? it->second : AssocDefault(aa, arena);
-  }
+  out = aa->is_string_key
+            ? AssocReadStr(aa, expr->index, expr->base->text, ctx, arena)
+            : AssocReadInt(aa, expr->index, expr->base->text, ctx, arena);
   return true;
 }
 
