@@ -191,7 +191,54 @@ static double ExtractDouble(const Logic4Vec& vec) {
   return d;
 }
 
+// §6.24.3: Pack unpacked array elements into a bitvector (index 0 at MSBs).
+static Logic4Vec PackArrayBitStream(std::string_view name,
+                                    const ArrayInfo& info, SimContext& ctx,
+                                    Arena& arena) {
+  uint32_t total_bits = info.size * info.elem_width;
+  uint64_t packed = 0;
+  for (uint32_t i = 0; i < info.size; ++i) {
+    uint32_t idx = info.lo + i;
+    auto elem_name = std::string(name) + "[" + std::to_string(idx) + "]";
+    auto* elem = ctx.FindVariable(elem_name);
+    if (!elem) continue;
+    uint64_t ev = elem->value.ToUint64();
+    uint32_t shift = total_bits - (i + 1) * info.elem_width;
+    packed |= (ev & ((uint64_t{1} << info.elem_width) - 1)) << shift;
+  }
+  return MakeLogic4VecVal(arena, total_bits, packed);
+}
+
+// §6.12.1: Handle real↔integer conversion in cast.
+static Logic4Vec CastRealConversion(const Logic4Vec& inner,
+                                    std::string_view type_name,
+                                    uint32_t target_width, Arena& arena) {
+  if (inner.is_real && !IsRealCastTarget(type_name)) {
+    auto val = static_cast<uint64_t>(
+        static_cast<int64_t>(std::llround(ExtractDouble(inner))));
+    if (target_width < 64) val &= (uint64_t{1} << target_width) - 1;
+    return MakeLogic4VecVal(arena, target_width, val);
+  }
+  auto d = static_cast<double>(inner.ToUint64());
+  uint64_t bits = 0;
+  std::memcpy(&bits, &d, sizeof(double));
+  auto result = MakeLogic4VecVal(arena, target_width, bits);
+  result.is_real = true;
+  return result;
+}
+
 Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
+  // §6.24.3: Detect bit-stream source (unpacked array).
+  if (expr->lhs && expr->lhs->kind == ExprKind::kIdentifier) {
+    auto* arr_info = ctx.FindArrayInfo(expr->lhs->text);
+    if (arr_info && arr_info->size > 0) {
+      auto inner = PackArrayBitStream(expr->lhs->text, *arr_info, ctx, arena);
+      uint32_t target_width = CastWidth(expr->text);
+      uint64_t val = inner.ToUint64();
+      if (target_width < 64) val &= (uint64_t{1} << target_width) - 1;
+      return MakeLogic4VecVal(arena, target_width, val);
+    }
+  }
   auto inner = EvalExpr(expr->lhs, ctx, arena);
   std::string_view type_name = expr->text;
   // §6.24.1: signed'(x) / unsigned'(x) change signedness, not width.
@@ -204,29 +251,12 @@ Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
     return inner;
   }
   uint32_t target_width = CastWidth(type_name);
-  // §6.12.1: real→integer rounds to nearest (ties away from zero).
-  if (inner.is_real && !IsRealCastTarget(type_name)) {
-    auto val = static_cast<uint64_t>(
-        static_cast<int64_t>(std::llround(ExtractDouble(inner))));
-    if (target_width < 64) {
-      val &= (uint64_t{1} << target_width) - 1;
-    }
-    return MakeLogic4VecVal(arena, target_width, val);
-  }
-  // §6.12.1: integer→real conversion.
-  if (!inner.is_real && IsRealCastTarget(type_name)) {
-    auto d = static_cast<double>(inner.ToUint64());
-    uint64_t bits = 0;
-    std::memcpy(&bits, &d, sizeof(double));
-    auto result = MakeLogic4VecVal(arena, target_width, bits);
-    result.is_real = true;
-    return result;
+  // §6.12.1: real↔integer conversion.
+  if (inner.is_real != IsRealCastTarget(type_name)) {
+    return CastRealConversion(inner, type_name, target_width, arena);
   }
   uint64_t val = inner.ToUint64();
-  // Truncate or zero-extend to target width.
-  if (target_width < 64) {
-    val &= (uint64_t{1} << target_width) - 1;
-  }
+  if (target_width < 64) val &= (uint64_t{1} << target_width) - 1;
   return MakeLogic4VecVal(arena, target_width, val);
 }
 
