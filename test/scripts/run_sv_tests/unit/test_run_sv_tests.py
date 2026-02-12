@@ -228,6 +228,11 @@ def test_chapter_from_path_extracts_chapter_directory():
     assert run_sv_tests.chapter_from_path("/a/chapter-5/foo.sv") == "chapter-5"
 
 
+def test_chapter_from_path_falls_back_to_parent_name():
+    """chapter_from_path() should return parent dir when no chapter- part."""
+    assert run_sv_tests.chapter_from_path("/some/other/foo.sv") == "other"
+
+
 def test_print_chapter_breakdown_has_box_drawing_table(capsys):
     """print_chapter_breakdown() should print a box-drawing table."""
     results = [{"chapter": "chapter-5", "status": "pass"}]
