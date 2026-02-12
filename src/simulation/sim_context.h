@@ -12,6 +12,7 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "parser/ast.h"
 #include "simulation/class_object.h"
 #include "simulation/net.h"
 #include "simulation/scheduler.h"
@@ -41,8 +42,9 @@ struct EnumTypeInfo {
 // §7.2: Struct field descriptor for packed struct layout.
 struct StructFieldInfo {
   std::string_view name;
-  uint32_t bit_offset = 0;  // Starting bit position within the struct
-  uint32_t width = 0;       // Width in bits
+  uint32_t bit_offset = 0;
+  uint32_t width = 0;
+  DataTypeKind type_kind = DataTypeKind::kLogic;
 };
 
 // §7.2: Struct type descriptor for field-level access.

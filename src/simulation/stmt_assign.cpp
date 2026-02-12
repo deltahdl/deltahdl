@@ -432,6 +432,20 @@ static bool TryClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 }
 
 // Execute a blocking assignment with full LHS support.
+// §10.9.2: Evaluate RHS as named struct pattern if applicable.
+static Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
+                                          Arena& arena) {
+  if (!stmt->rhs || stmt->lhs->kind != ExprKind::kIdentifier) {
+    return EvalExpr(stmt->rhs, ctx, arena);
+  }
+  bool named = stmt->rhs->kind == ExprKind::kAssignmentPattern &&
+               !stmt->rhs->pattern_keys.empty();
+  if (!named) return EvalExpr(stmt->rhs, ctx, arena);
+  auto* sinfo = ctx.GetVariableStructType(stmt->lhs->text);
+  if (!sinfo) return EvalExpr(stmt->rhs, ctx, arena);
+  return EvalStructPattern(stmt->rhs, sinfo, ctx, arena);
+}
+
 StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
                                   Arena& arena) {
   if (!stmt->lhs) return StmtResult::kDone;
@@ -440,7 +454,7 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
   if (TryAssocCopyAssign(stmt, ctx)) return StmtResult::kDone;
   if (TryQueueBlockingAssign(stmt, ctx, arena)) return StmtResult::kDone;
 
-  auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
+  auto rhs_val = EvalRhsWithStructContext(stmt, ctx, arena);
 
   if (stmt->lhs->kind == ExprKind::kSelect) {
     TrySelectBlockingAssign(stmt->lhs, rhs_val, ctx, arena);
@@ -462,7 +476,7 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
 
 StmtResult ExecNonblockingAssignImpl(const Stmt* stmt, SimContext& ctx,
                                      Arena& arena) {
-  auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
+  auto rhs_val = EvalRhsWithStructContext(stmt, ctx, arena);
   if (!stmt->lhs) return StmtResult::kDone;
 
   bool is_select = (stmt->lhs->kind == ExprKind::kSelect);

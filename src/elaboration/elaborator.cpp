@@ -428,6 +428,25 @@ static void SetEnumTypeInfo(const ModuleItem* item, RtlirVariable& var,
   }
 }
 
+// §7.2: Resolve struct/union type info for field-level access.
+void Elaborator::SetStructTypeInfo(const ModuleItem* item, RtlirVariable& var) {
+  if (item->data_type.kind == DataTypeKind::kStruct ||
+      item->data_type.kind == DataTypeKind::kUnion) {
+    var.dtype = &item->data_type;
+    return;
+  }
+  if (item->data_type.kind != DataTypeKind::kNamed) return;
+  auto td = typedefs_.find(item->data_type.type_name);
+  if (td == typedefs_.end()) return;
+  if (td->second.kind != DataTypeKind::kStruct &&
+      td->second.kind != DataTypeKind::kUnion) {
+    return;
+  }
+  // Arena-allocate copy: typedefs_ map is destroyed with the Elaborator,
+  // but var.dtype must survive until after lowering.
+  var.dtype = arena_.Create<DataType>(td->second);
+}
+
 void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   ResolveTypeRef(item, mod);
   // §6.25: Resolve parameterized class scope types (cls#(T)::member).
@@ -465,10 +484,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   var.is_signed = item->data_type.is_signed;
   var.init_expr = item->init_expr;
   // Pass struct/union type info for field-level access.
-  if (item->data_type.kind == DataTypeKind::kStruct ||
-      item->data_type.kind == DataTypeKind::kUnion) {
-    var.dtype = &item->data_type;
-  }
+  SetStructTypeInfo(item, var);
   // §8: Mark class-typed variables.
   if (item->data_type.kind == DataTypeKind::kNamed &&
       class_names_.count(item->data_type.type_name)) {
@@ -481,6 +497,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   InferDynArraySize(item->unpacked_dims, item->init_expr, var);
   mod->variables.push_back(var);
   ValidateArrayInitPattern(item);
+  ValidateStructInitPattern(item);
   TrackEnumVariable(item);
   if (item->data_type.kind == DataTypeKind::kEnum) {
     ValidateEnumDecl(item->data_type, item->loc);

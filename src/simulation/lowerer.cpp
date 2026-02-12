@@ -120,10 +120,10 @@ static void RegisterStructInfo(const RtlirVariable& var, SimContext& ctx) {
   for (const auto& m : var.dtype->struct_members) {
     uint32_t fw = EvalStructMemberWidth(m);
     if (is_union) {
-      info.fields.push_back({m.name, 0, fw});
+      info.fields.push_back({m.name, 0, fw, m.type_kind});
     } else {
       offset -= fw;
-      info.fields.push_back({m.name, offset, fw});
+      info.fields.push_back({m.name, offset, fw, m.type_kind});
     }
   }
   ctx.RegisterStructType(var.name, info);
@@ -221,13 +221,10 @@ void Lowerer::LowerVar(const RtlirVariable& var) {
   if (var.is_signed) v->is_signed = true;
   if (var.is_string) ctx_.RegisterStringVariable(var.name);
   if (var.is_real) ctx_.RegisterRealVariable(var.name);
-  if (var.init_expr) {
-    auto val = EvalExpr(var.init_expr, ctx_, arena_);
-    if (val.width != width && !var.is_real && !var.is_string)
-      val = MakeLogic4VecVal(arena_, width, val.ToUint64());
-    v->value = val;
-  }
   RegisterStructInfo(var, ctx_);
+  if (var.init_expr) {
+    LowerVarInit(var, v, width);
+  }
   if (!var.init_expr) ApplyStructMemberDefaults(var, v, ctx_, arena_);
   if (!var.class_type_name.empty())
     ctx_.SetVariableClassType(var.name, var.class_type_name);
@@ -236,6 +233,22 @@ void Lowerer::LowerVar(const RtlirVariable& var) {
     RegisterEnumForCast(var);
   }
   LowerVarAggregate(var);
+}
+
+// §10.9.2: Evaluate variable initializer with struct pattern awareness.
+void Lowerer::LowerVarInit(const RtlirVariable& var, Variable* v,
+                           uint32_t width) {
+  auto* sinfo = ctx_.GetVariableStructType(var.name);
+  bool named = var.init_expr->kind == ExprKind::kAssignmentPattern &&
+               !var.init_expr->pattern_keys.empty();
+  if (named && sinfo) {
+    v->value = EvalStructPattern(var.init_expr, sinfo, ctx_, arena_);
+    return;
+  }
+  auto val = EvalExpr(var.init_expr, ctx_, arena_);
+  if (val.width != width && !var.is_real && !var.is_string)
+    val = MakeLogic4VecVal(arena_, width, val.ToUint64());
+  v->value = val;
 }
 
 // §6.24.2: Register enum type info and variable mapping for $cast.

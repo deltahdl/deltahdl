@@ -16,6 +16,7 @@ struct AssocArrayObject;
 struct ClassDecl;
 struct Expr;
 struct RtlirVariable;
+struct Variable;
 
 class Lowerer {
  public:
@@ -26,6 +27,7 @@ class Lowerer {
  private:
   void LowerModule(const RtlirModule* mod);
   void LowerVar(const RtlirVariable& var);
+  void LowerVarInit(const RtlirVariable& var, Variable* v, uint32_t width);
   void LowerVarAggregate(const RtlirVariable& var);
   void LowerProcesses(const std::vector<RtlirProcess>& procs);
   void LowerProcess(const RtlirProcess& proc);

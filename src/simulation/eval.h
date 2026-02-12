@@ -9,6 +9,7 @@
 namespace delta {
 
 struct Expr;
+struct StructTypeInfo;
 class SimContext;
 class Arena;
 
@@ -65,6 +66,9 @@ Logic4Vec EvalInside(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalAssignmentPattern(const Expr* expr, SimContext& ctx,
                                 Arena& arena);
+// §10.9.2: Evaluate a named assignment pattern against struct type info.
+Logic4Vec EvalStructPattern(const Expr* expr, const StructTypeInfo* info,
+                            SimContext& ctx, Arena& arena);
 Logic4Vec EvalMatches(const Expr* expr, SimContext& ctx, Arena& arena);
 
 // System call and function call dispatch (eval_function.cpp).

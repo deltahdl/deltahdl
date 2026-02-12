@@ -399,6 +399,102 @@ Logic4Vec EvalAssignmentPattern(const Expr* expr, SimContext& ctx,
   return AssembleConcatParts(parts, total_width, arena);
 }
 
+// --- Structure assignment pattern (§10.9.2) ---
+
+static void PlaceFieldValue(Logic4Vec& result, const StructFieldInfo& f,
+                            uint64_t val) {
+  uint64_t mask = (f.width >= 64) ? ~uint64_t{0} : (uint64_t{1} << f.width) - 1;
+  uint64_t bits = (val & mask) << f.bit_offset;
+  result.words[0].aval |= bits;
+}
+
+static DataTypeKind TypeKeyToKind(std::string_view key) {
+  if (key == "int") return DataTypeKind::kInt;
+  if (key == "integer") return DataTypeKind::kInteger;
+  if (key == "logic") return DataTypeKind::kLogic;
+  if (key == "reg") return DataTypeKind::kReg;
+  if (key == "byte") return DataTypeKind::kByte;
+  if (key == "shortint") return DataTypeKind::kShortint;
+  if (key == "longint") return DataTypeKind::kLongint;
+  if (key == "bit") return DataTypeKind::kBit;
+  if (key == "real") return DataTypeKind::kReal;
+  if (key == "shortreal") return DataTypeKind::kShortreal;
+  if (key == "string") return DataTypeKind::kString;
+  return DataTypeKind::kImplicit;
+}
+
+static bool IsMemberNameKey(std::string_view key, const StructTypeInfo* info) {
+  for (const auto& f : info->fields) {
+    if (f.name == key) return true;
+  }
+  return false;
+}
+
+struct PatternState {
+  Logic4Vec& result;
+  std::vector<bool>& assigned;
+  SimContext& ctx;
+  Arena& arena;
+};
+
+// Pass 1: Assign fields by explicit member name (highest precedence).
+static void ApplyMemberKeys(const Expr* expr, const StructTypeInfo* info,
+                            PatternState& s) {
+  for (size_t i = 0; i < expr->pattern_keys.size(); ++i) {
+    if (i >= expr->elements.size()) break;
+    if (!IsMemberNameKey(expr->pattern_keys[i], info)) continue;
+    auto val = EvalExpr(expr->elements[i], s.ctx, s.arena);
+    for (size_t fi = 0; fi < info->fields.size(); ++fi) {
+      if (info->fields[fi].name != expr->pattern_keys[i]) continue;
+      PlaceFieldValue(s.result, info->fields[fi], val.ToUint64());
+      s.assigned[fi] = true;
+      break;
+    }
+  }
+}
+
+// Pass 2: Assign unset fields by type key (middle precedence).
+static void ApplyTypeKeys(const Expr* expr, const StructTypeInfo* info,
+                          PatternState& s) {
+  for (size_t i = 0; i < expr->pattern_keys.size(); ++i) {
+    if (i >= expr->elements.size()) break;
+    auto kind = TypeKeyToKind(expr->pattern_keys[i]);
+    if (kind == DataTypeKind::kImplicit) continue;
+    auto val = EvalExpr(expr->elements[i], s.ctx, s.arena);
+    for (size_t fi = 0; fi < info->fields.size(); ++fi) {
+      if (s.assigned[fi] || info->fields[fi].type_kind != kind) continue;
+      PlaceFieldValue(s.result, info->fields[fi], val.ToUint64());
+      s.assigned[fi] = true;
+    }
+  }
+}
+
+// Pass 3: Assign all remaining unset fields from 'default' key.
+static void ApplyDefaultKey(const Expr* expr, const StructTypeInfo* info,
+                            PatternState& s) {
+  for (size_t i = 0; i < expr->pattern_keys.size(); ++i) {
+    if (i >= expr->elements.size() || expr->pattern_keys[i] != "default")
+      continue;
+    auto val = EvalExpr(expr->elements[i], s.ctx, s.arena);
+    for (size_t fi = 0; fi < info->fields.size(); ++fi) {
+      if (s.assigned[fi]) continue;
+      PlaceFieldValue(s.result, info->fields[fi], val.ToUint64());
+    }
+    return;
+  }
+}
+
+Logic4Vec EvalStructPattern(const Expr* expr, const StructTypeInfo* info,
+                            SimContext& ctx, Arena& arena) {
+  auto result = MakeLogic4Vec(arena, info->total_width);
+  std::vector<bool> assigned(info->fields.size(), false);
+  PatternState state{result, assigned, ctx, arena};
+  ApplyMemberKeys(expr, info, state);
+  ApplyTypeKeys(expr, info, state);
+  ApplyDefaultKey(expr, info, state);
+  return result;
+}
+
 // --- Matches operator (§12.6) ---
 
 Logic4Vec EvalMatches(const Expr* expr, SimContext& ctx, Arena& arena) {

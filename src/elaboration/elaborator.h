@@ -22,6 +22,7 @@ struct RtlirDesign;
 struct RtlirModule;
 struct ModuleItem;
 struct Expr;
+struct RtlirVariable;
 struct RtlirModuleInst;
 struct RtlirParamDecl;
 struct EnumMember;
@@ -55,6 +56,7 @@ class Elaborator {
   void ElaborateParamDecl(ModuleItem* item, RtlirModule* mod);
   void ElaborateNetDecl(ModuleItem* item, RtlirModule* mod);
   void ElaborateVarDecl(ModuleItem* item, RtlirModule* mod);
+  void SetStructTypeInfo(const ModuleItem* item, RtlirVariable& var);
   void ElaborateContAssign(ModuleItem* item, RtlirModule* mod);
   void ElaborateSpecparam(ModuleItem* item, RtlirModule* mod);
 
@@ -115,6 +117,7 @@ class Elaborator {
 
   /// Validate array assignment pattern element count (§5.11).
   void ValidateArrayInitPattern(const ModuleItem* item);
+  void ValidateStructInitPattern(const ModuleItem* item);
 
   /// Run all post-item validation checks for a module (§6).
   void ValidateModuleConstraints(const ModuleDecl* decl);

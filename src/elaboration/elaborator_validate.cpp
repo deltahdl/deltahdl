@@ -43,6 +43,47 @@ void Elaborator::ValidateArrayInitPattern(const ModuleItem* item) {
   }
 }
 
+// §10.9.2: Type key strings that are valid in assignment patterns.
+static bool IsTypeKeyword(std::string_view key) {
+  return key == "int" || key == "integer" || key == "logic" || key == "reg" ||
+         key == "byte" || key == "shortint" || key == "longint" ||
+         key == "bit" || key == "real" || key == "shortreal" || key == "string";
+}
+
+static void CheckPatternKeys(const ModuleItem* item,
+                             const std::vector<StructMember>& members,
+                             DiagEngine& diag) {
+  std::unordered_set<std::string_view> member_names;
+  for (const auto& m : members) member_names.insert(m.name);
+  std::unordered_set<std::string_view> seen;
+  for (auto key : item->init_expr->pattern_keys) {
+    if (key == "default" || IsTypeKeyword(key)) continue;
+    if (!member_names.count(key)) {
+      diag.Error(item->loc,
+                 std::format("'{}' is not a member of the struct", key));
+    }
+    if (!seen.insert(key).second) {
+      diag.Error(item->loc,
+                 std::format("duplicate member key '{}' in pattern", key));
+    }
+  }
+}
+
+void Elaborator::ValidateStructInitPattern(const ModuleItem* item) {
+  if (!item->init_expr) return;
+  if (item->init_expr->kind != ExprKind::kAssignmentPattern) return;
+  if (item->init_expr->pattern_keys.empty()) return;
+  const auto& members = item->data_type.struct_members;
+  if (!members.empty()) {
+    CheckPatternKeys(item, members, diag_);
+    return;
+  }
+  if (item->data_type.kind != DataTypeKind::kNamed) return;
+  auto td = typedefs_.find(item->data_type.type_name);
+  if (td == typedefs_.end() || td->second.struct_members.empty()) return;
+  CheckPatternKeys(item, td->second.struct_members, diag_);
+}
+
 // --- §6 validation helpers ---
 
 static std::string_view ExprIdent(const Expr* e) {
