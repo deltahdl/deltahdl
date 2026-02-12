@@ -193,6 +193,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateMixedAssignments();
   ValidateSpecparamInParams(decl);
   ValidateEnumAssignments(decl);
+  ValidateConstAssignments(decl);
 }
 
 // §6.19 enum validation helpers
@@ -349,6 +350,38 @@ void Elaborator::ValidateEnumAssignments(const ModuleDecl* decl) {
                    item->kind == ModuleItemKind::kInitialBlock;
     if (is_proc && item->body) {
       WalkStmtsForEnumAssign(item->body);
+    }
+  }
+}
+
+// --- §6.20.6: Const assignment validation ---
+
+void Elaborator::WalkStmtsForConstAssign(const Stmt* s) {
+  if (!s) return;
+  if (s->kind == StmtKind::kBlockingAssign ||
+      s->kind == StmtKind::kNonblockingAssign) {
+    if (s->lhs && s->lhs->kind == ExprKind::kIdentifier) {
+      if (const_names_.count(s->lhs->text)) {
+        diag_.Error(
+            s->range.start,
+            std::format("assignment to const variable '{}'", s->lhs->text));
+      }
+    }
+  }
+  for (auto* sub : s->stmts) WalkStmtsForConstAssign(sub);
+  WalkStmtsForConstAssign(s->then_branch);
+  WalkStmtsForConstAssign(s->else_branch);
+  WalkStmtsForConstAssign(s->body);
+  WalkStmtsForConstAssign(s->for_body);
+  for (auto& ci : s->case_items) WalkStmtsForConstAssign(ci.body);
+}
+
+void Elaborator::ValidateConstAssignments(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForConstAssign(item->body);
     }
   }
 }

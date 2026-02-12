@@ -142,6 +142,12 @@ class Elaborator {
   /// Walk statement tree checking enum assignment constraints.
   void WalkStmtsForEnumAssign(const Stmt* s);
 
+  /// §6.20.6: Check assignments to const variables.
+  void ValidateConstAssignments(const ModuleDecl* decl);
+
+  /// Walk statement tree checking const assignment constraints.
+  void WalkStmtsForConstAssign(const Stmt* s);
+
   /// Check a single assignment statement for enum type violations.
   void CheckEnumAssignStmt(const Stmt* s);
 
@@ -159,6 +165,7 @@ class Elaborator {
   std::unordered_set<std::string_view> specparam_names_;
   std::unordered_set<std::string_view> enum_var_names_;
   std::unordered_set<std::string_view> enum_member_names_;
+  std::unordered_set<std::string_view> const_names_;  // §6.20.6: const vars
   std::unordered_set<std::string_view> class_names_;  // §8: known class names
 };
 

@@ -404,6 +404,15 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   if (!declared_names_.insert(item->name).second) {
     diag_.Error(item->loc, std::format("redeclaration of '{}'", item->name));
   }
+  // §6.20.6: Const variables must have an initializer.
+  if (item->data_type.is_const) {
+    if (!item->init_expr) {
+      diag_.Error(
+          item->loc,
+          std::format("const variable '{}' must be initialized", item->name));
+    }
+    const_names_.insert(item->name);
+  }
   var_types_[item->name] = item->data_type.kind;
   RtlirVariable var;
   var.name = ScopedName(item->name);
@@ -622,6 +631,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   specparam_names_.clear();
   enum_var_names_.clear();
   enum_member_names_.clear();
+  const_names_.clear();
   for (auto* item : decl->items) {
     ElaborateItem(item, mod);
   }

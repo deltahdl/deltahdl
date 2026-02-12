@@ -620,3 +620,40 @@ TEST(Elaboration, ImplicitNetOnInstancePort) {
   EXPECT_TRUE(found_x) << "implicit net 'x' not created";
   EXPECT_TRUE(found_y) << "implicit net 'y' not created";
 }
+
+// --- §6.20.6: Const constants ---
+
+TEST(Elaboration, ConstVarNoInit_Error) {
+  // const variable without initializer is an error.
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  const int x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Elaboration, ConstVarWithInit_OK) {
+  // const variable with initializer is fine.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  const int x = 42;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(Elaboration, ConstVarReassign_Error) {
+  // Assignment to const variable is an error.
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  const int x = 5;\n"
+      "  initial x = 10;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
