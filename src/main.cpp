@@ -325,24 +325,30 @@ std::string ReadFile(const std::string& path) {
   return ss.str();
 }
 
-std::string PreprocessSources(const CliOptions& opts,
-                              delta::SourceManager& src_mgr,
-                              delta::DiagEngine& diag) {
+struct PreprocResult {
+  std::string source;
+  delta::NetType default_nettype = delta::NetType::kWire;
+};
+
+PreprocResult PreprocessSources(const CliOptions& opts,
+                                delta::SourceManager& src_mgr,
+                                delta::DiagEngine& diag) {
   delta::PreprocConfig pp_config;
   pp_config.include_dirs = opts.include_dirs;
   pp_config.defines = opts.defines;
   delta::Preprocessor preproc(src_mgr, diag, std::move(pp_config));
 
-  std::string combined;
+  PreprocResult result;
   for (const auto& path : opts.source_files) {
     auto content = ReadFile(path);
     if (content.empty()) {
-      return "";
+      return result;
     }
     auto file_id = src_mgr.AddFile(path, content);
-    combined += preproc.Preprocess(file_id);
+    result.source += preproc.Preprocess(file_id);
   }
-  return combined;
+  result.default_nettype = preproc.DefaultNetType();
+  return result;
 }
 
 delta::CompilationUnit* ParseSource(const std::string& source,
@@ -487,16 +493,17 @@ int main(int argc, char* argv[]) {
     diag.SetWarningsAsErrors(true);
   }
 
-  auto source = PreprocessSources(opts, src_mgr, diag);
-  if (source.empty() || diag.HasErrors()) {
+  auto pp = PreprocessSources(opts, src_mgr, diag);
+  if (pp.source.empty() || diag.HasErrors()) {
     return 1;
   }
 
   delta::Arena ast_arena;
-  auto* cu = ParseSource(source, src_mgr, diag, ast_arena);
+  auto* cu = ParseSource(pp.source, src_mgr, diag, ast_arena);
   if (diag.HasErrors()) {
     return 1;
   }
+  cu->default_nettype = pp.default_nettype;
 
   if (opts.dump_ast) {
     DumpAst(cu);

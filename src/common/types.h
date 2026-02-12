@@ -151,6 +151,7 @@ enum class NetType : uint8_t {
   kSupply1,
   kTrireg,
   kUwire,
+  kNone,  // §22.8: `default_nettype none — implicit nets are forbidden.
 };
 
 // --- SmallVec: inline storage for common small sizes ---

@@ -248,8 +248,8 @@ TEST(Preprocessor, DefaultNettype_None) {
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`default_nettype none\n", f, pp);
   EXPECT_FALSE(f.diag.HasErrors());
-  // "none" maps to kWire as sentinel.
-  EXPECT_EQ(pp.DefaultNetType(), NetType::kWire);
+  // §22.8: "none" forbids implicit net declarations.
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
 }
 
 TEST(Preprocessor, DefaultNettype_Tri) {

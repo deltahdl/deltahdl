@@ -99,7 +99,7 @@ static bool ParseNetTypeName(std::string_view name, NetType& out) {
 void Preprocessor::HandleDefaultNettype(std::string_view rest, SourceLoc loc) {
   auto name = TrimDirective(rest);
   if (name == "none") {
-    default_net_type_ = NetType::kWire;
+    default_net_type_ = NetType::kNone;
     return;
   }
   NetType nt = NetType::kWire;

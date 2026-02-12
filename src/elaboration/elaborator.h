@@ -68,7 +68,8 @@ class Elaborator {
   void ElaborateModuleInst(ModuleItem* item, RtlirModule* mod);
 
   /// Bind instance ports to continuous assignments.
-  void BindPorts(RtlirModuleInst& inst, const ModuleItem* item);
+  void BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
+                 RtlirModule* parent_mod);
 
   /// Build a scope map from resolved module parameters.
   static ScopeMap BuildParamScope(const RtlirModule* mod);
@@ -94,6 +95,11 @@ class Elaborator {
 
   /// Resolve a hierarchical path to find the target module and param name.
   RtlirParamDecl* ResolveDefparamPath(RtlirModule* root, const Expr* path_expr);
+
+  /// §6.10: Create an implicit scalar net if the identifier is undeclared.
+  /// Returns false if `default_nettype none and the name is undeclared.
+  bool MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
+                              RtlirModule* mod);
 
   /// Return a scoped name (prefixed during generate-for expansion).
   std::string_view ScopedName(std::string_view base);

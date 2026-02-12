@@ -446,9 +446,43 @@ void Elaborator::ElaborateSpecparam(ModuleItem* item, RtlirModule* mod) {
   mod->variables.push_back(var);
 }
 
+// §6.10: Check if an identifier is already declared as a variable, net, or
+// port.
+static bool IsNameDeclared(std::string_view name, const RtlirModule* mod) {
+  for (const auto& v : mod->variables) {
+    if (v.name == name) return true;
+  }
+  for (const auto& n : mod->nets) {
+    if (n.name == name) return true;
+  }
+  for (const auto& p : mod->ports) {
+    if (p.name == name) return true;
+  }
+  return false;
+}
+
+bool Elaborator::MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
+                                        RtlirModule* mod) {
+  if (IsNameDeclared(name, mod)) return true;
+  if (unit_->default_nettype == NetType::kNone) {
+    diag_.Error(loc, std::format("implicit net '{}' forbidden by "
+                                 "`default_nettype none",
+                                 name));
+    return false;
+  }
+  RtlirNet net;
+  net.name = ScopedName(name);
+  net.net_type = unit_->default_nettype;
+  net.width = 1;  // §6.10: Implicit nets are scalar.
+  mod->nets.push_back(net);
+  declared_names_.insert(name);
+  return true;
+}
+
 void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
   if (item->assign_lhs && item->assign_lhs->kind == ExprKind::kIdentifier) {
     auto name = item->assign_lhs->text;
+    MaybeCreateImplicitNet(name, item->loc, mod);
     if (!cont_assign_targets_.emplace(name, item->loc).second) {
       diag_.Error(item->loc,
                   std::format("multiple continuous assignments to '{}'", name));
@@ -611,15 +645,20 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
 
   ParamList child_params;
   inst.resolved = ElaborateModule(child_decl, child_params);
-  BindPorts(inst, item);
+  BindPorts(inst, item, mod);
   mod->children.push_back(inst);
 }
 
-void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item) {
+void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
+                           RtlirModule* parent_mod) {
   if (!inst.resolved) return;
   const auto& child_ports = inst.resolved->ports;
 
   for (const auto& [port_name, conn_expr] : item->inst_ports) {
+    // §6.10: Create implicit nets for undeclared identifiers in connections.
+    if (conn_expr && conn_expr->kind == ExprKind::kIdentifier) {
+      MaybeCreateImplicitNet(conn_expr->text, item->loc, parent_mod);
+    }
     RtlirPortBinding binding;
     binding.port_name = port_name;
     binding.connection = conn_expr;
