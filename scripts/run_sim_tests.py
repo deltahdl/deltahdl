@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Run simulation integration tests against deltahdl."""
+"""Run simulation e2e tests against deltahdl."""
 
 import subprocess
 import sys
 
 from test_common import BINARY, REPO_ROOT, check_binary, print_result
 
-TEST_DIR = REPO_ROOT / "test" / "integration"
+TEST_DIR = REPO_ROOT / "test" / "e2e"
 
 
 def collect_tests():
@@ -40,7 +40,7 @@ def run_test(sv_path, expected_path):
 
 
 def main():
-    """Run all simulation integration tests and print a summary."""
+    """Run all simulation e2e tests and print a summary."""
     check_binary()
 
     tests = collect_tests()
