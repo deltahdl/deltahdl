@@ -390,3 +390,39 @@ TEST(ParserSection5, SizedLiteral_OneBitOverflow) {
   EXPECT_GE(r.diag->WarningCount(), 1u);
   delete r.diag;
 }
+
+// --- §5.12: Postfix function attributes ---
+
+TEST(ParserSection5, PostfixFunctionAttribute) {
+  // §5.12 Example 7: a = add (* mode = "cla" *) (b, c);
+  EXPECT_TRUE(
+      ParseOk5("module t;\n"
+               "  logic a, b, c;\n"
+               "  initial a = add (* mode = \"cla\" *) (b, c);\n"
+               "endmodule\n"));
+}
+
+TEST(ParserSection5, PostfixFunctionAttribute_NoArgs) {
+  EXPECT_TRUE(
+      ParseOk5("module t;\n"
+               "  logic a;\n"
+               "  initial a = foo (* bar *) ();\n"
+               "endmodule\n"));
+}
+
+// --- §5.12: Nested attribute rejection ---
+
+TEST(ParserSection5, NestedAttribute_Error) {
+  // §5.12: Nesting of attribute instances is disallowed.
+  EXPECT_FALSE(
+      ParseOk5("module t;\n"
+               "  (* foo = 1 + (* bar *) 2 *) logic x;\n"
+               "endmodule\n"));
+}
+
+TEST(ParserSection5, AttributeValue_NoNesting_Ok) {
+  EXPECT_TRUE(
+      ParseOk5("module t;\n"
+               "  (* foo = 1 + 2 *) logic x;\n"
+               "endmodule\n"));
+}

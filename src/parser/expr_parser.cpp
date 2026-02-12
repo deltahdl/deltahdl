@@ -510,8 +510,14 @@ Expr* Parser::ParseIdentifierExpr() {
     result = ParseParameterizedScope(result);
   }
 
-  // Postfix chain: calls, selects, and member access (§8.22 arr[0].method())
-  while (Check(TokenKind::kLParen) || Check(TokenKind::kLBracket)) {
+  // Postfix chain: calls, selects, member access, and attributes
+  // §5.12 Example 7: add (* mode = "cla" *) (b, c)
+  while (Check(TokenKind::kLParen) || Check(TokenKind::kLBracket) ||
+         Check(TokenKind::kAttrStart)) {
+    if (Check(TokenKind::kAttrStart)) {
+      ParseAttributes();
+      continue;
+    }
     if (Check(TokenKind::kLParen)) {
       result = ParseCallExpr(result);
     } else {
