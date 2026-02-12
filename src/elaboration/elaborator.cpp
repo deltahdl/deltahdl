@@ -368,12 +368,27 @@ static bool TryParseAssocDim(const Expr* dim, RtlirVariable& var) {
   return false;
 }
 
-static void ComputeUnpackedDims(const std::vector<Expr*>& dims,
-                                RtlirVariable& var) {
+// §7.8.5: Check if an identifier is a user-defined type for assoc index.
+static bool IsUserDefinedType(
+    std::string_view name, const TypedefMap& typedefs,
+    const std::unordered_set<std::string_view>& class_names) {
+  return typedefs.count(name) > 0 || class_names.count(name) > 0;
+}
+
+static void ComputeUnpackedDims(
+    const std::vector<Expr*>& dims, RtlirVariable& var,
+    const TypedefMap& typedefs,
+    const std::unordered_set<std::string_view>& class_names) {
   if (dims.empty() || !dims[0]) return;
   auto* dim = dims[0];
   if (TryParseQueueDim(dim, var)) return;
   if (TryParseAssocDim(dim, var)) return;
+  // §7.8.5: User-defined type (struct, class, enum) as assoc array index.
+  if (dim->kind == ExprKind::kIdentifier &&
+      IsUserDefinedType(dim->text, typedefs, class_names)) {
+    var.is_assoc = true;
+    return;
+  }
   if (TryParseRangeDim(dim, var)) return;
   // Simple size [N] — creates N elements indexed from 0.
   auto size_val = ConstEvalInt(dim);
@@ -493,7 +508,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   // §6.19/§6.24.2: Track enum type for $cast validation.
   SetEnumTypeInfo(item, var, typedefs_, arena_);
   // §7.4/§7.5: Compute unpacked array element count.
-  ComputeUnpackedDims(item->unpacked_dims, var);
+  ComputeUnpackedDims(item->unpacked_dims, var, typedefs_, class_names_);
   InferDynArraySize(item->unpacked_dims, item->init_expr, var);
   mod->variables.push_back(var);
   ValidateArrayInitPattern(item);
