@@ -67,6 +67,13 @@ def parse_metadata(path):
     return metadata
 
 
+_UNARY_OPS = {
+    ast.Not: operator.not_,
+    ast.USub: operator.neg,
+    ast.UAdd: operator.pos,
+    ast.Invert: operator.invert,
+}
+
 _COMPARE_OPS = {
     ast.Eq: operator.eq,
     ast.NotEq: operator.ne,
@@ -96,15 +103,8 @@ def eval_node(node):
         if isinstance(node.op, ast.And):
             return all(vals)
         return any(vals)
-    if isinstance(node, ast.UnaryOp):
-        if isinstance(node.op, ast.Not):
-            return not eval_node(node.operand)
-        if isinstance(node.op, ast.USub):
-            return -eval_node(node.operand)
-        if isinstance(node.op, ast.UAdd):
-            return +eval_node(node.operand)
-        if isinstance(node.op, ast.Invert):
-            return ~eval_node(node.operand)
+    if isinstance(node, ast.UnaryOp) and type(node.op) in _UNARY_OPS:
+        return _UNARY_OPS[type(node.op)](eval_node(node.operand))
     raise ValueError(f"Unsupported node: {type(node).__name__}")
 
 
