@@ -288,6 +288,9 @@ static bool TryBindAssocArg(const Expr* call_arg, std::string_view param_name,
       ctx.CreateAssocArray(param_name, src->elem_width, src->is_string_key);
   dst->int_data = src->int_data;
   dst->str_data = src->str_data;
+  dst->has_default = src->has_default;
+  dst->default_value = src->default_value;
+  dst->index_width = src->index_width;
   return true;
 }
 
