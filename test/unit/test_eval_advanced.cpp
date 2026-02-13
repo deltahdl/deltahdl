@@ -192,3 +192,35 @@ TEST(EvalAdv, PackedStructInequality) {
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
+
+// ==========================================================================
+// §11.9: Tagged union expressions
+// ==========================================================================
+
+TEST(EvalAdv, TaggedExprWithValue) {
+  EvalAdvFixture f;
+  // tagged Valid 42 → evaluates to 42.
+  auto* tagged = f.arena.Create<Expr>();
+  tagged->kind = ExprKind::kTagged;
+  auto* member = f.arena.Create<Expr>();
+  member->kind = ExprKind::kIdentifier;
+  member->text = "Valid";
+  tagged->rhs = member;
+  tagged->lhs = MakeInt(f.arena, 42);
+  auto result = EvalExpr(tagged, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 42u);
+}
+
+TEST(EvalAdv, TaggedExprVoidMember) {
+  EvalAdvFixture f;
+  // tagged Invalid (void member, no value) → 0.
+  auto* tagged = f.arena.Create<Expr>();
+  tagged->kind = ExprKind::kTagged;
+  auto* member = f.arena.Create<Expr>();
+  member->kind = ExprKind::kIdentifier;
+  member->text = "Invalid";
+  tagged->rhs = member;
+  tagged->lhs = nullptr;
+  auto result = EvalExpr(tagged, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
