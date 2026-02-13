@@ -863,4 +863,53 @@ Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, 1, (base_val.ToUint64() >> idx) & 1);
 }
 
+// --- Compound assignment operators (§11.4.1) ---
+
+static TokenKind CompoundAssignBaseOp(TokenKind op) {
+  switch (op) {
+    case TokenKind::kPlusEq:
+      return TokenKind::kPlus;
+    case TokenKind::kMinusEq:
+      return TokenKind::kMinus;
+    case TokenKind::kStarEq:
+      return TokenKind::kStar;
+    case TokenKind::kSlashEq:
+      return TokenKind::kSlash;
+    case TokenKind::kPercentEq:
+      return TokenKind::kPercent;
+    case TokenKind::kAmpEq:
+      return TokenKind::kAmp;
+    case TokenKind::kPipeEq:
+      return TokenKind::kPipe;
+    case TokenKind::kCaretEq:
+      return TokenKind::kCaret;
+    case TokenKind::kLtLtEq:
+      return TokenKind::kLtLt;
+    case TokenKind::kGtGtEq:
+      return TokenKind::kGtGt;
+    case TokenKind::kLtLtLtEq:
+      return TokenKind::kLtLtLt;
+    case TokenKind::kGtGtGtEq:
+      return TokenKind::kGtGtGt;
+    default:
+      return TokenKind::kEof;
+  }
+}
+
+bool IsCompoundAssignOp(TokenKind op) {
+  return CompoundAssignBaseOp(op) != TokenKind::kEof;
+}
+
+Logic4Vec EvalCompoundAssign(const Expr* expr, SimContext& ctx, Arena& arena) {
+  auto lhs_val = EvalExpr(expr->lhs, ctx, arena);
+  auto rhs_val = EvalExpr(expr->rhs, ctx, arena);
+  auto base_op = CompoundAssignBaseOp(expr->op);
+  auto result = EvalBinaryOp(base_op, lhs_val, rhs_val, arena);
+  if (expr->lhs->kind == ExprKind::kIdentifier) {
+    auto* var = ctx.FindVariable(expr->lhs->text);
+    if (var) var->value = result;
+  }
+  return result;
+}
+
 }  // namespace delta

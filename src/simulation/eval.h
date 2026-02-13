@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "common/types.h"
+#include "lexer/token.h"
 
 namespace delta {
 
@@ -66,7 +67,13 @@ bool TryExecArrayMethodStmt(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec AssembleConcatParts(const std::vector<Logic4Vec>& parts,
                               uint32_t total_width, Arena& arena);
 
-// Extended expression evaluators (eval_expr.cpp).
+// Binary operator dispatch (used by compound assignment).
+Logic4Vec EvalBinaryOp(TokenKind op, Logic4Vec lhs, Logic4Vec rhs, Arena& arena,
+                       uint32_t context_width = 0);
+
+// §11.4.1: Compound assignment operators (eval_expr.cpp).
+bool IsCompoundAssignOp(TokenKind op);
+Logic4Vec EvalCompoundAssign(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalReplicate(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalPrefixUnary(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalPostfixUnary(const Expr* expr, SimContext& ctx, Arena& arena);

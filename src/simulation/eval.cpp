@@ -660,8 +660,8 @@ static Logic4Vec EvalBinaryCompare(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
 
 // --- Binary dispatch ---
 
-static Logic4Vec EvalBinaryOp(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
-                              Arena& arena, uint32_t context_width = 0) {
+Logic4Vec EvalBinaryOp(TokenKind op, Logic4Vec lhs, Logic4Vec rhs, Arena& arena,
+                       uint32_t context_width) {
   switch (op) {
     case TokenKind::kPlus:
     case TokenKind::kMinus:
@@ -679,56 +679,6 @@ static Logic4Vec EvalBinaryOp(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
     default:
       return EvalBinaryCompare(op, lhs, rhs, arena);
   }
-}
-
-// --- Compound assignment operators (§11.4.1) ---
-
-static TokenKind CompoundAssignBaseOp(TokenKind op) {
-  switch (op) {
-    case TokenKind::kPlusEq:
-      return TokenKind::kPlus;
-    case TokenKind::kMinusEq:
-      return TokenKind::kMinus;
-    case TokenKind::kStarEq:
-      return TokenKind::kStar;
-    case TokenKind::kSlashEq:
-      return TokenKind::kSlash;
-    case TokenKind::kPercentEq:
-      return TokenKind::kPercent;
-    case TokenKind::kAmpEq:
-      return TokenKind::kAmp;
-    case TokenKind::kPipeEq:
-      return TokenKind::kPipe;
-    case TokenKind::kCaretEq:
-      return TokenKind::kCaret;
-    case TokenKind::kLtLtEq:
-      return TokenKind::kLtLt;
-    case TokenKind::kGtGtEq:
-      return TokenKind::kGtGt;
-    case TokenKind::kLtLtLtEq:
-      return TokenKind::kLtLtLt;
-    case TokenKind::kGtGtGtEq:
-      return TokenKind::kGtGtGt;
-    default:
-      return TokenKind::kEof;
-  }
-}
-
-static bool IsCompoundAssignOp(TokenKind op) {
-  return CompoundAssignBaseOp(op) != TokenKind::kEof;
-}
-
-static Logic4Vec EvalCompoundAssign(const Expr* expr, SimContext& ctx,
-                                    Arena& arena) {
-  auto lhs_val = EvalExpr(expr->lhs, ctx, arena);
-  auto rhs_val = EvalExpr(expr->rhs, ctx, arena);
-  auto base_op = CompoundAssignBaseOp(expr->op);
-  auto result = EvalBinaryOp(base_op, lhs_val, rhs_val, arena);
-  if (expr->lhs->kind == ExprKind::kIdentifier) {
-    auto* var = ctx.FindVariable(expr->lhs->text);
-    if (var) var->value = result;
-  }
-  return result;
 }
 
 // --- Concatenation assembly (shared with eval_expr.cpp) ---

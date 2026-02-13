@@ -153,13 +153,6 @@ TEST(EvalAdv, StreamingUnpackedArrayMissingElemGivesX) {
 }
 
 // ==========================================================================
-// §11.2.2: Aggregate expressions — struct equality
-// ==========================================================================
-
-// NOTE: Struct aggregate equality requires struct type infrastructure.
-// Placeholder tests validate the existing TryArrayEqualityOp path.
-
-// ==========================================================================
 // §11.9: Tagged union — tag mismatch returns X
 // ==========================================================================
 
