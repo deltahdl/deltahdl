@@ -382,6 +382,7 @@ static Logic4Vec EvalBinaryBitwise(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
         break;
     }
   }
+  result.is_signed = lhs.is_signed && rhs.is_signed;
   // XNOR: Logic4Not inverts all 64 bits per word; mask the top word to width.
   bool is_xnor = op == TokenKind::kTildeCaret || op == TokenKind::kCaretTilde;
   uint32_t bit_pos = width % 64;

@@ -532,3 +532,67 @@ TEST(EvalOpXZ, UnsignedDivUnchanged) {
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 124u);  // 249 / 2 = 124
 }
+
+// ==========================================================================
+// Expression type rules — §11.8.1
+// ==========================================================================
+
+TEST(EvalOpXZ, ComparisonResultUnsigned) {
+  EvalOpXZFixture f;
+  // §11.8.1: Comparison result is always unsigned.
+  MakeSignedVar(f, "ca", 8, 1);
+  MakeSignedVar(f, "cb", 8, 2);
+  auto* expr = MakeBinary(f.arena, TokenKind::kLt, MakeId(f.arena, "ca"),
+                          MakeId(f.arena, "cb"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+  EXPECT_FALSE(result.is_signed);
+}
+
+TEST(EvalOpXZ, ReductionResultUnsigned) {
+  EvalOpXZFixture f;
+  // §11.8.1: Reduction result is always unsigned.
+  MakeSignedVar(f, "rv", 8, 0xFF);
+  auto* expr = MakeUnary(f.arena, TokenKind::kAmp, MakeId(f.arena, "rv"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+  EXPECT_FALSE(result.is_signed);
+}
+
+TEST(EvalOpXZ, ConcatResultUnsigned) {
+  EvalOpXZFixture f;
+  // §11.8.1: Concatenation result is always unsigned.
+  MakeSignedVar(f, "c1", 4, 0xA);
+  MakeSignedVar(f, "c2", 4, 0xB);
+  auto* concat = f.arena.Create<Expr>();
+  concat->kind = ExprKind::kConcatenation;
+  concat->elements.push_back(MakeId(f.arena, "c1"));
+  concat->elements.push_back(MakeId(f.arena, "c2"));
+  auto result = EvalExpr(concat, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0xABu);
+  EXPECT_FALSE(result.is_signed);
+}
+
+TEST(EvalOpXZ, BitwiseSignedResult) {
+  EvalOpXZFixture f;
+  // §11.8.1: If both operands signed, bitwise result is signed.
+  MakeSignedVar(f, "b1", 8, 0xFF);
+  MakeSignedVar(f, "b2", 8, 0x0F);
+  auto* expr = MakeBinary(f.arena, TokenKind::kAmp, MakeId(f.arena, "b1"),
+                          MakeId(f.arena, "b2"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0x0Fu);
+  EXPECT_TRUE(result.is_signed);
+}
+
+TEST(EvalOpXZ, MixedSignUnsignedResult) {
+  EvalOpXZFixture f;
+  // §11.8.1: If any operand unsigned, binary result is unsigned.
+  MakeSignedVar(f, "ms", 8, 0xFF);
+  auto* u = f.ctx.CreateVariable("mu", 8);
+  u->value = MakeLogic4VecVal(f.arena, 8, 0x0F);
+  auto* expr = MakeBinary(f.arena, TokenKind::kAmp, MakeId(f.arena, "ms"),
+                          MakeId(f.arena, "mu"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_FALSE(result.is_signed);
+}
