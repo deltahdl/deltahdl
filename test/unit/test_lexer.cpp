@@ -867,6 +867,51 @@ TEST(Lexer, ParseKeywordVersion_Invalid) {
   EXPECT_FALSE(ParseKeywordVersion("").has_value());
 }
 
+// --- §5.7.1: Integer literal constants ---
+
+TEST(Lexer, IntLiteral_LrmExample1_Unsized) {
+  // §5.7.1 Example 1: 659, 'h 837FF, 'o7460
+  auto t1 = lex("659");
+  EXPECT_EQ(t1[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(t1[0].text, "659");
+  auto t2 = lex("'h 837FF");
+  EXPECT_EQ(t2[0].kind, TokenKind::kIntLiteral);
+  auto t3 = lex("'o7460");
+  EXPECT_EQ(t3[0].kind, TokenKind::kIntLiteral);
+}
+
+TEST(Lexer, IntLiteral_LrmExample2_Sized) {
+  // §5.7.1 Example 2: 4'b1001, 5 'D 3, 3'b01x, 12'hx, 16'hz
+  auto t1 = lex("4'b1001");
+  EXPECT_EQ(t1[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(t1[0].text, "4'b1001");
+  auto t2 = lex("5 'D 3");
+  EXPECT_EQ(t2[0].kind, TokenKind::kIntLiteral);
+  auto t3 = lex("3'b01x");
+  EXPECT_EQ(t3[0].kind, TokenKind::kIntLiteral);
+  auto t4 = lex("12'hx");
+  EXPECT_EQ(t4[0].kind, TokenKind::kIntLiteral);
+  auto t5 = lex("16'hz");
+  EXPECT_EQ(t5[0].kind, TokenKind::kIntLiteral);
+}
+
+TEST(Lexer, IntLiteral_LrmExample3_Signed) {
+  // §5.7.1 Example 3: 4'shf, 16'sd?
+  auto t1 = lex("4'shf");
+  EXPECT_EQ(t1[0].kind, TokenKind::kIntLiteral);
+  auto t2 = lex("16'sd?");
+  EXPECT_EQ(t2[0].kind, TokenKind::kIntLiteral);
+}
+
+TEST(Lexer, IntLiteral_LrmExample6_Underscores) {
+  // §5.7.1 Example 6: 27_195_000, 16'b0011_0101_0001_1111
+  auto t1 = lex("27_195_000");
+  EXPECT_EQ(t1[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(t1[0].text, "27_195_000");
+  auto t2 = lex("16'b0011_0101_0001_1111");
+  EXPECT_EQ(t2[0].kind, TokenKind::kIntLiteral);
+}
+
 // --- Whitespace in numeric literals (§5.7.1) ---
 
 TEST(Lexer, SpaceBeforeBase_SizedHex) {
