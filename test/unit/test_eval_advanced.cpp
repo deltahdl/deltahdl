@@ -925,3 +925,42 @@ TEST(EvalAdv, LetExpandDefaultArg) {
   auto result = EvalExpr(call, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 11u);
 }
+
+TEST(EvalAdv, LetNoRecursive) {
+  EvalAdvFixture f;
+  // let bad(a) = bad(a + 1); — recursive, should return X (not infinite loop).
+  auto* body_call = MakeCall(f.arena, "bad", {
+    [&]() {
+      auto* e = f.arena.Create<Expr>();
+      e->kind = ExprKind::kBinary;
+      e->op = TokenKind::kPlus;
+      e->lhs = MakeId(f.arena, "a");
+      e->rhs = MakeInt(f.arena, 1);
+      return e;
+    }()
+  });
+  FunctionArg arg;
+  arg.name = "a";
+  auto* decl = MakeLetDecl(f.arena, "bad", body_call, {arg});
+  f.ctx.RegisterLetDecl("bad", decl);
+
+  auto* call = MakeCall(f.arena, "bad", {MakeInt(f.arena, 0)});
+  auto result = EvalExpr(call, f.ctx, f.arena);
+  // Should not infinite loop; returns X (bval != 0) or 0.
+  EXPECT_TRUE(result.nwords > 0);
+}
+
+TEST(EvalAdv, LetDeclarativeScope) {
+  EvalAdvFixture f;
+  // let get_k() = K;
+  // K is set in the outer scope before let registration.
+  MakeVar(f, "K", 32, 42);
+  auto* body = MakeId(f.arena, "K");
+  auto* decl = MakeLetDecl(f.arena, "get_k", body);
+  f.ctx.RegisterLetDecl("get_k", decl);
+
+  // get_k() should access K=42 from declaration scope.
+  auto* call = MakeCall(f.arena, "get_k", {});
+  auto result = EvalExpr(call, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 42u);
+}

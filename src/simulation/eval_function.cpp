@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "common/arena.h"
@@ -600,10 +601,12 @@ static bool TryBuiltinMethodCall(const Expr* expr, SimContext& ctx,
   return TryEvalAssocMethodCall(expr, ctx, arena, out);
 }
 
-// §11.12/§F.4: Expand a let declaration by binding args and evaluating body.
-static Logic4Vec EvalLetExpansion(ModuleItem* decl, const Expr* call,
-                                  SimContext& ctx, Arena& arena) {
-  ctx.PushScope();
+// §11.12: Guard against recursive let expansion.
+static thread_local std::unordered_set<std::string_view> expanding_lets;
+
+// §11.12/§F.4: Bind let formal arguments to actual values in a new scope.
+static void BindLetArgs(ModuleItem* decl, const Expr* call, SimContext& ctx,
+                        Arena& arena) {
   auto& formals = decl->func_args;
   for (size_t i = 0; i < formals.size(); ++i) {
     Logic4Vec val;
@@ -617,8 +620,19 @@ static Logic4Vec EvalLetExpansion(ModuleItem* decl, const Expr* call,
     auto* var = ctx.CreateLocalVariable(formals[i].name, val.width);
     var->value = val;
   }
+}
+
+// §11.12/§F.4: Expand a let declaration by binding args and evaluating body.
+static Logic4Vec EvalLetExpansion(ModuleItem* decl, const Expr* call,
+                                  SimContext& ctx, Arena& arena) {
+  // §11.12: Recursive let instantiation is not permitted.
+  if (expanding_lets.count(decl->name)) return MakeAllX(arena, 32);
+  expanding_lets.insert(decl->name);
+  ctx.PushScope();
+  BindLetArgs(decl, call, ctx, arena);
   auto result = EvalExpr(decl->init_expr, ctx, arena);
   ctx.PopScope();
+  expanding_lets.erase(decl->name);
   return result;
 }
 
