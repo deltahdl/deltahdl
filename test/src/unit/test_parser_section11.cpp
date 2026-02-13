@@ -552,4 +552,3 @@ TEST(ParserSection11, UnaryNegation) {
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kMinus);
 }
-
