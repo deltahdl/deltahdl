@@ -138,24 +138,103 @@ TEST(Lexer, EmbeddedDollarSystemIdentifiers) {
   EXPECT_EQ(tokens[1].text, "$value$plusargs");
 }
 
-TEST(Lexer, Operators) {
-  auto tokens = lex("+ - * / == != <= >= << >> && ||");
+// --- §5.5: Operators ---
+
+TEST(Lexer, Operators_SingleChar) {
+  auto tokens = lex("+ - * / % & | ^ ~ ! = < > ?");
   EXPECT_EQ(tokens[0].kind, TokenKind::kPlus);
   EXPECT_EQ(tokens[1].kind, TokenKind::kMinus);
   EXPECT_EQ(tokens[2].kind, TokenKind::kStar);
   EXPECT_EQ(tokens[3].kind, TokenKind::kSlash);
-  EXPECT_EQ(tokens[4].kind, TokenKind::kEqEq);
-  EXPECT_EQ(tokens[5].kind, TokenKind::kBangEq);
-  EXPECT_EQ(tokens[6].kind, TokenKind::kLtEq);
-  EXPECT_EQ(tokens[7].kind, TokenKind::kGtEq);
-  EXPECT_EQ(tokens[8].kind, TokenKind::kLtLt);
-  EXPECT_EQ(tokens[9].kind, TokenKind::kGtGt);
-  EXPECT_EQ(tokens[10].kind, TokenKind::kAmpAmp);
-  EXPECT_EQ(tokens[11].kind, TokenKind::kPipePipe);
+  EXPECT_EQ(tokens[4].kind, TokenKind::kPercent);
+  EXPECT_EQ(tokens[5].kind, TokenKind::kAmp);
+  EXPECT_EQ(tokens[6].kind, TokenKind::kPipe);
+  EXPECT_EQ(tokens[7].kind, TokenKind::kCaret);
+  EXPECT_EQ(tokens[8].kind, TokenKind::kTilde);
+  EXPECT_EQ(tokens[9].kind, TokenKind::kBang);
+  EXPECT_EQ(tokens[10].kind, TokenKind::kEq);
+  EXPECT_EQ(tokens[11].kind, TokenKind::kLt);
+  EXPECT_EQ(tokens[12].kind, TokenKind::kGt);
+  EXPECT_EQ(tokens[13].kind, TokenKind::kQuestion);
+}
+
+TEST(Lexer, Operators_DoubleChar) {
+  auto tokens =
+      lex("== != <= >= << >> && || ** ++ -- -> => :: ~& ~| ~^ ^~ .* ## @@");
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEqEq);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kBangEq);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kLtEq);
+  EXPECT_EQ(tokens[3].kind, TokenKind::kGtEq);
+  EXPECT_EQ(tokens[4].kind, TokenKind::kLtLt);
+  EXPECT_EQ(tokens[5].kind, TokenKind::kGtGt);
+  EXPECT_EQ(tokens[6].kind, TokenKind::kAmpAmp);
+  EXPECT_EQ(tokens[7].kind, TokenKind::kPipePipe);
+  EXPECT_EQ(tokens[8].kind, TokenKind::kPower);
+  EXPECT_EQ(tokens[9].kind, TokenKind::kPlusPlus);
+  EXPECT_EQ(tokens[10].kind, TokenKind::kMinusMinus);
+  EXPECT_EQ(tokens[11].kind, TokenKind::kArrow);
+  EXPECT_EQ(tokens[12].kind, TokenKind::kEqGt);
+  EXPECT_EQ(tokens[13].kind, TokenKind::kColonColon);
+  EXPECT_EQ(tokens[14].kind, TokenKind::kTildeAmp);
+  EXPECT_EQ(tokens[15].kind, TokenKind::kTildePipe);
+  EXPECT_EQ(tokens[16].kind, TokenKind::kTildeCaret);
+  EXPECT_EQ(tokens[17].kind, TokenKind::kCaretTilde);
+  EXPECT_EQ(tokens[18].kind, TokenKind::kDotStar);
+  EXPECT_EQ(tokens[19].kind, TokenKind::kHashHash);
+  EXPECT_EQ(tokens[20].kind, TokenKind::kAtAt);
+}
+
+TEST(Lexer, Operators_TripleChar) {
+  auto tokens = lex("=== !== ==? !=? <<< >>> ->> |-> |=> <-> &&&");
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEqEqEq);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kBangEqEq);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kEqEqQuestion);
+  EXPECT_EQ(tokens[3].kind, TokenKind::kBangEqQuestion);
+  EXPECT_EQ(tokens[4].kind, TokenKind::kLtLtLt);
+  EXPECT_EQ(tokens[5].kind, TokenKind::kGtGtGt);
+  EXPECT_EQ(tokens[6].kind, TokenKind::kDashGtGt);
+  EXPECT_EQ(tokens[7].kind, TokenKind::kPipeDashGt);
+  EXPECT_EQ(tokens[8].kind, TokenKind::kPipeEqGt);
+  EXPECT_EQ(tokens[9].kind, TokenKind::kLtDashGt);
+  EXPECT_EQ(tokens[10].kind, TokenKind::kAmpAmpAmp);
+}
+
+TEST(Lexer, Operators_CompoundAssignment) {
+  auto tokens = lex("+= -= *= /= %= &= |= ^= <<= >>= <<<= >>>=");
+  EXPECT_EQ(tokens[0].kind, TokenKind::kPlusEq);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kMinusEq);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kStarEq);
+  EXPECT_EQ(tokens[3].kind, TokenKind::kSlashEq);
+  EXPECT_EQ(tokens[4].kind, TokenKind::kPercentEq);
+  EXPECT_EQ(tokens[5].kind, TokenKind::kAmpEq);
+  EXPECT_EQ(tokens[6].kind, TokenKind::kPipeEq);
+  EXPECT_EQ(tokens[7].kind, TokenKind::kCaretEq);
+  EXPECT_EQ(tokens[8].kind, TokenKind::kLtLtEq);
+  EXPECT_EQ(tokens[9].kind, TokenKind::kGtGtEq);
+  EXPECT_EQ(tokens[10].kind, TokenKind::kLtLtLtEq);
+  EXPECT_EQ(tokens[11].kind, TokenKind::kGtGtGtEq);
+}
+
+TEST(Lexer, Operators_IndexedPartSelect) {
+  auto tokens = lex("+: -:");
+  EXPECT_EQ(tokens[0].kind, TokenKind::kPlusColon);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kMinusColon);
+}
+
+TEST(Lexer, Operators_Tolerance) {
+  auto tokens = lex("+/- +%-");
+  EXPECT_EQ(tokens[0].kind, TokenKind::kPlusSlashMinus);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kPlusPercentMinus);
+}
+
+TEST(Lexer, Operators_StarGt) {
+  auto tokens = lex("*>");
+  ASSERT_GE(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kStarGt);
 }
 
 TEST(Lexer, Punctuation) {
-  auto tokens = lex("( ) [ ] { } ; , . :");
+  auto tokens = lex("( ) [ ] { } ; , . : # @");
   EXPECT_EQ(tokens[0].kind, TokenKind::kLParen);
   EXPECT_EQ(tokens[1].kind, TokenKind::kRParen);
   EXPECT_EQ(tokens[2].kind, TokenKind::kLBracket);
@@ -166,6 +245,14 @@ TEST(Lexer, Punctuation) {
   EXPECT_EQ(tokens[7].kind, TokenKind::kComma);
   EXPECT_EQ(tokens[8].kind, TokenKind::kDot);
   EXPECT_EQ(tokens[9].kind, TokenKind::kColon);
+  EXPECT_EQ(tokens[10].kind, TokenKind::kHash);
+  EXPECT_EQ(tokens[11].kind, TokenKind::kAt);
+}
+
+TEST(Lexer, Operators_Dollar) {
+  auto tokens = lex("$");
+  ASSERT_GE(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kDollar);
 }
 
 // --- §5.4: Comments ---
