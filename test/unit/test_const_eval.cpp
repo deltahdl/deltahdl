@@ -142,6 +142,13 @@ TEST(ConstEval, Clog2) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$clog2(5)", f)), 3);
 }
 
+TEST(ConstEval, BitsExpr) {
+  EvalFixture f;
+  // §20.6.2: $bits(8'hFF) should return 8 (width of expression).
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("$bits(8'hFF)", f)), 8);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("$bits(16'h0)", f)), 16);
+}
+
 // ==========================================================================
 // §11.5.3: Longest static prefix
 // ==========================================================================

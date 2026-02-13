@@ -168,13 +168,21 @@ static std::optional<int64_t> EvalReplicate(const Expr* expr,
   return result;
 }
 
-// Constant-evaluate a system call ($clog2).
+// Constant-evaluate a system call ($clog2, $bits).
 static std::optional<int64_t> EvalConstSysCall(const Expr* expr,
                                                const ScopeMap& scope) {
-  if (expr->callee == "$clog2" && !expr->args.empty()) {
+  if (expr->args.empty()) return std::nullopt;
+  if (expr->callee == "$clog2") {
     auto arg = ConstEvalInt(expr->args[0], scope);
     if (!arg) return std::nullopt;
     return Clog2(*arg);
+  }
+  if (expr->callee == "$bits") {
+    // §20.6.2: $bits returns bit width of the argument expression.
+    auto* arg = expr->args[0];
+    if (arg->kind == ExprKind::kIntegerLiteral)
+      return static_cast<int64_t>(ConstLiteralWidth(arg));
+    return std::nullopt;
   }
   return std::nullopt;
 }
