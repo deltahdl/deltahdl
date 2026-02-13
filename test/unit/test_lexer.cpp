@@ -923,6 +923,64 @@ TEST(Lexer, InterpretEscapes_NoEscapes) {
   EXPECT_EQ(InterpretStringEscapes(""), "");
 }
 
+// --- §5.6.1: Escaped identifiers ---
+
+TEST(Lexer, EscapedIdentifier_Basic) {
+  auto tokens = lex("\\my+name ");
+  ASSERT_GE(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(tokens[0].text, "\\my+name");
+}
+
+TEST(Lexer, EscapedIdentifier_SpecialChars) {
+  // §5.6.1: printable ASCII 33-126 allowed
+  auto tokens = lex("\\busa+index ");
+  ASSERT_GE(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(tokens[0].text, "\\busa+index");
+}
+
+TEST(Lexer, EscapedIdentifier_LrmExamples) {
+  // §5.6.1 examples
+  for (const char* src :
+       {"\\busa+index ", "\\-clock ", "\\***error-condition*** ", "\\{a,b} ",
+        "\\a*(b+c) "}) {
+    auto tokens = lex(src);
+    ASSERT_GE(tokens.size(), 2) << src;
+    EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier) << src;
+  }
+}
+
+TEST(Lexer, EscapedIdentifier_KeywordBecomesIdentifier) {
+  // §5.6.1: \net is a user-defined identifier, not the keyword "net"
+  auto tokens = lex("\\net ");
+  ASSERT_GE(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(tokens[0].text, "\\net");
+}
+
+TEST(Lexer, EscapedIdentifier_TerminatedBySpace) {
+  auto tokens = lex("\\esc_id next");
+  ASSERT_GE(tokens.size(), 3);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(tokens[0].text, "\\esc_id");
+  EXPECT_EQ(tokens[1].text, "next");
+}
+
+TEST(Lexer, EscapedIdentifier_TerminatedByNewline) {
+  auto tokens = lex("\\esc_id\n");
+  ASSERT_GE(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(tokens[0].text, "\\esc_id");
+}
+
+TEST(Lexer, EscapedIdentifier_TerminatedByTab) {
+  auto tokens = lex("\\esc_id\t");
+  ASSERT_GE(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(tokens[0].text, "\\esc_id");
+}
+
 // --- §5.6: Identifier max length validation ---
 
 TEST(Lexer, IdentifierMaxLength_Ok) {
