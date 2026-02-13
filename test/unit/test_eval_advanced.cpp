@@ -125,6 +125,14 @@ TEST(EvalAdv, AssignInExprTruncToLHSWidth) {
 // §11.2.2: Aggregate expressions — packed struct equality
 // ==========================================================================
 
+static Expr* MakeUnary(Arena& arena, TokenKind op, Expr* operand) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kUnary;
+  e->op = op;
+  e->lhs = operand;
+  return e;
+}
+
 static Expr* MakeBinary(Arena& arena, TokenKind op, Expr* lhs, Expr* rhs) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kBinary;
@@ -395,4 +403,224 @@ TEST(EvalAdv, PowNeg1EvenExp) {
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
   EXPECT_TRUE(result.is_signed);
+}
+
+// ==========================================================================
+// Signed comparison — §11.4.4, §11.4.5, §11.8.1
+// ==========================================================================
+
+TEST(EvalAdv, SignedLtNeg) {
+  EvalAdvFixture f;
+  MakeSignedVarAdv(f, "sa", 8, 0xFF);
+  MakeSignedVarAdv(f, "sb", 8, 0x01);
+  auto* expr = MakeBinary(f.arena, TokenKind::kLt, MakeId(f.arena, "sa"),
+                          MakeId(f.arena, "sb"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
+TEST(EvalAdv, SignedGtNeg) {
+  EvalAdvFixture f;
+  MakeSignedVarAdv(f, "sa", 8, 0x01);
+  MakeSignedVarAdv(f, "sb", 8, 0xFF);
+  auto* expr = MakeBinary(f.arena, TokenKind::kGt, MakeId(f.arena, "sa"),
+                          MakeId(f.arena, "sb"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
+TEST(EvalAdv, SignedEqNeg) {
+  EvalAdvFixture f;
+  MakeSignedVarAdv(f, "sa", 8, 0xFF);
+  MakeSignedVarAdv(f, "sb", 8, 0xFF);
+  auto* expr = MakeBinary(f.arena, TokenKind::kEqEq, MakeId(f.arena, "sa"),
+                          MakeId(f.arena, "sb"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
+TEST(EvalAdv, UnsignedLtUnchanged) {
+  EvalAdvFixture f;
+  auto* a = MakeVar(f, "ua", 8, 0xFF);
+  (void)a;
+  auto* b = MakeVar(f, "ub", 8, 0x01);
+  (void)b;
+  auto* expr = MakeBinary(f.arena, TokenKind::kLt, MakeId(f.arena, "ua"),
+                          MakeId(f.arena, "ub"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+// ==========================================================================
+// Signed arithmetic — §11.4.3, §11.4.3.1
+// ==========================================================================
+
+TEST(EvalAdv, SignedDivTruncToZero) {
+  EvalAdvFixture f;
+  MakeSignedVarAdv(f, "sd", 8, 0xF9);
+  MakeSignedVarAdv(f, "se", 8, 2);
+  auto* expr = MakeBinary(f.arena, TokenKind::kSlash, MakeId(f.arena, "sd"),
+                          MakeId(f.arena, "se"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64() & 0xFF, 0xFDu);
+  EXPECT_TRUE(result.is_signed);
+}
+
+TEST(EvalAdv, SignedModSignOfFirst) {
+  EvalAdvFixture f;
+  MakeSignedVarAdv(f, "sm", 8, 0xF9);
+  MakeSignedVarAdv(f, "sn", 8, 2);
+  auto* expr = MakeBinary(f.arena, TokenKind::kPercent, MakeId(f.arena, "sm"),
+                          MakeId(f.arena, "sn"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64() & 0xFF, 0xFFu);
+  EXPECT_TRUE(result.is_signed);
+}
+
+TEST(EvalAdv, SignedMulNeg) {
+  EvalAdvFixture f;
+  MakeSignedVarAdv(f, "ma", 8, 0xFD);
+  MakeSignedVarAdv(f, "mb", 8, 4);
+  auto* expr = MakeBinary(f.arena, TokenKind::kStar, MakeId(f.arena, "ma"),
+                          MakeId(f.arena, "mb"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64() & 0xFF, 0xF4u);
+  EXPECT_TRUE(result.is_signed);
+}
+
+TEST(EvalAdv, UnsignedDivUnchanged) {
+  EvalAdvFixture f;
+  auto* a = MakeVar(f, "ud", 8, 0xF9);
+  (void)a;
+  auto* b = MakeVar(f, "ue", 8, 2);
+  (void)b;
+  auto* expr = MakeBinary(f.arena, TokenKind::kSlash, MakeId(f.arena, "ud"),
+                          MakeId(f.arena, "ue"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 124u);
+}
+
+// ==========================================================================
+// Expression type rules — §11.8.1
+// ==========================================================================
+
+TEST(EvalAdv, ComparisonResultUnsigned) {
+  EvalAdvFixture f;
+  MakeSignedVarAdv(f, "ca", 8, 1);
+  MakeSignedVarAdv(f, "cb", 8, 2);
+  auto* expr = MakeBinary(f.arena, TokenKind::kLt, MakeId(f.arena, "ca"),
+                          MakeId(f.arena, "cb"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+  EXPECT_FALSE(result.is_signed);
+}
+
+TEST(EvalAdv, ReductionResultUnsigned) {
+  EvalAdvFixture f;
+  MakeSignedVarAdv(f, "rv", 8, 0xFF);
+  auto* expr = MakeUnary(f.arena, TokenKind::kAmp, MakeId(f.arena, "rv"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+  EXPECT_FALSE(result.is_signed);
+}
+
+TEST(EvalAdv, ConcatResultUnsigned) {
+  EvalAdvFixture f;
+  MakeSignedVarAdv(f, "c1", 4, 0xA);
+  MakeSignedVarAdv(f, "c2", 4, 0xB);
+  auto* concat = f.arena.Create<Expr>();
+  concat->kind = ExprKind::kConcatenation;
+  concat->elements.push_back(MakeId(f.arena, "c1"));
+  concat->elements.push_back(MakeId(f.arena, "c2"));
+  auto result = EvalExpr(concat, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0xABu);
+  EXPECT_FALSE(result.is_signed);
+}
+
+TEST(EvalAdv, BitwiseSignedResult) {
+  EvalAdvFixture f;
+  MakeSignedVarAdv(f, "b1", 8, 0xFF);
+  MakeSignedVarAdv(f, "b2", 8, 0x0F);
+  auto* expr = MakeBinary(f.arena, TokenKind::kAmp, MakeId(f.arena, "b1"),
+                          MakeId(f.arena, "b2"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0x0Fu);
+  EXPECT_TRUE(result.is_signed);
+}
+
+TEST(EvalAdv, MixedSignUnsignedResult) {
+  EvalAdvFixture f;
+  MakeSignedVarAdv(f, "ms", 8, 0xFF);
+  auto* u = MakeVar(f, "mu", 8, 0x0F);
+  (void)u;
+  auto* expr = MakeBinary(f.arena, TokenKind::kAmp, MakeId(f.arena, "ms"),
+                          MakeId(f.arena, "mu"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_FALSE(result.is_signed);
+}
+
+TEST(EvalAdv, BitSelectUnsigned) {
+  EvalAdvFixture f;
+  // §11.8.1: Bit-select result is always unsigned.
+  MakeSignedVarAdv(f, "bs", 8, 0xFF);
+  auto* sel = f.arena.Create<Expr>();
+  sel->kind = ExprKind::kSelect;
+  sel->base = MakeId(f.arena, "bs");
+  sel->index = MakeInt(f.arena, 3);
+  auto result = EvalExpr(sel, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 1u);
+  EXPECT_EQ(result.ToUint64(), 1u);
+  EXPECT_FALSE(result.is_signed);
+}
+
+TEST(EvalAdv, PartSelectUnsigned) {
+  EvalAdvFixture f;
+  // §11.8.1: Part-select result is always unsigned.
+  MakeSignedVarAdv(f, "ps", 8, 0xFF);
+  auto* sel = f.arena.Create<Expr>();
+  sel->kind = ExprKind::kSelect;
+  sel->base = MakeId(f.arena, "ps");
+  sel->index = MakeInt(f.arena, 0);
+  sel->index_end = MakeInt(f.arena, 4);
+  sel->is_part_select_plus = true;
+  auto result = EvalExpr(sel, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 4u);
+  EXPECT_EQ(result.ToUint64(), 0xFu);
+  EXPECT_FALSE(result.is_signed);
+}
+
+static Variable* MakeVar4Adv(EvalAdvFixture& f, std::string_view name,
+                              uint32_t width, uint64_t aval, uint64_t bval) {
+  auto* var = f.ctx.CreateVariable(name, width);
+  var->value = MakeLogic4Vec(f.arena, width);
+  var->value.words[0].aval = aval;
+  var->value.words[0].bval = bval;
+  return var;
+}
+
+TEST(EvalAdv, SignedXFillsX) {
+  EvalAdvFixture f;
+  // §11.8.4: Sign bit X → fill with X during sign extension.
+  // 4-bit signed value with sign bit (bit3) = X: aval=0b0001, bval=0b1000
+  auto* var = MakeVar4Adv(f, "sx", 4, 0b0001, 0b1000);
+  var->is_signed = true;
+  // Use $signed to trigger sign extension to 8-bit context.
+  auto* expr = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "sx"),
+                          MakeInt(f.arena, 0));
+  auto result = EvalExpr(expr, f.ctx, f.arena, 8);
+  // With sign bit X, upper bits should be X (bval set).
+  EXPECT_NE(result.words[0].bval & 0xF0u, 0u);
+}
+
+TEST(EvalAdv, SignedZFillsZ) {
+  EvalAdvFixture f;
+  // §11.8.4: Sign bit Z → fill with Z during sign extension.
+  // Z encoding: aval=0, bval=1 for sign bit (bit3).
+  auto* var = MakeVar4Adv(f, "sz", 4, 0b0001, 0b1000);
+  var->is_signed = true;
+  auto* expr = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "sz"),
+                          MakeInt(f.arena, 0));
+  auto result = EvalExpr(expr, f.ctx, f.arena, 8);
+  // With sign bit X/Z, upper bits should have bval set.
+  EXPECT_NE(result.words[0].bval & 0xF0u, 0u);
 }
