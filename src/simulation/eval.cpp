@@ -1,5 +1,6 @@
 #include "simulation/eval.h"
 
+#include <cmath>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -314,8 +315,47 @@ static Logic4Vec EvalSignedArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
   return result;
 }
 
+// §11.3.1: Convert Logic4Vec to double (real if is_real, else cast uint64).
+static double ToDouble(const Logic4Vec& v) {
+  if (v.is_real) {
+    double d = 0.0;
+    uint64_t bits = v.ToUint64();
+    std::memcpy(&d, &bits, sizeof(double));
+    return d;
+  }
+  return static_cast<double>(v.ToUint64());
+}
+
+// §11.3.1: Wrap a double result into a real Logic4Vec.
+static Logic4Vec MakeRealResult(Arena& arena, double val) {
+  uint64_t bits = 0;
+  std::memcpy(&bits, &val, sizeof(double));
+  auto r = MakeLogic4VecVal(arena, 64, bits);
+  r.is_real = true;
+  return r;
+}
+
+// §11.3.1: Real binary arithmetic — both operands converted to double.
+static Logic4Vec EvalRealArith(TokenKind op, const Logic4Vec& lhs,
+                               const Logic4Vec& rhs, Arena& arena) {
+  double lv = ToDouble(lhs);
+  double rv = ToDouble(rhs);
+  switch (op) {
+    case TokenKind::kPlus:  return MakeRealResult(arena, lv + rv);
+    case TokenKind::kMinus: return MakeRealResult(arena, lv - rv);
+    case TokenKind::kStar:  return MakeRealResult(arena, lv * rv);
+    case TokenKind::kSlash:
+      if (rv == 0.0) return MakeAllX(arena, 64);
+      return MakeRealResult(arena, lv / rv);
+    case TokenKind::kPower: return MakeRealResult(arena, std::pow(lv, rv));
+    default: return MakeRealResult(arena, 0.0);
+  }
+}
+
 static Logic4Vec EvalBinaryArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
                                  Arena& arena, uint32_t context_width = 0) {
+  // §11.3.1: If either operand is real, do real arithmetic.
+  if (lhs.is_real || rhs.is_real) return EvalRealArith(op, lhs, rhs, arena);
   uint32_t self_w = (lhs.width > rhs.width) ? lhs.width : rhs.width;
   uint32_t width = (context_width > self_w) ? context_width : self_w;
   if (HasUnknownBits(lhs) || HasUnknownBits(rhs)) {
@@ -513,16 +553,44 @@ static bool IsEqualityOp(TokenKind op) {
          op == TokenKind::kEqEqQuestion || op == TokenKind::kBangEqQuestion;
 }
 
-static bool IsRelationalOp(TokenKind op) {
-  return op == TokenKind::kLt || op == TokenKind::kGt ||
-         op == TokenKind::kLtEq || op == TokenKind::kGtEq;
+// §11.3.1: Real relational comparison.
+static Logic4Vec EvalRealRelational(TokenKind op, const Logic4Vec& lhs,
+                                    const Logic4Vec& rhs, Arena& arena) {
+  double ld = ToDouble(lhs);
+  double rd = ToDouble(rhs);
+  bool r = false;
+  switch (op) {
+    case TokenKind::kLt: r = ld < rd; break;
+    case TokenKind::kGt: r = ld > rd; break;
+    case TokenKind::kLtEq: r = ld <= rd; break;
+    case TokenKind::kGtEq: r = ld >= rd; break;
+    default: break;
+  }
+  return MakeLogic4VecVal(arena, 1, r ? 1 : 0);
+}
+
+// §11.4.4–§11.4.5: Relational operator dispatch.
+static Logic4Vec EvalRelational(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
+                                Arena& arena) {
+  if (lhs.is_real || rhs.is_real) {
+    return EvalRealRelational(op, lhs, rhs, arena);
+  }
+  if (HasUnknownBits(lhs) || HasUnknownBits(rhs)) {
+    return MakeAllX(arena, 1);
+  }
+  if (lhs.is_signed && rhs.is_signed) {
+    int64_t lv = SignExtend(lhs.ToUint64(), lhs.width);
+    int64_t rv = SignExtend(rhs.ToUint64(), rhs.width);
+    return MakeLogic4VecVal(arena, 1, EvalSignedRelOp(op, lv, rv));
+  }
+  return MakeLogic4VecVal(arena, 1,
+                          EvalRelationalOp(op, lhs.ToUint64(), rhs.ToUint64()));
 }
 
 static Logic4Vec EvalBinaryCompare(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
                                    Arena& arena) {
   if (op == TokenKind::kLtLt || op == TokenKind::kLtLtLt ||
       op == TokenKind::kGtGt || op == TokenKind::kGtGtGt) {
-    // §11.4.10: X/Z shift amount → all-X.
     if (HasUnknownBits(rhs)) return MakeAllX(arena, lhs.width);
     return EvalShift(op, lhs, rhs.ToUint64(), arena);
   }
@@ -531,18 +599,7 @@ static Logic4Vec EvalBinaryCompare(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
     if (val == kResultX) return MakeAllX(arena, 1);
     return MakeLogic4VecVal(arena, 1, val);
   }
-  // §11.4.4: X/Z in relational operand → 1'bx.
-  if (IsRelationalOp(op) && (HasUnknownBits(lhs) || HasUnknownBits(rhs))) {
-    return MakeAllX(arena, 1);
-  }
-  // §11.4.3.1: Both signed → signed comparison.
-  if (IsRelationalOp(op) && lhs.is_signed && rhs.is_signed) {
-    int64_t lv = SignExtend(lhs.ToUint64(), lhs.width);
-    int64_t rv = SignExtend(rhs.ToUint64(), rhs.width);
-    return MakeLogic4VecVal(arena, 1, EvalSignedRelOp(op, lv, rv));
-  }
-  return MakeLogic4VecVal(arena, 1,
-                          EvalRelationalOp(op, lhs.ToUint64(), rhs.ToUint64()));
+  return EvalRelational(op, lhs, rhs, arena);
 }
 
 // --- Binary dispatch ---

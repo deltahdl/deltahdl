@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstring>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -818,4 +820,61 @@ TEST(EvalOpXZ, TernaryWidthFromBranches) {
   // Width should be max(8,4) = 8, value 0xFF.
   EXPECT_EQ(result.width, 8u);
   EXPECT_EQ(result.ToUint64(), 0xFFu);
+}
+
+// ==========================================================================
+// Real operator propagation — §11.3.1
+// ==========================================================================
+
+static Variable* MakeRealVar(EvalOpXZFixture& f, std::string_view name,
+                             double val) {
+  auto* var = f.ctx.CreateVariable(name, 64);
+  uint64_t bits = 0;
+  std::memcpy(&bits, &val, sizeof(double));
+  var->value = MakeLogic4VecVal(f.arena, 64, bits);
+  var->value.is_real = true;
+  f.ctx.RegisterRealVariable(name);
+  return var;
+}
+
+static double ToDouble(const Logic4Vec& v) {
+  double d = 0.0;
+  uint64_t bits = v.ToUint64();
+  std::memcpy(&d, &bits, sizeof(double));
+  return d;
+}
+
+TEST(EvalOpXZ, RealArithResult) {
+  EvalOpXZFixture f;
+  MakeRealVar(f, "ra", 2.5);
+  MakeRealVar(f, "rb", 1.5);
+  auto* expr = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "ra"),
+                          MakeId(f.arena, "rb"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_TRUE(result.is_real);
+  EXPECT_DOUBLE_EQ(ToDouble(result), 4.0);
+}
+
+TEST(EvalOpXZ, RealComparisonSingleBit) {
+  EvalOpXZFixture f;
+  MakeRealVar(f, "rc", 3.14);
+  MakeRealVar(f, "rd", 2.71);
+  auto* expr = MakeBinary(f.arena, TokenKind::kGt, MakeId(f.arena, "rc"),
+                          MakeId(f.arena, "rd"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 1u);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
+TEST(EvalOpXZ, MixedRealIntArith) {
+  EvalOpXZFixture f;
+  // If either operand is real, both are converted to real.
+  MakeRealVar(f, "re", 2.5);
+  auto* vi = f.ctx.CreateVariable("ri", 32);
+  vi->value = MakeLogic4VecVal(f.arena, 32, 3);
+  auto* expr = MakeBinary(f.arena, TokenKind::kStar, MakeId(f.arena, "re"),
+                          MakeId(f.arena, "ri"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_TRUE(result.is_real);
+  EXPECT_DOUBLE_EQ(ToDouble(result), 7.5);
 }
