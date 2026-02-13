@@ -32,7 +32,7 @@ TEST(Constraint, RandVariableBasic) {
 
 TEST(Constraint, RandVariableMultiple) {
   ConstraintSolver solver(42);
-  for (const auto& name : {"a", "b", "c"}) {
+  for (const auto &name : {"a", "b", "c"}) {
     RandVariable v;
     v.name = name;
     v.min_val = 0;
@@ -40,7 +40,7 @@ TEST(Constraint, RandVariableMultiple) {
     solver.AddVariable(v);
   }
   ASSERT_TRUE(solver.Solve());
-  for (const auto& name : {"a", "b", "c"}) {
+  for (const auto &name : {"a", "b", "c"}) {
     int64_t val = solver.GetValue(name);
     EXPECT_GE(val, 0);
     EXPECT_LE(val, 255);
@@ -233,7 +233,8 @@ TEST(Constraint, DistributionWeighted) {
   int count_10 = 0;
   for (int i = 0; i < 100; ++i) {
     ASSERT_TRUE(solver.Solve());
-    if (solver.GetValue("x") == 10) ++count_10;
+    if (solver.GetValue("x") == 10)
+      ++count_10;
   }
   EXPECT_GT(count_10, 80);
 }
@@ -847,10 +848,11 @@ TEST(Constraint, CustomConstraintCallback) {
   block.name = "c_custom";
   ConstraintExpr c;
   c.kind = ConstraintKind::kCustom;
-  c.eval_fn = [](const std::unordered_map<std::string, int64_t>& vals) {
+  c.eval_fn = [](const std::unordered_map<std::string, int64_t> &vals) {
     auto ita = vals.find("a");
     auto itb = vals.find("b");
-    if (ita == vals.end() || itb == vals.end()) return true;
+    if (ita == vals.end() || itb == vals.end())
+      return true;
     return ita->second + itb->second <= 30;
   };
   block.constraints.push_back(c);
@@ -929,7 +931,7 @@ TEST(Constraint, GetValuesMap) {
   solver.AddVariable(vb);
 
   ASSERT_TRUE(solver.Solve());
-  const auto& vals = solver.GetValues();
+  const auto &vals = solver.GetValues();
   EXPECT_EQ(vals.size(), 2u);
   EXPECT_TRUE(vals.count("a"));
   EXPECT_TRUE(vals.count("b"));

@@ -24,17 +24,11 @@ TEST(SvVpiUser, VariableTypes) {
     int actual;
     int expected;
   } const kCases[] = {
-      {vpiLongIntVar, 610},
-      {vpiIntVar, 612},
-      {vpiClassVar, 615},
-      {vpiStringVar, 616},
-      {vpiEnumVar, 617},
-      {vpiStructVar, 618},
-      {vpiBitVar, 620},
-      {vpiClassObj, 621},
-      {vpiChandleVar, 622},
+      {vpiLongIntVar, 610}, {vpiIntVar, 612},   {vpiClassVar, 615},
+      {vpiStringVar, 616},  {vpiEnumVar, 617},  {vpiStructVar, 618},
+      {vpiBitVar, 620},     {vpiClassObj, 621}, {vpiChandleVar, 622},
   };
-  for (const auto& c : kCases) {
+  for (const auto &c : kCases) {
     EXPECT_EQ(c.actual, c.expected);
   }
 }
@@ -67,12 +61,11 @@ TEST(SvVpiUser, OperatorConstants) {
     int actual;
     int expected;
   } const kCases[] = {
-      {vpiImplyOp, 50},      {vpiPostIncOp, 62},
-      {vpiWildEqOp, 69},     {vpiStreamLROp, 71},
-      {vpiInsideOp, 95},     {vpiNexttimeOp, 89},
-      {vpiAlwaysOp, 90},     {vpiEventuallyOp, 91},
+      {vpiImplyOp, 50},    {vpiPostIncOp, 62},    {vpiWildEqOp, 69},
+      {vpiStreamLROp, 71}, {vpiInsideOp, 95},     {vpiNexttimeOp, 89},
+      {vpiAlwaysOp, 90},   {vpiEventuallyOp, 91},
   };
-  for (const auto& c : kCases) {
+  for (const auto &c : kCases) {
     EXPECT_EQ(c.actual, c.expected);
   }
 }
@@ -195,4 +188,4 @@ TEST(SvVpiUser, DpiAccessTypeConstants) {
   EXPECT_EQ(vpiDPIImportAcc, 4);
 }
 
-}  // namespace
+} // namespace

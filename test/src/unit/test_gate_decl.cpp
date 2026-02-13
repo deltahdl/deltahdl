@@ -58,46 +58,46 @@ struct GateDeclInfo {
   uint32_t terminal_count = 0;
 };
 
-bool ValidateGateDecl(const GateDeclInfo& info);
+bool ValidateGateDecl(const GateDeclInfo &info);
 bool CanHaveStrengthSpec(GateType type);
 uint32_t ComputeArraySize(int32_t lhi, int32_t rhi);
 bool ValidateStrengthSpec(StrengthLvl s0, StrengthLvl s1, GateType type);
 uint32_t MaxDelays(GateType type);
 
-bool ValidateGateDecl(const GateDeclInfo& info) {
+bool ValidateGateDecl(const GateDeclInfo &info) {
   return !info.has_range || info.has_name;
 }
 
 bool CanHaveStrengthSpec(GateType type) {
   switch (type) {
-    case GateType::kAnd:
-    case GateType::kNand:
-    case GateType::kOr:
-    case GateType::kNor:
-    case GateType::kXor:
-    case GateType::kXnor:
-    case GateType::kBuf:
-    case GateType::kNot:
-    case GateType::kBufif0:
-    case GateType::kBufif1:
-    case GateType::kNotif0:
-    case GateType::kNotif1:
-    case GateType::kPullup:
-    case GateType::kPulldown:
-      return true;
-    case GateType::kNmos:
-    case GateType::kPmos:
-    case GateType::kRnmos:
-    case GateType::kRpmos:
-    case GateType::kTran:
-    case GateType::kRtran:
-    case GateType::kTranif0:
-    case GateType::kTranif1:
-    case GateType::kRtranif0:
-    case GateType::kRtranif1:
-    case GateType::kCmos:
-    case GateType::kRcmos:
-      return false;
+  case GateType::kAnd:
+  case GateType::kNand:
+  case GateType::kOr:
+  case GateType::kNor:
+  case GateType::kXor:
+  case GateType::kXnor:
+  case GateType::kBuf:
+  case GateType::kNot:
+  case GateType::kBufif0:
+  case GateType::kBufif1:
+  case GateType::kNotif0:
+  case GateType::kNotif1:
+  case GateType::kPullup:
+  case GateType::kPulldown:
+    return true;
+  case GateType::kNmos:
+  case GateType::kPmos:
+  case GateType::kRnmos:
+  case GateType::kRpmos:
+  case GateType::kTran:
+  case GateType::kRtran:
+  case GateType::kTranif0:
+  case GateType::kTranif1:
+  case GateType::kRtranif0:
+  case GateType::kRtranif1:
+  case GateType::kCmos:
+  case GateType::kRcmos:
+    return false;
   }
   return false;
 }
@@ -112,37 +112,37 @@ bool ValidateStrengthSpec(StrengthLvl s0, StrengthLvl s1, GateType /*type*/) {
 
 uint32_t MaxDelays(GateType type) {
   switch (type) {
-    case GateType::kPullup:
-    case GateType::kPulldown:
-      return 0;
-    case GateType::kAnd:
-    case GateType::kNand:
-    case GateType::kOr:
-    case GateType::kNor:
-    case GateType::kXor:
-    case GateType::kXnor:
-    case GateType::kBuf:
-    case GateType::kNot:
-      return 2;
-    case GateType::kBufif0:
-    case GateType::kBufif1:
-    case GateType::kNotif0:
-    case GateType::kNotif1:
-    case GateType::kNmos:
-    case GateType::kPmos:
-    case GateType::kRnmos:
-    case GateType::kRpmos:
-    case GateType::kCmos:
-    case GateType::kRcmos:
-      return 3;
-    case GateType::kTranif0:
-    case GateType::kTranif1:
-    case GateType::kRtranif0:
-    case GateType::kRtranif1:
-      return 2;
-    case GateType::kTran:
-    case GateType::kRtran:
-      return 0;
+  case GateType::kPullup:
+  case GateType::kPulldown:
+    return 0;
+  case GateType::kAnd:
+  case GateType::kNand:
+  case GateType::kOr:
+  case GateType::kNor:
+  case GateType::kXor:
+  case GateType::kXnor:
+  case GateType::kBuf:
+  case GateType::kNot:
+    return 2;
+  case GateType::kBufif0:
+  case GateType::kBufif1:
+  case GateType::kNotif0:
+  case GateType::kNotif1:
+  case GateType::kNmos:
+  case GateType::kPmos:
+  case GateType::kRnmos:
+  case GateType::kRpmos:
+  case GateType::kCmos:
+  case GateType::kRcmos:
+    return 3;
+  case GateType::kTranif0:
+  case GateType::kTranif1:
+  case GateType::kRtranif0:
+  case GateType::kRtranif1:
+    return 2;
+  case GateType::kTran:
+  case GateType::kRtran:
+    return 0;
   }
   return 0;
 }
@@ -164,8 +164,8 @@ uint32_t MaxDelays(GateType type) {
 // §28.3.2: Only certain gate types can have drive strength.
 TEST(GateDecl, StrengthSpecValidForNInputGates) {
   constexpr GateType kNInputGates[] = {
-      GateType::kAnd,  GateType::kNand, GateType::kOr,
-      GateType::kNor,  GateType::kXor,  GateType::kXnor,
+      GateType::kAnd, GateType::kNand, GateType::kOr,
+      GateType::kNor, GateType::kXor,  GateType::kXnor,
   };
   for (auto gate : kNInputGates) {
     EXPECT_TRUE(CanHaveStrengthSpec(gate));
@@ -226,13 +226,10 @@ TEST(GateDecl, MaxDelaysByGateType) {
     GateType gate;
     uint32_t expected;
   } const kCases[] = {
-      {GateType::kPullup, 0u},
-      {GateType::kPulldown, 0u},
-      {GateType::kAnd, 2u},
-      {GateType::kBufif0, 3u},
-      {GateType::kNmos, 3u},
+      {GateType::kPullup, 0u}, {GateType::kPulldown, 0u}, {GateType::kAnd, 2u},
+      {GateType::kBufif0, 3u}, {GateType::kNmos, 3u},
   };
-  for (const auto& c : kCases) {
+  for (const auto &c : kCases) {
     EXPECT_EQ(MaxDelays(c.gate), c.expected);
   }
 }

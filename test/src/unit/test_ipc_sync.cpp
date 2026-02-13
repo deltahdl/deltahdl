@@ -31,7 +31,7 @@ struct SyncFixture {
   SimContext ctx{scheduler, arena, diag, 42};
 };
 
-}  // namespace
+} // namespace
 
 // =============================================================================
 // 1. Semaphore: Constructor with key count (section 15.3)
@@ -80,7 +80,7 @@ TEST(IpcSync, SemaphoreTryGetFails) {
   SemaphoreObject sem(1);
   int32_t result = sem.TryGet(2);
   EXPECT_EQ(result, 0);
-  EXPECT_EQ(sem.key_count, 1);  // Keys unchanged on failure.
+  EXPECT_EQ(sem.key_count, 1); // Keys unchanged on failure.
 }
 
 TEST(IpcSync, SemaphoreTryGetDefaultOne) {
@@ -94,7 +94,7 @@ TEST(IpcSync, SemaphoreTryGetExactKeys) {
   SemaphoreObject sem(5);
   EXPECT_EQ(sem.TryGet(5), 1);
   EXPECT_EQ(sem.key_count, 0);
-  EXPECT_EQ(sem.TryGet(1), 0);  // Empty now.
+  EXPECT_EQ(sem.TryGet(1), 0); // Empty now.
 }
 
 // =============================================================================
@@ -103,14 +103,14 @@ TEST(IpcSync, SemaphoreTryGetExactKeys) {
 
 TEST(IpcSync, SemaphoreContextCreateFind) {
   SyncFixture f;
-  auto* sem = f.ctx.CreateSemaphore("sem1", 3);
+  auto *sem = f.ctx.CreateSemaphore("sem1", 3);
   ASSERT_NE(sem, nullptr);
   EXPECT_EQ(sem->key_count, 3);
 
-  auto* found = f.ctx.FindSemaphore("sem1");
+  auto *found = f.ctx.FindSemaphore("sem1");
   EXPECT_EQ(found, sem);
 
-  auto* not_found = f.ctx.FindSemaphore("no_such_sem");
+  auto *not_found = f.ctx.FindSemaphore("no_such_sem");
   EXPECT_EQ(not_found, nullptr);
 }
 
@@ -124,9 +124,9 @@ TEST(IpcSync, SemaphorePutWakesWaiters) {
   // Simulate a waiting coroutine by adding a waiter manually.
   // We cannot create a real coroutine here, but we can verify the
   // waiter queue management.
-  EXPECT_EQ(sem.TryGet(1), 0);  // No keys available.
+  EXPECT_EQ(sem.TryGet(1), 0); // No keys available.
   sem.Put(1);
-  EXPECT_EQ(sem.key_count, 1);  // Key added, no waiters to wake.
+  EXPECT_EQ(sem.key_count, 1); // Key added, no waiters to wake.
   (void)woken;
 }
 
@@ -167,7 +167,7 @@ TEST(IpcSync, MailboxTryPutBoundedSuccess) {
 TEST(IpcSync, MailboxTryPutBoundedFull) {
   MailboxObject mb(1);
   EXPECT_EQ(mb.TryPut(10), 0);
-  EXPECT_EQ(mb.TryPut(20), -1);  // Full.
+  EXPECT_EQ(mb.TryPut(20), -1); // Full.
   EXPECT_EQ(mb.Num(), 1);
 }
 
@@ -215,7 +215,7 @@ TEST(IpcSync, MailboxTryPeekSuccess) {
   uint64_t msg = 0;
   EXPECT_EQ(mb.TryPeek(msg), 0);
   EXPECT_EQ(msg, 42u);
-  EXPECT_EQ(mb.Num(), 1);  // Peek does not remove.
+  EXPECT_EQ(mb.Num(), 1); // Peek does not remove.
 }
 
 TEST(IpcSync, MailboxTryPeekEmpty) {
@@ -230,14 +230,14 @@ TEST(IpcSync, MailboxTryPeekEmpty) {
 
 TEST(IpcSync, MailboxContextCreateFind) {
   SyncFixture f;
-  auto* mb = f.ctx.CreateMailbox("mbox1", 10);
+  auto *mb = f.ctx.CreateMailbox("mbox1", 10);
   ASSERT_NE(mb, nullptr);
   EXPECT_EQ(mb->bound, 10);
 
-  auto* found = f.ctx.FindMailbox("mbox1");
+  auto *found = f.ctx.FindMailbox("mbox1");
   EXPECT_EQ(found, mb);
 
-  auto* not_found = f.ctx.FindMailbox("no_such_mbox");
+  auto *not_found = f.ctx.FindMailbox("no_such_mbox");
   EXPECT_EQ(not_found, nullptr);
 }
 
@@ -248,12 +248,12 @@ TEST(IpcSync, MailboxContextCreateFind) {
 TEST(IpcSync, MailboxBoundedGetFreesSpace) {
   MailboxObject mb(1);
   EXPECT_EQ(mb.TryPut(10), 0);
-  EXPECT_EQ(mb.TryPut(20), -1);  // Full.
+  EXPECT_EQ(mb.TryPut(20), -1); // Full.
 
   uint64_t msg = 0;
   mb.TryGet(msg);
   EXPECT_EQ(msg, 10u);
-  EXPECT_EQ(mb.TryPut(30), 0);  // Space freed.
+  EXPECT_EQ(mb.TryPut(30), 0); // Space freed.
   EXPECT_EQ(mb.Num(), 1);
 }
 
@@ -339,7 +339,7 @@ TEST(IpcSync, MailboxIsFullUnbounded) {
   for (int i = 0; i < 1000; ++i) {
     mb.TryPut(static_cast<uint64_t>(i));
   }
-  EXPECT_FALSE(mb.IsFull());  // Unbounded never full.
+  EXPECT_FALSE(mb.IsFull()); // Unbounded never full.
 }
 
 // =============================================================================
@@ -349,12 +349,12 @@ TEST(IpcSync, MailboxIsFullUnbounded) {
 TEST(IpcSync, EventTriggerSetsTriggeredState) {
   SyncFixture f;
   // Create named event variable.
-  auto* ev = f.ctx.CreateVariable("my_event", 1);
+  auto *ev = f.ctx.CreateVariable("my_event", 1);
   ev->is_event = true;
   ev->value = MakeLogic4VecVal(f.arena, 1, 0);
 
   // Build event trigger statement: ->my_event
-  auto* trigger_stmt = f.arena.Create<Stmt>();
+  auto *trigger_stmt = f.arena.Create<Stmt>();
   trigger_stmt->kind = StmtKind::kEventTrigger;
   trigger_stmt->expr = f.arena.Create<Expr>();
   trigger_stmt->expr->kind = ExprKind::kIdentifier;
@@ -364,8 +364,8 @@ TEST(IpcSync, EventTriggerSetsTriggeredState) {
   struct DriverResult {
     StmtResult value = StmtResult::kDone;
   };
-  auto driver = [](const Stmt* stmt, SimContext& ctx, Arena& arena,
-                   DriverResult* out) -> SimCoroutine {
+  auto driver = [](const Stmt *stmt, SimContext &ctx, Arena &arena,
+                   DriverResult *out) -> SimCoroutine {
     out->value = co_await ExecStmt(stmt, ctx, arena);
   };
   DriverResult result;
@@ -460,11 +460,11 @@ TEST(IpcSync, MailboxNumReflectsState) {
 
 TEST(IpcSync, EventVariableCreation) {
   SyncFixture f;
-  auto* ev = f.ctx.CreateVariable("ev1", 1);
+  auto *ev = f.ctx.CreateVariable("ev1", 1);
   ev->is_event = true;
   ev->value = MakeLogic4VecVal(f.arena, 1, 0);
 
-  auto* found = f.ctx.FindVariable("ev1");
+  auto *found = f.ctx.FindVariable("ev1");
   ASSERT_NE(found, nullptr);
   EXPECT_TRUE(found->is_event);
 }
@@ -475,8 +475,8 @@ TEST(IpcSync, EventVariableCreation) {
 
 TEST(IpcSync, MultipleSemaphoresInContext) {
   SyncFixture f;
-  auto* sem1 = f.ctx.CreateSemaphore("s1", 1);
-  auto* sem2 = f.ctx.CreateSemaphore("s2", 5);
+  auto *sem1 = f.ctx.CreateSemaphore("s1", 1);
+  auto *sem2 = f.ctx.CreateSemaphore("s2", 5);
   EXPECT_EQ(sem1->key_count, 1);
   EXPECT_EQ(sem2->key_count, 5);
   EXPECT_NE(f.ctx.FindSemaphore("s1"), f.ctx.FindSemaphore("s2"));
@@ -488,8 +488,8 @@ TEST(IpcSync, MultipleSemaphoresInContext) {
 
 TEST(IpcSync, MultipleMailboxesInContext) {
   SyncFixture f;
-  auto* mb1 = f.ctx.CreateMailbox("m1", 0);
-  auto* mb2 = f.ctx.CreateMailbox("m2", 3);
+  auto *mb1 = f.ctx.CreateMailbox("m1", 0);
+  auto *mb2 = f.ctx.CreateMailbox("m2", 3);
   mb1->TryPut(100);
   mb2->TryPut(200);
   uint64_t msg = 0;

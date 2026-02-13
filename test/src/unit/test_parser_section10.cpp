@@ -13,10 +13,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult Parse(const std::string& src) {
+static ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -26,9 +26,10 @@ static ParseResult Parse(const std::string& src) {
   return result;
 }
 
-static Stmt* FirstInitialStmt(ParseResult& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+static Stmt *FirstInitialStmt(ParseResult &r) {
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock)
+      continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
     }
@@ -37,11 +38,13 @@ static Stmt* FirstInitialStmt(ParseResult& r) {
   return nullptr;
 }
 
-static Stmt* NthInitialStmt(ParseResult& r, size_t n) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+static Stmt *NthInitialStmt(ParseResult &r, size_t n) {
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock)
+      continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
-      if (n < item->body->stmts.size()) return item->body->stmts[n];
+      if (n < item->body->stmts.size())
+        return item->body->stmts[n];
     }
   }
   return nullptr;
@@ -52,77 +55,72 @@ static Stmt* NthInitialStmt(ParseResult& r, size_t n) {
 // =============================================================================
 
 TEST(ParserSection10, ProceduralAssignKind) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg q;\n"
-      "  initial begin\n"
-      "    assign q = 1;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  reg q;\n"
+                 "  initial begin\n"
+                 "    assign q = 1;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kAssign);
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
 TEST(ParserSection10, ProceduralAssignLhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg q;\n"
-      "  initial begin\n"
-      "    assign q = 1;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  reg q;\n"
+                 "  initial begin\n"
+                 "    assign q = 1;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->lhs, nullptr);
   EXPECT_EQ(stmt->lhs->text, "q");
 }
 
 TEST(ParserSection10, ProceduralDeassignKind) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg q;\n"
-      "  initial begin\n"
-      "    deassign q;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  reg q;\n"
+                 "  initial begin\n"
+                 "    deassign q;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDeassign);
   EXPECT_EQ(stmt->rhs, nullptr);
 }
 
 TEST(ParserSection10, ProceduralDeassignLhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg q;\n"
-      "  initial begin\n"
-      "    deassign q;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  reg q;\n"
+                 "  initial begin\n"
+                 "    deassign q;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->lhs, nullptr);
   EXPECT_EQ(stmt->lhs->text, "q");
 }
 
 TEST(ParserSection10, ProceduralAssignThenDeassign) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg q;\n"
-      "  initial begin\n"
-      "    assign q = 1;\n"
-      "    deassign q;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  reg q;\n"
+                 "  initial begin\n"
+                 "    assign q = 1;\n"
+                 "    deassign q;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* s0 = NthInitialStmt(r, 0);
-  auto* s1 = NthInitialStmt(r, 1);
+  auto *s0 = NthInitialStmt(r, 0);
+  auto *s1 = NthInitialStmt(r, 1);
   ASSERT_NE(s0, nullptr);
   ASSERT_NE(s1, nullptr);
   EXPECT_EQ(s0->kind, StmtKind::kAssign);
@@ -134,77 +132,72 @@ TEST(ParserSection10, ProceduralAssignThenDeassign) {
 // =============================================================================
 
 TEST(ParserSection10, ForceKind) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire w;\n"
-      "  initial begin\n"
-      "    force w = 1'b1;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire w;\n"
+                 "  initial begin\n"
+                 "    force w = 1'b1;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kForce);
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
 TEST(ParserSection10, ForceLhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire w;\n"
-      "  initial begin\n"
-      "    force w = 1'b1;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire w;\n"
+                 "  initial begin\n"
+                 "    force w = 1'b1;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->lhs, nullptr);
   EXPECT_EQ(stmt->lhs->text, "w");
 }
 
 TEST(ParserSection10, ReleaseKind) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire w;\n"
-      "  initial begin\n"
-      "    release w;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire w;\n"
+                 "  initial begin\n"
+                 "    release w;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kRelease);
   EXPECT_EQ(stmt->rhs, nullptr);
 }
 
 TEST(ParserSection10, ReleaseLhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire w;\n"
-      "  initial begin\n"
-      "    release w;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire w;\n"
+                 "  initial begin\n"
+                 "    release w;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->lhs, nullptr);
   EXPECT_EQ(stmt->lhs->text, "w");
 }
 
 TEST(ParserSection10, ForceThenRelease) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire w;\n"
-      "  initial begin\n"
-      "    force w = 1'b1;\n"
-      "    release w;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire w;\n"
+                 "  initial begin\n"
+                 "    force w = 1'b1;\n"
+                 "    release w;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* s0 = NthInitialStmt(r, 0);
-  auto* s1 = NthInitialStmt(r, 1);
+  auto *s0 = NthInitialStmt(r, 0);
+  auto *s1 = NthInitialStmt(r, 1);
   ASSERT_NE(s0, nullptr);
   ASSERT_NE(s1, nullptr);
   EXPECT_EQ(s0->kind, StmtKind::kForce);
@@ -216,60 +209,56 @@ TEST(ParserSection10, ForceThenRelease) {
 // =============================================================================
 
 TEST(ParserSection10, BlockingIntraAssignDelayKind) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b;\n"
-      "  initial begin\n"
-      "    a = #10 b;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  reg a, b;\n"
+                 "  initial begin\n"
+                 "    a = #10 b;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
   EXPECT_NE(stmt->delay, nullptr);
 }
 
 TEST(ParserSection10, BlockingIntraAssignDelayOperands) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b;\n"
-      "  initial begin\n"
-      "    a = #10 b;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  reg a, b;\n"
+                 "  initial begin\n"
+                 "    a = #10 b;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_NE(stmt->lhs, nullptr);
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
 TEST(ParserSection10, NonblockingIntraAssignDelayKind) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b;\n"
-      "  initial begin\n"
-      "    a <= #5 b;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  reg a, b;\n"
+                 "  initial begin\n"
+                 "    a <= #5 b;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
   EXPECT_NE(stmt->delay, nullptr);
 }
 
 TEST(ParserSection10, NonblockingIntraAssignDelayOperands) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b;\n"
-      "  initial begin\n"
-      "    a <= #5 b;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  reg a, b;\n"
+                 "  initial begin\n"
+                 "    a <= #5 b;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_NE(stmt->lhs, nullptr);
   EXPECT_NE(stmt->rhs, nullptr);
@@ -280,15 +269,14 @@ TEST(ParserSection10, NonblockingIntraAssignDelayOperands) {
 // =============================================================================
 
 TEST(ParserSection10, BlockingIntraAssignEventKind) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b, clk;\n"
-      "  initial begin\n"
-      "    a = @(posedge clk) b;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  reg a, b, clk;\n"
+                 "  initial begin\n"
+                 "    a = @(posedge clk) b;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
   EXPECT_NE(stmt->lhs, nullptr);
@@ -296,30 +284,28 @@ TEST(ParserSection10, BlockingIntraAssignEventKind) {
 }
 
 TEST(ParserSection10, BlockingIntraAssignEventEdge) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b, clk;\n"
-      "  initial begin\n"
-      "    a = @(posedge clk) b;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  reg a, b, clk;\n"
+                 "  initial begin\n"
+                 "    a = @(posedge clk) b;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_FALSE(stmt->events.empty());
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
 }
 
 TEST(ParserSection10, NonblockingIntraAssignEventKind) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b, clk;\n"
-      "  initial begin\n"
-      "    a <= @(negedge clk) b;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  reg a, b, clk;\n"
+                 "  initial begin\n"
+                 "    a <= @(negedge clk) b;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
   EXPECT_NE(stmt->lhs, nullptr);
@@ -327,15 +313,14 @@ TEST(ParserSection10, NonblockingIntraAssignEventKind) {
 }
 
 TEST(ParserSection10, NonblockingIntraAssignEventEdge) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b, clk;\n"
-      "  initial begin\n"
-      "    a <= @(negedge clk) b;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  reg a, b, clk;\n"
+                 "  initial begin\n"
+                 "    a <= @(negedge clk) b;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_FALSE(stmt->events.empty());
   EXPECT_EQ(stmt->events[0].edge, Edge::kNegedge);
@@ -346,17 +331,16 @@ TEST(ParserSection10, NonblockingIntraAssignEventEdge) {
 // =============================================================================
 
 TEST(ParserSection10, NetAliasTwoNets) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b;\n"
-      "  alias a = b;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire a, b;\n"
+                 "  alias a = b;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_FALSE(r.cu->modules.empty());
-  auto* mod = r.cu->modules[0];
+  auto *mod = r.cu->modules[0];
   // Find the alias item.
-  ModuleItem* alias_item = nullptr;
-  for (auto* item : mod->items) {
+  ModuleItem *alias_item = nullptr;
+  for (auto *item : mod->items) {
     if (item->kind == ModuleItemKind::kAlias) {
       alias_item = item;
       break;
@@ -367,15 +351,14 @@ TEST(ParserSection10, NetAliasTwoNets) {
 }
 
 TEST(ParserSection10, NetAliasThreeNets) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b, c;\n"
-      "  alias a = b = c;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire a, b, c;\n"
+                 "  alias a = b = c;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ModuleItem* alias_item = nullptr;
-  for (auto* item : mod->items) {
+  auto *mod = r.cu->modules[0];
+  ModuleItem *alias_item = nullptr;
+  for (auto *item : mod->items) {
     if (item->kind == ModuleItemKind::kAlias) {
       alias_item = item;
       break;
@@ -390,15 +373,14 @@ TEST(ParserSection10, NetAliasThreeNets) {
 // =============================================================================
 
 TEST(ParserSection10, ContinuousAssignBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b;\n"
-      "  assign a = b;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire a, b;\n"
+                 "  assign a = b;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
+  auto *mod = r.cu->modules[0];
   bool found = false;
-  for (auto* item : mod->items) {
+  for (auto *item : mod->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
       found = true;
       ASSERT_NE(item->assign_lhs, nullptr);
@@ -409,14 +391,13 @@ TEST(ParserSection10, ContinuousAssignBasic) {
 }
 
 TEST(ParserSection10, NetDeclAssignment) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a = 1'b0;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire a = 1'b0;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
+  auto *mod = r.cu->modules[0];
   ASSERT_FALSE(mod->items.empty());
-  auto* item = mod->items[0];
+  auto *item = mod->items[0];
   EXPECT_EQ(item->name, "a");
   EXPECT_NE(item->init_expr, nullptr);
 }
@@ -426,14 +407,13 @@ TEST(ParserSection10, NetDeclAssignment) {
 // =============================================================================
 
 TEST(ParserSection10, ContinuousAssignDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b;\n"
-      "  assign #10 a = b;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire a, b;\n"
+                 "  assign #10 a = b;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  for (auto* item : mod->items) {
+  auto *mod = r.cu->modules[0];
+  for (auto *item : mod->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
       EXPECT_NE(item->assign_delay, nullptr);
     }
@@ -445,25 +425,23 @@ TEST(ParserSection10, ContinuousAssignDelay) {
 // =============================================================================
 
 TEST(ParserSection10, VarDeclAssignment) {
-  auto r = Parse(
-      "module m;\n"
-      "  int x = 42;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  int x = 42;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
+  auto *mod = r.cu->modules[0];
   ASSERT_FALSE(mod->items.empty());
-  auto* item = mod->items[0];
+  auto *item = mod->items[0];
   EXPECT_EQ(item->name, "x");
   EXPECT_NE(item->init_expr, nullptr);
 }
 
 TEST(ParserSection10, VarDeclAssignmentLogic) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [7:0] data = 8'hFF;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  logic [7:0] data = 8'hFF;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
+  auto *mod = r.cu->modules[0];
   ASSERT_FALSE(mod->items.empty());
   EXPECT_NE(mod->items[0]->init_expr, nullptr);
 }
@@ -473,21 +451,19 @@ TEST(ParserSection10, VarDeclAssignmentLogic) {
 // =============================================================================
 
 TEST(ParserSection10, BlockingAssignSimple) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial a = 1;\n"
-      "endmodule\n");
-  auto* stmt = FirstInitialStmt(r);
+  auto r = Parse("module m;\n"
+                 "  initial a = 1;\n"
+                 "endmodule\n");
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
 TEST(ParserSection10, NonblockingAssignSimple) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial a <= 1;\n"
-      "endmodule\n");
-  auto* stmt = FirstInitialStmt(r);
+  auto r = Parse("module m;\n"
+                 "  initial a <= 1;\n"
+                 "endmodule\n");
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
 }
@@ -497,158 +473,146 @@ TEST(ParserSection10, NonblockingAssignSimple) {
 // =============================================================================
 
 TEST(ParserSection10, OperatorAssignPlusEq) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a += 1;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    a += 1;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
 TEST(ParserSection10, OperatorAssignMinusEq) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a -= 2;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    a -= 2;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
 TEST(ParserSection10, OperatorAssignStarEq) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a *= 3;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    a *= 3;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
 TEST(ParserSection10, OperatorAssignSlashEq) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a /= 4;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    a /= 4;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
 TEST(ParserSection10, OperatorAssignPercentEq) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a %= 5;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    a %= 5;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
 TEST(ParserSection10, OperatorAssignAmpEq) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a &= 8'hFF;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    a &= 8'hFF;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
 TEST(ParserSection10, OperatorAssignPipeEq) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a |= 8'h01;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    a |= 8'h01;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
 TEST(ParserSection10, OperatorAssignCaretEq) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a ^= 8'hAA;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    a ^= 8'hAA;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
 TEST(ParserSection10, OperatorAssignLtLtEq) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a <<= 2;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    a <<= 2;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
 TEST(ParserSection10, OperatorAssignGtGtEq) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a >>= 1;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    a >>= 1;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
 TEST(ParserSection10, OperatorAssignLtLtLtEq) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a <<<= 3;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    a <<<= 3;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
 TEST(ParserSection10, OperatorAssignGtGtGtEq) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a >>>= 1;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    a >>>= 1;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
@@ -658,31 +622,30 @@ TEST(ParserSection10, OperatorAssignGtGtGtEq) {
 // =============================================================================
 
 TEST(ParserSection10, ContinuousAssignMultipleTargets) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b, c, d;\n"
-      "  assign a = b, c = d;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire a, b, c, d;\n"
+                 "  assign a = b, c = d;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
+  auto *mod = r.cu->modules[0];
   int count = 0;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kContAssign) count++;
+  for (auto *item : mod->items) {
+    if (item->kind == ModuleItemKind::kContAssign)
+      count++;
   }
   EXPECT_GE(count, 1);
 }
 
 // §10.3.4: Drive strength on continuous assignment.
 TEST(ParserSection10, ContinuousAssignDriveStrength) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire w;\n"
-      "  assign (strong0, weak1) w = 1'b1;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire w;\n"
+                 "  assign (strong0, weak1) w = 1'b1;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ModuleItem* ca = nullptr;
-  for (auto* item : mod->items) {
+  auto *mod = r.cu->modules[0];
+  ModuleItem *ca = nullptr;
+  for (auto *item : mod->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
       ca = item;
       break;
@@ -697,21 +660,20 @@ TEST(ParserSection10, ContinuousAssignDriveStrength) {
 
 // §10.3.4: Drive strength order can be reversed.
 TEST(ParserSection10, ContinuousAssignDriveStrengthReversed) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire w;\n"
-      "  assign (pull1, supply0) w = 1'b0;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire w;\n"
+                 "  assign (pull1, supply0) w = 1'b0;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ModuleItem* ca = nullptr;
-  for (auto* item : mod->items) {
+  auto *mod = r.cu->modules[0];
+  ModuleItem *ca = nullptr;
+  for (auto *item : mod->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
       ca = item;
       break;
     }
   }
   ASSERT_NE(ca, nullptr);
-  EXPECT_EQ(ca->drive_strength0, 5u);  // supply0
-  EXPECT_EQ(ca->drive_strength1, 3u);  // pull1
+  EXPECT_EQ(ca->drive_strength0, 5u); // supply0
+  EXPECT_EQ(ca->drive_strength1, 3u); // pull1
 }

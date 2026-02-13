@@ -17,7 +17,7 @@ using namespace delta;
 // Helpers
 // ---------------------------------------------------------------------------
 
-static std::vector<Token> Lex(const std::string& src) {
+static std::vector<Token> Lex(const std::string &src) {
   static SourceManager mgr;
   auto fid = mgr.AddFile("<test>", src);
   DiagEngine diag(mgr);
@@ -28,10 +28,10 @@ static std::vector<Token> Lex(const std::string& src) {
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult Parse(const std::string& src) {
+static ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -46,7 +46,7 @@ struct PreprocFixture {
   DiagEngine diag{mgr};
 };
 
-static std::string Preprocess(const std::string& src, PreprocFixture& f,
+static std::string Preprocess(const std::string &src, PreprocFixture &f,
                               PreprocConfig config = {}) {
   auto fid = f.mgr.AddFile("<test>", src);
   Preprocessor pp(f.mgr, f.diag, std::move(config));
@@ -74,9 +74,8 @@ TEST(Lexical, EscapedIdentifier_WithSpecialChars) {
 
 TEST(Lexical, EscapedIdentifier_InModulePort) {
   // Escaped identifiers should work as port/signal names in a module.
-  auto r = Parse(
-      "module top(input logic \\clk.in );\n"
-      "endmodule\n");
+  auto r = Parse("module top(input logic \\clk.in );\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1);
   ASSERT_EQ(r.cu->modules[0]->ports.size(), 1);
@@ -191,10 +190,9 @@ TEST(Lexical, IntLiteral_QuestionMarkInBased) {
 // ===========================================================================
 
 TEST(Lexical, Timeunit_BasicParse) {
-  auto r = Parse(
-      "module top;\n"
-      "  timeunit 1ns;\n"
-      "endmodule\n");
+  auto r = Parse("module top;\n"
+                 "  timeunit 1ns;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1);
   // Should parse without error. The timeunit decl is consumed.
@@ -202,58 +200,53 @@ TEST(Lexical, Timeunit_BasicParse) {
 }
 
 TEST(Lexical, Timeprecision_BasicParse) {
-  auto r = Parse(
-      "module top;\n"
-      "  timeprecision 1ps;\n"
-      "endmodule\n");
+  auto r = Parse("module top;\n"
+                 "  timeprecision 1ps;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1);
 }
 
 TEST(Lexical, Timeunit_WithSlash) {
   // timeunit 1ns / 1ps;  (combined form)
-  auto r = Parse(
-      "module top;\n"
-      "  timeunit 1ns / 1ps;\n"
-      "endmodule\n");
+  auto r = Parse("module top;\n"
+                 "  timeunit 1ns / 1ps;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1);
 }
 
 TEST(Lexical, Timeunit_DifferentValues) {
   // Various time unit values
-  auto r = Parse(
-      "module top;\n"
-      "  timeunit 100us;\n"
-      "  timeprecision 10ns;\n"
-      "endmodule\n");
+  auto r = Parse("module top;\n"
+                 "  timeunit 100us;\n"
+                 "  timeprecision 10ns;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1);
 }
 
 TEST(Lexical, Timeunit_StoredInModuleDecl_Values) {
   // The timeunit/timeprecision values should be stored in ModuleDecl.
-  auto r = Parse(
-      "module top;\n"
-      "  timeunit 1ns;\n"
-      "  timeprecision 1ps;\n"
-      "endmodule\n");
+  auto r = Parse("module top;\n"
+                 "  timeunit 1ns;\n"
+                 "  timeprecision 1ps;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1);
-  auto* mod = r.cu->modules[0];
+  auto *mod = r.cu->modules[0];
   EXPECT_EQ(mod->time_unit, TimeUnit::kNs);
   EXPECT_EQ(mod->time_prec, TimeUnit::kPs);
 }
 
 TEST(Lexical, Timeunit_StoredInModuleDecl_Flags) {
-  auto r = Parse(
-      "module top;\n"
-      "  timeunit 1ns;\n"
-      "  timeprecision 1ps;\n"
-      "endmodule\n");
+  auto r = Parse("module top;\n"
+                 "  timeunit 1ns;\n"
+                 "  timeprecision 1ps;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1);
-  auto* mod = r.cu->modules[0];
+  auto *mod = r.cu->modules[0];
   EXPECT_TRUE(mod->has_timeunit);
   EXPECT_TRUE(mod->has_timeprecision);
 }
@@ -274,19 +267,17 @@ TEST(Lexical, Define_WithDefaultArgs) {
 TEST(Lexical, Define_Stringification) {
   // `` (double backtick) concatenation in macros
   PreprocFixture f;
-  auto result = Preprocess(
-      "`define CONCAT(a, b) a``b\n"
-      "`CONCAT(foo, bar)\n",
-      f);
+  auto result = Preprocess("`define CONCAT(a, b) a``b\n"
+                           "`CONCAT(foo, bar)\n",
+                           f);
   EXPECT_NE(result.find("foobar"), std::string::npos);
 }
 
 TEST(Lexical, Define_EmptyArgUsesDefault) {
   PreprocFixture f;
-  auto result = Preprocess(
-      "`define M(a, b=99) a + b\n"
-      "`M(1,)\n",
-      f);
+  auto result = Preprocess("`define M(a, b=99) a + b\n"
+                           "`M(1,)\n",
+                           f);
   EXPECT_NE(result.find("1 + 99"), std::string::npos);
 }
 
@@ -295,15 +286,14 @@ TEST(Lexical, Define_EmptyArgUsesDefault) {
 // ===========================================================================
 
 TEST(Lexical, ContAssign_WithDelay) {
-  auto r = Parse(
-      "module top;\n"
-      "  wire out, in;\n"
-      "  assign #5 out = in;\n"
-      "endmodule\n");
+  auto r = Parse("module top;\n"
+                 "  wire out, in;\n"
+                 "  assign #5 out = in;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1);
-  const ModuleItem* assign_item = nullptr;
-  for (auto* item : r.cu->modules[0]->items) {
+  const ModuleItem *assign_item = nullptr;
+  for (auto *item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
       assign_item = item;
       break;
@@ -316,15 +306,15 @@ TEST(Lexical, ContAssign_WithDelay) {
 }
 
 TEST(Lexical, ContAssign_WithParenDelay) {
-  auto r = Parse(
-      "module top;\n"
-      "  wire out, in;\n"
-      "  assign #(10) out = in;\n"
-      "endmodule\n");
+  auto r = Parse("module top;\n"
+                 "  wire out, in;\n"
+                 "  assign #(10) out = in;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   bool found = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kContAssign) continue;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kContAssign)
+      continue;
     found = true;
     ASSERT_NE(item->assign_delay, nullptr);
     EXPECT_EQ(item->assign_delay->int_val, 10);
@@ -333,14 +323,14 @@ TEST(Lexical, ContAssign_WithParenDelay) {
 }
 
 TEST(Lexical, ContAssign_NoDelay) {
-  auto r = Parse(
-      "module top;\n"
-      "  wire a, b;\n"
-      "  assign a = b;\n"
-      "endmodule\n");
+  auto r = Parse("module top;\n"
+                 "  wire a, b;\n"
+                 "  assign a = b;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kContAssign) continue;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kContAssign)
+      continue;
     EXPECT_EQ(item->assign_delay, nullptr);
   }
 }
@@ -350,34 +340,31 @@ TEST(Lexical, ContAssign_NoDelay) {
 // ===========================================================================
 
 TEST(Lexical, AssignmentPattern_DefaultZero) {
-  auto r = Parse(
-      "module top;\n"
-      "  logic [7:0] a;\n"
-      "  initial a = '{default: 0};\n"
-      "endmodule\n");
+  auto r = Parse("module top;\n"
+                 "  logic [7:0] a;\n"
+                 "  initial a = '{default: 0};\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   // Should parse without error.
   ASSERT_EQ(r.cu->modules.size(), 1);
 }
 
 TEST(Lexical, AssignmentPattern_Positional) {
-  auto r = Parse(
-      "module top;\n"
-      "  logic [3:0] a;\n"
-      "  initial a = '{1, 0, 1, 0};\n"
-      "endmodule\n");
+  auto r = Parse("module top;\n"
+                 "  logic [3:0] a;\n"
+                 "  initial a = '{1, 0, 1, 0};\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1);
 }
 
 TEST(Lexical, AssignmentPattern_Named) {
-  auto r = Parse(
-      "module top;\n"
-      "  initial begin\n"
-      "    logic [7:0] x;\n"
-      "    x = '{default: 'x};\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module top;\n"
+                 "  initial begin\n"
+                 "    logic [7:0] x;\n"
+                 "    x = '{default: 'x};\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
 }
 
@@ -387,10 +374,9 @@ TEST(Lexical, AssignmentPattern_Named) {
 
 TEST(Lexical, CompilationUnit_MultipleModules) {
   // Multiple modules should each become separate entries in the CU.
-  auto r = Parse(
-      "module a; endmodule\n"
-      "module b; endmodule\n"
-      "module c; endmodule\n");
+  auto r = Parse("module a; endmodule\n"
+                 "module b; endmodule\n"
+                 "module c; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 3);
   EXPECT_EQ(r.cu->modules[0]->name, "a");
@@ -400,11 +386,10 @@ TEST(Lexical, CompilationUnit_MultipleModules) {
 
 TEST(Lexical, CompilationUnit_MixedTopLevel) {
   // Mixed modules and packages in a single compilation unit.
-  auto r = Parse(
-      "package pkg;\n"
-      "endpackage\n"
-      "module top;\n"
-      "endmodule\n");
+  auto r = Parse("package pkg;\n"
+                 "endpackage\n"
+                 "module top;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->packages.size(), 1);
   ASSERT_EQ(r.cu->modules.size(), 1);
@@ -412,11 +397,10 @@ TEST(Lexical, CompilationUnit_MixedTopLevel) {
 
 TEST(Lexical, CompilationUnit_WithInterface) {
   // §3.12.1: interfaces are visible across all CUs
-  auto r = Parse(
-      "interface bus_if;\n"
-      "endinterface\n"
-      "module top;\n"
-      "endmodule\n");
+  auto r = Parse("interface bus_if;\n"
+                 "endinterface\n"
+                 "module top;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->interfaces.size(), 1);
   ASSERT_EQ(r.cu->modules.size(), 1);
@@ -424,21 +408,19 @@ TEST(Lexical, CompilationUnit_WithInterface) {
 
 TEST(Lexical, CompilationUnit_WithProgram) {
   // §3.12.1: programs are visible across all CUs
-  auto r = Parse(
-      "program test;\n"
-      "endprogram\n");
+  auto r = Parse("program test;\n"
+                 "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->programs.size(), 1);
 }
 
 TEST(Lexical, CompilationUnit_TopLevelFunction) {
   // §3.12.1: CU scope can contain items that a package can (functions)
-  auto r = Parse(
-      "function int add(int a, int b);\n"
-      "  return a + b;\n"
-      "endfunction\n"
-      "module top;\n"
-      "endmodule\n");
+  auto r = Parse("function int add(int a, int b);\n"
+                 "  return a + b;\n"
+                 "endfunction\n"
+                 "module top;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->cu_items.size(), 1);
   ASSERT_EQ(r.cu->modules.size(), 1);
@@ -446,11 +428,10 @@ TEST(Lexical, CompilationUnit_TopLevelFunction) {
 
 TEST(Lexical, CompilationUnit_AllDesignElements) {
   // §3.12.1: CU can hold modules, packages, interfaces, programs
-  auto r = Parse(
-      "package pkg; endpackage\n"
-      "interface intf; endinterface\n"
-      "program prog; endprogram\n"
-      "module mod; endmodule\n");
+  auto r = Parse("package pkg; endpackage\n"
+                 "interface intf; endinterface\n"
+                 "program prog; endprogram\n"
+                 "module mod; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_EQ(r.cu->packages.size(), 1);
   EXPECT_EQ(r.cu->interfaces.size(), 1);
@@ -463,15 +444,15 @@ TEST(Lexical, CompilationUnit_AllDesignElements) {
 // ===========================================================================
 
 TEST(Lexical, EscapedIdentifier_InVarDecl) {
-  auto r = Parse(
-      "module top;\n"
-      "  logic \\data+bus ;\n"
-      "endmodule\n");
+  auto r = Parse("module top;\n"
+                 "  logic \\data+bus ;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1);
   bool found = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kVarDecl) continue;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kVarDecl)
+      continue;
     if (item->name == "\\data+bus") {
       found = true;
       break;
@@ -486,11 +467,10 @@ TEST(Lexical, EscapedIdentifier_InVarDecl) {
 
 TEST(Lexical, BeginKeywords_LogicAsIdentifier) {
   PreprocFixture f;
-  auto preprocessed = Preprocess(
-      "`begin_keywords \"1364-2001\"\n"
-      "module m; reg logic; endmodule\n"
-      "`end_keywords\n",
-      f);
+  auto preprocessed = Preprocess("`begin_keywords \"1364-2001\"\n"
+                                 "module m; reg logic; endmodule\n"
+                                 "`end_keywords\n",
+                                 f);
   EXPECT_FALSE(f.diag.HasErrors());
   DiagEngine diag2(f.mgr);
   Lexer lexer(preprocessed, 0, diag2);
@@ -508,12 +488,11 @@ TEST(Lexical, BeginKeywords_LogicAsIdentifier) {
 
 TEST(Lexical, BeginKeywords_RestoresAfterEnd) {
   PreprocFixture f;
-  auto preprocessed = Preprocess(
-      "`begin_keywords \"1364-2001\"\n"
-      "logic\n"
-      "`end_keywords\n"
-      "logic\n",
-      f);
+  auto preprocessed = Preprocess("`begin_keywords \"1364-2001\"\n"
+                                 "logic\n"
+                                 "`end_keywords\n"
+                                 "logic\n",
+                                 f);
   EXPECT_FALSE(f.diag.HasErrors());
   DiagEngine diag2(f.mgr);
   Lexer lexer(preprocessed, 0, diag2);
