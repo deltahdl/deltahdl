@@ -175,9 +175,15 @@ TEST(LogicGates, NandIsInvertedAnd) {
     for (Val4 b : vals) {
       Val4 and_result = EvalNInputGate(GateKind::kAnd, a, b);
       Val4 nand_result = EvalNInputGate(GateKind::kNand, a, b);
-      if (and_result == Val4::kV0) EXPECT_EQ(nand_result, Val4::kV1);
-      if (and_result == Val4::kV1) EXPECT_EQ(nand_result, Val4::kV0);
-      if (and_result == Val4::kX) EXPECT_EQ(nand_result, Val4::kX);
+      if (and_result == Val4::kV0) {
+        EXPECT_EQ(nand_result, Val4::kV1);
+      }
+      if (and_result == Val4::kV1) {
+        EXPECT_EQ(nand_result, Val4::kV0);
+      }
+      if (and_result == Val4::kX) {
+        EXPECT_EQ(nand_result, Val4::kX);
+      }
     }
   }
 }
@@ -188,9 +194,15 @@ TEST(LogicGates, NorIsInvertedOr) {
     for (Val4 b : vals) {
       Val4 or_result = EvalNInputGate(GateKind::kOr, a, b);
       Val4 nor_result = EvalNInputGate(GateKind::kNor, a, b);
-      if (or_result == Val4::kV0) EXPECT_EQ(nor_result, Val4::kV1);
-      if (or_result == Val4::kV1) EXPECT_EQ(nor_result, Val4::kV0);
-      if (or_result == Val4::kX) EXPECT_EQ(nor_result, Val4::kX);
+      if (or_result == Val4::kV0) {
+        EXPECT_EQ(nor_result, Val4::kV1);
+      }
+      if (or_result == Val4::kV1) {
+        EXPECT_EQ(nor_result, Val4::kV0);
+      }
+      if (or_result == Val4::kX) {
+        EXPECT_EQ(nor_result, Val4::kX);
+      }
     }
   }
 }
@@ -201,9 +213,15 @@ TEST(LogicGates, XnorIsInvertedXor) {
     for (Val4 b : vals) {
       Val4 xor_result = EvalNInputGate(GateKind::kXor, a, b);
       Val4 xnor_result = EvalNInputGate(GateKind::kXnor, a, b);
-      if (xor_result == Val4::kV0) EXPECT_EQ(xnor_result, Val4::kV1);
-      if (xor_result == Val4::kV1) EXPECT_EQ(xnor_result, Val4::kV0);
-      if (xor_result == Val4::kX) EXPECT_EQ(xnor_result, Val4::kX);
+      if (xor_result == Val4::kV0) {
+        EXPECT_EQ(xnor_result, Val4::kV1);
+      }
+      if (xor_result == Val4::kV1) {
+        EXPECT_EQ(xnor_result, Val4::kV0);
+      }
+      if (xor_result == Val4::kX) {
+        EXPECT_EQ(xnor_result, Val4::kX);
+      }
     }
   }
 }
