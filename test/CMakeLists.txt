@@ -16,6 +16,7 @@ endfunction()
 
 add_unit_test(test_logic4)
 add_unit_test(test_lexer)
+add_unit_test(test_lexer_extended)
 add_unit_test(test_parser)
 add_unit_test(test_parser_section5)
 add_unit_test(test_parser_section6)
