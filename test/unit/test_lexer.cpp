@@ -160,7 +160,9 @@ TEST(Lexer, Identifier_LrmExamples) {
   }
 }
 
-TEST(Lexer, IntegerLiterals) {
+// --- §5.7: Numbers (dispatch: integral vs real vs time) ---
+
+TEST(Lexer, Number_IntegerLiterals) {
   auto tokens = lex("42 8'hFF 4'b1010");
   ASSERT_EQ(tokens.size(), 4);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
@@ -169,6 +171,15 @@ TEST(Lexer, IntegerLiterals) {
   EXPECT_EQ(tokens[1].text, "8'hFF");
   EXPECT_EQ(tokens[2].kind, TokenKind::kIntLiteral);
   EXPECT_EQ(tokens[2].text, "4'b1010");
+}
+
+TEST(Lexer, Number_DispatchIntRealTime) {
+  // §5.7: number is integral_number or real_number; time_literal adds unit
+  auto tokens = lex("42 3.14 100ns");
+  ASSERT_EQ(tokens.size(), 4);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kRealLiteral);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kTimeLiteral);
 }
 
 TEST(Lexer, StringLiterals) {
