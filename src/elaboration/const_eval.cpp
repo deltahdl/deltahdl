@@ -186,24 +186,27 @@ static std::optional<int64_t> EvalFirstArg(const Expr* expr,
   return ConstEvalInt(expr->args[0], scope);
 }
 
+// §20.6.2: Evaluate $bits in a constant context.
+static std::optional<int64_t> EvalConstBits(const Expr* expr) {
+  if (expr->args.empty()) return std::nullopt;
+  auto* a = expr->args[0];
+  if (a->kind == ExprKind::kIntegerLiteral)
+    return static_cast<int64_t>(ConstLiteralWidth(a));
+  return std::nullopt;
+}
+
 // Constant-evaluate a system call ($clog2, $bits, $countones, etc.).
 static std::optional<int64_t> EvalConstSysCall(const Expr* expr,
                                                const ScopeMap& scope) {
+  if (expr->callee == "$bits") return EvalConstBits(expr);
   auto arg = EvalFirstArg(expr, scope);
-  if (!arg && expr->callee != "$bits") return std::nullopt;
+  if (!arg) return std::nullopt;
   if (expr->callee == "$clog2") return Clog2(*arg);
   if (expr->callee == "$countones") return Countones(*arg);
   if (expr->callee == "$onehot")
     return static_cast<int64_t>(Countones(*arg) == 1);
   if (expr->callee == "$onehot0")
     return static_cast<int64_t>(Countones(*arg) <= 1);
-  if (expr->callee == "$bits") {
-    if (expr->args.empty()) return std::nullopt;
-    auto* a = expr->args[0];
-    if (a->kind == ExprKind::kIntegerLiteral)
-      return static_cast<int64_t>(ConstLiteralWidth(a));
-    return std::nullopt;
-  }
   return std::nullopt;
 }
 
