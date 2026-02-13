@@ -570,16 +570,38 @@ static std::optional<AlwaysKind> TokenToAlwaysKind(TokenKind tk) {
   }
 }
 
+// §11.12: Parse a single let port argument.
+FunctionArg Parser::ParseLetArg() {
+  FunctionArg arg;
+  if (!Match(TokenKind::kKwUntyped)) {
+    arg.data_type = ParseDataType();
+  }
+  arg.name = Expect(TokenKind::kIdentifier).text;
+  ParseUnpackedDims(arg.unpacked_dims);
+  if (Match(TokenKind::kEq)) {
+    arg.default_value = ParseExpr();
+  }
+  return arg;
+}
+
 // §11.12: let declaration — let name(args) = expr;
+// let_port_item ::= let_formal_type identifier {dim} [= expr]
+// let_formal_type ::= data_type_or_implicit | untyped
 ModuleItem* Parser::ParseLetDecl() {
   Consume();  // 'let'
   auto* item = arena_.Create<ModuleItem>();
-  item->kind = ModuleItemKind::kVarDecl;
+  item->kind = ModuleItemKind::kLetDecl;
   item->loc = CurrentLoc();
   item->name = ExpectIdentifier().text;
   if (Check(TokenKind::kLParen)) {
-    std::vector<Expr*> discard;
-    ParseParenList(discard);
+    Consume();  // '('
+    if (!Check(TokenKind::kRParen)) {
+      item->func_args.push_back(ParseLetArg());
+      while (Match(TokenKind::kComma)) {
+        item->func_args.push_back(ParseLetArg());
+      }
+    }
+    Expect(TokenKind::kRParen);
   }
   Expect(TokenKind::kEq);
   item->init_expr = ParseExpr();

@@ -723,7 +723,8 @@ Token Lexer::LexAngleLeft(SourceLoc loc, uint32_t start) {
     Advance();
     return MakeOp(TokenKind::kLtEq, loc, start);
   }
-  if (Current() == '-' && pos_ + 1 < source_.size() && source_[pos_ + 1] == '>') {
+  if (Current() == '-' && pos_ + 1 < source_.size() &&
+      source_[pos_ + 1] == '>') {
     Advance();  // -
     Advance();  // >
     return MakeOp(TokenKind::kLtDashGt, loc, start);

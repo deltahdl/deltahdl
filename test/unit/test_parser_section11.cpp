@@ -941,13 +941,4 @@ TEST(ParserSection11, TaggedUnionExpr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- Let construct (§11.12) ---
-
-TEST(ParserSection11, LetConstruct) {
-  auto r = Parse(
-      "module t;\n"
-      "  let op(x, y, z) = |((x | y) & z);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
+// Let construct tests moved to test_parser_let.cpp (§11.12)

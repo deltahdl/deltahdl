@@ -690,6 +690,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kSpecifyBlock:
     case ModuleItemKind::kDpiImport:
     case ModuleItemKind::kDpiExport:
+    case ModuleItemKind::kLetDecl:
     case ModuleItemKind::kClassDecl:
       if (item->class_decl) {
         class_names_.insert(item->class_decl->name);

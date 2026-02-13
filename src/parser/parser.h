@@ -41,6 +41,7 @@ class Parser {
   bool TryParseClassOrVerification(std::vector<ModuleItem*>& items);
   bool TryParseVerificationItem(std::vector<ModuleItem*>& items);
   ModuleItem* ParseLetDecl();
+  FunctionArg ParseLetArg();
   void ParseGenvarDecl(std::vector<ModuleItem*>& items);
   void ParseTimeunitDecl(ModuleDecl* mod = nullptr);
   bool TryParseClockingOrVerification(std::vector<ModuleItem*>& items);

@@ -676,8 +676,8 @@ TEST(EvalOpXZ, EquivSame) {
   // 1 <-> 1 = 1
   MakeVar4(f, "eq1", 1, 1, 0);
   MakeVar4(f, "eq2", 1, 1, 0);
-  auto* expr = MakeBinary(f.arena, TokenKind::kLtDashGt,
-                          MakeId(f.arena, "eq1"), MakeId(f.arena, "eq2"));
+  auto* expr = MakeBinary(f.arena, TokenKind::kLtDashGt, MakeId(f.arena, "eq1"),
+                          MakeId(f.arena, "eq2"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
@@ -687,8 +687,8 @@ TEST(EvalOpXZ, EquivDiff) {
   // 1 <-> 0 = 0
   MakeVar4(f, "eq1", 1, 1, 0);
   MakeVar4(f, "eq2", 1, 0, 0);
-  auto* expr = MakeBinary(f.arena, TokenKind::kLtDashGt,
-                          MakeId(f.arena, "eq1"), MakeId(f.arena, "eq2"));
+  auto* expr = MakeBinary(f.arena, TokenKind::kLtDashGt, MakeId(f.arena, "eq1"),
+                          MakeId(f.arena, "eq2"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
@@ -698,8 +698,8 @@ TEST(EvalOpXZ, EquivX) {
   // x <-> 1 = x
   MakeVar4(f, "ex1", 1, 0, 1);  // 1'bx
   MakeVar4(f, "ex2", 1, 1, 0);
-  auto* expr = MakeBinary(f.arena, TokenKind::kLtDashGt,
-                          MakeId(f.arena, "ex1"), MakeId(f.arena, "ex2"));
+  auto* expr = MakeBinary(f.arena, TokenKind::kLtDashGt, MakeId(f.arena, "ex1"),
+                          MakeId(f.arena, "ex2"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_NE(result.words[0].bval, 0u);  // result is x
 }
@@ -713,9 +713,9 @@ TEST(EvalOpXZ, MinTypMaxDefaultTyp) {
   // Default delay mode is typ — should return middle expression.
   auto* mtm = f.arena.Create<Expr>();
   mtm->kind = ExprKind::kMinTypMax;
-  mtm->lhs = MakeInt(f.arena, 10);       // min
+  mtm->lhs = MakeInt(f.arena, 10);        // min
   mtm->condition = MakeInt(f.arena, 20);  // typ
-  mtm->rhs = MakeInt(f.arena, 30);       // max
+  mtm->rhs = MakeInt(f.arena, 30);        // max
   auto result = EvalExpr(mtm, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 20u);
 }
@@ -884,7 +884,7 @@ TEST(EvalOpXZ, MixedRealIntArith) {
 // ==========================================================================
 
 static Variable* MakeStringVar(EvalOpXZFixture& f, std::string_view name,
-                                std::string_view value) {
+                               std::string_view value) {
   uint32_t width = static_cast<uint32_t>(value.size()) * 8;
   if (width == 0) width = 8;
   auto* var = f.ctx.CreateVariable(name, width);
@@ -943,7 +943,7 @@ TEST(EvalOpXZ, StringReplicateRuntime) {
 
 // Helper: build a range expression [lo:hi] for inside elements.
 static Expr* MakeRange(Arena& arena, Expr* lo, Expr* hi,
-                        TokenKind op = TokenKind::kEof) {
+                       TokenKind op = TokenKind::kEof) {
   auto* r = arena.Create<Expr>();
   r->kind = ExprKind::kSelect;
   r->index = lo;
@@ -996,8 +996,8 @@ TEST(EvalOpXZ, InsideAbsTolerance) {
   inside->kind = ExprKind::kInside;
   inside->lhs = MakeId(f.arena, "at");
   inside->elements.push_back(MakeRange(f.arena, MakeInt(f.arena, 7),
-                                        MakeInt(f.arena, 5),
-                                        TokenKind::kPlusSlashMinus));
+                                       MakeInt(f.arena, 5),
+                                       TokenKind::kPlusSlashMinus));
   auto result = EvalExpr(inside, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
@@ -1011,8 +1011,8 @@ TEST(EvalOpXZ, InsideAbsToleranceMiss) {
   inside->kind = ExprKind::kInside;
   inside->lhs = MakeId(f.arena, "am");
   inside->elements.push_back(MakeRange(f.arena, MakeInt(f.arena, 7),
-                                        MakeInt(f.arena, 5),
-                                        TokenKind::kPlusSlashMinus));
+                                       MakeInt(f.arena, 5),
+                                       TokenKind::kPlusSlashMinus));
   auto result = EvalExpr(inside, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
@@ -1026,8 +1026,8 @@ TEST(EvalOpXZ, InsideRelTolerance) {
   inside->kind = ExprKind::kInside;
   inside->lhs = MakeId(f.arena, "rt");
   inside->elements.push_back(MakeRange(f.arena, MakeInt(f.arena, 10),
-                                        MakeInt(f.arena, 25),
-                                        TokenKind::kPlusPercentMinus));
+                                       MakeInt(f.arena, 25),
+                                       TokenKind::kPlusPercentMinus));
   auto result = EvalExpr(inside, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }

@@ -367,6 +367,7 @@ enum class ModuleItemKind : uint8_t {
   kDpiExport,       // export "DPI-C" function/task (§35)
   kClassDecl,       // class ... endclass inside module (§8.3)
   kNettypeDecl,     // nettype <type> <name> [with <func>] (§6.6.7)
+  kLetDecl,         // let name(args) = expr; (§11.12)
 };
 
 // clang-format off

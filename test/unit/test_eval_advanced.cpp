@@ -36,7 +36,7 @@ static Expr* MakeId(Arena& arena, std::string_view name) {
 }
 
 static Variable* MakeVar(EvalAdvFixture& f, std::string_view name,
-                          uint32_t width, uint64_t val) {
+                         uint32_t width, uint64_t val) {
   auto* var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4VecVal(f.arena, width, val);
   return var;
@@ -149,7 +149,7 @@ TEST(EvalAdv, PackedStructEqualitySameValue) {
   f.ctx.SetVariableStructType("s1", "my_struct");
   f.ctx.SetVariableStructType("s2", "my_struct");
   auto* expr = MakeBinary(f.arena, TokenKind::kEqEq, MakeId(f.arena, "s1"),
-                           MakeId(f.arena, "s2"));
+                          MakeId(f.arena, "s2"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
@@ -169,7 +169,7 @@ TEST(EvalAdv, PackedStructEqualityDiffValue) {
   f.ctx.SetVariableStructType("s3", "my_struct");
   f.ctx.SetVariableStructType("s4", "my_struct");
   auto* expr = MakeBinary(f.arena, TokenKind::kEqEq, MakeId(f.arena, "s3"),
-                           MakeId(f.arena, "s4"));
+                          MakeId(f.arena, "s4"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
@@ -188,7 +188,7 @@ TEST(EvalAdv, PackedStructInequality) {
   f.ctx.SetVariableStructType("s5", "my_struct");
   f.ctx.SetVariableStructType("s6", "my_struct");
   auto* expr = MakeBinary(f.arena, TokenKind::kBangEq, MakeId(f.arena, "s5"),
-                           MakeId(f.arena, "s6"));
+                          MakeId(f.arena, "s6"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }

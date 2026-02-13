@@ -766,7 +766,8 @@ Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
   // §11.5.1: X/Z index → return X for packed bit/part-select.
   if (HasUnknownBits(idx_val)) {
     if (expr->index_end) {
-      auto w = static_cast<uint32_t>(EvalExpr(expr->index_end, ctx, arena).ToUint64());
+      auto w = static_cast<uint32_t>(
+          EvalExpr(expr->index_end, ctx, arena).ToUint64());
       return MakeAllX(arena, w > 0 ? w : 1);
     }
     return MakeAllX(arena, 1);
