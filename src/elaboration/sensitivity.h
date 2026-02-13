@@ -1,6 +1,6 @@
 #pragma once
 
-#include <string_view>
+#include <string>
 #include <unordered_set>
 #include <vector>
 
@@ -12,16 +12,16 @@ struct Stmt;
 struct EventExpr;
 class Arena;
 
-/// Collect all identifier names read by an expression tree.
-void CollectExprReads(const Expr* expr,
-                      std::unordered_set<std::string_view>& out);
+/// Collect signal names read by an expression tree, using longest static
+/// prefix (§11.5.3) for select expressions.
+void CollectExprReads(const Expr* expr, std::unordered_set<std::string>& out);
 
-/// Collect all identifier names read by a statement tree.
-void CollectStmtReads(const Stmt* stmt,
-                      std::unordered_set<std::string_view>& out);
+/// Collect signal names read by a statement tree, using longest static
+/// prefix (§11.5.3) for select expressions.
+void CollectStmtReads(const Stmt* stmt, std::unordered_set<std::string>& out);
 
 /// Return the set of signal names read by a statement body.
-std::vector<std::string_view> CollectReadSignals(const Stmt* body);
+std::vector<std::string> CollectReadSignals(const Stmt* body);
 
 /// Infer a sensitivity list from read signals in a statement body.
 /// Creates EventExpr nodes with Edge::kNone for each read signal.

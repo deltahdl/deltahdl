@@ -344,7 +344,7 @@ static StmtResult ExecEventTriggerImpl(const Stmt* stmt, SimContext& ctx) {
 // --- Wait (IEEE §9.4.3) ---
 
 static ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena) {
-  std::unordered_set<std::string_view> reads;
+  std::unordered_set<std::string> reads;
   CollectExprReads(stmt->condition, reads);
   std::vector<std::string_view> read_vars(reads.begin(), reads.end());
   while (!ctx.StopRequested()) {

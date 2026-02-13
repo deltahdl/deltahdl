@@ -1,15 +1,36 @@
 #include "elaboration/sensitivity.h"
 
 #include "common/arena.h"
+#include "elaboration/const_eval.h"
 #include "parser/ast.h"
 
 namespace delta {
 
+// §9.2.2.2.1 / §11.5.3: For select expressions, insert the longest static
+// prefix as the sensitivity signal.  Non-static index sub-expressions are
+// also collected (they are themselves reads).
+static void CollectSelectReads(const Expr* expr,
+                               std::unordered_set<std::string>& out) {
+  out.insert(LongestStaticPrefix(expr));
+  // Walk the index chain to collect reads from non-static indices.
+  const Expr* cur = expr;
+  while (cur && cur->kind == ExprKind::kSelect) {
+    if (cur->index && cur->index->kind != ExprKind::kIntegerLiteral) {
+      CollectExprReads(cur->index, out);
+    }
+    cur = cur->base;
+  }
+}
+
 void CollectExprReads(const Expr* expr,
-                      std::unordered_set<std::string_view>& out) {
+                      std::unordered_set<std::string>& out) {
   if (!expr) return;
   if (expr->kind == ExprKind::kIdentifier) {
-    out.insert(expr->text);
+    out.insert(std::string(expr->text));
+    return;
+  }
+  if (expr->kind == ExprKind::kSelect) {
+    CollectSelectReads(expr, out);
     return;
   }
   CollectExprReads(expr->lhs, out);
@@ -24,7 +45,7 @@ void CollectExprReads(const Expr* expr,
 }
 
 void CollectStmtReads(const Stmt* stmt,
-                      std::unordered_set<std::string_view>& out) {
+                      std::unordered_set<std::string>& out) {
   if (!stmt) return;
   CollectExprReads(stmt->condition, out);
   CollectExprReads(stmt->rhs, out);
@@ -40,8 +61,8 @@ void CollectStmtReads(const Stmt* stmt,
   for (auto* s : stmt->fork_stmts) CollectStmtReads(s, out);
 }
 
-std::vector<std::string_view> CollectReadSignals(const Stmt* body) {
-  std::unordered_set<std::string_view> set;
+std::vector<std::string> CollectReadSignals(const Stmt* body) {
+  std::unordered_set<std::string> set;
   CollectStmtReads(body, set);
   return {set.begin(), set.end()};
 }
@@ -50,10 +71,11 @@ std::vector<EventExpr> InferSensitivity(const Stmt* body, Arena& arena) {
   auto signals = CollectReadSignals(body);
   std::vector<EventExpr> events;
   events.reserve(signals.size());
-  for (auto name : signals) {
+  for (const auto& name : signals) {
     auto* expr = arena.Create<Expr>();
     expr->kind = ExprKind::kIdentifier;
-    expr->text = name;
+    expr->text = std::string_view(
+        arena.AllocString(name.data(), name.size()), name.size());
     events.push_back({Edge::kNone, expr});
   }
   return events;

@@ -50,7 +50,8 @@ static SimCoroutine MakeAlwaysSensCoroutine(const Stmt* body,
 
 static SimCoroutine MakeAlwaysCombCoroutine(const Stmt* body, SimContext& ctx,
                                             Arena& arena) {
-  auto read_vars = CollectReadSignals(body);
+  auto read_strs = CollectReadSignals(body);
+  std::vector<std::string_view> read_vars(read_strs.begin(), read_strs.end());
   while (!ctx.StopRequested()) {
     co_await ExecStmt(body, ctx, arena);
     if (read_vars.empty()) break;
@@ -396,7 +397,7 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
 static void RegisterSensitivity(const RtlirProcess& proc, Process* p,
                                 SimContext& ctx) {
   auto signals = CollectReadSignals(proc.body);
-  for (auto name : signals) {
+  for (const auto& name : signals) {
     ctx.AddSensitivity(name, p);
   }
 }
