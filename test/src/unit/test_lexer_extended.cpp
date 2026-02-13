@@ -468,7 +468,7 @@ TEST(Lexer, BasedNumber_NoDigitsAfterBase_Error) {
   DiagEngine diag(mgr);
   auto fid = mgr.AddFile("<test>", "8'd-6");
   Lexer lexer(mgr.FileContent(fid), fid, diag);
-  lexer.LexAll(); // lex the based number
+  lexer.LexAll();  // lex the based number
   EXPECT_TRUE(diag.HasErrors());
 }
 
@@ -523,18 +523,18 @@ TEST(Lexer, InterpretEscapes_NamedChars) {
 
 TEST(Lexer, InterpretEscapes_Octal) {
   using delta::InterpretStringEscapes;
-  EXPECT_EQ(InterpretStringEscapes(R"(\101)"), "A");     // 0101 = 65 = 'A'
-  EXPECT_EQ(InterpretStringEscapes(R"(\12)"), "\n");     // 012 = 10 = newline
-  EXPECT_EQ(InterpretStringEscapes(R"(\7)"), "\a");      // 07 = 7 = bell
-  EXPECT_EQ(InterpretStringEscapes(R"(\101BC)"), "ABC"); // \101 then BC
+  EXPECT_EQ(InterpretStringEscapes(R"(\101)"), "A");      // 0101 = 65 = 'A'
+  EXPECT_EQ(InterpretStringEscapes(R"(\12)"), "\n");      // 012 = 10 = newline
+  EXPECT_EQ(InterpretStringEscapes(R"(\7)"), "\a");       // 07 = 7 = bell
+  EXPECT_EQ(InterpretStringEscapes(R"(\101BC)"), "ABC");  // \101 then BC
 }
 
 TEST(Lexer, InterpretEscapes_Hex) {
   using delta::InterpretStringEscapes;
-  EXPECT_EQ(InterpretStringEscapes(R"(\x41)"), "A");  // 0x41 = 65 = 'A'
-  EXPECT_EQ(InterpretStringEscapes(R"(\x0A)"), "\n"); // 0x0A = newline
+  EXPECT_EQ(InterpretStringEscapes(R"(\x41)"), "A");   // 0x41 = 65 = 'A'
+  EXPECT_EQ(InterpretStringEscapes(R"(\x0A)"), "\n");  // 0x0A = newline
   EXPECT_EQ(InterpretStringEscapes(R"(\xAhello)"),
-            "\nhello"); // single hex digit
+            "\nhello");  // single hex digit
 }
 
 TEST(Lexer, InterpretEscapes_Unknown) {

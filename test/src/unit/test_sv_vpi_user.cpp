@@ -188,4 +188,4 @@ TEST(SvVpiUser, DpiAccessTypeConstants) {
   EXPECT_EQ(vpiDPIImportAcc, 4);
 }
 
-} // namespace
+}  // namespace

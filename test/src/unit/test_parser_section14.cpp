@@ -29,10 +29,8 @@ static ParseResult14 Parse(const std::string &src) {
 static ModuleItem *FindClockingBlock(ParseResult14 &r, size_t idx = 0) {
   size_t count = 0;
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kClockingBlock)
-      continue;
-    if (count == idx)
-      return item;
+    if (item->kind != ModuleItemKind::kClockingBlock) continue;
+    if (count == idx) return item;
     ++count;
   }
   return nullptr;
@@ -53,11 +51,12 @@ static void GetClockingBlock(ParseResult14 &r, ModuleItem *&out,
 // =============================================================================
 
 TEST(ParserSection14, BasicClockingBlock) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    input data;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ModuleItem *item = nullptr;
   ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
   EXPECT_EQ(r.cu->modules.size(), 1u);
@@ -87,12 +86,13 @@ TEST(ParserSection14, BasicClockingBlock) {
 // =============================================================================
 
 TEST(ParserSection14, DefaultClocking) {
-  auto r = Parse("module m;\n"
-                 "  default clocking cb @(posedge clk);\n"
-                 "    input data;\n"
-                 "    output ack;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  default clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "    output ack;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ModuleItem *item = nullptr;
   ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
   EXPECT_TRUE(item->is_default_clocking);
@@ -121,10 +121,11 @@ TEST(ParserSection14, DefaultClocking) {
 // =============================================================================
 
 TEST(ParserSection14, GlobalClocking) {
-  auto r = Parse("module m;\n"
-                 "  global clocking gclk @(posedge sys_clk);\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  global clocking gclk @(posedge sys_clk);\n"
+      "  endclocking\n"
+      "endmodule\n");
   ModuleItem *item = nullptr;
   ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
   EXPECT_EQ(item->name, "gclk");
@@ -138,13 +139,14 @@ TEST(ParserSection14, GlobalClocking) {
 // =============================================================================
 
 TEST(ParserSection14, SignalDirections) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    input data_in;\n"
-                 "    output data_out;\n"
-                 "    inout bidir;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data_in;\n"
+      "    output data_out;\n"
+      "    inout bidir;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ModuleItem *item = nullptr;
   ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
 
@@ -171,11 +173,12 @@ TEST(ParserSection14, SignalDirections) {
 // =============================================================================
 
 TEST(ParserSection14, InputSkewDelay) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    input #2 data;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input #2 data;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ModuleItem *item = nullptr;
   ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
   ASSERT_EQ(item->clocking_signals.size(), 1u);
@@ -200,11 +203,12 @@ TEST(ParserSection14, InputSkewDelay) {
 // =============================================================================
 
 TEST(ParserSection14, OutputSkewEdge) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    output negedge ack;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    output negedge ack;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ModuleItem *item = nullptr;
   ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
   ASSERT_EQ(item->clocking_signals.size(), 1u);
@@ -219,11 +223,12 @@ TEST(ParserSection14, OutputSkewEdge) {
 // =============================================================================
 
 TEST(ParserSection14, MultipleSignalsSameDirection) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    input data, ready, enable;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data, ready, enable;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ModuleItem *item = nullptr;
   ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
 
@@ -242,11 +247,12 @@ TEST(ParserSection14, MultipleSignalsSameDirection) {
 // =============================================================================
 
 TEST(ParserSection14, HierarchicalExpression) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    input enable = top.mem1.enable;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input enable = top.mem1.enable;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FindClockingBlock(r);
   ASSERT_NE(item, nullptr);
@@ -260,11 +266,12 @@ TEST(ParserSection14, HierarchicalExpression) {
 // =============================================================================
 
 TEST(ParserSection14, CombinedInputOutputSkew) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    input #2 output #4 cmd;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input #2 output #4 cmd;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ModuleItem *item = nullptr;
   ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
   ASSERT_EQ(item->clocking_signals.size(), 1u);
@@ -283,11 +290,12 @@ TEST(ParserSection14, CombinedInputOutputSkew) {
 // =============================================================================
 
 TEST(ParserSection14, EndLabel) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    input data;\n"
-                 "  endclocking : cb\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking : cb\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FindClockingBlock(r);
   ASSERT_NE(item, nullptr);
@@ -299,16 +307,17 @@ TEST(ParserSection14, EndLabel) {
 // =============================================================================
 
 TEST(ParserSection14, ClockingBlockAmongOtherItems) {
-  auto r = Parse("module m;\n"
-                 "  logic clk;\n"
-                 "  logic [7:0] data;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    input data;\n"
-                 "  endclocking\n"
-                 "  initial begin\n"
-                 "    clk = 0;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic clk;\n"
+      "  logic [7:0] data;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "  initial begin\n"
+      "    clk = 0;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FindClockingBlock(r);
   ASSERT_NE(item, nullptr);
@@ -322,11 +331,12 @@ TEST(ParserSection14, ClockingBlockAmongOtherItems) {
 // =============================================================================
 
 TEST(ParserSection14, UnnamedDefaultClocking) {
-  auto r = Parse("module m;\n"
-                 "  default clocking @(posedge clk);\n"
-                 "    input data;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  default clocking @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FindClockingBlock(r);
   ASSERT_NE(item, nullptr);
@@ -339,14 +349,15 @@ TEST(ParserSection14, UnnamedDefaultClocking) {
 // =============================================================================
 
 TEST(ParserSection14, MultipleClockingBlocks) {
-  auto r = Parse("module m;\n"
-                 "  clocking cd1 @(posedge phi1);\n"
-                 "    input data;\n"
-                 "  endclocking\n"
-                 "  clocking cd2 @(posedge phi2);\n"
-                 "    output cmd;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cd1 @(posedge phi1);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "  clocking cd2 @(posedge phi2);\n"
+      "    output cmd;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *cb1 = FindClockingBlock(r, 0);
   auto *cb2 = FindClockingBlock(r, 1);
@@ -361,11 +372,12 @@ TEST(ParserSection14, MultipleClockingBlocks) {
 // =============================================================================
 
 TEST(ParserSection14, ClockingEventBareIdentifier) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(clk);\n"
-                 "    input data;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FindClockingBlock(r);
   ASSERT_NE(item, nullptr);

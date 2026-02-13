@@ -59,7 +59,7 @@ TEST(DriverUpdatePool, ReleaseAndReuse_SamePointer) {
   EXPECT_EQ(pool.FreeCount(), 1);
 
   DriverUpdate *reused = pool.Acquire();
-  EXPECT_EQ(reused, du); // Same pointer returned.
+  EXPECT_EQ(reused, du);  // Same pointer returned.
   EXPECT_EQ(pool.FreeCount(), 0);
 }
 

@@ -28,8 +28,7 @@ static ParseResult Parse(const std::string &src) {
 
 static Stmt *FirstInitialStmt(ParseResult &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock)
-      continue;
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
     }
@@ -40,8 +39,7 @@ static Stmt *FirstInitialStmt(ParseResult &r) {
 
 static Stmt *InitialBody(ParseResult &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock)
-      return item->body;
+    if (item->kind == ModuleItemKind::kInitialBlock) return item->body;
   }
   return nullptr;
 }
@@ -51,11 +49,12 @@ static Stmt *InitialBody(ParseResult &r) {
 // =============================================================================
 
 TEST(ParserSection12, NamedBeginEnd) {
-  auto r = Parse("module t;\n"
-                 "  initial begin : my_block\n"
-                 "    x = 1;\n"
-                 "  end : my_block\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin : my_block\n"
+      "    x = 1;\n"
+      "  end : my_block\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *body = InitialBody(r);
   ASSERT_NE(body, nullptr);
@@ -64,11 +63,12 @@ TEST(ParserSection12, NamedBeginEnd) {
 }
 
 TEST(ParserSection12, NamedBeginEndNoEndLabel) {
-  auto r = Parse("module t;\n"
-                 "  initial begin : blk\n"
-                 "    x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin : blk\n"
+      "    x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *body = InitialBody(r);
   ASSERT_NE(body, nullptr);
@@ -77,11 +77,12 @@ TEST(ParserSection12, NamedBeginEndNoEndLabel) {
 }
 
 TEST(ParserSection12, NamedForkJoin) {
-  auto r = Parse("module t;\n"
-                 "  initial fork : my_fork\n"
-                 "    x = 1;\n"
-                 "  join : my_fork\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial fork : my_fork\n"
+      "    x = 1;\n"
+      "  join : my_fork\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *body = InitialBody(r);
   ASSERT_NE(body, nullptr);
@@ -90,11 +91,12 @@ TEST(ParserSection12, NamedForkJoin) {
 }
 
 TEST(ParserSection12, NamedForkJoinAny) {
-  auto r = Parse("module t;\n"
-                 "  initial fork : par_blk\n"
-                 "    x = 1;\n"
-                 "  join_any : par_blk\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial fork : par_blk\n"
+      "    x = 1;\n"
+      "  join_any : par_blk\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *body = InitialBody(r);
   ASSERT_NE(body, nullptr);
@@ -104,11 +106,12 @@ TEST(ParserSection12, NamedForkJoinAny) {
 }
 
 TEST(ParserSection12, UnlabeledBlockHasEmptyLabel) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *body = InitialBody(r);
   ASSERT_NE(body, nullptr);
@@ -121,12 +124,13 @@ TEST(ParserSection12, UnlabeledBlockHasEmptyLabel) {
 // =============================================================================
 
 TEST(ParserSection12, UniqueIf) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    unique if (a) x = 1;\n"
-                 "    else x = 2;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    unique if (a) x = 1;\n"
+      "    else x = 2;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -135,12 +139,13 @@ TEST(ParserSection12, UniqueIf) {
 }
 
 TEST(ParserSection12, PriorityIf) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    priority if (a) x = 1;\n"
-                 "    else x = 2;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    priority if (a) x = 1;\n"
+      "    else x = 2;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -149,11 +154,12 @@ TEST(ParserSection12, PriorityIf) {
 }
 
 TEST(ParserSection12, Unique0If) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    unique0 if (a) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    unique0 if (a) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -162,14 +168,15 @@ TEST(ParserSection12, Unique0If) {
 }
 
 TEST(ParserSection12, UniqueCase) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    unique case (sel)\n"
-                 "      0: x = 1;\n"
-                 "      1: x = 2;\n"
-                 "    endcase\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    unique case (sel)\n"
+      "      0: x = 1;\n"
+      "      1: x = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -178,14 +185,15 @@ TEST(ParserSection12, UniqueCase) {
 }
 
 TEST(ParserSection12, PriorityCase) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    priority case (sel)\n"
-                 "      0: x = 1;\n"
-                 "      default: x = 0;\n"
-                 "    endcase\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    priority case (sel)\n"
+      "      0: x = 1;\n"
+      "      default: x = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -194,13 +202,14 @@ TEST(ParserSection12, PriorityCase) {
 }
 
 TEST(ParserSection12, PlainCaseHasNoQualifier) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    case (sel)\n"
-                 "      0: x = 1;\n"
-                 "    endcase\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    case (sel)\n"
+      "      0: x = 1;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -213,14 +222,15 @@ TEST(ParserSection12, PlainCaseHasNoQualifier) {
 // =============================================================================
 
 TEST(ParserSection12, CaseInside) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    case (val) inside\n"
-                 "      0: x = 1;\n"
-                 "      1: x = 2;\n"
-                 "    endcase\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    case (val) inside\n"
+      "      0: x = 1;\n"
+      "      1: x = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -229,13 +239,14 @@ TEST(ParserSection12, CaseInside) {
 }
 
 TEST(ParserSection12, PlainCaseIsNotInside) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    case (val)\n"
-                 "      0: x = 1;\n"
-                 "    endcase\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    case (val)\n"
+      "      0: x = 1;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -248,11 +259,12 @@ TEST(ParserSection12, PlainCaseIsNotInside) {
 // =============================================================================
 
 TEST(ParserSection12, ForeachBasicParses) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    foreach (arr[i]) x = arr[i];\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    foreach (arr[i]) x = arr[i];\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -262,11 +274,12 @@ TEST(ParserSection12, ForeachBasicParses) {
 }
 
 TEST(ParserSection12, ForeachBasicVars) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    foreach (arr[i]) x = arr[i];\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    foreach (arr[i]) x = arr[i];\n"
+      "  end\n"
+      "endmodule\n");
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_EQ(stmt->foreach_vars.size(), 1u);
@@ -274,11 +287,12 @@ TEST(ParserSection12, ForeachBasicVars) {
 }
 
 TEST(ParserSection12, ForeachMultipleVars) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    foreach (matrix[i, j]) x = matrix[i][j];\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    foreach (matrix[i, j]) x = matrix[i][j];\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -291,11 +305,12 @@ TEST(ParserSection12, ForeachMultipleVars) {
 }
 
 TEST(ParserSection12, ForeachEmptyVar) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    foreach (arr[, j]) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    foreach (arr[, j]) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -304,11 +319,12 @@ TEST(ParserSection12, ForeachEmptyVar) {
 }
 
 TEST(ParserSection12, ForeachEmptyVarValues) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    foreach (arr[, j]) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    foreach (arr[, j]) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_TRUE(stmt->foreach_vars[0].empty());
@@ -316,13 +332,14 @@ TEST(ParserSection12, ForeachEmptyVarValues) {
 }
 
 TEST(ParserSection12, ForeachWithBlock) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    foreach (arr[i]) begin\n"
-                 "      $display(\"%d\", arr[i]);\n"
-                 "    end\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    foreach (arr[i]) begin\n"
+      "      $display(\"%d\", arr[i]);\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -336,11 +353,12 @@ TEST(ParserSection12, ForeachWithBlock) {
 // =============================================================================
 
 TEST(ParserSection12, ForWithIntDeclParses) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    for (int i = 0; i < 10; i = i + 1) x = i;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 10; i = i + 1) x = i;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -350,11 +368,12 @@ TEST(ParserSection12, ForWithIntDeclParses) {
 }
 
 TEST(ParserSection12, ForWithIntDeclParts) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    for (int i = 0; i < 10; i = i + 1) x = i;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 10; i = i + 1) x = i;\n"
+      "  end\n"
+      "endmodule\n");
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_NE(stmt->for_step, nullptr);
@@ -363,11 +382,12 @@ TEST(ParserSection12, ForWithIntDeclParts) {
 }
 
 TEST(ParserSection12, ForWithLogicDecl) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    for (logic [7:0] i = 0; i < 10; i = i + 1) x = i;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    for (logic [7:0] i = 0; i < 10; i = i + 1) x = i;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -376,11 +396,12 @@ TEST(ParserSection12, ForWithLogicDecl) {
 }
 
 TEST(ParserSection12, ForWithoutDeclStillWorks) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    for (i = 0; i < 10; i = i + 1) x = i;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    for (i = 0; i < 10; i = i + 1) x = i;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -393,14 +414,15 @@ TEST(ParserSection12, ForWithoutDeclStillWorks) {
 // =============================================================================
 
 TEST(ParserSection12, CasexStatement) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    casex (sel)\n"
-                 "      2'b1?: x = 1;\n"
-                 "      default: x = 0;\n"
-                 "    endcase\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    casex (sel)\n"
+      "      2'b1?: x = 1;\n"
+      "      default: x = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -410,14 +432,15 @@ TEST(ParserSection12, CasexStatement) {
 }
 
 TEST(ParserSection12, CasezStatement) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    casez (sel)\n"
-                 "      2'b1?: x = 1;\n"
-                 "      default: x = 0;\n"
-                 "    endcase\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    casez (sel)\n"
+      "      2'b1?: x = 1;\n"
+      "      default: x = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -435,11 +458,12 @@ TEST(ParserSection12, CasezStatement) {
 // =============================================================================
 
 TEST(ParserSection12, WhileLoop) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    while (x > 0) x = x - 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    while (x > 0) x = x - 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -449,13 +473,14 @@ TEST(ParserSection12, WhileLoop) {
 }
 
 TEST(ParserSection12, WhileLoopWithBlock) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    while (x > 0) begin\n"
-                 "      x = x - 1;\n"
-                 "    end\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    while (x > 0) begin\n"
+      "      x = x - 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -469,11 +494,12 @@ TEST(ParserSection12, WhileLoopWithBlock) {
 // =============================================================================
 
 TEST(ParserSection12, DoWhileLoop) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    do x = x + 1; while (x < 10);\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    do x = x + 1; while (x < 10);\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -483,13 +509,14 @@ TEST(ParserSection12, DoWhileLoop) {
 }
 
 TEST(ParserSection12, DoWhileLoopWithBlock) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    do begin\n"
-                 "      x = x + 1;\n"
-                 "    end while (x < 10);\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    do begin\n"
+      "      x = x + 1;\n"
+      "    end while (x < 10);\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -503,11 +530,12 @@ TEST(ParserSection12, DoWhileLoopWithBlock) {
 // =============================================================================
 
 TEST(ParserSection12, RepeatLoop) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    repeat (10) x = x + 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    repeat (10) x = x + 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -521,11 +549,12 @@ TEST(ParserSection12, RepeatLoop) {
 // =============================================================================
 
 TEST(ParserSection12, ForeverLoop) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    forever x = x + 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    forever x = x + 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -534,14 +563,15 @@ TEST(ParserSection12, ForeverLoop) {
 }
 
 TEST(ParserSection12, ForeverLoopWithBlock) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    forever begin\n"
-                 "      @(posedge clk);\n"
-                 "      x = x + 1;\n"
-                 "    end\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    forever begin\n"
+      "      @(posedge clk);\n"
+      "      x = x + 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -558,22 +588,21 @@ TEST(ParserSection12, ForeverLoopWithBlock) {
 static Stmt *FindReturnStmt(ParseResult &r) {
   auto *mod = r.cu->modules[0];
   for (auto *item : mod->items) {
-    if (item->kind != ModuleItemKind::kFunctionDecl)
-      continue;
+    if (item->kind != ModuleItemKind::kFunctionDecl) continue;
     for (auto *s : item->func_body_stmts) {
-      if (s->kind == StmtKind::kReturn)
-        return s;
+      if (s->kind == StmtKind::kReturn) return s;
     }
   }
   return nullptr;
 }
 
 TEST(ParserSection12, ReturnWithValue) {
-  auto r = Parse("module t;\n"
-                 "  function int foo();\n"
-                 "    return 42;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  function int foo();\n"
+      "    return 42;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *ret = FindReturnStmt(r);
   ASSERT_NE(ret, nullptr);
@@ -582,11 +611,12 @@ TEST(ParserSection12, ReturnWithValue) {
 }
 
 TEST(ParserSection12, ReturnVoid) {
-  auto r = Parse("module t;\n"
-                 "  function void bar();\n"
-                 "    return;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  function void bar();\n"
+      "    return;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *ret = FindReturnStmt(r);
   ASSERT_NE(ret, nullptr);
@@ -595,13 +625,14 @@ TEST(ParserSection12, ReturnVoid) {
 }
 
 TEST(ParserSection12, BreakStatementParses) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    forever begin\n"
-                 "      if (done) break;\n"
-                 "    end\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    forever begin\n"
+      "      if (done) break;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -609,13 +640,14 @@ TEST(ParserSection12, BreakStatementParses) {
 }
 
 TEST(ParserSection12, BreakStatementInBody) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    forever begin\n"
-                 "      if (done) break;\n"
-                 "    end\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    forever begin\n"
+      "      if (done) break;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   // The body contains an if whose then_branch is break.
@@ -627,14 +659,15 @@ TEST(ParserSection12, BreakStatementInBody) {
 }
 
 TEST(ParserSection12, ContinueStatementParses) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    for (int i = 0; i < 10; i = i + 1) begin\n"
-                 "      if (i == 5) continue;\n"
-                 "      x = i;\n"
-                 "    end\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 10; i = i + 1) begin\n"
+      "      if (i == 5) continue;\n"
+      "      x = i;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -645,14 +678,15 @@ TEST(ParserSection12, ContinueStatementParses) {
 }
 
 TEST(ParserSection12, ContinueStatementInBody) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    for (int i = 0; i < 10; i = i + 1) begin\n"
-                 "      if (i == 5) continue;\n"
-                 "      x = i;\n"
-                 "    end\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 10; i = i + 1) begin\n"
+      "      if (i == 5) continue;\n"
+      "      x = i;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   auto *body = stmt->for_body;
@@ -667,11 +701,12 @@ TEST(ParserSection12, ContinueStatementInBody) {
 // =============================================================================
 
 TEST(ParserSection12, EventTrigger) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    -> done_event;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    -> done_event;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -684,11 +719,12 @@ TEST(ParserSection12, EventTrigger) {
 // =============================================================================
 
 TEST(ParserSection12, DisableBlock) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    disable my_block;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    disable my_block;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -697,11 +733,12 @@ TEST(ParserSection12, DisableBlock) {
 }
 
 TEST(ParserSection12, DisableFork) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    disable fork;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    disable fork;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -713,14 +750,15 @@ TEST(ParserSection12, DisableFork) {
 // =============================================================================
 
 TEST(ParserSection12, UniqueCasexQualifier) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    unique casex (sel)\n"
-                 "      2'b1?: x = 1;\n"
-                 "      default: x = 0;\n"
-                 "    endcase\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    unique casex (sel)\n"
+      "      2'b1?: x = 1;\n"
+      "      default: x = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);

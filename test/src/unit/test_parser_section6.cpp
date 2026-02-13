@@ -26,8 +26,7 @@ static ParseResult6 Parse(const std::string &src) {
 }
 
 static ModuleItem *FirstItem(ParseResult6 &r) {
-  if (!r.cu || r.cu->modules.empty())
-    return nullptr;
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
   auto &items = r.cu->modules[0]->items;
   return items.empty() ? nullptr : items[0];
 }
@@ -49,9 +48,10 @@ static Stmt *FirstInitialStmt(ParseResult6 &r) {
 // =========================================================================
 
 TEST(ParserSection6, WireDeclaration_Kind) {
-  auto r = Parse("module t;\n"
-                 "  wire [7:0] w;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  wire [7:0] w;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -60,9 +60,10 @@ TEST(ParserSection6, WireDeclaration_Kind) {
 }
 
 TEST(ParserSection6, WireDeclaration_Props) {
-  auto r = Parse("module t;\n"
-                 "  wire [7:0] w;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  wire [7:0] w;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -71,9 +72,10 @@ TEST(ParserSection6, WireDeclaration_Props) {
 }
 
 TEST(ParserSection6, TriDeclaration) {
-  auto r = Parse("module t;\n"
-                 "  tri [3:0] t1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  tri [3:0] t1;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -86,9 +88,10 @@ TEST(ParserSection6, TriDeclaration) {
 // =========================================================================
 
 TEST(ParserSection6, LogicVarDecl) {
-  auto r = Parse("module t;\n"
-                 "  logic [15:0] data;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  logic [15:0] data;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -97,9 +100,10 @@ TEST(ParserSection6, LogicVarDecl) {
 }
 
 TEST(ParserSection6, IntVarDecl) {
-  auto r = Parse("module t;\n"
-                 "  int count;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int count;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -108,9 +112,10 @@ TEST(ParserSection6, IntVarDecl) {
 }
 
 TEST(ParserSection6, ByteVarDecl) {
-  auto r = Parse("module t;\n"
-                 "  byte b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  byte b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -118,9 +123,10 @@ TEST(ParserSection6, ByteVarDecl) {
 }
 
 TEST(ParserSection6, LongintVarDecl) {
-  auto r = Parse("module t;\n"
-                 "  longint li;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  longint li;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -132,9 +138,10 @@ TEST(ParserSection6, LongintVarDecl) {
 // =========================================================================
 
 TEST(ParserSection6, SignedVector) {
-  auto r = Parse("module t;\n"
-                 "  logic signed [7:0] sv;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  logic signed [7:0] sv;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -147,9 +154,10 @@ TEST(ParserSection6, SignedVector) {
 // =========================================================================
 
 TEST(ParserSection6, IntDefaultSigned) {
-  auto r = Parse("module t;\n"
-                 "  int x;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int x;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -158,9 +166,10 @@ TEST(ParserSection6, IntDefaultSigned) {
 }
 
 TEST(ParserSection6, IntExplicitUnsigned) {
-  auto r = Parse("module t;\n"
-                 "  int unsigned x;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int unsigned x;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -169,9 +178,10 @@ TEST(ParserSection6, IntExplicitUnsigned) {
 }
 
 TEST(ParserSection6, ByteDefaultSigned) {
-  auto r = Parse("module t;\n"
-                 "  byte b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  byte b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -180,9 +190,10 @@ TEST(ParserSection6, ByteDefaultSigned) {
 }
 
 TEST(ParserSection6, ShortintDefaultSigned) {
-  auto r = Parse("module t;\n"
-                 "  shortint s;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  shortint s;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -191,9 +202,10 @@ TEST(ParserSection6, ShortintDefaultSigned) {
 }
 
 TEST(ParserSection6, LongintDefaultSigned) {
-  auto r = Parse("module t;\n"
-                 "  longint l;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  longint l;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -202,9 +214,10 @@ TEST(ParserSection6, LongintDefaultSigned) {
 }
 
 TEST(ParserSection6, IntegerDefaultSigned) {
-  auto r = Parse("module t;\n"
-                 "  integer i;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  integer i;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -213,9 +226,10 @@ TEST(ParserSection6, IntegerDefaultSigned) {
 }
 
 TEST(ParserSection6, TimeDefaultUnsigned) {
-  auto r = Parse("module t;\n"
-                 "  time t;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  time t;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -224,9 +238,10 @@ TEST(ParserSection6, TimeDefaultUnsigned) {
 }
 
 TEST(ParserSection6, LogicDefaultUnsigned) {
-  auto r = Parse("module t;\n"
-                 "  logic l;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  logic l;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -235,9 +250,10 @@ TEST(ParserSection6, LogicDefaultUnsigned) {
 }
 
 TEST(ParserSection6, BitDefaultUnsigned) {
-  auto r = Parse("module t;\n"
-                 "  bit b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  bit b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -246,9 +262,10 @@ TEST(ParserSection6, BitDefaultUnsigned) {
 }
 
 TEST(ParserSection6, RegDefaultUnsigned) {
-  auto r = Parse("module t;\n"
-                 "  reg r;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  reg r;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -261,9 +278,10 @@ TEST(ParserSection6, RegDefaultUnsigned) {
 // =========================================================================
 
 TEST(ParserSection6, RealVarDecl) {
-  auto r = Parse("module t;\n"
-                 "  real r;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  real r;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -271,9 +289,10 @@ TEST(ParserSection6, RealVarDecl) {
 }
 
 TEST(ParserSection6, ShortrealVarDecl) {
-  auto r = Parse("module t;\n"
-                 "  shortreal sr;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  shortreal sr;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -281,9 +300,10 @@ TEST(ParserSection6, ShortrealVarDecl) {
 }
 
 TEST(ParserSection6, RealtimeVarDecl) {
-  auto r = Parse("module t;\n"
-                 "  realtime rt;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  realtime rt;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -295,10 +315,11 @@ TEST(ParserSection6, RealtimeVarDecl) {
 // =========================================================================
 
 TEST(ParserSection6, VoidFunctionReturn) {
-  auto r = Parse("module t;\n"
-                 "  function void do_nothing();\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  function void do_nothing();\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -311,9 +332,10 @@ TEST(ParserSection6, VoidFunctionReturn) {
 // =========================================================================
 
 TEST(ParserSection6, ChandleVarDecl) {
-  auto r = Parse("module t;\n"
-                 "  chandle ch;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  chandle ch;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -326,9 +348,10 @@ TEST(ParserSection6, ChandleVarDecl) {
 // =========================================================================
 
 TEST(ParserSection6, EventVarDecl) {
-  auto r = Parse("module t;\n"
-                 "  event e;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  event e;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -340,10 +363,11 @@ TEST(ParserSection6, EventVarDecl) {
 // =========================================================================
 
 TEST(ParserSection6, TypedefInt) {
-  auto r = Parse("module t;\n"
-                 "  typedef int myint;\n"
-                 "  myint x;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  typedef int myint;\n"
+      "  myint x;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
   auto *item = r.cu->modules[0]->items[1];
@@ -356,9 +380,10 @@ TEST(ParserSection6, TypedefInt) {
 // =========================================================================
 
 TEST(ParserSection6, EnumBasic) {
-  auto r = Parse("module t;\n"
-                 "  typedef enum { RED, GREEN, BLUE } color_t;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  typedef enum { RED, GREEN, BLUE } color_t;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -372,9 +397,10 @@ TEST(ParserSection6, EnumBasic) {
 // =========================================================================
 
 TEST(ParserSection6, ConstVarDecl) {
-  auto r = Parse("module t;\n"
-                 "  const logic [7:0] MAX = 8'hFF;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  const logic [7:0] MAX = 8'hFF;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -383,9 +409,10 @@ TEST(ParserSection6, ConstVarDecl) {
 }
 
 TEST(ParserSection6, ConstVarDecl_NameAndInit) {
-  auto r = Parse("module t;\n"
-                 "  const logic [7:0] MAX = 8'hFF;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  const logic [7:0] MAX = 8'hFF;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -394,9 +421,10 @@ TEST(ParserSection6, ConstVarDecl_NameAndInit) {
 }
 
 TEST(ParserSection6, ConstIntDecl) {
-  auto r = Parse("module t;\n"
-                 "  const int LIMIT = 100;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  const int LIMIT = 100;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -409,11 +437,12 @@ TEST(ParserSection6, ConstIntDecl) {
 // =========================================================================
 
 TEST(ParserSection6, AutomaticVarDecl) {
-  auto r = Parse("module t;\n"
-                 "  function automatic int get_val();\n"
-                 "    return 42;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  function automatic int get_val();\n"
+      "    return 42;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -422,11 +451,12 @@ TEST(ParserSection6, AutomaticVarDecl) {
 }
 
 TEST(ParserSection6, StaticFunction) {
-  auto r = Parse("module t;\n"
-                 "  function static int counter();\n"
-                 "    return 0;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  function static int counter();\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -439,9 +469,10 @@ TEST(ParserSection6, StaticFunction) {
 // =========================================================================
 
 TEST(ParserSection6, IntCast) {
-  auto r = Parse("module t;\n"
-                 "  initial x = int'(y);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = int'(y);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -451,9 +482,10 @@ TEST(ParserSection6, IntCast) {
 }
 
 TEST(ParserSection6, IntCast_Details) {
-  auto r = Parse("module t;\n"
-                 "  initial x = int'(y);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = int'(y);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -464,9 +496,10 @@ TEST(ParserSection6, IntCast_Details) {
 }
 
 TEST(ParserSection6, SignedCast) {
-  auto r = Parse("module t;\n"
-                 "  initial x = signed'(y);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = signed'(y);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -477,9 +510,10 @@ TEST(ParserSection6, SignedCast) {
 }
 
 TEST(ParserSection6, ConstCast) {
-  auto r = Parse("module t;\n"
-                 "  initial x = const'(y);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = const'(y);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -495,12 +529,13 @@ TEST(ParserSection6, ConstCast) {
 
 TEST(ParserSection6, ClassVarDecl_ClassParsed) {
   // Class declared at top-level, then used as a type inside a module.
-  auto r = Parse("class MyClass;\n"
-                 "  int x;\n"
-                 "endclass\n"
-                 "module t;\n"
-                 "  MyClass obj;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "class MyClass;\n"
+      "  int x;\n"
+      "endclass\n"
+      "module t;\n"
+      "  MyClass obj;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_FALSE(r.cu->classes.empty());
   EXPECT_EQ(r.cu->classes[0]->name, "MyClass");
@@ -508,12 +543,13 @@ TEST(ParserSection6, ClassVarDecl_ClassParsed) {
 }
 
 TEST(ParserSection6, ClassVarDecl_VarType) {
-  auto r = Parse("class MyClass;\n"
-                 "  int x;\n"
-                 "endclass\n"
-                 "module t;\n"
-                 "  MyClass obj;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "class MyClass;\n"
+      "  int x;\n"
+      "endclass\n"
+      "module t;\n"
+      "  MyClass obj;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_FALSE(r.cu->modules.empty());
   auto &items = r.cu->modules[0]->items;
@@ -570,9 +606,9 @@ TEST(ParserSection6, TypesEquivalentPackedSameWidth) {
   a.kind = DataTypeKind::kByte;
   DataType b;
   b.kind = DataTypeKind::kByte;
-  b.is_signed = true; // byte defaults to signed, make both agree.
+  b.is_signed = true;  // byte defaults to signed, make both agree.
   a.is_signed = true;
-  EXPECT_TRUE(TypesEquivalent(a, b)); // Same kind → match → equivalent.
+  EXPECT_TRUE(TypesEquivalent(a, b));  // Same kind → match → equivalent.
 }
 
 TEST(ParserSection6, TypesNotEquivalentDifferentState) {
@@ -625,9 +661,10 @@ TEST(ParserSection6, CastCompatibleIntToEnum) {
 // =========================================================================
 
 TEST(ParserSection6, TypeOperatorExpr_Kind) {
-  auto r = Parse("module t;\n"
-                 "  initial x = type(y);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = type(y);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -637,9 +674,10 @@ TEST(ParserSection6, TypeOperatorExpr_Kind) {
 }
 
 TEST(ParserSection6, TypeOperatorExpr_Inner) {
-  auto r = Parse("module t;\n"
-                 "  initial x = type(y);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = type(y);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -654,7 +692,7 @@ TEST(ParserSection6, TypeRefInferWidth) {
   // §6.23: InferExprWidth on type(expr) returns inner expression's width.
   Arena arena;
   auto *inner = arena.Create<Expr>();
-  inner->kind = ExprKind::kIntegerLiteral; // 32-bit default.
+  inner->kind = ExprKind::kIntegerLiteral;  // 32-bit default.
   auto *ref = arena.Create<Expr>();
   ref->kind = ExprKind::kTypeRef;
   ref->lhs = inner;
@@ -663,9 +701,10 @@ TEST(ParserSection6, TypeRefInferWidth) {
 }
 
 TEST(ParserSection6, TypeOperatorInDataType) {
-  auto r = Parse("module t;\n"
-                 "  parameter type T = type(int);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  parameter type T = type(int);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -680,10 +719,11 @@ TEST(ParserSection6, TypeOperatorInDataType) {
 // =========================================================================
 
 TEST(ParserSection6, ScopeResolutionType) {
-  auto r = Parse("module t;\n"
-                 "  import pkg::mytype;\n"
-                 "  pkg::mytype x;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  import pkg::mytype;\n"
+      "  pkg::mytype x;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   // Find the variable declaration.
   auto &items = r.cu->modules[0]->items;
@@ -718,11 +758,12 @@ static bool ParseOk6(const std::string &src) {
 
 // Step 1a: string type in block-level declarations (fixes 6.19.5.6)
 TEST(ParserSection6, BlockVarDecl_StringType) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    string s;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    string s;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -747,17 +788,19 @@ TEST(ParserSection6, ParsePortDecl_ImplicitType) {
 
 // Step 1c: localparam implicit type (fixes 6.20.4)
 TEST(ParserSection6, ParamDecl_ImplicitType) {
-  EXPECT_TRUE(ParseOk6("module t;\n"
-                       "  localparam [10:0] p = 1 << 5;\n"
-                       "  localparam logic [10:0] q = 1 << 5;\n"
-                       "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk6("module t;\n"
+               "  localparam [10:0] p = 1 << 5;\n"
+               "  localparam logic [10:0] q = 1 << 5;\n"
+               "endmodule\n"));
 }
 
 // Step 1c: parameter unpacked dims (fixes 6.20.2)
 TEST(ParserSection6, ParamDecl_UnpackedDims) {
-  EXPECT_TRUE(ParseOk6("module t;\n"
-                       "  parameter logic [31:0] p [3:0] = '{1, 2, 3, 4};\n"
-                       "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk6("module t;\n"
+               "  parameter logic [31:0] p [3:0] = '{1, 2, 3, 4};\n"
+               "endmodule\n"));
 }
 
 // Step 1d: type parameter in module header (fixes 6.20.3)
@@ -767,56 +810,61 @@ TEST(ParserSection6, TypeParamPort) {
 
 // Step 1d: localparam type declaration (fixes 6.23-localparam_type_decl)
 TEST(ParserSection6, LocalparamTypeDecl) {
-  EXPECT_TRUE(ParseOk6("module t;\n"
-                       "  localparam type testtype = logic;\n"
-                       "  testtype x;\n"
-                       "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk6("module t;\n"
+               "  localparam type testtype = logic;\n"
+               "  testtype x;\n"
+               "endmodule\n"));
 }
 
 // Step 2a: user-defined type cast (fixes 6.19.4-cast)
 TEST(ParserSection6, TypeCast_UserDefined) {
-  EXPECT_TRUE(ParseOk6("module t;\n"
-                       "  typedef enum {a, b, c, d} e;\n"
-                       "  initial begin\n"
-                       "    e val;\n"
-                       "    val = a;\n"
-                       "    val = e'(val + 1);\n"
-                       "  end\n"
-                       "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk6("module t;\n"
+               "  typedef enum {a, b, c, d} e;\n"
+               "  initial begin\n"
+               "    e val;\n"
+               "    val = a;\n"
+               "    val = e'(val + 1);\n"
+               "  end\n"
+               "endmodule\n"));
 }
 
 // Step 2b: interconnect (fixes 6.6.8)
 TEST(ParserSection6, Interconnect_Basic) {
-  EXPECT_TRUE(ParseOk6("module t;\n"
-                       "  interconnect bus;\n"
-                       "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk6("module t;\n"
+               "  interconnect bus;\n"
+               "endmodule\n"));
 }
 
 // Step 3a: var type(expr) declarations (fixes 6.23-type_op)
 TEST(ParserSection6, VarTypeOp_Basic) {
-  EXPECT_TRUE(ParseOk6("module t;\n"
-                       "  real a = 4.76;\n"
-                       "  real b = 0.74;\n"
-                       "  var type(a+b) c;\n"
-                       "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk6("module t;\n"
+               "  real a = 4.76;\n"
+               "  real b = 0.74;\n"
+               "  var type(a+b) c;\n"
+               "endmodule\n"));
 }
 
 // Step 3b: type(data_type) in expressions (fixes 6.23-type_op_compare)
 TEST(ParserSection6, TypeRef_DataType) {
-  EXPECT_TRUE(ParseOk6("module top #(parameter type T = type(logic[11:0]))\n"
-                       "  ();\n"
-                       "  initial begin\n"
-                       "    case (type(T))\n"
-                       "      type(logic[11:0]) : ;\n"
-                       "      default : $stop;\n"
-                       "    endcase\n"
-                       "    if (type(T) == type(logic[12:0])) $stop;\n"
-                       "    if (type(T) != type(logic[11:0])) $stop;\n"
-                       "    if (type(T) === type(logic[12:0])) $stop;\n"
-                       "    if (type(T) !== type(logic[11:0])) $stop;\n"
-                       "    $finish;\n"
-                       "  end\n"
-                       "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk6("module top #(parameter type T = type(logic[11:0]))\n"
+               "  ();\n"
+               "  initial begin\n"
+               "    case (type(T))\n"
+               "      type(logic[11:0]) : ;\n"
+               "      default : $stop;\n"
+               "    endcase\n"
+               "    if (type(T) == type(logic[12:0])) $stop;\n"
+               "    if (type(T) != type(logic[11:0])) $stop;\n"
+               "    if (type(T) === type(logic[12:0])) $stop;\n"
+               "    if (type(T) !== type(logic[11:0])) $stop;\n"
+               "    $finish;\n"
+               "  end\n"
+               "endmodule\n"));
 }
 
 // =========================================================================
@@ -824,11 +872,12 @@ TEST(ParserSection6, TypeRef_DataType) {
 // =========================================================================
 
 TEST(ParserSection6, BlockVarDecl_Automatic) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    automatic int auto1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    automatic int auto1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -837,11 +886,12 @@ TEST(ParserSection6, BlockVarDecl_Automatic) {
 }
 
 TEST(ParserSection6, BlockVarDecl_Automatic_Props) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    automatic int auto1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    automatic int auto1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -850,11 +900,12 @@ TEST(ParserSection6, BlockVarDecl_Automatic_Props) {
 }
 
 TEST(ParserSection6, BlockVarDecl_Static) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    static int st2;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    static int st2;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -863,11 +914,12 @@ TEST(ParserSection6, BlockVarDecl_Static) {
 }
 
 TEST(ParserSection6, BlockVarDecl_Static_Props) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    static int st2;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    static int st2;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -876,11 +928,12 @@ TEST(ParserSection6, BlockVarDecl_Static_Props) {
 }
 
 TEST(ParserSection6, BlockVarDecl_AutomaticWithInit) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    automatic int loop3 = 0;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    automatic int loop3 = 0;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -890,11 +943,12 @@ TEST(ParserSection6, BlockVarDecl_AutomaticWithInit) {
 }
 
 TEST(ParserSection6, BlockVarDecl_StaticVar) {
-  EXPECT_TRUE(ParseOk6("module t;\n"
-                       "  initial begin\n"
-                       "    static var logic x;\n"
-                       "  end\n"
-                       "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk6("module t;\n"
+               "  initial begin\n"
+               "    static var logic x;\n"
+               "  end\n"
+               "endmodule\n"));
 }
 
 // =========================================================================
@@ -902,9 +956,10 @@ TEST(ParserSection6, BlockVarDecl_StaticVar) {
 // =========================================================================
 
 TEST(ParserSection6, DollarConstant_ParamAssign) {
-  EXPECT_TRUE(ParseOk6("module t;\n"
-                       "  parameter p = $;\n"
-                       "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk6("module t;\n"
+               "  parameter p = $;\n"
+               "endmodule\n"));
 }
 
 // =========================================================================
@@ -912,9 +967,10 @@ TEST(ParserSection6, DollarConstant_ParamAssign) {
 // =========================================================================
 
 TEST(ParserSection6, TriregChargeStrengthSmall) {
-  auto r = Parse("module t;\n"
-                 "  trireg (small) s1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  trireg (small) s1;\n"
+      "endmodule\n");
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
@@ -922,18 +978,20 @@ TEST(ParserSection6, TriregChargeStrengthSmall) {
 }
 
 TEST(ParserSection6, TriregChargeStrengthLarge) {
-  auto r = Parse("module t;\n"
-                 "  trireg (large) l1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  trireg (large) l1;\n"
+      "endmodule\n");
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.charge_strength, 4);
 }
 
 TEST(ParserSection6, TriregThreeDelay_Strength) {
-  auto r = Parse("module t;\n"
-                 "  trireg (large) #(10, 20, 50) cap1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  trireg (large) #(10, 20, 50) cap1;\n"
+      "endmodule\n");
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.charge_strength, 4);
@@ -942,9 +1000,10 @@ TEST(ParserSection6, TriregThreeDelay_Strength) {
 }
 
 TEST(ParserSection6, TriregThreeDelay_FallAndDecay) {
-  auto r = Parse("module t;\n"
-                 "  trireg (large) #(10, 20, 50) cap1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  trireg (large) #(10, 20, 50) cap1;\n"
+      "endmodule\n");
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   ASSERT_NE(item->net_delay_fall, nullptr);
@@ -954,9 +1013,10 @@ TEST(ParserSection6, TriregThreeDelay_FallAndDecay) {
 }
 
 TEST(ParserSection6, TriregSingleDelay) {
-  auto r = Parse("module t;\n"
-                 "  trireg #5 t1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  trireg #5 t1;\n"
+      "endmodule\n");
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
@@ -965,9 +1025,10 @@ TEST(ParserSection6, TriregSingleDelay) {
 }
 
 TEST(ParserSection6, TriregSingleDelay_NoFallDecay) {
-  auto r = Parse("module t;\n"
-                 "  trireg #5 t1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  trireg #5 t1;\n"
+      "endmodule\n");
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->net_delay_fall, nullptr);
@@ -976,40 +1037,44 @@ TEST(ParserSection6, TriregSingleDelay_NoFallDecay) {
 
 // §6.20.1 — block-level parameter declaration
 TEST(ParserSection6, BlockLevelParameter) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    parameter int P = 42;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    parameter int P = 42;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
 // §6.20.1 — block-level localparam declaration
 TEST(ParserSection6, BlockLevelLocalparam) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    localparam int LP = 10;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    localparam int LP = 10;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
 // §20.6 — Bare type keyword in expression context ($typename(logic))
 TEST(ParserSection6, BareTypeKeywordInExpr) {
-  auto r = Parse("module t;\n"
-                 "  initial $display($typename(logic));\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial $display($typename(logic));\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
 // §6.3.2.2: Drive strength on net declaration with inline assignment.
 TEST(ParserSection6, NetDeclDriveStrength) {
-  auto r = Parse("module m;\n"
-                 "  wire (weak0, strong1) w = 1'b1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  wire (weak0, strong1) w = 1'b1;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);

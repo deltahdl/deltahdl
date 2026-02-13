@@ -28,8 +28,7 @@ static ParseResult Parse(const std::string &src) {
 
 static Stmt *FirstInitialStmt(ParseResult &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock)
-      continue;
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
     }
@@ -40,8 +39,7 @@ static Stmt *FirstInitialStmt(ParseResult &r) {
 
 static ModuleItem *FirstAlwaysItem(ParseResult &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysBlock)
-      return item;
+    if (item->kind == ModuleItemKind::kAlwaysBlock) return item;
   }
   return nullptr;
 }
@@ -51,9 +49,10 @@ static ModuleItem *FirstAlwaysItem(ParseResult &r) {
 // =============================================================================
 
 TEST(ParserSection9, InitialBlock) {
-  auto r = Parse("module m;\n"
-                 "  initial x = 1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = 1;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *mod = r.cu->modules[0];
   bool found = false;
@@ -67,9 +66,10 @@ TEST(ParserSection9, InitialBlock) {
 }
 
 TEST(ParserSection9, FinalBlock) {
-  auto r = Parse("module m;\n"
-                 "  final $display(\"done\");\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  final $display(\"done\");\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *mod = r.cu->modules[0];
   bool found = false;
@@ -88,9 +88,10 @@ TEST(ParserSection9, FinalBlock) {
 // =============================================================================
 
 TEST(ParserSection9, AlwaysBlock) {
-  auto r = Parse("module m;\n"
-                 "  always @(posedge clk) q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk) q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
@@ -100,9 +101,10 @@ TEST(ParserSection9, AlwaysBlock) {
 }
 
 TEST(ParserSection9, AlwaysComb) {
-  auto r = Parse("module m;\n"
-                 "  always_comb a = b & c;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always_comb a = b & c;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
@@ -111,9 +113,10 @@ TEST(ParserSection9, AlwaysComb) {
 }
 
 TEST(ParserSection9, AlwaysFF) {
-  auto r = Parse("module m;\n"
-                 "  always_ff @(posedge clk) q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always_ff @(posedge clk) q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
@@ -123,10 +126,11 @@ TEST(ParserSection9, AlwaysFF) {
 }
 
 TEST(ParserSection9, AlwaysLatch) {
-  auto r = Parse("module m;\n"
-                 "  always_latch\n"
-                 "    if (en) q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always_latch\n"
+      "    if (en) q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
@@ -139,14 +143,15 @@ TEST(ParserSection9, AlwaysLatch) {
 // =============================================================================
 
 TEST(ParserSection9, ForkJoin) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      #10 a = 1;\n"
-                 "      #20 b = 1;\n"
-                 "    join\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      #10 a = 1;\n"
+      "      #20 b = 1;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -156,14 +161,15 @@ TEST(ParserSection9, ForkJoin) {
 }
 
 TEST(ParserSection9, ForkJoinAny) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      #10 a = 1;\n"
-                 "      #20 b = 1;\n"
-                 "    join_any\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      #10 a = 1;\n"
+      "      #20 b = 1;\n"
+      "    join_any\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -172,13 +178,14 @@ TEST(ParserSection9, ForkJoinAny) {
 }
 
 TEST(ParserSection9, ForkJoinNone) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      #10 a = 1;\n"
-                 "    join_none\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      #10 a = 1;\n"
+      "    join_none\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -191,11 +198,12 @@ TEST(ParserSection9, ForkJoinNone) {
 // =============================================================================
 
 TEST(ParserSection9, DelayControl) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    #10 a = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    #10 a = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -209,11 +217,12 @@ TEST(ParserSection9, DelayControl) {
 // =============================================================================
 
 TEST(ParserSection9, EventControlPosedgeKind) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @(posedge clk) a = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge clk) a = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -222,11 +231,12 @@ TEST(ParserSection9, EventControlPosedgeKind) {
 }
 
 TEST(ParserSection9, EventControlPosedgeEdge) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @(posedge clk) a = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge clk) a = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -235,11 +245,12 @@ TEST(ParserSection9, EventControlPosedgeEdge) {
 }
 
 TEST(ParserSection9, EventControlNegedge) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @(negedge rst) a = 0;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(negedge rst) a = 0;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -249,11 +260,12 @@ TEST(ParserSection9, EventControlNegedge) {
 }
 
 TEST(ParserSection9, EventControlMultiple) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @(posedge clk or negedge rst) a = 0;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge clk or negedge rst) a = 0;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -266,11 +278,12 @@ TEST(ParserSection9, EventControlMultiple) {
 }
 
 TEST(ParserSection9, EventControlComma) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @(posedge clk, negedge rst) a = 0;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge clk, negedge rst) a = 0;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -283,11 +296,12 @@ TEST(ParserSection9, EventControlComma) {
 // =============================================================================
 
 TEST(ParserSection9, WaitStatement) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    wait (done == 1) a = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    wait (done == 1) a = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -302,9 +316,10 @@ TEST(ParserSection9, WaitStatement) {
 
 TEST(ParserSection9, StarEventBareAlways) {
   // always @* consumes the @* at the always-block level; body is the stmt.
-  auto r = Parse("module m;\n"
-                 "  always @* a = b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @* a = b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
@@ -315,9 +330,10 @@ TEST(ParserSection9, StarEventBareAlways) {
 
 TEST(ParserSection9, StarEventParenAlways) {
   // always @(*) consumes the @(*) at the always-block level.
-  auto r = Parse("module m;\n"
-                 "  always @(*) begin a = b; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @(*) begin a = b; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
@@ -328,11 +344,12 @@ TEST(ParserSection9, StarEventParenAlways) {
 
 TEST(ParserSection9, StarEventBareStmt) {
   // @* at the statement level produces an kEventControl stmt.
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @* a = b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @* a = b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -343,11 +360,12 @@ TEST(ParserSection9, StarEventBareStmt) {
 
 TEST(ParserSection9, StarEventParenStmt) {
   // @(*) at the statement level produces an kEventControl stmt.
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @(*) a = b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(*) a = b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -361,10 +379,11 @@ TEST(ParserSection9, StarEventParenStmt) {
 // =============================================================================
 
 TEST(ParserSection9, IffGuardPosedgeEdge) {
-  auto r = Parse("module m;\n"
-                 "  reg clk, reset, a, b;\n"
-                 "  always @(posedge clk iff reset == 0) a <= b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, reset, a, b;\n"
+      "  always @(posedge clk iff reset == 0) a <= b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
@@ -374,10 +393,11 @@ TEST(ParserSection9, IffGuardPosedgeEdge) {
 }
 
 TEST(ParserSection9, IffGuardPosedgeFields) {
-  auto r = Parse("module m;\n"
-                 "  reg clk, reset, a, b;\n"
-                 "  always @(posedge clk iff reset == 0) a <= b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, reset, a, b;\n"
+      "  always @(posedge clk iff reset == 0) a <= b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
@@ -387,10 +407,11 @@ TEST(ParserSection9, IffGuardPosedgeFields) {
 }
 
 TEST(ParserSection9, IffGuardNoEdge) {
-  auto r = Parse("module m;\n"
-                 "  reg clk, en, a, b;\n"
-                 "  always @(clk iff en) a <= b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, en, a, b;\n"
+      "  always @(clk iff en) a <= b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
@@ -400,11 +421,11 @@ TEST(ParserSection9, IffGuardNoEdge) {
 }
 
 TEST(ParserSection9, IffGuardMultipleEventsFirst) {
-  auto r =
-      Parse("module m;\n"
-            "  reg clk, reset, a, b;\n"
-            "  always @(posedge clk iff reset == 0 or negedge reset) a <= b;\n"
-            "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, reset, a, b;\n"
+      "  always @(posedge clk iff reset == 0 or negedge reset) a <= b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
@@ -413,11 +434,11 @@ TEST(ParserSection9, IffGuardMultipleEventsFirst) {
 }
 
 TEST(ParserSection9, IffGuardMultipleEventsSecond) {
-  auto r =
-      Parse("module m;\n"
-            "  reg clk, reset, a, b;\n"
-            "  always @(posedge clk iff reset == 0 or negedge reset) a <= b;\n"
-            "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, reset, a, b;\n"
+      "  always @(posedge clk iff reset == 0 or negedge reset) a <= b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
@@ -427,10 +448,11 @@ TEST(ParserSection9, IffGuardMultipleEventsSecond) {
 }
 
 TEST(ParserSection9, IffGuardStmtLevelKind) {
-  auto r = Parse("module m;\n"
-                 "  reg clk, reset, a, b;\n"
-                 "  initial @(posedge clk iff reset == 0) a <= b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, reset, a, b;\n"
+      "  initial @(posedge clk iff reset == 0) a <= b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -439,10 +461,11 @@ TEST(ParserSection9, IffGuardStmtLevelKind) {
 }
 
 TEST(ParserSection9, IffGuardStmtLevelEvent) {
-  auto r = Parse("module m;\n"
-                 "  reg clk, reset, a, b;\n"
-                 "  initial @(posedge clk iff reset == 0) a <= b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, reset, a, b;\n"
+      "  initial @(posedge clk iff reset == 0) a <= b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -456,14 +479,15 @@ TEST(ParserSection9, IffGuardStmtLevelEvent) {
 // =============================================================================
 
 TEST(ParserSection9, WaitFork) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      #10;\n"
-                 "    join_none\n"
-                 "    wait fork;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      #10;\n"
+      "    join_none\n"
+      "    wait fork;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *body = r.cu->modules[0]->items[0]->body;
   ASSERT_NE(body, nullptr);
@@ -473,11 +497,12 @@ TEST(ParserSection9, WaitFork) {
 }
 
 TEST(ParserSection9, WaitExprStillWorks) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    wait (done) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    wait (done) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -489,14 +514,15 @@ TEST(ParserSection9, WaitExprStillWorks) {
 // =============================================================================
 
 TEST(ParserSection9, DisableFork) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      #10;\n"
-                 "    join_none\n"
-                 "    disable fork;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      #10;\n"
+      "    join_none\n"
+      "    disable fork;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *body = r.cu->modules[0]->items[0]->body;
   ASSERT_NE(body, nullptr);
@@ -506,11 +532,12 @@ TEST(ParserSection9, DisableFork) {
 }
 
 TEST(ParserSection9, DisableIdentStillWorks) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    disable my_block;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    disable my_block;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -522,10 +549,11 @@ TEST(ParserSection9, DisableIdentStillWorks) {
 // =============================================================================
 
 TEST(ParserSection9, RepeatEventControl) {
-  auto r = Parse("module m;\n"
-                 "  reg clk, a, b;\n"
-                 "  initial a = repeat(3) @(posedge clk) b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, a, b;\n"
+      "  initial a = repeat(3) @(posedge clk) b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -535,10 +563,11 @@ TEST(ParserSection9, RepeatEventControl) {
 }
 
 TEST(ParserSection9, RepeatEventControlNonblocking) {
-  auto r = Parse("module m;\n"
-                 "  reg clk, a, b;\n"
-                 "  initial a <= repeat(2) @(posedge clk) b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, a, b;\n"
+      "  initial a <= repeat(2) @(posedge clk) b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -552,12 +581,13 @@ TEST(ParserSection9, RepeatEventControlNonblocking) {
 // =============================================================================
 
 TEST(ParserSection9, StatementLabelOnBeginBlock) {
-  auto r = Parse("module m;\n"
-                 "  initial\n"
-                 "    name: begin\n"
-                 "      a = 1;\n"
-                 "    end: name\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial\n"
+      "    name: begin\n"
+      "      a = 1;\n"
+      "    end: name\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   ASSERT_NE(item, nullptr);
@@ -567,12 +597,13 @@ TEST(ParserSection9, StatementLabelOnBeginBlock) {
 }
 
 TEST(ParserSection9, StatementLabelOnForkBlock) {
-  auto r = Parse("module m;\n"
-                 "  initial\n"
-                 "    name: fork\n"
-                 "      a = 1;\n"
-                 "    join: name\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial\n"
+      "    name: fork\n"
+      "      a = 1;\n"
+      "    join: name\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -585,11 +616,12 @@ TEST(ParserSection9, StatementLabelOnForkBlock) {
 // =============================================================================
 
 TEST(ParserSection9, EventControlEdge) {
-  auto r = Parse("module m;\n"
-                 "  reg [3:0] a;\n"
-                 "  wire clk;\n"
-                 "  always @(edge clk) a = ~a;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg [3:0] a;\n"
+      "  wire clk;\n"
+      "  always @(edge clk) a = ~a;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
@@ -602,10 +634,11 @@ TEST(ParserSection9, EventControlEdge) {
 // =============================================================================
 
 TEST(ParserSection9, DynamicArrayNew) {
-  auto r = Parse("module m;\n"
-                 "  int arr[];\n"
-                 "  initial arr = new[5];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  int arr[];\n"
+      "  initial arr = new[5];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -617,14 +650,15 @@ TEST(ParserSection9, DynamicArrayNew) {
 // =============================================================================
 
 TEST(ParserSection9, AutomaticVarInFork) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      automatic int k = 0;\n"
-                 "      begin k = 1; end\n"
-                 "    join_none\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      automatic int k = 0;\n"
+      "      begin k = 1; end\n"
+      "    join_none\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);

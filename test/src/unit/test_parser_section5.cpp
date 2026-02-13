@@ -67,9 +67,10 @@ static ParseDiag5 ParseWithDiag(const std::string &src) {
 // --- §5.10/§5.11: Assignment patterns ---
 
 TEST(ParserSection5, AssignmentPatternPositional_Parse) {
-  auto r = Parse("module t;\n"
-                 "  initial x = '{1, 2, 3};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = '{1, 2, 3};\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -80,9 +81,10 @@ TEST(ParserSection5, AssignmentPatternPositional_Parse) {
 }
 
 TEST(ParserSection5, AssignmentPatternPositional_Elements) {
-  auto r = Parse("module t;\n"
-                 "  initial x = '{1, 2, 3};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = '{1, 2, 3};\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -93,9 +95,10 @@ TEST(ParserSection5, AssignmentPatternPositional_Elements) {
 }
 
 TEST(ParserSection5, AssignmentPatternNamed) {
-  auto r = Parse("module t;\n"
-                 "  initial x = '{a: 0, b: 1};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = '{a: 0, b: 1};\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -111,9 +114,10 @@ TEST(ParserSection5, AssignmentPatternNamed) {
 }
 
 TEST(ParserSection5, AssignmentPatternDefault) {
-  auto r = Parse("module t;\n"
-                 "  initial x = '{default: 0};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = '{default: 0};\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -130,10 +134,11 @@ TEST(ParserSection5, AssignmentPatternDefault) {
 // --- §5.12: Attributes ---
 
 TEST(ParserSection5, AttributeOnModuleItem) {
-  auto r = Parse("module t;\n"
-                 "  (* full_case *)\n"
-                 "  logic [7:0] x;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  (* full_case *)\n"
+      "  logic [7:0] x;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
   auto *item = r.cu->modules[0]->items[0];
@@ -143,10 +148,11 @@ TEST(ParserSection5, AttributeOnModuleItem) {
 }
 
 TEST(ParserSection5, AttributeWithValue_Names) {
-  auto r = Parse("module t;\n"
-                 "  (* synthesis, optimize_power = 1 *)\n"
-                 "  logic y;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  (* synthesis, optimize_power = 1 *)\n"
+      "  logic y;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
   auto *item = r.cu->modules[0]->items[0];
@@ -158,10 +164,11 @@ TEST(ParserSection5, AttributeWithValue_Names) {
 }
 
 TEST(ParserSection5, AttributeWithValue_Values) {
-  auto r = Parse("module t;\n"
-                 "  (* synthesis, optimize_power = 1 *)\n"
-                 "  logic y;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  (* synthesis, optimize_power = 1 *)\n"
+      "  logic y;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
   auto *item = r.cu->modules[0]->items[0];
@@ -173,9 +180,10 @@ TEST(ParserSection5, AttributeWithValue_Values) {
 // --- §5.13: Built-in method calls ---
 
 TEST(ParserSection5, BuiltInMethodCall_Parse) {
-  auto r = Parse("module t;\n"
-                 "  initial x = arr.size();\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = arr.size();\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -187,9 +195,10 @@ TEST(ParserSection5, BuiltInMethodCall_Parse) {
 
 TEST(ParserSection5, BuiltInMethodCall_Callee) {
   // The callee_expr should be the full member-access expression.
-  auto r = Parse("module t;\n"
-                 "  initial x = arr.size();\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = arr.size();\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -216,32 +225,36 @@ TEST(ParserSection5, UnpackedDim_Typedef) {
 // --- Assignment pattern type/default/integer keys ---
 
 TEST(ParserSection5, AssignmentPattern_TypeKey) {
-  EXPECT_TRUE(ParseOk5("module m;\n"
-                       "  typedef struct { int x; int y; } ms_t;\n"
-                       "  ms_t ms = '{int:0, int:1};\n"
-                       "endmodule"));
+  EXPECT_TRUE(
+      ParseOk5("module m;\n"
+               "  typedef struct { int x; int y; } ms_t;\n"
+               "  ms_t ms = '{int:0, int:1};\n"
+               "endmodule"));
 }
 
 TEST(ParserSection5, AssignmentPattern_DefaultKey) {
-  EXPECT_TRUE(ParseOk5("module m;\n"
-                       "  typedef struct { int x; int y; } ms_t;\n"
-                       "  ms_t ms = '{default:1};\n"
-                       "endmodule"));
+  EXPECT_TRUE(
+      ParseOk5("module m;\n"
+               "  typedef struct { int x; int y; } ms_t;\n"
+               "  ms_t ms = '{default:1};\n"
+               "endmodule"));
 }
 
 TEST(ParserSection5, AssignmentPattern_IntKey) {
-  EXPECT_TRUE(ParseOk5("module m;\n"
-                       "  typedef int triple[1:3];\n"
-                       "  triple t = '{1:1, default:0};\n"
-                       "endmodule"));
+  EXPECT_TRUE(
+      ParseOk5("module m;\n"
+               "  typedef int triple[1:3];\n"
+               "  triple t = '{1:1, default:0};\n"
+               "endmodule"));
 }
 
 // --- Comma-separated struct members ---
 
 TEST(ParserSection5, StructMembers_CommaSeparated) {
-  auto r = Parse("module m;\n"
-                 "  struct { int X, Y, Z; } s;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  struct { int X, Y, Z; } s;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->data_type.struct_members.size(), 3u);
@@ -274,41 +287,46 @@ TEST(ParserSection5, TopLevel_TrailingSemicolonAfterEndmodule) {
 // --- Attributes in expressions ---
 
 TEST(ParserSection5, Expr_AttributeOnOperator) {
-  EXPECT_TRUE(ParseOk5("module m;\n"
-                       "  logic a, b, c;\n"
-                       "  assign a = b + (* mode = \"cla\" *) c;\n"
-                       "endmodule"));
+  EXPECT_TRUE(
+      ParseOk5("module m;\n"
+               "  logic a, b, c;\n"
+               "  assign a = b + (* mode = \"cla\" *) c;\n"
+               "endmodule"));
 }
 
 TEST(ParserSection5, Expr_AttributeOnTernary) {
-  EXPECT_TRUE(ParseOk5("module m;\n"
-                       "  logic a, b, c, d;\n"
-                       "  assign a = b ? (* no_glitch *) c : d;\n"
-                       "endmodule"));
+  EXPECT_TRUE(
+      ParseOk5("module m;\n"
+               "  logic a, b, c, d;\n"
+               "  assign a = b ? (* no_glitch *) c : d;\n"
+               "endmodule"));
 }
 
 // --- Assignment pattern replication ---
 
 TEST(ParserSection5, AssignmentPattern_Replication) {
-  EXPECT_TRUE(ParseOk5("module m;\n"
-                       "  int a[1:3] = '{3{1}};\n"
-                       "endmodule"));
+  EXPECT_TRUE(
+      ParseOk5("module m;\n"
+               "  int a[1:3] = '{3{1}};\n"
+               "endmodule"));
 }
 
 TEST(ParserSection5, AssignmentPattern_NestedReplication) {
-  EXPECT_TRUE(ParseOk5("module m;\n"
-                       "  int n[1:2][1:6] = '{2{'{3{4, 5}}}};\n"
-                       "endmodule"));
+  EXPECT_TRUE(
+      ParseOk5("module m;\n"
+               "  int n[1:2][1:6] = '{2{'{3{4, 5}}}};\n"
+               "endmodule"));
 }
 
 // --- §9.3.1: Block-level variable declarations ---
 
 TEST(ParserSection5, BlockVarDecl_BuiltinType_Block) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    int x;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int x;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   ASSERT_EQ(item->kind, ModuleItemKind::kInitialBlock);
@@ -319,11 +337,12 @@ TEST(ParserSection5, BlockVarDecl_BuiltinType_Block) {
 }
 
 TEST(ParserSection5, BlockVarDecl_BuiltinType_Stmt) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    int x;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int x;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *blk = r.cu->modules[0]->items[0]->body;
   ASSERT_NE(blk, nullptr);
@@ -334,20 +353,22 @@ TEST(ParserSection5, BlockVarDecl_BuiltinType_Stmt) {
 }
 
 TEST(ParserSection5, BlockVarDecl_UserDefinedType) {
-  EXPECT_TRUE(ParseOk5("module m;\n"
-                       "  typedef struct {int a, b[4];} ab_t;\n"
-                       "  initial begin\n"
-                       "    ab_t v1[1:0] [2:0];\n"
-                       "  end\n"
-                       "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk5("module m;\n"
+               "  typedef struct {int a, b[4];} ab_t;\n"
+               "  initial begin\n"
+               "    ab_t v1[1:0] [2:0];\n"
+               "  end\n"
+               "endmodule\n"));
 }
 
 TEST(ParserSection5, BlockVarDecl_CommaSeparated) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    int a, b, c;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int a, b, c;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *blk = r.cu->modules[0]->items[0]->body;
   ASSERT_NE(blk, nullptr);
@@ -360,11 +381,12 @@ TEST(ParserSection5, BlockVarDecl_CommaSeparated) {
 }
 
 TEST(ParserSection5, BlockVarDecl_WithInit) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    int x = 42;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int x = 42;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *blk = r.cu->modules[0]->items[0]->body;
   ASSERT_NE(blk, nullptr);
@@ -374,47 +396,52 @@ TEST(ParserSection5, BlockVarDecl_WithInit) {
 }
 
 TEST(ParserSection5, BlockVarDecl_FullStructReplication) {
-  EXPECT_TRUE(ParseOk5("module top();\n"
-                       "  struct {int X,Y,Z;} XYZ = '{3{1}};\n"
-                       "  typedef struct {int a,b[4];} ab_t;\n"
-                       "  int a,b,c;\n"
-                       "  initial begin\n"
-                       "    ab_t v1[1:0] [2:0];\n"
-                       "    v1 = '{2{'{3{'{a,'{2{b,c}}}}}}};\n"
-                       "  end\n"
-                       "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk5("module top();\n"
+               "  struct {int X,Y,Z;} XYZ = '{3{1}};\n"
+               "  typedef struct {int a,b[4];} ab_t;\n"
+               "  int a,b,c;\n"
+               "  initial begin\n"
+               "    ab_t v1[1:0] [2:0];\n"
+               "    v1 = '{2{'{3{'{a,'{2{b,c}}}}}}};\n"
+               "  end\n"
+               "endmodule\n"));
 }
 
 // --- §5.7.1: Sized literal overflow warning ---
 
 TEST(ParserSection5, SizedLiteral_NoOverflow) {
-  auto r = ParseWithDiag("module t;\n"
-                         "  initial x = 4'hF;\n"
-                         "endmodule\n");
+  auto r = ParseWithDiag(
+      "module t;\n"
+      "  initial x = 4'hF;\n"
+      "endmodule\n");
   EXPECT_EQ(r.diag->WarningCount(), 0u);
   delete r.diag;
 }
 
 TEST(ParserSection5, SizedLiteral_Overflow_Warning) {
-  auto r = ParseWithDiag("module t;\n"
-                         "  initial x = 4'hFF;\n"
-                         "endmodule\n");
+  auto r = ParseWithDiag(
+      "module t;\n"
+      "  initial x = 4'hFF;\n"
+      "endmodule\n");
   EXPECT_GE(r.diag->WarningCount(), 1u);
   delete r.diag;
 }
 
 TEST(ParserSection5, SizedLiteral_ExactFit) {
-  auto r = ParseWithDiag("module t;\n"
-                         "  initial x = 8'hFF;\n"
-                         "endmodule\n");
+  auto r = ParseWithDiag(
+      "module t;\n"
+      "  initial x = 8'hFF;\n"
+      "endmodule\n");
   EXPECT_EQ(r.diag->WarningCount(), 0u);
   delete r.diag;
 }
 
 TEST(ParserSection5, SizedLiteral_OneBitOverflow) {
-  auto r = ParseWithDiag("module t;\n"
-                         "  initial x = 3'b1111;\n"
-                         "endmodule\n");
+  auto r = ParseWithDiag(
+      "module t;\n"
+      "  initial x = 3'b1111;\n"
+      "endmodule\n");
   EXPECT_GE(r.diag->WarningCount(), 1u);
   delete r.diag;
 }
@@ -423,30 +450,34 @@ TEST(ParserSection5, SizedLiteral_OneBitOverflow) {
 
 TEST(ParserSection5, PostfixFunctionAttribute) {
   // §5.12 Example 7: a = add (* mode = "cla" *) (b, c);
-  EXPECT_TRUE(ParseOk5("module t;\n"
-                       "  logic a, b, c;\n"
-                       "  initial a = add (* mode = \"cla\" *) (b, c);\n"
-                       "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk5("module t;\n"
+               "  logic a, b, c;\n"
+               "  initial a = add (* mode = \"cla\" *) (b, c);\n"
+               "endmodule\n"));
 }
 
 TEST(ParserSection5, PostfixFunctionAttribute_NoArgs) {
-  EXPECT_TRUE(ParseOk5("module t;\n"
-                       "  logic a;\n"
-                       "  initial a = foo (* bar *) ();\n"
-                       "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk5("module t;\n"
+               "  logic a;\n"
+               "  initial a = foo (* bar *) ();\n"
+               "endmodule\n"));
 }
 
 // --- §5.12: Nested attribute rejection ---
 
 TEST(ParserSection5, NestedAttribute_Error) {
   // §5.12: Nesting of attribute instances is disallowed.
-  EXPECT_FALSE(ParseOk5("module t;\n"
-                        "  (* foo = 1 + (* bar *) 2 *) logic x;\n"
-                        "endmodule\n"));
+  EXPECT_FALSE(
+      ParseOk5("module t;\n"
+               "  (* foo = 1 + (* bar *) 2 *) logic x;\n"
+               "endmodule\n"));
 }
 
 TEST(ParserSection5, AttributeValue_NoNesting_Ok) {
-  EXPECT_TRUE(ParseOk5("module t;\n"
-                       "  (* foo = 1 + 2 *) logic x;\n"
-                       "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk5("module t;\n"
+               "  (* foo = 1 + 2 *) logic x;\n"
+               "endmodule\n"));
 }

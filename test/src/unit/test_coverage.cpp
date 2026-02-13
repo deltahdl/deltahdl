@@ -82,7 +82,7 @@ TEST(Coverage, SampleHitsExplicitBin) {
   EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 1u);
 
   db.Sample(g, {{"val", 2}});
-  EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 1u); // No change.
+  EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 1u);  // No change.
 
   db.Sample(g, {{"val", 1}});
   EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 2u);
@@ -176,14 +176,14 @@ TEST(Coverage, WildcardBinMatchesValues) {
   CoverBin wbin;
   wbin.name = "w_even";
   wbin.kind = CoverBinKind::kWildcard;
-  wbin.values = {0, 2, 4, 6}; // Even values.
+  wbin.values = {0, 2, 4, 6};  // Even values.
   CoverageDB::AddBin(cp, wbin);
 
   db.Sample(g, {{"data", 2}});
   EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 1u);
 
   db.Sample(g, {{"data", 3}});
-  EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 1u); // Odd, no match.
+  EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 1u);  // Odd, no match.
 }
 
 // =============================================================================
@@ -381,7 +381,7 @@ TEST(Coverage, WeightOption) {
   b1.name = "b";
   b1.values = {0};
   CoverageDB::AddBin(cp1, b1);
-  db.Sample(g1, {{"x", 0}}); // 100% coverage, weight=2.
+  db.Sample(g1, {{"x", 0}});  // 100% coverage, weight=2.
 
   auto *g2 = db.CreateGroup("cg2");
   g2->options.weight = 1;
@@ -500,7 +500,7 @@ TEST(Coverage, IffGuardBlocksSampling) {
   auto *g = db.CreateGroup("cg");
   auto *cp = CoverageDB::AddCoverPoint(g, "x");
   cp->has_iff_guard = true;
-  cp->iff_guard_value = false; // Guard is disabled.
+  cp->iff_guard_value = false;  // Guard is disabled.
 
   CoverBin b;
   b.name = "b0";
@@ -508,7 +508,7 @@ TEST(Coverage, IffGuardBlocksSampling) {
   CoverageDB::AddBin(cp, b);
 
   db.Sample(g, {{"x", 0}});
-  EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 0u); // Blocked by iff.
+  EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 0u);  // Blocked by iff.
 }
 
 TEST(Coverage, IffGuardAllowsSampling) {
@@ -516,7 +516,7 @@ TEST(Coverage, IffGuardAllowsSampling) {
   auto *g = db.CreateGroup("cg");
   auto *cp = CoverageDB::AddCoverPoint(g, "x");
   cp->has_iff_guard = true;
-  cp->iff_guard_value = true; // Guard is enabled.
+  cp->iff_guard_value = true;  // Guard is enabled.
 
   CoverBin b;
   b.name = "b0";

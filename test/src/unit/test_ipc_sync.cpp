@@ -31,7 +31,7 @@ struct SyncFixture {
   SimContext ctx{scheduler, arena, diag, 42};
 };
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // 1. Semaphore: Constructor with key count (section 15.3)
@@ -80,7 +80,7 @@ TEST(IpcSync, SemaphoreTryGetFails) {
   SemaphoreObject sem(1);
   int32_t result = sem.TryGet(2);
   EXPECT_EQ(result, 0);
-  EXPECT_EQ(sem.key_count, 1); // Keys unchanged on failure.
+  EXPECT_EQ(sem.key_count, 1);  // Keys unchanged on failure.
 }
 
 TEST(IpcSync, SemaphoreTryGetDefaultOne) {
@@ -94,7 +94,7 @@ TEST(IpcSync, SemaphoreTryGetExactKeys) {
   SemaphoreObject sem(5);
   EXPECT_EQ(sem.TryGet(5), 1);
   EXPECT_EQ(sem.key_count, 0);
-  EXPECT_EQ(sem.TryGet(1), 0); // Empty now.
+  EXPECT_EQ(sem.TryGet(1), 0);  // Empty now.
 }
 
 // =============================================================================
@@ -124,9 +124,9 @@ TEST(IpcSync, SemaphorePutWakesWaiters) {
   // Simulate a waiting coroutine by adding a waiter manually.
   // We cannot create a real coroutine here, but we can verify the
   // waiter queue management.
-  EXPECT_EQ(sem.TryGet(1), 0); // No keys available.
+  EXPECT_EQ(sem.TryGet(1), 0);  // No keys available.
   sem.Put(1);
-  EXPECT_EQ(sem.key_count, 1); // Key added, no waiters to wake.
+  EXPECT_EQ(sem.key_count, 1);  // Key added, no waiters to wake.
   (void)woken;
 }
 
@@ -167,7 +167,7 @@ TEST(IpcSync, MailboxTryPutBoundedSuccess) {
 TEST(IpcSync, MailboxTryPutBoundedFull) {
   MailboxObject mb(1);
   EXPECT_EQ(mb.TryPut(10), 0);
-  EXPECT_EQ(mb.TryPut(20), -1); // Full.
+  EXPECT_EQ(mb.TryPut(20), -1);  // Full.
   EXPECT_EQ(mb.Num(), 1);
 }
 
@@ -215,7 +215,7 @@ TEST(IpcSync, MailboxTryPeekSuccess) {
   uint64_t msg = 0;
   EXPECT_EQ(mb.TryPeek(msg), 0);
   EXPECT_EQ(msg, 42u);
-  EXPECT_EQ(mb.Num(), 1); // Peek does not remove.
+  EXPECT_EQ(mb.Num(), 1);  // Peek does not remove.
 }
 
 TEST(IpcSync, MailboxTryPeekEmpty) {
@@ -248,12 +248,12 @@ TEST(IpcSync, MailboxContextCreateFind) {
 TEST(IpcSync, MailboxBoundedGetFreesSpace) {
   MailboxObject mb(1);
   EXPECT_EQ(mb.TryPut(10), 0);
-  EXPECT_EQ(mb.TryPut(20), -1); // Full.
+  EXPECT_EQ(mb.TryPut(20), -1);  // Full.
 
   uint64_t msg = 0;
   mb.TryGet(msg);
   EXPECT_EQ(msg, 10u);
-  EXPECT_EQ(mb.TryPut(30), 0); // Space freed.
+  EXPECT_EQ(mb.TryPut(30), 0);  // Space freed.
   EXPECT_EQ(mb.Num(), 1);
 }
 
@@ -339,7 +339,7 @@ TEST(IpcSync, MailboxIsFullUnbounded) {
   for (int i = 0; i < 1000; ++i) {
     mb.TryPut(static_cast<uint64_t>(i));
   }
-  EXPECT_FALSE(mb.IsFull()); // Unbounded never full.
+  EXPECT_FALSE(mb.IsFull());  // Unbounded never full.
 }
 
 // =============================================================================

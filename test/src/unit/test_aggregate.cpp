@@ -52,8 +52,8 @@ TEST(StructType, RegisterAndFind_Metadata) {
   info.type_name = "point_t";
   info.is_packed = true;
   info.total_width = 16;
-  info.fields.push_back({"x", 8, 8}); // MSB field: bits [15:8]
-  info.fields.push_back({"y", 0, 8}); // LSB field: bits [7:0]
+  info.fields.push_back({"x", 8, 8});  // MSB field: bits [15:8]
+  info.fields.push_back({"y", 0, 8});  // LSB field: bits [7:0]
 
   f.ctx.RegisterStructType("point_t", info);
   auto *found = f.ctx.FindStructType("point_t");
@@ -870,4 +870,4 @@ TEST(TaskCall, SetupReturnsNullForUnknown) {
   EXPECT_EQ(result, nullptr);
 }
 
-} // namespace
+}  // namespace

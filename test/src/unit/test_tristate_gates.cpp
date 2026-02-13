@@ -36,8 +36,7 @@ Val4Ext PassGateValue(Val4 data, bool invert) {
     else
       v = Val4::kX;
   }
-  if (v == Val4::kZ)
-    v = Val4::kX;
+  if (v == Val4::kZ) v = Val4::kX;
   return static_cast<Val4Ext>(v);
 }
 
@@ -50,30 +49,26 @@ Val4Ext EvalTristateGate(TristateKind kind, Val4 data, Val4 control) {
           : Val4::kV1;
   Val4 block = (conduct == Val4::kV0) ? Val4::kV1 : Val4::kV0;
 
-  if (control == conduct)
-    return PassGateValue(data, invert);
-  if (control == block)
-    return Val4Ext::kZ;
+  if (control == conduct) return PassGateValue(data, invert);
+  if (control == block) return Val4Ext::kZ;
   // control is x or z — weak / unknown output per Table 28-5.
-  if (data == Val4::kV0)
-    return invert ? Val4Ext::kH : Val4Ext::kL;
-  if (data == Val4::kV1)
-    return invert ? Val4Ext::kL : Val4Ext::kH;
-  return Val4Ext::kX; // data is x or z
+  if (data == Val4::kV0) return invert ? Val4Ext::kH : Val4Ext::kL;
+  if (data == Val4::kV1) return invert ? Val4Ext::kL : Val4Ext::kH;
+  return Val4Ext::kX;  // data is x or z
 }
 
 uint64_t ComputeTristateDelay(uint64_t d_rise, uint64_t d_fall, uint64_t d_z,
                               Val4Ext from, Val4Ext to) {
-  (void)from; // delay depends only on the destination value
+  (void)from;  // delay depends only on the destination value
   switch (to) {
-  case Val4Ext::kV1:
-    return d_rise;
-  case Val4Ext::kV0:
-    return d_fall;
-  case Val4Ext::kZ:
-    return d_z;
-  default:
-    return std::min({d_rise, d_fall, d_z});
+    case Val4Ext::kV1:
+      return d_rise;
+    case Val4Ext::kV0:
+      return d_fall;
+    case Val4Ext::kZ:
+      return d_z;
+    default:
+      return std::min({d_rise, d_fall, d_z});
   }
 }
 

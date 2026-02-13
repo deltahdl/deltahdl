@@ -32,16 +32,14 @@ static ModuleItem *FindFunc(ParseResult &r, std::string_view name) {
         item->kind != ModuleItemKind::kTaskDecl) {
       continue;
     }
-    if (item->name == name)
-      return item;
+    if (item->name == name) return item;
   }
   return nullptr;
 }
 
 static Stmt *FirstInitialStmt(ParseResult &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock)
-      continue;
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
     }
@@ -55,10 +53,11 @@ static Stmt *FirstInitialStmt(ParseResult &r) {
 // =============================================================================
 
 TEST(ParserSection13, DefaultArgValues) {
-  auto r = Parse("module m;\n"
-                 "  function void foo(int a = 0, int b = 1);\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function void foo(int a = 0, int b = 1);\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *fn = FindFunc(r, "foo");
   ASSERT_NE(fn, nullptr);
@@ -68,10 +67,11 @@ TEST(ParserSection13, DefaultArgValues) {
 }
 
 TEST(ParserSection13, DefaultArgValueOnTask) {
-  auto r = Parse("module m;\n"
-                 "  task bar(int x, int y = 10);\n"
-                 "  endtask\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  task bar(int x, int y = 10);\n"
+      "  endtask\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *tk = FindFunc(r, "bar");
   ASSERT_NE(tk, nullptr);
@@ -81,10 +81,11 @@ TEST(ParserSection13, DefaultArgValueOnTask) {
 }
 
 TEST(ParserSection13, DefaultArgNoDefault) {
-  auto r = Parse("module m;\n"
-                 "  function void foo(int a, int b);\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function void foo(int a, int b);\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *fn = FindFunc(r, "foo");
   ASSERT_NE(fn, nullptr);
@@ -98,10 +99,11 @@ TEST(ParserSection13, DefaultArgNoDefault) {
 // =============================================================================
 
 TEST(ParserSection13, ConstRefArg) {
-  auto r = Parse("module m;\n"
-                 "  function void bar(const ref int arr);\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function void bar(const ref int arr);\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *fn = FindFunc(r, "bar");
   ASSERT_NE(fn, nullptr);
@@ -111,10 +113,11 @@ TEST(ParserSection13, ConstRefArg) {
 }
 
 TEST(ParserSection13, RefWithoutConst) {
-  auto r = Parse("module m;\n"
-                 "  function void baz(ref int x);\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function void baz(ref int x);\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *fn = FindFunc(r, "baz");
   ASSERT_NE(fn, nullptr);
@@ -128,11 +131,12 @@ TEST(ParserSection13, RefWithoutConst) {
 // =============================================================================
 
 TEST(ParserSection13, NamedArgBindingParses) {
-  auto r = Parse("module m;\n"
-                 "  function void foo(int a, int b);\n"
-                 "  endfunction\n"
-                 "  initial foo(.b(2), .a(1));\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function void foo(int a, int b);\n"
+      "  endfunction\n"
+      "  initial foo(.b(2), .a(1));\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -143,11 +147,12 @@ TEST(ParserSection13, NamedArgBindingParses) {
 }
 
 TEST(ParserSection13, NamedArgBindingNames) {
-  auto r = Parse("module m;\n"
-                 "  function void foo(int a, int b);\n"
-                 "  endfunction\n"
-                 "  initial foo(.b(2), .a(1));\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function void foo(int a, int b);\n"
+      "  endfunction\n"
+      "  initial foo(.b(2), .a(1));\n"
+      "endmodule\n");
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   auto *call = stmt->expr;
@@ -161,11 +166,12 @@ TEST(ParserSection13, NamedArgBindingNames) {
 }
 
 TEST(ParserSection13, PositionalArgsHaveEmptyNames) {
-  auto r = Parse("module m;\n"
-                 "  function void foo(int a, int b);\n"
-                 "  endfunction\n"
-                 "  initial foo(1, 2);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function void foo(int a, int b);\n"
+      "  endfunction\n"
+      "  initial foo(1, 2);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -175,11 +181,12 @@ TEST(ParserSection13, PositionalArgsHaveEmptyNames) {
 }
 
 TEST(ParserSection13, PositionalArgsNoNamedArgs) {
-  auto r = Parse("module m;\n"
-                 "  function void foo(int a, int b);\n"
-                 "  endfunction\n"
-                 "  initial foo(1, 2);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function void foo(int a, int b);\n"
+      "  endfunction\n"
+      "  initial foo(1, 2);\n"
+      "endmodule\n");
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   auto *call = stmt->expr;
@@ -194,10 +201,11 @@ TEST(ParserSection13, PositionalArgsNoNamedArgs) {
 // =============================================================================
 
 TEST(ParserSection13, ArrayParamOnFuncArg) {
-  auto r = Parse("module m;\n"
-                 "  function void foo(int data[3]);\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function void foo(int data[3]);\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *fn = FindFunc(r, "foo");
   ASSERT_NE(fn, nullptr);
@@ -206,10 +214,11 @@ TEST(ParserSection13, ArrayParamOnFuncArg) {
 }
 
 TEST(ParserSection13, MultipleDimsOnFuncArg) {
-  auto r = Parse("module m;\n"
-                 "  task bar(logic mem[16][8]);\n"
-                 "  endtask\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  task bar(logic mem[16][8]);\n"
+      "  endtask\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *tk = FindFunc(r, "bar");
   ASSERT_NE(tk, nullptr);
@@ -218,10 +227,11 @@ TEST(ParserSection13, MultipleDimsOnFuncArg) {
 }
 
 TEST(ParserSection13, NoDimsOnFuncArg) {
-  auto r = Parse("module m;\n"
-                 "  function void foo(int x);\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function void foo(int x);\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *fn = FindFunc(r, "foo");
   ASSERT_NE(fn, nullptr);
@@ -234,12 +244,13 @@ TEST(ParserSection13, NoDimsOnFuncArg) {
 // =============================================================================
 
 TEST(ParserSection13, OldStyleFunction) {
-  auto r = Parse("module m;\n"
-                 "  function [7:0] myfunc;\n"
-                 "    input [7:0] a;\n"
-                 "    myfunc = a + 1;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function [7:0] myfunc;\n"
+      "    input [7:0] a;\n"
+      "    myfunc = a + 1;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *fn = FindFunc(r, "myfunc");
   ASSERT_NE(fn, nullptr);
@@ -248,13 +259,14 @@ TEST(ParserSection13, OldStyleFunction) {
 }
 
 TEST(ParserSection13, OldStyleTask) {
-  auto r = Parse("module m;\n"
-                 "  task mytask;\n"
-                 "    input a;\n"
-                 "    output b;\n"
-                 "    b = a;\n"
-                 "  endtask\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  task mytask;\n"
+      "    input a;\n"
+      "    output b;\n"
+      "    b = a;\n"
+      "  endtask\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *tk = FindFunc(r, "mytask");
   ASSERT_NE(tk, nullptr);
@@ -268,11 +280,12 @@ TEST(ParserSection13, OldStyleTask) {
 // =============================================================================
 
 TEST(ParserSection13, FunctionReturnTypeInt) {
-  auto r = Parse("module m;\n"
-                 "  function int foo();\n"
-                 "    return 42;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function int foo();\n"
+      "    return 42;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *fn = FindFunc(r, "foo");
   ASSERT_NE(fn, nullptr);
@@ -280,10 +293,11 @@ TEST(ParserSection13, FunctionReturnTypeInt) {
 }
 
 TEST(ParserSection13, FunctionReturnTypeVoid) {
-  auto r = Parse("module m;\n"
-                 "  function void bar();\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function void bar();\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *fn = FindFunc(r, "bar");
   ASSERT_NE(fn, nullptr);
@@ -291,11 +305,12 @@ TEST(ParserSection13, FunctionReturnTypeVoid) {
 }
 
 TEST(ParserSection13, FunctionReturnTypeLogicVec) {
-  auto r = Parse("module m;\n"
-                 "  function logic [7:0] get_byte();\n"
-                 "    return 8'hAB;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function logic [7:0] get_byte();\n"
+      "    return 8'hAB;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *fn = FindFunc(r, "get_byte");
   ASSERT_NE(fn, nullptr);
@@ -307,12 +322,13 @@ TEST(ParserSection13, FunctionReturnTypeLogicVec) {
 // =============================================================================
 
 TEST(ParserSection13, AutomaticFunction) {
-  auto r = Parse("module m;\n"
-                 "  function automatic int fact(int n);\n"
-                 "    if (n <= 1) return 1;\n"
-                 "    return n * fact(n - 1);\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int fact(int n);\n"
+      "    if (n <= 1) return 1;\n"
+      "    return n * fact(n - 1);\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *fn = FindFunc(r, "fact");
   ASSERT_NE(fn, nullptr);
@@ -321,10 +337,11 @@ TEST(ParserSection13, AutomaticFunction) {
 }
 
 TEST(ParserSection13, StaticTask) {
-  auto r = Parse("module m;\n"
-                 "  task static do_stuff();\n"
-                 "  endtask\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  task static do_stuff();\n"
+      "  endtask\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *tk = FindFunc(r, "do_stuff");
   ASSERT_NE(tk, nullptr);
@@ -337,9 +354,10 @@ TEST(ParserSection13, StaticTask) {
 // =============================================================================
 
 TEST(ParserSection13, DpiImportFunction) {
-  auto r = Parse("module m;\n"
-                 "  import \"DPI-C\" function int c_add(int a, int b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function int c_add(int a, int b);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *mod = r.cu->modules[0];
   ModuleItem *dpi = nullptr;
@@ -356,9 +374,10 @@ TEST(ParserSection13, DpiImportFunction) {
 }
 
 TEST(ParserSection13, DpiImportPureFunction) {
-  auto r = Parse("module m;\n"
-                 "  import \"DPI-C\" pure function int c_mul(int a, int b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" pure function int c_mul(int a, int b);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *mod = r.cu->modules[0];
   ModuleItem *dpi = nullptr;
@@ -374,9 +393,10 @@ TEST(ParserSection13, DpiImportPureFunction) {
 }
 
 TEST(ParserSection13, DpiImportContextTask) {
-  auto r = Parse("module m;\n"
-                 "  import \"DPI-C\" context task c_display(input int x);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" context task c_display(input int x);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *mod = r.cu->modules[0];
   ModuleItem *dpi = nullptr;
@@ -392,10 +412,10 @@ TEST(ParserSection13, DpiImportContextTask) {
 }
 
 TEST(ParserSection13, DpiImportWithCName) {
-  auto r =
-      Parse("module m;\n"
-            "  import \"DPI-C\" c_real_name = function void sv_wrapper();\n"
-            "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" c_real_name = function void sv_wrapper();\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *mod = r.cu->modules[0];
   ModuleItem *dpi = nullptr;
@@ -411,9 +431,10 @@ TEST(ParserSection13, DpiImportWithCName) {
 }
 
 TEST(ParserSection13, DpiExportFunction) {
-  auto r = Parse("module m;\n"
-                 "  export \"DPI-C\" function my_sv_func;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  export \"DPI-C\" function my_sv_func;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *mod = r.cu->modules[0];
   ModuleItem *dpi = nullptr;
@@ -428,9 +449,10 @@ TEST(ParserSection13, DpiExportFunction) {
 }
 
 TEST(ParserSection13, DpiExportTask) {
-  auto r = Parse("module m;\n"
-                 "  export \"DPI-C\" task my_sv_task;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  export \"DPI-C\" task my_sv_task;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *mod = r.cu->modules[0];
   ModuleItem *dpi = nullptr;
@@ -450,14 +472,15 @@ TEST(ParserSection13, DpiExportTask) {
 // =============================================================================
 
 TEST(ParserSection13, OldStyleTaskMultipleInputs) {
-  auto r = Parse("module m;\n"
-                 "  task add;\n"
-                 "    input a;\n"
-                 "    input b;\n"
-                 "    output c;\n"
-                 "    c = a + b;\n"
-                 "  endtask\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  task add;\n"
+      "    input a;\n"
+      "    input b;\n"
+      "    output c;\n"
+      "    c = a + b;\n"
+      "  endtask\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *tk = FindFunc(r, "add");
   ASSERT_NE(tk, nullptr);

@@ -34,10 +34,11 @@ static RtlirDesign *ElaborateSrc(const std::string &src, LowerFixture &f) {
 
 TEST(Lowerer, InitialBlockSchedulesEvent) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  initial begin end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  initial begin end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -48,11 +49,12 @@ TEST(Lowerer, InitialBlockSchedulesEvent) {
 
 TEST(Lowerer, VariableCreation) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial x = 42;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 42;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -64,11 +66,12 @@ TEST(Lowerer, VariableCreation) {
 
 TEST(Lowerer, InitialBlockExecutes) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] x;\n"
-                              "  initial x = 42;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial x = 42;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -82,11 +85,12 @@ TEST(Lowerer, InitialBlockExecutes) {
 
 TEST(Lowerer, ContAssignExecutes) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  wire [31:0] y;\n"
-                              "  assign y = 99;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  wire [31:0] y;\n"
+      "  assign y = 99;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -100,11 +104,12 @@ TEST(Lowerer, ContAssignExecutes) {
 
 TEST(Lowerer, FinalBlockExecutesAfterRun) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] x;\n"
-                              "  final x = 77;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  final x = 77;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -122,12 +127,13 @@ TEST(Lowerer, FinalBlockExecutesAfterRun) {
 
 TEST(Lowerer, FinalBlockNotScheduledAtTimeZero) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] x;\n"
-                              "  initial x = 10;\n"
-                              "  final x = 77;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial x = 10;\n"
+      "  final x = 77;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -142,15 +148,15 @@ TEST(Lowerer, FinalBlockNotScheduledAtTimeZero) {
 
 TEST(Lowerer, NbaDefersUpdate) {
   LowerFixture f;
-  auto *design =
-      ElaborateSrc("module t;\n"
-                   "  logic [31:0] x;\n"
-                   "  initial begin\n"
-                   "    x <= 42;\n"
-                   "    x = x;  // read x: should still be 0 (X→0), not 42\n"
-                   "  end\n"
-                   "endmodule\n",
-                   f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    x <= 42;\n"
+      "    x = x;  // read x: should still be 0 (X→0), not 42\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -169,14 +175,15 @@ TEST(Lowerer, NbaDefersUpdate) {
 
 TEST(Lowerer, NbaAppliesToValue) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] a, b;\n"
-                              "  initial begin\n"
-                              "    a <= 10;\n"
-                              "    b <= 20;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a, b;\n"
+      "  initial begin\n"
+      "    a <= 10;\n"
+      "    b <= 20;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -193,15 +200,16 @@ TEST(Lowerer, NbaAppliesToValue) {
 
 TEST(Lowerer, DelayBasic) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] x;\n"
-                              "  initial begin\n"
-                              "    x = 1;\n"
-                              "    #10;\n"
-                              "    x = 2;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    x = 1;\n"
+      "    #10;\n"
+      "    x = 2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -215,14 +223,15 @@ TEST(Lowerer, DelayBasic) {
 
 TEST(Lowerer, DelayZero) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] x;\n"
-                              "  initial begin\n"
-                              "    #0;\n"
-                              "    x = 99;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    #0;\n"
+      "    x = 99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -236,13 +245,14 @@ TEST(Lowerer, DelayZero) {
 
 TEST(Lowerer, AlwaysLoopWithDelay) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] clk;\n"
-                              "  initial clk = 0;\n"
-                              "  always #5 clk = clk + 1;\n"
-                              "  initial #20 $finish;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] clk;\n"
+      "  initial clk = 0;\n"
+      "  always #5 clk = clk + 1;\n"
+      "  initial #20 $finish;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -259,12 +269,13 @@ TEST(Lowerer, AlwaysLoopWithDelay) {
 
 TEST(Lowerer, FinalBlocksFIFOOrder) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] x;\n"
-                              "  final x = 10;\n"
-                              "  final x = 20;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  final x = 10;\n"
+      "  final x = 20;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -280,14 +291,15 @@ TEST(Lowerer, FinalBlocksFIFOOrder) {
 
 TEST(Lowerer, FatalStopsSim) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] x;\n"
-                              "  initial begin\n"
-                              "    $fatal(1, \"test fatal\");\n"
-                              "    x = 99;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    $fatal(1, \"test fatal\");\n"
+      "    x = 99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -299,14 +311,15 @@ TEST(Lowerer, FatalStopsSim) {
 
 TEST(Lowerer, ErrorDoesNotStop) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] x;\n"
-                              "  initial begin\n"
-                              "    $error(\"test error\");\n"
-                              "    x = 42;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    $error(\"test error\");\n"
+      "    x = 42;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -321,14 +334,15 @@ TEST(Lowerer, ErrorDoesNotStop) {
 
 TEST(Lowerer, WarningContinues) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] x;\n"
-                              "  initial begin\n"
-                              "    $warning(\"test warning\");\n"
-                              "    x = 7;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    $warning(\"test warning\");\n"
+      "    x = 7;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -342,11 +356,12 @@ TEST(Lowerer, WarningContinues) {
 
 TEST(Lowerer, UrandomReturnsValue) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] x;\n"
-                              "  initial x = $urandom;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial x = $urandom;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -361,11 +376,12 @@ TEST(Lowerer, UrandomReturnsValue) {
 
 TEST(Lowerer, UrandomRangeInBounds) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] x;\n"
-                              "  initial x = $urandom_range(100, 50);\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial x = $urandom_range(100, 50);\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -380,19 +396,20 @@ TEST(Lowerer, UrandomRangeInBounds) {
 
 TEST(Lowerer, PosedgeWakeup) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic clk;\n"
-                              "  logic [31:0] count;\n"
-                              "  initial begin\n"
-                              "    clk = 0;\n"
-                              "    count = 0;\n"
-                              "    #1 clk = 1;\n"
-                              "    #1 $finish;\n"
-                              "  end\n"
-                              "  always @(posedge clk)\n"
-                              "    count = count + 1;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk;\n"
+      "  logic [31:0] count;\n"
+      "  initial begin\n"
+      "    clk = 0;\n"
+      "    count = 0;\n"
+      "    #1 clk = 1;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "  always @(posedge clk)\n"
+      "    count = count + 1;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -406,15 +423,16 @@ TEST(Lowerer, PosedgeWakeup) {
 
 TEST(Lowerer, AlwaysCombRetrigger) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] a, b;\n"
-                              "  always_comb b = a + 1;\n"
-                              "  initial begin\n"
-                              "    a = 5;\n"
-                              "    #1 $finish;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a, b;\n"
+      "  always_comb b = a + 1;\n"
+      "  initial begin\n"
+      "    a = 5;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -428,14 +446,15 @@ TEST(Lowerer, AlwaysCombRetrigger) {
 
 TEST(Lowerer, FunctionCallReturnsValue) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  function int add(input int a, input int b);\n"
-                              "    return a + b;\n"
-                              "  endfunction\n"
-                              "  logic [31:0] x;\n"
-                              "  initial x = add(10, 32);\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  function int add(input int a, input int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "  logic [31:0] x;\n"
+      "  initial x = add(10, 32);\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -449,17 +468,18 @@ TEST(Lowerer, FunctionCallReturnsValue) {
 
 TEST(Elaborator, GenerateIfTrueBranch) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t #(parameter N = 1) ();\n"
-                              "  logic [31:0] x;\n"
-                              "  generate\n"
-                              "    if (N > 0) begin\n"
-                              "      assign x = 42;\n"
-                              "    end else begin\n"
-                              "      assign x = 0;\n"
-                              "    end\n"
-                              "  endgenerate\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t #(parameter N = 1) ();\n"
+      "  logic [31:0] x;\n"
+      "  generate\n"
+      "    if (N > 0) begin\n"
+      "      assign x = 42;\n"
+      "    end else begin\n"
+      "      assign x = 0;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -473,17 +493,18 @@ TEST(Elaborator, GenerateIfTrueBranch) {
 
 TEST(Elaborator, GenerateIfFalseBranch) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t #(parameter N = 0) ();\n"
-                              "  logic [31:0] x;\n"
-                              "  generate\n"
-                              "    if (N > 0) begin\n"
-                              "      assign x = 42;\n"
-                              "    end else begin\n"
-                              "      assign x = 99;\n"
-                              "    end\n"
-                              "  endgenerate\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t #(parameter N = 0) ();\n"
+      "  logic [31:0] x;\n"
+      "  generate\n"
+      "    if (N > 0) begin\n"
+      "      assign x = 42;\n"
+      "    end else begin\n"
+      "      assign x = 99;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -497,17 +518,18 @@ TEST(Elaborator, GenerateIfFalseBranch) {
 
 TEST(Elaborator, GenerateCaseMatch) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t #(parameter MODE = 2) ();\n"
-                              "  logic [31:0] x;\n"
-                              "  generate\n"
-                              "    case (MODE)\n"
-                              "      1: begin assign x = 10; end\n"
-                              "      2: begin assign x = 20; end\n"
-                              "      3: begin assign x = 30; end\n"
-                              "    endcase\n"
-                              "  endgenerate\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t #(parameter MODE = 2) ();\n"
+      "  logic [31:0] x;\n"
+      "  generate\n"
+      "    case (MODE)\n"
+      "      1: begin assign x = 10; end\n"
+      "      2: begin assign x = 20; end\n"
+      "      3: begin assign x = 30; end\n"
+      "    endcase\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -521,17 +543,18 @@ TEST(Elaborator, GenerateCaseMatch) {
 
 TEST(Elaborator, GenerateCaseDefault) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t #(parameter MODE = 99) ();\n"
-                              "  logic [31:0] x;\n"
-                              "  generate\n"
-                              "    case (MODE)\n"
-                              "      1: begin assign x = 10; end\n"
-                              "      2: begin assign x = 20; end\n"
-                              "      default: begin assign x = 77; end\n"
-                              "    endcase\n"
-                              "  endgenerate\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t #(parameter MODE = 99) ();\n"
+      "  logic [31:0] x;\n"
+      "  generate\n"
+      "    case (MODE)\n"
+      "      1: begin assign x = 10; end\n"
+      "      2: begin assign x = 20; end\n"
+      "      default: begin assign x = 77; end\n"
+      "    endcase\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -546,12 +569,13 @@ TEST(Elaborator, GenerateCaseDefault) {
 TEST(Lowerer, AlwaysCombAutoTriggerTimeZero) {
   // IEEE §9.2: always_comb auto-triggers once at time zero.
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] b;\n"
-                              "  always_comb b = 42;\n"
-                              "  initial #1 $finish;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] b;\n"
+      "  always_comb b = 42;\n"
+      "  initial #1 $finish;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -565,11 +589,12 @@ TEST(Lowerer, AlwaysCombAutoTriggerTimeZero) {
 
 TEST(Lowerer, SensitivityMapPopulated) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] a, b;\n"
-                              "  always_comb b = a + 1;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a, b;\n"
+      "  always_comb b = a + 1;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -582,11 +607,12 @@ TEST(Lowerer, SensitivityMapPopulated) {
 
 TEST(Lowerer, SensitivityMapEmpty) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] x;\n"
-                              "  initial x = 1;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial x = 1;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -600,14 +626,15 @@ TEST(Lowerer, SensitivityMapEmpty) {
 TEST(Lowerer, WaitConditionTrue) {
   // wait(expr) when condition is immediately true.
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] x;\n"
-                              "  initial begin\n"
-                              "    x = 1;\n"
-                              "    wait (x) x = 42;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    x = 1;\n"
+      "    wait (x) x = 42;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -622,18 +649,19 @@ TEST(Lowerer, WaitConditionTrue) {
 TEST(Lowerer, WaitConditionDeferred) {
   // wait(expr) when condition is initially false, becomes true later.
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] flag, result;\n"
-                              "  initial begin\n"
-                              "    flag = 0;\n"
-                              "    #5 flag = 1;\n"
-                              "    #1 $finish;\n"
-                              "  end\n"
-                              "  initial begin\n"
-                              "    wait (flag) result = 99;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] flag, result;\n"
+      "  initial begin\n"
+      "    flag = 0;\n"
+      "    #5 flag = 1;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    wait (flag) result = 99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -648,17 +676,18 @@ TEST(Lowerer, WaitConditionDeferred) {
 TEST(Lowerer, ForkJoinNone) {
   // fork/join_none: parent continues immediately.
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] a, b;\n"
-                              "  initial begin\n"
-                              "    fork\n"
-                              "      a = 10;\n"
-                              "      b = 20;\n"
-                              "    join_none\n"
-                              "    #1 $finish;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a, b;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      a = 10;\n"
+      "      b = 20;\n"
+      "    join_none\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -676,18 +705,19 @@ TEST(Lowerer, ForkJoinNone) {
 TEST(Lowerer, ForkJoin) {
   // fork/join: parent waits for all children to complete.
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] a, b, done;\n"
-                              "  initial begin\n"
-                              "    fork\n"
-                              "      a = 10;\n"
-                              "      begin #2 b = 20; end\n"
-                              "    join\n"
-                              "    done = 1;\n"
-                              "    #1 $finish;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a, b, done;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      a = 10;\n"
+      "      begin #2 b = 20; end\n"
+      "    join\n"
+      "    done = 1;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -707,14 +737,15 @@ TEST(Lowerer, ForkJoin) {
 
 TEST(Lowerer, StrobeDoesNotCrash) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] x;\n"
-                              "  initial begin\n"
-                              "    x = 42;\n"
-                              "    $strobe(\"x=%d\", x);\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    x = 42;\n"
+      "    $strobe(\"x=%d\", x);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -728,15 +759,16 @@ TEST(Lowerer, StrobeDoesNotCrash) {
 
 TEST(Lowerer, RealtimeReturnsTime) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [63:0] t_val;\n"
-                              "  initial begin\n"
-                              "    #10;\n"
-                              "    t_val = $realtime;\n"
-                              "    #1 $finish;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [63:0] t_val;\n"
+      "  initial begin\n"
+      "    #10;\n"
+      "    t_val = $realtime;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -750,11 +782,12 @@ TEST(Lowerer, RealtimeReturnsTime) {
 
 TEST(Lowerer, NetCreatedFromDecl) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  wire [7:0] w;\n"
-                              "  assign w = 55;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  wire [7:0] w;\n"
+      "  assign w = 55;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -771,10 +804,11 @@ TEST(Lowerer, NetCreatedFromDecl) {
 
 TEST(Lowerer, EventVariableCreated) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  event ev;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  event ev;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -787,19 +821,20 @@ TEST(Lowerer, EventVariableCreated) {
 
 TEST(Lowerer, NamedEventTriggerAndWait) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  event ev;\n"
-                              "  logic [31:0] result;\n"
-                              "  initial begin\n"
-                              "    @(ev);\n"
-                              "    result = 42;\n"
-                              "  end\n"
-                              "  initial begin\n"
-                              "    #5 ->ev;\n"
-                              "    #1 $finish;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  event ev;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    @(ev);\n"
+      "    result = 42;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #5 ->ev;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -813,19 +848,20 @@ TEST(Lowerer, NamedEventTriggerAndWait) {
 
 TEST(Lowerer, NamedEventBareWaitSyntax) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  event ev;\n"
-                              "  logic [31:0] result;\n"
-                              "  initial begin\n"
-                              "    @ev;\n"
-                              "    result = 99;\n"
-                              "  end\n"
-                              "  initial begin\n"
-                              "    #3 ->ev;\n"
-                              "    #1 $finish;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  event ev;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    @ev;\n"
+      "    result = 99;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #3 ->ev;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -840,15 +876,16 @@ TEST(Lowerer, NamedEventBareWaitSyntax) {
 // §6.14: Chandle variables initialized to null, boolean test.
 TEST(Lowerer, ChandleNullDefault) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  chandle h;\n"
-                              "  int result;\n"
-                              "  initial begin\n"
-                              "    if (h == null) result = 1;\n"
-                              "    else result = 0;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  chandle h;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    if (h == null) result = 1;\n"
+      "    else result = 0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -863,12 +900,13 @@ TEST(Lowerer, ChandleNullDefault) {
 // §6.20.5: Specparam values accessible during simulation.
 TEST(Lowerer, SpecparamValue) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  specparam DELAY = 42;\n"
-                              "  int result;\n"
-                              "  initial result = DELAY;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  specparam DELAY = 42;\n"
+      "  int result;\n"
+      "  initial result = DELAY;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);

@@ -34,19 +34,18 @@ void ForceNet(Net &net, const Logic4Vec &value, Arena &arena);
 void ReleaseNet(Net &net, Arena &arena);
 
 bool ValidateForceTarget(const ForceInfo &info) {
-  if (info.has_mixed_assignments)
-    return false;
+  if (info.has_mixed_assignments) return false;
   switch (info.target) {
-  case ForceTarget::kSingularVariable:
-  case ForceTarget::kNet:
-  case ForceTarget::kConstBitSelectNet:
-  case ForceTarget::kConstPartSelectNet:
-  case ForceTarget::kConcatenation:
-    return true;
-  case ForceTarget::kBitSelectVariable:
-  case ForceTarget::kPartSelectVariable:
-  case ForceTarget::kUserDefinedNettypePartSelect:
-    return false;
+    case ForceTarget::kSingularVariable:
+    case ForceTarget::kNet:
+    case ForceTarget::kConstBitSelectNet:
+    case ForceTarget::kConstPartSelectNet:
+    case ForceTarget::kConcatenation:
+      return true;
+    case ForceTarget::kBitSelectVariable:
+    case ForceTarget::kPartSelectVariable:
+    case ForceTarget::kUserDefinedNettypePartSelect:
+      return false;
   }
   return false;
 }

@@ -9,7 +9,7 @@ namespace {
 // A real coroutine that produces a SimCoroutine.
 SimCoroutine MakeTestCoroutine() { co_return; }
 
-} // namespace
+}  // namespace
 
 TEST(Process, CoroutineLifecycle) {
   SimCoroutine coro = MakeTestCoroutine();
@@ -26,7 +26,7 @@ TEST(Process, MoveSemantics) {
   SimCoroutine *pa = &a;
   SimCoroutine b = std::move(a);
   EXPECT_FALSE(b.Done());
-  EXPECT_TRUE(pa->Done()); // Moved-from state check via pre-move pointer.
+  EXPECT_TRUE(pa->Done());  // Moved-from state check via pre-move pointer.
 }
 
 // ============================================================================

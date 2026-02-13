@@ -233,8 +233,7 @@ TEST(Constraint, DistributionWeighted) {
   int count_10 = 0;
   for (int i = 0; i < 100; ++i) {
     ASSERT_TRUE(solver.Solve());
-    if (solver.GetValue("x") == 10)
-      ++count_10;
+    if (solver.GetValue("x") == 10) ++count_10;
   }
   EXPECT_GT(count_10, 80);
 }
@@ -851,8 +850,7 @@ TEST(Constraint, CustomConstraintCallback) {
   c.eval_fn = [](const std::unordered_map<std::string, int64_t> &vals) {
     auto ita = vals.find("a");
     auto itb = vals.find("b");
-    if (ita == vals.end() || itb == vals.end())
-      return true;
+    if (ita == vals.end() || itb == vals.end()) return true;
     return ita->second + itb->second <= 30;
   };
   block.constraints.push_back(c);
