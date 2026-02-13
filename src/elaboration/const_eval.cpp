@@ -168,20 +168,40 @@ static std::optional<int64_t> EvalReplicate(const Expr* expr,
   return result;
 }
 
-// Constant-evaluate a system call ($clog2, $bits).
+// §20.9.2: $countones — count number of 1-bits.
+static int64_t Countones(int64_t val) {
+  auto u = static_cast<uint64_t>(val);
+  int64_t count = 0;
+  while (u != 0) {
+    u &= u - 1;
+    ++count;
+  }
+  return count;
+}
+
+// Evaluate the first argument of a constant system call.
+static std::optional<int64_t> EvalFirstArg(const Expr* expr,
+                                           const ScopeMap& scope) {
+  if (expr->args.empty()) return std::nullopt;
+  return ConstEvalInt(expr->args[0], scope);
+}
+
+// Constant-evaluate a system call ($clog2, $bits, $countones, etc.).
 static std::optional<int64_t> EvalConstSysCall(const Expr* expr,
                                                const ScopeMap& scope) {
-  if (expr->args.empty()) return std::nullopt;
-  if (expr->callee == "$clog2") {
-    auto arg = ConstEvalInt(expr->args[0], scope);
-    if (!arg) return std::nullopt;
-    return Clog2(*arg);
-  }
+  auto arg = EvalFirstArg(expr, scope);
+  if (!arg && expr->callee != "$bits") return std::nullopt;
+  if (expr->callee == "$clog2") return Clog2(*arg);
+  if (expr->callee == "$countones") return Countones(*arg);
+  if (expr->callee == "$onehot")
+    return static_cast<int64_t>(Countones(*arg) == 1);
+  if (expr->callee == "$onehot0")
+    return static_cast<int64_t>(Countones(*arg) <= 1);
   if (expr->callee == "$bits") {
-    // §20.6.2: $bits returns bit width of the argument expression.
-    auto* arg = expr->args[0];
-    if (arg->kind == ExprKind::kIntegerLiteral)
-      return static_cast<int64_t>(ConstLiteralWidth(arg));
+    if (expr->args.empty()) return std::nullopt;
+    auto* a = expr->args[0];
+    if (a->kind == ExprKind::kIntegerLiteral)
+      return static_cast<int64_t>(ConstLiteralWidth(a));
     return std::nullopt;
   }
   return std::nullopt;

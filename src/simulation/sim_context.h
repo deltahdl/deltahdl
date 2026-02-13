@@ -286,7 +286,7 @@ class SimContext {
                      std::unordered_map<std::string_view, Variable*>>
       static_frames_;
   std::vector<Process*> final_processes_;
-  std::unordered_map<std::string_view, std::vector<Process*>> sensitivity_map_;
+  std::unordered_map<std::string, std::vector<Process*>> sensitivity_map_;
   static const std::vector<Process*> kEmptyProcessList;
   VcdWriter* vcd_writer_ = nullptr;
   DpiContext* dpi_context_ = nullptr;

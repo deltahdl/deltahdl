@@ -128,14 +128,14 @@ void SimContext::RegisterFinalProcess(Process* proc) {
 }
 
 void SimContext::AddSensitivity(std::string_view signal, Process* proc) {
-  sensitivity_map_[signal].push_back(proc);
+  sensitivity_map_[std::string(signal)].push_back(proc);
 }
 
 const std::vector<Process*> SimContext::kEmptyProcessList;
 
 const std::vector<Process*>& SimContext::GetSensitiveProcesses(
     std::string_view signal) const {
-  auto it = sensitivity_map_.find(signal);
+  auto it = sensitivity_map_.find(std::string(signal));
   return (it != sensitivity_map_.end()) ? it->second : kEmptyProcessList;
 }
 
