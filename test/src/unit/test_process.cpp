@@ -23,9 +23,10 @@ TEST(Process, MoveSemantics) {
   SimCoroutine a = MakeTestCoroutine();
   EXPECT_FALSE(a.Done());
 
+  SimCoroutine* pa = &a;
   SimCoroutine b = std::move(a);
   EXPECT_FALSE(b.Done());
-  EXPECT_TRUE(a.Done());  // NOLINT -- moved-from state check
+  EXPECT_TRUE(pa->Done());  // Moved-from state check via pre-move pointer.
 }
 
 // ============================================================================

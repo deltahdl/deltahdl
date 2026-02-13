@@ -343,7 +343,6 @@ Expr* Parser::ParseTaggedExpr() {
 Expr* Parser::ParsePrimaryExpr() {
   auto tok = CurrentToken();
 
-  // clang-format off
   switch (tok.kind) {
     case TokenKind::kIntLiteral:
       return MakeLiteral(ExprKind::kIntegerLiteral, tok);
@@ -372,20 +371,19 @@ Expr* Parser::ParsePrimaryExpr() {
     case TokenKind::kKwNull:  // §8.4
       return MakeLiteral(ExprKind::kIdentifier, tok);
     case TokenKind::kKwThis:
-    case TokenKind::kKwSuper: {                          // §8.11/§8.15
+    case TokenKind::kKwSuper: {  // §8.11/§8.15
       Expr* result = ParseMemberAccessChain(Consume());
       if (Check(TokenKind::kLParen)) result = ParseCallExpr(result);
       if (Check(TokenKind::kLBracket)) result = ParseSelectExpr(result);
       return ParseWithClause(result);
     }
-    case TokenKind::kKwTagged:                            // §11.9
+    case TokenKind::kKwTagged:  // §11.9
       return ParseTaggedExpr();
-    case TokenKind::kKwNew:                               // §8.7
+    case TokenKind::kKwNew:  // §8.7
       return ParseNewExpr();
     default:
       break;
   }
-  // clang-format on
 
   // §6.24 type cast: type'(expr) — only if followed by apostrophe.
   // Bare type keywords (e.g., $typename(logic)) are valid identifiers.

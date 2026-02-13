@@ -45,7 +45,14 @@ bool ValidateNetDataType(NetDataTypeKind kind);
 void InitializeNet(Net& net, NetType type, Arena& arena);
 void InitializeTriregNet(Net& net, LocalChargeStrength str, Arena& arena);
 
-// NOLINTNEXTLINE(readability-function-cognitive-complexity)
+static bool ValidateInterconnectDecl(const NetDeclInfo& info) {
+  if (info.has_data_type) return false;
+  if (info.has_drive_strength) return false;
+  if (info.has_charge_strength) return false;
+  if (info.has_assignment) return false;
+  return info.delay_count <= 1;
+}
+
 bool ValidateNetDecl(const NetDeclInfo& info) {
   // Charge strength only allowed on trireg.
   if (info.has_charge_strength && info.type != NetType::kTrireg &&
@@ -55,13 +62,7 @@ bool ValidateNetDecl(const NetDeclInfo& info) {
   if ((info.is_vectored || info.is_scalared) && info.packed_dim_count == 0)
     return false;
   // Interconnect constraints.
-  if (info.is_interconnect) {
-    if (info.has_data_type) return false;
-    if (info.has_drive_strength) return false;
-    if (info.has_charge_strength) return false;
-    if (info.has_assignment) return false;
-    if (info.delay_count > 1) return false;
-  }
+  if (info.is_interconnect) return ValidateInterconnectDecl(info);
   return true;
 }
 

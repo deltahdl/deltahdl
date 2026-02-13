@@ -4,39 +4,64 @@ namespace delta {
 
 // --- Gate primitive parsing ---
 
-// clang-format off
 static GateKind TokenToGateKind(TokenKind tk) {
   switch (tk) {
-    case TokenKind::kKwAnd:      return GateKind::kAnd;
-    case TokenKind::kKwNand:     return GateKind::kNand;
-    case TokenKind::kKwOr:       return GateKind::kOr;
-    case TokenKind::kKwNor:      return GateKind::kNor;
-    case TokenKind::kKwXor:      return GateKind::kXor;
-    case TokenKind::kKwXnor:     return GateKind::kXnor;
-    case TokenKind::kKwBuf:      return GateKind::kBuf;
-    case TokenKind::kKwNot:      return GateKind::kNot;
-    case TokenKind::kKwBufif0:   return GateKind::kBufif0;
-    case TokenKind::kKwBufif1:   return GateKind::kBufif1;
-    case TokenKind::kKwNotif0:   return GateKind::kNotif0;
-    case TokenKind::kKwNotif1:   return GateKind::kNotif1;
-    case TokenKind::kKwTran:     return GateKind::kTran;
-    case TokenKind::kKwRtran:    return GateKind::kRtran;
-    case TokenKind::kKwTranif0:  return GateKind::kTranif0;
-    case TokenKind::kKwTranif1:  return GateKind::kTranif1;
-    case TokenKind::kKwRtranif0: return GateKind::kRtranif0;
-    case TokenKind::kKwRtranif1: return GateKind::kRtranif1;
-    case TokenKind::kKwNmos:     return GateKind::kNmos;
-    case TokenKind::kKwPmos:     return GateKind::kPmos;
-    case TokenKind::kKwRnmos:    return GateKind::kRnmos;
-    case TokenKind::kKwRpmos:    return GateKind::kRpmos;
-    case TokenKind::kKwCmos:     return GateKind::kCmos;
-    case TokenKind::kKwRcmos:    return GateKind::kRcmos;
-    case TokenKind::kKwPullup:   return GateKind::kPullup;
-    case TokenKind::kKwPulldown: return GateKind::kPulldown;
-    default:                     return GateKind::kAnd;
+    case TokenKind::kKwAnd:
+      return GateKind::kAnd;
+    case TokenKind::kKwNand:
+      return GateKind::kNand;
+    case TokenKind::kKwOr:
+      return GateKind::kOr;
+    case TokenKind::kKwNor:
+      return GateKind::kNor;
+    case TokenKind::kKwXor:
+      return GateKind::kXor;
+    case TokenKind::kKwXnor:
+      return GateKind::kXnor;
+    case TokenKind::kKwBuf:
+      return GateKind::kBuf;
+    case TokenKind::kKwNot:
+      return GateKind::kNot;
+    case TokenKind::kKwBufif0:
+      return GateKind::kBufif0;
+    case TokenKind::kKwBufif1:
+      return GateKind::kBufif1;
+    case TokenKind::kKwNotif0:
+      return GateKind::kNotif0;
+    case TokenKind::kKwNotif1:
+      return GateKind::kNotif1;
+    case TokenKind::kKwTran:
+      return GateKind::kTran;
+    case TokenKind::kKwRtran:
+      return GateKind::kRtran;
+    case TokenKind::kKwTranif0:
+      return GateKind::kTranif0;
+    case TokenKind::kKwTranif1:
+      return GateKind::kTranif1;
+    case TokenKind::kKwRtranif0:
+      return GateKind::kRtranif0;
+    case TokenKind::kKwRtranif1:
+      return GateKind::kRtranif1;
+    case TokenKind::kKwNmos:
+      return GateKind::kNmos;
+    case TokenKind::kKwPmos:
+      return GateKind::kPmos;
+    case TokenKind::kKwRnmos:
+      return GateKind::kRnmos;
+    case TokenKind::kKwRpmos:
+      return GateKind::kRpmos;
+    case TokenKind::kKwCmos:
+      return GateKind::kCmos;
+    case TokenKind::kKwRcmos:
+      return GateKind::kRcmos;
+    case TokenKind::kKwPullup:
+      return GateKind::kPullup;
+    case TokenKind::kKwPulldown:
+      return GateKind::kPulldown;
+    default:
+      return GateKind::kAnd;
   }
 }
-// clang-format on
 
 bool Parser::IsAtGateKeyword() {
   switch (CurrentToken().kind) {
@@ -72,31 +97,41 @@ bool Parser::IsAtGateKeyword() {
   }
 }
 
-// clang-format off
 uint8_t Parser::ParseStrength0() {
   auto k = Consume().kind;
   switch (k) {
-    case TokenKind::kKwHighz0:  return 1;
-    case TokenKind::kKwWeak0:   return 2;
-    case TokenKind::kKwPull0:   return 3;
-    case TokenKind::kKwStrong0: return 4;
-    case TokenKind::kKwSupply0: return 5;
-    default:                    return 0;
+    case TokenKind::kKwHighz0:
+      return 1;
+    case TokenKind::kKwWeak0:
+      return 2;
+    case TokenKind::kKwPull0:
+      return 3;
+    case TokenKind::kKwStrong0:
+      return 4;
+    case TokenKind::kKwSupply0:
+      return 5;
+    default:
+      return 0;
   }
 }
 
 uint8_t Parser::ParseStrength1() {
   auto k = Consume().kind;
   switch (k) {
-    case TokenKind::kKwHighz1:  return 1;
-    case TokenKind::kKwWeak1:   return 2;
-    case TokenKind::kKwPull1:   return 3;
-    case TokenKind::kKwStrong1: return 4;
-    case TokenKind::kKwSupply1: return 5;
-    default:                    return 0;
+    case TokenKind::kKwHighz1:
+      return 1;
+    case TokenKind::kKwWeak1:
+      return 2;
+    case TokenKind::kKwPull1:
+      return 3;
+    case TokenKind::kKwStrong1:
+      return 4;
+    case TokenKind::kKwSupply1:
+      return 5;
+    default:
+      return 0;
   }
 }
-// clang-format on
 
 // Parse gate terminals when '(' was already consumed (no strength spec).
 void Parser::ParseInlineGateTerminals(GateKind kind, SourceLoc loc,
@@ -341,12 +376,19 @@ ModportPort Parser::ParseModportPort(Direction& cur_dir) {
     return port;
   }
   // Direction keywords
-  // clang-format off
-  if      (Check(TokenKind::kKwInput))  { cur_dir = Direction::kInput;  Consume(); }
-  else if (Check(TokenKind::kKwOutput)) { cur_dir = Direction::kOutput; Consume(); }
-  else if (Check(TokenKind::kKwInout))  { cur_dir = Direction::kInout;  Consume(); }
-  else if (Check(TokenKind::kKwRef))    { cur_dir = Direction::kRef;    Consume(); }
-  // clang-format on
+  if (Check(TokenKind::kKwInput)) {
+    cur_dir = Direction::kInput;
+    Consume();
+  } else if (Check(TokenKind::kKwOutput)) {
+    cur_dir = Direction::kOutput;
+    Consume();
+  } else if (Check(TokenKind::kKwInout)) {
+    cur_dir = Direction::kInout;
+    Consume();
+  } else if (Check(TokenKind::kKwRef)) {
+    cur_dir = Direction::kRef;
+    Consume();
+  }
 
   // Port expression syntax: .name(expr) (§25.5.4)
   if (Match(TokenKind::kDot)) {
@@ -475,18 +517,28 @@ ClassDecl* Parser::ParseClassDecl() {
 bool Parser::ParseClassQualifiers(ClassMember* m) {
   bool proto = false;
   while (true) {
-    // clang-format off
-    if      (Match(TokenKind::kKwLocal))     { m->is_local = true; }
-    else if (Match(TokenKind::kKwProtected)) { m->is_protected = true; }
-    else if (Match(TokenKind::kKwStatic))    { m->is_static = true; }
-    else if (Match(TokenKind::kKwVirtual))   { m->is_virtual = true; }
-    else if (Match(TokenKind::kKwPure))      { m->is_virtual = true; proto = true; }
-    else if (Match(TokenKind::kKwRand))      { m->is_rand = true; }
-    else if (Match(TokenKind::kKwRandc))     { m->is_randc = true; }
-    else if (Match(TokenKind::kKwConst))     { m->is_const = true; }
-    else if (Match(TokenKind::kKwExtern))    { proto = true; }
-    else { break; }
-    // clang-format on
+    if (Match(TokenKind::kKwLocal)) {
+      m->is_local = true;
+    } else if (Match(TokenKind::kKwProtected)) {
+      m->is_protected = true;
+    } else if (Match(TokenKind::kKwStatic)) {
+      m->is_static = true;
+    } else if (Match(TokenKind::kKwVirtual)) {
+      m->is_virtual = true;
+    } else if (Match(TokenKind::kKwPure)) {
+      m->is_virtual = true;
+      proto = true;
+    } else if (Match(TokenKind::kKwRand)) {
+      m->is_rand = true;
+    } else if (Match(TokenKind::kKwRandc)) {
+      m->is_randc = true;
+    } else if (Match(TokenKind::kKwConst)) {
+      m->is_const = true;
+    } else if (Match(TokenKind::kKwExtern)) {
+      proto = true;
+    } else {
+      break;
+    }
   }
   return proto;
 }

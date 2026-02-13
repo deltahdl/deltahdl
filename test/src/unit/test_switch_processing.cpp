@@ -65,7 +65,24 @@ static bool IsActiveDriver(const Net& net, const Logic4Vec& drv) {
   return !net.drivers.empty() && !IsZ(drv.words[0]);
 }
 
-// NOLINTNEXTLINE(readability-function-cognitive-complexity)
+static void ResolveOneTerminal(Variable& terminal_var,
+                               const Logic4Vec& term_drv, bool term_is_driven,
+                               const Logic4Vec& other_drv,
+                               bool other_is_driven) {
+  uint8_t t_a = term_drv.words[0].aval & 1;
+  uint8_t t_b = term_drv.words[0].bval & 1;
+  uint8_t o_a = other_drv.words[0].aval & 1;
+  uint8_t o_b = other_drv.words[0].bval & 1;
+  uint8_t on_a = term_is_driven ? t_a : (other_is_driven ? o_a : t_a);
+  uint8_t on_b = term_is_driven ? t_b : (other_is_driven ? o_b : t_b);
+  uint8_t off_a = term_is_driven ? t_a : 1;
+  uint8_t off_b = term_is_driven ? t_b : 1;
+  if ((on_a != off_a || on_b != off_b) && !term_is_driven) {
+    terminal_var.value.words[0].aval = 0;
+    terminal_var.value.words[0].bval = 1;
+  }
+}
+
 static void ResolveUnknownControlBuiltinSwitch(const SwitchInst& sw) {
   auto& va = *sw.terminal_a->resolved;
   auto& vb = *sw.terminal_b->resolved;
@@ -73,31 +90,8 @@ static void ResolveUnknownControlBuiltinSwitch(const SwitchInst& sw) {
   auto b_driven = GetDriverValue(*sw.terminal_b, vb);
   bool a_is_driven = IsActiveDriver(*sw.terminal_a, a_driven);
   bool b_is_driven = IsActiveDriver(*sw.terminal_b, b_driven);
-
-  uint8_t a_aval = a_driven.words[0].aval & 1;
-  uint8_t a_bval = a_driven.words[0].bval & 1;
-  uint8_t b_aval = b_driven.words[0].aval & 1;
-  uint8_t b_bval = b_driven.words[0].bval & 1;
-
-  // Check terminal b: on scenario vs off scenario.
-  uint8_t b_on_a = b_is_driven ? b_aval : (a_is_driven ? a_aval : b_aval);
-  uint8_t b_on_b = b_is_driven ? b_bval : (a_is_driven ? a_bval : b_bval);
-  uint8_t b_off_a = b_is_driven ? b_aval : 1;
-  uint8_t b_off_b = b_is_driven ? b_bval : 1;
-  if ((b_on_a != b_off_a || b_on_b != b_off_b) && !b_is_driven) {
-    vb.value.words[0].aval = 0;
-    vb.value.words[0].bval = 1;
-  }
-
-  // Check terminal a: on scenario vs off scenario.
-  uint8_t a_on_a = a_is_driven ? a_aval : (b_is_driven ? b_aval : a_aval);
-  uint8_t a_on_b = a_is_driven ? a_bval : (b_is_driven ? b_bval : a_bval);
-  uint8_t a_off_a = a_is_driven ? a_aval : 1;
-  uint8_t a_off_b = a_is_driven ? a_bval : 1;
-  if ((a_on_a != a_off_a || a_on_b != a_off_b) && !a_is_driven) {
-    va.value.words[0].aval = 0;
-    va.value.words[0].bval = 1;
-  }
+  ResolveOneTerminal(vb, b_driven, b_is_driven, a_driven, a_is_driven);
+  ResolveOneTerminal(va, a_driven, a_is_driven, b_driven, b_is_driven);
 }
 
 static void PropagateConductingSwitch(const SwitchInst& sw) {
@@ -112,9 +106,12 @@ static void PropagateConductingSwitch(const SwitchInst& sw) {
   }
 }
 
-// NOLINTNEXTLINE(readability-function-cognitive-complexity)
-void ResolveSwitchNetwork(std::vector<SwitchInst>& switches, Arena& /*arena*/) {
-  // Initialize each terminal's resolved value from its own drivers.
+static bool HasValidTerminals(const SwitchInst& sw) {
+  return sw.terminal_a && sw.terminal_b && sw.terminal_a->resolved &&
+         sw.terminal_b->resolved;
+}
+
+static void InitializeTerminals(std::vector<SwitchInst>& switches) {
   for (auto& sw : switches) {
     for (auto* net : {sw.terminal_a, sw.terminal_b}) {
       if (net && net->resolved && !net->drivers.empty()) {
@@ -122,10 +119,11 @@ void ResolveSwitchNetwork(std::vector<SwitchInst>& switches, Arena& /*arena*/) {
       }
     }
   }
-  // First pass: resolve each switch.
+}
+
+static void ResolveSwitchFirstPass(std::vector<SwitchInst>& switches) {
   for (auto& sw : switches) {
-    if (!sw.terminal_a || !sw.terminal_b) continue;
-    if (!sw.terminal_a->resolved || !sw.terminal_b->resolved) continue;
+    if (!HasValidTerminals(sw)) continue;
     bool conducts = SwitchConducts(sw.kind, sw.control);
     bool unknown_ctrl = SwitchControlIsUnknown(sw.kind, sw.control);
     if (unknown_ctrl && !sw.user_defined_nets) {
@@ -134,10 +132,11 @@ void ResolveSwitchNetwork(std::vector<SwitchInst>& switches, Arena& /*arena*/) {
       PropagateConductingSwitch(sw);
     }
   }
-  // Second pass: chain propagation.
+}
+
+static void ChainPropagate(std::vector<SwitchInst>& switches) {
   for (auto& sw : switches) {
-    if (!sw.terminal_a || !sw.terminal_b) continue;
-    if (!sw.terminal_a->resolved || !sw.terminal_b->resolved) continue;
+    if (!HasValidTerminals(sw)) continue;
     if (!SwitchConducts(sw.kind, sw.control)) continue;
     if (SwitchControlIsUnknown(sw.kind, sw.control)) continue;
     auto& va = *sw.terminal_a->resolved;
@@ -148,6 +147,12 @@ void ResolveSwitchNetwork(std::vector<SwitchInst>& switches, Arena& /*arena*/) {
       vb.value.words[0] = va.value.words[0];
     }
   }
+}
+
+void ResolveSwitchNetwork(std::vector<SwitchInst>& switches, Arena& /*arena*/) {
+  InitializeTerminals(switches);
+  ResolveSwitchFirstPass(switches);
+  ChainPropagate(switches);
 }
 
 // --- Helpers ---

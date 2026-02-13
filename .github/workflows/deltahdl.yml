@@ -632,6 +632,9 @@ jobs:
           --minimum-tokens 100
           --language cpp
           --dir src/
+      # DO NOT disable this step. Inline suppression comments (NOLINT,
+      # clang-format off, etc.) hide problems instead of fixing them and
+      # make the codebase progressively harder to maintain.
       - name: Assert no inline directives
         run: |
           pip install assert-no-inline-directives

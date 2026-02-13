@@ -370,26 +370,42 @@ enum class ModuleItemKind : uint8_t {
   kLetDecl,         // let name(args) = expr; (§11.12)
 };
 
-// clang-format off
 enum class GateKind : uint8_t {
   // N-input gates
-  kAnd, kNand, kOr, kNor, kXor, kXnor,
+  kAnd,
+  kNand,
+  kOr,
+  kNor,
+  kXor,
+  kXnor,
   // N-output gates
-  kBuf, kNot,
+  kBuf,
+  kNot,
   // Enable gates
-  kBufif0, kBufif1, kNotif0, kNotif1,
+  kBufif0,
+  kBufif1,
+  kNotif0,
+  kNotif1,
   // Pass gates
-  kTran, kRtran,
+  kTran,
+  kRtran,
   // Pass enable gates
-  kTranif0, kTranif1, kRtranif0, kRtranif1,
+  kTranif0,
+  kTranif1,
+  kRtranif0,
+  kRtranif1,
   // MOS switches
-  kNmos, kPmos, kRnmos, kRpmos,
+  kNmos,
+  kPmos,
+  kRnmos,
+  kRpmos,
   // CMOS switches
-  kCmos, kRcmos,
+  kCmos,
+  kRcmos,
   // Pull gates
-  kPullup, kPulldown,
+  kPullup,
+  kPulldown,
 };
-// clang-format on
 
 enum class AlwaysKind : uint8_t {
   kAlways,

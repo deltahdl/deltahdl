@@ -424,41 +424,68 @@ static bool IsNetTypeToken(TokenKind tk) {
   }
 }
 
-// clang-format off
 static std::optional<DataTypeKind> TokenToTypeKind(TokenKind tk) {
   switch (tk) {
-    case TokenKind::kKwLogic:    return DataTypeKind::kLogic;
-    case TokenKind::kKwReg:      return DataTypeKind::kReg;
-    case TokenKind::kKwBit:      return DataTypeKind::kBit;
-    case TokenKind::kKwByte:     return DataTypeKind::kByte;
-    case TokenKind::kKwShortint: return DataTypeKind::kShortint;
-    case TokenKind::kKwInt:      return DataTypeKind::kInt;
-    case TokenKind::kKwLongint:  return DataTypeKind::kLongint;
-    case TokenKind::kKwInteger:  return DataTypeKind::kInteger;
-    case TokenKind::kKwReal:     return DataTypeKind::kReal;
-    case TokenKind::kKwShortreal:return DataTypeKind::kShortreal;
-    case TokenKind::kKwRealtime: return DataTypeKind::kRealtime;
-    case TokenKind::kKwTime:     return DataTypeKind::kTime;
-    case TokenKind::kKwString:   return DataTypeKind::kString;
-    case TokenKind::kKwEvent:    return DataTypeKind::kEvent;
-    case TokenKind::kKwVoid:     return DataTypeKind::kVoid;
-    case TokenKind::kKwChandle:  return DataTypeKind::kChandle;
-    case TokenKind::kKwWire:     return DataTypeKind::kWire;
-    case TokenKind::kKwTri:      return DataTypeKind::kTri;
-    case TokenKind::kKwTriand:   return DataTypeKind::kTriand;
-    case TokenKind::kKwTrior:    return DataTypeKind::kTrior;
-    case TokenKind::kKwTri0:     return DataTypeKind::kTri0;
-    case TokenKind::kKwTri1:     return DataTypeKind::kTri1;
-    case TokenKind::kKwTrireg:   return DataTypeKind::kTrireg;
-    case TokenKind::kKwWand:     return DataTypeKind::kWand;
-    case TokenKind::kKwWor:      return DataTypeKind::kWor;
-    case TokenKind::kKwSupply0:  return DataTypeKind::kSupply0;
-    case TokenKind::kKwSupply1:  return DataTypeKind::kSupply1;
-    case TokenKind::kKwUwire:    return DataTypeKind::kUwire;
-    default:                     return std::nullopt;
+    case TokenKind::kKwLogic:
+      return DataTypeKind::kLogic;
+    case TokenKind::kKwReg:
+      return DataTypeKind::kReg;
+    case TokenKind::kKwBit:
+      return DataTypeKind::kBit;
+    case TokenKind::kKwByte:
+      return DataTypeKind::kByte;
+    case TokenKind::kKwShortint:
+      return DataTypeKind::kShortint;
+    case TokenKind::kKwInt:
+      return DataTypeKind::kInt;
+    case TokenKind::kKwLongint:
+      return DataTypeKind::kLongint;
+    case TokenKind::kKwInteger:
+      return DataTypeKind::kInteger;
+    case TokenKind::kKwReal:
+      return DataTypeKind::kReal;
+    case TokenKind::kKwShortreal:
+      return DataTypeKind::kShortreal;
+    case TokenKind::kKwRealtime:
+      return DataTypeKind::kRealtime;
+    case TokenKind::kKwTime:
+      return DataTypeKind::kTime;
+    case TokenKind::kKwString:
+      return DataTypeKind::kString;
+    case TokenKind::kKwEvent:
+      return DataTypeKind::kEvent;
+    case TokenKind::kKwVoid:
+      return DataTypeKind::kVoid;
+    case TokenKind::kKwChandle:
+      return DataTypeKind::kChandle;
+    case TokenKind::kKwWire:
+      return DataTypeKind::kWire;
+    case TokenKind::kKwTri:
+      return DataTypeKind::kTri;
+    case TokenKind::kKwTriand:
+      return DataTypeKind::kTriand;
+    case TokenKind::kKwTrior:
+      return DataTypeKind::kTrior;
+    case TokenKind::kKwTri0:
+      return DataTypeKind::kTri0;
+    case TokenKind::kKwTri1:
+      return DataTypeKind::kTri1;
+    case TokenKind::kKwTrireg:
+      return DataTypeKind::kTrireg;
+    case TokenKind::kKwWand:
+      return DataTypeKind::kWand;
+    case TokenKind::kKwWor:
+      return DataTypeKind::kWor;
+    case TokenKind::kKwSupply0:
+      return DataTypeKind::kSupply0;
+    case TokenKind::kKwSupply1:
+      return DataTypeKind::kSupply1;
+    case TokenKind::kKwUwire:
+      return DataTypeKind::kUwire;
+    default:
+      return std::nullopt;
   }
 }
-// clang-format on
 
 // §6.11.3 Table 6-8: Types that are signed by default.
 static bool IsDefaultSigned(DataTypeKind kind) {
