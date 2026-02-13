@@ -38,7 +38,7 @@ Checks: >-
   readability-identifier-naming,
   readability-redundant-smartptr-get,
   readability-simplify-boolean-expr
-HeaderFilterRegex: 'src/.*\.h$'
+HeaderFilterRegex: '(src|test)/.*\.h$'
 CheckOptions:
   # -- Function complexity ---------------------------------
   # Google C++ Style: keep functions short and focused.
