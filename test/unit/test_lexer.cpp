@@ -436,25 +436,52 @@ TEST(Lexer, HelloSv) {
   EXPECT_EQ(tokens[4].text, "$display");
 }
 
-TEST(Lexer, RealLiteralFixed) {
+// --- §5.7.2: Real literal constants ---
+
+TEST(Lexer, RealLiteral_FixedPoint) {
   auto tokens = lex("3.14");
   ASSERT_EQ(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kRealLiteral);
   EXPECT_EQ(tokens[0].text, "3.14");
 }
 
-TEST(Lexer, RealLiteralExponent) {
+TEST(Lexer, RealLiteral_Exponent) {
   auto tokens = lex("1e10");
   ASSERT_EQ(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kRealLiteral);
   EXPECT_EQ(tokens[0].text, "1e10");
 }
 
-TEST(Lexer, RealLiteralFixedExponent) {
+TEST(Lexer, RealLiteral_FixedExponent) {
   auto tokens = lex("2.5e3");
   ASSERT_EQ(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kRealLiteral);
   EXPECT_EQ(tokens[0].text, "2.5e3");
+}
+
+TEST(Lexer, RealLiteral_LrmExamples) {
+  // §5.7.2 examples: 1.2, 0.1, 2394.26331, 1.2E12, 1.30e-2, 0.1e-0,
+  //                  23E10, 29E-2, 236.123_763_e-12
+  for (const char* src : {"1.2", "0.1", "2394.26331", "1.2E12", "1.30e-2",
+                          "0.1e-0", "23E10", "29E-2", "236.123_763_e-12"}) {
+    auto tokens = lex(src);
+    ASSERT_GE(tokens.size(), 2) << src;
+    EXPECT_EQ(tokens[0].kind, TokenKind::kRealLiteral) << src;
+  }
+}
+
+TEST(Lexer, RealLiteral_NegativeExponent) {
+  auto tokens = lex("1.30e-2");
+  ASSERT_EQ(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kRealLiteral);
+  EXPECT_EQ(tokens[0].text, "1.30e-2");
+}
+
+TEST(Lexer, RealLiteral_UppercaseE) {
+  auto tokens = lex("1.2E12");
+  ASSERT_EQ(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kRealLiteral);
+  EXPECT_EQ(tokens[0].text, "1.2E12");
 }
 
 TEST(Lexer, TimeLiteral) {
