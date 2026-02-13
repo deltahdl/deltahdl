@@ -315,8 +315,9 @@ static Logic4Vec EvalSignedArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
 }
 
 static Logic4Vec EvalBinaryArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
-                                 Arena& arena) {
-  uint32_t width = (lhs.width > rhs.width) ? lhs.width : rhs.width;
+                                 Arena& arena, uint32_t context_width = 0) {
+  uint32_t self_w = (lhs.width > rhs.width) ? lhs.width : rhs.width;
+  uint32_t width = (context_width > self_w) ? context_width : self_w;
   if (HasUnknownBits(lhs) || HasUnknownBits(rhs)) {
     return MakeAllX(arena, width);
   }
@@ -547,7 +548,7 @@ static Logic4Vec EvalBinaryCompare(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
 // --- Binary dispatch ---
 
 static Logic4Vec EvalBinaryOp(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
-                              Arena& arena) {
+                              Arena& arena, uint32_t context_width = 0) {
   switch (op) {
     case TokenKind::kPlus:
     case TokenKind::kMinus:
@@ -555,7 +556,7 @@ static Logic4Vec EvalBinaryOp(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
     case TokenKind::kSlash:
     case TokenKind::kPercent:
     case TokenKind::kPower:
-      return EvalBinaryArith(op, lhs, rhs, arena);
+      return EvalBinaryArith(op, lhs, rhs, arena, context_width);
     case TokenKind::kAmp:
     case TokenKind::kPipe:
     case TokenKind::kCaret:
@@ -797,7 +798,7 @@ static Logic4Vec EvalLogicalEquiv(const Expr* expr, SimContext& ctx,
 }
 
 static Logic4Vec EvalBinaryExpr(const Expr* expr, SimContext& ctx,
-                                Arena& arena) {
+                                Arena& arena, uint32_t context_width = 0) {
   if (expr->op == TokenKind::kEq) return EvalAssignInExpr(expr, ctx, arena);
   {
     Logic4Vec arr_result;
@@ -808,7 +809,8 @@ static Logic4Vec EvalBinaryExpr(const Expr* expr, SimContext& ctx,
   if (expr->op == TokenKind::kArrow) return EvalLogicalImpl(expr, ctx, arena);
   if (expr->op == TokenKind::kLtDashGt) return EvalLogicalEquiv(expr, ctx, arena);
   return EvalBinaryOp(expr->op, EvalExpr(expr->lhs, ctx, arena),
-                      EvalExpr(expr->rhs, ctx, arena), arena);
+                      EvalExpr(expr->rhs, ctx, arena), arena,
+                      context_width);
 }
 
 // §7.3.2/§11.9: Evaluate tagged union expression — return member value.
@@ -822,7 +824,8 @@ static Logic4Vec EvalTaggedExpr(const Expr* expr, SimContext& ctx,
 
 // --- Main dispatch ---
 
-Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena) {
+Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
+                   uint32_t context_width) {
   if (!expr) return MakeLogic4Vec(arena, 1);
 
   switch (expr->kind) {
@@ -854,7 +857,7 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena) {
       if (expr->op == TokenKind::kKwMatches) {
         return EvalMatches(expr, ctx, arena);
       }
-      return EvalBinaryExpr(expr, ctx, arena);
+      return EvalBinaryExpr(expr, ctx, arena, context_width);
     case ExprKind::kTernary:
       return EvalTernary(expr, ctx, arena);
     case ExprKind::kConcatenation:

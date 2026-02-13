@@ -14,7 +14,8 @@ struct StructTypeInfo;
 class SimContext;
 class Arena;
 
-Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena);
+Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
+                   uint32_t context_width = 0);
 
 // §11 helpers shared across eval*.cpp files.
 bool HasUnknownBits(const Logic4Vec& v);
