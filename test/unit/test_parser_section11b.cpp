@@ -84,3 +84,66 @@ TEST(ParserSection11, StreamingWithSimpleIndex) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
+
+// --- Helper to get the first assignment RHS expression ---
+static Expr* FirstAssignRhs(ParseResult11b& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    auto* body = item->body;
+    if (body && body->kind == StmtKind::kBlock && !body->stmts.empty()) {
+      body = body->stmts[0];
+    }
+    if (!body) return nullptr;
+    return body->rhs;
+  }
+  return nullptr;
+}
+
+// --- Logical implication and equivalence (§11.4.7) ---
+
+TEST(ParserSection11, ImplicationParsed) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic a, b, c;\n"
+      "  initial c = a -> b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kArrow);
+}
+
+TEST(ParserSection11, EquivalenceParsed) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic a, b, c;\n"
+      "  initial c = a <-> b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kLtDashGt);
+}
+
+TEST(ParserSection11, ImplicationRightAssoc) {
+  // a -> b -> c should be parsed as a -> (b -> c)
+  auto r = Parse(
+      "module t;\n"
+      "  logic a, b, c, d;\n"
+      "  initial d = a -> b -> c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kArrow);
+  // LHS is 'a', RHS is 'b -> c'
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(rhs->rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->rhs->op, TokenKind::kArrow);
+}

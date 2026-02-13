@@ -114,6 +114,9 @@ static std::pair<int, int> InfixBp(TokenKind kind) {
     case TokenKind::kPipeDashGt:
     case TokenKind::kPipeEqGt:
       return {1, 2};
+    case TokenKind::kArrow:
+    case TokenKind::kLtDashGt:
+      return {2, 1};  // right-assoc, below ||
     case TokenKind::kPipePipe:
       return {3, 4};
     case TokenKind::kAmpAmp:

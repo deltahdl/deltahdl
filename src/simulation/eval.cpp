@@ -765,6 +765,37 @@ static Logic4Vec EvalLogicalOr(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
+// §11.4.7: Logical implication (a -> b) = (!a || b) with 3-value logic.
+// Short-circuits: if a is false, result is 1 without evaluating b.
+static Logic4Vec EvalLogicalImpl(const Expr* expr, SimContext& ctx,
+                                 Arena& arena) {
+  auto l = EvalExpr(expr->lhs, ctx, arena);
+  bool l_unknown = HasUnknownBits(l);
+  if (!l_unknown && l.ToUint64() == 0) {
+    return MakeLogic4VecVal(arena, 1, 1);  // false -> anything = true
+  }
+  auto r = EvalExpr(expr->rhs, ctx, arena);
+  bool r_unknown = HasUnknownBits(r);
+  if (!r_unknown && r.ToUint64() != 0) {
+    return MakeLogic4VecVal(arena, 1, 1);  // anything -> true = true
+  }
+  if (l_unknown || r_unknown) return MakeAllX(arena, 1);
+  return MakeLogic4VecVal(arena, 1, 0);  // true -> false = false
+}
+
+// §11.4.7: Logical equivalence (a <-> b) = (a -> b) && (b -> a).
+static Logic4Vec EvalLogicalEquiv(const Expr* expr, SimContext& ctx,
+                                  Arena& arena) {
+  auto l = EvalExpr(expr->lhs, ctx, arena);
+  auto r = EvalExpr(expr->rhs, ctx, arena);
+  bool l_unknown = HasUnknownBits(l);
+  bool r_unknown = HasUnknownBits(r);
+  if (l_unknown || r_unknown) return MakeAllX(arena, 1);
+  bool lv = l.ToUint64() != 0;
+  bool rv = r.ToUint64() != 0;
+  return MakeLogic4VecVal(arena, 1, (lv == rv) ? 1 : 0);
+}
+
 static Logic4Vec EvalBinaryExpr(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
   if (expr->op == TokenKind::kEq) return EvalAssignInExpr(expr, ctx, arena);
@@ -774,6 +805,8 @@ static Logic4Vec EvalBinaryExpr(const Expr* expr, SimContext& ctx,
   }
   if (expr->op == TokenKind::kAmpAmp) return EvalLogicalAnd(expr, ctx, arena);
   if (expr->op == TokenKind::kPipePipe) return EvalLogicalOr(expr, ctx, arena);
+  if (expr->op == TokenKind::kArrow) return EvalLogicalImpl(expr, ctx, arena);
+  if (expr->op == TokenKind::kLtDashGt) return EvalLogicalEquiv(expr, ctx, arena);
   return EvalBinaryOp(expr->op, EvalExpr(expr->lhs, ctx, arena),
                       EvalExpr(expr->rhs, ctx, arena), arena);
 }

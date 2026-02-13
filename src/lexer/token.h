@@ -96,6 +96,7 @@ enum class TokenKind : uint16_t {
   kAmpAmpAmp,         // &&&
   kPipeDashGt,        // |->
   kPipeEqGt,          // |=>
+  kLtDashGt,          // <->
   kHashMinusHash,     // #-#
   kHashEqHash,        // #=#
   kApostrophe,        // '   (cast operator §6.24)

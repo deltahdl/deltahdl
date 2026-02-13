@@ -596,3 +596,108 @@ TEST(EvalOpXZ, MixedSignUnsignedResult) {
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_FALSE(result.is_signed);
 }
+
+// ==========================================================================
+// Logical implication (->) and equivalence (<->) — §11.4.7
+// ==========================================================================
+
+TEST(EvalOpXZ, ImplTT) {
+  EvalOpXZFixture f;
+  // 1 -> 1 = 1
+  MakeVar4(f, "it1", 1, 1, 0);
+  MakeVar4(f, "it2", 1, 1, 0);
+  auto* expr = MakeBinary(f.arena, TokenKind::kArrow, MakeId(f.arena, "it1"),
+                          MakeId(f.arena, "it2"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 1u);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
+TEST(EvalOpXZ, ImplTF) {
+  EvalOpXZFixture f;
+  // 1 -> 0 = 0
+  MakeVar4(f, "it1", 1, 1, 0);
+  MakeVar4(f, "it2", 1, 0, 0);
+  auto* expr = MakeBinary(f.arena, TokenKind::kArrow, MakeId(f.arena, "it1"),
+                          MakeId(f.arena, "it2"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+TEST(EvalOpXZ, ImplFT) {
+  EvalOpXZFixture f;
+  // 0 -> 1 = 1 (vacuous truth)
+  MakeVar4(f, "it1", 1, 0, 0);
+  MakeVar4(f, "it2", 1, 1, 0);
+  auto* expr = MakeBinary(f.arena, TokenKind::kArrow, MakeId(f.arena, "it1"),
+                          MakeId(f.arena, "it2"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
+TEST(EvalOpXZ, ImplFF) {
+  EvalOpXZFixture f;
+  // 0 -> 0 = 1 (vacuous truth)
+  MakeVar4(f, "it1", 1, 0, 0);
+  MakeVar4(f, "it2", 1, 0, 0);
+  auto* expr = MakeBinary(f.arena, TokenKind::kArrow, MakeId(f.arena, "it1"),
+                          MakeId(f.arena, "it2"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
+TEST(EvalOpXZ, ImplXT) {
+  EvalOpXZFixture f;
+  // x -> 1 = 1 (since !x || 1 = 1 regardless of x)
+  MakeVar4(f, "ix1", 1, 0, 1);  // 1'bx
+  MakeVar4(f, "ix2", 1, 1, 0);
+  auto* expr = MakeBinary(f.arena, TokenKind::kArrow, MakeId(f.arena, "ix1"),
+                          MakeId(f.arena, "ix2"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+  EXPECT_EQ(result.words[0].bval, 0u);
+}
+
+TEST(EvalOpXZ, ImplXF) {
+  EvalOpXZFixture f;
+  // x -> 0 = x (since !x || 0 = !x, and !x is x when x is unknown)
+  MakeVar4(f, "ix1", 1, 0, 1);  // 1'bx
+  MakeVar4(f, "ix2", 1, 0, 0);
+  auto* expr = MakeBinary(f.arena, TokenKind::kArrow, MakeId(f.arena, "ix1"),
+                          MakeId(f.arena, "ix2"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_NE(result.words[0].bval, 0u);  // result is x
+}
+
+TEST(EvalOpXZ, EquivSame) {
+  EvalOpXZFixture f;
+  // 1 <-> 1 = 1
+  MakeVar4(f, "eq1", 1, 1, 0);
+  MakeVar4(f, "eq2", 1, 1, 0);
+  auto* expr = MakeBinary(f.arena, TokenKind::kLtDashGt,
+                          MakeId(f.arena, "eq1"), MakeId(f.arena, "eq2"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
+TEST(EvalOpXZ, EquivDiff) {
+  EvalOpXZFixture f;
+  // 1 <-> 0 = 0
+  MakeVar4(f, "eq1", 1, 1, 0);
+  MakeVar4(f, "eq2", 1, 0, 0);
+  auto* expr = MakeBinary(f.arena, TokenKind::kLtDashGt,
+                          MakeId(f.arena, "eq1"), MakeId(f.arena, "eq2"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+TEST(EvalOpXZ, EquivX) {
+  EvalOpXZFixture f;
+  // x <-> 1 = x
+  MakeVar4(f, "ex1", 1, 0, 1);  // 1'bx
+  MakeVar4(f, "ex2", 1, 1, 0);
+  auto* expr = MakeBinary(f.arena, TokenKind::kLtDashGt,
+                          MakeId(f.arena, "ex1"), MakeId(f.arena, "ex2"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_NE(result.words[0].bval, 0u);  // result is x
+}
