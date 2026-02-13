@@ -168,12 +168,64 @@ TEST(Lexer, Punctuation) {
   EXPECT_EQ(tokens[9].kind, TokenKind::kColon);
 }
 
-TEST(Lexer, SkipsComments) {
-  auto tokens = lex("a // comment\nb /* block */ c");
-  ASSERT_EQ(tokens.size(), 4);
+// --- §5.4: Comments ---
+
+TEST(Lexer, Comment_LineComment) {
+  auto tokens = lex("a // comment\nb");
+  ASSERT_EQ(tokens.size(), 3);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
-  EXPECT_EQ(tokens[2].text, "c");
+}
+
+TEST(Lexer, Comment_BlockComment) {
+  auto tokens = lex("a /* block */ b");
+  ASSERT_EQ(tokens.size(), 3);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+TEST(Lexer, Comment_LineInsideBlock) {
+  // §5.4: // has no special meaning inside /* */
+  auto tokens = lex("a /* // not a line comment */ b");
+  ASSERT_EQ(tokens.size(), 3);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+TEST(Lexer, Comment_BlockInsideLine) {
+  // §5.4: /* */ has no special meaning inside //
+  auto tokens = lex("a // /* not a block comment\nb");
+  ASSERT_EQ(tokens.size(), 3);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+TEST(Lexer, Comment_MultilineBlock) {
+  auto tokens = lex("a /* line1\nline2\nline3 */ b");
+  ASSERT_EQ(tokens.size(), 3);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+TEST(Lexer, Comment_AdjacentComments) {
+  auto tokens = lex("a /* c1 */ /* c2 */ b");
+  ASSERT_EQ(tokens.size(), 3);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+TEST(Lexer, Comment_LineCommentAtEof) {
+  auto tokens = lex("a // trailing");
+  ASSERT_EQ(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_TRUE(tokens[1].IsEof());
+}
+
+TEST(Lexer, Comment_EmptyBlockComment) {
+  auto tokens = lex("a /**/ b");
+  ASSERT_EQ(tokens.size(), 3);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
 }
 
 TEST(Lexer, HelloSv) {
