@@ -617,6 +617,29 @@ TEST(Lexer, AttrStart) {
   EXPECT_EQ(tokens[2].text, "*)");
 }
 
+TEST(Lexer, AttrWithValue) {
+  // §5.12: (* attr_name = constant_expression *)
+  auto tokens = lex("(* synthesis = 1 *)");
+  EXPECT_EQ(tokens[0].kind, TokenKind::kAttrStart);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].text, "synthesis");
+  EXPECT_EQ(tokens[2].kind, TokenKind::kEq);
+  EXPECT_EQ(tokens[3].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[4].kind, TokenKind::kAttrEnd);
+}
+
+TEST(Lexer, AttrMultipleSpecs) {
+  // §5.12: (* attr1, attr2 *)
+  auto tokens = lex("(* full_case, parallel_case *)");
+  EXPECT_EQ(tokens[0].kind, TokenKind::kAttrStart);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].text, "full_case");
+  EXPECT_EQ(tokens[2].kind, TokenKind::kComma);
+  EXPECT_EQ(tokens[3].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[3].text, "parallel_case");
+  EXPECT_EQ(tokens[4].kind, TokenKind::kAttrEnd);
+}
+
 TEST(Lexer, AttrDoesNotConfuseMultiply) {
   // (a * b) should NOT produce kAttrStart.
   auto tokens = lex("(a * b)");
