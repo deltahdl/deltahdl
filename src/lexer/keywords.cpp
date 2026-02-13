@@ -375,6 +375,10 @@ std::string_view TokenKindName(TokenKind kind) {
       return "'(*'";
     case TokenKind::kAttrEnd:
       return "'*)'";
+    case TokenKind::kPlusSlashMinus:
+      return "'+/-'";
+    case TokenKind::kPlusPercentMinus:
+      return "'+%-'";
     default:
       return "token";
   }

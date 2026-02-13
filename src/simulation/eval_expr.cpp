@@ -268,13 +268,55 @@ Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
 
 // --- Inside operator (§11.4.13) ---
 
+// Resolve a $ bound to type min (lower=true) or type max (lower=false).
+static uint64_t ResolveDollarBound(uint32_t width, bool lower) {
+  if (lower) return 0;
+  if (width >= 64) return ~uint64_t{0};
+  return (uint64_t{1} << width) - 1;
+}
+
+// Compute tolerance range bounds: [A +/- B] or [A +%- B].
+static void ComputeToleranceBounds(uint64_t a, uint64_t b, TokenKind op,
+                                   uint64_t& lo, uint64_t& hi) {
+  uint64_t tol = b;
+  if (op == TokenKind::kPlusPercentMinus) tol = a * b / 100;
+  lo = (a >= tol) ? a - tol : 0;
+  hi = a + tol;
+  if (lo > hi) std::swap(lo, hi);
+}
+
 // Returns: 1=match, 0=no-match, 2=ambiguous.
+static int InsideMatchTolerance(uint64_t lv, const Expr* elem, SimContext& ctx,
+                                Arena& arena) {
+  auto a_v = EvalExpr(elem->index, ctx, arena);
+  auto b_v = EvalExpr(elem->index_end, ctx, arena);
+  if (!a_v.IsKnown() || !b_v.IsKnown()) return 2;
+  uint64_t lo = 0;
+  uint64_t hi = 0;
+  ComputeToleranceBounds(a_v.ToUint64(), b_v.ToUint64(), elem->op, lo, hi);
+  return (lv >= lo && lv <= hi) ? 1 : 0;
+}
+
+static bool IsDollarExpr(const Expr* e) {
+  return e->kind == ExprKind::kIdentifier && e->text == "$";
+}
+
 static int InsideMatchRange(Logic4Vec lhs, const Expr* elem, SimContext& ctx,
                             Arena& arena) {
-  auto lo_v = EvalExpr(elem->index, ctx, arena);
-  auto hi_v = EvalExpr(elem->index_end, ctx, arena);
-  if (!lhs.IsKnown() || !lo_v.IsKnown() || !hi_v.IsKnown()) return 2;
-  uint64_t lo = lo_v.ToUint64(), hi = hi_v.ToUint64(), lv = lhs.ToUint64();
+  if (!lhs.IsKnown()) return 2;
+  uint64_t lv = lhs.ToUint64();
+  // §11.4.13: Tolerance range [A +/- B] or [A +%- B].
+  if (elem->op == TokenKind::kPlusSlashMinus ||
+      elem->op == TokenKind::kPlusPercentMinus) {
+    return InsideMatchTolerance(lv, elem, ctx, arena);
+  }
+  // §11.4.13: Normal range with possible $ bounds.
+  uint64_t lo = IsDollarExpr(elem->index)
+                    ? ResolveDollarBound(lhs.width, true)
+                    : EvalExpr(elem->index, ctx, arena).ToUint64();
+  uint64_t hi = IsDollarExpr(elem->index_end)
+                    ? ResolveDollarBound(lhs.width, false)
+                    : EvalExpr(elem->index_end, ctx, arena).ToUint64();
   if (lo > hi) std::swap(lo, hi);
   return (lv >= lo && lv <= hi) ? 1 : 0;
 }

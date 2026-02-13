@@ -881,20 +881,27 @@ void Parser::ParseInsideRangeList(std::vector<Expr*>& out) {
 }
 
 Expr* Parser::ParseInsideValueRange() {
-  // Range syntax: [lo:hi]
-  if (Check(TokenKind::kLBracket)) {
+  // §11.4.13: Range syntax variants.
+  if (!Check(TokenKind::kLBracket)) return ParseExpr();
+  Consume();
+  auto* lo = ParseExpr();
+  auto* range = arena_.Create<Expr>();
+  range->kind = ExprKind::kSelect;
+  range->index = lo;
+  // Tolerance: [A +/- B] or [A +%- B].
+  if (Check(TokenKind::kPlusSlashMinus) ||
+      Check(TokenKind::kPlusPercentMinus)) {
+    range->op = CurrentToken().kind;
     Consume();
-    auto* lo = ParseExpr();
-    Expect(TokenKind::kColon);
-    auto* hi = ParseExpr();
+    range->index_end = ParseExpr();
     Expect(TokenKind::kRBracket);
-    auto* range = arena_.Create<Expr>();
-    range->kind = ExprKind::kSelect;
-    range->index = lo;
-    range->index_end = hi;
     return range;
   }
-  return ParseExpr();
+  // Normal range: [lo:hi], [$:hi], [lo:$].
+  Expect(TokenKind::kColon);
+  range->index_end = ParseExpr();
+  Expect(TokenKind::kRBracket);
+  return range;
 }
 
 Expr* Parser::ParseStreamingConcat(TokenKind dir) {

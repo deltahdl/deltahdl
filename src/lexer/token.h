@@ -104,6 +104,8 @@ enum class TokenKind : uint16_t {
   kDollar,            // $   (queue dimension / last index)
   kPlusColon,         // +:  (indexed part-select up)
   kMinusColon,        // -:  (indexed part-select down)
+  kPlusSlashMinus,    // +/- (absolute tolerance §11.4.13)
+  kPlusPercentMinus,  // +%- (relative tolerance §11.4.13)
   kAttrStart,         // (*  (attribute instance start)
   kAttrEnd,           // *)  (attribute instance end)
 

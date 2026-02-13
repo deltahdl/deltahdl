@@ -526,6 +526,19 @@ Token Lexer::LexOpPlus(SourceLoc loc, uint32_t start) {
     Advance();
     return MakeOp(TokenKind::kPlusColon, loc, start);
   }
+  // §11.4.13: +/- (absolute tolerance) and +%- (relative tolerance).
+  if (!AtEnd() && Current() == '/' && pos_ + 1 < source_.size() &&
+      source_[pos_ + 1] == '-') {
+    Advance();  // /
+    Advance();  // -
+    return MakeOp(TokenKind::kPlusSlashMinus, loc, start);
+  }
+  if (!AtEnd() && Current() == '%' && pos_ + 1 < source_.size() &&
+      source_[pos_ + 1] == '-') {
+    Advance();  // %
+    Advance();  // -
+    return MakeOp(TokenKind::kPlusPercentMinus, loc, start);
+  }
   return MakeOp(TokenKind::kPlus, loc, start);
 }
 
