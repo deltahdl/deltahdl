@@ -624,3 +624,25 @@ TEST(EvalAdv, SignedZFillsZ) {
   // With sign bit X/Z, upper bits should have bval set.
   EXPECT_NE(result.words[0].bval & 0xF0u, 0u);
 }
+
+// ==========================================================================
+// Part-select partial OOB — §11.5.1
+// ==========================================================================
+
+TEST(EvalAdv, PartSelectPartialOOB) {
+  EvalAdvFixture f;
+  // §11.5.1: v[6 +: 4] on 8-bit var → bits 6,7 valid, bits 8,9 OOB → X.
+  MakeVar(f, "ov", 8, 0xFF);
+  auto* sel = f.arena.Create<Expr>();
+  sel->kind = ExprKind::kSelect;
+  sel->base = MakeId(f.arena, "ov");
+  sel->index = MakeInt(f.arena, 6);
+  sel->index_end = MakeInt(f.arena, 4);
+  sel->is_part_select_plus = true;
+  auto result = EvalExpr(sel, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 4u);
+  // Bits 0,1 (= original bits 6,7) should be 1 (known).
+  EXPECT_EQ(result.words[0].aval & 0x3u, 0x3u);
+  // Bits 2,3 (= original bits 8,9) should be X (bval set).
+  EXPECT_NE(result.words[0].bval & 0xCu, 0u);
+}

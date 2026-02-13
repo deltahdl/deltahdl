@@ -682,7 +682,16 @@ static Logic4Vec EvalPartSelect(const Logic4Vec& base_val, uint64_t idx,
   uint32_t width = hi - lo + 1;
   uint64_t val = base_val.ToUint64() >> lo;
   uint64_t mask = (width >= 64) ? ~uint64_t{0} : (uint64_t{1} << width) - 1;
-  return MakeLogic4VecVal(arena, width, val & mask);
+  auto result = MakeLogic4VecVal(arena, width, val & mask);
+  // §11.5.1: OOB bits → X. Mark bits beyond base_val.width as X.
+  if (hi >= base_val.width && result.nwords > 0) {
+    uint32_t first_oob = (base_val.width > lo) ? base_val.width - lo : 0;
+    for (uint32_t b = first_oob; b < width && b < 64; ++b) {
+      result.words[0].aval |= uint64_t{1} << b;
+      result.words[0].bval |= uint64_t{1} << b;
+    }
+  }
+  return result;
 }
 
 static Logic4Vec AssocDefault(const AssocArrayObject* aa, Arena& arena) {
