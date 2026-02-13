@@ -398,6 +398,54 @@ TEST(Lexical, CompilationUnit_MixedTopLevel) {
   ASSERT_EQ(r.cu->modules.size(), 1);
 }
 
+TEST(Lexical, CompilationUnit_WithInterface) {
+  // §3.12.1: interfaces are visible across all CUs
+  auto r = Parse(
+      "interface bus_if;\n"
+      "endinterface\n"
+      "module top;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->interfaces.size(), 1);
+  ASSERT_EQ(r.cu->modules.size(), 1);
+}
+
+TEST(Lexical, CompilationUnit_WithProgram) {
+  // §3.12.1: programs are visible across all CUs
+  auto r = Parse(
+      "program test;\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->programs.size(), 1);
+}
+
+TEST(Lexical, CompilationUnit_TopLevelFunction) {
+  // §3.12.1: CU scope can contain items that a package can (functions)
+  auto r = Parse(
+      "function int add(int a, int b);\n"
+      "  return a + b;\n"
+      "endfunction\n"
+      "module top;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->cu_items.size(), 1);
+  ASSERT_EQ(r.cu->modules.size(), 1);
+}
+
+TEST(Lexical, CompilationUnit_AllDesignElements) {
+  // §3.12.1: CU can hold modules, packages, interfaces, programs
+  auto r = Parse(
+      "package pkg; endpackage\n"
+      "interface intf; endinterface\n"
+      "program prog; endprogram\n"
+      "module mod; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_EQ(r.cu->packages.size(), 1);
+  EXPECT_EQ(r.cu->interfaces.size(), 1);
+  EXPECT_EQ(r.cu->programs.size(), 1);
+  EXPECT_EQ(r.cu->modules.size(), 1);
+}
+
 // ===========================================================================
 // 8. Escaped identifier in parser contexts
 // ===========================================================================
