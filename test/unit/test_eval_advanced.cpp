@@ -859,3 +859,69 @@ TEST(EvalAdv, SignedHexLiteralIsSigned) {
   EXPECT_EQ(result.width, 8u);
   EXPECT_EQ(result.ToUint64(), 0xFFu);
 }
+
+// ==========================================================================
+// §11.12: Let construct expansion (§F.4)
+// ==========================================================================
+
+// Helper: build a let declaration ModuleItem.
+static ModuleItem* MakeLetDecl(Arena& arena, std::string_view name, Expr* body,
+                               std::vector<FunctionArg> args = {}) {
+  auto* item = arena.Create<ModuleItem>();
+  item->kind = ModuleItemKind::kLetDecl;
+  item->name = name;
+  item->init_expr = body;
+  item->func_args = std::move(args);
+  return item;
+}
+
+// Helper: build a function call expression (used for let instantiation).
+static Expr* MakeCall(Arena& arena, std::string_view callee,
+                      std::vector<Expr*> args) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kCall;
+  e->callee = callee;
+  e->args = std::move(args);
+  return e;
+}
+
+TEST(EvalAdv, LetExpandSimple) {
+  EvalAdvFixture f;
+  // let add1(a) = a + 1;
+  FunctionArg arg;
+  arg.name = "a";
+  auto* body = f.arena.Create<Expr>();
+  body->kind = ExprKind::kBinary;
+  body->op = TokenKind::kPlus;
+  body->lhs = MakeId(f.arena, "a");
+  body->rhs = MakeInt(f.arena, 1);
+  auto* decl = MakeLetDecl(f.arena, "add1", body, {arg});
+  f.ctx.RegisterLetDecl("add1", decl);
+
+  // add1(5) should return 6.
+  auto* call = MakeCall(f.arena, "add1", {MakeInt(f.arena, 5)});
+  auto result = EvalExpr(call, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 6u);
+}
+
+TEST(EvalAdv, LetExpandDefaultArg) {
+  EvalAdvFixture f;
+  // let inc(a, b = 1) = a + b;
+  FunctionArg arg_a;
+  arg_a.name = "a";
+  FunctionArg arg_b;
+  arg_b.name = "b";
+  arg_b.default_value = MakeInt(f.arena, 1);
+  auto* body = f.arena.Create<Expr>();
+  body->kind = ExprKind::kBinary;
+  body->op = TokenKind::kPlus;
+  body->lhs = MakeId(f.arena, "a");
+  body->rhs = MakeId(f.arena, "b");
+  auto* decl = MakeLetDecl(f.arena, "inc", body, {arg_a, arg_b});
+  f.ctx.RegisterLetDecl("inc", decl);
+
+  // inc(10) — uses default b=1, should return 11.
+  auto* call = MakeCall(f.arena, "inc", {MakeInt(f.arena, 10)});
+  auto result = EvalExpr(call, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 11u);
+}

@@ -600,6 +600,28 @@ static bool TryBuiltinMethodCall(const Expr* expr, SimContext& ctx,
   return TryEvalAssocMethodCall(expr, ctx, arena, out);
 }
 
+// §11.12/§F.4: Expand a let declaration by binding args and evaluating body.
+static Logic4Vec EvalLetExpansion(ModuleItem* decl, const Expr* call,
+                                  SimContext& ctx, Arena& arena) {
+  ctx.PushScope();
+  auto& formals = decl->func_args;
+  for (size_t i = 0; i < formals.size(); ++i) {
+    Logic4Vec val;
+    if (i < call->args.size()) {
+      val = EvalExpr(call->args[i], ctx, arena);
+    } else if (formals[i].default_value) {
+      val = EvalExpr(formals[i].default_value, ctx, arena);
+    } else {
+      val = MakeLogic4Vec(arena, 32);
+    }
+    auto* var = ctx.CreateLocalVariable(formals[i].name, val.width);
+    var->value = val;
+  }
+  auto result = EvalExpr(decl->init_expr, ctx, arena);
+  ctx.PopScope();
+  return result;
+}
+
 // §13: Dispatch function calls with lifetime and void support.
 Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec method_result;
@@ -609,6 +631,10 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (TryEvalClassMethodCall(expr, ctx, arena, method_result)) {
     return method_result;
   }
+
+  // §11.12: Try let expansion before function lookup.
+  auto* let_decl = ctx.FindLetDecl(expr->callee);
+  if (let_decl) return EvalLetExpansion(let_decl, expr, ctx, arena);
 
   auto* func = ctx.FindFunction(expr->callee);
   if (!func) return EvalDpiCall(expr, ctx, arena);

@@ -141,6 +141,10 @@ class SimContext {
   void RegisterFunction(std::string_view name, ModuleItem* item);
   ModuleItem* FindFunction(std::string_view name);
 
+  // §11.12: Let declaration registration and lookup.
+  void RegisterLetDecl(std::string_view name, ModuleItem* item);
+  ModuleItem* FindLetDecl(std::string_view name);
+
   void PushScope();
   void PopScope();
   void PushStaticScope(std::string_view func_name);
@@ -275,6 +279,7 @@ class SimContext {
   std::unordered_map<std::string_view, Variable*> variables_;
   std::unordered_map<std::string_view, Net*> nets_;
   std::unordered_map<std::string_view, ModuleItem*> functions_;
+  std::unordered_map<std::string_view, ModuleItem*> let_decls_;
   std::vector<std::unordered_map<std::string_view, Variable*>> scope_stack_;
   // §13.3.1: Static function frames persist between calls.
   std::unordered_map<std::string_view,

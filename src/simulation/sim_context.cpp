@@ -60,6 +60,15 @@ ModuleItem* SimContext::FindFunction(std::string_view name) {
   return (it != functions_.end()) ? it->second : nullptr;
 }
 
+void SimContext::RegisterLetDecl(std::string_view name, ModuleItem* item) {
+  let_decls_[name] = item;
+}
+
+ModuleItem* SimContext::FindLetDecl(std::string_view name) {
+  auto it = let_decls_.find(name);
+  return (it != let_decls_.end()) ? it->second : nullptr;
+}
+
 void SimContext::PushScope() { scope_stack_.emplace_back(); }
 
 void SimContext::PopScope() {
