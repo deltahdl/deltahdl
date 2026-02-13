@@ -182,11 +182,46 @@ TEST(Lexer, Number_DispatchIntRealTime) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kTimeLiteral);
 }
 
-TEST(Lexer, StringLiterals) {
+// --- §5.9: String literals ---
+
+TEST(Lexer, String_Basic) {
   auto tokens = lex("\"Hello, World!\"");
   ASSERT_EQ(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
   EXPECT_EQ(tokens[0].text, "\"Hello, World!\"");
+}
+
+TEST(Lexer, String_Empty) {
+  auto tokens = lex("\"\"");
+  ASSERT_EQ(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
+  EXPECT_EQ(tokens[0].text, "\"\"");
+}
+
+TEST(Lexer, String_WithEscapedQuote) {
+  auto tokens = lex("\"say \\\"hi\\\"\"");
+  ASSERT_EQ(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
+}
+
+TEST(Lexer, String_WithEscapedBackslash) {
+  auto tokens = lex("\"path\\\\dir\"");
+  ASSERT_EQ(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
+}
+
+TEST(Lexer, String_TripleQuotedWithUnescapedQuotes) {
+  // §5.9: triple-quoted strings allow " without escape
+  auto tokens = lex(R"("""a "quoted" word""")");
+  ASSERT_EQ(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
+}
+
+TEST(Lexer, String_TripleQuotedWithNewline) {
+  // §5.9: triple-quoted strings allow direct newlines
+  auto tokens = lex("\"\"\"line1\nline2\"\"\"");
+  ASSERT_EQ(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
 }
 
 // --- §5.6.3: System tasks and system functions ---
