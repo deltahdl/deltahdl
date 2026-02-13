@@ -104,6 +104,9 @@ struct ArrayInfo {
   bool is_queue = false;       // §7.10: queue ($).
 };
 
+// §11.11: Delay mode for min:typ:max expression evaluation.
+enum class DelayMode : uint8_t { kMin, kTyp, kMax };
+
 class SimContext {
  public:
   SimContext(Scheduler& sched, Arena& arena, DiagEngine& diag,
@@ -124,6 +127,9 @@ class SimContext {
 
   void RequestStop() { stop_requested_ = true; }
   bool StopRequested() const { return stop_requested_; }
+
+  void SetDelayMode(DelayMode mode) { delay_mode_ = mode; }
+  DelayMode GetDelayMode() const { return delay_mode_; }
 
   void RegisterFinalProcess(Process* proc);
   void RunFinalBlocks();
@@ -281,6 +287,7 @@ class SimContext {
   DpiContext* dpi_context_ = nullptr;
   Process* current_process_ = nullptr;
   bool stop_requested_ = false;
+  DelayMode delay_mode_ = DelayMode::kTyp;
   std::vector<std::string> plus_args_;
   std::unordered_map<int, FILE*> file_descriptors_;
   int next_fd_ = 3;  // Start after stdin/stdout/stderr.

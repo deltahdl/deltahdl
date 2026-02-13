@@ -881,6 +881,12 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena) {
       return EvalAssignmentPattern(expr, ctx, arena);
     case ExprKind::kTagged:
       return EvalTaggedExpr(expr, ctx, arena);
+    case ExprKind::kMinTypMax: {
+      DelayMode mode = ctx.GetDelayMode();
+      if (mode == DelayMode::kMin) return EvalExpr(expr->lhs, ctx, arena);
+      if (mode == DelayMode::kMax) return EvalExpr(expr->rhs, ctx, arena);
+      return EvalExpr(expr->condition, ctx, arena);
+    }
     default:
       return MakeLogic4Vec(arena, 1);
   }
