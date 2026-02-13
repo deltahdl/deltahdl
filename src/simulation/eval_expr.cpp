@@ -151,6 +151,27 @@ static Logic4Vec ExtractStructField(Variable* base_var,
   return MakeLogic4Vec(arena, 1);
 }
 
+// §7.12/§7.10/§7.8: Try collection property/method access.
+static bool TryCollectionAccess(std::string_view base, std::string_view field,
+                                SimContext& ctx, Arena& arena, Logic4Vec& out) {
+  if (TryEvalArrayProperty(base, field, ctx, arena, out)) return true;
+  if (TryExecArrayPropertyStmt(base, field, ctx, arena)) {
+    out = MakeLogic4VecVal(arena, 1, 0);
+    return true;
+  }
+  if (TryEvalQueueProperty(base, field, ctx, arena, out)) return true;
+  if (TryExecQueuePropertyStmt(base, field, ctx, arena)) {
+    out = MakeLogic4VecVal(arena, 1, 0);
+    return true;
+  }
+  if (TryEvalAssocProperty(base, field, ctx, arena, out)) return true;
+  if (TryExecAssocPropertyStmt(base, field, ctx, arena)) {
+    out = MakeLogic4VecVal(arena, 1, 0);
+    return true;
+  }
+  return false;
+}
+
 Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   std::string name;
   BuildMemberName(expr, name);
@@ -164,32 +185,24 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto field_name = std::string_view(name).substr(dot + 1);
   auto* base_var = ctx.FindVariable(base_name);
   auto* sinfo = ctx.GetVariableStructType(base_name);
-  if (base_var && sinfo)
+  if (base_var && sinfo) {
+    // §11.9: Tagged union — tag mismatch returns X.
+    if (sinfo->is_union) {
+      auto tag = ctx.GetVariableTag(base_name);
+      if (!tag.empty() && tag != field_name)
+        return MakeAllX(arena, sinfo->total_width);
+    }
     return ExtractStructField(base_var, sinfo, field_name, arena);
+  }
   // §8: Class object property access (e.g., obj.a).
   if (base_var) {
     auto handle = base_var->value.ToUint64();
     auto* obj = ctx.GetClassObject(handle);
     if (obj) return obj->GetProperty(field_name, arena);
   }
-  // §7.12: Array property/method access (e.g., arr.sum, arr.sort).
-  Logic4Vec arr_result;
-  if (TryEvalArrayProperty(base_name, field_name, ctx, arena, arr_result))
-    return arr_result;
-  if (TryExecArrayPropertyStmt(base_name, field_name, ctx, arena))
-    return MakeLogic4VecVal(arena, 1, 0);
-  // §7.10: Queue property access (e.g., q.size).
-  Logic4Vec queue_result;
-  if (TryEvalQueueProperty(base_name, field_name, ctx, arena, queue_result))
-    return queue_result;
-  if (TryExecQueuePropertyStmt(base_name, field_name, ctx, arena))
-    return MakeLogic4VecVal(arena, 1, 0);
-  // §7.8: Associative array property access (e.g., aa.size).
-  Logic4Vec assoc_result;
-  if (TryEvalAssocProperty(base_name, field_name, ctx, arena, assoc_result))
-    return assoc_result;
-  if (TryExecAssocPropertyStmt(base_name, field_name, ctx, arena))
-    return MakeLogic4VecVal(arena, 1, 0);
+  Logic4Vec coll_result;
+  if (TryCollectionAccess(base_name, field_name, ctx, arena, coll_result))
+    return coll_result;
   return MakeLogic4Vec(arena, 1);
 }
 
