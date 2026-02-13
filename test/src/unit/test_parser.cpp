@@ -16,7 +16,7 @@ using namespace delta;
 // AST shape are visible together in the test output. Integration and
 // conformance testing uses external .sv files instead: the CHIPS Alliance
 // sv-tests suite validates broad language coverage, and the sim-tests under
-// test/e2e/ verify end-to-end simulation behavior against .expected output
+// test/src/e2e/ verify end-to-end simulation behavior against .expected output
 // files. This inline pattern is standard practice for compiler parser unit
 // tests (used by LLVM, Clang, rustc, etc.).
 

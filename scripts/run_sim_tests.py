@@ -6,7 +6,7 @@ import sys
 
 from test_common import BINARY, REPO_ROOT, check_binary, print_result
 
-TEST_DIR = REPO_ROOT / "test" / "e2e"
+TEST_DIR = REPO_ROOT / "test" / "src" / "e2e"
 
 
 def collect_tests():

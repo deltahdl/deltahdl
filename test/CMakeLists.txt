@@ -9,7 +9,7 @@ FetchContent_MakeAvailable(googletest)
 include(GoogleTest)
 
 function(add_unit_test name)
-    add_executable(${name} unit/${name}.cpp)
+    add_executable(${name} src/unit/${name}.cpp)
     target_link_libraries(${name} PRIVATE deltahdl_lib GTest::gtest_main)
     gtest_discover_tests(${name})
 endfunction()
