@@ -438,13 +438,37 @@ static void PlaceSlice(Logic4Vec& dst, uint32_t start_bit, uint64_t val,
   }
 }
 
+// §11.4.14.1: Expand an unpacked array identifier into its element values.
+static void ExpandArrayElements(std::string_view name, SimContext& ctx,
+                                std::vector<Logic4Vec>& parts,
+                                uint32_t& total_width) {
+  auto* info = ctx.FindArrayInfo(name);
+  if (!info) return;
+  for (uint32_t i = 0; i < info->size; ++i) {
+    std::string elem_name =
+        std::string(name) + "[" + std::to_string(info->lo + i) + "]";
+    auto* var = ctx.FindVariable(elem_name);
+    if (var) {
+      parts.push_back(var->value);
+    } else {
+      parts.push_back(MakeLogic4Vec(ctx.GetArena(), info->elem_width));
+    }
+    total_width += parts.back().width;
+  }
+}
+
 Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
   // Concatenate all elements MSB-first (left-to-right = most significant).
   uint32_t total_width = 0;
   std::vector<Logic4Vec> parts;
   for (auto* elem : expr->elements) {
-    parts.push_back(EvalExpr(elem, ctx, arena));
-    total_width += parts.back().width;
+    // §11.4.14.1: If element is an unpacked array, expand its elements.
+    if (elem->kind == ExprKind::kIdentifier && ctx.FindArrayInfo(elem->text)) {
+      ExpandArrayElements(elem->text, ctx, parts, total_width);
+    } else {
+      parts.push_back(EvalExpr(elem, ctx, arena));
+      total_width += parts.back().width;
+    }
   }
   if (total_width == 0) return MakeLogic4Vec(arena, 1);
 
