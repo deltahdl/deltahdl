@@ -741,3 +741,39 @@ TEST(EvalOpXZ, MinTypMaxMax) {
   auto result = EvalExpr(mtm, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 30u);
 }
+
+// ==========================================================================
+// Bit-select/part-select X/Z address — §11.5.1
+// ==========================================================================
+
+TEST(EvalOpXZ, BitSelectXAddr) {
+  EvalOpXZFixture f;
+  // v[x] should return 1'bx when index is unknown.
+  auto* v = f.ctx.CreateVariable("bsv", 8);
+  v->value = MakeLogic4VecVal(f.arena, 8, 0xAB);
+  MakeVar4(f, "bsi", 4, 0, 1);  // 4'bx (unknown index)
+  auto* sel = f.arena.Create<Expr>();
+  sel->kind = ExprKind::kSelect;
+  sel->base = MakeId(f.arena, "bsv");
+  sel->index = MakeId(f.arena, "bsi");
+  auto result = EvalExpr(sel, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 1u);
+  EXPECT_NE(result.words[0].bval, 0u);  // result is x
+}
+
+TEST(EvalOpXZ, PartSelectXAddr) {
+  EvalOpXZFixture f;
+  // v[x +: 4] should return all-x when base index is unknown.
+  auto* v = f.ctx.CreateVariable("psv", 8);
+  v->value = MakeLogic4VecVal(f.arena, 8, 0xAB);
+  MakeVar4(f, "psi", 4, 0, 1);  // unknown index
+  auto* sel = f.arena.Create<Expr>();
+  sel->kind = ExprKind::kSelect;
+  sel->base = MakeId(f.arena, "psv");
+  sel->index = MakeId(f.arena, "psi");
+  sel->index_end = MakeInt(f.arena, 4);
+  sel->is_part_select_plus = true;
+  auto result = EvalExpr(sel, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 4u);
+  EXPECT_NE(result.words[0].bval, 0u);  // result has x bits
+}

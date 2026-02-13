@@ -721,6 +721,14 @@ Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (TryQueueSelect(expr, ctx, arena, result)) return result;
   if (TryAssocSelect(expr, ctx, arena, result)) return result;
   auto idx_val = EvalExpr(expr->index, ctx, arena);
+  // §11.5.1: X/Z index → return X for packed bit/part-select.
+  if (HasUnknownBits(idx_val)) {
+    if (expr->index_end) {
+      auto w = static_cast<uint32_t>(EvalExpr(expr->index_end, ctx, arena).ToUint64());
+      return MakeAllX(arena, w > 0 ? w : 1);
+    }
+    return MakeAllX(arena, 1);
+  }
   uint64_t idx = idx_val.ToUint64();
   if (TryArrayElementSelect(expr, idx, ctx, arena, result)) return result;
   if (TryCompoundArraySelect(expr, ctx, arena, result)) return result;
