@@ -221,6 +221,21 @@ TEST(Lexer, SystemTf_DollarAloneIsNotSystem) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kDollar);
 }
 
+// --- §5.6.4: Compiler directives ---
+// NOTE: Directives (`) are handled by the preprocessor before lexing.
+// Preprocessor coverage is in test_lexical.cpp (§22.5, §22.6, §22.14).
+// The lexer sees backtick as an unexpected character if it reaches it.
+
+TEST(Lexer, CompilerDirective_BacktickIsUnexpected) {
+  // If a backtick reaches the lexer (not preprocessed), it's an error.
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<test>", "`define FOO 1");
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  auto tokens = lexer.LexAll();
+  EXPECT_TRUE(diag.HasErrors());
+}
+
 // --- §5.5: Operators ---
 
 TEST(Lexer, Operators_SingleChar) {
