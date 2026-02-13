@@ -484,21 +484,28 @@ TEST(Lexer, RealLiteral_UppercaseE) {
   EXPECT_EQ(tokens[0].text, "1.2E12");
 }
 
-TEST(Lexer, TimeLiteral) {
-  auto tokens = lex("100ns");
-  ASSERT_EQ(tokens.size(), 2);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kTimeLiteral);
-  EXPECT_EQ(tokens[0].text, "100ns");
+// --- §5.8: Time literals ---
+
+TEST(Lexer, TimeLiteral_AllUnits) {
+  // §5.8: time_unit ::= s | ms | us | ns | ps | fs
+  for (const char* src : {"100s", "10ms", "5us", "100ns", "40ps", "1fs"}) {
+    auto tokens = lex(src);
+    ASSERT_GE(tokens.size(), 2) << src;
+    EXPECT_EQ(tokens[0].kind, TokenKind::kTimeLiteral) << src;
+  }
 }
 
-TEST(Lexer, TimeLiteralMs) {
-  auto tokens = lex("10ms");
-  ASSERT_EQ(tokens.size(), 2);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kTimeLiteral);
-  EXPECT_EQ(tokens[0].text, "10ms");
+TEST(Lexer, TimeLiteral_LrmExamples) {
+  // §5.8 examples: 2.1ns, 40ps
+  auto t1 = lex("2.1ns");
+  EXPECT_EQ(t1[0].kind, TokenKind::kTimeLiteral);
+  EXPECT_EQ(t1[0].text, "2.1ns");
+  auto t2 = lex("40ps");
+  EXPECT_EQ(t2[0].kind, TokenKind::kTimeLiteral);
+  EXPECT_EQ(t2[0].text, "40ps");
 }
 
-TEST(Lexer, TimeLiteralRealBase) {
+TEST(Lexer, TimeLiteral_FixedPointBase) {
   auto tokens = lex("1.5us");
   ASSERT_EQ(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kTimeLiteral);
