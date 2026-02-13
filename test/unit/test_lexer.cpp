@@ -86,12 +86,29 @@ TEST(Lexer, Whitespace_OnlyWhitespace) {
   EXPECT_TRUE(tokens[0].IsEof());
 }
 
-TEST(Lexer, Keywords) {
+// --- §5.6.2: Keywords ---
+
+TEST(Lexer, Keyword_Basic) {
   auto tokens = lex("module endmodule");
   ASSERT_EQ(tokens.size(), 3);
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwModule);
   EXPECT_EQ(tokens[1].kind, TokenKind::kKwEndmodule);
   EXPECT_TRUE(tokens[2].IsEof());
+}
+
+TEST(Lexer, Keyword_LowercaseOnly) {
+  // §5.6.2: keywords are lowercase only. Uppercase = identifier.
+  auto tokens = lex("Module MODULE");
+  ASSERT_EQ(tokens.size(), 3);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+}
+
+TEST(Lexer, Keyword_EscapedKeywordIsIdentifier) {
+  // §5.6.2: keyword preceded by backslash is not a keyword
+  auto tokens = lex("\\module ");
+  ASSERT_GE(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
 }
 
 // --- §5.6: Identifiers, keywords, and system names ---
