@@ -588,6 +588,22 @@ TEST(Lexer, ApostropheLBrace_Replication) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kIntLiteral);
 }
 
+TEST(Lexer, ApostropheLBrace_ArrayLiteral) {
+  // §5.11: '{'{0,1,2},'{3{4}}} — multi-dim array literal
+  auto tokens = lex("'{'{0,1,2},'{3{4}}}");
+  EXPECT_EQ(tokens[0].kind, TokenKind::kApostropheLBrace);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kApostropheLBrace);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kIntLiteral);
+}
+
+TEST(Lexer, ApostropheLBrace_ArrayTypePrefixed) {
+  // §5.11: triple'{0,1,2} — type-prefixed array literal
+  auto tokens = lex("triple'{0,1,2}");
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[0].text, "triple");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kApostropheLBrace);
+}
+
 // --- §5.12: Attribute tokens ---
 
 TEST(Lexer, AttrStart) {
