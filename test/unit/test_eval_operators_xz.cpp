@@ -97,6 +97,18 @@ TEST(EvalOpXZ, RelationalLtX) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
+TEST(EvalOpXZ, RelationalGtZ) {
+  EvalOpXZFixture f;
+  // 4'b10z0 > 4'b1000 → x (Z operand)
+  MakeVar4(f, "gz", 4, 0b1000, 0b0010);  // bit1=z
+  auto* b = f.ctx.CreateVariable("g8", 4);
+  b->value = MakeLogic4VecVal(f.arena, 4, 0b1000);
+  auto* expr = MakeBinary(f.arena, TokenKind::kGt, MakeId(f.arena, "gz"),
+                          MakeId(f.arena, "g8"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_NE(result.words[0].bval, 0u);  // result is X
+}
+
 TEST(EvalOpXZ, RelationalKnownStillWorks) {
   EvalOpXZFixture f;
   // 3 < 5 → 1 (known values still work)
@@ -133,6 +145,18 @@ TEST(EvalOpXZ, LogicalNeqX) {
                           MakeId(f.arena, "nr"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_NE(result.words[0].bval, 0u);
+}
+
+TEST(EvalOpXZ, WildcardEqLeftX) {
+  EvalOpXZFixture f;
+  // §11.4.6: 4'bx001 ==? 4'b0001 → x (left X in non-wildcard position)
+  MakeVar4(f, "wl", 4, 0b0001, 0b1000);  // bit3=x
+  auto* b = f.ctx.CreateVariable("wr", 4);
+  b->value = MakeLogic4VecVal(f.arena, 4, 0b0001);
+  auto* expr = MakeBinary(f.arena, TokenKind::kEqEqQuestion,
+                          MakeId(f.arena, "wl"), MakeId(f.arena, "wr"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_NE(result.words[0].bval, 0u);  // result is X
 }
 
 TEST(EvalOpXZ, CaseEqStillExact) {

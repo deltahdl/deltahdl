@@ -499,16 +499,19 @@ static Logic4Vec EvalShift(TokenKind op, Logic4Vec lhs, uint64_t rv,
   return EvalArithShiftRight(lhs, rv, arena);
 }
 
+// Return 2 to indicate X result (neither 0 nor 1).
+static constexpr uint64_t kResultX = 2;
+
 // --- Wildcard equality ---
 static uint64_t EvalWildcardEq(Logic4Vec lhs, Logic4Vec rhs) {
   uint64_t rhs_dc = rhs.nwords > 0 ? rhs.words[0].bval : 0;
+  uint64_t lhs_x = lhs.nwords > 0 ? lhs.words[0].bval : 0;
+  // §11.4.6: Left X/Z in non-wildcard positions → result is X.
+  if (lhs_x & ~rhs_dc) return kResultX;
   return (((lhs.ToUint64() ^ rhs.ToUint64()) & ~rhs_dc) == 0) ? 1 : 0;
 }
 
 // --- Equality operations (§11.4.5, §11.4.6) ---
-// Return 2 to indicate X result (neither 0 nor 1).
-static constexpr uint64_t kResultX = 2;
-
 static uint64_t EvalEqualityOp(TokenKind op, Logic4Vec lhs, Logic4Vec rhs) {
   switch (op) {
     case TokenKind::kEqEq:
