@@ -29,46 +29,57 @@ bool ExtractMethodCallParts(const Expr* expr, MethodCallParts& out) {
 
 // --- Replication ({n{expr}}) ---
 
+// Evaluate inner elements and pack into a single 64-bit aval/bval pair.
+struct ReplicateInner {
+  uint64_t aval = 0;
+  uint64_t bval = 0;
+  uint32_t width = 0;
+  bool is_string = false;
+};
+
+static ReplicateInner EvalReplicateInner(const Expr* expr, SimContext& ctx,
+                                         Arena& arena) {
+  ReplicateInner inner;
+  std::vector<Logic4Vec> parts;
+  for (auto* elem : expr->elements) {
+    parts.push_back(EvalExpr(elem, ctx, arena));
+    if (parts.back().is_string) inner.is_string = true;
+    inner.width += parts.back().width;
+  }
+  uint32_t bit_pos = 0;
+  for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
+    inner.aval |= it->ToUint64() << bit_pos;
+    uint64_t bv = (it->nwords > 0) ? it->words[0].bval : 0;
+    inner.bval |= bv << bit_pos;
+    bit_pos += it->width;
+  }
+  return inner;
+}
+
 Logic4Vec EvalReplicate(const Expr* expr, SimContext& ctx, Arena& arena) {
   uint32_t count = static_cast<uint32_t>(
       EvalExpr(expr->repeat_count, ctx, arena).ToUint64());
   if (count == 0 || expr->elements.empty()) return MakeLogic4Vec(arena, 1);
 
-  // Evaluate inner elements as a concatenation.
-  uint32_t elem_width = 0;
-  std::vector<Logic4Vec> parts;
-  for (auto* elem : expr->elements) {
-    parts.push_back(EvalExpr(elem, ctx, arena));
-    elem_width += parts.back().width;
-  }
-  // Concatenate inner elements into a single aval/bval pair.
-  uint64_t inner_aval = 0;
-  uint64_t inner_bval = 0;
-  uint32_t bit_pos = 0;
-  for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
-    inner_aval |= it->ToUint64() << bit_pos;
-    uint64_t bv = (it->nwords > 0) ? it->words[0].bval : 0;
-    inner_bval |= bv << bit_pos;
-    bit_pos += it->width;
-  }
-  // Replicate the concatenated value.
-  uint32_t total_width = elem_width * count;
+  auto inner = EvalReplicateInner(expr, ctx, arena);
+  uint32_t total_width = inner.width * count;
   auto result = MakeLogic4Vec(arena, total_width);
-  bit_pos = 0;
-  uint32_t ew = (elem_width > 64) ? 64 : elem_width;
+  uint32_t bit_pos = 0;
+  uint32_t ew = (inner.width > 64) ? 64 : inner.width;
   for (uint32_t i = 0; i < count; ++i) {
     uint32_t word = bit_pos / 64;
     uint32_t bit = bit_pos % 64;
     if (word < result.nwords) {
-      result.words[word].aval |= inner_aval << bit;
-      result.words[word].bval |= inner_bval << bit;
+      result.words[word].aval |= inner.aval << bit;
+      result.words[word].bval |= inner.bval << bit;
       if (bit + ew > 64 && word + 1 < result.nwords) {
-        result.words[word + 1].aval |= inner_aval >> (64 - bit);
-        result.words[word + 1].bval |= inner_bval >> (64 - bit);
+        result.words[word + 1].aval |= inner.aval >> (64 - bit);
+        result.words[word + 1].bval |= inner.bval >> (64 - bit);
       }
     }
-    bit_pos += elem_width;
+    bit_pos += inner.width;
   }
+  result.is_string = inner.is_string;
   return result;
 }
 

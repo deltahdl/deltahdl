@@ -166,6 +166,7 @@ static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
   if (var) {
     auto val = var->value;
     if (ctx.IsRealVariable(expr->text)) val.is_real = true;
+    if (ctx.IsStringVariable(expr->text)) val.is_string = true;
     if (var->is_signed) val.is_signed = true;
     return val;
   }
@@ -761,13 +762,17 @@ Logic4Vec AssembleConcatParts(const std::vector<Logic4Vec>& parts,
 
 static Logic4Vec EvalConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
   uint32_t total_width = 0;
+  bool any_string = false;
   std::vector<Logic4Vec> parts;
   for (auto* elem : expr->elements) {
     parts.push_back(EvalExpr(elem, ctx, arena));
+    if (parts.back().is_string) any_string = true;
     total_width += parts.back().width;
   }
   if (total_width == 0) return MakeLogic4Vec(arena, 1);
-  return AssembleConcatParts(parts, total_width, arena);
+  auto result = AssembleConcatParts(parts, total_width, arena);
+  result.is_string = any_string;
+  return result;
 }
 
 // --- Ternary ---

@@ -853,4 +853,52 @@ TEST(EvalOpXZ, ArithPowX) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
+// ==========================================================================
+// §6.16: String data type detection in concatenation/replication
+// ==========================================================================
+
+TEST(EvalOpXZ, StringConcatSetsIsString) {
+  EvalOpXZFixture f;
+  MakeStringVar(f, "sa", "hi");
+  MakeStringVar(f, "sb", "lo");
+  auto* concat = f.arena.Create<Expr>();
+  concat->kind = ExprKind::kConcatenation;
+  concat->elements.push_back(MakeId(f.arena, "sa"));
+  concat->elements.push_back(MakeId(f.arena, "sb"));
+  auto result = EvalExpr(concat, f.ctx, f.arena);
+  EXPECT_TRUE(result.is_string);
+}
+
+TEST(EvalOpXZ, NonStringConcatNotIsString) {
+  EvalOpXZFixture f;
+  auto* a = f.ctx.CreateVariable("ia", 8);
+  a->value = MakeLogic4VecVal(f.arena, 8, 0x41);
+  auto* b = f.ctx.CreateVariable("ib", 8);
+  b->value = MakeLogic4VecVal(f.arena, 8, 0x42);
+  auto* concat = f.arena.Create<Expr>();
+  concat->kind = ExprKind::kConcatenation;
+  concat->elements.push_back(MakeId(f.arena, "ia"));
+  concat->elements.push_back(MakeId(f.arena, "ib"));
+  auto result = EvalExpr(concat, f.ctx, f.arena);
+  EXPECT_FALSE(result.is_string);
+}
+
+TEST(EvalOpXZ, StringReplicateSetsIsString) {
+  EvalOpXZFixture f;
+  MakeStringVar(f, "sr2", "ab");
+  auto* repl = f.arena.Create<Expr>();
+  repl->kind = ExprKind::kReplicate;
+  repl->repeat_count = MakeInt(f.arena, 2);
+  repl->elements.push_back(MakeId(f.arena, "sr2"));
+  auto result = EvalExpr(repl, f.ctx, f.arena);
+  EXPECT_TRUE(result.is_string);
+}
+
+TEST(EvalOpXZ, IdentifierStringPropagation) {
+  EvalOpXZFixture f;
+  MakeStringVar(f, "sv2", "test");
+  auto result = EvalExpr(MakeId(f.arena, "sv2"), f.ctx, f.arena);
+  EXPECT_TRUE(result.is_string);
+}
+
 // Inside operator advanced unit tests moved to test_eval_advanced.cpp

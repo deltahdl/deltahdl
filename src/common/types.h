@@ -34,6 +34,7 @@ struct Logic4Vec {
   Logic4Word* words = nullptr;
   bool is_real = false;    // True when value holds IEEE 754 double bits.
   bool is_signed = false;  // True when value should be treated as signed.
+  bool is_string = false;  // True when value holds a string (§6.16).
 
   bool IsKnown() const;
   uint64_t ToUint64() const;
