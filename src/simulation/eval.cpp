@@ -749,15 +749,21 @@ static Logic4Vec EvalTernary(const Expr* expr, SimContext& ctx, Arena& arena) {
 
 // --- Binary expression with short-circuit ---
 
-// §10.3: Assignment within expression — evaluate RHS, store in LHS, return.
+// §11.3.6: Assignment within expression — evaluate RHS, store in LHS, return
+// the value cast to LHS type (width).
 static Logic4Vec EvalAssignInExpr(const Expr* expr, SimContext& ctx,
                                   Arena& arena) {
   auto rhs_val = EvalExpr(expr->rhs, ctx, arena);
-  if (expr->lhs->kind == ExprKind::kIdentifier) {
-    auto* var = ctx.FindVariable(expr->lhs->text);
-    if (var) var->value = rhs_val;
-  }
-  return rhs_val;
+  if (expr->lhs->kind != ExprKind::kIdentifier) return rhs_val;
+  auto* var = ctx.FindVariable(expr->lhs->text);
+  if (!var) return rhs_val;
+  uint32_t lhs_w = var->value.width;
+  var->value = rhs_val;
+  // §11.3.6: Result is cast to LHS data type.
+  if (lhs_w == rhs_val.width) return rhs_val;
+  uint64_t v = rhs_val.ToUint64();
+  if (lhs_w < 64) v &= (uint64_t{1} << lhs_w) - 1;
+  return MakeLogic4VecVal(arena, lhs_w, v);
 }
 
 // §7.4.6: Compare two unpacked arrays element-by-element.
