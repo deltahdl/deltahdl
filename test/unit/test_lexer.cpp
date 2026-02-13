@@ -22,6 +22,70 @@ TEST(Lexer, EmptyInput) {
   EXPECT_TRUE(tokens[0].IsEof());
 }
 
+// --- §5.3: White space ---
+
+TEST(Lexer, Whitespace_SpaceSeparatesTokens) {
+  auto tokens = lex("a b");
+  ASSERT_EQ(tokens.size(), 3);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+TEST(Lexer, Whitespace_TabSeparatesTokens) {
+  auto tokens = lex("a\tb");
+  ASSERT_EQ(tokens.size(), 3);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+TEST(Lexer, Whitespace_NewlineSeparatesTokens) {
+  auto tokens = lex("a\nb");
+  ASSERT_EQ(tokens.size(), 3);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+TEST(Lexer, Whitespace_FormfeedSeparatesTokens) {
+  auto tokens = lex("a\fb");
+  ASSERT_EQ(tokens.size(), 3);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+TEST(Lexer, Whitespace_CarriageReturnSeparatesTokens) {
+  auto tokens = lex("a\rb");
+  ASSERT_EQ(tokens.size(), 3);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+TEST(Lexer, Whitespace_CrLfSeparatesTokens) {
+  auto tokens = lex("a\r\nb");
+  ASSERT_EQ(tokens.size(), 3);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+TEST(Lexer, Whitespace_MixedWhitespace) {
+  auto tokens = lex("a \t\n \f b");
+  ASSERT_EQ(tokens.size(), 3);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+TEST(Lexer, Whitespace_LeadingAndTrailing) {
+  auto tokens = lex("  \t a \n  ");
+  ASSERT_EQ(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_TRUE(tokens[1].IsEof());
+}
+
+TEST(Lexer, Whitespace_OnlyWhitespace) {
+  auto tokens = lex("   \t\n\f  ");
+  ASSERT_EQ(tokens.size(), 1);
+  EXPECT_TRUE(tokens[0].IsEof());
+}
+
 TEST(Lexer, Keywords) {
   auto tokens = lex("module endmodule");
   ASSERT_EQ(tokens.size(), 3);
