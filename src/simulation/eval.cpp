@@ -120,11 +120,25 @@ static Logic4Vec ParseBasedXZLiteral(std::string_view text, uint32_t width,
   return vec;
 }
 
+// §11.3.3: Check if a based literal has a signed base marker ('s or 'S).
+static bool IsSignedLiteral(std::string_view text) {
+  auto tick = text.find('\'');
+  if (tick == std::string_view::npos || tick + 1 >= text.size()) return false;
+  char c = text[tick + 1];
+  return c == 's' || c == 'S';
+}
+
 static Logic4Vec EvalIntLiteral(const Expr* expr, Arena& arena) {
   uint32_t width = LiteralWidth(expr->text, expr->int_val);
-  if (TextHasXZ(expr->text))
-    return ParseBasedXZLiteral(expr->text, width, arena);
-  return MakeLogic4VecVal(arena, width, expr->int_val);
+  bool is_signed = IsSignedLiteral(expr->text);
+  if (TextHasXZ(expr->text)) {
+    auto vec = ParseBasedXZLiteral(expr->text, width, arena);
+    vec.is_signed = is_signed;
+    return vec;
+  }
+  auto vec = MakeLogic4VecVal(arena, width, expr->int_val);
+  vec.is_signed = is_signed;
+  return vec;
 }
 
 static Logic4Vec EvalStringLiteral(const Expr* expr, Arena& arena) {
