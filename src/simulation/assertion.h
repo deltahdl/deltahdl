@@ -31,6 +31,7 @@ enum class SvaPropertyKind : uint8_t {
   kRose,
   kFell,
   kStable,
+  kChanged,
   kPast,
   kCustom,
 };

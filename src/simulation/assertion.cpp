@@ -74,6 +74,32 @@ const AssertionEntry* AssertionMonitor::FindEntry(std::string_view name) const {
   return nullptr;
 }
 
+static AssertionResult PassIf(bool cond) {
+  return cond ? AssertionResult::kPass : AssertionResult::kFail;
+}
+
+// Evaluate the property check for a single kind.
+static AssertionResult EvalPropertyKind(const SvaProperty& prop,
+                                        uint64_t current_val, uint64_t prev) {
+  switch (prop.kind) {
+    case SvaPropertyKind::kRose:
+      return PassIf((prev & 1) == 0 && (current_val & 1) == 1);
+    case SvaPropertyKind::kFell:
+      return PassIf((prev & 1) == 1 && (current_val & 1) == 0);
+    case SvaPropertyKind::kStable:
+      return PassIf(current_val == prev);
+    case SvaPropertyKind::kChanged:
+      return PassIf(current_val != prev);
+    case SvaPropertyKind::kPast:
+      return AssertionResult::kPass;
+    case SvaPropertyKind::kCustom:
+      if (prop.custom_check)
+        return PassIf(prop.custom_check(current_val, prev));
+      return AssertionResult::kVacuousPass;
+  }
+  return AssertionResult::kVacuousPass;
+}
+
 AssertionResult AssertionMonitor::EvaluateEntry(AssertionEntry& entry,
                                                 uint64_t current_val) {
   if (entry.cycle_count == 0) {
@@ -82,40 +108,8 @@ AssertionResult AssertionMonitor::EvaluateEntry(AssertionEntry& entry,
     return AssertionResult::kVacuousPass;
   }
 
-  AssertionResult result = AssertionResult::kVacuousPass;
   uint64_t prev = entry.prev_value;
-
-  switch (entry.property.kind) {
-    case SvaPropertyKind::kRose:
-      // $rose: signal was 0 and is now 1 (bit 0).
-      result = (prev & 1) == 0 && (current_val & 1) == 1
-                   ? AssertionResult::kPass
-                   : AssertionResult::kFail;
-      break;
-    case SvaPropertyKind::kFell:
-      // $fell: signal was 1 and is now 0 (bit 0).
-      result = (prev & 1) == 1 && (current_val & 1) == 0
-                   ? AssertionResult::kPass
-                   : AssertionResult::kFail;
-      break;
-    case SvaPropertyKind::kStable:
-      // $stable: signal did not change.
-      result =
-          current_val == prev ? AssertionResult::kPass : AssertionResult::kFail;
-      break;
-    case SvaPropertyKind::kPast:
-      // $past: always passes (value is available via prev_value).
-      result = AssertionResult::kPass;
-      break;
-    case SvaPropertyKind::kCustom:
-      if (entry.property.custom_check) {
-        result = entry.property.custom_check(current_val, prev)
-                     ? AssertionResult::kPass
-                     : AssertionResult::kFail;
-      }
-      break;
-  }
-
+  auto result = EvalPropertyKind(entry.property, current_val, prev);
   entry.prev_prev_value = prev;
   entry.prev_value = current_val;
   return result;

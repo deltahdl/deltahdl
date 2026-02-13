@@ -724,7 +724,7 @@ TEST(EvalAdv, PartSelectUnsigned) {
 }
 
 static Variable* MakeVar4Adv(EvalAdvFixture& f, std::string_view name,
-                              uint32_t width, uint64_t aval, uint64_t bval) {
+                             uint32_t width, uint64_t aval, uint64_t bval) {
   auto* var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4Vec(f.arena, width);
   var->value.words[0].aval = aval;
@@ -966,16 +966,14 @@ TEST(EvalAdv, ArrayXZAddrReturnsX) {
 TEST(EvalAdv, LetNoRecursive) {
   EvalAdvFixture f;
   // let bad(a) = bad(a + 1); — recursive, should return X (not infinite loop).
-  auto* body_call = MakeCall(f.arena, "bad", {
-    [&]() {
-      auto* e = f.arena.Create<Expr>();
-      e->kind = ExprKind::kBinary;
-      e->op = TokenKind::kPlus;
-      e->lhs = MakeId(f.arena, "a");
-      e->rhs = MakeInt(f.arena, 1);
-      return e;
-    }()
-  });
+  auto* body_call = MakeCall(f.arena, "bad", {[&]() {
+                               auto* e = f.arena.Create<Expr>();
+                               e->kind = ExprKind::kBinary;
+                               e->op = TokenKind::kPlus;
+                               e->lhs = MakeId(f.arena, "a");
+                               e->rhs = MakeInt(f.arena, 1);
+                               return e;
+                             }()});
   FunctionArg arg;
   arg.name = "a";
   auto* decl = MakeLetDecl(f.arena, "bad", body_call, {arg});

@@ -22,8 +22,7 @@ static void CollectSelectReads(const Expr* expr,
   }
 }
 
-void CollectExprReads(const Expr* expr,
-                      std::unordered_set<std::string>& out) {
+void CollectExprReads(const Expr* expr, std::unordered_set<std::string>& out) {
   if (!expr) return;
   if (expr->kind == ExprKind::kIdentifier) {
     out.insert(std::string(expr->text));
@@ -44,8 +43,7 @@ void CollectExprReads(const Expr* expr,
   for (auto* elem : expr->elements) CollectExprReads(elem, out);
 }
 
-void CollectStmtReads(const Stmt* stmt,
-                      std::unordered_set<std::string>& out) {
+void CollectStmtReads(const Stmt* stmt, std::unordered_set<std::string>& out) {
   if (!stmt) return;
   CollectExprReads(stmt->condition, out);
   CollectExprReads(stmt->rhs, out);
@@ -74,8 +72,8 @@ std::vector<EventExpr> InferSensitivity(const Stmt* body, Arena& arena) {
   for (const auto& name : signals) {
     auto* expr = arena.Create<Expr>();
     expr->kind = ExprKind::kIdentifier;
-    expr->text = std::string_view(
-        arena.AllocString(name.data(), name.size()), name.size());
+    expr->text = std::string_view(arena.AllocString(name.data(), name.size()),
+                                  name.size());
     events.push_back({Edge::kNone, expr});
   }
   return events;

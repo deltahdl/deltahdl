@@ -302,8 +302,10 @@ static Logic4Vec EvalSignedPow(int64_t base, int64_t exp, uint32_t width,
   if (exp < 0) {
     if (base == 0) return MakeAllX(arena, width);
     int64_t r = 0;
-    if (base == 1) r = 1;
-    else if (base == -1) r = (exp % 2 == 0) ? 1 : -1;
+    if (base == 1)
+      r = 1;
+    else if (base == -1)
+      r = (exp % 2 == 0) ? 1 : -1;
     auto result = MakeLogic4VecVal(arena, width, static_cast<uint64_t>(r));
     result.is_signed = true;
     return result;
