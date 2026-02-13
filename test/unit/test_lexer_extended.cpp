@@ -348,8 +348,16 @@ TEST(Lexer, KeywordVersionMarker_RestoresToDefault) {
 }
 
 TEST(Lexer, ParseKeywordVersion_ValidVersions) {
+  // §22.14: all nine version specifiers
   EXPECT_EQ(*ParseKeywordVersion("1364-1995"), KeywordVersion::kVer13641995);
   EXPECT_EQ(*ParseKeywordVersion("1364-2001"), KeywordVersion::kVer13642001);
+  EXPECT_EQ(*ParseKeywordVersion("1364-2001-noconfig"),
+            KeywordVersion::kVer13642001Noconfig);
+  EXPECT_EQ(*ParseKeywordVersion("1364-2005"), KeywordVersion::kVer13642005);
+  EXPECT_EQ(*ParseKeywordVersion("1800-2005"), KeywordVersion::kVer18002005);
+  EXPECT_EQ(*ParseKeywordVersion("1800-2009"), KeywordVersion::kVer18002009);
+  EXPECT_EQ(*ParseKeywordVersion("1800-2012"), KeywordVersion::kVer18002012);
+  EXPECT_EQ(*ParseKeywordVersion("1800-2017"), KeywordVersion::kVer18002017);
   EXPECT_EQ(*ParseKeywordVersion("1800-2023"), KeywordVersion::kVer18002023);
 }
 
@@ -392,6 +400,15 @@ TEST(Lexer, IntLiteral_LrmExample3_Signed) {
   EXPECT_EQ(t1[0].kind, TokenKind::kIntLiteral);
   auto t2 = lex("16'sd?");
   EXPECT_EQ(t2[0].kind, TokenKind::kIntLiteral);
+}
+
+TEST(Lexer, IntLiteral_UnbasedUnsized) {
+  // §5.7.1: '0, '1, 'x, 'X, 'z, 'Z are unbased unsized literals
+  for (const char* src : {"'0", "'1", "'x", "'X", "'z", "'Z"}) {
+    auto tokens = lex(src);
+    ASSERT_GE(tokens.size(), 2) << src;
+    EXPECT_EQ(tokens[0].kind, TokenKind::kUnbasedUnsizedLiteral) << src;
+  }
 }
 
 TEST(Lexer, IntLiteral_LrmExample6_Underscores) {
