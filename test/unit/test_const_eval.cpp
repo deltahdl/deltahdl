@@ -122,3 +122,22 @@ TEST(ConstEval, ScopedTernary) {
   EXPECT_EQ(
       ConstEvalInt(ParseExprFrom("WIDTH > 8 ? WIDTH : 8", f), scope_small), 8);
 }
+
+TEST(ConstEval, Concatenation) {
+  EvalFixture f;
+  // {4'd3, 4'd5} = 8'h35 = 53
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("{4'd3, 4'd5}", f)), 0x35);
+}
+
+TEST(ConstEval, Replication) {
+  EvalFixture f;
+  // {4{1'b1}} = 4'b1111 = 15
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("{4{1'b1}}", f)), 15);
+}
+
+TEST(ConstEval, Clog2) {
+  EvalFixture f;
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("$clog2(256)", f)), 8);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("$clog2(1)", f)), 0);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("$clog2(5)", f)), 3);
+}

@@ -114,38 +114,104 @@ static std::optional<int64_t> EvalUnary(TokenKind op, int64_t operand) {
   }
 }
 
+// Width of a literal from its text (e.g., "4'd3" → 4, "8'hFF" → 8).
+static uint32_t ConstLiteralWidth(const Expr* expr) {
+  auto tick = expr->text.find('\'');
+  if (tick != std::string_view::npos && tick > 0) {
+    uint32_t w = 0;
+    for (size_t i = 0; i < tick; ++i) {
+      char c = expr->text[i];
+      if (c >= '0' && c <= '9') w = w * 10 + (c - '0');
+    }
+    if (w > 0) return w;
+  }
+  return 32;
+}
+
+// §20.4.1: $clog2 — ceiling of log base 2.
+static int64_t Clog2(int64_t val) {
+  if (val <= 1) return 0;
+  int64_t result = 0;
+  int64_t v = val - 1;
+  while (v > 0) {
+    v >>= 1;
+    ++result;
+  }
+  return result;
+}
+
+// Constant-evaluate a concatenation: {a, b, c}.
+static std::optional<int64_t> EvalConcat(const Expr* expr,
+                                         const ScopeMap& scope) {
+  int64_t result = 0;
+  for (auto* elem : expr->elements) {
+    auto val = ConstEvalInt(elem, scope);
+    if (!val) return std::nullopt;
+    uint32_t w = ConstLiteralWidth(elem);
+    result = (result << w) | (*val & ((int64_t{1} << w) - 1));
+  }
+  return result;
+}
+
+// Constant-evaluate a replication: {n{expr}}.
+static std::optional<int64_t> EvalReplicate(const Expr* expr,
+                                            const ScopeMap& scope) {
+  auto count = ConstEvalInt(expr->repeat_count, scope);
+  if (!count || expr->elements.empty()) return std::nullopt;
+  auto val = ConstEvalInt(expr->elements[0], scope);
+  if (!val) return std::nullopt;
+  uint32_t w = ConstLiteralWidth(expr->elements[0]);
+  int64_t result = 0;
+  for (int64_t i = 0; i < *count; ++i) {
+    result = (result << w) | (*val & ((int64_t{1} << w) - 1));
+  }
+  return result;
+}
+
+// Constant-evaluate a system call ($clog2).
+static std::optional<int64_t> EvalConstSysCall(const Expr* expr,
+                                               const ScopeMap& scope) {
+  if (expr->callee == "$clog2" && !expr->args.empty()) {
+    auto arg = ConstEvalInt(expr->args[0], scope);
+    if (!arg) return std::nullopt;
+    return Clog2(*arg);
+  }
+  return std::nullopt;
+}
+
 std::optional<int64_t> ConstEvalInt(const Expr* expr, const ScopeMap& scope) {
   if (!expr) return std::nullopt;
 
   switch (expr->kind) {
     case ExprKind::kIntegerLiteral:
       return static_cast<int64_t>(expr->int_val);
-
     case ExprKind::kIdentifier: {
       auto it = scope.find(expr->text);
       if (it != scope.end()) return it->second;
       return std::nullopt;
     }
-
     case ExprKind::kUnary: {
       auto operand = ConstEvalInt(expr->lhs, scope);
       if (!operand) return std::nullopt;
       return EvalUnary(expr->op, *operand);
     }
-
     case ExprKind::kBinary: {
       auto lhs = ConstEvalInt(expr->lhs, scope);
       auto rhs = ConstEvalInt(expr->rhs, scope);
       if (!lhs || !rhs) return std::nullopt;
       return EvalBinary(expr->op, *lhs, *rhs);
     }
-
     case ExprKind::kTernary: {
       auto cond = ConstEvalInt(expr->condition, scope);
       if (!cond) return std::nullopt;
       return ConstEvalInt(*cond ? expr->true_expr : expr->false_expr, scope);
     }
-
+    case ExprKind::kConcatenation:
+      return EvalConcat(expr, scope);
+    case ExprKind::kReplicate:
+      return EvalReplicate(expr, scope);
+    case ExprKind::kSystemCall:
+      return EvalConstSysCall(expr, scope);
     default:
       return std::nullopt;
   }
