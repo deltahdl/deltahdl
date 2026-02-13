@@ -724,15 +724,15 @@ TEST(Lowerer, ForkJoin) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* a = f.ctx.FindVariable("a");
-  auto* b = f.ctx.FindVariable("b");
-  auto* done = f.ctx.FindVariable("done");
-  ASSERT_NE(a, nullptr);
-  ASSERT_NE(b, nullptr);
-  ASSERT_NE(done, nullptr);
-  EXPECT_EQ(a->value.ToUint64(), 10u);
-  EXPECT_EQ(b->value.ToUint64(), 20u);
-  EXPECT_EQ(done->value.ToUint64(), 1u);
+  struct {
+    const char* name;
+    uint64_t expected;
+  } const kCases[] = {{"a", 10u}, {"b", 20u}, {"done", 1u}};
+  for (const auto& c : kCases) {
+    auto* var = f.ctx.FindVariable(c.name);
+    ASSERT_NE(var, nullptr);
+    EXPECT_EQ(var->value.ToUint64(), c.expected);
+  }
 }
 
 TEST(Lowerer, StrobeDoesNotCrash) {

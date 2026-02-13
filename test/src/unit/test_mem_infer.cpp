@@ -51,6 +51,22 @@ TEST(MemInfer, DetectSinglePortWrite) {
   auto memories = InferMemories(mod);
   ASSERT_EQ(memories.size(), 1u);
   EXPECT_EQ(memories[0].name, "mem");
+}
+
+TEST(MemInfer, DetectSinglePortWrite_PortDetails) {
+  MemInferFixture f;
+  auto* mod = ElaborateSrc(f,
+                           "module m(input clk, input logic [3:0] addr,\n"
+                           "         input logic [7:0] wdata, input we);\n"
+                           "  logic [7:0] mem;\n"
+                           "  always_ff @(posedge clk) begin\n"
+                           "    if (we) mem[addr] <= wdata;\n"
+                           "  end\n"
+                           "endmodule");
+  ASSERT_NE(mod, nullptr);
+
+  auto memories = InferMemories(mod);
+  ASSERT_EQ(memories.size(), 1u);
   EXPECT_EQ(memories[0].write_ports.size(), 1u);
   EXPECT_TRUE(memories[0].write_ports[0].is_write);
   EXPECT_EQ(memories[0].write_ports[0].clock_edge, Edge::kPosedge);
@@ -75,6 +91,22 @@ TEST(MemInfer, DetectSinglePortRead) {
   auto memories = InferMemories(mod);
   ASSERT_EQ(memories.size(), 1u);
   EXPECT_EQ(memories[0].name, "mem");
+}
+
+TEST(MemInfer, DetectSinglePortRead_PortDetails) {
+  MemInferFixture f;
+  auto* mod = ElaborateSrc(f,
+                           "module m(input clk, input logic [3:0] addr,\n"
+                           "         output logic [7:0] rdata);\n"
+                           "  logic [7:0] mem;\n"
+                           "  always_ff @(posedge clk) begin\n"
+                           "    rdata <= mem[addr];\n"
+                           "  end\n"
+                           "endmodule");
+  ASSERT_NE(mod, nullptr);
+
+  auto memories = InferMemories(mod);
+  ASSERT_EQ(memories.size(), 1u);
   EXPECT_EQ(memories[0].read_ports.size(), 1u);
   EXPECT_FALSE(memories[0].read_ports[0].is_write);
   EXPECT_EQ(memories[0].read_ports[0].clock_edge, Edge::kPosedge);

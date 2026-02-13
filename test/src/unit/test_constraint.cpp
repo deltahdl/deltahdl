@@ -601,7 +601,7 @@ TEST(Constraint, RandModeReEnable) {
 // §18.9: constraint_mode() enable/disable
 // =============================================================================
 
-TEST(Constraint, ConstraintModeDisable) {
+TEST(Constraint, ConstraintModeDisable_ActiveSolve) {
   ConstraintSolver solver(42);
   RandVariable v;
   v.name = "x";
@@ -620,6 +620,24 @@ TEST(Constraint, ConstraintModeDisable) {
 
   ASSERT_TRUE(solver.Solve());
   EXPECT_EQ(solver.GetValue("x"), 42);
+}
+
+TEST(Constraint, ConstraintModeDisable_DisabledSolve) {
+  ConstraintSolver solver(42);
+  RandVariable v;
+  v.name = "x";
+  v.min_val = 0;
+  v.max_val = 1000;
+  solver.AddVariable(v);
+
+  ConstraintBlock block;
+  block.name = "c_tight";
+  ConstraintExpr c;
+  c.kind = ConstraintKind::kEqual;
+  c.var_name = "x";
+  c.lo = 42;
+  block.constraints.push_back(c);
+  solver.AddConstraintBlock(block);
 
   solver.SetConstraintMode("c_tight", false);
   EXPECT_FALSE(solver.GetConstraintMode("c_tight"));

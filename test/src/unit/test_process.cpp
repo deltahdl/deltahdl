@@ -35,20 +35,29 @@ TEST(Process, MoveSemantics) {
 
 TEST(Process, ProcessKindEnum) {
   // §9.2: All process kinds are defined.
-  EXPECT_EQ(static_cast<uint8_t>(ProcessKind::kInitial), 0);
-  EXPECT_EQ(static_cast<uint8_t>(ProcessKind::kAlways), 1);
-  EXPECT_EQ(static_cast<uint8_t>(ProcessKind::kAlwaysComb), 2);
-  EXPECT_EQ(static_cast<uint8_t>(ProcessKind::kAlwaysLatch), 3);
-  EXPECT_EQ(static_cast<uint8_t>(ProcessKind::kAlwaysFF), 4);
-  EXPECT_EQ(static_cast<uint8_t>(ProcessKind::kFinal), 5);
-  EXPECT_EQ(static_cast<uint8_t>(ProcessKind::kContAssign), 6);
+  struct {
+    ProcessKind kind;
+    uint8_t expected;
+  } const kCases[] = {
+      {ProcessKind::kInitial, 0},     {ProcessKind::kAlways, 1},
+      {ProcessKind::kAlwaysComb, 2},   {ProcessKind::kAlwaysLatch, 3},
+      {ProcessKind::kAlwaysFF, 4},     {ProcessKind::kFinal, 5},
+      {ProcessKind::kContAssign, 6},
+  };
+  for (const auto& c : kCases) {
+    EXPECT_EQ(static_cast<uint8_t>(c.kind), c.expected);
+  }
 }
 
-TEST(Process, ProcessDefaultState) {
+TEST(Process, ProcessDefaultState_KindAndCoro) {
   Process p;
   EXPECT_EQ(p.kind, ProcessKind::kInitial);
   EXPECT_EQ(p.coro, nullptr);
   EXPECT_EQ(p.home_region, Region::kActive);
+}
+
+TEST(Process, ProcessDefaultState_Flags) {
+  Process p;
   EXPECT_TRUE(p.active);
   EXPECT_FALSE(p.is_reactive);
   EXPECT_TRUE(p.Done());

@@ -20,15 +20,23 @@ TEST(SvVpiUser, PackageAndInterfaceTypes) {
 }
 
 TEST(SvVpiUser, VariableTypes) {
-  EXPECT_EQ(vpiLongIntVar, 610);
-  EXPECT_EQ(vpiIntVar, 612);
-  EXPECT_EQ(vpiClassVar, 615);
-  EXPECT_EQ(vpiStringVar, 616);
-  EXPECT_EQ(vpiEnumVar, 617);
-  EXPECT_EQ(vpiStructVar, 618);
-  EXPECT_EQ(vpiBitVar, 620);
-  EXPECT_EQ(vpiClassObj, 621);
-  EXPECT_EQ(vpiChandleVar, 622);
+  struct {
+    int actual;
+    int expected;
+  } const kCases[] = {
+      {vpiLongIntVar, 610},
+      {vpiIntVar, 612},
+      {vpiClassVar, 615},
+      {vpiStringVar, 616},
+      {vpiEnumVar, 617},
+      {vpiStructVar, 618},
+      {vpiBitVar, 620},
+      {vpiClassObj, 621},
+      {vpiChandleVar, 622},
+  };
+  for (const auto& c : kCases) {
+    EXPECT_EQ(c.actual, c.expected);
+  }
 }
 
 TEST(SvVpiUser, TypespecTypes) {
@@ -55,14 +63,18 @@ TEST(SvVpiUser, AssertionTypes) {
 // =============================================================================
 
 TEST(SvVpiUser, OperatorConstants) {
-  EXPECT_EQ(vpiImplyOp, 50);
-  EXPECT_EQ(vpiPostIncOp, 62);
-  EXPECT_EQ(vpiWildEqOp, 69);
-  EXPECT_EQ(vpiStreamLROp, 71);
-  EXPECT_EQ(vpiInsideOp, 95);
-  EXPECT_EQ(vpiNexttimeOp, 89);
-  EXPECT_EQ(vpiAlwaysOp, 90);
-  EXPECT_EQ(vpiEventuallyOp, 91);
+  struct {
+    int actual;
+    int expected;
+  } const kCases[] = {
+      {vpiImplyOp, 50},      {vpiPostIncOp, 62},
+      {vpiWildEqOp, 69},     {vpiStreamLROp, 71},
+      {vpiInsideOp, 95},     {vpiNexttimeOp, 89},
+      {vpiAlwaysOp, 90},     {vpiEventuallyOp, 91},
+  };
+  for (const auto& c : kCases) {
+    EXPECT_EQ(c.actual, c.expected);
+  }
 }
 
 // =============================================================================

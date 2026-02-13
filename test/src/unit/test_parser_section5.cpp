@@ -66,7 +66,7 @@ static ParseDiag5 ParseWithDiag(const std::string& src) {
 
 // --- §5.10/§5.11: Assignment patterns ---
 
-TEST(ParserSection5, AssignmentPatternPositional) {
+TEST(ParserSection5, AssignmentPatternPositional_Parse) {
   auto r = Parse(
       "module t;\n"
       "  initial x = '{1, 2, 3};\n"
@@ -78,6 +78,18 @@ TEST(ParserSection5, AssignmentPatternPositional) {
   auto* rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
+}
+
+TEST(ParserSection5, AssignmentPatternPositional_Elements) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = '{1, 2, 3};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->elements.size(), 3u);
   EXPECT_TRUE(rhs->pattern_keys.empty());
 }
@@ -94,9 +106,11 @@ TEST(ParserSection5, AssignmentPatternNamed) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
   EXPECT_EQ(rhs->elements.size(), 2u);
-  ASSERT_EQ(rhs->pattern_keys.size(), 2u);
-  EXPECT_EQ(rhs->pattern_keys[0], "a");
-  EXPECT_EQ(rhs->pattern_keys[1], "b");
+  std::string expected_keys[] = {"a", "b"};
+  ASSERT_EQ(rhs->pattern_keys.size(), std::size(expected_keys));
+  for (size_t i = 0; i < std::size(expected_keys); ++i) {
+    EXPECT_EQ(rhs->pattern_keys[i], expected_keys[i]) << "key " << i;
+  }
 }
 
 TEST(ParserSection5, AssignmentPatternDefault) {
@@ -110,8 +124,11 @@ TEST(ParserSection5, AssignmentPatternDefault) {
   auto* rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
-  ASSERT_EQ(rhs->pattern_keys.size(), 1u);
-  EXPECT_EQ(rhs->pattern_keys[0], "default");
+  std::string expected_keys[] = {"default"};
+  ASSERT_EQ(rhs->pattern_keys.size(), std::size(expected_keys));
+  for (size_t i = 0; i < std::size(expected_keys); ++i) {
+    EXPECT_EQ(rhs->pattern_keys[i], expected_keys[i]) << "key " << i;
+  }
 }
 
 // --- §5.12: Attributes ---
@@ -130,7 +147,23 @@ TEST(ParserSection5, AttributeOnModuleItem) {
   EXPECT_EQ(item->attrs[0].value, nullptr);
 }
 
-TEST(ParserSection5, AttributeWithValue) {
+TEST(ParserSection5, AttributeWithValue_Names) {
+  auto r = Parse(
+      "module t;\n"
+      "  (* synthesis, optimize_power = 1 *)\n"
+      "  logic y;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
+  auto* item = r.cu->modules[0]->items[0];
+  std::string expected_names[] = {"synthesis", "optimize_power"};
+  ASSERT_EQ(item->attrs.size(), std::size(expected_names));
+  for (size_t i = 0; i < std::size(expected_names); ++i) {
+    EXPECT_EQ(item->attrs[i].name, expected_names[i]) << "attr " << i;
+  }
+}
+
+TEST(ParserSection5, AttributeWithValue_Values) {
   auto r = Parse(
       "module t;\n"
       "  (* synthesis, optimize_power = 1 *)\n"
@@ -140,15 +173,13 @@ TEST(ParserSection5, AttributeWithValue) {
   ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
   auto* item = r.cu->modules[0]->items[0];
   ASSERT_EQ(item->attrs.size(), 2u);
-  EXPECT_EQ(item->attrs[0].name, "synthesis");
   EXPECT_EQ(item->attrs[0].value, nullptr);
-  EXPECT_EQ(item->attrs[1].name, "optimize_power");
   ASSERT_NE(item->attrs[1].value, nullptr);
 }
 
 // --- §5.13: Built-in method calls ---
 
-TEST(ParserSection5, BuiltInMethodCall) {
+TEST(ParserSection5, BuiltInMethodCall_Parse) {
   auto r = Parse(
       "module t;\n"
       "  initial x = arr.size();\n"
@@ -160,7 +191,19 @@ TEST(ParserSection5, BuiltInMethodCall) {
   auto* rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
+}
+
+TEST(ParserSection5, BuiltInMethodCall_Callee) {
   // The callee_expr should be the full member-access expression.
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = arr.size();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
   ASSERT_NE(rhs->lhs, nullptr);
   EXPECT_EQ(rhs->lhs->kind, ExprKind::kMemberAccess);
 }
@@ -277,7 +320,7 @@ TEST(ParserSection5, AssignmentPattern_NestedReplication) {
 
 // --- §9.3.1: Block-level variable declarations ---
 
-TEST(ParserSection5, BlockVarDecl_BuiltinType) {
+TEST(ParserSection5, BlockVarDecl_BuiltinType_Block) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -290,6 +333,19 @@ TEST(ParserSection5, BlockVarDecl_BuiltinType) {
   auto* blk = item->body;
   ASSERT_NE(blk, nullptr);
   ASSERT_EQ(blk->kind, StmtKind::kBlock);
+  ASSERT_EQ(blk->stmts.size(), 1u);
+}
+
+TEST(ParserSection5, BlockVarDecl_BuiltinType_Stmt) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int x;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* blk = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(blk, nullptr);
   ASSERT_EQ(blk->stmts.size(), 1u);
   EXPECT_EQ(blk->stmts[0]->kind, StmtKind::kVarDecl);
   EXPECT_EQ(blk->stmts[0]->var_decl_type.kind, DataTypeKind::kInt);
@@ -316,13 +372,12 @@ TEST(ParserSection5, BlockVarDecl_CommaSeparated) {
   ASSERT_NE(r.cu, nullptr);
   auto* blk = r.cu->modules[0]->items[0]->body;
   ASSERT_NE(blk, nullptr);
-  ASSERT_EQ(blk->stmts.size(), 3u);
-  EXPECT_EQ(blk->stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(blk->stmts[1]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(blk->stmts[2]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(blk->stmts[0]->var_name, "a");
-  EXPECT_EQ(blk->stmts[1]->var_name, "b");
-  EXPECT_EQ(blk->stmts[2]->var_name, "c");
+  std::string expected_names[] = {"a", "b", "c"};
+  ASSERT_EQ(blk->stmts.size(), std::size(expected_names));
+  for (size_t i = 0; i < std::size(expected_names); ++i) {
+    EXPECT_EQ(blk->stmts[i]->kind, StmtKind::kVarDecl) << "stmt " << i;
+    EXPECT_EQ(blk->stmts[i]->var_name, expected_names[i]) << "stmt " << i;
+  }
 }
 
 TEST(ParserSection5, BlockVarDecl_WithInit) {

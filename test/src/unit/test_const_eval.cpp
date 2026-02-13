@@ -58,13 +58,17 @@ TEST(ConstEval, Shifts) {
 
 TEST(ConstEval, Comparison) {
   EvalFixture f;
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("3 < 5", f)), 1);
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("5 < 3", f)), 0);
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("5 > 3", f)), 1);
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("3 >= 3", f)), 1);
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("3 <= 3", f)), 1);
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("3 == 3", f)), 1);
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("3 != 4", f)), 1);
+  struct Case {
+    const char* expr;
+    int64_t expected;
+  };
+  const Case kCases[] = {
+      {"3 < 5", 1},  {"5 < 3", 0},  {"5 > 3", 1}, {"3 >= 3", 1},
+      {"3 <= 3", 1}, {"3 == 3", 1}, {"3 != 4", 1},
+  };
+  for (const auto& c : kCases) {
+    EXPECT_EQ(ConstEvalInt(ParseExprFrom(c.expr, f)), c.expected) << c.expr;
+  }
 }
 
 TEST(ConstEval, Logical) {
@@ -248,13 +252,23 @@ TEST(ConstEval, Onehot0) {
 
 TEST(TypeEval, ImplicitlySignedTypes) {
   // §6.8: integer, int, shortint, longint, byte are implicitly signed.
-  EXPECT_TRUE(IsImplicitlySigned(DataTypeKind::kInteger));
-  EXPECT_TRUE(IsImplicitlySigned(DataTypeKind::kInt));
-  EXPECT_TRUE(IsImplicitlySigned(DataTypeKind::kShortint));
-  EXPECT_TRUE(IsImplicitlySigned(DataTypeKind::kLongint));
-  EXPECT_TRUE(IsImplicitlySigned(DataTypeKind::kByte));
   // logic, reg, bit are NOT implicitly signed.
-  EXPECT_FALSE(IsImplicitlySigned(DataTypeKind::kLogic));
-  EXPECT_FALSE(IsImplicitlySigned(DataTypeKind::kReg));
-  EXPECT_FALSE(IsImplicitlySigned(DataTypeKind::kBit));
+  struct Case {
+    DataTypeKind kind;
+    bool expected;
+    const char* label;
+  };
+  const Case kCases[] = {
+      {DataTypeKind::kInteger, true, "integer"},
+      {DataTypeKind::kInt, true, "int"},
+      {DataTypeKind::kShortint, true, "shortint"},
+      {DataTypeKind::kLongint, true, "longint"},
+      {DataTypeKind::kByte, true, "byte"},
+      {DataTypeKind::kLogic, false, "logic"},
+      {DataTypeKind::kReg, false, "reg"},
+      {DataTypeKind::kBit, false, "bit"},
+  };
+  for (const auto& c : kCases) {
+    EXPECT_EQ(IsImplicitlySigned(c.kind), c.expected) << c.label;
+  }
 }

@@ -134,10 +134,11 @@ TEST(ParserAnnexA, A1ModulePortDirections) {
   EXPECT_FALSE(r.has_errors);
   auto& ports = r.cu->modules[0]->ports;
   ASSERT_EQ(ports.size(), 4u);
-  EXPECT_EQ(ports[0].direction, Direction::kInput);
-  EXPECT_EQ(ports[1].direction, Direction::kOutput);
-  EXPECT_EQ(ports[2].direction, Direction::kInout);
-  EXPECT_EQ(ports[3].direction, Direction::kRef);
+  const Direction kExpected[] = {Direction::kInput, Direction::kOutput,
+                                 Direction::kInout, Direction::kRef};
+  for (size_t i = 0; i < 4; i++) {
+    EXPECT_EQ(ports[i].direction, kExpected[i]);
+  }
 }
 
 // =============================================================================
@@ -202,7 +203,7 @@ TEST(ParserAnnexA, A2TypedefStructPacked) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kTypedef);
 }
 
-TEST(ParserAnnexA, A2FunctionDeclAutomatic) {
+TEST(ParserAnnexA, A2FunctionDeclAutomaticParse) {
   auto r = Parse(
       "module m;\n"
       "  function automatic int add(int a, int b);\n"
@@ -214,6 +215,17 @@ TEST(ParserAnnexA, A2FunctionDeclAutomatic) {
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_EQ(item->name, "add");
+}
+
+TEST(ParserAnnexA, A2FunctionDeclAutomaticProps) {
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int add(int a, int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_TRUE(item->is_automatic);
   EXPECT_EQ(item->func_args.size(), 2u);
 }
@@ -497,8 +509,11 @@ TEST(ParserAnnexA, A6BlockingAndNonblocking) {
   auto* blk = r.cu->modules[0]->items[0]->body;
   ASSERT_NE(blk, nullptr);
   ASSERT_EQ(blk->stmts.size(), 2u);
-  EXPECT_EQ(blk->stmts[0]->kind, StmtKind::kBlockingAssign);
-  EXPECT_EQ(blk->stmts[1]->kind, StmtKind::kNonblockingAssign);
+  const StmtKind kExpected[] = {StmtKind::kBlockingAssign,
+                                StmtKind::kNonblockingAssign};
+  for (size_t i = 0; i < 2; i++) {
+    EXPECT_EQ(blk->stmts[i]->kind, kExpected[i]);
+  }
 }
 
 TEST(ParserAnnexA, A6IfElseStmt) {
@@ -514,7 +529,7 @@ TEST(ParserAnnexA, A6IfElseStmt) {
   EXPECT_NE(stmt->else_branch, nullptr);
 }
 
-TEST(ParserAnnexA, A6ForLoop) {
+TEST(ParserAnnexA, A6ForLoopParse) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -526,6 +541,18 @@ TEST(ParserAnnexA, A6ForLoop) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
+}
+
+TEST(ParserAnnexA, A6ForLoopParts) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 10; i++) x = i;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
   EXPECT_NE(stmt->for_init, nullptr);
   EXPECT_NE(stmt->for_cond, nullptr);
   EXPECT_NE(stmt->for_step, nullptr);
@@ -579,7 +606,7 @@ TEST(ParserAnnexA, A6RepeatLoop) {
   EXPECT_EQ(stmt->kind, StmtKind::kRepeat);
 }
 
-TEST(ParserAnnexA, A6CaseStmt) {
+TEST(ParserAnnexA, A6CaseStmtParse) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -591,6 +618,18 @@ TEST(ParserAnnexA, A6CaseStmt) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
+}
+
+TEST(ParserAnnexA, A6CaseStmtItems) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x) 0: y = 1; default: y = 0; endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
   ASSERT_EQ(stmt->case_items.size(), 2u);
   EXPECT_FALSE(stmt->case_items[0].is_default);
   EXPECT_TRUE(stmt->case_items[1].is_default);
@@ -683,10 +722,11 @@ TEST(ParserAnnexA, A6ProceduralAssignForce) {
   EXPECT_FALSE(r.has_errors);
   auto* blk = r.cu->modules[0]->items[0]->body;
   ASSERT_EQ(blk->stmts.size(), 4u);
-  EXPECT_EQ(blk->stmts[0]->kind, StmtKind::kAssign);
-  EXPECT_EQ(blk->stmts[1]->kind, StmtKind::kDeassign);
-  EXPECT_EQ(blk->stmts[2]->kind, StmtKind::kForce);
-  EXPECT_EQ(blk->stmts[3]->kind, StmtKind::kRelease);
+  const StmtKind kExpected[] = {StmtKind::kAssign, StmtKind::kDeassign,
+                                StmtKind::kForce, StmtKind::kRelease};
+  for (size_t i = 0; i < 4; i++) {
+    EXPECT_EQ(blk->stmts[i]->kind, kExpected[i]);
+  }
 }
 
 TEST(ParserAnnexA, A6ReturnStmt) {

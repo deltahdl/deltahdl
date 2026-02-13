@@ -99,16 +99,17 @@ TEST(ParserSection15, WaitOrderBasic) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kWaitOrder);
   ASSERT_EQ(stmt->wait_order_events.size(), 3u);
-  EXPECT_EQ(stmt->wait_order_events[0]->text, "a");
-  EXPECT_EQ(stmt->wait_order_events[1]->text, "b");
-  EXPECT_EQ(stmt->wait_order_events[2]->text, "c");
+  const std::string kExpected[] = {"a", "b", "c"};
+  for (size_t i = 0; i < 3; ++i) {
+    EXPECT_EQ(stmt->wait_order_events[i]->text, kExpected[i]);
+  }
 }
 
 // =============================================================================
 // §15.5.4 — wait_order with else clause
 // =============================================================================
 
-TEST(ParserSection15, WaitOrderWithElse) {
+TEST(ParserSection15, WaitOrderWithElseKind) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -121,6 +122,19 @@ TEST(ParserSection15, WaitOrderWithElse) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kWaitOrder);
   ASSERT_EQ(stmt->wait_order_events.size(), 3u);
+}
+
+TEST(ParserSection15, WaitOrderWithElseBranches) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    wait_order(a, b, c) success = 1;\n"
+      "    else success = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->then_branch, nullptr);
   ASSERT_NE(stmt->else_branch, nullptr);
 }

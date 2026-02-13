@@ -38,7 +38,7 @@ static ModuleItem* FirstLetDecl(LetParseResult& r) {
 // §11.12: Let declaration parsing
 // ==========================================================================
 
-TEST(ParserLet, DeclNoArgs) {
+TEST(ParserLet, DeclNoArgsParse) {
   auto r = Parse(
       "module t;\n"
       "  let addr = top.block1.base + top.block1.displ;\n"
@@ -48,11 +48,21 @@ TEST(ParserLet, DeclNoArgs) {
   auto* let_item = FirstLetDecl(r);
   ASSERT_NE(let_item, nullptr);
   EXPECT_EQ(let_item->name, "addr");
+}
+
+TEST(ParserLet, DeclNoArgsBody) {
+  auto r = Parse(
+      "module t;\n"
+      "  let addr = top.block1.base + top.block1.displ;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* let_item = FirstLetDecl(r);
+  ASSERT_NE(let_item, nullptr);
   EXPECT_TRUE(let_item->func_args.empty());
   ASSERT_NE(let_item->init_expr, nullptr);
 }
 
-TEST(ParserLet, DeclWithArgs) {
+TEST(ParserLet, DeclWithArgsParse) {
   auto r = Parse(
       "module t;\n"
       "  let op(x, y, z) = |((x | y) & z);\n"
@@ -62,14 +72,25 @@ TEST(ParserLet, DeclWithArgs) {
   auto* let_item = FirstLetDecl(r);
   ASSERT_NE(let_item, nullptr);
   EXPECT_EQ(let_item->name, "op");
+}
+
+TEST(ParserLet, DeclWithArgsNames) {
+  auto r = Parse(
+      "module t;\n"
+      "  let op(x, y, z) = |((x | y) & z);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* let_item = FirstLetDecl(r);
+  ASSERT_NE(let_item, nullptr);
   ASSERT_EQ(let_item->func_args.size(), 3u);
-  EXPECT_EQ(let_item->func_args[0].name, "x");
-  EXPECT_EQ(let_item->func_args[1].name, "y");
-  EXPECT_EQ(let_item->func_args[2].name, "z");
+  const char* const kExpected[] = {"x", "y", "z"};
+  for (size_t i = 0; i < 3; i++) {
+    EXPECT_EQ(let_item->func_args[i].name, kExpected[i]);
+  }
   ASSERT_NE(let_item->init_expr, nullptr);
 }
 
-TEST(ParserLet, DeclWithDefaults) {
+TEST(ParserLet, DeclWithDefaultsParse) {
   auto r = Parse(
       "module t;\n"
       "  let at_least_two(sig, rst = 1'b0) = rst || sig;\n"
@@ -80,13 +101,23 @@ TEST(ParserLet, DeclWithDefaults) {
   ASSERT_NE(let_item, nullptr);
   EXPECT_EQ(let_item->name, "at_least_two");
   ASSERT_EQ(let_item->func_args.size(), 2u);
+}
+
+TEST(ParserLet, DeclWithDefaultsArgs) {
+  auto r = Parse(
+      "module t;\n"
+      "  let at_least_two(sig, rst = 1'b0) = rst || sig;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* let_item = FirstLetDecl(r);
+  ASSERT_NE(let_item, nullptr);
   EXPECT_EQ(let_item->func_args[0].name, "sig");
   EXPECT_EQ(let_item->func_args[0].default_value, nullptr);
   EXPECT_EQ(let_item->func_args[1].name, "rst");
   EXPECT_NE(let_item->func_args[1].default_value, nullptr);
 }
 
-TEST(ParserLet, DeclTypedArgs) {
+TEST(ParserLet, DeclTypedArgsParse) {
   auto r = Parse(
       "module t;\n"
       "  let mult(logic [15:0] x, logic [15:0] y) = x * y;\n"
@@ -96,6 +127,16 @@ TEST(ParserLet, DeclTypedArgs) {
   auto* let_item = FirstLetDecl(r);
   ASSERT_NE(let_item, nullptr);
   EXPECT_EQ(let_item->name, "mult");
+}
+
+TEST(ParserLet, DeclTypedArgsNames) {
+  auto r = Parse(
+      "module t;\n"
+      "  let mult(logic [15:0] x, logic [15:0] y) = x * y;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* let_item = FirstLetDecl(r);
+  ASSERT_NE(let_item, nullptr);
   ASSERT_EQ(let_item->func_args.size(), 2u);
   EXPECT_EQ(let_item->func_args[0].name, "x");
   EXPECT_EQ(let_item->func_args[1].name, "y");

@@ -59,9 +59,13 @@ TEST(ParserSection7, StructBasic) {
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
   EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kStruct);
-  EXPECT_EQ(item->typedef_type.struct_members.size(), 2u);
-  EXPECT_EQ(item->typedef_type.struct_members[0].name, "a");
-  EXPECT_EQ(item->typedef_type.struct_members[1].name, "b");
+  std::string expected_names[] = {"a", "b"};
+  ASSERT_EQ(item->typedef_type.struct_members.size(),
+            std::size(expected_names));
+  for (size_t i = 0; i < std::size(expected_names); ++i) {
+    EXPECT_EQ(item->typedef_type.struct_members[i].name, expected_names[i])
+        << "member " << i;
+  }
 }
 
 TEST(ParserSection7, StructPackedSigned) {
@@ -270,6 +274,17 @@ TEST(ParserSection7, AssocArrayStringIndex) {
   EXPECT_EQ(item->name, "scores");
   ASSERT_EQ(item->unpacked_dims.size(), 1u);
   ASSERT_NE(item->unpacked_dims[0], nullptr);
+}
+
+TEST(ParserSection7, AssocArrayStringIndex_DimExpr) {
+  auto r = Parse(
+      "module t;\n"
+      "  int scores[string];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->unpacked_dims.size(), 1u);
   EXPECT_EQ(item->unpacked_dims[0]->kind, ExprKind::kIdentifier);
   EXPECT_EQ(item->unpacked_dims[0]->text, "string");
 }
@@ -285,6 +300,17 @@ TEST(ParserSection7, AssocArrayIntIndex) {
   EXPECT_EQ(item->name, "lookup");
   ASSERT_EQ(item->unpacked_dims.size(), 1u);
   ASSERT_NE(item->unpacked_dims[0], nullptr);
+}
+
+TEST(ParserSection7, AssocArrayIntIndex_DimExpr) {
+  auto r = Parse(
+      "module t;\n"
+      "  byte lookup[int];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->unpacked_dims.size(), 1u);
   EXPECT_EQ(item->unpacked_dims[0]->kind, ExprKind::kIdentifier);
   EXPECT_EQ(item->unpacked_dims[0]->text, "int");
 }
@@ -298,6 +324,17 @@ TEST(ParserSection7, AssocArrayIntegerIndex) {
   auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "cache");
+  ASSERT_EQ(item->unpacked_dims.size(), 1u);
+}
+
+TEST(ParserSection7, AssocArrayIntegerIndex_DimExpr) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic [7:0] cache[integer];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->unpacked_dims.size(), 1u);
   ASSERT_NE(item->unpacked_dims[0], nullptr);
   EXPECT_EQ(item->unpacked_dims[0]->text, "integer");
@@ -407,10 +444,13 @@ TEST(ParserSection7, StructMultipleMembersSameType) {
   ASSERT_NE(r.cu, nullptr);
   auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->typedef_type.struct_members.size(), 3u);
-  EXPECT_EQ(item->typedef_type.struct_members[0].name, "x");
-  EXPECT_EQ(item->typedef_type.struct_members[1].name, "y");
-  EXPECT_EQ(item->typedef_type.struct_members[2].name, "z");
+  std::string expected_names[] = {"x", "y", "z"};
+  ASSERT_EQ(item->typedef_type.struct_members.size(),
+            std::size(expected_names));
+  for (size_t i = 0; i < std::size(expected_names); ++i) {
+    EXPECT_EQ(item->typedef_type.struct_members[i].name, expected_names[i])
+        << "member " << i;
+  }
 }
 
 // =========================================================================
@@ -495,7 +535,7 @@ TEST(ParserSection7, MultidimensionalPackedArray) {
 // §7.4.3: Memories
 // =========================================================================
 
-TEST(ParserSection7, MemoryDeclaration) {
+TEST(ParserSection7, MemoryDeclaration_Type) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] mema [0:255];\n"
@@ -505,6 +545,17 @@ TEST(ParserSection7, MemoryDeclaration) {
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "mema");
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
+  ASSERT_EQ(item->unpacked_dims.size(), 1u);
+}
+
+TEST(ParserSection7, MemoryDeclaration_Dim) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic [7:0] mema [0:255];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->unpacked_dims.size(), 1u);
   auto* dim = item->unpacked_dims[0];
   ASSERT_NE(dim, nullptr);

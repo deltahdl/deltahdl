@@ -146,6 +146,24 @@ TEST(SdfParser, ParseCellWithIopath) {
   EXPECT_EQ(file.cells[0].cell_type, "buf");
   EXPECT_EQ(file.cells[0].instance, "u1");
   ASSERT_EQ(file.cells[0].iopaths.size(), 1u);
+}
+
+TEST(SdfParser, ParseCellWithIopath_Ports) {
+  SdfFile file;
+  std::string sdf = R"(
+    (DELAYFILE
+      (CELL
+        (CELLTYPE "buf")
+        (INSTANCE u1)
+        (DELAY
+          (ABSOLUTE
+            (IOPATH a y (10) (20))
+          )
+        )
+      )
+    )
+  )";
+  ParseSdf(sdf, file);
   EXPECT_EQ(file.cells[0].iopaths[0].src_port, "a");
   EXPECT_EQ(file.cells[0].iopaths[0].dst_port, "y");
   EXPECT_EQ(file.cells[0].iopaths[0].rise.typ_val, 10u);
@@ -169,6 +187,22 @@ TEST(SdfParser, ParseTimingCheck) {
   EXPECT_TRUE(ok);
   ASSERT_EQ(file.cells.size(), 1u);
   ASSERT_EQ(file.cells[0].timing_checks.size(), 1u);
+}
+
+TEST(SdfParser, ParseTimingCheck_Fields) {
+  SdfFile file;
+  std::string sdf = R"(
+    (DELAYFILE
+      (CELL
+        (CELLTYPE "dff")
+        (INSTANCE u2)
+        (TIMINGCHECK
+          (SETUP d (posedge clk) (5))
+        )
+      )
+    )
+  )";
+  ParseSdf(sdf, file);
   auto& tc = file.cells[0].timing_checks[0];
   EXPECT_EQ(tc.check_type, SdfCheckType::kSetup);
   EXPECT_EQ(tc.data_port, "d");
@@ -195,10 +229,47 @@ TEST(SdfParser, ParseMinTypMaxDelay) {
   bool ok = ParseSdf(sdf, file);
   EXPECT_TRUE(ok);
   ASSERT_EQ(file.cells[0].iopaths.size(), 1u);
+}
+
+TEST(SdfParser, ParseMinTypMaxDelay_RiseValues) {
+  SdfFile file;
+  std::string sdf = R"(
+    (DELAYFILE
+      (CELL
+        (CELLTYPE "inv")
+        (INSTANCE u3)
+        (DELAY
+          (ABSOLUTE
+            (IOPATH a y (1:2:3) (4:5:6))
+          )
+        )
+      )
+    )
+  )";
+  ParseSdf(sdf, file);
   auto& io = file.cells[0].iopaths[0];
   EXPECT_EQ(io.rise.min_val, 1u);
   EXPECT_EQ(io.rise.typ_val, 2u);
   EXPECT_EQ(io.rise.max_val, 3u);
+}
+
+TEST(SdfParser, ParseMinTypMaxDelay_FallValues) {
+  SdfFile file;
+  std::string sdf = R"(
+    (DELAYFILE
+      (CELL
+        (CELLTYPE "inv")
+        (INSTANCE u3)
+        (DELAY
+          (ABSOLUTE
+            (IOPATH a y (1:2:3) (4:5:6))
+          )
+        )
+      )
+    )
+  )";
+  ParseSdf(sdf, file);
+  auto& io = file.cells[0].iopaths[0];
   EXPECT_EQ(io.fall.min_val, 4u);
   EXPECT_EQ(io.fall.typ_val, 5u);
   EXPECT_EQ(io.fall.max_val, 6u);

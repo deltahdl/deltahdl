@@ -129,7 +129,7 @@ TEST(ParserSection11, EquivalenceParsed) {
   EXPECT_EQ(rhs->op, TokenKind::kLtDashGt);
 }
 
-TEST(ParserSection11, ImplicationRightAssoc) {
+TEST(ParserSection11, ImplicationRightAssocParses) {
   // a -> b -> c should be parsed as a -> (b -> c)
   auto r = Parse(
       "module t;\n"
@@ -142,6 +142,17 @@ TEST(ParserSection11, ImplicationRightAssoc) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kArrow);
+}
+
+TEST(ParserSection11, ImplicationRightAssocStructure) {
+  // a -> b -> c should be parsed as a -> (b -> c)
+  auto r = Parse(
+      "module t;\n"
+      "  logic a, b, c, d;\n"
+      "  initial d = a -> b -> c;\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
   // LHS is 'a', RHS is 'b -> c'
   EXPECT_EQ(rhs->lhs->kind, ExprKind::kIdentifier);
   EXPECT_EQ(rhs->rhs->kind, ExprKind::kBinary);

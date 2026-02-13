@@ -101,11 +101,17 @@ TEST(Coverage, AutoBinCreation) {
   EXPECT_EQ(cp->bins.size(), 4u);
 
   // Each bin should cover 2 values: [0,1], [2,3], [4,5], [6,7].
+  struct {
+    size_t bin_idx;
+    size_t val_idx;
+    int64_t expected;
+  } const kCases[] = {
+      {0, 0, 0}, {0, 1, 1}, {3, 0, 6}, {3, 1, 7},
+  };
+  for (const auto& c : kCases) {
+    EXPECT_EQ(cp->bins[c.bin_idx].values[c.val_idx], c.expected);
+  }
   EXPECT_EQ(cp->bins[0].values.size(), 2u);
-  EXPECT_EQ(cp->bins[0].values[0], 0);
-  EXPECT_EQ(cp->bins[0].values[1], 1);
-  EXPECT_EQ(cp->bins[3].values[0], 6);
-  EXPECT_EQ(cp->bins[3].values[1], 7);
 }
 
 TEST(Coverage, AutoBinSmallRange) {
@@ -474,10 +480,10 @@ TEST(Coverage, CoverGroupAsClassMember) {
   struct MyClass {
     CoverageDB db;
     CoverGroup* cg = nullptr;
-    void init() { cg = db.CreateGroup("cg_in_class"); }
+    void Init() { cg = db.CreateGroup("cg_in_class"); }
   };
   MyClass obj;
-  obj.init();
+  obj.Init();
   ASSERT_NE(obj.cg, nullptr);
   EXPECT_EQ(obj.cg->name, "cg_in_class");
 }

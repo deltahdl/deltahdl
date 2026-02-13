@@ -43,7 +43,7 @@ TEST(ParserSection27, GenerateForSingleItem) {
 
 // --- Single-item generate-if without begin/end (§27.5) ---
 
-TEST(ParserSection27, GenerateIfSingleItem) {
+TEST(ParserSection27, GenerateIfSingleItemParse) {
   auto r = Parse(
       "module m;\n"
       "  if (WIDTH > 1)\n"
@@ -55,11 +55,21 @@ TEST(ParserSection27, GenerateIfSingleItem) {
   auto* gen = mod->items[0];
   EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateIf);
   ASSERT_EQ(gen->gen_body.size(), 1);
+}
+
+TEST(ParserSection27, GenerateIfSingleItemBody) {
+  auto r = Parse(
+      "module m;\n"
+      "  if (WIDTH > 1)\n"
+      "    assign out = in;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* gen = r.cu->modules[0]->items[0];
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kContAssign);
   EXPECT_EQ(gen->gen_else, nullptr);
 }
 
-TEST(ParserSection27, GenerateIfElseSingleItem) {
+TEST(ParserSection27, GenerateIfElseSingleItemParse) {
   auto r = Parse(
       "module m;\n"
       "  if (WIDTH > 1)\n"
@@ -73,6 +83,18 @@ TEST(ParserSection27, GenerateIfElseSingleItem) {
   auto* gen = mod->items[0];
   EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateIf);
   ASSERT_EQ(gen->gen_body.size(), 1);
+}
+
+TEST(ParserSection27, GenerateIfElseSingleItemBranches) {
+  auto r = Parse(
+      "module m;\n"
+      "  if (WIDTH > 1)\n"
+      "    assign out = a;\n"
+      "  else\n"
+      "    assign out = b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* gen = r.cu->modules[0]->items[0];
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kContAssign);
   ASSERT_NE(gen->gen_else, nullptr);
   ASSERT_EQ(gen->gen_else->gen_body.size(), 1);
@@ -106,7 +128,7 @@ TEST(ParserSection27, GenvarDeclaration) {
 
 // --- Inline genvar in generate-for init (§27.4) ---
 
-TEST(ParserSection27, InlineGenvarInForInit) {
+TEST(ParserSection27, InlineGenvarInForInitParse) {
   auto r = Parse(
       "module m;\n"
       "  for (genvar i = 0; i < 4; i = i + 1) begin\n"
@@ -119,6 +141,17 @@ TEST(ParserSection27, InlineGenvarInForInit) {
   auto* gen = mod->items[0];
   EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateFor);
   ASSERT_NE(gen->gen_init, nullptr);
+}
+
+TEST(ParserSection27, InlineGenvarInForInitBody) {
+  auto r = Parse(
+      "module m;\n"
+      "  for (genvar i = 0; i < 4; i = i + 1) begin\n"
+      "    assign out[i] = in[i];\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* gen = r.cu->modules[0]->items[0];
   ASSERT_EQ(gen->gen_body.size(), 1);
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kContAssign);
 }
@@ -143,7 +176,7 @@ TEST(ParserSection27, GenerateForPostIncrement) {
 
 // --- Generate-case (§27.6) ---
 
-TEST(ParserSection27, GenerateCase) {
+TEST(ParserSection27, GenerateCaseParse) {
   auto r = Parse(
       "module m;\n"
       "  case (WIDTH)\n"
@@ -158,9 +191,23 @@ TEST(ParserSection27, GenerateCase) {
   auto* gen = mod->items[0];
   EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateCase);
   ASSERT_EQ(gen->gen_case_items.size(), 3u);
-  EXPECT_FALSE(gen->gen_case_items[0].is_default);
-  EXPECT_FALSE(gen->gen_case_items[1].is_default);
-  EXPECT_TRUE(gen->gen_case_items[2].is_default);
+}
+
+TEST(ParserSection27, GenerateCaseItemDefaults) {
+  auto r = Parse(
+      "module m;\n"
+      "  case (WIDTH)\n"
+      "    1: assign out = in;\n"
+      "    2: assign out = in2;\n"
+      "    default: assign out = 0;\n"
+      "  endcase\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* gen = r.cu->modules[0]->items[0];
+  const bool kExpectedDefaults[] = {false, false, true};
+  for (size_t i = 0; i < 3; i++) {
+    EXPECT_EQ(gen->gen_case_items[i].is_default, kExpectedDefaults[i]);
+  }
 }
 
 // --- Generate-for with labeled begin/end (§27.4) ---
@@ -200,7 +247,7 @@ TEST(ParserSection27, GenerateIfBeginEnd) {
 
 // --- Generate-if/else-if chain (§27.5) ---
 
-TEST(ParserSection27, GenerateIfElseIfChain) {
+TEST(ParserSection27, GenerateIfElseIfChainParse) {
   auto r = Parse(
       "module m;\n"
       "  if (WIDTH == 1)\n"
@@ -216,6 +263,20 @@ TEST(ParserSection27, GenerateIfElseIfChain) {
   auto* gen = mod->items[0];
   EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateIf);
   ASSERT_NE(gen->gen_else, nullptr);
+}
+
+TEST(ParserSection27, GenerateIfElseIfChainNesting) {
+  auto r = Parse(
+      "module m;\n"
+      "  if (WIDTH == 1)\n"
+      "    assign out = a;\n"
+      "  else if (WIDTH == 2)\n"
+      "    assign out = b;\n"
+      "  else\n"
+      "    assign out = c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* gen = r.cu->modules[0]->items[0];
   EXPECT_EQ(gen->gen_else->kind, ModuleItemKind::kGenerateIf);
   ASSERT_NE(gen->gen_else->gen_else, nullptr);
 }

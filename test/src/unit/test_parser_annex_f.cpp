@@ -55,7 +55,7 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
 // =============================================================================
 
 // --- D.1: $getpattern ---
-TEST(ParserAnnexD2, AnnexDGetpattern) {
+TEST(ParserAnnexD2, AnnexDGetpatternParse) {
   auto r = Parse(
       "module m;\n"
       "  initial x = $getpattern(mem_addr);\n"
@@ -65,12 +65,22 @@ TEST(ParserAnnexD2, AnnexDGetpattern) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+}
+
+TEST(ParserAnnexD2, AnnexDGetpatternRhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = $getpattern(mem_addr);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
 }
 
 // --- D.2: $incsave ---
-TEST(ParserAnnexD2, AnnexDIncsave) {
+TEST(ParserAnnexD2, AnnexDIncsaveParse) {
   auto r = Parse(
       "module m;\n"
       "  initial $incsave(\"incremental.sav\");\n"
@@ -80,6 +90,16 @@ TEST(ParserAnnexD2, AnnexDIncsave) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
+}
+
+TEST(ParserAnnexD2, AnnexDIncsaveExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial $incsave(\"incremental.sav\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->expr, nullptr);
   EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
 }
@@ -125,7 +145,7 @@ TEST(ParserAnnexD2, AnnexDResetFamily) {
 }
 
 // --- D.6: $scale ---
-TEST(ParserAnnexD2, AnnexDScale) {
+TEST(ParserAnnexD2, AnnexDScaleParse) {
   auto r = Parse(
       "module m;\n"
       "  initial x = $scale(hier_ref);\n"
@@ -135,6 +155,16 @@ TEST(ParserAnnexD2, AnnexDScale) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+}
+
+TEST(ParserAnnexD2, AnnexDScaleRhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = $scale(hier_ref);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
 }
@@ -153,7 +183,7 @@ TEST(ParserAnnexD2, AnnexDShowscopesArg) {
 }
 
 // --- D.8: $countones as expression ---
-TEST(ParserAnnexD2, AnnexDCountones) {
+TEST(ParserAnnexD2, AnnexDCountonesParse) {
   auto r = Parse(
       "module m;\n"
       "  initial x = $countones(data);\n"
@@ -163,12 +193,22 @@ TEST(ParserAnnexD2, AnnexDCountones) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+}
+
+TEST(ParserAnnexD2, AnnexDCountonesRhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = $countones(data);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
 }
 
 // --- D.9: $isunknown ---
-TEST(ParserAnnexD2, AnnexDIsunknown) {
+TEST(ParserAnnexD2, AnnexDIsunknownParse) {
   auto r = Parse(
       "module m;\n"
       "  initial x = $isunknown(data);\n"
@@ -178,6 +218,16 @@ TEST(ParserAnnexD2, AnnexDIsunknown) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+}
+
+TEST(ParserAnnexD2, AnnexDIsunknownRhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = $isunknown(data);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
 }

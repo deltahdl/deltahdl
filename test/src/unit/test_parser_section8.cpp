@@ -48,10 +48,11 @@ TEST(ParserSection8, ClassWithProperties) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
   auto* cls = r.cu->classes[0];
   ASSERT_GE(cls->members.size(), 2u);
-  EXPECT_EQ(cls->members[0]->kind, ClassMemberKind::kProperty);
-  EXPECT_EQ(cls->members[0]->name, "header");
-  EXPECT_EQ(cls->members[1]->kind, ClassMemberKind::kProperty);
-  EXPECT_EQ(cls->members[1]->name, "payload");
+  const std::string kExpectedNames[] = {"header", "payload"};
+  for (size_t i = 0; i < 2; ++i) {
+    EXPECT_EQ(cls->members[i]->kind, ClassMemberKind::kProperty);
+    EXPECT_EQ(cls->members[i]->name, kExpectedNames[i]);
+  }
 }
 
 TEST(ParserSection8, ClassWithMethod) {
@@ -75,7 +76,7 @@ TEST(ParserSection8, ClassWithMethod) {
   EXPECT_TRUE(found_method);
 }
 
-TEST(ParserSection8, ClassExtends) {
+TEST(ParserSection8, ClassExtendsBase) {
   auto r = Parse(
       "class Base;\n"
       "  int x;\n"
@@ -87,6 +88,18 @@ TEST(ParserSection8, ClassExtends) {
   ASSERT_EQ(r.cu->classes.size(), 2u);
   EXPECT_EQ(r.cu->classes[0]->name, "Base");
   EXPECT_TRUE(r.cu->classes[0]->base_class.empty());
+}
+
+TEST(ParserSection8, ClassExtendsDerived) {
+  auto r = Parse(
+      "class Base;\n"
+      "  int x;\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  int y;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 2u);
   EXPECT_EQ(r.cu->classes[1]->name, "Derived");
   EXPECT_EQ(r.cu->classes[1]->base_class, "Base");
 }
@@ -101,7 +114,7 @@ TEST(ParserSection8, VirtualClass) {
   EXPECT_TRUE(r.cu->classes[0]->is_virtual);
 }
 
-TEST(ParserSection8, ClassWithQualifiers) {
+TEST(ParserSection8, ClassWithQualifiersLocalProtected) {
   auto r = Parse(
       "class MyClass;\n"
       "  local int secret;\n"
@@ -115,6 +128,20 @@ TEST(ParserSection8, ClassWithQualifiers) {
   ASSERT_GE(cls->members.size(), 4u);
   EXPECT_TRUE(cls->members[0]->is_local);
   EXPECT_TRUE(cls->members[1]->is_protected);
+}
+
+TEST(ParserSection8, ClassWithQualifiersStaticRand) {
+  auto r = Parse(
+      "class MyClass;\n"
+      "  local int secret;\n"
+      "  protected int hidden;\n"
+      "  static int shared;\n"
+      "  rand int random_val;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto* cls = r.cu->classes[0];
+  ASSERT_GE(cls->members.size(), 4u);
   EXPECT_TRUE(cls->members[2]->is_static);
   EXPECT_TRUE(cls->members[3]->is_rand);
 }
@@ -236,7 +263,7 @@ TEST(ParserSection8, ParameterizedClassTypeParam) {
 }
 
 // §8.5 — Parameterized class with extends
-TEST(ParserSection8, ParameterizedClassExtends) {
+TEST(ParserSection8, ParameterizedClassExtendsName) {
   auto r = Parse(
       "class Base;\n"
       "  int x;\n"
@@ -248,9 +275,22 @@ TEST(ParserSection8, ParameterizedClassExtends) {
   ASSERT_EQ(r.cu->classes.size(), 2u);
   auto* cls = r.cu->classes[1];
   EXPECT_EQ(cls->name, "Derived");
+  EXPECT_EQ(cls->base_class, "Base");
+}
+
+TEST(ParserSection8, ParameterizedClassExtendsParams) {
+  auto r = Parse(
+      "class Base;\n"
+      "  int x;\n"
+      "endclass\n"
+      "class Derived #(parameter int N = 4) extends Base;\n"
+      "  int y;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 2u);
+  auto* cls = r.cu->classes[1];
   ASSERT_EQ(cls->params.size(), 1u);
   EXPECT_EQ(cls->params[0].first, "N");
-  EXPECT_EQ(cls->base_class, "Base");
 }
 
 // §8.13 — Extends with constructor arguments
@@ -288,7 +328,7 @@ TEST(ParserSection8, ClassInsideModule) {
 }
 
 // §8.5 — Parameterized class inside module (the sv-tests TIMEOUT case)
-TEST(ParserSection8, ParameterizedClassInsideModule) {
+TEST(ParserSection8, ParameterizedClassInsideModuleName) {
   auto r = Parse(
       "module class_tb;\n"
       "  class test_cls #(parameter a = 12);\n"
@@ -303,11 +343,27 @@ TEST(ParserSection8, ParameterizedClassInsideModule) {
       found = true;
       ASSERT_NE(item->class_decl, nullptr);
       EXPECT_EQ(item->class_decl->name, "test_cls");
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+TEST(ParserSection8, ParameterizedClassInsideModuleParams) {
+  auto r = Parse(
+      "module class_tb;\n"
+      "  class test_cls #(parameter a = 12);\n"
+      "  endclass\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto& items = r.cu->modules[0]->items;
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kClassDecl) {
+      ASSERT_NE(item->class_decl, nullptr);
       ASSERT_EQ(item->class_decl->params.size(), 1u);
       EXPECT_EQ(item->class_decl->params[0].first, "a");
     }
   }
-  EXPECT_TRUE(found);
 }
 
 // §8.26 — Typedef class (forward declaration)
@@ -693,9 +749,10 @@ TEST(ParserSection8, MultiplePropertiesCommaSeparated) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
   auto* cls = r.cu->classes[0];
   ASSERT_EQ(cls->members.size(), 3u);
-  EXPECT_EQ(cls->members[0]->name, "a");
-  EXPECT_EQ(cls->members[1]->name, "b");
-  EXPECT_EQ(cls->members[2]->name, "c");
+  const std::string kExpectedNames[] = {"a", "b", "c"};
+  for (size_t i = 0; i < 3; ++i) {
+    EXPECT_EQ(cls->members[i]->name, kExpectedNames[i]);
+  }
 }
 
 // §8.17 — Chaining constructors with super.new() and default

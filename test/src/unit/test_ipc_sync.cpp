@@ -301,13 +301,19 @@ TEST(IpcSync, EventTriggeredDifferentNames) {
 // 14. Semaphore: Multiple put/tryget cycles
 // =============================================================================
 
-TEST(IpcSync, SemaphoreMultiplePutTryGetCycles) {
+TEST(IpcSync, SemaphoreMultiplePutTryGetCycles_DrainKeys) {
   SemaphoreObject sem(0);
   sem.Put(10);
   EXPECT_EQ(sem.TryGet(3), 1);
   EXPECT_EQ(sem.key_count, 7);
   EXPECT_EQ(sem.TryGet(7), 1);
   EXPECT_EQ(sem.key_count, 0);
+}
+
+TEST(IpcSync, SemaphoreMultiplePutTryGetCycles_RefillAndDrain) {
+  SemaphoreObject sem(0);
+  sem.Put(10);
+  sem.TryGet(10);
   EXPECT_EQ(sem.TryGet(1), 0);
   sem.Put(2);
   EXPECT_EQ(sem.TryGet(2), 1);

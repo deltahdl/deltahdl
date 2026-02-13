@@ -46,7 +46,7 @@ TEST(ParserSection25, EndinterfaceNoLabel) {
 
 // --- Modport with port expressions (LRM §25.5.4) ---
 
-TEST(ParserSection25, ModportPortExpression) {
+TEST(ParserSection25, ModportPortExpressionName) {
   auto r = Parse(
       "interface bus;\n"
       "  logic [7:0] bus_data;\n"
@@ -57,6 +57,16 @@ TEST(ParserSection25, ModportPortExpression) {
   ASSERT_EQ(iface->modports.size(), 1);
   auto* mp = iface->modports[0];
   EXPECT_EQ(mp->name, "target");
+}
+
+TEST(ParserSection25, ModportPortExpressionPort) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  logic [7:0] bus_data;\n"
+      "  modport target(.data(bus_data));\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mp = r.cu->interfaces[0]->modports[0];
   ASSERT_EQ(mp->ports.size(), 1);
   EXPECT_EQ(mp->ports[0].name, "data");
   EXPECT_NE(mp->ports[0].expr, nullptr);
@@ -75,7 +85,7 @@ TEST(ParserSection25, ModportPortExpressionPartSelect) {
   EXPECT_NE(mp->ports[0].expr, nullptr);
 }
 
-TEST(ParserSection25, ModportMixedDirectionAndExpr) {
+TEST(ParserSection25, ModportMixedDirectionAndExprFirst) {
   auto r = Parse(
       "interface bus;\n"
       "  logic [7:0] bus_data;\n"
@@ -88,13 +98,25 @@ TEST(ParserSection25, ModportMixedDirectionAndExpr) {
   EXPECT_EQ(mp->ports[0].direction, Direction::kInput);
   EXPECT_EQ(mp->ports[0].name, "clk");
   EXPECT_EQ(mp->ports[0].expr, nullptr);
+}
+
+TEST(ParserSection25, ModportMixedDirectionAndExprSecond) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  logic [7:0] bus_data;\n"
+      "  logic clk;\n"
+      "  modport target(input clk, .data(bus_data[3:0]));\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 2);
   EXPECT_EQ(mp->ports[1].name, "data");
   EXPECT_NE(mp->ports[1].expr, nullptr);
 }
 
 // --- Modport import/export (LRM §25.5, §25.7) ---
 
-TEST(ParserSection25, ModportImportExport) {
+TEST(ParserSection25, ModportImportExportName) {
   auto r = Parse(
       "interface bus;\n"
       "  modport target(import Read, export Write);\n"
@@ -103,13 +125,26 @@ TEST(ParserSection25, ModportImportExport) {
   auto* mp = r.cu->interfaces[0]->modports[0];
   EXPECT_EQ(mp->name, "target");
   ASSERT_EQ(mp->ports.size(), 2);
-  EXPECT_TRUE(mp->ports[0].is_import);
-  EXPECT_EQ(mp->ports[0].name, "Read");
-  EXPECT_TRUE(mp->ports[1].is_export);
-  EXPECT_EQ(mp->ports[1].name, "Write");
 }
 
-TEST(ParserSection25, ModportImportWithDirection) {
+TEST(ParserSection25, ModportImportExportPorts) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  modport target(import Read, export Write);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 2);
+  struct Expected { bool is_import; bool is_export; const char* name; };
+  Expected expected[] = {{true, false, "Read"}, {false, true, "Write"}};
+  for (size_t i = 0; i < 2; ++i) {
+    EXPECT_EQ(mp->ports[i].is_import, expected[i].is_import);
+    EXPECT_EQ(mp->ports[i].is_export, expected[i].is_export);
+    EXPECT_EQ(mp->ports[i].name, expected[i].name);
+  }
+}
+
+TEST(ParserSection25, ModportImportWithDirectionFirst) {
   auto r = Parse(
       "interface bus;\n"
       "  logic data;\n"
@@ -121,6 +156,17 @@ TEST(ParserSection25, ModportImportWithDirection) {
   EXPECT_EQ(mp->ports[0].direction, Direction::kInput);
   EXPECT_EQ(mp->ports[0].name, "data");
   EXPECT_FALSE(mp->ports[0].is_import);
+}
+
+TEST(ParserSection25, ModportImportWithDirectionSecond) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  logic data;\n"
+      "  modport target(input data, import Read);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 2);
   EXPECT_FALSE(mp->ports[0].is_export);
   EXPECT_TRUE(mp->ports[1].is_import);
   EXPECT_EQ(mp->ports[1].name, "Read");
@@ -154,7 +200,7 @@ TEST(ParserSection25, VirtualInterfaceNoKeyword) {
   EXPECT_EQ(item->name, "bus_if");
 }
 
-TEST(ParserSection25, VirtualInterfaceWithModport) {
+TEST(ParserSection25, VirtualInterfaceWithModportKind) {
   auto r = Parse(
       "module top;\n"
       "  virtual interface simple_bus.target bus_if;\n"
@@ -163,9 +209,18 @@ TEST(ParserSection25, VirtualInterfaceWithModport) {
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kVirtualInterface);
+  EXPECT_EQ(item->name, "bus_if");
+}
+
+TEST(ParserSection25, VirtualInterfaceWithModportNames) {
+  auto r = Parse(
+      "module top;\n"
+      "  virtual interface simple_bus.target bus_if;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->data_type.type_name, "simple_bus");
   EXPECT_EQ(item->data_type.modport_name, "target");
-  EXPECT_EQ(item->name, "bus_if");
 }
 
 // --- Multiple modport items per statement (LRM §25.5) ---
@@ -180,14 +235,17 @@ TEST(ParserSection25, MultipleModportItems) {
   ASSERT_NE(r.cu, nullptr);
   auto* iface = r.cu->interfaces[0];
   ASSERT_EQ(iface->modports.size(), 2);
-  EXPECT_EQ(iface->modports[0]->name, "m1");
-  ASSERT_EQ(iface->modports[0]->ports.size(), 1);
-  EXPECT_EQ(iface->modports[0]->ports[0].direction, Direction::kInput);
-  EXPECT_EQ(iface->modports[0]->ports[0].name, "a");
-  EXPECT_EQ(iface->modports[1]->name, "m2");
-  ASSERT_EQ(iface->modports[1]->ports.size(), 1);
-  EXPECT_EQ(iface->modports[1]->ports[0].direction, Direction::kOutput);
-  EXPECT_EQ(iface->modports[1]->ports[0].name, "b");
+  struct Expected { const char* mp_name; Direction dir; const char* port_name; };
+  Expected expected[] = {
+      {"m1", Direction::kInput, "a"},
+      {"m2", Direction::kOutput, "b"},
+  };
+  for (size_t i = 0; i < 2; ++i) {
+    EXPECT_EQ(iface->modports[i]->name, expected[i].mp_name);
+    ASSERT_EQ(iface->modports[i]->ports.size(), 1);
+    EXPECT_EQ(iface->modports[i]->ports[0].direction, expected[i].dir);
+    EXPECT_EQ(iface->modports[i]->ports[0].name, expected[i].port_name);
+  }
 }
 
 TEST(ParserSection25, MultipleModportThreeItems) {
@@ -201,8 +259,9 @@ TEST(ParserSection25, MultipleModportThreeItems) {
   ASSERT_NE(r.cu, nullptr);
   auto* iface = r.cu->interfaces[0];
   ASSERT_EQ(iface->modports.size(), 3);
-  EXPECT_EQ(iface->modports[0]->name, "m1");
-  EXPECT_EQ(iface->modports[1]->name, "m2");
-  EXPECT_EQ(iface->modports[2]->name, "m3");
+  const std::string kExpectedNames[] = {"m1", "m2", "m3"};
+  for (size_t i = 0; i < 3; ++i) {
+    EXPECT_EQ(iface->modports[i]->name, kExpectedNames[i]);
+  }
   EXPECT_EQ(iface->modports[2]->ports[0].direction, Direction::kInout);
 }

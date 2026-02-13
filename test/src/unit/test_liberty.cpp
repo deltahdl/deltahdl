@@ -24,7 +24,7 @@ TEST(Liberty, ParseEmptyLibrary) {
 // Parse library with one cell, one pin
 // =============================================================================
 
-TEST(Liberty, ParseOneCellOnePin) {
+TEST(Liberty, ParseOneCellOnePin_CellInfo) {
   constexpr std::string_view kSrc = R"lib(
     library(mylib) {
       cell(BUF) {
@@ -41,17 +41,38 @@ TEST(Liberty, ParseOneCellOnePin) {
   auto lib = ParseLiberty(kSrc);
   EXPECT_EQ(lib.library_name, "mylib");
   ASSERT_EQ(lib.cells.size(), 1);
+  EXPECT_EQ(lib.cells[0].name, "BUF");
+  ASSERT_EQ(lib.cells[0].pins.size(), 2);
+}
 
-  const auto& cell = lib.cells[0];
-  EXPECT_EQ(cell.name, "BUF");
-  ASSERT_EQ(cell.pins.size(), 2);
-
-  EXPECT_EQ(cell.pins[0].name, "A");
-  EXPECT_EQ(cell.pins[0].direction, "input");
-
-  EXPECT_EQ(cell.pins[1].name, "Y");
-  EXPECT_EQ(cell.pins[1].direction, "output");
-  EXPECT_EQ(cell.pins[1].function, "A");
+TEST(Liberty, ParseOneCellOnePin_PinDetails) {
+  constexpr std::string_view kSrc = R"lib(
+    library(mylib) {
+      cell(BUF) {
+        pin(A) {
+          direction : input;
+        }
+        pin(Y) {
+          direction : output;
+          function : "A";
+        }
+      }
+    }
+  )lib";
+  auto lib = ParseLiberty(kSrc);
+  struct {
+    const char* name;
+    const char* direction;
+    const char* function;
+  } const kExpected[] = {
+      {"A", "input", ""},
+      {"Y", "output", "A"},
+  };
+  for (size_t i = 0; i < 2; ++i) {
+    EXPECT_EQ(lib.cells[0].pins[i].name, kExpected[i].name);
+    EXPECT_EQ(lib.cells[0].pins[i].direction, kExpected[i].direction);
+  }
+  EXPECT_EQ(lib.cells[0].pins[1].function, "A");
 }
 
 // =============================================================================

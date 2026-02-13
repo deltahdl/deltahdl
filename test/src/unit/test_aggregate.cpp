@@ -46,7 +46,7 @@ static Expr* ParseExprFrom(const std::string& src, AggFixture& f) {
 // §7.2 Struct type metadata — StructTypeInfo registration
 // =============================================================================
 
-TEST(StructType, RegisterAndFind) {
+TEST(StructType, RegisterAndFind_Metadata) {
   AggFixture f;
   StructTypeInfo info;
   info.type_name = "point_t";
@@ -62,12 +62,36 @@ TEST(StructType, RegisterAndFind) {
   EXPECT_TRUE(found->is_packed);
   EXPECT_EQ(found->total_width, 16u);
   ASSERT_EQ(found->fields.size(), 2u);
-  EXPECT_EQ(found->fields[0].name, "x");
-  EXPECT_EQ(found->fields[0].bit_offset, 8u);
-  EXPECT_EQ(found->fields[0].width, 8u);
-  EXPECT_EQ(found->fields[1].name, "y");
-  EXPECT_EQ(found->fields[1].bit_offset, 0u);
-  EXPECT_EQ(found->fields[1].width, 8u);
+}
+
+TEST(StructType, RegisterAndFind_Fields) {
+  AggFixture f;
+  StructTypeInfo info;
+  info.type_name = "point_t";
+  info.is_packed = true;
+  info.total_width = 16;
+  info.fields.push_back({"x", 8, 8});
+  info.fields.push_back({"y", 0, 8});
+
+  f.ctx.RegisterStructType("point_t", info);
+  auto* found = f.ctx.FindStructType("point_t");
+  ASSERT_NE(found, nullptr);
+  ASSERT_EQ(found->fields.size(), 2u);
+
+  struct Expected {
+    const char* name;
+    uint32_t bit_offset;
+    uint32_t width;
+  };
+  const Expected kExpected[] = {
+      {"x", 8, 8},
+      {"y", 0, 8},
+  };
+  for (size_t i = 0; i < 2; ++i) {
+    EXPECT_EQ(found->fields[i].name, kExpected[i].name) << "field " << i;
+    EXPECT_EQ(found->fields[i].bit_offset, kExpected[i].bit_offset) << "field " << i;
+    EXPECT_EQ(found->fields[i].width, kExpected[i].width) << "field " << i;
+  }
 }
 
 TEST(StructType, FindNonexistent) {

@@ -20,7 +20,7 @@ TEST(Lexer, AllAnnexBKeywords) {
   // Every IEEE 1800-2023 Annex B keyword must lex as a keyword, not
   // kIdentifier.  If this test fails, a keyword is missing from the
   // keyword table in keywords.cpp or token.h.
-  const char* keywords[] = {
+  const char* const kKeywords[] = {
       "accept_on",
       "alias",
       "always",
@@ -270,7 +270,7 @@ TEST(Lexer, AllAnnexBKeywords) {
       "xnor",
       "xor",
   };
-  for (const char* kw : keywords) {
+  for (const char* kw : kKeywords) {
     auto tokens = lex(kw);
     ASSERT_GE(tokens.size(), 2) << "keyword: " << kw;
     EXPECT_NE(tokens[0].kind, TokenKind::kIdentifier)
@@ -349,16 +349,24 @@ TEST(Lexer, KeywordVersionMarker_RestoresToDefault) {
 
 TEST(Lexer, ParseKeywordVersion_ValidVersions) {
   // §22.14: all nine version specifiers
-  EXPECT_EQ(*ParseKeywordVersion("1364-1995"), KeywordVersion::kVer13641995);
-  EXPECT_EQ(*ParseKeywordVersion("1364-2001"), KeywordVersion::kVer13642001);
-  EXPECT_EQ(*ParseKeywordVersion("1364-2001-noconfig"),
-            KeywordVersion::kVer13642001Noconfig);
-  EXPECT_EQ(*ParseKeywordVersion("1364-2005"), KeywordVersion::kVer13642005);
-  EXPECT_EQ(*ParseKeywordVersion("1800-2005"), KeywordVersion::kVer18002005);
-  EXPECT_EQ(*ParseKeywordVersion("1800-2009"), KeywordVersion::kVer18002009);
-  EXPECT_EQ(*ParseKeywordVersion("1800-2012"), KeywordVersion::kVer18002012);
-  EXPECT_EQ(*ParseKeywordVersion("1800-2017"), KeywordVersion::kVer18002017);
-  EXPECT_EQ(*ParseKeywordVersion("1800-2023"), KeywordVersion::kVer18002023);
+  struct Case {
+    const char* input;
+    KeywordVersion expected;
+  };
+  const Case kCases[] = {
+      {"1364-1995", KeywordVersion::kVer13641995},
+      {"1364-2001", KeywordVersion::kVer13642001},
+      {"1364-2001-noconfig", KeywordVersion::kVer13642001Noconfig},
+      {"1364-2005", KeywordVersion::kVer13642005},
+      {"1800-2005", KeywordVersion::kVer18002005},
+      {"1800-2009", KeywordVersion::kVer18002009},
+      {"1800-2012", KeywordVersion::kVer18002012},
+      {"1800-2017", KeywordVersion::kVer18002017},
+      {"1800-2023", KeywordVersion::kVer18002023},
+  };
+  for (const auto& c : kCases) {
+    EXPECT_EQ(*ParseKeywordVersion(c.input), c.expected) << c.input;
+  }
 }
 
 TEST(Lexer, ParseKeywordVersion_Invalid) {
@@ -384,14 +392,10 @@ TEST(Lexer, IntLiteral_LrmExample2_Sized) {
   auto t1 = lex("4'b1001");
   EXPECT_EQ(t1[0].kind, TokenKind::kIntLiteral);
   EXPECT_EQ(t1[0].text, "4'b1001");
-  auto t2 = lex("5 'D 3");
-  EXPECT_EQ(t2[0].kind, TokenKind::kIntLiteral);
-  auto t3 = lex("3'b01x");
-  EXPECT_EQ(t3[0].kind, TokenKind::kIntLiteral);
-  auto t4 = lex("12'hx");
-  EXPECT_EQ(t4[0].kind, TokenKind::kIntLiteral);
-  auto t5 = lex("16'hz");
-  EXPECT_EQ(t5[0].kind, TokenKind::kIntLiteral);
+  for (const char* src : {"5 'D 3", "3'b01x", "12'hx", "16'hz"}) {
+    auto tokens = lex(src);
+    EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral) << src;
+  }
 }
 
 TEST(Lexer, IntLiteral_LrmExample3_Signed) {
@@ -499,13 +503,22 @@ TEST(Lexer, TripleQuotedString_WithEscape) {
 
 TEST(Lexer, InterpretEscapes_NamedChars) {
   using delta::InterpretStringEscapes;
-  EXPECT_EQ(InterpretStringEscapes(R"(hello\nworld)"), "hello\nworld");
-  EXPECT_EQ(InterpretStringEscapes(R"(a\tb)"), "a\tb");
-  EXPECT_EQ(InterpretStringEscapes(R"(a\\b)"), "a\\b");
-  EXPECT_EQ(InterpretStringEscapes(R"(a\"b)"), "a\"b");
-  EXPECT_EQ(InterpretStringEscapes(R"(a\vb)"), std::string("a\vb"));
-  EXPECT_EQ(InterpretStringEscapes(R"(a\fb)"), std::string("a\fb"));
-  EXPECT_EQ(InterpretStringEscapes(R"(a\ab)"), std::string("a\ab"));
+  struct Case {
+    const char* input;
+    std::string expected;
+  };
+  const Case kCases[] = {
+      {R"(hello\nworld)", "hello\nworld"},
+      {R"(a\tb)", "a\tb"},
+      {R"(a\\b)", "a\\b"},
+      {R"(a\"b)", "a\"b"},
+      {R"(a\vb)", std::string("a\vb")},
+      {R"(a\fb)", std::string("a\fb")},
+      {R"(a\ab)", std::string("a\ab")},
+  };
+  for (const auto& c : kCases) {
+    EXPECT_EQ(InterpretStringEscapes(c.input), c.expected) << c.input;
+  }
 }
 
 TEST(Lexer, InterpretEscapes_Octal) {

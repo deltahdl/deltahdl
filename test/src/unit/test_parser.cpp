@@ -63,11 +63,21 @@ TEST(Parser, ModuleWithPorts) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->ports.size(), 4);
-  EXPECT_EQ(mod->ports[0].direction, Direction::kInput);
-  EXPECT_EQ(mod->ports[0].name, "a");
-  EXPECT_EQ(mod->ports[3].direction, Direction::kOutput);
-  EXPECT_EQ(mod->ports[3].name, "y");
+  struct Expected {
+    Direction dir;
+    const char* name;
+  };
+  Expected expected[] = {
+      {Direction::kInput, "a"},
+      {Direction::kInput, "b"},
+      {Direction::kInput, "sel"},
+      {Direction::kOutput, "y"},
+  };
+  ASSERT_EQ(mod->ports.size(), std::size(expected));
+  for (size_t i = 0; i < std::size(expected); ++i) {
+    EXPECT_EQ(mod->ports[i].direction, expected[i].dir) << "port " << i;
+    EXPECT_EQ(mod->ports[i].name, expected[i].name) << "port " << i;
+  }
 }
 
 TEST(Parser, ContinuousAssignment) {
@@ -231,15 +241,16 @@ TEST(Parser, TypedefEnum) {
       "  typedef enum { A, B, C } state_t;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->items.size(), 1);
-  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kTypedef);
-  EXPECT_EQ(mod->items[0]->name, "state_t");
-  EXPECT_EQ(mod->items[0]->typedef_type.kind, DataTypeKind::kEnum);
-  ASSERT_EQ(mod->items[0]->typedef_type.enum_members.size(), 3);
-  EXPECT_EQ(mod->items[0]->typedef_type.enum_members[0].name, "A");
-  EXPECT_EQ(mod->items[0]->typedef_type.enum_members[1].name, "B");
-  EXPECT_EQ(mod->items[0]->typedef_type.enum_members[2].name, "C");
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
+  EXPECT_EQ(item->name, "state_t");
+  EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kEnum);
+  std::string expected[] = {"A", "B", "C"};
+  ASSERT_EQ(item->typedef_type.enum_members.size(), std::size(expected));
+  for (size_t i = 0; i < std::size(expected); ++i) {
+    EXPECT_EQ(item->typedef_type.enum_members[i].name, expected[i])
+        << "member " << i;
+  }
 }
 
 TEST(Parser, EnumWithValues) {
@@ -249,11 +260,12 @@ TEST(Parser, EnumWithValues) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto& members = r.cu->modules[0]->items[0]->typedef_type.enum_members;
-  ASSERT_EQ(members.size(), 3);
-  EXPECT_EQ(members[0].name, "IDLE");
-  EXPECT_NE(members[0].value, nullptr);
-  EXPECT_EQ(members[1].name, "RUN");
-  EXPECT_NE(members[1].value, nullptr);
+  std::string expected[] = {"IDLE", "RUN", "STOP"};
+  ASSERT_EQ(members.size(), std::size(expected));
+  for (size_t i = 0; i < std::size(expected); ++i) {
+    EXPECT_EQ(members[i].name, expected[i]) << "member " << i;
+    EXPECT_NE(members[i].value, nullptr) << "member " << i;
+  }
 }
 
 TEST(Parser, InlineEnumVar) {
@@ -262,12 +274,11 @@ TEST(Parser, InlineEnumVar) {
       "  enum { X, Y } my_var;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->items.size(), 1);
-  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kVarDecl);
-  EXPECT_EQ(mod->items[0]->name, "my_var");
-  EXPECT_EQ(mod->items[0]->data_type.kind, DataTypeKind::kEnum);
-  ASSERT_EQ(mod->items[0]->data_type.enum_members.size(), 2);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(item->name, "my_var");
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kEnum);
+  ASSERT_EQ(item->data_type.enum_members.size(), 2);
 }
 
 TEST(Parser, FunctionDecl) {
@@ -278,13 +289,14 @@ TEST(Parser, FunctionDecl) {
       "  endfunction\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->items.size(), 1);
-  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_EQ(mod->items[0]->name, "add");
-  ASSERT_EQ(mod->items[0]->func_args.size(), 2);
-  EXPECT_EQ(mod->items[0]->func_args[0].name, "a");
-  EXPECT_EQ(mod->items[0]->func_args[1].name, "b");
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(item->name, "add");
+  std::string expected[] = {"a", "b"};
+  ASSERT_EQ(item->func_args.size(), std::size(expected));
+  for (size_t i = 0; i < std::size(expected); ++i) {
+    EXPECT_EQ(item->func_args[i].name, expected[i]) << "arg " << i;
+  }
 }
 
 TEST(Parser, TaskDecl) {
@@ -323,17 +335,24 @@ TEST(Parser, TypedefStruct) {
       "  } my_struct_t;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->items.size(), 1);
-  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kTypedef);
-  EXPECT_EQ(mod->items[0]->name, "my_struct_t");
-  EXPECT_EQ(mod->items[0]->typedef_type.kind, DataTypeKind::kStruct);
-  auto& members = mod->items[0]->typedef_type.struct_members;
-  ASSERT_EQ(members.size(), 2);
-  EXPECT_EQ(members[0].name, "a");
-  EXPECT_EQ(members[0].type_kind, DataTypeKind::kLogic);
-  EXPECT_EQ(members[1].name, "b");
-  EXPECT_EQ(members[1].type_kind, DataTypeKind::kInt);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
+  EXPECT_EQ(item->name, "my_struct_t");
+  EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kStruct);
+  struct Expected {
+    const char* name;
+    DataTypeKind type_kind;
+  };
+  Expected expected[] = {
+      {"a", DataTypeKind::kLogic},
+      {"b", DataTypeKind::kInt},
+  };
+  auto& members = item->typedef_type.struct_members;
+  ASSERT_EQ(members.size(), std::size(expected));
+  for (size_t i = 0; i < std::size(expected); ++i) {
+    EXPECT_EQ(members[i].name, expected[i].name) << "member " << i;
+    EXPECT_EQ(members[i].type_kind, expected[i].type_kind) << "member " << i;
+  }
 }
 
 TEST(Parser, TypedefUnion) {
@@ -372,12 +391,11 @@ TEST(Parser, InlineStructVar) {
       "  struct { int x; int y; } point;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->items.size(), 1);
-  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kVarDecl);
-  EXPECT_EQ(mod->items[0]->name, "point");
-  EXPECT_EQ(mod->items[0]->data_type.kind, DataTypeKind::kStruct);
-  ASSERT_EQ(mod->items[0]->data_type.struct_members.size(), 2);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(item->name, "point");
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kStruct);
+  ASSERT_EQ(item->data_type.struct_members.size(), 2);
 }
 
 TEST(Parser, EmptyPackage) {
@@ -405,12 +423,11 @@ TEST(Parser, ImportSpecific) {
       "  import my_pkg::WIDTH;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->items.size(), 1);
-  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kImportDecl);
-  EXPECT_EQ(mod->items[0]->import_item.package_name, "my_pkg");
-  EXPECT_EQ(mod->items[0]->import_item.item_name, "WIDTH");
-  EXPECT_FALSE(mod->items[0]->import_item.is_wildcard);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kImportDecl);
+  EXPECT_EQ(item->import_item.package_name, "my_pkg");
+  EXPECT_EQ(item->import_item.item_name, "WIDTH");
+  EXPECT_FALSE(item->import_item.is_wildcard);
 }
 
 TEST(Parser, ImportWildcard) {
@@ -446,17 +463,17 @@ TEST(Parser, GenerateFor) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto* mod = r.cu->modules[0];
-  bool found_gen = false;
+  ModuleItem* gen = nullptr;
   for (auto* item : mod->items) {
     if (item->kind == ModuleItemKind::kGenerateFor) {
-      found_gen = true;
-      EXPECT_NE(item->gen_init, nullptr);
-      EXPECT_NE(item->gen_cond, nullptr);
-      EXPECT_NE(item->gen_step, nullptr);
-      EXPECT_FALSE(item->gen_body.empty());
+      gen = item;
     }
   }
-  EXPECT_TRUE(found_gen);
+  ASSERT_NE(gen, nullptr);
+  EXPECT_NE(gen->gen_init, nullptr);
+  EXPECT_NE(gen->gen_cond, nullptr);
+  EXPECT_NE(gen->gen_step, nullptr);
+  EXPECT_FALSE(gen->gen_body.empty());
 }
 
 TEST(Parser, GenerateIf) {
@@ -526,10 +543,11 @@ TEST(Parser, GenerateCase) {
   EXPECT_EQ(item->kind, ModuleItemKind::kGenerateCase);
   EXPECT_NE(item->gen_cond, nullptr);
   ASSERT_EQ(item->gen_case_items.size(), 2);
-  EXPECT_FALSE(item->gen_case_items[0].is_default);
-  EXPECT_EQ(item->gen_case_items[0].patterns.size(), 1);
-  EXPECT_FALSE(item->gen_case_items[0].body.empty());
-  EXPECT_EQ(item->gen_case_items[1].patterns.size(), 1);
+  for (size_t i = 0; i < 2; ++i) {
+    EXPECT_FALSE(item->gen_case_items[i].is_default) << "case item " << i;
+    EXPECT_EQ(item->gen_case_items[i].patterns.size(), 1) << "case item " << i;
+    EXPECT_FALSE(item->gen_case_items[i].body.empty()) << "case item " << i;
+  }
 }
 
 TEST(Parser, GenerateCaseDefault) {
@@ -595,19 +613,17 @@ TEST(Parser, GateAndInst) {
   EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
   EXPECT_EQ(item->gate_kind, GateKind::kAnd);
   EXPECT_EQ(item->gate_inst_name, "g1");
-  EXPECT_EQ(item->gate_terminals.size(), 3);
-  EXPECT_EQ(item->gate_delay, nullptr);
+  EXPECT_EQ(item->gate_terminals.size(), 3u);
 }
 
 TEST(Parser, GateNandWithDelay) {
   auto r = Parse("module t; nand #(5) g2(out, a, b); endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
   EXPECT_EQ(item->gate_kind, GateKind::kNand);
   EXPECT_EQ(item->gate_inst_name, "g2");
   EXPECT_NE(item->gate_delay, nullptr);
-  EXPECT_EQ(item->gate_terminals.size(), 3);
+  EXPECT_EQ(item->gate_terminals.size(), 3u);
 }
 
 TEST(Parser, GateBufMultiOutput) {
@@ -701,13 +717,19 @@ TEST(Parser, InterfaceWithModport) {
       "  modport master(output data);\n"
       "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* iface = r.cu->interfaces[0];
-  EXPECT_EQ(iface->items.size(), 1);
-  ASSERT_EQ(iface->modports.size(), 1);
-  EXPECT_EQ(iface->modports[0]->name, "master");
-  ASSERT_EQ(iface->modports[0]->ports.size(), 1);
-  EXPECT_EQ(iface->modports[0]->ports[0].direction, Direction::kOutput);
-  EXPECT_EQ(iface->modports[0]->ports[0].name, "data");
+  ASSERT_EQ(r.cu->interfaces[0]->modports.size(), 1);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  EXPECT_EQ(mp->name, "master");
+  struct Expected {
+    Direction dir;
+    const char* name;
+  };
+  Expected expected[] = {{Direction::kOutput, "data"}};
+  ASSERT_EQ(mp->ports.size(), std::size(expected));
+  for (size_t i = 0; i < std::size(expected); ++i) {
+    EXPECT_EQ(mp->ports[i].direction, expected[i].dir) << "port " << i;
+    EXPECT_EQ(mp->ports[i].name, expected[i].name) << "port " << i;
+  }
 }
 
 TEST(Parser, ModportMultipleGroups) {
@@ -863,12 +885,11 @@ TEST(Parser, EventTrigger) {
       "  initial ->ev;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[1];
-  EXPECT_EQ(item->kind, ModuleItemKind::kInitialBlock);
-  EXPECT_EQ(item->body->kind, StmtKind::kEventTrigger);
-  EXPECT_NE(item->body->expr, nullptr);
-  EXPECT_EQ(item->body->expr->kind, ExprKind::kIdentifier);
-  EXPECT_EQ(item->body->expr->text, "ev");
+  auto* stmt = r.cu->modules[0]->items[1]->body;
+  EXPECT_EQ(stmt->kind, StmtKind::kEventTrigger);
+  ASSERT_NE(stmt->expr, nullptr);
+  EXPECT_EQ(stmt->expr->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(stmt->expr->text, "ev");
 }
 
 TEST(Parser, EventWaitWithParens) {

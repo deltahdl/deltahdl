@@ -183,7 +183,7 @@ TEST(ParserSection11, PrefixDecrement) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection11, PostfixIncrement) {
+TEST(ParserSection11, PostfixIncrementParses) {
   auto r = Parse(
       "module t;\n"
       "  initial a++;\n"
@@ -193,12 +193,21 @@ TEST(ParserSection11, PostfixIncrement) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
+}
+
+TEST(ParserSection11, PostfixIncrementOp) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial a++;\n"
+      "endmodule\n");
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->expr, nullptr);
   EXPECT_EQ(stmt->expr->kind, ExprKind::kPostfixUnary);
   EXPECT_EQ(stmt->expr->op, TokenKind::kPlusPlus);
 }
 
-TEST(ParserSection11, PostfixDecrement) {
+TEST(ParserSection11, PostfixDecrementParses) {
   auto r = Parse(
       "module t;\n"
       "  initial a--;\n"
@@ -208,6 +217,15 @@ TEST(ParserSection11, PostfixDecrement) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
+}
+
+TEST(ParserSection11, PostfixDecrementOp) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial a--;\n"
+      "endmodule\n");
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->expr, nullptr);
   EXPECT_EQ(stmt->expr->kind, ExprKind::kPostfixUnary);
   EXPECT_EQ(stmt->expr->op, TokenKind::kMinusMinus);
@@ -217,7 +235,7 @@ TEST(ParserSection11, PostfixDecrement) {
 // Section 11.4.13 -- Inside operator (set membership)
 // =========================================================================
 
-TEST(ParserSection11, InsideBasicList) {
+TEST(ParserSection11, InsideBasicListParses) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -229,12 +247,36 @@ TEST(ParserSection11, InsideBasicList) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
+}
+
+TEST(ParserSection11, InsideBasicListCondition) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (a inside {1, 2, 3}) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
   auto* cond = stmt->condition;
   ASSERT_NE(cond, nullptr);
   EXPECT_EQ(cond->kind, ExprKind::kInside);
+  EXPECT_EQ(cond->elements.size(), 3u);
+}
+
+TEST(ParserSection11, InsideBasicListLhs) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (a inside {1, 2, 3}) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* cond = stmt->condition;
+  ASSERT_NE(cond, nullptr);
   ASSERT_NE(cond->lhs, nullptr);
   EXPECT_EQ(cond->lhs->kind, ExprKind::kIdentifier);
-  EXPECT_EQ(cond->elements.size(), 3u);
 }
 
 TEST(ParserSection11, InsideWithRange) {
@@ -251,6 +293,19 @@ TEST(ParserSection11, InsideWithRange) {
   auto* cond = stmt->condition;
   ASSERT_NE(cond, nullptr);
   EXPECT_EQ(cond->kind, ExprKind::kInside);
+}
+
+TEST(ParserSection11, InsideWithRangeElements) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (a inside {[16:23], [32:47]}) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* cond = stmt->condition;
+  ASSERT_NE(cond, nullptr);
   EXPECT_EQ(cond->elements.size(), 2u);
 }
 
@@ -278,6 +333,15 @@ TEST(ParserSection11, StreamingRight) {
   auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
+}
+
+TEST(ParserSection11, StreamingRightDetails) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = {>> {a, b, c}};\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kGtGt);
   EXPECT_EQ(rhs->elements.size(), 3u);
 }
@@ -818,7 +882,7 @@ TEST(ParserSection11, LogicalShiftRight) {
 // Section 11.3.2 -- Operator precedence (complex expression)
 // =========================================================================
 
-TEST(ParserSection11, OperatorPrecedenceMixedArith) {
+TEST(ParserSection11, OperatorPrecedenceMixedArithParses) {
   auto r = Parse(
       "module t;\n"
       "  initial x = a + b * c;\n"
@@ -830,6 +894,15 @@ TEST(ParserSection11, OperatorPrecedenceMixedArith) {
   // * has higher precedence than +, so top-level is +
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
+}
+
+TEST(ParserSection11, OperatorPrecedenceMixedArithRhs) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = a + b * c;\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
   ASSERT_NE(rhs->rhs, nullptr);
   EXPECT_EQ(rhs->rhs->op, TokenKind::kStar);
 }

@@ -60,7 +60,7 @@ TEST(NetlistWriter, VerilogSimpleAnd) {
   EXPECT_NE(vlog.find("output"), std::string::npos);
   EXPECT_NE(vlog.find("endmodule"), std::string::npos);
   // Should contain an AND assign.
-  EXPECT_NE(vlog.find("&"), std::string::npos);
+  EXPECT_NE(vlog.find('&'), std::string::npos);
 }
 
 TEST(NetlistWriter, VerilogConstantOutput) {
@@ -135,15 +135,12 @@ TEST(NetlistWriter, BlifMultiInputMultiOutput) {
   std::string blif = NetlistWriter::WriteBlif(g, "multi");
 
   EXPECT_NE(blif.find(".model multi"), std::string::npos);
-  // Three inputs.
-  EXPECT_NE(blif.find("i0"), std::string::npos);
-  EXPECT_NE(blif.find("i1"), std::string::npos);
-  EXPECT_NE(blif.find("i2"), std::string::npos);
-  // Three outputs.
-  EXPECT_NE(blif.find("o0"), std::string::npos);
-  EXPECT_NE(blif.find("o1"), std::string::npos);
-  EXPECT_NE(blif.find("o2"), std::string::npos);
   EXPECT_NE(blif.find(".end"), std::string::npos);
+  // Three inputs and three outputs.
+  const char* const kExpectedNames[] = {"i0", "i1", "i2", "o0", "o1", "o2"};
+  for (const char* name : kExpectedNames) {
+    EXPECT_NE(blif.find(name), std::string::npos);
+  }
 }
 
 // =============================================================================

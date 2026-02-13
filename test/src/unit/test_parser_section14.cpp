@@ -36,6 +36,16 @@ static ModuleItem* FindClockingBlock(ParseResult14& r, size_t idx = 0) {
   return nullptr;
 }
 
+// Validates parse result and retrieves a clocking block via output param.
+// Must be called through ASSERT_NO_FATAL_FAILURE.
+static void GetClockingBlock(ParseResult14& r, ModuleItem*& out,
+                             size_t idx = 0) {
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_FALSE(r.cu->modules.empty());
+  out = FindClockingBlock(r, idx);
+  ASSERT_NE(out, nullptr);
+}
+
 // =============================================================================
 // §14.3 — Basic clocking block declaration
 // =============================================================================
@@ -47,19 +57,25 @@ TEST(ParserSection14, BasicClockingBlock) {
       "    input data;\n"
       "  endclocking\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto* item = FindClockingBlock(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kClockingBlock);
-  EXPECT_EQ(item->name, "cb");
-  EXPECT_FALSE(item->is_default_clocking);
-  EXPECT_FALSE(item->is_global_clocking);
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  EXPECT_EQ(r.cu->modules.size(), 1u);
   ASSERT_EQ(item->clocking_event.size(), 1u);
-  EXPECT_EQ(item->clocking_event[0].edge, Edge::kPosedge);
   ASSERT_EQ(item->clocking_signals.size(), 1u);
-  EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInput);
-  EXPECT_EQ(item->clocking_signals[0].name, "data");
+
+  // Validate properties, event, and signal via loop.
+  struct { bool ok; const char* label; } const kChecks[] = {
+      {item->kind == ModuleItemKind::kClockingBlock, "kind"},
+      {item->name == "cb", "name"},
+      {!item->is_default_clocking, "not_default"},
+      {!item->is_global_clocking, "not_global"},
+      {item->clocking_event[0].edge == Edge::kPosedge, "event_edge"},
+      {item->clocking_signals[0].direction == Direction::kInput, "sig_dir"},
+      {item->clocking_signals[0].name == "data", "sig_name"},
+  };
+  for (const auto& c : kChecks) {
+    EXPECT_TRUE(c.ok) << c.label;
+  }
 }
 
 // =============================================================================
@@ -74,17 +90,24 @@ TEST(ParserSection14, DefaultClocking) {
       "    output ack;\n"
       "  endclocking\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FindClockingBlock(r);
-  ASSERT_NE(item, nullptr);
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
   EXPECT_TRUE(item->is_default_clocking);
   EXPECT_FALSE(item->is_global_clocking);
   EXPECT_EQ(item->name, "cb");
-  ASSERT_EQ(item->clocking_signals.size(), 2u);
-  EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInput);
-  EXPECT_EQ(item->clocking_signals[0].name, "data");
-  EXPECT_EQ(item->clocking_signals[1].direction, Direction::kOutput);
-  EXPECT_EQ(item->clocking_signals[1].name, "ack");
+
+  struct Expected { Direction dir; std::string name; };
+  Expected expected[] = {
+      {Direction::kInput, "data"},
+      {Direction::kOutput, "ack"},
+  };
+  ASSERT_EQ(item->clocking_signals.size(), std::size(expected));
+  for (size_t i = 0; i < std::size(expected); ++i) {
+    EXPECT_EQ(item->clocking_signals[i].direction, expected[i].dir)
+        << "signal " << i;
+    EXPECT_EQ(item->clocking_signals[i].name, expected[i].name)
+        << "signal " << i;
+  }
 }
 
 // =============================================================================
@@ -97,12 +120,11 @@ TEST(ParserSection14, GlobalClocking) {
       "  global clocking gclk @(posedge sys_clk);\n"
       "  endclocking\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FindClockingBlock(r);
-  ASSERT_NE(item, nullptr);
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  EXPECT_EQ(item->name, "gclk");
   EXPECT_TRUE(item->is_global_clocking);
   EXPECT_FALSE(item->is_default_clocking);
-  EXPECT_EQ(item->name, "gclk");
   EXPECT_TRUE(item->clocking_signals.empty());
 }
 
@@ -119,16 +141,22 @@ TEST(ParserSection14, SignalDirections) {
       "    inout bidir;\n"
       "  endclocking\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FindClockingBlock(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->clocking_signals.size(), 3u);
-  EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInput);
-  EXPECT_EQ(item->clocking_signals[0].name, "data_in");
-  EXPECT_EQ(item->clocking_signals[1].direction, Direction::kOutput);
-  EXPECT_EQ(item->clocking_signals[1].name, "data_out");
-  EXPECT_EQ(item->clocking_signals[2].direction, Direction::kInout);
-  EXPECT_EQ(item->clocking_signals[2].name, "bidir");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+
+  struct Expected { Direction dir; std::string name; };
+  Expected expected[] = {
+      {Direction::kInput, "data_in"},
+      {Direction::kOutput, "data_out"},
+      {Direction::kInout, "bidir"},
+  };
+  ASSERT_EQ(item->clocking_signals.size(), std::size(expected));
+  for (size_t i = 0; i < std::size(expected); ++i) {
+    EXPECT_EQ(item->clocking_signals[i].direction, expected[i].dir)
+        << "signal " << i;
+    EXPECT_EQ(item->clocking_signals[i].name, expected[i].name)
+        << "signal " << i;
+  }
 }
 
 // =============================================================================
@@ -142,15 +170,20 @@ TEST(ParserSection14, InputSkewDelay) {
       "    input #2 data;\n"
       "  endclocking\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FindClockingBlock(r);
-  ASSERT_NE(item, nullptr);
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   auto& sig = item->clocking_signals[0];
-  EXPECT_EQ(sig.direction, Direction::kInput);
-  EXPECT_EQ(sig.name, "data");
   ASSERT_NE(sig.skew_delay, nullptr);
-  EXPECT_EQ(sig.skew_delay->kind, ExprKind::kIntegerLiteral);
+
+  struct { bool ok; const char* label; } const kChecks[] = {
+      {sig.direction == Direction::kInput, "direction"},
+      {sig.name == "data", "name"},
+      {sig.skew_delay->kind == ExprKind::kIntegerLiteral, "skew_delay_kind"},
+  };
+  for (const auto& c : kChecks) {
+    EXPECT_TRUE(c.ok) << c.label;
+  }
 }
 
 // =============================================================================
@@ -164,9 +197,8 @@ TEST(ParserSection14, OutputSkewEdge) {
       "    output negedge ack;\n"
       "  endclocking\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FindClockingBlock(r);
-  ASSERT_NE(item, nullptr);
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   auto& sig = item->clocking_signals[0];
   EXPECT_EQ(sig.direction, Direction::kOutput);
@@ -185,15 +217,16 @@ TEST(ParserSection14, MultipleSignalsSameDirection) {
       "    input data, ready, enable;\n"
       "  endclocking\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FindClockingBlock(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->clocking_signals.size(), 3u);
-  EXPECT_EQ(item->clocking_signals[0].name, "data");
-  EXPECT_EQ(item->clocking_signals[1].name, "ready");
-  EXPECT_EQ(item->clocking_signals[2].name, "enable");
-  for (const auto& sig : item->clocking_signals) {
-    EXPECT_EQ(sig.direction, Direction::kInput);
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+
+  const char* const kExpectedNames[] = {"data", "ready", "enable"};
+  ASSERT_EQ(item->clocking_signals.size(), std::size(kExpectedNames));
+  for (size_t i = 0; i < std::size(kExpectedNames); ++i) {
+    EXPECT_EQ(item->clocking_signals[i].name, kExpectedNames[i])
+        << "signal " << i;
+    EXPECT_EQ(item->clocking_signals[i].direction, Direction::kInput)
+        << "signal " << i;
   }
 }
 
@@ -227,15 +260,17 @@ TEST(ParserSection14, CombinedInputOutputSkew) {
       "    input #2 output #4 cmd;\n"
       "  endclocking\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FindClockingBlock(r);
-  ASSERT_NE(item, nullptr);
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   auto& sig = item->clocking_signals[0];
   EXPECT_EQ(sig.direction, Direction::kInout);
   EXPECT_EQ(sig.name, "cmd");
-  ASSERT_NE(sig.skew_delay, nullptr);
-  ASSERT_NE(sig.out_skew_delay, nullptr);
+
+  const void* const kSkewPtrs[] = {sig.skew_delay, sig.out_skew_delay};
+  for (const auto* p : kSkewPtrs) {
+    EXPECT_NE(p, nullptr);
+  }
 }
 
 // =============================================================================

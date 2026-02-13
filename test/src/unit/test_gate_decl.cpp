@@ -163,12 +163,13 @@ uint32_t MaxDelays(GateType type) {
 
 // §28.3.2: Only certain gate types can have drive strength.
 TEST(GateDecl, StrengthSpecValidForNInputGates) {
-  EXPECT_TRUE(CanHaveStrengthSpec(GateType::kAnd));
-  EXPECT_TRUE(CanHaveStrengthSpec(GateType::kNand));
-  EXPECT_TRUE(CanHaveStrengthSpec(GateType::kOr));
-  EXPECT_TRUE(CanHaveStrengthSpec(GateType::kNor));
-  EXPECT_TRUE(CanHaveStrengthSpec(GateType::kXor));
-  EXPECT_TRUE(CanHaveStrengthSpec(GateType::kXnor));
+  constexpr GateType kNInputGates[] = {
+      GateType::kAnd,  GateType::kNand, GateType::kOr,
+      GateType::kNor,  GateType::kXor,  GateType::kXnor,
+  };
+  for (auto gate : kNInputGates) {
+    EXPECT_TRUE(CanHaveStrengthSpec(gate));
+  }
 }
 
 TEST(GateDecl, StrengthSpecValidForNOutputGates) {
@@ -220,22 +221,20 @@ TEST(GateDecl, Highz1OutputsZInsteadOf1) {
 
 // §28.3.3: "pullup and pulldown instance declarations shall not include
 //  delay specifications."
-TEST(GateDecl, PullupNoDelays) { EXPECT_EQ(MaxDelays(GateType::kPullup), 0u); }
-
-TEST(GateDecl, PulldownNoDelays) {
-  EXPECT_EQ(MaxDelays(GateType::kPulldown), 0u);
-}
-
-TEST(GateDecl, NInputGateMaxTwoDelays) {
-  EXPECT_EQ(MaxDelays(GateType::kAnd), 2u);
-}
-
-TEST(GateDecl, EnableGateMaxThreeDelays) {
-  EXPECT_EQ(MaxDelays(GateType::kBufif0), 3u);
-}
-
-TEST(GateDecl, MosSwitchMaxThreeDelays) {
-  EXPECT_EQ(MaxDelays(GateType::kNmos), 3u);
+TEST(GateDecl, MaxDelaysByGateType) {
+  struct {
+    GateType gate;
+    uint32_t expected;
+  } const kCases[] = {
+      {GateType::kPullup, 0u},
+      {GateType::kPulldown, 0u},
+      {GateType::kAnd, 2u},
+      {GateType::kBufif0, 3u},
+      {GateType::kNmos, 3u},
+  };
+  for (const auto& c : kCases) {
+    EXPECT_EQ(MaxDelays(c.gate), c.expected);
+  }
 }
 
 // §28.3.3: "Gates and switches in declarations with no delay

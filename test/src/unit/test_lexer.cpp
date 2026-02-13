@@ -162,13 +162,17 @@ TEST(Lexer, Identifier_LrmExamples) {
 
 TEST(Lexer, Number_IntegerLiterals) {
   auto tokens = lex("42 8'hFF 4'b1010");
-  ASSERT_EQ(tokens.size(), 4);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
-  EXPECT_EQ(tokens[0].text, "42");
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIntLiteral);
-  EXPECT_EQ(tokens[1].text, "8'hFF");
-  EXPECT_EQ(tokens[2].kind, TokenKind::kIntLiteral);
-  EXPECT_EQ(tokens[2].text, "4'b1010");
+  struct Case { TokenKind kind; std::string text; };
+  Case expected[] = {
+      {TokenKind::kIntLiteral, "42"},
+      {TokenKind::kIntLiteral, "8'hFF"},
+      {TokenKind::kIntLiteral, "4'b1010"},
+  };
+  ASSERT_EQ(tokens.size(), std::size(expected) + 1);
+  for (size_t i = 0; i < std::size(expected); ++i) {
+    EXPECT_EQ(tokens[i].kind, expected[i].kind) << "token " << i;
+    EXPECT_EQ(tokens[i].text, expected[i].text) << "token " << i;
+  }
 }
 
 TEST(Lexer, Number_DispatchIntRealTime) {
@@ -284,77 +288,65 @@ TEST(Lexer, CompilerDirective_BacktickIsUnexpected) {
 
 TEST(Lexer, Operators_SingleChar) {
   auto tokens = lex("+ - * / % & | ^ ~ ! = < > ?");
-  EXPECT_EQ(tokens[0].kind, TokenKind::kPlus);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kMinus);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kStar);
-  EXPECT_EQ(tokens[3].kind, TokenKind::kSlash);
-  EXPECT_EQ(tokens[4].kind, TokenKind::kPercent);
-  EXPECT_EQ(tokens[5].kind, TokenKind::kAmp);
-  EXPECT_EQ(tokens[6].kind, TokenKind::kPipe);
-  EXPECT_EQ(tokens[7].kind, TokenKind::kCaret);
-  EXPECT_EQ(tokens[8].kind, TokenKind::kTilde);
-  EXPECT_EQ(tokens[9].kind, TokenKind::kBang);
-  EXPECT_EQ(tokens[10].kind, TokenKind::kEq);
-  EXPECT_EQ(tokens[11].kind, TokenKind::kLt);
-  EXPECT_EQ(tokens[12].kind, TokenKind::kGt);
-  EXPECT_EQ(tokens[13].kind, TokenKind::kQuestion);
+  TokenKind expected[] = {
+      TokenKind::kPlus,     TokenKind::kMinus, TokenKind::kStar,
+      TokenKind::kSlash,    TokenKind::kPercent, TokenKind::kAmp,
+      TokenKind::kPipe,     TokenKind::kCaret, TokenKind::kTilde,
+      TokenKind::kBang,     TokenKind::kEq,    TokenKind::kLt,
+      TokenKind::kGt,       TokenKind::kQuestion,
+  };
+  ASSERT_EQ(tokens.size(), std::size(expected) + 1);
+  for (size_t i = 0; i < std::size(expected); ++i) {
+    EXPECT_EQ(tokens[i].kind, expected[i]) << "token " << i;
+  }
 }
 
 TEST(Lexer, Operators_DoubleChar) {
   auto tokens =
       lex("== != <= >= << >> && || ** ++ -- -> => :: ~& ~| ~^ ^~ .* ## @@");
-  EXPECT_EQ(tokens[0].kind, TokenKind::kEqEq);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kBangEq);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kLtEq);
-  EXPECT_EQ(tokens[3].kind, TokenKind::kGtEq);
-  EXPECT_EQ(tokens[4].kind, TokenKind::kLtLt);
-  EXPECT_EQ(tokens[5].kind, TokenKind::kGtGt);
-  EXPECT_EQ(tokens[6].kind, TokenKind::kAmpAmp);
-  EXPECT_EQ(tokens[7].kind, TokenKind::kPipePipe);
-  EXPECT_EQ(tokens[8].kind, TokenKind::kPower);
-  EXPECT_EQ(tokens[9].kind, TokenKind::kPlusPlus);
-  EXPECT_EQ(tokens[10].kind, TokenKind::kMinusMinus);
-  EXPECT_EQ(tokens[11].kind, TokenKind::kArrow);
-  EXPECT_EQ(tokens[12].kind, TokenKind::kEqGt);
-  EXPECT_EQ(tokens[13].kind, TokenKind::kColonColon);
-  EXPECT_EQ(tokens[14].kind, TokenKind::kTildeAmp);
-  EXPECT_EQ(tokens[15].kind, TokenKind::kTildePipe);
-  EXPECT_EQ(tokens[16].kind, TokenKind::kTildeCaret);
-  EXPECT_EQ(tokens[17].kind, TokenKind::kCaretTilde);
-  EXPECT_EQ(tokens[18].kind, TokenKind::kDotStar);
-  EXPECT_EQ(tokens[19].kind, TokenKind::kHashHash);
-  EXPECT_EQ(tokens[20].kind, TokenKind::kAtAt);
+  TokenKind expected[] = {
+      TokenKind::kEqEq,      TokenKind::kBangEq,    TokenKind::kLtEq,
+      TokenKind::kGtEq,      TokenKind::kLtLt,      TokenKind::kGtGt,
+      TokenKind::kAmpAmp,    TokenKind::kPipePipe,   TokenKind::kPower,
+      TokenKind::kPlusPlus,  TokenKind::kMinusMinus, TokenKind::kArrow,
+      TokenKind::kEqGt,      TokenKind::kColonColon, TokenKind::kTildeAmp,
+      TokenKind::kTildePipe, TokenKind::kTildeCaret, TokenKind::kCaretTilde,
+      TokenKind::kDotStar,   TokenKind::kHashHash,   TokenKind::kAtAt,
+  };
+  ASSERT_EQ(tokens.size(), std::size(expected) + 1);
+  for (size_t i = 0; i < std::size(expected); ++i) {
+    EXPECT_EQ(tokens[i].kind, expected[i]) << "token " << i;
+  }
 }
 
 TEST(Lexer, Operators_TripleChar) {
   auto tokens = lex("=== !== ==? !=? <<< >>> ->> |-> |=> <-> &&&");
-  EXPECT_EQ(tokens[0].kind, TokenKind::kEqEqEq);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kBangEqEq);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kEqEqQuestion);
-  EXPECT_EQ(tokens[3].kind, TokenKind::kBangEqQuestion);
-  EXPECT_EQ(tokens[4].kind, TokenKind::kLtLtLt);
-  EXPECT_EQ(tokens[5].kind, TokenKind::kGtGtGt);
-  EXPECT_EQ(tokens[6].kind, TokenKind::kDashGtGt);
-  EXPECT_EQ(tokens[7].kind, TokenKind::kPipeDashGt);
-  EXPECT_EQ(tokens[8].kind, TokenKind::kPipeEqGt);
-  EXPECT_EQ(tokens[9].kind, TokenKind::kLtDashGt);
-  EXPECT_EQ(tokens[10].kind, TokenKind::kAmpAmpAmp);
+  TokenKind expected[] = {
+      TokenKind::kEqEqEq,       TokenKind::kBangEqEq,
+      TokenKind::kEqEqQuestion,  TokenKind::kBangEqQuestion,
+      TokenKind::kLtLtLt,       TokenKind::kGtGtGt,
+      TokenKind::kDashGtGt,     TokenKind::kPipeDashGt,
+      TokenKind::kPipeEqGt,     TokenKind::kLtDashGt,
+      TokenKind::kAmpAmpAmp,
+  };
+  ASSERT_EQ(tokens.size(), std::size(expected) + 1);
+  for (size_t i = 0; i < std::size(expected); ++i) {
+    EXPECT_EQ(tokens[i].kind, expected[i]) << "token " << i;
+  }
 }
 
 TEST(Lexer, Operators_CompoundAssignment) {
   auto tokens = lex("+= -= *= /= %= &= |= ^= <<= >>= <<<= >>>=");
-  EXPECT_EQ(tokens[0].kind, TokenKind::kPlusEq);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kMinusEq);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kStarEq);
-  EXPECT_EQ(tokens[3].kind, TokenKind::kSlashEq);
-  EXPECT_EQ(tokens[4].kind, TokenKind::kPercentEq);
-  EXPECT_EQ(tokens[5].kind, TokenKind::kAmpEq);
-  EXPECT_EQ(tokens[6].kind, TokenKind::kPipeEq);
-  EXPECT_EQ(tokens[7].kind, TokenKind::kCaretEq);
-  EXPECT_EQ(tokens[8].kind, TokenKind::kLtLtEq);
-  EXPECT_EQ(tokens[9].kind, TokenKind::kGtGtEq);
-  EXPECT_EQ(tokens[10].kind, TokenKind::kLtLtLtEq);
-  EXPECT_EQ(tokens[11].kind, TokenKind::kGtGtGtEq);
+  TokenKind expected[] = {
+      TokenKind::kPlusEq,    TokenKind::kMinusEq,   TokenKind::kStarEq,
+      TokenKind::kSlashEq,   TokenKind::kPercentEq,  TokenKind::kAmpEq,
+      TokenKind::kPipeEq,    TokenKind::kCaretEq,   TokenKind::kLtLtEq,
+      TokenKind::kGtGtEq,   TokenKind::kLtLtLtEq,  TokenKind::kGtGtGtEq,
+  };
+  ASSERT_EQ(tokens.size(), std::size(expected) + 1);
+  for (size_t i = 0; i < std::size(expected); ++i) {
+    EXPECT_EQ(tokens[i].kind, expected[i]) << "token " << i;
+  }
 }
 
 TEST(Lexer, Operators_IndexedPartSelect) {
@@ -377,18 +369,18 @@ TEST(Lexer, Operators_StarGt) {
 
 TEST(Lexer, Punctuation) {
   auto tokens = lex("( ) [ ] { } ; , . : # @");
-  EXPECT_EQ(tokens[0].kind, TokenKind::kLParen);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kRParen);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kLBracket);
-  EXPECT_EQ(tokens[3].kind, TokenKind::kRBracket);
-  EXPECT_EQ(tokens[4].kind, TokenKind::kLBrace);
-  EXPECT_EQ(tokens[5].kind, TokenKind::kRBrace);
-  EXPECT_EQ(tokens[6].kind, TokenKind::kSemicolon);
-  EXPECT_EQ(tokens[7].kind, TokenKind::kComma);
-  EXPECT_EQ(tokens[8].kind, TokenKind::kDot);
-  EXPECT_EQ(tokens[9].kind, TokenKind::kColon);
-  EXPECT_EQ(tokens[10].kind, TokenKind::kHash);
-  EXPECT_EQ(tokens[11].kind, TokenKind::kAt);
+  TokenKind expected[] = {
+      TokenKind::kLParen,    TokenKind::kRParen,
+      TokenKind::kLBracket,  TokenKind::kRBracket,
+      TokenKind::kLBrace,    TokenKind::kRBrace,
+      TokenKind::kSemicolon, TokenKind::kComma,
+      TokenKind::kDot,       TokenKind::kColon,
+      TokenKind::kHash,      TokenKind::kAt,
+  };
+  ASSERT_EQ(tokens.size(), std::size(expected) + 1);
+  for (size_t i = 0; i < std::size(expected); ++i) {
+    EXPECT_EQ(tokens[i].kind, expected[i]) << "token " << i;
+  }
 }
 
 TEST(Lexer, Operators_Dollar) {
@@ -460,13 +452,20 @@ TEST(Lexer, Comment_EmptyBlockComment) {
 TEST(Lexer, HelloSv) {
   auto tokens = lex(
       "module hello;\n  initial $display(\"Hello, DeltaHDL!\");\nendmodule\n");
-  EXPECT_EQ(tokens[0].kind, TokenKind::kKwModule);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[1].text, "hello");
-  EXPECT_EQ(tokens[2].kind, TokenKind::kSemicolon);
-  EXPECT_EQ(tokens[3].kind, TokenKind::kKwInitial);
-  EXPECT_EQ(tokens[4].kind, TokenKind::kSystemIdentifier);
-  EXPECT_EQ(tokens[4].text, "$display");
+  struct Case { size_t idx; TokenKind kind; const char* text; };
+  Case expected[] = {
+      {0, TokenKind::kKwModule, nullptr},
+      {1, TokenKind::kIdentifier, "hello"},
+      {2, TokenKind::kSemicolon, nullptr},
+      {3, TokenKind::kKwInitial, nullptr},
+      {4, TokenKind::kSystemIdentifier, "$display"},
+  };
+  for (const auto& c : expected) {
+    EXPECT_EQ(tokens[c.idx].kind, c.kind) << "token " << c.idx;
+    if (c.text) {
+      EXPECT_EQ(tokens[c.idx].text, c.text) << "token " << c.idx;
+    }
+  }
 }
 
 // --- §5.7.2: Real literal constants ---
@@ -547,12 +546,16 @@ TEST(Lexer, TimeLiteral_FixedPointBase) {
 
 TEST(Lexer, SourceLocations) {
   auto tokens = lex("a\nb c");
-  EXPECT_EQ(tokens[0].loc.line, 1);
-  EXPECT_EQ(tokens[0].loc.column, 1);
-  EXPECT_EQ(tokens[1].loc.line, 2);
-  EXPECT_EQ(tokens[1].loc.column, 1);
-  EXPECT_EQ(tokens[2].loc.line, 2);
-  EXPECT_EQ(tokens[2].loc.column, 3);
+  struct Case { size_t idx; int line; int column; };
+  Case expected[] = {
+      {0, 1, 1},
+      {1, 2, 1},
+      {2, 2, 3},
+  };
+  for (const auto& c : expected) {
+    EXPECT_EQ(tokens[c.idx].loc.line, c.line) << "token " << c.idx;
+    EXPECT_EQ(tokens[c.idx].loc.column, c.column) << "token " << c.idx;
+  }
 }
 
 // --- §5.10/5.11: Assignment pattern token ---
@@ -607,35 +610,54 @@ TEST(Lexer, ApostropheLBrace_ArrayTypePrefixed) {
 TEST(Lexer, AttrStart) {
   auto tokens = lex("(* full_case *)");
   ASSERT_GE(tokens.size(), 4);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kAttrStart);
-  EXPECT_EQ(tokens[0].text, "(*");
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[1].text, "full_case");
-  EXPECT_EQ(tokens[2].kind, TokenKind::kAttrEnd);
-  EXPECT_EQ(tokens[2].text, "*)");
+  struct Case { size_t idx; TokenKind kind; const char* text; };
+  Case expected[] = {
+      {0, TokenKind::kAttrStart, "(*"},
+      {1, TokenKind::kIdentifier, "full_case"},
+      {2, TokenKind::kAttrEnd, "*)"},
+  };
+  for (const auto& c : expected) {
+    EXPECT_EQ(tokens[c.idx].kind, c.kind) << "token " << c.idx;
+    EXPECT_EQ(tokens[c.idx].text, c.text) << "token " << c.idx;
+  }
 }
 
 TEST(Lexer, AttrWithValue) {
   // §5.12: (* attr_name = constant_expression *)
   auto tokens = lex("(* synthesis = 1 *)");
-  EXPECT_EQ(tokens[0].kind, TokenKind::kAttrStart);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[1].text, "synthesis");
-  EXPECT_EQ(tokens[2].kind, TokenKind::kEq);
-  EXPECT_EQ(tokens[3].kind, TokenKind::kIntLiteral);
-  EXPECT_EQ(tokens[4].kind, TokenKind::kAttrEnd);
+  struct Case { size_t idx; TokenKind kind; const char* text; };
+  Case expected[] = {
+      {0, TokenKind::kAttrStart, nullptr},
+      {1, TokenKind::kIdentifier, "synthesis"},
+      {2, TokenKind::kEq, nullptr},
+      {3, TokenKind::kIntLiteral, nullptr},
+      {4, TokenKind::kAttrEnd, nullptr},
+  };
+  for (const auto& c : expected) {
+    EXPECT_EQ(tokens[c.idx].kind, c.kind) << "token " << c.idx;
+    if (c.text) {
+      EXPECT_EQ(tokens[c.idx].text, c.text) << "token " << c.idx;
+    }
+  }
 }
 
 TEST(Lexer, AttrMultipleSpecs) {
   // §5.12: (* attr1, attr2 *)
   auto tokens = lex("(* full_case, parallel_case *)");
-  EXPECT_EQ(tokens[0].kind, TokenKind::kAttrStart);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[1].text, "full_case");
-  EXPECT_EQ(tokens[2].kind, TokenKind::kComma);
-  EXPECT_EQ(tokens[3].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[3].text, "parallel_case");
-  EXPECT_EQ(tokens[4].kind, TokenKind::kAttrEnd);
+  struct Case { size_t idx; TokenKind kind; const char* text; };
+  Case expected[] = {
+      {0, TokenKind::kAttrStart, nullptr},
+      {1, TokenKind::kIdentifier, "full_case"},
+      {2, TokenKind::kComma, nullptr},
+      {3, TokenKind::kIdentifier, "parallel_case"},
+      {4, TokenKind::kAttrEnd, nullptr},
+  };
+  for (const auto& c : expected) {
+    EXPECT_EQ(tokens[c.idx].kind, c.kind) << "token " << c.idx;
+    if (c.text) {
+      EXPECT_EQ(tokens[c.idx].text, c.text) << "token " << c.idx;
+    }
+  }
 }
 
 TEST(Lexer, AttrDoesNotConfuseMultiply) {

@@ -245,14 +245,13 @@ TEST(ForceRelease, ReleaseNetImmediatelyRestoresDriverValue) {
 // §10.6.2 example: at time 0, d=0 (a&b&c=1&0&1=0), e=0 (and gate).
 // At time 10, force d and e to a|b|c=1. At time 20, release both back
 // to driver values (0).
-TEST(ForceRelease, NormativeExampleForceAndRelease) {
+TEST(ForceRelease, NormativeExampleForceAndRelease_InitialState) {
   Arena arena;
   auto* vd = arena.Create<Variable>();
   vd->value = MakeLogic4Vec(arena, 1);
   auto* ve = arena.Create<Variable>();
   ve->value = MakeLogic4Vec(arena, 1);
 
-  // Drivers: d has continuous assign a&b&c = 0, e has gate and(a,b,c) = 0.
   Net net_d;
   net_d.type = NetType::kWire;
   net_d.resolved = vd;
@@ -268,6 +267,24 @@ TEST(ForceRelease, NormativeExampleForceAndRelease) {
   ReleaseNet(net_e, arena);
   EXPECT_EQ(ValOf(*vd), kVal0);
   EXPECT_EQ(ValOf(*ve), kVal0);
+}
+
+TEST(ForceRelease, NormativeExampleForceAndRelease_ForceAndRelease) {
+  Arena arena;
+  auto* vd = arena.Create<Variable>();
+  vd->value = MakeLogic4Vec(arena, 1);
+  auto* ve = arena.Create<Variable>();
+  ve->value = MakeLogic4Vec(arena, 1);
+
+  Net net_d;
+  net_d.type = NetType::kWire;
+  net_d.resolved = vd;
+  net_d.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+
+  Net net_e;
+  net_e.type = NetType::kWire;
+  net_e.resolved = ve;
+  net_e.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
 
   // Time 10: force both to a|b|c = 1.
   ForceNet(net_d, MakeLogic4VecVal(arena, 1, 1), arena);

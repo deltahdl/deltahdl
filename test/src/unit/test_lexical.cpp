@@ -231,7 +231,7 @@ TEST(Lexical, Timeunit_DifferentValues) {
   ASSERT_EQ(r.cu->modules.size(), 1);
 }
 
-TEST(Lexical, Timeunit_StoredInModuleDecl) {
+TEST(Lexical, Timeunit_StoredInModuleDecl_Values) {
   // The timeunit/timeprecision values should be stored in ModuleDecl.
   auto r = Parse(
       "module top;\n"
@@ -243,6 +243,17 @@ TEST(Lexical, Timeunit_StoredInModuleDecl) {
   auto* mod = r.cu->modules[0];
   EXPECT_EQ(mod->time_unit, TimeUnit::kNs);
   EXPECT_EQ(mod->time_prec, TimeUnit::kPs);
+}
+
+TEST(Lexical, Timeunit_StoredInModuleDecl_Flags) {
+  auto r = Parse(
+      "module top;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1);
+  auto* mod = r.cu->modules[0];
   EXPECT_TRUE(mod->has_timeunit);
   EXPECT_TRUE(mod->has_timeprecision);
 }
@@ -291,16 +302,17 @@ TEST(Lexical, ContAssign_WithDelay) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1);
-  bool found = false;
+  const ModuleItem* assign_item = nullptr;
   for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kContAssign) continue;
-    found = true;
-    // The delay should be stored in assign_delay.
-    ASSERT_NE(item->assign_delay, nullptr);
-    EXPECT_EQ(item->assign_delay->kind, ExprKind::kIntegerLiteral);
-    EXPECT_EQ(item->assign_delay->int_val, 5);
+    if (item->kind == ModuleItemKind::kContAssign) {
+      assign_item = item;
+      break;
+    }
   }
-  EXPECT_TRUE(found) << "no continuous assignment found";
+  ASSERT_NE(assign_item, nullptr) << "no continuous assignment found";
+  ASSERT_NE(assign_item->assign_delay, nullptr);
+  EXPECT_EQ(assign_item->assign_delay->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(assign_item->assign_delay->int_val, 5);
 }
 
 TEST(Lexical, ContAssign_WithParenDelay) {

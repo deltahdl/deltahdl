@@ -43,7 +43,7 @@ static Stmt* FirstInitialStmt(ParseResult& r) {
 // §16.3 Immediate assertions — assert
 // =============================================================================
 
-TEST(ParserSection16, ImmediateAssertBasic) {
+TEST(ParserSection16, ImmediateAssertBasicKind) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -55,11 +55,23 @@ TEST(ParserSection16, ImmediateAssertBasic) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
   EXPECT_NE(stmt->assert_expr, nullptr);
+}
+
+TEST(ParserSection16, ImmediateAssertBasicNoActions) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    assert(a == b);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->assert_pass_stmt, nullptr);
   EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
 }
 
-TEST(ParserSection16, ImmediateAssertWithElse) {
+TEST(ParserSection16, ImmediateAssertWithElseKind) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -71,6 +83,18 @@ TEST(ParserSection16, ImmediateAssertWithElse) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
   EXPECT_NE(stmt->assert_expr, nullptr);
+}
+
+TEST(ParserSection16, ImmediateAssertWithElseActions) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    assert(x > 0) $display(\"ok\"); else $error(\"fail\");\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
   EXPECT_NE(stmt->assert_pass_stmt, nullptr);
   EXPECT_NE(stmt->assert_fail_stmt, nullptr);
 }

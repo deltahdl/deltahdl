@@ -25,9 +25,22 @@ uint64_t ComputeTristateDelay(uint64_t d_rise, uint64_t d_fall, uint64_t d_z,
 
 // --- Implementations ---
 
+// Helper: compute pass-through value for conducting tristate gate.
+Val4Ext PassGateValue(Val4 data, bool invert) {
+  Val4 v = data;
+  if (invert) {
+    if (v == Val4::kV0)
+      v = Val4::kV1;
+    else if (v == Val4::kV1)
+      v = Val4::kV0;
+    else
+      v = Val4::kX;
+  }
+  if (v == Val4::kZ) v = Val4::kX;
+  return static_cast<Val4Ext>(v);
+}
+
 Val4Ext EvalTristateGate(TristateKind kind, Val4 data, Val4 control) {
-  // Determine whether this gate inverts (notif0/notif1) and which control
-  // value enables conduction (bufif0/notif0 → 0, bufif1/notif1 → 1).
   bool invert =
       (kind == TristateKind::kNotif0 || kind == TristateKind::kNotif1);
   Val4 conduct =
@@ -36,22 +49,8 @@ Val4Ext EvalTristateGate(TristateKind kind, Val4 data, Val4 control) {
           : Val4::kV1;
   Val4 block = (conduct == Val4::kV0) ? Val4::kV1 : Val4::kV0;
 
-  auto pass = [&](Val4 d) -> Val4Ext {
-    Val4 v = invert ? ((d == Val4::kV0)   ? Val4::kV1
-                       : (d == Val4::kV1) ? Val4::kV0
-                                          : Val4::kX)
-                    : d;
-    // z on input is treated as x for the output value.
-    if (v == Val4::kZ) v = Val4::kX;
-    return static_cast<Val4Ext>(v);
-  };
-
-  if (control == conduct) {
-    return pass(data);
-  }
-  if (control == block) {
-    return Val4Ext::kZ;
-  }
+  if (control == conduct) return PassGateValue(data, invert);
+  if (control == block) return Val4Ext::kZ;
   // control is x or z — weak / unknown output per Table 28-5.
   if (data == Val4::kV0) return invert ? Val4Ext::kH : Val4Ext::kL;
   if (data == Val4::kV1) return invert ? Val4Ext::kL : Val4Ext::kH;
@@ -81,93 +80,95 @@ uint64_t ComputeTristateDelay(uint64_t d_rise, uint64_t d_fall, uint64_t d_z,
 
 // bufif0: conducts when control=0
 TEST(TristateGates, Bufif0TruthTable) {
-  // control=0: pass data through
-  EXPECT_EQ(EvalTristateGate(TristateKind::kBufif0, Val4::kV0, Val4::kV0),
-            Val4Ext::kV0);
-  EXPECT_EQ(EvalTristateGate(TristateKind::kBufif0, Val4::kV1, Val4::kV0),
-            Val4Ext::kV1);
-  EXPECT_EQ(EvalTristateGate(TristateKind::kBufif0, Val4::kX, Val4::kV0),
-            Val4Ext::kX);
-  EXPECT_EQ(EvalTristateGate(TristateKind::kBufif0, Val4::kZ, Val4::kV0),
-            Val4Ext::kX);
-  // control=1: output z
-  EXPECT_EQ(EvalTristateGate(TristateKind::kBufif0, Val4::kV0, Val4::kV1),
-            Val4Ext::kZ);
-  EXPECT_EQ(EvalTristateGate(TristateKind::kBufif0, Val4::kV1, Val4::kV1),
-            Val4Ext::kZ);
-  EXPECT_EQ(EvalTristateGate(TristateKind::kBufif0, Val4::kX, Val4::kV1),
-            Val4Ext::kZ);
-  EXPECT_EQ(EvalTristateGate(TristateKind::kBufif0, Val4::kZ, Val4::kV1),
-            Val4Ext::kZ);
-  // control=x: L or H or x
-  EXPECT_EQ(EvalTristateGate(TristateKind::kBufif0, Val4::kV0, Val4::kX),
-            Val4Ext::kL);
-  EXPECT_EQ(EvalTristateGate(TristateKind::kBufif0, Val4::kV1, Val4::kX),
-            Val4Ext::kH);
-  EXPECT_EQ(EvalTristateGate(TristateKind::kBufif0, Val4::kX, Val4::kX),
-            Val4Ext::kX);
-  EXPECT_EQ(EvalTristateGate(TristateKind::kBufif0, Val4::kZ, Val4::kX),
-            Val4Ext::kX);
-  // control=z: same as control=x
-  EXPECT_EQ(EvalTristateGate(TristateKind::kBufif0, Val4::kV0, Val4::kZ),
-            Val4Ext::kL);
-  EXPECT_EQ(EvalTristateGate(TristateKind::kBufif0, Val4::kV1, Val4::kZ),
-            Val4Ext::kH);
-  EXPECT_EQ(EvalTristateGate(TristateKind::kBufif0, Val4::kX, Val4::kZ),
-            Val4Ext::kX);
-  EXPECT_EQ(EvalTristateGate(TristateKind::kBufif0, Val4::kZ, Val4::kZ),
-            Val4Ext::kX);
+  struct Case { Val4 data; Val4 control; Val4Ext expected; };
+  Case cases[] = {
+      // control=0: pass data through
+      {Val4::kV0, Val4::kV0, Val4Ext::kV0},
+      {Val4::kV1, Val4::kV0, Val4Ext::kV1},
+      {Val4::kX,  Val4::kV0, Val4Ext::kX},
+      {Val4::kZ,  Val4::kV0, Val4Ext::kX},
+      // control=1: output z
+      {Val4::kV0, Val4::kV1, Val4Ext::kZ},
+      {Val4::kV1, Val4::kV1, Val4Ext::kZ},
+      {Val4::kX,  Val4::kV1, Val4Ext::kZ},
+      {Val4::kZ,  Val4::kV1, Val4Ext::kZ},
+      // control=x: L or H or x
+      {Val4::kV0, Val4::kX,  Val4Ext::kL},
+      {Val4::kV1, Val4::kX,  Val4Ext::kH},
+      {Val4::kX,  Val4::kX,  Val4Ext::kX},
+      {Val4::kZ,  Val4::kX,  Val4Ext::kX},
+      // control=z: same as control=x
+      {Val4::kV0, Val4::kZ,  Val4Ext::kL},
+      {Val4::kV1, Val4::kZ,  Val4Ext::kH},
+      {Val4::kX,  Val4::kZ,  Val4Ext::kX},
+      {Val4::kZ,  Val4::kZ,  Val4Ext::kX},
+  };
+  for (const auto& c : cases) {
+    EXPECT_EQ(EvalTristateGate(TristateKind::kBufif0, c.data, c.control),
+              c.expected)
+        << "Bufif0(" << static_cast<int>(c.data) << ", "
+        << static_cast<int>(c.control) << ")";
+  }
 }
 
 // bufif1: conducts when control=1
 TEST(TristateGates, Bufif1TruthTable) {
-  EXPECT_EQ(EvalTristateGate(TristateKind::kBufif1, Val4::kV0, Val4::kV0),
-            Val4Ext::kZ);
-  EXPECT_EQ(EvalTristateGate(TristateKind::kBufif1, Val4::kV0, Val4::kV1),
-            Val4Ext::kV0);
-  EXPECT_EQ(EvalTristateGate(TristateKind::kBufif1, Val4::kV1, Val4::kV0),
-            Val4Ext::kZ);
-  EXPECT_EQ(EvalTristateGate(TristateKind::kBufif1, Val4::kV1, Val4::kV1),
-            Val4Ext::kV1);
-  // x/z control
-  EXPECT_EQ(EvalTristateGate(TristateKind::kBufif1, Val4::kV0, Val4::kX),
-            Val4Ext::kL);
-  EXPECT_EQ(EvalTristateGate(TristateKind::kBufif1, Val4::kV1, Val4::kX),
-            Val4Ext::kH);
+  struct Case { Val4 data; Val4 control; Val4Ext expected; };
+  Case cases[] = {
+      {Val4::kV0, Val4::kV0, Val4Ext::kZ},
+      {Val4::kV0, Val4::kV1, Val4Ext::kV0},
+      {Val4::kV1, Val4::kV0, Val4Ext::kZ},
+      {Val4::kV1, Val4::kV1, Val4Ext::kV1},
+      // x/z control
+      {Val4::kV0, Val4::kX,  Val4Ext::kL},
+      {Val4::kV1, Val4::kX,  Val4Ext::kH},
+  };
+  for (const auto& c : cases) {
+    EXPECT_EQ(EvalTristateGate(TristateKind::kBufif1, c.data, c.control),
+              c.expected)
+        << "Bufif1(" << static_cast<int>(c.data) << ", "
+        << static_cast<int>(c.control) << ")";
+  }
 }
 
 // notif0: conducts inverted when control=0
 TEST(TristateGates, Notif0TruthTable) {
-  EXPECT_EQ(EvalTristateGate(TristateKind::kNotif0, Val4::kV0, Val4::kV0),
-            Val4Ext::kV1);
-  EXPECT_EQ(EvalTristateGate(TristateKind::kNotif0, Val4::kV1, Val4::kV0),
-            Val4Ext::kV0);
-  EXPECT_EQ(EvalTristateGate(TristateKind::kNotif0, Val4::kV0, Val4::kV1),
-            Val4Ext::kZ);
-  EXPECT_EQ(EvalTristateGate(TristateKind::kNotif0, Val4::kV1, Val4::kV1),
-            Val4Ext::kZ);
-  // x/z control
-  EXPECT_EQ(EvalTristateGate(TristateKind::kNotif0, Val4::kV0, Val4::kX),
-            Val4Ext::kH);
-  EXPECT_EQ(EvalTristateGate(TristateKind::kNotif0, Val4::kV1, Val4::kX),
-            Val4Ext::kL);
+  struct Case { Val4 data; Val4 control; Val4Ext expected; };
+  Case cases[] = {
+      {Val4::kV0, Val4::kV0, Val4Ext::kV1},
+      {Val4::kV1, Val4::kV0, Val4Ext::kV0},
+      {Val4::kV0, Val4::kV1, Val4Ext::kZ},
+      {Val4::kV1, Val4::kV1, Val4Ext::kZ},
+      // x/z control
+      {Val4::kV0, Val4::kX,  Val4Ext::kH},
+      {Val4::kV1, Val4::kX,  Val4Ext::kL},
+  };
+  for (const auto& c : cases) {
+    EXPECT_EQ(EvalTristateGate(TristateKind::kNotif0, c.data, c.control),
+              c.expected)
+        << "Notif0(" << static_cast<int>(c.data) << ", "
+        << static_cast<int>(c.control) << ")";
+  }
 }
 
 // notif1: conducts inverted when control=1
 TEST(TristateGates, Notif1TruthTable) {
-  EXPECT_EQ(EvalTristateGate(TristateKind::kNotif1, Val4::kV0, Val4::kV0),
-            Val4Ext::kZ);
-  EXPECT_EQ(EvalTristateGate(TristateKind::kNotif1, Val4::kV0, Val4::kV1),
-            Val4Ext::kV1);
-  EXPECT_EQ(EvalTristateGate(TristateKind::kNotif1, Val4::kV1, Val4::kV0),
-            Val4Ext::kZ);
-  EXPECT_EQ(EvalTristateGate(TristateKind::kNotif1, Val4::kV1, Val4::kV1),
-            Val4Ext::kV0);
-  // x/z control
-  EXPECT_EQ(EvalTristateGate(TristateKind::kNotif1, Val4::kV0, Val4::kX),
-            Val4Ext::kH);
-  EXPECT_EQ(EvalTristateGate(TristateKind::kNotif1, Val4::kV1, Val4::kX),
-            Val4Ext::kL);
+  struct Case { Val4 data; Val4 control; Val4Ext expected; };
+  Case cases[] = {
+      {Val4::kV0, Val4::kV0, Val4Ext::kZ},
+      {Val4::kV0, Val4::kV1, Val4Ext::kV1},
+      {Val4::kV1, Val4::kV0, Val4Ext::kZ},
+      {Val4::kV1, Val4::kV1, Val4Ext::kV0},
+      // x/z control
+      {Val4::kV0, Val4::kX,  Val4Ext::kH},
+      {Val4::kV1, Val4::kX,  Val4Ext::kL},
+  };
+  for (const auto& c : cases) {
+    EXPECT_EQ(EvalTristateGate(TristateKind::kNotif1, c.data, c.control),
+              c.expected)
+        << "Notif1(" << static_cast<int>(c.data) << ", "
+        << static_cast<int>(c.control) << ")";
+  }
 }
 
 // §28.6: Three delays — rise, fall, z; smallest = x.

@@ -258,7 +258,7 @@ TEST(ParserSection12, PlainCaseIsNotInside) {
 // LRM section 12.7.3 -- foreach loop
 // =============================================================================
 
-TEST(ParserSection12, ForeachBasic) {
+TEST(ParserSection12, ForeachBasicParses) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -270,9 +270,20 @@ TEST(ParserSection12, ForeachBasic) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kForeach);
   EXPECT_NE(stmt->expr, nullptr);
+  EXPECT_NE(stmt->body, nullptr);
+}
+
+TEST(ParserSection12, ForeachBasicVars) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    foreach (arr[i]) x = arr[i];\n"
+      "  end\n"
+      "endmodule\n");
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
   ASSERT_EQ(stmt->foreach_vars.size(), 1u);
   EXPECT_EQ(stmt->foreach_vars[0], "i");
-  EXPECT_NE(stmt->body, nullptr);
 }
 
 TEST(ParserSection12, ForeachMultipleVars) {
@@ -287,8 +298,10 @@ TEST(ParserSection12, ForeachMultipleVars) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kForeach);
   ASSERT_EQ(stmt->foreach_vars.size(), 2u);
-  EXPECT_EQ(stmt->foreach_vars[0], "i");
-  EXPECT_EQ(stmt->foreach_vars[1], "j");
+  const std::vector<std::string> expected = {"i", "j"};
+  for (size_t k = 0; k < expected.size(); ++k) {
+    EXPECT_EQ(stmt->foreach_vars[k], expected[k]);
+  }
 }
 
 TEST(ParserSection12, ForeachEmptyVar) {
@@ -303,6 +316,17 @@ TEST(ParserSection12, ForeachEmptyVar) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kForeach);
   ASSERT_EQ(stmt->foreach_vars.size(), 2u);
+}
+
+TEST(ParserSection12, ForeachEmptyVarValues) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    foreach (arr[, j]) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
   EXPECT_TRUE(stmt->foreach_vars[0].empty());
   EXPECT_EQ(stmt->foreach_vars[1], "j");
 }
@@ -328,7 +352,7 @@ TEST(ParserSection12, ForeachWithBlock) {
 // LRM section 12.7.1 -- for with variable declaration
 // =============================================================================
 
-TEST(ParserSection12, ForWithIntDecl) {
+TEST(ParserSection12, ForWithIntDeclParses) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -341,6 +365,17 @@ TEST(ParserSection12, ForWithIntDecl) {
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
   EXPECT_NE(stmt->for_init, nullptr);
   EXPECT_NE(stmt->for_cond, nullptr);
+}
+
+TEST(ParserSection12, ForWithIntDeclParts) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 10; i = i + 1) x = i;\n"
+      "  end\n"
+      "endmodule\n");
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
   EXPECT_NE(stmt->for_step, nullptr);
   EXPECT_NE(stmt->for_body, nullptr);
   EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kInt);
@@ -549,6 +584,18 @@ TEST(ParserSection12, ForeverLoopWithBlock) {
 // LRM section 12.8 -- Jump statements (return, break, continue)
 // =============================================================================
 
+// Helper: find a function declaration's first return statement.
+static Stmt* FindReturnStmt(ParseResult& r) {
+  auto* mod = r.cu->modules[0];
+  for (auto* item : mod->items) {
+    if (item->kind != ModuleItemKind::kFunctionDecl) continue;
+    for (auto* s : item->func_body_stmts) {
+      if (s->kind == StmtKind::kReturn) return s;
+    }
+  }
+  return nullptr;
+}
+
 TEST(ParserSection12, ReturnWithValue) {
   auto r = Parse(
       "module t;\n"
@@ -557,20 +604,7 @@ TEST(ParserSection12, ReturnWithValue) {
       "  endfunction\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ModuleItem* fn = nullptr;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kFunctionDecl) fn = item;
-  }
-  ASSERT_NE(fn, nullptr);
-  ASSERT_FALSE(fn->func_body_stmts.empty());
-  Stmt* ret = nullptr;
-  for (auto* s : fn->func_body_stmts) {
-    if (s->kind == StmtKind::kReturn) {
-      ret = s;
-      break;
-    }
-  }
+  auto* ret = FindReturnStmt(r);
   ASSERT_NE(ret, nullptr);
   EXPECT_EQ(ret->kind, StmtKind::kReturn);
   EXPECT_NE(ret->expr, nullptr);
@@ -584,26 +618,13 @@ TEST(ParserSection12, ReturnVoid) {
       "  endfunction\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ModuleItem* fn = nullptr;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kFunctionDecl) fn = item;
-  }
-  ASSERT_NE(fn, nullptr);
-  ASSERT_FALSE(fn->func_body_stmts.empty());
-  Stmt* ret = nullptr;
-  for (auto* s : fn->func_body_stmts) {
-    if (s->kind == StmtKind::kReturn) {
-      ret = s;
-      break;
-    }
-  }
+  auto* ret = FindReturnStmt(r);
   ASSERT_NE(ret, nullptr);
   EXPECT_EQ(ret->kind, StmtKind::kReturn);
   EXPECT_EQ(ret->expr, nullptr);
 }
 
-TEST(ParserSection12, BreakStatement) {
+TEST(ParserSection12, BreakStatementParses) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -616,6 +637,19 @@ TEST(ParserSection12, BreakStatement) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kForever);
+}
+
+TEST(ParserSection12, BreakStatementInBody) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    forever begin\n"
+      "      if (done) break;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
   // The body contains an if whose then_branch is break.
   auto* if_stmt = stmt->body->stmts[0];
   ASSERT_NE(if_stmt, nullptr);
@@ -624,7 +658,7 @@ TEST(ParserSection12, BreakStatement) {
   EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kBreak);
 }
 
-TEST(ParserSection12, ContinueStatement) {
+TEST(ParserSection12, ContinueStatementParses) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -641,6 +675,22 @@ TEST(ParserSection12, ContinueStatement) {
   auto* body = stmt->for_body;
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->kind, StmtKind::kBlock);
+}
+
+TEST(ParserSection12, ContinueStatementInBody) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 10; i = i + 1) begin\n"
+      "      if (i == 5) continue;\n"
+      "      x = i;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* body = stmt->for_body;
+  ASSERT_NE(body, nullptr);
   auto* if_stmt = body->stmts[0];
   EXPECT_EQ(if_stmt->kind, StmtKind::kIf);
   EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kContinue);

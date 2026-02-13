@@ -123,7 +123,7 @@ TEST(ParserSection7, ArrayReductionXor) {
 // §7.10.4: Empty concatenation {} to clear queue
 // =========================================================================
 
-TEST(ParserSection7, EmptyConcatClearQueue) {
+TEST(ParserSection7, EmptyConcatClearQueue_Parse) {
   auto r = Parse(
       "module t;\n"
       "  int q[$];\n"
@@ -133,6 +133,18 @@ TEST(ParserSection7, EmptyConcatClearQueue) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
+TEST(ParserSection7, EmptyConcatClearQueue_Rhs) {
+  auto r = Parse(
+      "module t;\n"
+      "  int q[$];\n"
+      "  initial q = {};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
   EXPECT_TRUE(stmt->rhs->elements.empty());

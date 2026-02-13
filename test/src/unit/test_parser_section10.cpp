@@ -51,7 +51,7 @@ static Stmt* NthInitialStmt(ParseResult& r, size_t n) {
 // LRM section 10.6.1 -- Procedural assign / deassign
 // =============================================================================
 
-TEST(ParserSection10, ProceduralAssign) {
+TEST(ParserSection10, ProceduralAssignKind) {
   auto r = Parse(
       "module m;\n"
       "  reg q;\n"
@@ -63,12 +63,25 @@ TEST(ParserSection10, ProceduralAssign) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->text, "q");
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection10, ProceduralDeassign) {
+TEST(ParserSection10, ProceduralAssignLhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg q;\n"
+      "  initial begin\n"
+      "    assign q = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->text, "q");
+}
+
+TEST(ParserSection10, ProceduralDeassignKind) {
   auto r = Parse(
       "module m;\n"
       "  reg q;\n"
@@ -80,9 +93,22 @@ TEST(ParserSection10, ProceduralDeassign) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDeassign);
+  EXPECT_EQ(stmt->rhs, nullptr);
+}
+
+TEST(ParserSection10, ProceduralDeassignLhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg q;\n"
+      "  initial begin\n"
+      "    deassign q;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->lhs, nullptr);
   EXPECT_EQ(stmt->lhs->text, "q");
-  EXPECT_EQ(stmt->rhs, nullptr);
 }
 
 TEST(ParserSection10, ProceduralAssignThenDeassign) {
@@ -107,7 +133,7 @@ TEST(ParserSection10, ProceduralAssignThenDeassign) {
 // LRM section 10.6.2 -- Force / release
 // =============================================================================
 
-TEST(ParserSection10, Force) {
+TEST(ParserSection10, ForceKind) {
   auto r = Parse(
       "module m;\n"
       "  wire w;\n"
@@ -119,12 +145,25 @@ TEST(ParserSection10, Force) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kForce);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->text, "w");
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection10, Release) {
+TEST(ParserSection10, ForceLhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire w;\n"
+      "  initial begin\n"
+      "    force w = 1'b1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->text, "w");
+}
+
+TEST(ParserSection10, ReleaseKind) {
   auto r = Parse(
       "module m;\n"
       "  wire w;\n"
@@ -136,9 +175,22 @@ TEST(ParserSection10, Release) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kRelease);
+  EXPECT_EQ(stmt->rhs, nullptr);
+}
+
+TEST(ParserSection10, ReleaseLhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire w;\n"
+      "  initial begin\n"
+      "    release w;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->lhs, nullptr);
   EXPECT_EQ(stmt->lhs->text, "w");
-  EXPECT_EQ(stmt->rhs, nullptr);
 }
 
 TEST(ParserSection10, ForceThenRelease) {
@@ -163,7 +215,7 @@ TEST(ParserSection10, ForceThenRelease) {
 // LRM section 10.4.1 -- Intra-assignment delay
 // =============================================================================
 
-TEST(ParserSection10, BlockingIntraAssignDelay) {
+TEST(ParserSection10, BlockingIntraAssignDelayKind) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -175,12 +227,25 @@ TEST(ParserSection10, BlockingIntraAssignDelay) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  ASSERT_NE(stmt->delay, nullptr);
+  EXPECT_NE(stmt->delay, nullptr);
 }
 
-TEST(ParserSection10, NonblockingIntraAssignDelay) {
+TEST(ParserSection10, BlockingIntraAssignDelayOperands) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial begin\n"
+      "    a = #10 b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_NE(stmt->lhs, nullptr);
+  EXPECT_NE(stmt->rhs, nullptr);
+}
+
+TEST(ParserSection10, NonblockingIntraAssignDelayKind) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -192,16 +257,29 @@ TEST(ParserSection10, NonblockingIntraAssignDelay) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  ASSERT_NE(stmt->delay, nullptr);
+  EXPECT_NE(stmt->delay, nullptr);
+}
+
+TEST(ParserSection10, NonblockingIntraAssignDelayOperands) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial begin\n"
+      "    a <= #5 b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_NE(stmt->lhs, nullptr);
+  EXPECT_NE(stmt->rhs, nullptr);
 }
 
 // =============================================================================
 // LRM section 10.4.2 -- Intra-assignment event control
 // =============================================================================
 
-TEST(ParserSection10, BlockingIntraAssignEvent) {
+TEST(ParserSection10, BlockingIntraAssignEventKind) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b, clk;\n"
@@ -213,13 +291,26 @@ TEST(ParserSection10, BlockingIntraAssignEvent) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_NE(stmt->lhs, nullptr);
+  EXPECT_NE(stmt->rhs, nullptr);
+}
+
+TEST(ParserSection10, BlockingIntraAssignEventEdge) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b, clk;\n"
+      "  initial begin\n"
+      "    a = @(posedge clk) b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
   ASSERT_FALSE(stmt->events.empty());
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
 }
 
-TEST(ParserSection10, NonblockingIntraAssignEvent) {
+TEST(ParserSection10, NonblockingIntraAssignEventKind) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b, clk;\n"
@@ -231,8 +322,21 @@ TEST(ParserSection10, NonblockingIntraAssignEvent) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_NE(stmt->lhs, nullptr);
+  EXPECT_NE(stmt->rhs, nullptr);
+}
+
+TEST(ParserSection10, NonblockingIntraAssignEventEdge) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b, clk;\n"
+      "  initial begin\n"
+      "    a <= @(negedge clk) b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
   ASSERT_FALSE(stmt->events.empty());
   EXPECT_EQ(stmt->events[0].edge, Edge::kNegedge);
 }

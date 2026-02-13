@@ -11,7 +11,7 @@ using namespace delta;
 // SvCallable
 // =============================================================================
 
-TEST(SvCallable, ConstructFunction) {
+TEST(SvCallable, ConstructFunction_BasicProperties) {
   std::vector<CallableParam> params = {
       {"a", Direction::kInput, 8},
       {"b", Direction::kInput, 8},
@@ -20,9 +20,17 @@ TEST(SvCallable, ConstructFunction) {
   EXPECT_EQ(func.Name(), "add");
   EXPECT_FALSE(func.IsTask());
   EXPECT_EQ(func.Params().size(), 2u);
+  EXPECT_EQ(func.Body(), nullptr);
+}
+
+TEST(SvCallable, ConstructFunction_ParamDetails) {
+  std::vector<CallableParam> params = {
+      {"a", Direction::kInput, 8},
+      {"b", Direction::kInput, 8},
+  };
+  SvCallable func("add", /*is_task=*/false, params, nullptr);
   EXPECT_EQ(func.Params()[0].name, "a");
   EXPECT_EQ(func.Params()[1].width, 8u);
-  EXPECT_EQ(func.Body(), nullptr);
 }
 
 TEST(SvCallable, ConstructTask) {
@@ -55,7 +63,7 @@ TEST(SvCallableContext, EmptyStack) {
   EXPECT_EQ(ctx.CurrentFrame(), nullptr);
 }
 
-TEST(SvCallableContext, PushAndPop) {
+TEST(SvCallableContext, PushFrame) {
   SvCallableContext ctx;
   CallFrame frame;
   frame.callable_name = "test_func";
@@ -67,6 +75,14 @@ TEST(SvCallableContext, PushAndPop) {
   ASSERT_NE(ctx.CurrentFrame(), nullptr);
   EXPECT_EQ(ctx.CurrentFrame()->callable_name, "test_func");
   EXPECT_EQ(ctx.CurrentFrame()->caller_id, 42u);
+}
+
+TEST(SvCallableContext, PopFrame) {
+  SvCallableContext ctx;
+  CallFrame frame;
+  frame.callable_name = "test_func";
+  frame.caller_id = 42;
+  ctx.PushFrame(frame);
 
   ctx.PopFrame();
   EXPECT_TRUE(ctx.Empty());

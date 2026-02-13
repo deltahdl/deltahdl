@@ -57,13 +57,11 @@ TEST(ParserSection28, BasicAndGate) {
       "  and g1(out, a, b);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->items.size(), 1);
-  auto* item = mod->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
   EXPECT_EQ(item->gate_kind, GateKind::kAnd);
   EXPECT_EQ(item->gate_inst_name, "g1");
-  ASSERT_EQ(item->gate_terminals.size(), 3);
+  EXPECT_EQ(item->gate_terminals.size(), 3);
 }
 
 TEST(ParserSection28, BasicOrGate) {
@@ -135,7 +133,6 @@ TEST(ParserSection28, StrengthSpec) {
   EXPECT_EQ(item->drive_strength0, 4);  // strong0 = 4
   EXPECT_EQ(item->drive_strength1, 2);  // weak1 = 2
   EXPECT_EQ(item->gate_inst_name, "g1");
-  ASSERT_EQ(item->gate_terminals.size(), 3);
 }
 
 TEST(ParserSection28, StrengthSpecSupply) {
@@ -184,15 +181,12 @@ TEST(ParserSection28, MultipleInstances) {
   auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 2);
 
-  auto* g1 = mod->items[0];
-  EXPECT_EQ(g1->gate_kind, GateKind::kAnd);
-  EXPECT_EQ(g1->gate_inst_name, "g1");
-  ASSERT_EQ(g1->gate_terminals.size(), 3);
-
-  auto* g2 = mod->items[1];
-  EXPECT_EQ(g2->gate_kind, GateKind::kAnd);
-  EXPECT_EQ(g2->gate_inst_name, "g2");
-  ASSERT_EQ(g2->gate_terminals.size(), 3);
+  std::string expected_names[] = {"g1", "g2"};
+  for (size_t i = 0; i < 2; ++i) {
+    EXPECT_EQ(mod->items[i]->gate_kind, GateKind::kAnd);
+    EXPECT_EQ(mod->items[i]->gate_inst_name, expected_names[i]);
+    EXPECT_EQ(mod->items[i]->gate_terminals.size(), 3);
+  }
 }
 
 TEST(ParserSection28, MultipleInstancesThree) {
@@ -228,12 +222,11 @@ TEST(ParserSection28, MultipleInstancesWithStrengthAndDelay) {
   ASSERT_NE(r.cu, nullptr);
   auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 2);
-  EXPECT_EQ(mod->items[0]->drive_strength0, 4);
-  EXPECT_EQ(mod->items[0]->drive_strength1, 4);
-  EXPECT_NE(mod->items[0]->gate_delay, nullptr);
-  EXPECT_EQ(mod->items[1]->drive_strength0, 4);
-  EXPECT_EQ(mod->items[1]->drive_strength1, 4);
-  EXPECT_NE(mod->items[1]->gate_delay, nullptr);
+  for (size_t i = 0; i < 2; ++i) {
+    EXPECT_EQ(mod->items[i]->drive_strength0, 4);
+    EXPECT_EQ(mod->items[i]->drive_strength1, 4);
+    EXPECT_NE(mod->items[i]->gate_delay, nullptr);
+  }
 }
 
 // --- All gate kinds ---
@@ -251,12 +244,11 @@ TEST(ParserSection28, AllNInputGates) {
   ASSERT_NE(r.cu, nullptr);
   auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 6);
-  EXPECT_EQ(mod->items[0]->gate_kind, GateKind::kAnd);
-  EXPECT_EQ(mod->items[1]->gate_kind, GateKind::kNand);
-  EXPECT_EQ(mod->items[2]->gate_kind, GateKind::kOr);
-  EXPECT_EQ(mod->items[3]->gate_kind, GateKind::kNor);
-  EXPECT_EQ(mod->items[4]->gate_kind, GateKind::kXor);
-  EXPECT_EQ(mod->items[5]->gate_kind, GateKind::kXnor);
+  GateKind expected[] = {GateKind::kAnd, GateKind::kNand, GateKind::kOr,
+                         GateKind::kNor, GateKind::kXor, GateKind::kXnor};
+  for (size_t i = 0; i < std::size(expected); ++i) {
+    EXPECT_EQ(mod->items[i]->gate_kind, expected[i]);
+  }
 }
 
 TEST(ParserSection28, EnableGates) {
@@ -270,10 +262,11 @@ TEST(ParserSection28, EnableGates) {
   ASSERT_NE(r.cu, nullptr);
   auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 4);
-  EXPECT_EQ(mod->items[0]->gate_kind, GateKind::kBufif0);
-  EXPECT_EQ(mod->items[1]->gate_kind, GateKind::kBufif1);
-  EXPECT_EQ(mod->items[2]->gate_kind, GateKind::kNotif0);
-  EXPECT_EQ(mod->items[3]->gate_kind, GateKind::kNotif1);
+  GateKind expected[] = {GateKind::kBufif0, GateKind::kBufif1,
+                         GateKind::kNotif0, GateKind::kNotif1};
+  for (size_t i = 0; i < std::size(expected); ++i) {
+    EXPECT_EQ(mod->items[i]->gate_kind, expected[i]);
+  }
 }
 
 TEST(ParserSection28, PullGates) {
@@ -308,18 +301,25 @@ TEST(ParserSection29, CombinationalUdp) {
   auto* udp = r.cu->udps[0];
   EXPECT_EQ(udp->name, "mux");
   EXPECT_EQ(udp->output_name, "out");
-  ASSERT_EQ(udp->input_names.size(), 3);
-  EXPECT_EQ(udp->input_names[0], "a");
-  EXPECT_EQ(udp->input_names[1], "b");
-  EXPECT_EQ(udp->input_names[2], "sel");
   EXPECT_FALSE(udp->is_sequential);
-  ASSERT_EQ(udp->table.size(), 4);
-  // First row: 0 ? 0 : 0
-  EXPECT_EQ(udp->table[0].inputs.size(), 3);
-  EXPECT_EQ(udp->table[0].inputs[0], '0');
-  EXPECT_EQ(udp->table[0].inputs[1], '?');
-  EXPECT_EQ(udp->table[0].inputs[2], '0');
-  EXPECT_EQ(udp->table[0].output, '0');
+
+  std::string expected_inputs[] = {"a", "b", "sel"};
+  ASSERT_EQ(udp->input_names.size(), std::size(expected_inputs));
+  for (size_t i = 0; i < std::size(expected_inputs); ++i) {
+    EXPECT_EQ(udp->input_names[i], expected_inputs[i]);
+  }
+
+  struct Row { std::string inputs; char output; };
+  Row expected_rows[] = {{"0?0", '0'}, {"1?0", '1'},
+                         {"?01", '0'}, {"?11", '1'}};
+  ASSERT_EQ(udp->table.size(), std::size(expected_rows));
+  for (size_t i = 0; i < std::size(expected_rows); ++i) {
+    ASSERT_EQ(udp->table[i].inputs.size(), expected_rows[i].inputs.size());
+    for (size_t j = 0; j < expected_rows[i].inputs.size(); ++j) {
+      EXPECT_EQ(udp->table[i].inputs[j], expected_rows[i].inputs[j]);
+    }
+    EXPECT_EQ(udp->table[i].output, expected_rows[i].output);
+  }
   EXPECT_EQ(udp->table[0].current_state, 0);
 }
 
@@ -337,13 +337,17 @@ TEST(ParserSection29, SequentialUdp) {
   EXPECT_EQ(udp->name, "dff");
   EXPECT_TRUE(udp->is_sequential);
   EXPECT_EQ(udp->output_name, "q");
-  ASSERT_EQ(udp->input_names.size(), 2);
-  ASSERT_EQ(udp->table.size(), 2);
-  // First row: 0 r : ? : 0
-  EXPECT_EQ(udp->table[0].inputs[0], '0');
-  EXPECT_EQ(udp->table[0].inputs[1], 'r');
-  EXPECT_EQ(udp->table[0].current_state, '?');
-  EXPECT_EQ(udp->table[0].output, '0');
+
+  struct Row { std::string inputs; char state; char output; };
+  Row expected[] = {{"0r", '?', '0'}, {"1r", '?', '1'}};
+  ASSERT_EQ(udp->table.size(), std::size(expected));
+  for (size_t i = 0; i < std::size(expected); ++i) {
+    for (size_t j = 0; j < expected[i].inputs.size(); ++j) {
+      EXPECT_EQ(udp->table[i].inputs[j], expected[i].inputs[j]);
+    }
+    EXPECT_EQ(udp->table[i].current_state, expected[i].state);
+    EXPECT_EQ(udp->table[i].output, expected[i].output);
+  }
 }
 
 TEST(ParserSection29, UdpTableSpecialChars) {
@@ -356,12 +360,14 @@ TEST(ParserSection29, UdpTableSpecialChars) {
       "  endtable\n"
       "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->udps.size(), 1);
   auto* udp = r.cu->udps[0];
   ASSERT_EQ(udp->table.size(), 3);
-  EXPECT_EQ(udp->table[0].inputs[1], 'f');
-  EXPECT_EQ(udp->table[1].inputs[1], 'p');
-  EXPECT_EQ(udp->table[2].inputs[0], '*');
+
+  struct Check { size_t row; size_t col; char val; };
+  Check input_checks[] = {{0, 1, 'f'}, {1, 1, 'p'}, {2, 0, '*'}};
+  for (const auto& c : input_checks) {
+    EXPECT_EQ(udp->table[c.row].inputs[c.col], c.val);
+  }
   EXPECT_EQ(udp->table[2].output, '-');
 }
 
@@ -479,15 +485,18 @@ TEST(ParserSection29, MixedLevelEdgeSensitive) {
   auto* udp = r.cu->udps[0];
   EXPECT_TRUE(udp->is_sequential);
   ASSERT_EQ(udp->table.size(), 5);
-  // Level-sensitive entry (no edge chars in inputs)
-  EXPECT_EQ(udp->table[0].inputs[0], '?');
-  EXPECT_EQ(udp->table[0].output, '1');
-  // Edge-sensitive entry
-  EXPECT_EQ(udp->table[2].inputs[0], 'r');
-  EXPECT_EQ(udp->table[2].output, '1');
-  // Falling edge entry with no-change output
-  EXPECT_EQ(udp->table[4].inputs[0], 'f');
-  EXPECT_EQ(udp->table[4].output, '-');
+
+  // Verify first input char and output for representative rows.
+  struct Check { size_t row; char input0; char output; };
+  Check checks[] = {
+      {0, '?', '1'},  // Level-sensitive entry
+      {2, 'r', '1'},  // Edge-sensitive entry
+      {4, 'f', '-'},  // Falling edge with no-change output
+  };
+  for (const auto& c : checks) {
+    EXPECT_EQ(udp->table[c.row].inputs[0], c.input0);
+    EXPECT_EQ(udp->table[c.row].output, c.output);
+  }
 }
 
 // =============================================================

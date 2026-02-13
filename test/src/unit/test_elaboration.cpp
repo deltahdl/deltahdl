@@ -66,10 +66,18 @@ TEST(Elaboration, PortBinding_Direction) {
   ASSERT_EQ(mod->children.size(), 1);
   const auto& bindings = mod->children[0].port_bindings;
   ASSERT_EQ(bindings.size(), 2);
-  EXPECT_EQ(bindings[0].port_name, "a");
-  EXPECT_EQ(bindings[0].direction, Direction::kInput);
-  EXPECT_EQ(bindings[1].port_name, "b");
-  EXPECT_EQ(bindings[1].direction, Direction::kOutput);
+
+  struct {
+    const char* port_name;
+    Direction direction;
+  } const kExpected[] = {
+      {"a", Direction::kInput},
+      {"b", Direction::kOutput},
+  };
+  for (size_t i = 0; i < 2; ++i) {
+    EXPECT_EQ(bindings[i].port_name, kExpected[i].port_name);
+    EXPECT_EQ(bindings[i].direction, kExpected[i].direction);
+  }
 }
 
 TEST(Elaboration, PortBinding_UnknownModule) {
@@ -184,6 +192,20 @@ TEST(Elaboration, Defparam_OverridesDefault) {
   auto* child = mod->children[0].resolved;
   ASSERT_NE(child, nullptr);
   ASSERT_EQ(child->params.size(), 1);
+}
+
+TEST(Elaboration, Defparam_OverridesDefault_Value) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter WIDTH = 4)();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child u0();\n"
+      "  defparam u0.WIDTH = 16;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* child = design->top_modules[0]->children[0].resolved;
   EXPECT_EQ(child->params[0].resolved_value, 16);
   EXPECT_TRUE(child->params[0].is_resolved);
 }

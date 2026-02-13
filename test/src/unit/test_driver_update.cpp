@@ -8,11 +8,15 @@ using namespace delta;
 
 // --- DriverUpdate struct tests ---
 
-TEST(DriverUpdate, DefaultConstruction) {
+TEST(DriverUpdate, DefaultConstruction_ValueFields) {
   DriverUpdate du;
   EXPECT_EQ(du.value.width, 0);
   EXPECT_EQ(du.value.nwords, 0);
   EXPECT_EQ(du.value.words, nullptr);
+}
+
+TEST(DriverUpdate, DefaultConstruction_StrengthAndIndex) {
+  DriverUpdate du;
   EXPECT_EQ(du.drive_strength_0, Strength::kStrong);
   EXPECT_EQ(du.drive_strength_1, Strength::kStrong);
   EXPECT_EQ(du.driver_index, 0);
@@ -29,11 +33,18 @@ TEST(DriverUpdatePool, AcquireCreatesNew) {
   EXPECT_EQ(du->value.width, 0);
   EXPECT_EQ(du->drive_strength_0, Strength::kStrong);
   EXPECT_EQ(du->drive_strength_1, Strength::kStrong);
+}
+
+TEST(DriverUpdatePool, AcquireCreatesNewDefaults) {
+  Arena arena;
+  DriverUpdatePool pool(arena);
+  DriverUpdate* du = pool.Acquire();
+  ASSERT_NE(du, nullptr);
   EXPECT_EQ(du->driver_index, 0);
   EXPECT_EQ(du->next, nullptr);
 }
 
-TEST(DriverUpdatePool, ReleaseAndReuse) {
+TEST(DriverUpdatePool, ReleaseAndReuse_SamePointer) {
   Arena arena;
   DriverUpdatePool pool(arena);
   DriverUpdate* du = pool.Acquire();
@@ -49,13 +60,28 @@ TEST(DriverUpdatePool, ReleaseAndReuse) {
 
   DriverUpdate* reused = pool.Acquire();
   EXPECT_EQ(reused, du);  // Same pointer returned.
+  EXPECT_EQ(pool.FreeCount(), 0);
+}
+
+TEST(DriverUpdatePool, ReleaseAndReuse_FieldsReset) {
+  Arena arena;
+  DriverUpdatePool pool(arena);
+  DriverUpdate* du = pool.Acquire();
+
+  // Modify all fields.
+  du->value = MakeLogic4VecVal(arena, 8, 0xFF);
+  du->drive_strength_0 = Strength::kWeak;
+  du->drive_strength_1 = Strength::kPull;
+  du->driver_index = 42;
+
+  pool.Release(du);
+  DriverUpdate* reused = pool.Acquire();
   // All fields reset to defaults.
   EXPECT_EQ(reused->value.width, 0);
   EXPECT_EQ(reused->drive_strength_0, Strength::kStrong);
   EXPECT_EQ(reused->drive_strength_1, Strength::kStrong);
   EXPECT_EQ(reused->driver_index, 0);
   EXPECT_EQ(reused->next, nullptr);
-  EXPECT_EQ(pool.FreeCount(), 0);
 }
 
 TEST(DriverUpdatePool, FreeCount) {

@@ -130,7 +130,7 @@ TEST(ParserSection13, RefWithoutConst) {
 // LRM section 13.5.4 -- Named argument binding
 // =============================================================================
 
-TEST(ParserSection13, NamedArgBinding) {
+TEST(ParserSection13, NamedArgBindingParses) {
   auto r = Parse(
       "module m;\n"
       "  function void foo(int a, int b);\n"
@@ -144,10 +144,25 @@ TEST(ParserSection13, NamedArgBinding) {
   auto* call = stmt->expr;
   ASSERT_NE(call, nullptr);
   EXPECT_EQ(call->kind, ExprKind::kCall);
+}
+
+TEST(ParserSection13, NamedArgBindingNames) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void foo(int a, int b);\n"
+      "  endfunction\n"
+      "  initial foo(.b(2), .a(1));\n"
+      "endmodule\n");
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* call = stmt->expr;
+  ASSERT_NE(call, nullptr);
   ASSERT_EQ(call->args.size(), 2u);
   ASSERT_EQ(call->arg_names.size(), 2u);
-  EXPECT_EQ(call->arg_names[0], "b");
-  EXPECT_EQ(call->arg_names[1], "a");
+  const std::vector<std::string> kExpected = {"b", "a"};
+  for (size_t i = 0; i < kExpected.size(); ++i) {
+    EXPECT_EQ(call->arg_names[i], kExpected[i]);
+  }
 }
 
 TEST(ParserSection13, PositionalArgsHaveEmptyNames) {
@@ -163,6 +178,19 @@ TEST(ParserSection13, PositionalArgsHaveEmptyNames) {
   auto* call = stmt->expr;
   ASSERT_NE(call, nullptr);
   EXPECT_EQ(call->kind, ExprKind::kCall);
+}
+
+TEST(ParserSection13, PositionalArgsNoNamedArgs) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void foo(int a, int b);\n"
+      "  endfunction\n"
+      "  initial foo(1, 2);\n"
+      "endmodule\n");
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* call = stmt->expr;
+  ASSERT_NE(call, nullptr);
   ASSERT_EQ(call->args.size(), 2u);
   // Positional calls: arg_names is empty (no named args detected)
   EXPECT_TRUE(call->arg_names.empty());
@@ -457,7 +485,9 @@ TEST(ParserSection13, OldStyleTaskMultipleInputs) {
   auto* tk = FindFunc(r, "add");
   ASSERT_NE(tk, nullptr);
   ASSERT_EQ(tk->func_args.size(), 3u);
-  EXPECT_EQ(tk->func_args[0].direction, Direction::kInput);
-  EXPECT_EQ(tk->func_args[1].direction, Direction::kInput);
-  EXPECT_EQ(tk->func_args[2].direction, Direction::kOutput);
+  const Direction kExpected[] = {
+      Direction::kInput, Direction::kInput, Direction::kOutput};
+  for (size_t i = 0; i < 3u; ++i) {
+    EXPECT_EQ(tk->func_args[i].direction, kExpected[i]);
+  }
 }

@@ -108,64 +108,88 @@ uint64_t ComputeGateDelay(uint64_t d_rise, uint64_t d_fall, Val4 from,
 
 // §28.4: Truth tables (Table 28-3)
 TEST(LogicGates, AndGateTruthTable) {
-  // Row 0
-  EXPECT_EQ(EvalNInputGate(GateKind::kAnd, Val4::kV0, Val4::kV0), Val4::kV0);
-  EXPECT_EQ(EvalNInputGate(GateKind::kAnd, Val4::kV0, Val4::kV1), Val4::kV0);
-  EXPECT_EQ(EvalNInputGate(GateKind::kAnd, Val4::kV0, Val4::kX), Val4::kV0);
-  EXPECT_EQ(EvalNInputGate(GateKind::kAnd, Val4::kV0, Val4::kZ), Val4::kV0);
-  // Row 1
-  EXPECT_EQ(EvalNInputGate(GateKind::kAnd, Val4::kV1, Val4::kV0), Val4::kV0);
-  EXPECT_EQ(EvalNInputGate(GateKind::kAnd, Val4::kV1, Val4::kV1), Val4::kV1);
-  EXPECT_EQ(EvalNInputGate(GateKind::kAnd, Val4::kV1, Val4::kX), Val4::kX);
-  EXPECT_EQ(EvalNInputGate(GateKind::kAnd, Val4::kV1, Val4::kZ), Val4::kX);
-  // Row x
-  EXPECT_EQ(EvalNInputGate(GateKind::kAnd, Val4::kX, Val4::kV0), Val4::kV0);
-  EXPECT_EQ(EvalNInputGate(GateKind::kAnd, Val4::kX, Val4::kV1), Val4::kX);
-  EXPECT_EQ(EvalNInputGate(GateKind::kAnd, Val4::kX, Val4::kX), Val4::kX);
-  EXPECT_EQ(EvalNInputGate(GateKind::kAnd, Val4::kX, Val4::kZ), Val4::kX);
-  // Row z
-  EXPECT_EQ(EvalNInputGate(GateKind::kAnd, Val4::kZ, Val4::kV0), Val4::kV0);
-  EXPECT_EQ(EvalNInputGate(GateKind::kAnd, Val4::kZ, Val4::kV1), Val4::kX);
-  EXPECT_EQ(EvalNInputGate(GateKind::kAnd, Val4::kZ, Val4::kX), Val4::kX);
-  EXPECT_EQ(EvalNInputGate(GateKind::kAnd, Val4::kZ, Val4::kZ), Val4::kX);
+  struct Case { Val4 a; Val4 b; Val4 expected; };
+  Case cases[] = {
+      // Row 0
+      {Val4::kV0, Val4::kV0, Val4::kV0},
+      {Val4::kV0, Val4::kV1, Val4::kV0},
+      {Val4::kV0, Val4::kX, Val4::kV0},
+      {Val4::kV0, Val4::kZ, Val4::kV0},
+      // Row 1
+      {Val4::kV1, Val4::kV0, Val4::kV0},
+      {Val4::kV1, Val4::kV1, Val4::kV1},
+      {Val4::kV1, Val4::kX, Val4::kX},
+      {Val4::kV1, Val4::kZ, Val4::kX},
+      // Row x
+      {Val4::kX, Val4::kV0, Val4::kV0},
+      {Val4::kX, Val4::kV1, Val4::kX},
+      {Val4::kX, Val4::kX, Val4::kX},
+      {Val4::kX, Val4::kZ, Val4::kX},
+      // Row z
+      {Val4::kZ, Val4::kV0, Val4::kV0},
+      {Val4::kZ, Val4::kV1, Val4::kX},
+      {Val4::kZ, Val4::kX, Val4::kX},
+      {Val4::kZ, Val4::kZ, Val4::kX},
+  };
+  for (const auto& c : cases) {
+    EXPECT_EQ(EvalNInputGate(GateKind::kAnd, c.a, c.b), c.expected)
+        << "And(" << static_cast<int>(c.a) << ", " << static_cast<int>(c.b)
+        << ")";
+  }
 }
 
 TEST(LogicGates, OrGateTruthTable) {
-  EXPECT_EQ(EvalNInputGate(GateKind::kOr, Val4::kV0, Val4::kV0), Val4::kV0);
-  EXPECT_EQ(EvalNInputGate(GateKind::kOr, Val4::kV0, Val4::kV1), Val4::kV1);
-  EXPECT_EQ(EvalNInputGate(GateKind::kOr, Val4::kV0, Val4::kX), Val4::kX);
-  EXPECT_EQ(EvalNInputGate(GateKind::kOr, Val4::kV0, Val4::kZ), Val4::kX);
-  EXPECT_EQ(EvalNInputGate(GateKind::kOr, Val4::kV1, Val4::kV0), Val4::kV1);
-  EXPECT_EQ(EvalNInputGate(GateKind::kOr, Val4::kV1, Val4::kV1), Val4::kV1);
-  EXPECT_EQ(EvalNInputGate(GateKind::kOr, Val4::kV1, Val4::kX), Val4::kV1);
-  EXPECT_EQ(EvalNInputGate(GateKind::kOr, Val4::kV1, Val4::kZ), Val4::kV1);
-  EXPECT_EQ(EvalNInputGate(GateKind::kOr, Val4::kX, Val4::kV0), Val4::kX);
-  EXPECT_EQ(EvalNInputGate(GateKind::kOr, Val4::kX, Val4::kV1), Val4::kV1);
-  EXPECT_EQ(EvalNInputGate(GateKind::kOr, Val4::kX, Val4::kX), Val4::kX);
-  EXPECT_EQ(EvalNInputGate(GateKind::kOr, Val4::kX, Val4::kZ), Val4::kX);
-  EXPECT_EQ(EvalNInputGate(GateKind::kOr, Val4::kZ, Val4::kV0), Val4::kX);
-  EXPECT_EQ(EvalNInputGate(GateKind::kOr, Val4::kZ, Val4::kV1), Val4::kV1);
-  EXPECT_EQ(EvalNInputGate(GateKind::kOr, Val4::kZ, Val4::kX), Val4::kX);
-  EXPECT_EQ(EvalNInputGate(GateKind::kOr, Val4::kZ, Val4::kZ), Val4::kX);
+  struct Case { Val4 a; Val4 b; Val4 expected; };
+  Case cases[] = {
+      {Val4::kV0, Val4::kV0, Val4::kV0},
+      {Val4::kV0, Val4::kV1, Val4::kV1},
+      {Val4::kV0, Val4::kX, Val4::kX},
+      {Val4::kV0, Val4::kZ, Val4::kX},
+      {Val4::kV1, Val4::kV0, Val4::kV1},
+      {Val4::kV1, Val4::kV1, Val4::kV1},
+      {Val4::kV1, Val4::kX, Val4::kV1},
+      {Val4::kV1, Val4::kZ, Val4::kV1},
+      {Val4::kX, Val4::kV0, Val4::kX},
+      {Val4::kX, Val4::kV1, Val4::kV1},
+      {Val4::kX, Val4::kX, Val4::kX},
+      {Val4::kX, Val4::kZ, Val4::kX},
+      {Val4::kZ, Val4::kV0, Val4::kX},
+      {Val4::kZ, Val4::kV1, Val4::kV1},
+      {Val4::kZ, Val4::kX, Val4::kX},
+      {Val4::kZ, Val4::kZ, Val4::kX},
+  };
+  for (const auto& c : cases) {
+    EXPECT_EQ(EvalNInputGate(GateKind::kOr, c.a, c.b), c.expected)
+        << "Or(" << static_cast<int>(c.a) << ", " << static_cast<int>(c.b)
+        << ")";
+  }
 }
 
 TEST(LogicGates, XorGateTruthTable) {
-  EXPECT_EQ(EvalNInputGate(GateKind::kXor, Val4::kV0, Val4::kV0), Val4::kV0);
-  EXPECT_EQ(EvalNInputGate(GateKind::kXor, Val4::kV0, Val4::kV1), Val4::kV1);
-  EXPECT_EQ(EvalNInputGate(GateKind::kXor, Val4::kV0, Val4::kX), Val4::kX);
-  EXPECT_EQ(EvalNInputGate(GateKind::kXor, Val4::kV0, Val4::kZ), Val4::kX);
-  EXPECT_EQ(EvalNInputGate(GateKind::kXor, Val4::kV1, Val4::kV0), Val4::kV1);
-  EXPECT_EQ(EvalNInputGate(GateKind::kXor, Val4::kV1, Val4::kV1), Val4::kV0);
-  EXPECT_EQ(EvalNInputGate(GateKind::kXor, Val4::kV1, Val4::kX), Val4::kX);
-  EXPECT_EQ(EvalNInputGate(GateKind::kXor, Val4::kV1, Val4::kZ), Val4::kX);
-  EXPECT_EQ(EvalNInputGate(GateKind::kXor, Val4::kX, Val4::kV0), Val4::kX);
-  EXPECT_EQ(EvalNInputGate(GateKind::kXor, Val4::kX, Val4::kV1), Val4::kX);
-  EXPECT_EQ(EvalNInputGate(GateKind::kXor, Val4::kX, Val4::kX), Val4::kX);
-  EXPECT_EQ(EvalNInputGate(GateKind::kXor, Val4::kX, Val4::kZ), Val4::kX);
-  EXPECT_EQ(EvalNInputGate(GateKind::kXor, Val4::kZ, Val4::kV0), Val4::kX);
-  EXPECT_EQ(EvalNInputGate(GateKind::kXor, Val4::kZ, Val4::kV1), Val4::kX);
-  EXPECT_EQ(EvalNInputGate(GateKind::kXor, Val4::kZ, Val4::kX), Val4::kX);
-  EXPECT_EQ(EvalNInputGate(GateKind::kXor, Val4::kZ, Val4::kZ), Val4::kX);
+  struct Case { Val4 a; Val4 b; Val4 expected; };
+  Case cases[] = {
+      {Val4::kV0, Val4::kV0, Val4::kV0},
+      {Val4::kV0, Val4::kV1, Val4::kV1},
+      {Val4::kV0, Val4::kX, Val4::kX},
+      {Val4::kV0, Val4::kZ, Val4::kX},
+      {Val4::kV1, Val4::kV0, Val4::kV1},
+      {Val4::kV1, Val4::kV1, Val4::kV0},
+      {Val4::kV1, Val4::kX, Val4::kX},
+      {Val4::kV1, Val4::kZ, Val4::kX},
+      {Val4::kX, Val4::kV0, Val4::kX},
+      {Val4::kX, Val4::kV1, Val4::kX},
+      {Val4::kX, Val4::kX, Val4::kX},
+      {Val4::kX, Val4::kZ, Val4::kX},
+      {Val4::kZ, Val4::kV0, Val4::kX},
+      {Val4::kZ, Val4::kV1, Val4::kX},
+      {Val4::kZ, Val4::kX, Val4::kX},
+      {Val4::kZ, Val4::kZ, Val4::kX},
+  };
+  for (const auto& c : cases) {
+    EXPECT_EQ(EvalNInputGate(GateKind::kXor, c.a, c.b), c.expected)
+        << "Xor(" << static_cast<int>(c.a) << ", " << static_cast<int>(c.b)
+        << ")";
+  }
 }
 
 // §28.4: nand = NOT(and), nor = NOT(or), xnor = NOT(xor)

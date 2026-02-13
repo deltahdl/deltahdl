@@ -216,7 +216,7 @@ TEST(ParserSection9, DelayControl) {
 // LRM section 9.4.2 -- Event control (@)
 // =============================================================================
 
-TEST(ParserSection9, EventControlPosedge) {
+TEST(ParserSection9, EventControlPosedgeKind) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -227,9 +227,21 @@ TEST(ParserSection9, EventControlPosedge) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  EXPECT_NE(stmt->body, nullptr);
+}
+
+TEST(ParserSection9, EventControlPosedgeEdge) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge clk) a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
   ASSERT_FALSE(stmt->events.empty());
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
-  EXPECT_NE(stmt->body, nullptr);
 }
 
 TEST(ParserSection9, EventControlNegedge) {
@@ -259,8 +271,10 @@ TEST(ParserSection9, EventControlMultiple) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
   ASSERT_GE(stmt->events.size(), 2u);
-  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
-  EXPECT_EQ(stmt->events[1].edge, Edge::kNegedge);
+  const Edge kExpectedEdges[] = {Edge::kPosedge, Edge::kNegedge};
+  for (size_t i = 0; i < 2; ++i) {
+    EXPECT_EQ(stmt->events[i].edge, kExpectedEdges[i]);
+  }
 }
 
 TEST(ParserSection9, EventControlComma) {
@@ -364,7 +378,7 @@ TEST(ParserSection9, StarEventParenStmt) {
 // LRM section 9.4.2 -- iff guards on event expressions
 // =============================================================================
 
-TEST(ParserSection9, IffGuardPosedge) {
+TEST(ParserSection9, IffGuardPosedgeEdge) {
   auto r = Parse(
       "module m;\n"
       "  reg clk, reset, a, b;\n"
@@ -376,6 +390,18 @@ TEST(ParserSection9, IffGuardPosedge) {
   // iff guard goes through always-block sensitivity path.
   ASSERT_EQ(item->sensitivity.size(), 1u);
   EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
+}
+
+TEST(ParserSection9, IffGuardPosedgeFields) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, reset, a, b;\n"
+      "  always @(posedge clk iff reset == 0) a <= b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->sensitivity.size(), 1u);
   EXPECT_NE(item->sensitivity[0].signal, nullptr);
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
 }
@@ -394,7 +420,7 @@ TEST(ParserSection9, IffGuardNoEdge) {
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
 }
 
-TEST(ParserSection9, IffGuardMultipleEvents) {
+TEST(ParserSection9, IffGuardMultipleEventsFirst) {
   auto r = Parse(
       "module m;\n"
       "  reg clk, reset, a, b;\n"
@@ -405,11 +431,23 @@ TEST(ParserSection9, IffGuardMultipleEvents) {
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->sensitivity.size(), 2u);
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
+}
+
+TEST(ParserSection9, IffGuardMultipleEventsSecond) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, reset, a, b;\n"
+      "  always @(posedge clk iff reset == 0 or negedge reset) a <= b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->sensitivity.size(), 2u);
   EXPECT_EQ(item->sensitivity[1].iff_condition, nullptr);
   EXPECT_EQ(item->sensitivity[1].edge, Edge::kNegedge);
 }
 
-TEST(ParserSection9, IffGuardStmtLevel) {
+TEST(ParserSection9, IffGuardStmtLevelKind) {
   auto r = Parse(
       "module m;\n"
       "  reg clk, reset, a, b;\n"
@@ -419,6 +457,18 @@ TEST(ParserSection9, IffGuardStmtLevel) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  ASSERT_EQ(stmt->events.size(), 1u);
+}
+
+TEST(ParserSection9, IffGuardStmtLevelEvent) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, reset, a, b;\n"
+      "  initial @(posedge clk iff reset == 0) a <= b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
   ASSERT_EQ(stmt->events.size(), 1u);
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
   EXPECT_NE(stmt->events[0].iff_condition, nullptr);
