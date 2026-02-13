@@ -145,6 +145,19 @@ bool Is4stateType(DataTypeKind kind) {
   }
 }
 
+bool IsImplicitlySigned(DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kInteger:
+    case DataTypeKind::kInt:
+    case DataTypeKind::kShortint:
+    case DataTypeKind::kLongint:
+    case DataTypeKind::kByte:
+      return true;
+    default:
+      return false;
+  }
+}
+
 static const DataType* ResolveNamed(const DataType& dtype,
                                     const TypedefMap& typedefs) {
   if (dtype.kind != DataTypeKind::kNamed) return nullptr;

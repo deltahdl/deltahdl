@@ -213,3 +213,22 @@ TEST(ConstEval, LongestStaticPrefixParamIdx) {
   auto* sel = LspSelect(arena, LspId(arena, "m"), LspId(arena, "P"));
   EXPECT_EQ(LongestStaticPrefix(sel, scope), "m[7]");
 }
+
+// ==========================================================================
+// §6.8: Implicit signedness of integer types
+// ==========================================================================
+
+#include "elaboration/type_eval.h"
+
+TEST(TypeEval, ImplicitlySignedTypes) {
+  // §6.8: integer, int, shortint, longint, byte are implicitly signed.
+  EXPECT_TRUE(IsImplicitlySigned(DataTypeKind::kInteger));
+  EXPECT_TRUE(IsImplicitlySigned(DataTypeKind::kInt));
+  EXPECT_TRUE(IsImplicitlySigned(DataTypeKind::kShortint));
+  EXPECT_TRUE(IsImplicitlySigned(DataTypeKind::kLongint));
+  EXPECT_TRUE(IsImplicitlySigned(DataTypeKind::kByte));
+  // logic, reg, bit are NOT implicitly signed.
+  EXPECT_FALSE(IsImplicitlySigned(DataTypeKind::kLogic));
+  EXPECT_FALSE(IsImplicitlySigned(DataTypeKind::kReg));
+  EXPECT_FALSE(IsImplicitlySigned(DataTypeKind::kBit));
+}

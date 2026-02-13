@@ -505,7 +505,8 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   var.is_real = (item->data_type.kind == DataTypeKind::kReal ||
                  item->data_type.kind == DataTypeKind::kShortreal ||
                  item->data_type.kind == DataTypeKind::kRealtime);
-  var.is_signed = item->data_type.is_signed;
+  var.is_signed = item->data_type.is_signed ||
+                  IsImplicitlySigned(item->data_type.kind);
   var.init_expr = item->init_expr;
   // Pass struct/union type info for field-level access.
   SetStructTypeInfo(item, var);
