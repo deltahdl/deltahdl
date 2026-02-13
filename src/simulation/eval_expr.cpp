@@ -76,9 +76,21 @@ Logic4Vec EvalReplicate(const Expr* expr, SimContext& ctx, Arena& arena) {
 
 Logic4Vec EvalPrefixUnary(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto old_val = EvalExpr(expr->lhs, ctx, arena);
-  uint64_t v = old_val.ToUint64();
-  uint64_t nv = (expr->op == TokenKind::kPlusPlus) ? v + 1 : v - 1;
-  auto new_val = MakeLogic4VecVal(arena, old_val.width, nv);
+  Logic4Vec new_val;
+  if (old_val.is_real) {
+    // §11.4.2: Real increment/decrement by 1.0.
+    double d = 0.0;
+    uint64_t bits = old_val.ToUint64();
+    std::memcpy(&d, &bits, sizeof(double));
+    d += (expr->op == TokenKind::kPlusPlus) ? 1.0 : -1.0;
+    std::memcpy(&bits, &d, sizeof(double));
+    new_val = MakeLogic4VecVal(arena, 64, bits);
+    new_val.is_real = true;
+  } else {
+    uint64_t v = old_val.ToUint64();
+    uint64_t nv = (expr->op == TokenKind::kPlusPlus) ? v + 1 : v - 1;
+    new_val = MakeLogic4VecVal(arena, old_val.width, nv);
+  }
   if (expr->lhs->kind == ExprKind::kIdentifier) {
     auto* var = ctx.FindVariable(expr->lhs->text);
     if (var) var->value = new_val;
@@ -90,11 +102,23 @@ Logic4Vec EvalPrefixUnary(const Expr* expr, SimContext& ctx, Arena& arena) {
 
 Logic4Vec EvalPostfixUnary(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto old_val = EvalExpr(expr->lhs, ctx, arena);
-  uint64_t v = old_val.ToUint64();
-  uint64_t nv = (expr->op == TokenKind::kPlusPlus) ? v + 1 : v - 1;
   if (expr->lhs->kind == ExprKind::kIdentifier) {
     auto* var = ctx.FindVariable(expr->lhs->text);
-    if (var) var->value = MakeLogic4VecVal(arena, old_val.width, nv);
+    if (var) {
+      if (old_val.is_real) {
+        double d = 0.0;
+        uint64_t bits = old_val.ToUint64();
+        std::memcpy(&d, &bits, sizeof(double));
+        d += (expr->op == TokenKind::kPlusPlus) ? 1.0 : -1.0;
+        std::memcpy(&bits, &d, sizeof(double));
+        var->value = MakeLogic4VecVal(arena, 64, bits);
+        var->value.is_real = true;
+      } else {
+        uint64_t v = old_val.ToUint64();
+        uint64_t nv = (expr->op == TokenKind::kPlusPlus) ? v + 1 : v - 1;
+        var->value = MakeLogic4VecVal(arena, old_val.width, nv);
+      }
+    }
   }
   return old_val;  // Return original value (postfix semantics).
 }
