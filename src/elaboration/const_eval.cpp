@@ -222,4 +222,26 @@ std::optional<int64_t> ConstEvalInt(const Expr* expr) {
   return ConstEvalInt(expr, kEmptyScope);
 }
 
+// §11.5.3: Build the textual representation of a static prefix.
+static std::string BuildStaticPrefix(const Expr* expr, const ScopeMap& scope) {
+  if (!expr) return "";
+  if (expr->kind == ExprKind::kIdentifier) return std::string(expr->text);
+  if (expr->kind != ExprKind::kSelect || !expr->base) return "";
+  std::string base = BuildStaticPrefix(expr->base, scope);
+  if (base.empty()) return "";
+  // Check if index is a constant expression.
+  auto idx = ConstEvalInt(expr->index, scope);
+  if (!idx) return base;  // Non-constant index → stop here.
+  return base + "[" + std::to_string(*idx) + "]";
+}
+
+std::string LongestStaticPrefix(const Expr* expr, const ScopeMap& scope) {
+  if (!expr) return "";
+  // For a select chain, walk recursively.
+  if (expr->kind == ExprKind::kSelect) return BuildStaticPrefix(expr, scope);
+  // For a plain identifier, the prefix is the identifier itself.
+  if (expr->kind == ExprKind::kIdentifier) return std::string(expr->text);
+  return "";
+}
+
 }  // namespace delta

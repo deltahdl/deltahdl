@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 
@@ -19,5 +20,10 @@ std::optional<int64_t> ConstEvalInt(const Expr* expr);
 
 /// Scoped overload: resolves identifiers via the given scope map.
 std::optional<int64_t> ConstEvalInt(const Expr* expr, const ScopeMap& scope);
+
+/// §11.5.3: Compute the longest static prefix of a select expression.
+/// Returns a string representation (e.g., "m[1]" for m[1][i]).
+/// The scope map is used to determine which identifiers are constants.
+std::string LongestStaticPrefix(const Expr* expr, const ScopeMap& scope = {});
 
 }  // namespace delta
