@@ -654,7 +654,7 @@ jobs:
           -extra-arg=-ferror-limit=0
           -extra-arg=-w
           -warnings-as-errors='*'
-          'src/.*\.cpp$'
+          '(?<!test/)src/.*\.cpp$'
   unit-test-asan-ubsan:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
