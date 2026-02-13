@@ -476,3 +476,59 @@ TEST(EvalOpXZ, UnsignedLtUnchanged) {
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);  // 255 < 1 → false
 }
+
+// ==========================================================================
+// Signed arithmetic — §11.4.3, §11.4.3.1
+// ==========================================================================
+
+TEST(EvalOpXZ, SignedDivTruncToZero) {
+  EvalOpXZFixture f;
+  // -7 / 2 = -3 (truncation toward zero, not -4)
+  // -7 as 8-bit signed = 0xF9
+  MakeSignedVar(f, "sd", 8, 0xF9);
+  MakeSignedVar(f, "se", 8, 2);
+  auto* expr = MakeBinary(f.arena, TokenKind::kSlash, MakeId(f.arena, "sd"),
+                          MakeId(f.arena, "se"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  // -3 as 8-bit = 0xFD
+  EXPECT_EQ(result.ToUint64() & 0xFF, 0xFDu);
+  EXPECT_TRUE(result.is_signed);
+}
+
+TEST(EvalOpXZ, SignedModSignOfFirst) {
+  EvalOpXZFixture f;
+  // -7 % 2 = -1 (sign of dividend per IEEE)
+  MakeSignedVar(f, "sm", 8, 0xF9);
+  MakeSignedVar(f, "sn", 8, 2);
+  auto* expr = MakeBinary(f.arena, TokenKind::kPercent, MakeId(f.arena, "sm"),
+                          MakeId(f.arena, "sn"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  // -1 as 8-bit = 0xFF
+  EXPECT_EQ(result.ToUint64() & 0xFF, 0xFFu);
+  EXPECT_TRUE(result.is_signed);
+}
+
+TEST(EvalOpXZ, SignedMulNeg) {
+  EvalOpXZFixture f;
+  // -3 * 4 = -12. -3 as 8-bit = 0xFD, -12 as 8-bit = 0xF4
+  MakeSignedVar(f, "ma", 8, 0xFD);
+  MakeSignedVar(f, "mb", 8, 4);
+  auto* expr = MakeBinary(f.arena, TokenKind::kStar, MakeId(f.arena, "ma"),
+                          MakeId(f.arena, "mb"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64() & 0xFF, 0xF4u);
+  EXPECT_TRUE(result.is_signed);
+}
+
+TEST(EvalOpXZ, UnsignedDivUnchanged) {
+  EvalOpXZFixture f;
+  // 0xF9 / 2 = 124 (unsigned: 249 / 2 = 124)
+  auto* a = f.ctx.CreateVariable("ud", 8);
+  a->value = MakeLogic4VecVal(f.arena, 8, 0xF9);
+  auto* b = f.ctx.CreateVariable("ue", 8);
+  b->value = MakeLogic4VecVal(f.arena, 8, 2);
+  auto* expr = MakeBinary(f.arena, TokenKind::kSlash, MakeId(f.arena, "ud"),
+                          MakeId(f.arena, "ue"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 124u);  // 249 / 2 = 124
+}

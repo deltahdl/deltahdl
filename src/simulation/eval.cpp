@@ -280,17 +280,53 @@ static uint64_t IntPow(uint64_t base, uint64_t exp) {
   return result;
 }
 
+static Logic4Vec EvalSignedArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
+                                 uint32_t width, Arena& arena) {
+  int64_t lv = SignExtend(lhs.ToUint64(), lhs.width);
+  int64_t rv = SignExtend(rhs.ToUint64(), rhs.width);
+  int64_t r = 0;
+  switch (op) {
+    case TokenKind::kPlus:
+      r = lv + rv;
+      break;
+    case TokenKind::kMinus:
+      r = lv - rv;
+      break;
+    case TokenKind::kStar:
+      r = lv * rv;
+      break;
+    case TokenKind::kSlash:
+      if (rv == 0) return MakeAllX(arena, width);
+      r = lv / rv;
+      break;
+    case TokenKind::kPercent:
+      if (rv == 0) return MakeAllX(arena, width);
+      r = lv % rv;
+      break;
+    case TokenKind::kPower:
+      r = static_cast<int64_t>(IntPow(lv, rv));
+      break;
+    default:
+      break;
+  }
+  auto result = MakeLogic4VecVal(arena, width, static_cast<uint64_t>(r));
+  result.is_signed = true;
+  return result;
+}
+
 static Logic4Vec EvalBinaryArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
                                  Arena& arena) {
   uint32_t width = (lhs.width > rhs.width) ? lhs.width : rhs.width;
-  // §11.4.3: Any X/Z operand → all-X result.
   if (HasUnknownBits(lhs) || HasUnknownBits(rhs)) {
     return MakeAllX(arena, width);
+  }
+  // §11.4.3.1: Both signed → signed arithmetic.
+  if (lhs.is_signed && rhs.is_signed) {
+    return EvalSignedArith(op, lhs, rhs, width, arena);
   }
   uint64_t lv = lhs.ToUint64();
   uint64_t rv = rhs.ToUint64();
   uint64_t result = 0;
-
   switch (op) {
     case TokenKind::kPlus:
       result = lv + rv;
