@@ -178,7 +178,9 @@ TEST(Lexer, StringLiterals) {
   EXPECT_EQ(tokens[0].text, "\"Hello, World!\"");
 }
 
-TEST(Lexer, SystemIdentifiers) {
+// --- §5.6.3: System tasks and system functions ---
+
+TEST(Lexer, SystemTf_Basic) {
   auto tokens = lex("$display $finish");
   ASSERT_EQ(tokens.size(), 3);
   EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
@@ -186,13 +188,37 @@ TEST(Lexer, SystemIdentifiers) {
   EXPECT_EQ(tokens[1].text, "$finish");
 }
 
-TEST(Lexer, EmbeddedDollarSystemIdentifiers) {
+TEST(Lexer, SystemTf_EmbeddedDollar) {
+  // §5.6.3: system_tf_identifier allows $ within the name
   auto tokens = lex("$test$plusargs $value$plusargs");
   ASSERT_EQ(tokens.size(), 3);
   EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
   EXPECT_EQ(tokens[0].text, "$test$plusargs");
   EXPECT_EQ(tokens[1].kind, TokenKind::kSystemIdentifier);
   EXPECT_EQ(tokens[1].text, "$value$plusargs");
+}
+
+TEST(Lexer, SystemTf_WithDigitsAndUnderscore) {
+  auto tokens = lex("$urandom_range $stime");
+  ASSERT_EQ(tokens.size(), 3);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
+  EXPECT_EQ(tokens[0].text, "$urandom_range");
+  EXPECT_EQ(tokens[1].text, "$stime");
+}
+
+TEST(Lexer, SystemTf_LrmExamples) {
+  // §5.6.3 examples
+  auto tokens = lex("$display $finish");
+  ASSERT_GE(tokens.size(), 3);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kSystemIdentifier);
+}
+
+TEST(Lexer, SystemTf_DollarAloneIsNotSystem) {
+  // Bare $ followed by non-alpha is just kDollar, not a system identifier
+  auto tokens = lex("$");
+  ASSERT_GE(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kDollar);
 }
 
 // --- §5.5: Operators ---
