@@ -1100,6 +1100,19 @@ TEST(Lexer, InterpretEscapes_LineContinuation) {
   EXPECT_EQ(InterpretStringEscapes("hello\\\r\nworld"), "helloworld");
 }
 
+TEST(Lexer, InterpretEscapes_OctalMaxDigits) {
+  using delta::InterpretStringEscapes;
+  // §5.9.1: octal consumes up to 3 digits; \1019 → 'A' then '9'
+  EXPECT_EQ(InterpretStringEscapes(R"(\1019)"), "A9");
+}
+
+TEST(Lexer, InterpretEscapes_TripleBackslashNewline) {
+  using delta::InterpretStringEscapes;
+  // §5.9.1: \\\<newline> → double backslash is escape for '\', then
+  // backslash+newline is line continuation (both removed)
+  EXPECT_EQ(InterpretStringEscapes("\\\\\\\n"), "\\");
+}
+
 TEST(Lexer, InterpretEscapes_NoEscapes) {
   using delta::InterpretStringEscapes;
   EXPECT_EQ(InterpretStringEscapes("hello world"), "hello world");
