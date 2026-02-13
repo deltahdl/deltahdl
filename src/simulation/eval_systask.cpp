@@ -30,13 +30,6 @@ static uint32_t CountOnesInVec(const Logic4Vec& val) {
   return count;
 }
 
-static bool HasUnknownBits(const Logic4Vec& val) {
-  for (uint32_t i = 0; i < val.nwords; ++i) {
-    if (val.words[i].bval != 0) return true;
-  }
-  return false;
-}
-
 // ============================================================================
 // §20 — $clog2
 // ============================================================================

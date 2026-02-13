@@ -5,7 +5,6 @@
 #include <vector>
 
 #include "common/arena.h"
-#include "common/diagnostic.h"
 #include "elaboration/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
@@ -146,7 +145,6 @@ static Logic4Vec EvalStringLiteral(const Expr* expr, Arena& arena) {
 }
 
 // --- Identifier evaluation ---
-
 static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
   auto* var = ctx.FindVariable(expr->text);
@@ -159,40 +157,69 @@ static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
   return MakeLogic4Vec(arena, 1);  // X for unknown
 }
 
-// --- Reduction operations (§11.4.9) ---
+// --- Helpers for X/Z propagation ---
+bool HasUnknownBits(const Logic4Vec& v) {
+  for (uint32_t i = 0; i < v.nwords; ++i) {
+    if (v.words[i].bval != 0) return true;
+  }
+  return false;
+}
 
-static uint64_t ReduceBits(uint64_t val, uint32_t width) {
-  uint64_t mask = (width >= 64) ? ~uint64_t{0} : (uint64_t{1} << width) - 1;
-  return val & mask;
+Logic4Vec MakeAllX(Arena& arena, uint32_t width) {
+  auto vec = MakeLogic4Vec(arena, width);
+  for (uint32_t i = 0; i < vec.nwords; ++i) {
+    vec.words[i] = {~uint64_t{0}, ~uint64_t{0}};
+  }
+  return vec;
+}
+
+// --- Reduction operations (§11.4.9) ---
+// Extract a single bit from a Logic4Vec as a 1-bit Logic4Word.
+static Logic4Word ExtractBit(const Logic4Vec& v, uint32_t idx) {
+  uint32_t word = idx / 64;
+  uint64_t mask = uint64_t{1} << (idx % 64);
+  uint64_t a = (v.words[word].aval & mask) ? 1 : 0;
+  uint64_t b = (v.words[word].bval & mask) ? 1 : 0;
+  return {a, b};
+}
+
+// Select the base 4-state fold function for the reduction operator.
+using FoldFn = Logic4Word (*)(Logic4Word, Logic4Word);
+
+static FoldFn ReductionFoldFn(TokenKind op) {
+  switch (op) {
+    case TokenKind::kAmp:
+    case TokenKind::kTildeAmp:
+      return Logic4And;
+    case TokenKind::kPipe:
+    case TokenKind::kTildePipe:
+      return Logic4Or;
+    default:
+      return Logic4Xor;
+  }
 }
 
 static Logic4Vec EvalReductionOp(TokenKind op, Logic4Vec operand,
                                  Arena& arena) {
-  uint64_t val = ReduceBits(operand.ToUint64(), operand.width);
-  uint64_t all_ones =
-      (operand.width >= 64) ? ~uint64_t{0} : (uint64_t{1} << operand.width) - 1;
-  uint64_t bit_count = __builtin_popcountll(val);
-  switch (op) {
-    case TokenKind::kAmp:
-      return MakeLogic4VecVal(arena, 1, (val == all_ones) ? 1 : 0);
-    case TokenKind::kPipe:
-      return MakeLogic4VecVal(arena, 1, (val != 0) ? 1 : 0);
-    case TokenKind::kCaret:
-      return MakeLogic4VecVal(arena, 1, bit_count & 1);
-    case TokenKind::kTildeAmp:
-      return MakeLogic4VecVal(arena, 1, (val == all_ones) ? 0 : 1);
-    case TokenKind::kTildePipe:
-      return MakeLogic4VecVal(arena, 1, (val != 0) ? 0 : 1);
-    case TokenKind::kTildeCaret:
-    case TokenKind::kCaretTilde:
-      return MakeLogic4VecVal(arena, 1, (bit_count & 1) ? 0 : 1);
-    default:
-      return operand;
+  if (operand.width == 0) return MakeLogic4Vec(arena, 1);
+  auto fold = ReductionFoldFn(op);
+  Logic4Word acc = ExtractBit(operand, 0);
+  for (uint32_t i = 1; i < operand.width; ++i) {
+    acc = fold(acc, ExtractBit(operand, i));
   }
+  bool negate = op == TokenKind::kTildeAmp || op == TokenKind::kTildePipe ||
+                op == TokenKind::kTildeCaret || op == TokenKind::kCaretTilde;
+  if (negate) {
+    acc = Logic4Not(acc);
+    acc.aval &= 1;
+    acc.bval &= 1;
+  }
+  auto result = MakeLogic4Vec(arena, 1);
+  result.words[0] = acc;
+  return result;
 }
 
 // --- Unary operations ---
-
 static bool IsReductionOp(TokenKind op) {
   switch (op) {
     case TokenKind::kAmp:
@@ -219,10 +246,10 @@ static Logic4Vec EvalUnaryOp(TokenKind op, Logic4Vec operand, Arena& arena) {
         result.words[i] = Logic4Not(operand.words[i]);
       }
       return result;
-    case TokenKind::kBang: {
-      uint64_t val = operand.ToUint64();
-      return MakeLogic4VecVal(arena, 1, val == 0 ? 1 : 0);
-    }
+    case TokenKind::kBang:
+      // §11.4.7: X/Z operand → 1'bx.
+      if (HasUnknownBits(operand)) return MakeAllX(arena, 1);
+      return MakeLogic4VecVal(arena, 1, operand.ToUint64() == 0 ? 1 : 0);
     case TokenKind::kMinus: {
       if (operand.is_real) {
         double d = 0.0;
@@ -243,7 +270,6 @@ static Logic4Vec EvalUnaryOp(TokenKind op, Logic4Vec operand, Arena& arena) {
 }
 
 // --- Binary arithmetic ---
-
 static uint64_t IntPow(uint64_t base, uint64_t exp) {
   uint64_t result = 1;
   while (exp > 0) {
@@ -256,9 +282,13 @@ static uint64_t IntPow(uint64_t base, uint64_t exp) {
 
 static Logic4Vec EvalBinaryArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
                                  Arena& arena) {
+  uint32_t width = (lhs.width > rhs.width) ? lhs.width : rhs.width;
+  // §11.4.3: Any X/Z operand → all-X result.
+  if (HasUnknownBits(lhs) || HasUnknownBits(rhs)) {
+    return MakeAllX(arena, width);
+  }
   uint64_t lv = lhs.ToUint64();
   uint64_t rv = rhs.ToUint64();
-  uint32_t width = (lhs.width > rhs.width) ? lhs.width : rhs.width;
   uint64_t result = 0;
 
   switch (op) {
@@ -272,10 +302,12 @@ static Logic4Vec EvalBinaryArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
       result = lv * rv;
       break;
     case TokenKind::kSlash:
-      result = (rv != 0) ? lv / rv : 0;
+      if (rv == 0) return MakeAllX(arena, width);
+      result = lv / rv;
       break;
     case TokenKind::kPercent:
-      result = (rv != 0) ? lv % rv : 0;
+      if (rv == 0) return MakeAllX(arena, width);
+      result = lv % rv;
       break;
     case TokenKind::kPower:
       result = IntPow(lv, rv);
@@ -287,7 +319,6 @@ static Logic4Vec EvalBinaryArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
 }
 
 // --- Binary bitwise ---
-
 static Logic4Vec EvalBinaryBitwise(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
                                    Arena& arena) {
   uint32_t width = (lhs.width > rhs.width) ? lhs.width : rhs.width;
@@ -307,15 +338,26 @@ static Logic4Vec EvalBinaryBitwise(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
       case TokenKind::kCaret:
         result.words[i] = Logic4Xor(lw, rw);
         break;
+      case TokenKind::kTildeCaret:
+      case TokenKind::kCaretTilde:
+        result.words[i] = Logic4Not(Logic4Xor(lw, rw));
+        break;
       default:
         break;
     }
+  }
+  // XNOR: Logic4Not inverts all 64 bits per word; mask the top word to width.
+  bool is_xnor = op == TokenKind::kTildeCaret || op == TokenKind::kCaretTilde;
+  uint32_t bit_pos = width % 64;
+  if (is_xnor && bit_pos != 0) {
+    uint64_t mask = (uint64_t{1} << bit_pos) - 1;
+    result.words[words - 1].aval &= mask;
+    result.words[words - 1].bval &= mask;
   }
   return result;
 }
 
 // --- Case equality (compares both aval and bval) ---
-
 static bool EvalCaseEquality(Logic4Vec lhs, Logic4Vec rhs) {
   if (lhs.width != rhs.width) return false;
   for (uint32_t i = 0; i < lhs.nwords; ++i) {
@@ -326,7 +368,6 @@ static bool EvalCaseEquality(Logic4Vec lhs, Logic4Vec rhs) {
 }
 
 // --- Shift operations ---
-
 static Logic4Vec MakeSignedResult(Arena& arena, uint32_t width, uint64_t val,
                                   bool is_signed) {
   auto result = MakeLogic4VecVal(arena, width, val);
@@ -359,24 +400,25 @@ static Logic4Vec EvalShift(TokenKind op, Logic4Vec lhs, uint64_t rv,
 }
 
 // --- Wildcard equality ---
-
 static uint64_t EvalWildcardEq(Logic4Vec lhs, Logic4Vec rhs) {
   uint64_t rhs_dc = rhs.nwords > 0 ? rhs.words[0].bval : 0;
   return (((lhs.ToUint64() ^ rhs.ToUint64()) & ~rhs_dc) == 0) ? 1 : 0;
 }
 
 // --- Equality operations (§11.4.5, §11.4.6) ---
+// Return 2 to indicate X result (neither 0 nor 1).
+static constexpr uint64_t kResultX = 2;
 
 static uint64_t EvalEqualityOp(TokenKind op, Logic4Vec lhs, Logic4Vec rhs) {
-  uint64_t lv = lhs.ToUint64();
-  uint64_t rv = rhs.ToUint64();
   switch (op) {
     case TokenKind::kEqEq:
-      return (lv == rv) ? 1 : 0;
+    case TokenKind::kBangEq:
+      // §11.4.5: X/Z in either operand → 1'bx.
+      if (HasUnknownBits(lhs) || HasUnknownBits(rhs)) return kResultX;
+      return (op == TokenKind::kEqEq) == (lhs.ToUint64() == rhs.ToUint64()) ? 1
+                                                                            : 0;
     case TokenKind::kEqEqEq:
       return EvalCaseEquality(lhs, rhs) ? 1 : 0;
-    case TokenKind::kBangEq:
-      return (lv != rv) ? 1 : 0;
     case TokenKind::kBangEqEq:
       return EvalCaseEquality(lhs, rhs) ? 0 : 1;
     case TokenKind::kEqEqQuestion:
@@ -388,8 +430,14 @@ static uint64_t EvalEqualityOp(TokenKind op, Logic4Vec lhs, Logic4Vec rhs) {
   }
 }
 
-// --- Relational and logical operations (§11.4.4, §11.4.7) ---
+// --- Signed helpers ---
+int64_t SignExtend(uint64_t val, uint32_t width) {
+  if (width == 0 || width >= 64) return static_cast<int64_t>(val);
+  uint64_t mask = uint64_t{1} << (width - 1);
+  return static_cast<int64_t>((val ^ mask) - mask);
+}
 
+// --- Relational and logical operations (§11.4.4, §11.4.7) ---
 static uint64_t EvalRelationalOp(TokenKind op, uint64_t lv, uint64_t rv) {
   switch (op) {
     case TokenKind::kLt:
@@ -400,31 +448,60 @@ static uint64_t EvalRelationalOp(TokenKind op, uint64_t lv, uint64_t rv) {
       return (lv <= rv) ? 1 : 0;
     case TokenKind::kGtEq:
       return (lv >= rv) ? 1 : 0;
-    case TokenKind::kAmpAmp:
-      return (lv != 0 && rv != 0) ? 1 : 0;
-    case TokenKind::kPipePipe:
-      return (lv != 0 || rv != 0) ? 1 : 0;
+    default:
+      return 0;
+  }
+}
+
+static uint64_t EvalSignedRelOp(TokenKind op, int64_t lv, int64_t rv) {
+  switch (op) {
+    case TokenKind::kLt:
+      return (lv < rv) ? 1 : 0;
+    case TokenKind::kGt:
+      return (lv > rv) ? 1 : 0;
+    case TokenKind::kLtEq:
+      return (lv <= rv) ? 1 : 0;
+    case TokenKind::kGtEq:
+      return (lv >= rv) ? 1 : 0;
     default:
       return 0;
   }
 }
 
 // --- Binary comparison dispatch ---
-
 static bool IsEqualityOp(TokenKind op) {
   return op == TokenKind::kEqEq || op == TokenKind::kEqEqEq ||
          op == TokenKind::kBangEq || op == TokenKind::kBangEqEq ||
          op == TokenKind::kEqEqQuestion || op == TokenKind::kBangEqQuestion;
 }
 
+static bool IsRelationalOp(TokenKind op) {
+  return op == TokenKind::kLt || op == TokenKind::kGt ||
+         op == TokenKind::kLtEq || op == TokenKind::kGtEq;
+}
+
 static Logic4Vec EvalBinaryCompare(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
                                    Arena& arena) {
   if (op == TokenKind::kLtLt || op == TokenKind::kLtLtLt ||
       op == TokenKind::kGtGt || op == TokenKind::kGtGtGt) {
+    // §11.4.10: X/Z shift amount → all-X.
+    if (HasUnknownBits(rhs)) return MakeAllX(arena, lhs.width);
     return EvalShift(op, lhs, rhs.ToUint64(), arena);
   }
   if (IsEqualityOp(op)) {
-    return MakeLogic4VecVal(arena, 1, EvalEqualityOp(op, lhs, rhs));
+    uint64_t val = EvalEqualityOp(op, lhs, rhs);
+    if (val == kResultX) return MakeAllX(arena, 1);
+    return MakeLogic4VecVal(arena, 1, val);
+  }
+  // §11.4.4: X/Z in relational operand → 1'bx.
+  if (IsRelationalOp(op) && (HasUnknownBits(lhs) || HasUnknownBits(rhs))) {
+    return MakeAllX(arena, 1);
+  }
+  // §11.4.3.1: Both signed → signed comparison.
+  if (IsRelationalOp(op) && lhs.is_signed && rhs.is_signed) {
+    int64_t lv = SignExtend(lhs.ToUint64(), lhs.width);
+    int64_t rv = SignExtend(rhs.ToUint64(), rhs.width);
+    return MakeLogic4VecVal(arena, 1, EvalSignedRelOp(op, lv, rv));
   }
   return MakeLogic4VecVal(arena, 1,
                           EvalRelationalOp(op, lhs.ToUint64(), rhs.ToUint64()));
@@ -445,6 +522,8 @@ static Logic4Vec EvalBinaryOp(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
     case TokenKind::kAmp:
     case TokenKind::kPipe:
     case TokenKind::kCaret:
+    case TokenKind::kTildeCaret:
+    case TokenKind::kCaretTilde:
       return EvalBinaryBitwise(op, lhs, rhs, arena);
     default:
       return EvalBinaryCompare(op, lhs, rhs, arena);
@@ -508,15 +587,18 @@ Logic4Vec AssembleConcatParts(const std::vector<Logic4Vec>& parts,
   auto result = MakeLogic4Vec(arena, total_width);
   uint32_t bit_pos = 0;
   for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
-    uint64_t val = it->ToUint64();
+    uint64_t aval = it->ToUint64();
+    uint64_t bval = (it->nwords > 0) ? it->words[0].bval : 0;
     uint32_t w = it->width;
     if (w > 64) w = 64;
     uint32_t word = bit_pos / 64;
     uint32_t bit = bit_pos % 64;
     if (word < result.nwords) {
-      result.words[word].aval |= val << bit;
+      result.words[word].aval |= aval << bit;
+      result.words[word].bval |= bval << bit;
       if (bit + w > 64 && word + 1 < result.nwords) {
-        result.words[word + 1].aval |= val >> (64 - bit);
+        result.words[word + 1].aval |= aval >> (64 - bit);
+        result.words[word + 1].bval |= bval >> (64 - bit);
       }
     }
     bit_pos += it->width;
@@ -537,227 +619,30 @@ static Logic4Vec EvalConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
   return AssembleConcatParts(parts, total_width, arena);
 }
 
-// --- Select (bit/part) ---
-
-// §7.10: Resolve a queue index with $ = last element index.
-static uint64_t ResolveQueueIdx(const Expr* idx_expr, QueueObject* q,
-                                SimContext& ctx, Arena& arena) {
-  ctx.PushScope();
-  auto* dv = ctx.CreateLocalVariable("$", 32);
-  uint64_t last = q->elements.empty() ? 0 : q->elements.size() - 1;
-  dv->value = MakeLogic4VecVal(arena, 32, last);
-  auto val = EvalExpr(idx_expr, ctx, arena);
-  ctx.PopScope();
-  return val.ToUint64();
-}
-
-// §7.4.5: Create an all-X Logic4Vec (out-of-bounds result).
-static Logic4Vec MakeAllX(Arena& arena, uint32_t width) {
-  auto vec = MakeLogic4Vec(arena, width);
-  for (uint32_t i = 0; i < vec.nwords; ++i) {
-    vec.words[i] = {~uint64_t{0}, ~uint64_t{0}};
-  }
-  return vec;
-}
-
-// §7.10: Try queue indexed access with $ support. Returns true if handled.
-static bool TryQueueSelect(const Expr* expr, SimContext& ctx, Arena& arena,
-                           Logic4Vec& out) {
-  if (!expr->base || expr->base->kind != ExprKind::kIdentifier) return false;
-  if (expr->index_end) return false;
-  auto* q = ctx.FindQueue(expr->base->text);
-  if (!q) return false;
-  auto idx = ResolveQueueIdx(expr->index, q, ctx, arena);
-  out = (idx < q->elements.size()) ? q->elements[idx]
-                                   : MakeAllX(arena, q->elem_width);
-  return true;
-}
-
-// §7.4: Try unpacked array element access. Returns true if handled.
-static bool TryArrayElementSelect(const Expr* expr, uint64_t idx,
-                                  SimContext& ctx, Arena& arena,
-                                  Logic4Vec& out) {
-  if (!expr->base || expr->base->kind != ExprKind::kIdentifier) return false;
-  if (expr->index_end) return false;
-  auto* info = ctx.FindArrayInfo(expr->base->text);
-  if (!info) return false;
-  auto elem_name =
-      std::string(expr->base->text) + "[" + std::to_string(idx) + "]";
-  auto* elem = ctx.FindVariable(elem_name);
-  if (!elem) {
-    out = MakeAllX(arena, info->elem_width);
-    return true;
-  }
-  out = elem->value;
-  return true;
-}
-
-// §7.4: Build a compound variable name from chained selects (e.g., mem[i][j]).
-static bool BuildCompoundName(const Expr* expr, SimContext& ctx, Arena& arena,
-                              std::string& name) {
-  if (expr->kind == ExprKind::kIdentifier) {
-    name = expr->text;
-    return true;
-  }
-  if (expr->kind != ExprKind::kSelect || expr->index_end) return false;
-  if (!BuildCompoundName(expr->base, ctx, arena, name)) return false;
-  auto idx = EvalExpr(expr->index, ctx, arena).ToUint64();
-  name += "[" + std::to_string(idx) + "]";
-  return true;
-}
-
-// §7.4: Try multi-dimensional array element access (e.g., mem[i][j]).
-static bool TryCompoundArraySelect(const Expr* expr, SimContext& ctx,
-                                   Arena& arena, Logic4Vec& out) {
-  if (!expr->base || expr->base->kind != ExprKind::kSelect) return false;
-  if (expr->index_end) return false;
-  std::string compound;
-  if (!BuildCompoundName(expr, ctx, arena, compound)) return false;
-  auto* elem = ctx.FindVariable(compound);
-  if (!elem) return false;
-  out = elem->value;
-  return true;
-}
-
-// §7.4.5: Try unpacked array slice select. Returns true if handled.
-static bool TryArraySliceSelect(const Expr* expr, SimContext& ctx, Arena& arena,
-                                Logic4Vec& out) {
-  if (!expr->index_end || !expr->base) return false;
-  if (expr->base->kind != ExprKind::kIdentifier) return false;
-  auto* info = ctx.FindArrayInfo(expr->base->text);
-  if (!info) return false;
-  auto hi_val = EvalExpr(expr->index, ctx, arena).ToUint64();
-  auto lo_val = EvalExpr(expr->index_end, ctx, arena).ToUint64();
-  auto lo = std::min(hi_val, lo_val);
-  auto hi = std::max(hi_val, lo_val);
-  auto count = static_cast<uint32_t>(hi - lo + 1);
-  uint32_t ew = info->elem_width;
-  out = MakeLogic4Vec(arena, count * ew);
-  for (uint32_t i = 0; i < count; ++i) {
-    auto n = std::string(expr->base->text) + "[" + std::to_string(lo + i) + "]";
-    auto* v = ctx.FindVariable(n);
-    auto val = v ? v->value.ToUint64() : 0;
-    uint32_t bit_off = i * ew;
-    out.words[bit_off / 64].aval |= (val & ((1ULL << ew) - 1))
-                                    << (bit_off % 64);
-  }
-  return true;
-}
-
-// Evaluate a packed part-select: base[hi:lo].
-static Logic4Vec EvalPartSelect(const Logic4Vec& base_val, uint64_t idx,
-                                uint64_t end_idx, Arena& arena) {
-  auto lo = static_cast<uint32_t>(std::min(idx, end_idx));
-  auto hi = static_cast<uint32_t>(std::max(idx, end_idx));
-  uint32_t width = hi - lo + 1;
-  uint64_t val = base_val.ToUint64() >> lo;
-  uint64_t mask = (width >= 64) ? ~uint64_t{0} : (uint64_t{1} << width) - 1;
-  return MakeLogic4VecVal(arena, width, val & mask);
-}
-
-// §7.8: Return the default-or-zero value for an assoc array miss.
-static Logic4Vec AssocDefault(const AssocArrayObject* aa, Arena& arena) {
-  return aa->has_default ? aa->default_value
-                         : MakeLogic4VecVal(arena, aa->elem_width, 0);
-}
-
-// §7.8: Extract string key from a Logic4Vec (packed byte representation).
-static std::string ExtractStringKey(const Logic4Vec& key) {
-  uint32_t nb = key.width / 8;
-  std::string s;
-  s.reserve(nb);
-  for (uint32_t i = nb; i > 0; --i) {
-    uint32_t bi = i - 1;
-    auto ch = static_cast<char>(
-        (key.words[(bi * 8) / 64].aval >> ((bi * 8) % 64)) & 0xFF);
-    if (ch != 0) s.push_back(ch);
-  }
-  return s;
-}
-
-// §7.8.6: Warn on read of non-existent associative array index.
-static void WarnAssocMiss(const AssocArrayObject* aa, std::string_view name,
-                          SimContext& ctx) {
-  if (!aa->has_default)
-    ctx.GetDiag().Warning({}, "associative array '" + std::string(name) +
-                                  "': read of non-existent index");
-}
-
-// §7.8: Read from assoc array by string key.
-static Logic4Vec AssocReadStr(AssocArrayObject* aa, const Expr* idx_expr,
-                              std::string_view name, SimContext& ctx,
-                              Arena& arena) {
-  auto s = ExtractStringKey(EvalExpr(idx_expr, ctx, arena));
-  auto it = aa->str_data.find(s);
-  if (it != aa->str_data.end()) return it->second;
-  WarnAssocMiss(aa, name, ctx);
-  return AssocDefault(aa, arena);
-}
-
-// §7.8: Read from assoc array by integer key.
-static Logic4Vec AssocReadInt(AssocArrayObject* aa, const Expr* idx_expr,
-                              std::string_view name, SimContext& ctx,
-                              Arena& arena) {
-  auto key = static_cast<int64_t>(EvalExpr(idx_expr, ctx, arena).ToUint64());
-  auto it = aa->int_data.find(key);
-  if (it != aa->int_data.end()) return it->second;
-  WarnAssocMiss(aa, name, ctx);
-  return AssocDefault(aa, arena);
-}
-
-// §7.8: Try associative array indexed access. Returns true if handled.
-static bool TryAssocSelect(const Expr* expr, SimContext& ctx, Arena& arena,
-                           Logic4Vec& out) {
-  if (!expr->base || expr->base->kind != ExprKind::kIdentifier) return false;
-  if (expr->index_end) return false;
-  auto* aa = ctx.FindAssocArray(expr->base->text);
-  if (!aa) return false;
-  out = aa->is_string_key
-            ? AssocReadStr(aa, expr->index, expr->base->text, ctx, arena)
-            : AssocReadInt(aa, expr->index, expr->base->text, ctx, arena);
-  return true;
-}
-
-// §7.4.5: Packed part-select with +:/−: support.
-static Logic4Vec EvalPackedPartSelect(const Expr* expr, const Logic4Vec& base,
-                                      uint64_t idx, SimContext& ctx,
-                                      Arena& arena) {
-  auto end_val = EvalExpr(expr->index_end, ctx, arena).ToUint64();
-  if (expr->is_part_select_plus) {
-    auto w = static_cast<uint32_t>(end_val);
-    return EvalPartSelect(base, idx, idx + w - 1, arena);
-  }
-  if (expr->is_part_select_minus) {
-    auto w = static_cast<uint32_t>(end_val);
-    uint64_t lo = (idx >= w - 1) ? idx - w + 1 : 0;
-    return EvalPartSelect(base, lo, idx, arena);
-  }
-  return EvalPartSelect(base, idx, end_val, arena);
-}
-
-static Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
-  Logic4Vec result;
-  if (TryQueueSelect(expr, ctx, arena, result)) return result;
-  if (TryAssocSelect(expr, ctx, arena, result)) return result;
-
-  auto idx_val = EvalExpr(expr->index, ctx, arena);
-  uint64_t idx = idx_val.ToUint64();
-
-  if (TryArrayElementSelect(expr, idx, ctx, arena, result)) return result;
-  if (TryCompoundArraySelect(expr, ctx, arena, result)) return result;
-  if (TryArraySliceSelect(expr, ctx, arena, result)) return result;
-
-  auto base_val = EvalExpr(expr->base, ctx, arena);
-  if (expr->index_end)
-    return EvalPackedPartSelect(expr, base_val, idx, ctx, arena);
-  // Single bit select.
-  return MakeLogic4VecVal(arena, 1, (base_val.ToUint64() >> idx) & 1);
-}
-
 // --- Ternary ---
+
+// §11.4.11 Table 11-20: combine two branches when condition is X/Z.
+// Matching known bits → keep; differing → X.
+static Logic4Vec CombineBranches(Logic4Vec tv, Logic4Vec fv, Arena& arena) {
+  uint32_t width = (tv.width > fv.width) ? tv.width : fv.width;
+  auto result = MakeLogic4Vec(arena, width);
+  for (uint32_t i = 0; i < result.nwords; ++i) {
+    auto tw = (i < tv.nwords) ? tv.words[i] : Logic4Word{};
+    auto fw = (i < fv.nwords) ? fv.words[i] : Logic4Word{};
+    result.words[i].aval = tw.aval & fw.aval;
+    result.words[i].bval = tw.bval | fw.bval | (tw.aval ^ fw.aval);
+  }
+  return result;
+}
 
 static Logic4Vec EvalTernary(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto cond = EvalExpr(expr->condition, ctx, arena);
+  // §11.4.11: X/Z condition → eval both, combine bit-by-bit.
+  if (HasUnknownBits(cond)) {
+    auto tv = EvalExpr(expr->true_expr, ctx, arena);
+    auto fv = EvalExpr(expr->false_expr, ctx, arena);
+    return CombineBranches(tv, fv, arena);
+  }
   if (cond.ToUint64() != 0) {
     return EvalExpr(expr->true_expr, ctx, arena);
   }
@@ -809,6 +694,40 @@ static bool TryArrayEqualityOp(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
+// §11.4.7: Logical AND with 3-value truth table.
+static Logic4Vec EvalLogicalAnd(const Expr* expr, SimContext& ctx,
+                                Arena& arena) {
+  auto l = EvalExpr(expr->lhs, ctx, arena);
+  bool l_unknown = HasUnknownBits(l);
+  if (!l_unknown && l.ToUint64() == 0) {
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
+  auto r = EvalExpr(expr->rhs, ctx, arena);
+  bool r_unknown = HasUnknownBits(r);
+  if (!r_unknown && r.ToUint64() == 0) {
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
+  if (l_unknown || r_unknown) return MakeAllX(arena, 1);
+  return MakeLogic4VecVal(arena, 1, 1);
+}
+
+// §11.4.7: Logical OR with 3-value truth table.
+static Logic4Vec EvalLogicalOr(const Expr* expr, SimContext& ctx,
+                               Arena& arena) {
+  auto l = EvalExpr(expr->lhs, ctx, arena);
+  bool l_unknown = HasUnknownBits(l);
+  if (!l_unknown && l.ToUint64() != 0) {
+    return MakeLogic4VecVal(arena, 1, 1);
+  }
+  auto r = EvalExpr(expr->rhs, ctx, arena);
+  bool r_unknown = HasUnknownBits(r);
+  if (!r_unknown && r.ToUint64() != 0) {
+    return MakeLogic4VecVal(arena, 1, 1);
+  }
+  if (l_unknown || r_unknown) return MakeAllX(arena, 1);
+  return MakeLogic4VecVal(arena, 1, 0);
+}
+
 static Logic4Vec EvalBinaryExpr(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
   if (expr->op == TokenKind::kEq) return EvalAssignInExpr(expr, ctx, arena);
@@ -816,18 +735,8 @@ static Logic4Vec EvalBinaryExpr(const Expr* expr, SimContext& ctx,
     Logic4Vec arr_result;
     if (TryArrayEqualityOp(expr, ctx, arena, arr_result)) return arr_result;
   }
-  if (expr->op == TokenKind::kAmpAmp) {
-    auto l = EvalExpr(expr->lhs, ctx, arena);
-    if (l.ToUint64() == 0) return MakeLogic4VecVal(arena, 1, 0);
-    auto r = EvalExpr(expr->rhs, ctx, arena);
-    return MakeLogic4VecVal(arena, 1, r.ToUint64() != 0 ? 1 : 0);
-  }
-  if (expr->op == TokenKind::kPipePipe) {
-    auto l = EvalExpr(expr->lhs, ctx, arena);
-    if (l.ToUint64() != 0) return MakeLogic4VecVal(arena, 1, 1);
-    auto r = EvalExpr(expr->rhs, ctx, arena);
-    return MakeLogic4VecVal(arena, 1, r.ToUint64() != 0 ? 1 : 0);
-  }
+  if (expr->op == TokenKind::kAmpAmp) return EvalLogicalAnd(expr, ctx, arena);
+  if (expr->op == TokenKind::kPipePipe) return EvalLogicalOr(expr, ctx, arena);
   return EvalBinaryOp(expr->op, EvalExpr(expr->lhs, ctx, arena),
                       EvalExpr(expr->rhs, ctx, arena), arena);
 }

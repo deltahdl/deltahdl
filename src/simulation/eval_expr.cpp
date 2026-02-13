@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/class_object.h"
@@ -40,11 +41,14 @@ Logic4Vec EvalReplicate(const Expr* expr, SimContext& ctx, Arena& arena) {
     parts.push_back(EvalExpr(elem, ctx, arena));
     elem_width += parts.back().width;
   }
-  // Concatenate inner elements into a single value.
-  uint64_t inner_val = 0;
+  // Concatenate inner elements into a single aval/bval pair.
+  uint64_t inner_aval = 0;
+  uint64_t inner_bval = 0;
   uint32_t bit_pos = 0;
   for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
-    inner_val |= it->ToUint64() << bit_pos;
+    inner_aval |= it->ToUint64() << bit_pos;
+    uint64_t bv = (it->nwords > 0) ? it->words[0].bval : 0;
+    inner_bval |= bv << bit_pos;
     bit_pos += it->width;
   }
   // Replicate the concatenated value.
@@ -56,9 +60,11 @@ Logic4Vec EvalReplicate(const Expr* expr, SimContext& ctx, Arena& arena) {
     uint32_t word = bit_pos / 64;
     uint32_t bit = bit_pos % 64;
     if (word < result.nwords) {
-      result.words[word].aval |= inner_val << bit;
+      result.words[word].aval |= inner_aval << bit;
+      result.words[word].bval |= inner_bval << bit;
       if (bit + ew > 64 && word + 1 < result.nwords) {
-        result.words[word + 1].aval |= inner_val >> (64 - bit);
+        result.words[word + 1].aval |= inner_aval >> (64 - bit);
+        result.words[word + 1].bval |= inner_bval >> (64 - bit);
       }
     }
     bit_pos += elem_width;
@@ -262,19 +268,39 @@ Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
 
 // --- Inside operator (§11.4.13) ---
 
+// Returns: 1=match, 0=no-match, 2=ambiguous.
+static int InsideMatchRange(Logic4Vec lhs, const Expr* elem, SimContext& ctx,
+                            Arena& arena) {
+  auto lo_v = EvalExpr(elem->index, ctx, arena);
+  auto hi_v = EvalExpr(elem->index_end, ctx, arena);
+  if (!lhs.IsKnown() || !lo_v.IsKnown() || !hi_v.IsKnown()) return 2;
+  uint64_t lo = lo_v.ToUint64(), hi = hi_v.ToUint64(), lv = lhs.ToUint64();
+  if (lo > hi) std::swap(lo, hi);
+  return (lv >= lo && lv <= hi) ? 1 : 0;
+}
+
+static int InsideMatchValue(Logic4Vec lhs, const Expr* elem, SimContext& ctx,
+                            Arena& arena) {
+  auto ev = EvalExpr(elem, ctx, arena);
+  if (!lhs.IsKnown() || !ev.IsKnown()) return 2;
+  return (lhs.ToUint64() == ev.ToUint64()) ? 1 : 0;
+}
+
 Logic4Vec EvalInside(const Expr* expr, SimContext& ctx, Arena& arena) {
-  uint64_t lv = EvalExpr(expr->lhs, ctx, arena).ToUint64();
+  auto lhs = EvalExpr(expr->lhs, ctx, arena);
+  bool ambiguous = false;
   for (auto* elem : expr->elements) {
-    if (elem->kind == ExprKind::kSelect && elem->index && elem->index_end) {
-      // Range element [lo:hi].
-      uint64_t lo = EvalExpr(elem->index, ctx, arena).ToUint64();
-      uint64_t hi = EvalExpr(elem->index_end, ctx, arena).ToUint64();
-      if (lo > hi) std::swap(lo, hi);
-      if (lv >= lo && lv <= hi) return MakeLogic4VecVal(arena, 1, 1);
-    } else {
-      uint64_t ev = EvalExpr(elem, ctx, arena).ToUint64();
-      if (lv == ev) return MakeLogic4VecVal(arena, 1, 1);
-    }
+    bool is_range =
+        elem->kind == ExprKind::kSelect && elem->index && elem->index_end;
+    int r = is_range ? InsideMatchRange(lhs, elem, ctx, arena)
+                     : InsideMatchValue(lhs, elem, ctx, arena);
+    if (r == 1) return MakeLogic4VecVal(arena, 1, 1);
+    if (r == 2) ambiguous = true;
+  }
+  if (ambiguous) {
+    auto x = MakeLogic4Vec(arena, 1);
+    x.words[0] = {~uint64_t{0}, ~uint64_t{0}};
+    return x;
   }
   return MakeLogic4VecVal(arena, 1, 0);
 }
@@ -512,6 +538,197 @@ Logic4Vec EvalMatches(const Expr* expr, SimContext& ctx, Arena& arena) {
   uint64_t mask = ~rb;
   bool match = (la & mask) == (ra & mask);
   return MakeLogic4VecVal(arena, 1, match ? 1 : 0);
+}
+
+// --- Select (bit/part) ---
+
+// §7.10: Resolve a queue index with $ = last element index.
+static uint64_t ResolveQueueIdx(const Expr* idx_expr, QueueObject* q,
+                                SimContext& ctx, Arena& arena) {
+  ctx.PushScope();
+  auto* dv = ctx.CreateLocalVariable("$", 32);
+  uint64_t last = q->elements.empty() ? 0 : q->elements.size() - 1;
+  dv->value = MakeLogic4VecVal(arena, 32, last);
+  auto val = EvalExpr(idx_expr, ctx, arena);
+  ctx.PopScope();
+  return val.ToUint64();
+}
+
+static bool TryQueueSelect(const Expr* expr, SimContext& ctx, Arena& arena,
+                           Logic4Vec& out) {
+  if (!expr->base || expr->base->kind != ExprKind::kIdentifier) return false;
+  if (expr->index_end) return false;
+  auto* q = ctx.FindQueue(expr->base->text);
+  if (!q) return false;
+  auto idx = ResolveQueueIdx(expr->index, q, ctx, arena);
+  out = (idx < q->elements.size()) ? q->elements[idx]
+                                   : MakeAllX(arena, q->elem_width);
+  return true;
+}
+
+static bool TryArrayElementSelect(const Expr* expr, uint64_t idx,
+                                  SimContext& ctx, Arena& arena,
+                                  Logic4Vec& out) {
+  if (!expr->base || expr->base->kind != ExprKind::kIdentifier) return false;
+  if (expr->index_end) return false;
+  auto* info = ctx.FindArrayInfo(expr->base->text);
+  if (!info) return false;
+  auto elem_name =
+      std::string(expr->base->text) + "[" + std::to_string(idx) + "]";
+  auto* elem = ctx.FindVariable(elem_name);
+  if (!elem) {
+    out = MakeAllX(arena, info->elem_width);
+    return true;
+  }
+  out = elem->value;
+  return true;
+}
+
+static bool BuildCompoundName(const Expr* expr, SimContext& ctx, Arena& arena,
+                              std::string& name) {
+  if (expr->kind == ExprKind::kIdentifier) {
+    name = expr->text;
+    return true;
+  }
+  if (expr->kind != ExprKind::kSelect || expr->index_end) return false;
+  if (!BuildCompoundName(expr->base, ctx, arena, name)) return false;
+  auto idx = EvalExpr(expr->index, ctx, arena).ToUint64();
+  name += "[" + std::to_string(idx) + "]";
+  return true;
+}
+
+static bool TryCompoundArraySelect(const Expr* expr, SimContext& ctx,
+                                   Arena& arena, Logic4Vec& out) {
+  if (!expr->base || expr->base->kind != ExprKind::kSelect) return false;
+  if (expr->index_end) return false;
+  std::string compound;
+  if (!BuildCompoundName(expr, ctx, arena, compound)) return false;
+  auto* elem = ctx.FindVariable(compound);
+  if (!elem) return false;
+  out = elem->value;
+  return true;
+}
+
+static bool TryArraySliceSelect(const Expr* expr, SimContext& ctx, Arena& arena,
+                                Logic4Vec& out) {
+  if (!expr->index_end || !expr->base) return false;
+  if (expr->base->kind != ExprKind::kIdentifier) return false;
+  auto* info = ctx.FindArrayInfo(expr->base->text);
+  if (!info) return false;
+  auto hi_val = EvalExpr(expr->index, ctx, arena).ToUint64();
+  auto lo_val = EvalExpr(expr->index_end, ctx, arena).ToUint64();
+  auto lo = std::min(hi_val, lo_val);
+  auto hi = std::max(hi_val, lo_val);
+  auto count = static_cast<uint32_t>(hi - lo + 1);
+  uint32_t ew = info->elem_width;
+  out = MakeLogic4Vec(arena, count * ew);
+  for (uint32_t i = 0; i < count; ++i) {
+    auto n = std::string(expr->base->text) + "[" + std::to_string(lo + i) + "]";
+    auto* v = ctx.FindVariable(n);
+    auto val = v ? v->value.ToUint64() : 0;
+    uint32_t bit_off = i * ew;
+    out.words[bit_off / 64].aval |= (val & ((1ULL << ew) - 1))
+                                    << (bit_off % 64);
+  }
+  return true;
+}
+
+static Logic4Vec EvalPartSelect(const Logic4Vec& base_val, uint64_t idx,
+                                uint64_t end_idx, Arena& arena) {
+  auto lo = static_cast<uint32_t>(std::min(idx, end_idx));
+  auto hi = static_cast<uint32_t>(std::max(idx, end_idx));
+  uint32_t width = hi - lo + 1;
+  uint64_t val = base_val.ToUint64() >> lo;
+  uint64_t mask = (width >= 64) ? ~uint64_t{0} : (uint64_t{1} << width) - 1;
+  return MakeLogic4VecVal(arena, width, val & mask);
+}
+
+static Logic4Vec AssocDefault(const AssocArrayObject* aa, Arena& arena) {
+  return aa->has_default ? aa->default_value
+                         : MakeLogic4VecVal(arena, aa->elem_width, 0);
+}
+
+static std::string ExtractStringKey(const Logic4Vec& key) {
+  uint32_t nb = key.width / 8;
+  std::string s;
+  s.reserve(nb);
+  for (uint32_t i = nb; i > 0; --i) {
+    uint32_t bi = i - 1;
+    auto ch = static_cast<char>(
+        (key.words[(bi * 8) / 64].aval >> ((bi * 8) % 64)) & 0xFF);
+    if (ch != 0) s.push_back(ch);
+  }
+  return s;
+}
+
+static void WarnAssocMiss(const AssocArrayObject* aa, std::string_view name,
+                          SimContext& ctx) {
+  if (!aa->has_default)
+    ctx.GetDiag().Warning({}, "associative array '" + std::string(name) +
+                                  "': read of non-existent index");
+}
+
+static Logic4Vec AssocReadStr(AssocArrayObject* aa, const Expr* idx_expr,
+                              std::string_view name, SimContext& ctx,
+                              Arena& arena) {
+  auto s = ExtractStringKey(EvalExpr(idx_expr, ctx, arena));
+  auto it = aa->str_data.find(s);
+  if (it != aa->str_data.end()) return it->second;
+  WarnAssocMiss(aa, name, ctx);
+  return AssocDefault(aa, arena);
+}
+
+static Logic4Vec AssocReadInt(AssocArrayObject* aa, const Expr* idx_expr,
+                              std::string_view name, SimContext& ctx,
+                              Arena& arena) {
+  auto key = static_cast<int64_t>(EvalExpr(idx_expr, ctx, arena).ToUint64());
+  auto it = aa->int_data.find(key);
+  if (it != aa->int_data.end()) return it->second;
+  WarnAssocMiss(aa, name, ctx);
+  return AssocDefault(aa, arena);
+}
+
+static bool TryAssocSelect(const Expr* expr, SimContext& ctx, Arena& arena,
+                           Logic4Vec& out) {
+  if (!expr->base || expr->base->kind != ExprKind::kIdentifier) return false;
+  if (expr->index_end) return false;
+  auto* aa = ctx.FindAssocArray(expr->base->text);
+  if (!aa) return false;
+  out = aa->is_string_key
+            ? AssocReadStr(aa, expr->index, expr->base->text, ctx, arena)
+            : AssocReadInt(aa, expr->index, expr->base->text, ctx, arena);
+  return true;
+}
+
+static Logic4Vec EvalPackedPartSelect(const Expr* expr, const Logic4Vec& base,
+                                      uint64_t idx, SimContext& ctx,
+                                      Arena& arena) {
+  auto end_val = EvalExpr(expr->index_end, ctx, arena).ToUint64();
+  if (expr->is_part_select_plus) {
+    auto w = static_cast<uint32_t>(end_val);
+    return EvalPartSelect(base, idx, idx + w - 1, arena);
+  }
+  if (expr->is_part_select_minus) {
+    auto w = static_cast<uint32_t>(end_val);
+    uint64_t lo = (idx >= w - 1) ? idx - w + 1 : 0;
+    return EvalPartSelect(base, lo, idx, arena);
+  }
+  return EvalPartSelect(base, idx, end_val, arena);
+}
+
+Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
+  Logic4Vec result;
+  if (TryQueueSelect(expr, ctx, arena, result)) return result;
+  if (TryAssocSelect(expr, ctx, arena, result)) return result;
+  auto idx_val = EvalExpr(expr->index, ctx, arena);
+  uint64_t idx = idx_val.ToUint64();
+  if (TryArrayElementSelect(expr, idx, ctx, arena, result)) return result;
+  if (TryCompoundArraySelect(expr, ctx, arena, result)) return result;
+  if (TryArraySliceSelect(expr, ctx, arena, result)) return result;
+  auto base_val = EvalExpr(expr->base, ctx, arena);
+  if (expr->index_end)
+    return EvalPackedPartSelect(expr, base_val, idx, ctx, arena);
+  return MakeLogic4VecVal(arena, 1, (base_val.ToUint64() >> idx) & 1);
 }
 
 }  // namespace delta

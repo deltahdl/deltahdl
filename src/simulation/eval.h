@@ -16,6 +16,14 @@ class Arena;
 
 Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena);
 
+// §11 helpers shared across eval*.cpp files.
+bool HasUnknownBits(const Logic4Vec& v);
+Logic4Vec MakeAllX(Arena& arena, uint32_t width);
+int64_t SignExtend(uint64_t val, uint32_t width);
+
+// §7: Select (bit/part) and indexed access (eval.cpp → eval_expr.cpp).
+Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena);
+
 // §20 Utility system calls ($clog2, $bits, $countones, etc.)
 Logic4Vec EvalUtilitySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                              std::string_view name);
