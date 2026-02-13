@@ -31,6 +31,26 @@ Val4 EvalPullSource(PullKind kind);
 StrengthLevel GetPullSourceStrength(const PullSourceInfo& info);
 bool PullSourceAcceptsDelaySpec();
 
+Val4 EvalPullSource(PullKind kind) {
+  switch (kind) {
+    case PullKind::kPullup:
+      return Val4::kV1;
+    case PullKind::kPulldown:
+      return Val4::kV0;
+  }
+  return Val4::kX;
+}
+
+StrengthLevel GetPullSourceStrength(const PullSourceInfo& info) {
+  if (info.kind == PullKind::kPullup && info.has_strength1)
+    return info.strength1;
+  if (info.kind == PullKind::kPulldown && info.has_strength0)
+    return info.strength0;
+  return StrengthLevel::kPull;
+}
+
+bool PullSourceAcceptsDelaySpec() { return false; }
+
 // =============================================================
 // §28.10: pullup and pulldown sources
 // =============================================================
@@ -104,6 +124,4 @@ TEST(PullGates, PulldownIgnoresStrength1) {
 }
 
 // §28.10: "There shall be no delay specifications for these sources."
-TEST(PullGates, NoDelaySpecs) {
-  EXPECT_FALSE(PullSourceAcceptsDelaySpec());
-}
+TEST(PullGates, NoDelaySpecs) { EXPECT_FALSE(PullSourceAcceptsDelaySpec()); }

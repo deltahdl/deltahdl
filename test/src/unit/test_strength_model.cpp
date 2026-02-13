@@ -36,6 +36,178 @@ StrengthSignal CombineWithWiredLogic(StrengthSignal a, StrengthSignal b,
 StrengthLevel ReduceNonresistive(StrengthLevel input);
 StrengthLevel ReduceResistive(StrengthLevel input);
 
+// --- Implementations ---
+
+StrengthLevel MapStrengthKeyword0(uint8_t keyword_index) {
+  // 0=none, 1=highz, 2=weak, 3=pull, 4=strong, 5=supply
+  switch (keyword_index) {
+    case 0:
+      return StrengthLevel::kHighz;
+    case 1:
+      return StrengthLevel::kHighz;
+    case 2:
+      return StrengthLevel::kWeak;
+    case 3:
+      return StrengthLevel::kPull;
+    case 4:
+      return StrengthLevel::kStrong;
+    case 5:
+      return StrengthLevel::kSupply;
+    default:
+      return StrengthLevel::kHighz;
+  }
+}
+
+StrengthLevel MapStrengthKeyword1(uint8_t keyword_index) {
+  // 0=none, 1=highz, 2=weak, 3=pull, 4=strong, 5=supply
+  switch (keyword_index) {
+    case 0:
+      return StrengthLevel::kHighz;
+    case 1:
+      return StrengthLevel::kHighz;
+    case 2:
+      return StrengthLevel::kWeak;
+    case 3:
+      return StrengthLevel::kPull;
+    case 4:
+      return StrengthLevel::kStrong;
+    case 5:
+      return StrengthLevel::kSupply;
+    default:
+      return StrengthLevel::kHighz;
+  }
+}
+
+bool ValidateStrengthPair(StrengthLevel s0, StrengthLevel s1) {
+  // Both highz is illegal; all other combinations are legal.
+  if (s0 == StrengthLevel::kHighz && s1 == StrengthLevel::kHighz) {
+    return false;
+  }
+  return true;
+}
+
+StrengthSignal CombineUnambiguous(StrengthSignal a, StrengthSignal b) {
+  // Effective strength is the maximum of the two strength fields,
+  // since for an unambiguous signal one side is always highz.
+  auto effective = [](const StrengthSignal& s) -> StrengthLevel {
+    return std::max(s.strength0_hi, s.strength1_hi);
+  };
+
+  StrengthLevel eff_a = effective(a);
+  StrengthLevel eff_b = effective(b);
+
+  if (a.value == b.value) {
+    // Like values: result has same value with the greater strength.
+    StrengthSignal result;
+    result.value = a.value;
+    StrengthLevel max_str = std::max(eff_a, eff_b);
+    if (a.value == Val4::kV0) {
+      result.strength0_hi = max_str;
+      result.strength1_hi = StrengthLevel::kHighz;
+    } else {
+      result.strength0_hi = StrengthLevel::kHighz;
+      result.strength1_hi = max_str;
+    }
+    return result;
+  }
+
+  // Unlike values: stronger signal dominates.
+  if (eff_a > eff_b) {
+    return a;
+  } else if (eff_b > eff_a) {
+    return b;
+  }
+
+  // Equal strength, unlike values: produce x.
+  StrengthSignal result;
+  result.value = Val4::kX;
+  result.strength0_hi = eff_a;
+  result.strength1_hi = eff_a;
+  return result;
+}
+
+StrengthSignal CombineWithWiredLogic(StrengthSignal a, StrengthSignal b,
+                                     WiredLogicKind logic) {
+  // For different strengths, the stronger signal dominates (same as
+  // unambiguous combination). Wired logic only applies when two
+  // same-strength opposite-value signals combine.
+  auto effective = [](const StrengthSignal& s) -> StrengthLevel {
+    return std::max(s.strength0_hi, s.strength1_hi);
+  };
+
+  StrengthLevel eff_a = effective(a);
+  StrengthLevel eff_b = effective(b);
+
+  // If same value or different strengths, defer to unambiguous rules
+  // (like values merge, stronger dominates).
+  if (a.value == b.value || eff_a != eff_b) {
+    return CombineUnambiguous(a, b);
+  }
+
+  // Same strength, opposite values: apply wired logic.
+  Val4 resolved;
+  if (logic == WiredLogicKind::kAnd) {
+    // AND: 1&0=0, 1&1=1, 0&0=0
+    if (a.value == Val4::kV1 && b.value == Val4::kV1) {
+      resolved = Val4::kV1;
+    } else {
+      resolved = Val4::kV0;
+    }
+  } else {
+    // OR: 1|0=1, 0|0=0, 1|1=1
+    if (a.value == Val4::kV0 && b.value == Val4::kV0) {
+      resolved = Val4::kV0;
+    } else {
+      resolved = Val4::kV1;
+    }
+  }
+
+  StrengthSignal result;
+  result.value = resolved;
+  if (resolved == Val4::kV0) {
+    result.strength0_hi = eff_a;
+    result.strength1_hi = StrengthLevel::kHighz;
+  } else {
+    result.strength0_hi = StrengthLevel::kHighz;
+    result.strength1_hi = eff_a;
+  }
+  return result;
+}
+
+StrengthLevel ReduceNonresistive(StrengthLevel input) {
+  // supply → strong; all others unchanged.
+  if (input == StrengthLevel::kSupply) {
+    return StrengthLevel::kStrong;
+  }
+  return input;
+}
+
+StrengthLevel ReduceResistive(StrengthLevel input) {
+  // Per Table 28-8:
+  //   supply → pull, strong → pull, pull → weak, large → medium,
+  //   weak → medium, medium → small, small → small, highz → highz.
+  switch (input) {
+    case StrengthLevel::kSupply:
+      return StrengthLevel::kPull;
+    case StrengthLevel::kStrong:
+      return StrengthLevel::kPull;
+    case StrengthLevel::kPull:
+      return StrengthLevel::kWeak;
+    case StrengthLevel::kLarge:
+      return StrengthLevel::kMedium;
+    case StrengthLevel::kWeak:
+      return StrengthLevel::kMedium;
+    case StrengthLevel::kMedium:
+      return StrengthLevel::kSmall;
+    case StrengthLevel::kSmall:
+      return StrengthLevel::kSmall;
+    case StrengthLevel::kHighz:
+      return StrengthLevel::kHighz;
+    default:
+      return StrengthLevel::kHighz;
+  }
+}
+
 // =============================================================
 // §28.11: Logic strength modeling
 // =============================================================
@@ -127,8 +299,7 @@ TEST(StrengthCombine, LikeValueTakesGreaterStrength) {
 // §28.12.1: "The combination of signals identical in strength and
 //  value shall result in the same signal."
 TEST(StrengthCombine, IdenticalSignalsUnchanged) {
-  StrengthSignal sig{Val4::kV0, StrengthLevel::kPull,
-                     StrengthLevel::kHighz};
+  StrengthSignal sig{Val4::kV0, StrengthLevel::kPull, StrengthLevel::kHighz};
   auto result = CombineUnambiguous(sig, sig);
   EXPECT_EQ(result.value, Val4::kV0);
   EXPECT_EQ(result.strength0_hi, StrengthLevel::kPull);
@@ -198,8 +369,7 @@ TEST(WiredLogic, WiredOrBothZero) {
 //  from the data input to the output, except that a supply strength
 //  shall be reduced to a strong strength."
 TEST(StrengthReduction, NonresistivePassesStrong) {
-  EXPECT_EQ(ReduceNonresistive(StrengthLevel::kStrong),
-            StrengthLevel::kStrong);
+  EXPECT_EQ(ReduceNonresistive(StrengthLevel::kStrong), StrengthLevel::kStrong);
 }
 
 TEST(StrengthReduction, NonresistivePassesPull) {
@@ -211,13 +381,11 @@ TEST(StrengthReduction, NonresistivePassesWeak) {
 }
 
 TEST(StrengthReduction, NonresistiveReducesSupplyToStrong) {
-  EXPECT_EQ(ReduceNonresistive(StrengthLevel::kSupply),
-            StrengthLevel::kStrong);
+  EXPECT_EQ(ReduceNonresistive(StrengthLevel::kSupply), StrengthLevel::kStrong);
 }
 
 TEST(StrengthReduction, NonresistivePassesHighz) {
-  EXPECT_EQ(ReduceNonresistive(StrengthLevel::kHighz),
-            StrengthLevel::kHighz);
+  EXPECT_EQ(ReduceNonresistive(StrengthLevel::kHighz), StrengthLevel::kHighz);
 }
 
 // =============================================================

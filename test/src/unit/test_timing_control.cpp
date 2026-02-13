@@ -43,6 +43,68 @@ bool EvaluateWaitCondition(uint64_t value);
 uint64_t EvaluateRepeatCount(int64_t count, bool is_signed, bool is_unknown,
                              bool is_highz);
 
+// §9.4.2: Edge detection per posedge/negedge transition tables.
+// Posedge: 0->1, 0->x, 0->z, x->1, z->1
+// Negedge: 1->0, 1->x, 1->z, x->0, z->0
+// All other transitions: no edge.
+EdgeKind DetectEdge(Logic4 from, Logic4 to) {
+  if (from == to) return EdgeKind::kNone;
+  // Posedge transitions.
+  if (from == Logic4::kVal0 &&
+      (to == Logic4::kVal1 || to == Logic4::kX || to == Logic4::kZ))
+    return EdgeKind::kPosedge;
+  if ((from == Logic4::kX || from == Logic4::kZ) && to == Logic4::kVal1)
+    return EdgeKind::kPosedge;
+  // Negedge transitions.
+  if (from == Logic4::kVal1 &&
+      (to == Logic4::kVal0 || to == Logic4::kX || to == Logic4::kZ))
+    return EdgeKind::kNegedge;
+  if ((from == Logic4::kX || from == Logic4::kZ) && to == Logic4::kVal0)
+    return EdgeKind::kNegedge;
+  return EdgeKind::kNone;
+}
+
+bool IsEdge(Logic4 from, Logic4 to) {
+  EdgeKind e = DetectEdge(from, to);
+  return e == EdgeKind::kPosedge || e == EdgeKind::kNegedge;
+}
+
+uint64_t EvaluateDelay(int64_t value, bool is_unknown, bool is_highz) {
+  if (is_unknown || is_highz) return 0;
+  if (value < 0) return static_cast<uint64_t>(value);
+  return static_cast<uint64_t>(value);
+}
+
+std::vector<std::string> ComputeImplicitSensitivity(
+    const std::vector<VarRef>& refs) {
+  std::vector<std::string> result;
+  for (const auto& ref : refs) {
+    switch (ref.role) {
+      case ExprRole::kRHS:
+      case ExprRole::kSubroutineArg:
+      case ExprRole::kCaseExpr:
+      case ExprRole::kConditionalExpr:
+      case ExprRole::kLHSIndex:
+        result.push_back(ref.name);
+        break;
+      case ExprRole::kPureLHS:
+      case ExprRole::kTimingControl:
+        break;
+    }
+  }
+  return result;
+}
+
+bool EvaluateWaitCondition(uint64_t value) { return value != 0; }
+
+uint64_t EvaluateRepeatCount(int64_t count, bool is_signed, bool is_unknown,
+                             bool is_highz) {
+  if (is_unknown || is_highz) return 0;
+  if (is_signed && count <= 0) return 0;
+  if (!is_signed && count < 0) return static_cast<uint64_t>(count);
+  return static_cast<uint64_t>(count);
+}
+
 // =============================================================
 // §9.4: Procedural timing controls
 // =============================================================
@@ -259,10 +321,8 @@ TEST(TimingControl, ImplicitSensitivityExcludesPureLHS) {
 // Multiple variables with mixed roles.
 TEST(TimingControl, ImplicitSensitivityMixedRoles) {
   std::vector<VarRef> refs = {
-      {"a", ExprRole::kRHS},
-      {"b", ExprRole::kSubroutineArg},
-      {"c", ExprRole::kPureLHS},
-      {"d", ExprRole::kTimingControl},
+      {"a", ExprRole::kRHS},      {"b", ExprRole::kSubroutineArg},
+      {"c", ExprRole::kPureLHS},  {"d", ExprRole::kTimingControl},
       {"e", ExprRole::kLHSIndex},
   };
   auto result = ComputeImplicitSensitivity(refs);

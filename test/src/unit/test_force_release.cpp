@@ -33,6 +33,52 @@ void ReleaseVariable(Variable& var, bool has_continuous_driver,
 void ForceNet(Net& net, const Logic4Vec& value, Arena& arena);
 void ReleaseNet(Net& net, Arena& arena);
 
+bool ValidateForceTarget(const ForceInfo& info) {
+  if (info.has_mixed_assignments) return false;
+  switch (info.target) {
+    case ForceTarget::kSingularVariable:
+    case ForceTarget::kNet:
+    case ForceTarget::kConstBitSelectNet:
+    case ForceTarget::kConstPartSelectNet:
+    case ForceTarget::kConcatenation:
+      return true;
+    case ForceTarget::kBitSelectVariable:
+    case ForceTarget::kPartSelectVariable:
+    case ForceTarget::kUserDefinedNettypePartSelect:
+      return false;
+  }
+  return false;
+}
+
+void ForceVariable(Variable& var, const Logic4Vec& value) { var.value = value; }
+
+void ReleaseVariable(Variable& var, bool has_continuous_driver,
+                     const Logic4Vec* continuous_value, Arena& arena) {
+  (void)arena;
+  if (has_continuous_driver && continuous_value) {
+    var.value = *continuous_value;
+  }
+  // Otherwise keep current value.
+}
+
+void ForceNet(Net& net, const Logic4Vec& value, Arena& arena) {
+  (void)arena;
+  net.resolved->value = value;
+}
+
+void ReleaseNet(Net& net, Arena& arena) {
+  (void)arena;
+  if (!net.drivers.empty()) {
+    net.resolved->value = net.drivers[0];
+  } else {
+    // Set to z: aval=1, bval=1.
+    for (uint32_t i = 0; i < net.resolved->value.nwords; ++i) {
+      net.resolved->value.words[i].aval = 1;
+      net.resolved->value.words[i].bval = 1;
+    }
+  }
+}
+
 // --- Helpers ---
 
 static uint8_t ValOf(const Variable& v) {

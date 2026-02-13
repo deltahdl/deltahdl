@@ -36,6 +36,34 @@ bool ValidateNettypeDataKind(NettypeDataKind kind);
 bool ResolveUserDefinedNet(Net& net, const UserNettype& nettype, Arena& arena);
 bool CheckUnresolvedMultipleDrivers(const Net& net, const UserNettype& nt);
 
+bool ValidateNettypeDataKind(NettypeDataKind kind) {
+  switch (kind) {
+    case NettypeDataKind::k4StateIntegral:
+    case NettypeDataKind::k2StateIntegral:
+    case NettypeDataKind::kReal:
+    case NettypeDataKind::kShortreal:
+    case NettypeDataKind::kFixedUnpackedArray:
+      return true;
+    case NettypeDataKind::kDynamicArray:
+    case NettypeDataKind::kString:
+    case NettypeDataKind::kClass:
+      return false;
+  }
+  return false;
+}
+
+bool ResolveUserDefinedNet(Net& net, const UserNettype& nettype, Arena& arena) {
+  if (nettype.resolution) {
+    Logic4Vec result = nettype.resolution(arena, net.drivers);
+    net.resolved->value = result;
+  }
+  return true;
+}
+
+bool CheckUnresolvedMultipleDrivers(const Net& net, const UserNettype& nt) {
+  return !nt.resolution && net.drivers.size() > 1;
+}
+
 // --- Helpers ---
 
 static Variable* MakeVar(Arena& arena, uint32_t width) {
@@ -250,8 +278,7 @@ TEST(UserDefinedNettype, ForceOverridesResolvedValue) {
   Net net = MakeDrivenNet(arena, var, 1);
 
   UserNettype nt;
-  nt.resolution = [](Arena& a,
-                     const std::vector<Logic4Vec>& d) -> Logic4Vec {
+  nt.resolution = [](Arena& a, const std::vector<Logic4Vec>& d) -> Logic4Vec {
     return MakeLogic4VecVal(a, 1, d[0].words[0].aval & 1);
   };
 
@@ -270,8 +297,7 @@ TEST(UserDefinedNettype, ReleaseRestoresResolvedValue) {
   Net net = MakeDrivenNet(arena, var, 1);
 
   UserNettype nt;
-  nt.resolution = [](Arena& a,
-                     const std::vector<Logic4Vec>& d) -> Logic4Vec {
+  nt.resolution = [](Arena& a, const std::vector<Logic4Vec>& d) -> Logic4Vec {
     return MakeLogic4VecVal(a, 1, d[0].words[0].aval & 1);
   };
 

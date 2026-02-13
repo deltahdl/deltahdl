@@ -25,7 +25,130 @@ struct SwitchInst {
   bool user_defined_nets = false;
 };
 
-void ResolveSwitchNetwork(std::vector<SwitchInst>& switches, Arena& arena);
+// --- Implementation ---
+
+static bool SwitchConducts(SwitchKind kind, Logic4Word control) {
+  uint8_t c_aval = control.aval & 1;
+  uint8_t c_bval = control.bval & 1;
+  // 0: aval=0,bval=0  1: aval=1,bval=0  x: aval=0,bval=1  z: aval=1,bval=1
+  bool is_one = (c_aval == 1 && c_bval == 0);
+  bool is_zero = (c_aval == 0 && c_bval == 0);
+  switch (kind) {
+    case SwitchKind::kTran:
+    case SwitchKind::kRtran:
+      return true;
+    case SwitchKind::kTranif1:
+    case SwitchKind::kRtranif1:
+      return is_one;
+    case SwitchKind::kTranif0:
+    case SwitchKind::kRtranif0:
+      return is_zero;
+  }
+  return false;
+}
+
+static bool SwitchControlIsUnknown(SwitchKind kind, Logic4Word control) {
+  if (kind == SwitchKind::kTran || kind == SwitchKind::kRtran) return false;
+  uint8_t c_bval = control.bval & 1;
+  return c_bval != 0;  // x or z
+}
+
+static bool IsZ(const Logic4Word& w) {
+  return (w.aval & 1) != 0 && (w.bval & 1) != 0;
+}
+
+static Logic4Vec GetDriverValue(const Net& net, const Variable& var) {
+  return !net.drivers.empty() ? net.drivers[0] : var.value;
+}
+
+static bool IsActiveDriver(const Net& net, const Logic4Vec& drv) {
+  return !net.drivers.empty() && !IsZ(drv.words[0]);
+}
+
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
+static void ResolveUnknownControlBuiltinSwitch(const SwitchInst& sw) {
+  auto& va = *sw.terminal_a->resolved;
+  auto& vb = *sw.terminal_b->resolved;
+  auto a_driven = GetDriverValue(*sw.terminal_a, va);
+  auto b_driven = GetDriverValue(*sw.terminal_b, vb);
+  bool a_is_driven = IsActiveDriver(*sw.terminal_a, a_driven);
+  bool b_is_driven = IsActiveDriver(*sw.terminal_b, b_driven);
+
+  uint8_t a_aval = a_driven.words[0].aval & 1;
+  uint8_t a_bval = a_driven.words[0].bval & 1;
+  uint8_t b_aval = b_driven.words[0].aval & 1;
+  uint8_t b_bval = b_driven.words[0].bval & 1;
+
+  // Check terminal b: on scenario vs off scenario.
+  uint8_t b_on_a = b_is_driven ? b_aval : (a_is_driven ? a_aval : b_aval);
+  uint8_t b_on_b = b_is_driven ? b_bval : (a_is_driven ? a_bval : b_bval);
+  uint8_t b_off_a = b_is_driven ? b_aval : 1;
+  uint8_t b_off_b = b_is_driven ? b_bval : 1;
+  if ((b_on_a != b_off_a || b_on_b != b_off_b) && !b_is_driven) {
+    vb.value.words[0].aval = 0;
+    vb.value.words[0].bval = 1;
+  }
+
+  // Check terminal a: on scenario vs off scenario.
+  uint8_t a_on_a = a_is_driven ? a_aval : (b_is_driven ? b_aval : a_aval);
+  uint8_t a_on_b = a_is_driven ? a_bval : (b_is_driven ? b_bval : a_bval);
+  uint8_t a_off_a = a_is_driven ? a_aval : 1;
+  uint8_t a_off_b = a_is_driven ? a_bval : 1;
+  if ((a_on_a != a_off_a || a_on_b != a_off_b) && !a_is_driven) {
+    va.value.words[0].aval = 0;
+    va.value.words[0].bval = 1;
+  }
+}
+
+static void PropagateConductingSwitch(const SwitchInst& sw) {
+  auto& va = *sw.terminal_a->resolved;
+  auto& vb = *sw.terminal_b->resolved;
+  auto a_drv = GetDriverValue(*sw.terminal_a, va);
+  auto b_drv = GetDriverValue(*sw.terminal_b, vb);
+  if (IsZ(a_drv.words[0]) && !IsZ(b_drv.words[0])) {
+    va.value.words[0] = b_drv.words[0];
+  } else if (IsZ(b_drv.words[0]) && !IsZ(a_drv.words[0])) {
+    vb.value.words[0] = a_drv.words[0];
+  }
+}
+
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
+void ResolveSwitchNetwork(std::vector<SwitchInst>& switches, Arena& /*arena*/) {
+  // Initialize each terminal's resolved value from its own drivers.
+  for (auto& sw : switches) {
+    for (auto* net : {sw.terminal_a, sw.terminal_b}) {
+      if (net && net->resolved && !net->drivers.empty()) {
+        net->resolved->value = net->drivers[0];
+      }
+    }
+  }
+  // First pass: resolve each switch.
+  for (auto& sw : switches) {
+    if (!sw.terminal_a || !sw.terminal_b) continue;
+    if (!sw.terminal_a->resolved || !sw.terminal_b->resolved) continue;
+    bool conducts = SwitchConducts(sw.kind, sw.control);
+    bool unknown_ctrl = SwitchControlIsUnknown(sw.kind, sw.control);
+    if (unknown_ctrl && !sw.user_defined_nets) {
+      ResolveUnknownControlBuiltinSwitch(sw);
+    } else if (conducts && !unknown_ctrl) {
+      PropagateConductingSwitch(sw);
+    }
+  }
+  // Second pass: chain propagation.
+  for (auto& sw : switches) {
+    if (!sw.terminal_a || !sw.terminal_b) continue;
+    if (!sw.terminal_a->resolved || !sw.terminal_b->resolved) continue;
+    if (!SwitchConducts(sw.kind, sw.control)) continue;
+    if (SwitchControlIsUnknown(sw.kind, sw.control)) continue;
+    auto& va = *sw.terminal_a->resolved;
+    auto& vb = *sw.terminal_b->resolved;
+    if (IsZ(va.value.words[0]) && !IsZ(vb.value.words[0])) {
+      va.value.words[0] = vb.value.words[0];
+    } else if (IsZ(vb.value.words[0]) && !IsZ(va.value.words[0])) {
+      vb.value.words[0] = va.value.words[0];
+    }
+  }
+}
 
 // --- Helpers ---
 

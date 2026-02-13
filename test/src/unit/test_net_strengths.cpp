@@ -36,6 +36,38 @@ NetDefaultInfo GetNetDefault(NetKind kind);
 StrengthLevel GetTriregChargeStrength(ChargeStrength cs);
 ChargeStrength GetTriregDefaultChargeStrength();
 
+NetDefaultInfo GetNetDefault(NetKind kind) {
+  switch (kind) {
+    case NetKind::kTri0:
+      return {Val4::kV0, StrengthLevel::kPull};
+    case NetKind::kTri1:
+      return {Val4::kV1, StrengthLevel::kPull};
+    case NetKind::kTrireg:
+      return {Val4::kX, StrengthLevel::kMedium};
+    case NetKind::kSupply0:
+      return {Val4::kV0, StrengthLevel::kSupply};
+    case NetKind::kSupply1:
+      return {Val4::kV1, StrengthLevel::kSupply};
+  }
+  return {};
+}
+
+StrengthLevel GetTriregChargeStrength(ChargeStrength cs) {
+  switch (cs) {
+    case ChargeStrength::kSmall:
+      return StrengthLevel::kSmall;
+    case ChargeStrength::kMedium:
+      return StrengthLevel::kMedium;
+    case ChargeStrength::kLarge:
+      return StrengthLevel::kLarge;
+  }
+  return StrengthLevel::kMedium;
+}
+
+ChargeStrength GetTriregDefaultChargeStrength() {
+  return ChargeStrength::kMedium;
+}
+
 // =============================================================
 // §28.15.1: tri0 and tri1 net strengths
 // =============================================================
