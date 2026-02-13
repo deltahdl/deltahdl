@@ -8,7 +8,7 @@
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+#include "simulation/sim_context.h"  // StructTypeInfo, StructFieldInfo
 
 using namespace delta;
 
@@ -119,4 +119,76 @@ TEST(EvalAdv, AssignInExprTruncToLHSWidth) {
   // §11.3.6: Result should be cast to LHS type (8-bit).
   EXPECT_EQ(result.width, 8u);
   EXPECT_EQ(result.ToUint64(), 0xFFu);
+}
+
+// ==========================================================================
+// §11.2.2: Aggregate expressions — packed struct equality
+// ==========================================================================
+
+static Expr* MakeBinary(Arena& arena, TokenKind op, Expr* lhs, Expr* rhs) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kBinary;
+  e->op = op;
+  e->lhs = lhs;
+  e->rhs = rhs;
+  return e;
+}
+
+TEST(EvalAdv, PackedStructEqualitySameValue) {
+  EvalAdvFixture f;
+  // Two 16-bit packed struct vars with same value → == is 1.
+  StructTypeInfo sinfo;
+  sinfo.type_name = "my_struct";
+  sinfo.total_width = 16;
+  sinfo.is_packed = true;
+  sinfo.fields.push_back({"a", 8, 8, DataTypeKind::kLogic});
+  sinfo.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
+  f.ctx.RegisterStructType("my_struct", sinfo);
+  MakeVar(f, "s1", 16, 0xABCD);
+  MakeVar(f, "s2", 16, 0xABCD);
+  f.ctx.SetVariableStructType("s1", "my_struct");
+  f.ctx.SetVariableStructType("s2", "my_struct");
+  auto* expr = MakeBinary(f.arena, TokenKind::kEqEq, MakeId(f.arena, "s1"),
+                           MakeId(f.arena, "s2"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
+TEST(EvalAdv, PackedStructEqualityDiffValue) {
+  EvalAdvFixture f;
+  // Two 16-bit packed struct vars with different values → == is 0.
+  StructTypeInfo sinfo;
+  sinfo.type_name = "my_struct";
+  sinfo.total_width = 16;
+  sinfo.is_packed = true;
+  sinfo.fields.push_back({"a", 8, 8, DataTypeKind::kLogic});
+  sinfo.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
+  f.ctx.RegisterStructType("my_struct", sinfo);
+  MakeVar(f, "s3", 16, 0xABCD);
+  MakeVar(f, "s4", 16, 0x1234);
+  f.ctx.SetVariableStructType("s3", "my_struct");
+  f.ctx.SetVariableStructType("s4", "my_struct");
+  auto* expr = MakeBinary(f.arena, TokenKind::kEqEq, MakeId(f.arena, "s3"),
+                           MakeId(f.arena, "s4"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+TEST(EvalAdv, PackedStructInequality) {
+  EvalAdvFixture f;
+  StructTypeInfo sinfo;
+  sinfo.type_name = "my_struct";
+  sinfo.total_width = 16;
+  sinfo.is_packed = true;
+  sinfo.fields.push_back({"a", 8, 8, DataTypeKind::kLogic});
+  sinfo.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
+  f.ctx.RegisterStructType("my_struct", sinfo);
+  MakeVar(f, "s5", 16, 0xABCD);
+  MakeVar(f, "s6", 16, 0x1234);
+  f.ctx.SetVariableStructType("s5", "my_struct");
+  f.ctx.SetVariableStructType("s6", "my_struct");
+  auto* expr = MakeBinary(f.arena, TokenKind::kBangEq, MakeId(f.arena, "s5"),
+                           MakeId(f.arena, "s6"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
 }
