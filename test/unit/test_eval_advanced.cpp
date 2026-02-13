@@ -926,6 +926,43 @@ TEST(EvalAdv, LetExpandDefaultArg) {
   EXPECT_EQ(result.ToUint64(), 11u);
 }
 
+// ==========================================================================
+// §7.4.5: X/Z address on array gives OOB (X) value
+// ==========================================================================
+
+TEST(EvalAdv, ArrayXZAddrReturnsX) {
+  EvalAdvFixture f;
+  // arr[0]=0x11, arr[1]=0x22 (8-bit elements).
+  MakeVar(f, "arr4[0]", 8, 0x11);
+  MakeVar(f, "arr4[1]", 8, 0x22);
+  ArrayInfo info{};
+  info.lo = 0;
+  info.size = 2;
+  info.elem_width = 8;
+  f.ctx.RegisterArray("arr4", info);
+
+  // arr4[x] — X address should return X.
+  auto* sel = f.arena.Create<Expr>();
+  sel->kind = ExprKind::kSelect;
+  sel->base = MakeId(f.arena, "arr4");
+  // Create an X-valued index.
+  auto* idx = MakeInt(f.arena, 0);
+  sel->index = idx;
+  // Manually set bval to make it X.
+  // Evaluate: since we can't directly set bval on a literal,
+  // create a variable with X value and use it.
+  auto* xvar = f.ctx.CreateVariable("xidx", 8);
+  xvar->value = MakeLogic4Vec(f.arena, 8);
+  xvar->value.words[0].aval = 1;
+  xvar->value.words[0].bval = 1;  // aval=1, bval=1 → X
+  sel->index = MakeId(f.arena, "xidx");
+
+  auto result = EvalExpr(sel, f.ctx, f.arena);
+  // X/Z address → result should be X (bval != 0).
+  EXPECT_NE(result.nwords, 0u);
+  EXPECT_NE(result.words[0].bval, 0u);
+}
+
 TEST(EvalAdv, LetNoRecursive) {
   EvalAdvFixture f;
   // let bad(a) = bad(a + 1); — recursive, should return X (not infinite loop).
