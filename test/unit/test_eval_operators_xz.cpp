@@ -878,3 +878,61 @@ TEST(EvalOpXZ, MixedRealIntArith) {
   EXPECT_TRUE(result.is_real);
   EXPECT_DOUBLE_EQ(ToDouble(result), 7.5);
 }
+
+// ==========================================================================
+// String concatenation/replication — §11.4.12.2
+// ==========================================================================
+
+static Variable* MakeStringVar(EvalOpXZFixture& f, std::string_view name,
+                                std::string_view value) {
+  uint32_t width = static_cast<uint32_t>(value.size()) * 8;
+  if (width == 0) width = 8;
+  auto* var = f.ctx.CreateVariable(name, width);
+  var->value = MakeLogic4Vec(f.arena, width);
+  for (size_t i = 0; i < value.size(); ++i) {
+    auto byte_idx = static_cast<uint32_t>(value.size() - 1 - i);
+    uint32_t word = (byte_idx * 8) / 64;
+    uint32_t bit = (byte_idx * 8) % 64;
+    var->value.words[word].aval |=
+        static_cast<uint64_t>(static_cast<unsigned char>(value[i])) << bit;
+  }
+  f.ctx.RegisterStringVariable(name);
+  return var;
+}
+
+static std::string VecToStr(const Logic4Vec& vec) {
+  std::string result;
+  uint32_t nbytes = vec.width / 8;
+  for (uint32_t i = nbytes; i > 0; --i) {
+    uint32_t byte_idx = i - 1;
+    uint32_t word = (byte_idx * 8) / 64;
+    uint32_t bit = (byte_idx * 8) % 64;
+    if (word >= vec.nwords) continue;
+    auto ch = static_cast<char>((vec.words[word].aval >> bit) & 0xFF);
+    if (ch != 0) result += ch;
+  }
+  return result;
+}
+
+TEST(EvalOpXZ, StringConcatDataType) {
+  EvalOpXZFixture f;
+  MakeStringVar(f, "s1", "hello");
+  MakeStringVar(f, "s2", " world");
+  auto* concat = f.arena.Create<Expr>();
+  concat->kind = ExprKind::kConcatenation;
+  concat->elements.push_back(MakeId(f.arena, "s1"));
+  concat->elements.push_back(MakeId(f.arena, "s2"));
+  auto result = EvalExpr(concat, f.ctx, f.arena);
+  EXPECT_EQ(VecToStr(result), "hello world");
+}
+
+TEST(EvalOpXZ, StringReplicateRuntime) {
+  EvalOpXZFixture f;
+  MakeStringVar(f, "sr", "ab");
+  auto* repl = f.arena.Create<Expr>();
+  repl->kind = ExprKind::kReplicate;
+  repl->repeat_count = MakeInt(f.arena, 3);
+  repl->elements.push_back(MakeId(f.arena, "sr"));
+  auto result = EvalExpr(repl, f.ctx, f.arena);
+  EXPECT_EQ(VecToStr(result), "ababab");
+}

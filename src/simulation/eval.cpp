@@ -702,6 +702,9 @@ Logic4Vec AssembleConcatParts(const std::vector<Logic4Vec>& parts,
 }
 
 // --- Concatenation ---
+// §11.4.12.2: String concatenation uses the same bit-level assembly path
+// because the 8-bit-per-char MSB-first encoding is compatible with both
+// bit and string semantics.  No-truncation resizing is an assignment concern.
 
 static Logic4Vec EvalConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
   uint32_t total_width = 0;
