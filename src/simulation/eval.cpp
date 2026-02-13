@@ -281,6 +281,24 @@ static uint64_t IntPow(uint64_t base, uint64_t exp) {
   return result;
 }
 
+// §11.4.3, Table 11-4: signed integer power with negative exponent handling.
+static Logic4Vec EvalSignedPow(int64_t base, int64_t exp, uint32_t width,
+                               Arena& arena) {
+  if (exp < 0) {
+    if (base == 0) return MakeAllX(arena, width);
+    int64_t r = 0;
+    if (base == 1) r = 1;
+    else if (base == -1) r = (exp % 2 == 0) ? 1 : -1;
+    auto result = MakeLogic4VecVal(arena, width, static_cast<uint64_t>(r));
+    result.is_signed = true;
+    return result;
+  }
+  auto r = static_cast<int64_t>(IntPow(base, exp));
+  auto result = MakeLogic4VecVal(arena, width, static_cast<uint64_t>(r));
+  result.is_signed = true;
+  return result;
+}
+
 static Logic4Vec EvalSignedArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
                                  uint32_t width, Arena& arena) {
   int64_t lv = SignExtend(lhs.ToUint64(), lhs.width);
@@ -305,8 +323,7 @@ static Logic4Vec EvalSignedArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
       r = lv % rv;
       break;
     case TokenKind::kPower:
-      r = static_cast<int64_t>(IntPow(lv, rv));
-      break;
+      return EvalSignedPow(lv, rv, width, arena);
     default:
       break;
   }

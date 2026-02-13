@@ -938,96 +938,41 @@ TEST(EvalOpXZ, StringReplicateRuntime) {
 }
 
 // ==========================================================================
-// Inside operator advanced features — §11.4.13
+// Arithmetic X/Z — §11.4.3 (subtraction, multiply, power with X/Z)
 // ==========================================================================
 
-// Helper: build a range expression [lo:hi] for inside elements.
-static Expr* MakeRange(Arena& arena, Expr* lo, Expr* hi,
-                       TokenKind op = TokenKind::kEof) {
-  auto* r = arena.Create<Expr>();
-  r->kind = ExprKind::kSelect;
-  r->index = lo;
-  r->index_end = hi;
-  r->op = op;
-  return r;
-}
-
-static Expr* MakeDollar(Arena& arena) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIdentifier;
-  e->text = "$";
-  return e;
-}
-
-TEST(EvalOpXZ, InsideDollarLowerBound) {
+TEST(EvalOpXZ, ArithSubX) {
   EvalOpXZFixture f;
-  // 8-bit var = 5. inside {[$:10]} → [$:10] means [0:10] for 8-bit.
-  auto* var = f.ctx.CreateVariable("dv", 8);
-  var->value = MakeLogic4VecVal(f.arena, 8, 5);
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeId(f.arena, "dv");
-  inside->elements.push_back(
-      MakeRange(f.arena, MakeDollar(f.arena), MakeInt(f.arena, 10)));
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
+  // 4'b1x00 - 1 → all-X (X/Z operand in subtraction)
+  MakeVar4(f, "sx", 4, 0b1000, 0b0100);
+  auto* b = f.ctx.CreateVariable("s1", 4);
+  b->value = MakeLogic4VecVal(f.arena, 4, 1);
+  auto* expr = MakeBinary(f.arena, TokenKind::kMinus, MakeId(f.arena, "sx"),
+                          MakeId(f.arena, "s1"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_NE(result.words[0].bval, 0u);
 }
 
-TEST(EvalOpXZ, InsideDollarUpperBound) {
+TEST(EvalOpXZ, ArithMulZ) {
   EvalOpXZFixture f;
-  // 8-bit var = 200. inside {[100:$]} → [100:255] for 8-bit.
-  auto* var = f.ctx.CreateVariable("du", 8);
-  var->value = MakeLogic4VecVal(f.arena, 8, 200);
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeId(f.arena, "du");
-  inside->elements.push_back(
-      MakeRange(f.arena, MakeInt(f.arena, 100), MakeDollar(f.arena)));
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
+  // 4'b10z0 * 3 → all-X (Z operand in multiply)
+  MakeVar4(f, "mz", 4, 0b1000, 0b0010);  // bit1=z (aval=0,bval=1)
+  auto* b = f.ctx.CreateVariable("m3", 4);
+  b->value = MakeLogic4VecVal(f.arena, 4, 3);
+  auto* expr = MakeBinary(f.arena, TokenKind::kStar, MakeId(f.arena, "mz"),
+                          MakeId(f.arena, "m3"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_NE(result.words[0].bval, 0u);
 }
 
-TEST(EvalOpXZ, InsideAbsTolerance) {
+TEST(EvalOpXZ, ArithPowX) {
   EvalOpXZFixture f;
-  // val=10. inside {[7 +/- 5]} → [7-5:7+5] = [2:12]. 10 is in range.
-  auto* var = f.ctx.CreateVariable("at", 8);
-  var->value = MakeLogic4VecVal(f.arena, 8, 10);
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeId(f.arena, "at");
-  inside->elements.push_back(MakeRange(f.arena, MakeInt(f.arena, 7),
-                                       MakeInt(f.arena, 5),
-                                       TokenKind::kPlusSlashMinus));
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
+  // 2 ** 4'b1x00 → all-X (X in exponent)
+  MakeVar4(f, "px", 4, 0b1000, 0b0100);
+  auto* expr = MakeBinary(f.arena, TokenKind::kPower, MakeInt(f.arena, 2),
+                          MakeId(f.arena, "px"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_NE(result.words[0].bval, 0u);
 }
 
-TEST(EvalOpXZ, InsideAbsToleranceMiss) {
-  EvalOpXZFixture f;
-  // val=20. inside {[7 +/- 5]} → [2:12]. 20 is NOT in range.
-  auto* var = f.ctx.CreateVariable("am", 8);
-  var->value = MakeLogic4VecVal(f.arena, 8, 20);
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeId(f.arena, "am");
-  inside->elements.push_back(MakeRange(f.arena, MakeInt(f.arena, 7),
-                                       MakeInt(f.arena, 5),
-                                       TokenKind::kPlusSlashMinus));
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-}
-
-TEST(EvalOpXZ, InsideRelTolerance) {
-  EvalOpXZFixture f;
-  // val=8. inside {[10 +%- 25]} → 25% of 10 = 2 (truncated). [8:12].
-  auto* var = f.ctx.CreateVariable("rt", 8);
-  var->value = MakeLogic4VecVal(f.arena, 8, 8);
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeId(f.arena, "rt");
-  inside->elements.push_back(MakeRange(f.arena, MakeInt(f.arena, 10),
-                                       MakeInt(f.arena, 25),
-                                       TokenKind::kPlusPercentMinus));
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
+// Inside operator advanced unit tests moved to test_eval_advanced.cpp

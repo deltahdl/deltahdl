@@ -224,3 +224,175 @@ TEST(EvalAdv, TaggedExprVoidMember) {
   auto result = EvalExpr(tagged, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
+
+// ==========================================================================
+// Inside operator advanced features — §11.4.13
+// ==========================================================================
+
+static Expr* MakeRange(Arena& arena, Expr* lo, Expr* hi,
+                       TokenKind op = TokenKind::kEof) {
+  auto* r = arena.Create<Expr>();
+  r->kind = ExprKind::kSelect;
+  r->index = lo;
+  r->index_end = hi;
+  r->op = op;
+  return r;
+}
+
+static Expr* MakeDollar(Arena& arena) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kIdentifier;
+  e->text = "$";
+  return e;
+}
+
+TEST(EvalAdv, InsideDollarLowerBound) {
+  EvalAdvFixture f;
+  auto* var = f.ctx.CreateVariable("dv", 8);
+  var->value = MakeLogic4VecVal(f.arena, 8, 5);
+  auto* inside = f.arena.Create<Expr>();
+  inside->kind = ExprKind::kInside;
+  inside->lhs = MakeId(f.arena, "dv");
+  inside->elements.push_back(
+      MakeRange(f.arena, MakeDollar(f.arena), MakeInt(f.arena, 10)));
+  auto result = EvalExpr(inside, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
+TEST(EvalAdv, InsideDollarUpperBound) {
+  EvalAdvFixture f;
+  auto* var = f.ctx.CreateVariable("du", 8);
+  var->value = MakeLogic4VecVal(f.arena, 8, 200);
+  auto* inside = f.arena.Create<Expr>();
+  inside->kind = ExprKind::kInside;
+  inside->lhs = MakeId(f.arena, "du");
+  inside->elements.push_back(
+      MakeRange(f.arena, MakeInt(f.arena, 100), MakeDollar(f.arena)));
+  auto result = EvalExpr(inside, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
+TEST(EvalAdv, InsideAbsTolerance) {
+  EvalAdvFixture f;
+  auto* var = f.ctx.CreateVariable("at", 8);
+  var->value = MakeLogic4VecVal(f.arena, 8, 10);
+  auto* inside = f.arena.Create<Expr>();
+  inside->kind = ExprKind::kInside;
+  inside->lhs = MakeId(f.arena, "at");
+  inside->elements.push_back(MakeRange(f.arena, MakeInt(f.arena, 7),
+                                       MakeInt(f.arena, 5),
+                                       TokenKind::kPlusSlashMinus));
+  auto result = EvalExpr(inside, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
+TEST(EvalAdv, InsideAbsToleranceMiss) {
+  EvalAdvFixture f;
+  auto* var = f.ctx.CreateVariable("am", 8);
+  var->value = MakeLogic4VecVal(f.arena, 8, 20);
+  auto* inside = f.arena.Create<Expr>();
+  inside->kind = ExprKind::kInside;
+  inside->lhs = MakeId(f.arena, "am");
+  inside->elements.push_back(MakeRange(f.arena, MakeInt(f.arena, 7),
+                                       MakeInt(f.arena, 5),
+                                       TokenKind::kPlusSlashMinus));
+  auto result = EvalExpr(inside, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+TEST(EvalAdv, InsideRelTolerance) {
+  EvalAdvFixture f;
+  auto* var = f.ctx.CreateVariable("rt", 8);
+  var->value = MakeLogic4VecVal(f.arena, 8, 8);
+  auto* inside = f.arena.Create<Expr>();
+  inside->kind = ExprKind::kInside;
+  inside->lhs = MakeId(f.arena, "rt");
+  inside->elements.push_back(MakeRange(f.arena, MakeInt(f.arena, 10),
+                                       MakeInt(f.arena, 25),
+                                       TokenKind::kPlusPercentMinus));
+  auto result = EvalExpr(inside, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
+// ==========================================================================
+// Power operator edge cases — §11.4.3, Table 11-4
+// ==========================================================================
+
+static Variable* MakeSignedVarAdv(EvalAdvFixture& f, std::string_view name,
+                                  uint32_t width, uint64_t val) {
+  auto* var = f.ctx.CreateVariable(name, width);
+  var->value = MakeLogic4VecVal(f.arena, width, val);
+  var->is_signed = true;
+  return var;
+}
+
+TEST(EvalAdv, PowZeroExp) {
+  EvalAdvFixture f;
+  // a ** 0 = 1 for any a (Table 11-4).
+  auto* expr = f.arena.Create<Expr>();
+  expr->kind = ExprKind::kBinary;
+  expr->op = TokenKind::kPower;
+  expr->lhs = MakeInt(f.arena, 7);
+  expr->rhs = MakeInt(f.arena, 0);
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
+TEST(EvalAdv, PowNegExpInt) {
+  EvalAdvFixture f;
+  // 3 ** (-2) = 0 for integer (Table 11-4: |base|>1, negative exp → 0).
+  MakeSignedVarAdv(f, "pb", 8, 3);
+  // -2 in 8-bit signed = 0xFE
+  MakeSignedVarAdv(f, "pe", 8, 0xFE);
+  auto* expr = f.arena.Create<Expr>();
+  expr->kind = ExprKind::kBinary;
+  expr->op = TokenKind::kPower;
+  expr->lhs = MakeId(f.arena, "pb");
+  expr->rhs = MakeId(f.arena, "pe");
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+TEST(EvalAdv, PowZeroBaseNegExp) {
+  EvalAdvFixture f;
+  // 0 ** (-1) = X (Table 11-4: zero base, negative exp → X).
+  MakeSignedVarAdv(f, "zb", 8, 0);
+  MakeSignedVarAdv(f, "ze", 8, 0xFF);  // -1 in 8-bit
+  auto* expr = f.arena.Create<Expr>();
+  expr->kind = ExprKind::kBinary;
+  expr->op = TokenKind::kPower;
+  expr->lhs = MakeId(f.arena, "zb");
+  expr->rhs = MakeId(f.arena, "ze");
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_NE(result.words[0].bval, 0u);  // result is X
+}
+
+TEST(EvalAdv, PowNeg1OddExp) {
+  EvalAdvFixture f;
+  // (-1) ** 3 = -1 (Table 11-4: base -1, odd exp).
+  MakeSignedVarAdv(f, "n1", 8, 0xFF);  // -1 in 8-bit
+  MakeSignedVarAdv(f, "n3", 8, 3);
+  auto* expr = f.arena.Create<Expr>();
+  expr->kind = ExprKind::kBinary;
+  expr->op = TokenKind::kPower;
+  expr->lhs = MakeId(f.arena, "n1");
+  expr->rhs = MakeId(f.arena, "n3");
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64() & 0xFF, 0xFFu);  // -1 in 8-bit
+  EXPECT_TRUE(result.is_signed);
+}
+
+TEST(EvalAdv, PowNeg1EvenExp) {
+  EvalAdvFixture f;
+  // (-1) ** 4 = 1 (Table 11-4: base -1, even exp).
+  MakeSignedVarAdv(f, "n1", 8, 0xFF);  // -1 in 8-bit
+  MakeSignedVarAdv(f, "n4", 8, 4);
+  auto* expr = f.arena.Create<Expr>();
+  expr->kind = ExprKind::kBinary;
+  expr->op = TokenKind::kPower;
+  expr->lhs = MakeId(f.arena, "n1");
+  expr->rhs = MakeId(f.arena, "n4");
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+  EXPECT_TRUE(result.is_signed);
+}

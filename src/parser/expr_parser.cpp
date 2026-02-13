@@ -963,34 +963,19 @@ Expr* Parser::ParseCompoundAssignExpr(Expr* lhs) {
   return bin;
 }
 
-// --- Parenthesized expression ---
-
-static bool IsAssignOp(TokenKind kind) {
-  switch (kind) {
-    case TokenKind::kEq:
-    case TokenKind::kPlusEq:
-    case TokenKind::kMinusEq:
-    case TokenKind::kStarEq:
-    case TokenKind::kSlashEq:
-    case TokenKind::kPercentEq:
-    case TokenKind::kAmpEq:
-    case TokenKind::kPipeEq:
-    case TokenKind::kCaretEq:
-    case TokenKind::kLtLtEq:
-    case TokenKind::kGtGtEq:
-    case TokenKind::kLtLtLtEq:
-    case TokenKind::kGtGtGtEq:
-      return true;
-    default:
-      return false;
-  }
-}
-
 Expr* Parser::ParseParenExpr() {
   Consume();  // (
   auto* lhs = ParseExpr();
   // Assignment expression inside parens: (a = b), (a += 1)
-  if (IsAssignOp(CurrentToken().kind)) {
+  auto k = CurrentToken().kind;
+  bool is_assign = k == TokenKind::kEq || k == TokenKind::kPlusEq ||
+                   k == TokenKind::kMinusEq || k == TokenKind::kStarEq ||
+                   k == TokenKind::kSlashEq || k == TokenKind::kPercentEq ||
+                   k == TokenKind::kAmpEq || k == TokenKind::kPipeEq ||
+                   k == TokenKind::kCaretEq || k == TokenKind::kLtLtEq ||
+                   k == TokenKind::kGtGtEq || k == TokenKind::kLtLtLtEq ||
+                   k == TokenKind::kGtGtGtEq;
+  if (is_assign) {
     auto op_tok = Consume();
     auto* rhs = ParseExpr();
     auto* bin = arena_.Create<Expr>();
