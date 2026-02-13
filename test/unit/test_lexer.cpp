@@ -573,6 +573,21 @@ TEST(Lexer, ApostropheLBraceNested) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kApostropheLBrace);
 }
 
+TEST(Lexer, ApostropheLBrace_TypePrefixed) {
+  // §5.10: ab'{int:1, shortreal:1.0} — type prefix then '{
+  auto tokens = lex("ab'{int:1}");
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[0].text, "ab");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kApostropheLBrace);
+}
+
+TEST(Lexer, ApostropheLBrace_Replication) {
+  // §5.10: '{3{1}} — replication inside assignment pattern
+  auto tokens = lex("'{3{1}}");
+  EXPECT_EQ(tokens[0].kind, TokenKind::kApostropheLBrace);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIntLiteral);
+}
+
 // --- §5.12: Attribute tokens ---
 
 TEST(Lexer, AttrStart) {
