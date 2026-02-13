@@ -94,13 +94,53 @@ TEST(Lexer, Keywords) {
   EXPECT_TRUE(tokens[2].IsEof());
 }
 
-TEST(Lexer, Identifiers) {
+// --- §5.6: Identifiers, keywords, and system names ---
+
+TEST(Lexer, Identifier_SimpleLettersDigitsUnderscore) {
   auto tokens = lex("foo bar_123 _baz");
   ASSERT_EQ(tokens.size(), 4);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[0].text, "foo");
   EXPECT_EQ(tokens[1].text, "bar_123");
   EXPECT_EQ(tokens[2].text, "_baz");
+}
+
+TEST(Lexer, Identifier_WithDollarSign) {
+  // §5.6: $ is allowed in simple identifiers (but not first char)
+  auto tokens = lex("n$657");
+  ASSERT_GE(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[0].text, "n$657");
+}
+
+TEST(Lexer, Identifier_CaseSensitive) {
+  // §5.6: identifiers are case sensitive
+  auto tokens = lex("Foo foo FOO");
+  ASSERT_EQ(tokens.size(), 4);
+  EXPECT_EQ(tokens[0].text, "Foo");
+  EXPECT_EQ(tokens[1].text, "foo");
+  EXPECT_EQ(tokens[2].text, "FOO");
+  // All three are distinct identifiers
+  EXPECT_NE(tokens[0].text, tokens[1].text);
+}
+
+TEST(Lexer, Identifier_UnderscoreStart) {
+  // §5.6: first char can be underscore
+  auto tokens = lex("_bus3");
+  ASSERT_GE(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[0].text, "_bus3");
+}
+
+TEST(Lexer, Identifier_LrmExamples) {
+  // §5.6 examples: shiftreg_a, busa_index, error_condition, merge_ab
+  for (const char* id :
+       {"shiftreg_a", "busa_index", "error_condition", "merge_ab"}) {
+    auto tokens = lex(id);
+    ASSERT_GE(tokens.size(), 2) << id;
+    EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier) << id;
+    EXPECT_EQ(tokens[0].text, id) << id;
+  }
 }
 
 TEST(Lexer, IntegerLiterals) {
