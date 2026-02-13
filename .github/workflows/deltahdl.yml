@@ -632,6 +632,12 @@ jobs:
           --minimum-tokens 100
           --language cpp
           --dir src/
+      - name: Assert no inline directives
+        run: |
+          pip install assert-no-inline-directives
+          assert-no-inline-directives \
+            --tools clang-tidy,clang-format,clang-diagnostic \
+            src/ test/
       - name: Generate compile_commands.json
         run: |
           cmake -B build \
