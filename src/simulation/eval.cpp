@@ -490,11 +490,16 @@ static Logic4Vec EvalArithShiftRight(Logic4Vec lhs, uint64_t rv, Arena& arena) {
 static Logic4Vec EvalShift(TokenKind op, Logic4Vec lhs, uint64_t rv,
                            Arena& arena) {
   uint64_t lv = lhs.ToUint64();
+  uint64_t bv = lhs.nwords > 0 ? lhs.words[0].bval : 0;
   if (op == TokenKind::kLtLt || op == TokenKind::kLtLtLt) {
-    return MakeSignedResult(arena, lhs.width, lv << rv, lhs.is_signed);
+    auto result = MakeSignedResult(arena, lhs.width, lv << rv, lhs.is_signed);
+    if (result.nwords > 0) result.words[0].bval = bv << rv;
+    return result;
   }
   if (op == TokenKind::kGtGt) {
-    return MakeSignedResult(arena, lhs.width, lv >> rv, lhs.is_signed);
+    auto result = MakeSignedResult(arena, lhs.width, lv >> rv, lhs.is_signed);
+    if (result.nwords > 0) result.words[0].bval = bv >> rv;
+    return result;
   }
   return EvalArithShiftRight(lhs, rv, arena);
 }

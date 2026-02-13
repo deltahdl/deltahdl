@@ -262,9 +262,40 @@ TEST(EvalOpXZ, ShiftXAmount) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
+TEST(EvalOpXZ, ShiftLeftXOperand) {
+  EvalOpXZFixture f;
+  // 4'b1x00 << 1 → 4'bx000 (bval should shift with aval)
+  MakeVar4(f, "so", 4, 0b1000, 0b0100);  // 4'b1x00
+  auto* expr = MakeBinary(f.arena, TokenKind::kLtLt, MakeId(f.arena, "so"),
+                          MakeInt(f.arena, 1));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  // After << 1: aval=0b0000, bval=0b1000 (X shifted to bit3)
+  EXPECT_EQ(result.words[0].aval & 0xFu, 0b0000u);
+  EXPECT_EQ(result.words[0].bval & 0xFu, 0b1000u);
+}
+
 // ==========================================================================
 // Ternary X/Z condition — §11.4.11
 // ==========================================================================
+
+TEST(EvalOpXZ, TernaryZCond) {
+  EvalOpXZFixture f;
+  // z ? 4'b1100 : 4'b1010 → same as x condition (bit-by-bit combine)
+  MakeVar4(f, "tz", 1, 0, 1);  // 1'bz (aval=0, bval=1)
+  auto* tv = f.ctx.CreateVariable("zt", 4);
+  tv->value = MakeLogic4VecVal(f.arena, 4, 0b1100);
+  auto* fv = f.ctx.CreateVariable("zf", 4);
+  fv->value = MakeLogic4VecVal(f.arena, 4, 0b1010);
+  auto* ternary = f.arena.Create<Expr>();
+  ternary->kind = ExprKind::kTernary;
+  ternary->condition = MakeId(f.arena, "tz");
+  ternary->true_expr = MakeId(f.arena, "zt");
+  ternary->false_expr = MakeId(f.arena, "zf");
+  auto result = EvalExpr(ternary, f.ctx, f.arena);
+  // Same as TernaryXCondDiff: aval=0b1000, bval=0b0110
+  EXPECT_EQ(result.words[0].aval, 0b1000u);
+  EXPECT_EQ(result.words[0].bval, 0b0110u);
+}
 
 TEST(EvalOpXZ, TernaryXCondSame) {
   EvalOpXZFixture f;
