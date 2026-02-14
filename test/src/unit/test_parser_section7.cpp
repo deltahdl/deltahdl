@@ -42,6 +42,15 @@ static Stmt* FirstInitialStmt(ParseResult7& r) {
   return nullptr;
 }
 
+static void VerifyStructMemberNames(const std::vector<StructMember>& members,
+                                    const std::string expected_names[],
+                                    size_t count) {
+  ASSERT_EQ(members.size(), count);
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(members[i].name, expected_names[i]) << "member " << i;
+  }
+}
+
 // =========================================================================
 // §7.2: Structures
 // =========================================================================
@@ -60,12 +69,8 @@ TEST(ParserSection7, StructBasic) {
   EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
   EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kStruct);
   std::string expected_names[] = {"a", "b"};
-  ASSERT_EQ(item->typedef_type.struct_members.size(),
-            std::size(expected_names));
-  for (size_t i = 0; i < std::size(expected_names); ++i) {
-    EXPECT_EQ(item->typedef_type.struct_members[i].name, expected_names[i])
-        << "member " << i;
-  }
+  VerifyStructMemberNames(item->typedef_type.struct_members, expected_names,
+                          std::size(expected_names));
 }
 
 TEST(ParserSection7, StructPackedSigned) {

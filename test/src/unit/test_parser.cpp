@@ -36,6 +36,60 @@ static ParseResult Parse(const std::string& src) {
   return result;
 }
 
+static void VerifyEnumMemberNames(const std::vector<EnumMember>& members,
+                                  const std::string expected[], size_t count) {
+  ASSERT_EQ(members.size(), count);
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(members[i].name, expected[i]) << "member " << i;
+  }
+}
+
+struct StructMemberExpected {
+  const char* name;
+  DataTypeKind type_kind;
+};
+
+static void VerifyStructMembers(const std::vector<StructMember>& members,
+                                const StructMemberExpected expected[],
+                                size_t count) {
+  ASSERT_EQ(members.size(), count);
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(members[i].name, expected[i].name) << "member " << i;
+    EXPECT_EQ(members[i].type_kind, expected[i].type_kind) << "member " << i;
+  }
+}
+
+static ModuleItem* FindItemByKind(const std::vector<ModuleItem*>& items,
+                                  ModuleItemKind kind) {
+  for (auto* item : items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
+}
+
+static void VerifyGenerateCaseItem(const GenerateCaseItem& ci, size_t idx,
+                                   bool expect_default,
+                                   size_t expect_pattern_count) {
+  EXPECT_EQ(ci.is_default, expect_default) << "case item " << idx;
+  EXPECT_EQ(ci.patterns.size(), expect_pattern_count) << "case item " << idx;
+  EXPECT_FALSE(ci.body.empty()) << "case item " << idx;
+}
+
+struct ModportPortExpected {
+  Direction dir;
+  const char* name;
+};
+
+static void VerifyModportPorts(const std::vector<ModportPort>& ports,
+                               const ModportPortExpected expected[],
+                               size_t count) {
+  ASSERT_EQ(ports.size(), count);
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(ports[i].direction, expected[i].dir) << "port " << i;
+    EXPECT_EQ(ports[i].name, expected[i].name) << "port " << i;
+  }
+}
+
 TEST(Parser, EmptyModule) {
   auto r = Parse("module empty; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -246,11 +300,8 @@ TEST(Parser, TypedefEnum) {
   EXPECT_EQ(item->name, "state_t");
   EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kEnum);
   std::string expected[] = {"A", "B", "C"};
-  ASSERT_EQ(item->typedef_type.enum_members.size(), std::size(expected));
-  for (size_t i = 0; i < std::size(expected); ++i) {
-    EXPECT_EQ(item->typedef_type.enum_members[i].name, expected[i])
-        << "member " << i;
-  }
+  VerifyEnumMemberNames(item->typedef_type.enum_members, expected,
+                        std::size(expected));
 }
 
 TEST(Parser, EnumWithValues) {
@@ -339,20 +390,12 @@ TEST(Parser, TypedefStruct) {
   EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
   EXPECT_EQ(item->name, "my_struct_t");
   EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kStruct);
-  struct Expected {
-    const char* name;
-    DataTypeKind type_kind;
-  };
-  Expected expected[] = {
+  StructMemberExpected expected[] = {
       {"a", DataTypeKind::kLogic},
       {"b", DataTypeKind::kInt},
   };
-  auto& members = item->typedef_type.struct_members;
-  ASSERT_EQ(members.size(), std::size(expected));
-  for (size_t i = 0; i < std::size(expected); ++i) {
-    EXPECT_EQ(members[i].name, expected[i].name) << "member " << i;
-    EXPECT_EQ(members[i].type_kind, expected[i].type_kind) << "member " << i;
-  }
+  VerifyStructMembers(item->typedef_type.struct_members, expected,
+                      std::size(expected));
 }
 
 TEST(Parser, TypedefUnion) {
@@ -462,13 +505,8 @@ TEST(Parser, GenerateFor) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ModuleItem* gen = nullptr;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kGenerateFor) {
-      gen = item;
-    }
-  }
+  auto* gen =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kGenerateFor);
   ASSERT_NE(gen, nullptr);
   EXPECT_NE(gen->gen_init, nullptr);
   EXPECT_NE(gen->gen_cond, nullptr);
@@ -543,11 +581,8 @@ TEST(Parser, GenerateCase) {
   EXPECT_EQ(item->kind, ModuleItemKind::kGenerateCase);
   EXPECT_NE(item->gen_cond, nullptr);
   ASSERT_EQ(item->gen_case_items.size(), 2);
-  for (size_t i = 0; i < 2; ++i) {
-    EXPECT_FALSE(item->gen_case_items[i].is_default) << "case item " << i;
-    EXPECT_EQ(item->gen_case_items[i].patterns.size(), 1) << "case item " << i;
-    EXPECT_FALSE(item->gen_case_items[i].body.empty()) << "case item " << i;
-  }
+  VerifyGenerateCaseItem(item->gen_case_items[0], 0, false, 1);
+  VerifyGenerateCaseItem(item->gen_case_items[1], 1, false, 1);
 }
 
 TEST(Parser, GenerateCaseDefault) {
@@ -720,16 +755,8 @@ TEST(Parser, InterfaceWithModport) {
   ASSERT_EQ(r.cu->interfaces[0]->modports.size(), 1);
   auto* mp = r.cu->interfaces[0]->modports[0];
   EXPECT_EQ(mp->name, "master");
-  struct Expected {
-    Direction dir;
-    const char* name;
-  };
-  Expected expected[] = {{Direction::kOutput, "data"}};
-  ASSERT_EQ(mp->ports.size(), std::size(expected));
-  for (size_t i = 0; i < std::size(expected); ++i) {
-    EXPECT_EQ(mp->ports[i].direction, expected[i].dir) << "port " << i;
-    EXPECT_EQ(mp->ports[i].name, expected[i].name) << "port " << i;
-  }
+  ModportPortExpected expected[] = {{Direction::kOutput, "data"}};
+  VerifyModportPorts(mp->ports, expected, std::size(expected));
 }
 
 TEST(Parser, ModportMultipleGroups) {
