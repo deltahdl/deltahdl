@@ -144,7 +144,7 @@ TEST(SvDpi, PutBitSelectLogic) {
 TEST(SvDpi, ScopeGetSetRoundTrip) {
   svScope old_scope = svGetScope();
   int dummy = 42;
-  svScope new_scope = reinterpret_cast<svScope>(&dummy);
+  auto new_scope = reinterpret_cast<svScope>(&dummy);
   svScope prev = svSetScope(new_scope);
   EXPECT_EQ(prev, old_scope);
   EXPECT_EQ(svGetScope(), new_scope);

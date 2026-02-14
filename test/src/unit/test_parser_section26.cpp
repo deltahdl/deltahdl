@@ -67,6 +67,14 @@ TEST(ParserSection26, PackageWithParameter) {
   ASSERT_FALSE(r.cu->packages[0]->items.empty());
 }
 
+static bool HasItemOfKind(const std::vector<ModuleItem*>& items,
+                          ModuleItemKind kind) {
+  for (const auto* item : items) {
+    if (item->kind == kind) return true;
+  }
+  return false;
+}
+
 TEST(ParserSection26, PackageWithFunction) {
   auto r = Parse(
       "package util_pkg;\n"
@@ -76,12 +84,8 @@ TEST(ParserSection26, PackageWithFunction) {
       "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->packages.size(), 1u);
-  auto* pkg = r.cu->packages[0];
-  bool found_func = false;
-  for (auto* item : pkg->items) {
-    if (item->kind == ModuleItemKind::kFunctionDecl) found_func = true;
-  }
-  EXPECT_TRUE(found_func);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kFunctionDecl));
 }
 
 // =============================================================================
@@ -98,12 +102,16 @@ TEST(ParserSection26, ModuleImportPackage) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->packages.size(), 1u);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto* mod = r.cu->modules[0];
-  bool found_import = false;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kImportDecl) found_import = true;
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl));
+}
+
+static const ModuleItem* FindItemOfKind(const std::vector<ModuleItem*>& items,
+                                        ModuleItemKind kind) {
+  for (const auto* item : items) {
+    if (item->kind == kind) return item;
   }
-  EXPECT_TRUE(found_import);
+  return nullptr;
 }
 
 TEST(ParserSection26, ModuleImportSpecific) {
@@ -116,16 +124,11 @@ TEST(ParserSection26, ModuleImportSpecific) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto* mod = r.cu->modules[0];
-  bool found_import = false;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kImportDecl) {
-      found_import = true;
-      EXPECT_EQ(item->import_item.package_name, "p");
-      EXPECT_EQ(item->import_item.item_name, "X");
-    }
-  }
-  EXPECT_TRUE(found_import);
+  const auto* imp =
+      FindItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl);
+  ASSERT_NE(imp, nullptr);
+  EXPECT_EQ(imp->import_item.package_name, "p");
+  EXPECT_EQ(imp->import_item.item_name, "X");
 }
 
 // =============================================================================
@@ -139,12 +142,8 @@ TEST(ParserSection26, PackageExportWildcard) {
       "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->packages.size(), 1u);
-  auto* pkg = r.cu->packages[0];
-  bool found_export = false;
-  for (auto* item : pkg->items) {
-    if (item->kind == ModuleItemKind::kExportDecl) found_export = true;
-  }
-  EXPECT_TRUE(found_export);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kExportDecl));
 }
 
 TEST(ParserSection26, PackageExportSpecific) {

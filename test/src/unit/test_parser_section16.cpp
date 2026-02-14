@@ -39,6 +39,14 @@ static Stmt *FirstInitialStmt(ParseResult &r) {
   return nullptr;
 }
 
+static ModuleItem *FindItemByKind(const std::vector<ModuleItem *> &items,
+                                  ModuleItemKind kind) {
+  for (auto *item : items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
+}
+
 // =============================================================================
 // §16.3 Immediate assertions — assert
 // =============================================================================
@@ -228,15 +236,11 @@ TEST(ParserSection16, AssertPropertyWithElse) {
       "    $display(\"ok\"); else $error(\"fail\");\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  bool found = false;
-  for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAssertProperty) {
-      found = true;
-      EXPECT_NE(item->assert_pass_stmt, nullptr);
-      EXPECT_NE(item->assert_fail_stmt, nullptr);
-    }
-  }
-  EXPECT_TRUE(found);
+  auto *ap =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty);
+  ASSERT_NE(ap, nullptr);
+  EXPECT_NE(ap->assert_pass_stmt, nullptr);
+  EXPECT_NE(ap->assert_fail_stmt, nullptr);
 }
 
 // =============================================================================

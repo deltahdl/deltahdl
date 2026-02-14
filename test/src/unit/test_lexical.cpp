@@ -294,6 +294,14 @@ TEST(Lexical, Define_EmptyArgUsesDefault) {
 // 5. Continuous assignment with delay (LRM SS10.3.3)
 // ===========================================================================
 
+static const ModuleItem *FindItemByKind(
+    const std::vector<ModuleItem *> &items, ModuleItemKind kind) {
+  for (auto *item : items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
+}
+
 TEST(Lexical, ContAssign_WithDelay) {
   auto r = Parse(
       "module top;\n"
@@ -302,13 +310,8 @@ TEST(Lexical, ContAssign_WithDelay) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1);
-  const ModuleItem *assign_item = nullptr;
-  for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kContAssign) {
-      assign_item = item;
-      break;
-    }
-  }
+  const auto *assign_item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kContAssign);
   ASSERT_NE(assign_item, nullptr) << "no continuous assignment found";
   ASSERT_NE(assign_item->assign_delay, nullptr);
   EXPECT_EQ(assign_item->assign_delay->kind, ExprKind::kIntegerLiteral);

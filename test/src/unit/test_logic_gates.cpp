@@ -39,7 +39,7 @@ Val4 EvalNInputGate(GateKind kind, Val4 a, Val4 b) {
   Val4 na = (a == Val4::kZ) ? Val4::kX : a;
   Val4 nb = (b == Val4::kZ) ? Val4::kX : b;
 
-  Val4 result;
+  Val4 result = Val4::kX;
   switch (kind) {
     case GateKind::kAnd:
       if (na == Val4::kV0 || nb == Val4::kV0)
@@ -188,62 +188,32 @@ TEST(LogicGates, XorGateTruthTable) {
   }
 }
 
-// §28.4: nand = NOT(and), nor = NOT(or), xnor = NOT(xor)
-TEST(LogicGates, NandIsInvertedAnd) {
+// Helper: verify that inverted_gate == NOT(gate) for all input combinations.
+static void CheckInversion(GateKind gate, GateKind inverted_gate) {
   Val4 vals[] = {Val4::kV0, Val4::kV1, Val4::kX, Val4::kZ};
   for (Val4 a : vals) {
     for (Val4 b : vals) {
-      Val4 and_result = EvalNInputGate(GateKind::kAnd, a, b);
-      Val4 nand_result = EvalNInputGate(GateKind::kNand, a, b);
-      if (and_result == Val4::kV0) {
-        EXPECT_EQ(nand_result, Val4::kV1);
-      }
-      if (and_result == Val4::kV1) {
-        EXPECT_EQ(nand_result, Val4::kV0);
-      }
-      if (and_result == Val4::kX) {
-        EXPECT_EQ(nand_result, Val4::kX);
-      }
+      Val4 result = EvalNInputGate(gate, a, b);
+      Val4 inv_result = EvalNInputGate(inverted_gate, a, b);
+      EXPECT_EQ(inv_result, InvertVal4(result))
+          << "Gate " << static_cast<int>(gate) << " inv "
+          << static_cast<int>(inverted_gate)
+          << " a=" << static_cast<int>(a) << " b=" << static_cast<int>(b);
     }
   }
+}
+
+// §28.4: nand = NOT(and), nor = NOT(or), xnor = NOT(xor)
+TEST(LogicGates, NandIsInvertedAnd) {
+  CheckInversion(GateKind::kAnd, GateKind::kNand);
 }
 
 TEST(LogicGates, NorIsInvertedOr) {
-  Val4 vals[] = {Val4::kV0, Val4::kV1, Val4::kX, Val4::kZ};
-  for (Val4 a : vals) {
-    for (Val4 b : vals) {
-      Val4 or_result = EvalNInputGate(GateKind::kOr, a, b);
-      Val4 nor_result = EvalNInputGate(GateKind::kNor, a, b);
-      if (or_result == Val4::kV0) {
-        EXPECT_EQ(nor_result, Val4::kV1);
-      }
-      if (or_result == Val4::kV1) {
-        EXPECT_EQ(nor_result, Val4::kV0);
-      }
-      if (or_result == Val4::kX) {
-        EXPECT_EQ(nor_result, Val4::kX);
-      }
-    }
-  }
+  CheckInversion(GateKind::kOr, GateKind::kNor);
 }
 
 TEST(LogicGates, XnorIsInvertedXor) {
-  Val4 vals[] = {Val4::kV0, Val4::kV1, Val4::kX, Val4::kZ};
-  for (Val4 a : vals) {
-    for (Val4 b : vals) {
-      Val4 xor_result = EvalNInputGate(GateKind::kXor, a, b);
-      Val4 xnor_result = EvalNInputGate(GateKind::kXnor, a, b);
-      if (xor_result == Val4::kV0) {
-        EXPECT_EQ(xnor_result, Val4::kV1);
-      }
-      if (xor_result == Val4::kV1) {
-        EXPECT_EQ(xnor_result, Val4::kV0);
-      }
-      if (xor_result == Val4::kX) {
-        EXPECT_EQ(xnor_result, Val4::kX);
-      }
-    }
-  }
+  CheckInversion(GateKind::kXor, GateKind::kXnor);
 }
 
 // §28.4: Two delays — "the first delay shall determine the output rise

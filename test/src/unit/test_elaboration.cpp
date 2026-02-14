@@ -286,6 +286,18 @@ TEST(Elaborator, GenerateForWithAssign) {
 
 // --- Typedef tests ---
 
+static void VerifyVariableByName(const std::vector<RtlirVariable> &vars,
+                                 std::string_view name, uint32_t width,
+                                 bool is_4state, bool &found) {
+  for (const auto &v : vars) {
+    if (v.name == name) {
+      EXPECT_EQ(v.width, width);
+      EXPECT_TRUE(is_4state);
+      found = true;
+    }
+  }
+}
+
 TEST(Elaborator, TypedefNamedResolution) {
   ElabFixture f;
   auto *design = ElaborateSrc(
@@ -299,13 +311,7 @@ TEST(Elaborator, TypedefNamedResolution) {
 
   auto *mod = design->top_modules[0];
   bool found = false;
-  for (const auto &v : mod->variables) {
-    if (v.name == "data") {
-      EXPECT_EQ(v.width, 16u);
-      EXPECT_TRUE(v.is_4state);
-      found = true;
-    }
-  }
+  VerifyVariableByName(mod->variables, "data", 16u, true, found);
   EXPECT_TRUE(found);
 }
 

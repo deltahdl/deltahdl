@@ -38,7 +38,6 @@ uint64_t ComputePropagationDelay(const DelaySpec& spec, Val4 from, Val4 to) {
       case Val4::kV0:
         return spec.d2;
       case Val4::kZ:
-        return std::min(spec.d1, spec.d2);
       case Val4::kX:
         return std::min(spec.d1, spec.d2);
     }

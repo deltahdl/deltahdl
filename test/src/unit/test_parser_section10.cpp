@@ -389,6 +389,14 @@ TEST(ParserSection10, NetAliasThreeNets) {
 // LRM section 10.3.1/10.3.2 -- Continuous assignment
 // =============================================================================
 
+static ModuleItem *FindItemByKind(const std::vector<ModuleItem *> &items,
+                                  ModuleItemKind kind) {
+  for (auto *item : items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
+}
+
 TEST(ParserSection10, ContinuousAssignBasic) {
   auto r = Parse(
       "module m;\n"
@@ -397,15 +405,10 @@ TEST(ParserSection10, ContinuousAssignBasic) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *mod = r.cu->modules[0];
-  bool found = false;
-  for (auto *item : mod->items) {
-    if (item->kind == ModuleItemKind::kContAssign) {
-      found = true;
-      ASSERT_NE(item->assign_lhs, nullptr);
-      ASSERT_NE(item->assign_rhs, nullptr);
-    }
-  }
-  EXPECT_TRUE(found);
+  auto *ca = FindItemByKind(mod->items, ModuleItemKind::kContAssign);
+  ASSERT_NE(ca, nullptr);
+  ASSERT_NE(ca->assign_lhs, nullptr);
+  ASSERT_NE(ca->assign_rhs, nullptr);
 }
 
 TEST(ParserSection10, NetDeclAssignment) {

@@ -260,6 +260,13 @@ TEST(ParserSection23, EndLabelClass) {
 
 // --- Multi-item import (LRM section 26.3) ---
 
+static void VerifyImportItem(const ModuleItem *item, const char *pkg,
+                             const char *name) {
+  EXPECT_EQ(item->kind, ModuleItemKind::kImportDecl);
+  EXPECT_EQ(item->import_item.package_name, pkg);
+  EXPECT_EQ(item->import_item.item_name, name);
+}
+
 TEST(ParserSection23, MultiItemImport) {
   auto r = Parse(
       "module m;\n"
@@ -268,16 +275,8 @@ TEST(ParserSection23, MultiItemImport) {
   ASSERT_NE(r.cu, nullptr);
   auto *mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 2);
-  struct Expected {
-    const char *pkg;
-    const char *item;
-  };
-  Expected expected[] = {{"pkg", "a"}, {"pkg", "b"}};
-  for (size_t i = 0; i < 2; ++i) {
-    EXPECT_EQ(mod->items[i]->kind, ModuleItemKind::kImportDecl);
-    EXPECT_EQ(mod->items[i]->import_item.package_name, expected[i].pkg);
-    EXPECT_EQ(mod->items[i]->import_item.item_name, expected[i].item);
-  }
+  VerifyImportItem(mod->items[0], "pkg", "a");
+  VerifyImportItem(mod->items[1], "pkg", "b");
 }
 
 TEST(ParserSection23, MultiItemImportWithWildcardFirst) {

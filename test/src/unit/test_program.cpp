@@ -62,6 +62,31 @@ static RtlirDesign* ElaborateSource(const std::string& src,
   return elab.Elaborate(top_name);
 }
 
+static bool HasItemOfKind(const std::vector<ModuleItem*>& items,
+                          ModuleItemKind kind) {
+  for (const auto* item : items) {
+    if (item->kind == kind) return true;
+  }
+  return false;
+}
+
+static const ModuleItem* FindItemOfKind(const std::vector<ModuleItem*>& items,
+                                        ModuleItemKind kind) {
+  for (const auto* item : items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
+}
+
+static int CountItemsOfKind(const std::vector<ModuleItem*>& items,
+                            ModuleItemKind kind) {
+  int count = 0;
+  for (const auto* item : items) {
+    if (item->kind == kind) ++count;
+  }
+  return count;
+}
+
 // =============================================================================
 // §24.1 Basic program declaration
 // =============================================================================
@@ -136,11 +161,9 @@ TEST_F(ProgramTestParse, ProgramWithMultipleInitialBlocks) {
       "  initial $display(\"init2\");\n"
       "endprogram\n");
   ASSERT_EQ(unit->programs.size(), 1u);
-  int initial_count = 0;
-  for (const auto* item : unit->programs[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) ++initial_count;
-  }
-  EXPECT_EQ(initial_count, 2);
+  EXPECT_EQ(
+      CountItemsOfKind(unit->programs[0]->items, ModuleItemKind::kInitialBlock),
+      2);
 }
 
 // =============================================================================
@@ -203,15 +226,11 @@ TEST_F(ProgramTestParse, ProgramInstantiatedInModule) {
       "endmodule\n");
   ASSERT_EQ(unit->programs.size(), 1u);
   ASSERT_EQ(unit->modules.size(), 1u);
-  bool found_inst = false;
-  for (const auto* item : unit->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kModuleInst) {
-      found_inst = true;
-      EXPECT_EQ(item->inst_module, "test_prog");
-      EXPECT_EQ(item->inst_name, "tp");
-    }
-  }
-  EXPECT_TRUE(found_inst);
+  const auto* inst =
+      FindItemOfKind(unit->modules[0]->items, ModuleItemKind::kModuleInst);
+  ASSERT_NE(inst, nullptr);
+  EXPECT_EQ(inst->inst_module, "test_prog");
+  EXPECT_EQ(inst->inst_name, "tp");
 }
 
 // =============================================================================

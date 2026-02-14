@@ -395,7 +395,7 @@ TEST(Preprocessor, MacroDefaultParamOverride) {
       "`define M(a=1) a\n"
       "`M(5)\n",
       f);
-  EXPECT_NE(result.find("5"), std::string::npos);
+  EXPECT_NE(result.find('5'), std::string::npos);
 }
 
 TEST(Preprocessor, MacroDefaultParamString) {

@@ -8,7 +8,7 @@
 
 using namespace delta;
 
-static std::vector<Token> lex(const std::string &src) {
+static std::vector<Token> Lex(const std::string &src) {
   static SourceManager mgr;
   auto fid = mgr.AddFile("<test>", src);
   DiagEngine diag(mgr);
@@ -271,7 +271,7 @@ TEST(Lexer, AllAnnexBKeywords) {
       "xor",
   };
   for (const char *kw : kKeywords) {
-    auto tokens = lex(kw);
+    auto tokens = Lex(kw);
     ASSERT_GE(tokens.size(), 2) << "keyword: " << kw;
     EXPECT_NE(tokens[0].kind, TokenKind::kIdentifier)
         << kw << " should be a keyword, not an identifier";
@@ -288,8 +288,7 @@ TEST(Lexer, KeywordVersion_1364_2001_LogicIsIdentifier) {
 
 TEST(Lexer, KeywordVersion_1800_2005_LogicIsKeyword) {
   auto kw = LookupKeyword("logic", KeywordVersion::kVer18002005);
-  ASSERT_TRUE(kw.has_value());
-  EXPECT_EQ(*kw, TokenKind::kKwLogic);
+  EXPECT_EQ(kw, std::optional(TokenKind::kKwLogic));
 }
 
 TEST(Lexer, KeywordVersion_Noconfig_ExcludesConfigKeywords) {
@@ -303,8 +302,7 @@ TEST(Lexer, KeywordVersion_Noconfig_ExcludesConfigKeywords) {
 
 TEST(Lexer, KeywordVersion_1364_1995_ModuleIsKeyword) {
   auto kw = LookupKeyword("module", KeywordVersion::kVer13641995);
-  ASSERT_TRUE(kw.has_value());
-  EXPECT_EQ(*kw, TokenKind::kKwModule);
+  EXPECT_EQ(kw, std::optional(TokenKind::kKwModule));
 }
 
 TEST(Lexer, KeywordVersion_1364_1995_AutomaticIsNotKeyword) {
@@ -322,7 +320,7 @@ TEST(Lexer, KeywordVersionMarker_SwitchesVersion) {
       static_cast<char>(static_cast<uint8_t>(KeywordVersion::kVer13642001));
   input += '\n';
   input += "logic";
-  auto tokens = lex(input);
+  auto tokens = Lex(input);
   ASSERT_GE(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[0].text, "logic");
@@ -341,7 +339,7 @@ TEST(Lexer, KeywordVersionMarker_RestoresToDefault) {
       static_cast<char>(static_cast<uint8_t>(KeywordVersion::kVer18002023));
   input += '\n';
   input += "logic";
-  auto tokens = lex(input);
+  auto tokens = Lex(input);
   ASSERT_GE(tokens.size(), 3);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[1].kind, TokenKind::kKwLogic);
@@ -365,7 +363,8 @@ TEST(Lexer, ParseKeywordVersion_ValidVersions) {
       {"1800-2023", KeywordVersion::kVer18002023},
   };
   for (const auto &c : kCases) {
-    EXPECT_EQ(*ParseKeywordVersion(c.input), c.expected) << c.input;
+    EXPECT_EQ(ParseKeywordVersion(c.input), std::optional(c.expected))
+        << c.input;
   }
 }
 
@@ -378,38 +377,38 @@ TEST(Lexer, ParseKeywordVersion_Invalid) {
 
 TEST(Lexer, IntLiteral_LrmExample1_Unsized) {
   // §5.7.1 Example 1: 659, 'h 837FF, 'o7460
-  auto t1 = lex("659");
+  auto t1 = Lex("659");
   EXPECT_EQ(t1[0].kind, TokenKind::kIntLiteral);
   EXPECT_EQ(t1[0].text, "659");
-  auto t2 = lex("'h 837FF");
+  auto t2 = Lex("'h 837FF");
   EXPECT_EQ(t2[0].kind, TokenKind::kIntLiteral);
-  auto t3 = lex("'o7460");
+  auto t3 = Lex("'o7460");
   EXPECT_EQ(t3[0].kind, TokenKind::kIntLiteral);
 }
 
 TEST(Lexer, IntLiteral_LrmExample2_Sized) {
   // §5.7.1 Example 2: 4'b1001, 5 'D 3, 3'b01x, 12'hx, 16'hz
-  auto t1 = lex("4'b1001");
+  auto t1 = Lex("4'b1001");
   EXPECT_EQ(t1[0].kind, TokenKind::kIntLiteral);
   EXPECT_EQ(t1[0].text, "4'b1001");
   for (const char *src : {"5 'D 3", "3'b01x", "12'hx", "16'hz"}) {
-    auto tokens = lex(src);
+    auto tokens = Lex(src);
     EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral) << src;
   }
 }
 
 TEST(Lexer, IntLiteral_LrmExample3_Signed) {
   // §5.7.1 Example 3: 4'shf, 16'sd?
-  auto t1 = lex("4'shf");
+  auto t1 = Lex("4'shf");
   EXPECT_EQ(t1[0].kind, TokenKind::kIntLiteral);
-  auto t2 = lex("16'sd?");
+  auto t2 = Lex("16'sd?");
   EXPECT_EQ(t2[0].kind, TokenKind::kIntLiteral);
 }
 
 TEST(Lexer, IntLiteral_UnbasedUnsized) {
   // §5.7.1: '0, '1, 'x, 'X, 'z, 'Z are unbased unsized literals
   for (const char *src : {"'0", "'1", "'x", "'X", "'z", "'Z"}) {
-    auto tokens = lex(src);
+    auto tokens = Lex(src);
     ASSERT_GE(tokens.size(), 2) << src;
     EXPECT_EQ(tokens[0].kind, TokenKind::kUnbasedUnsizedLiteral) << src;
   }
@@ -417,45 +416,45 @@ TEST(Lexer, IntLiteral_UnbasedUnsized) {
 
 TEST(Lexer, IntLiteral_LrmExample6_Underscores) {
   // §5.7.1 Example 6: 27_195_000, 16'b0011_0101_0001_1111
-  auto t1 = lex("27_195_000");
+  auto t1 = Lex("27_195_000");
   EXPECT_EQ(t1[0].kind, TokenKind::kIntLiteral);
   EXPECT_EQ(t1[0].text, "27_195_000");
-  auto t2 = lex("16'b0011_0101_0001_1111");
+  auto t2 = Lex("16'b0011_0101_0001_1111");
   EXPECT_EQ(t2[0].kind, TokenKind::kIntLiteral);
 }
 
 // --- Whitespace in numeric literals (§5.7.1) ---
 
 TEST(Lexer, SpaceBeforeBase_SizedHex) {
-  auto tokens = lex("32 'h 12ab_f001");
+  auto tokens = Lex("32 'h 12ab_f001");
   ASSERT_GE(tokens.size(), 1);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
   EXPECT_EQ(tokens[0].text, "32 'h 12ab_f001");
 }
 
 TEST(Lexer, SpaceAfterBase_UnsizedHex) {
-  auto tokens = lex("'h 837FF");
+  auto tokens = Lex("'h 837FF");
   ASSERT_GE(tokens.size(), 1);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
   EXPECT_EQ(tokens[0].text, "'h 837FF");
 }
 
 TEST(Lexer, SpaceAfterBase_HexXZ) {
-  auto tokens = lex("'h x");
+  auto tokens = Lex("'h x");
   ASSERT_GE(tokens.size(), 1);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
   EXPECT_EQ(tokens[0].text, "'h x");
 }
 
 TEST(Lexer, NoSpace_SizedHexStillWorks) {
-  auto tokens = lex("32'hFF");
+  auto tokens = Lex("32'hFF");
   ASSERT_GE(tokens.size(), 1);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
   EXPECT_EQ(tokens[0].text, "32'hFF");
 }
 
 TEST(Lexer, SpaceAfterBase_SignedDecimal) {
-  auto tokens = lex("8'd 6");
+  auto tokens = Lex("8'd 6");
   ASSERT_GE(tokens.size(), 1);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
   EXPECT_EQ(tokens[0].text, "8'd 6");
@@ -475,26 +474,26 @@ TEST(Lexer, BasedNumber_NoDigitsAfterBase_Error) {
 // --- Triple-quoted strings (§5.9) ---
 
 TEST(Lexer, TripleQuotedString_Basic) {
-  auto tokens = lex(R"("""hello""")");
+  auto tokens = Lex(R"("""hello""")");
   ASSERT_EQ(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
   EXPECT_EQ(tokens[0].text, R"("""hello""")");
 }
 
 TEST(Lexer, TripleQuotedString_WithNewline) {
-  auto tokens = lex("\"\"\"line1\nline2\"\"\"");
+  auto tokens = Lex("\"\"\"line1\nline2\"\"\"");
   ASSERT_EQ(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
 }
 
 TEST(Lexer, TripleQuotedString_WithQuote) {
-  auto tokens = lex(R"("""a "quoted" word""")");
+  auto tokens = Lex(R"("""a "quoted" word""")");
   ASSERT_EQ(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
 }
 
 TEST(Lexer, TripleQuotedString_WithEscape) {
-  auto tokens = lex(R"("""hello\nworld""")");
+  auto tokens = Lex(R"("""hello\nworld""")");
   ASSERT_EQ(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
 }
@@ -574,7 +573,7 @@ TEST(Lexer, InterpretEscapes_NoEscapes) {
 // --- §5.6.1: Escaped identifiers ---
 
 TEST(Lexer, EscapedIdentifier_Basic) {
-  auto tokens = lex("\\my+name ");
+  auto tokens = Lex("\\my+name ");
   ASSERT_GE(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
   EXPECT_EQ(tokens[0].text, "\\my+name");
@@ -582,7 +581,7 @@ TEST(Lexer, EscapedIdentifier_Basic) {
 
 TEST(Lexer, EscapedIdentifier_SpecialChars) {
   // §5.6.1: printable ASCII 33-126 allowed
-  auto tokens = lex("\\busa+index ");
+  auto tokens = Lex("\\busa+index ");
   ASSERT_GE(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
   EXPECT_EQ(tokens[0].text, "\\busa+index");
@@ -593,7 +592,7 @@ TEST(Lexer, EscapedIdentifier_LrmExamples) {
   for (const char *src :
        {"\\busa+index ", "\\-clock ", "\\***error-condition*** ", "\\{a,b} ",
         "\\a*(b+c) "}) {
-    auto tokens = lex(src);
+    auto tokens = Lex(src);
     ASSERT_GE(tokens.size(), 2) << src;
     EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier) << src;
   }
@@ -601,14 +600,14 @@ TEST(Lexer, EscapedIdentifier_LrmExamples) {
 
 TEST(Lexer, EscapedIdentifier_KeywordBecomesIdentifier) {
   // §5.6.1: \net is a user-defined identifier, not the keyword "net"
-  auto tokens = lex("\\net ");
+  auto tokens = Lex("\\net ");
   ASSERT_GE(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
   EXPECT_EQ(tokens[0].text, "\\net");
 }
 
 TEST(Lexer, EscapedIdentifier_TerminatedBySpace) {
-  auto tokens = lex("\\esc_id next");
+  auto tokens = Lex("\\esc_id next");
   ASSERT_GE(tokens.size(), 3);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
   EXPECT_EQ(tokens[0].text, "\\esc_id");
@@ -616,14 +615,14 @@ TEST(Lexer, EscapedIdentifier_TerminatedBySpace) {
 }
 
 TEST(Lexer, EscapedIdentifier_TerminatedByNewline) {
-  auto tokens = lex("\\esc_id\n");
+  auto tokens = Lex("\\esc_id\n");
   ASSERT_GE(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
   EXPECT_EQ(tokens[0].text, "\\esc_id");
 }
 
 TEST(Lexer, EscapedIdentifier_TerminatedByTab) {
-  auto tokens = lex("\\esc_id\t");
+  auto tokens = Lex("\\esc_id\t");
   ASSERT_GE(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
   EXPECT_EQ(tokens[0].text, "\\esc_id");
@@ -633,7 +632,7 @@ TEST(Lexer, EscapedIdentifier_TerminatedByTab) {
 
 TEST(Lexer, IdentifierMaxLength_Ok) {
   std::string id(1024, 'a');
-  auto tokens = lex(id);
+  auto tokens = Lex(id);
   ASSERT_EQ(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
 }

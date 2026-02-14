@@ -6,7 +6,7 @@
 
 using namespace delta;
 
-static std::vector<Token> lex(const std::string &src) {
+static std::vector<Token> Lex(const std::string &src) {
   static SourceManager mgr;
   auto fid = mgr.AddFile("<test>", src);
   DiagEngine diag(mgr);
@@ -15,7 +15,7 @@ static std::vector<Token> lex(const std::string &src) {
 }
 
 TEST(Lexer, EmptyInput) {
-  auto tokens = lex("");
+  auto tokens = Lex("");
   ASSERT_EQ(tokens.size(), 1);
   EXPECT_TRUE(tokens[0].IsEof());
 }
@@ -23,63 +23,63 @@ TEST(Lexer, EmptyInput) {
 // --- §5.3: White space ---
 
 TEST(Lexer, Whitespace_SpaceSeparatesTokens) {
-  auto tokens = lex("a b");
+  auto tokens = Lex("a b");
   ASSERT_EQ(tokens.size(), 3);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
 TEST(Lexer, Whitespace_TabSeparatesTokens) {
-  auto tokens = lex("a\tb");
+  auto tokens = Lex("a\tb");
   ASSERT_EQ(tokens.size(), 3);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
 TEST(Lexer, Whitespace_NewlineSeparatesTokens) {
-  auto tokens = lex("a\nb");
+  auto tokens = Lex("a\nb");
   ASSERT_EQ(tokens.size(), 3);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
 TEST(Lexer, Whitespace_FormfeedSeparatesTokens) {
-  auto tokens = lex("a\fb");
+  auto tokens = Lex("a\fb");
   ASSERT_EQ(tokens.size(), 3);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
 TEST(Lexer, Whitespace_CarriageReturnSeparatesTokens) {
-  auto tokens = lex("a\rb");
+  auto tokens = Lex("a\rb");
   ASSERT_EQ(tokens.size(), 3);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
 TEST(Lexer, Whitespace_CrLfSeparatesTokens) {
-  auto tokens = lex("a\r\nb");
+  auto tokens = Lex("a\r\nb");
   ASSERT_EQ(tokens.size(), 3);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
 TEST(Lexer, Whitespace_MixedWhitespace) {
-  auto tokens = lex("a \t\n \f b");
+  auto tokens = Lex("a \t\n \f b");
   ASSERT_EQ(tokens.size(), 3);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
 TEST(Lexer, Whitespace_LeadingAndTrailing) {
-  auto tokens = lex("  \t a \n  ");
+  auto tokens = Lex("  \t a \n  ");
   ASSERT_EQ(tokens.size(), 2);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_TRUE(tokens[1].IsEof());
 }
 
 TEST(Lexer, Whitespace_OnlyWhitespace) {
-  auto tokens = lex("   \t\n\f  ");
+  auto tokens = Lex("   \t\n\f  ");
   ASSERT_EQ(tokens.size(), 1);
   EXPECT_TRUE(tokens[0].IsEof());
 }
@@ -87,7 +87,7 @@ TEST(Lexer, Whitespace_OnlyWhitespace) {
 // --- §5.6.2: Keywords ---
 
 TEST(Lexer, Keyword_Basic) {
-  auto tokens = lex("module endmodule");
+  auto tokens = Lex("module endmodule");
   ASSERT_EQ(tokens.size(), 3);
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwModule);
   EXPECT_EQ(tokens[1].kind, TokenKind::kKwEndmodule);
@@ -96,7 +96,7 @@ TEST(Lexer, Keyword_Basic) {
 
 TEST(Lexer, Keyword_LowercaseOnly) {
   // §5.6.2: keywords are lowercase only. Uppercase = identifier.
-  auto tokens = lex("Module MODULE");
+  auto tokens = Lex("Module MODULE");
   ASSERT_EQ(tokens.size(), 3);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
@@ -104,7 +104,7 @@ TEST(Lexer, Keyword_LowercaseOnly) {
 
 TEST(Lexer, Keyword_EscapedKeywordIsIdentifier) {
   // §5.6.2: keyword preceded by backslash is not a keyword
-  auto tokens = lex("\\module ");
+  auto tokens = Lex("\\module ");
   ASSERT_GE(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
 }
@@ -112,7 +112,7 @@ TEST(Lexer, Keyword_EscapedKeywordIsIdentifier) {
 // --- §5.6: Identifiers, keywords, and system names ---
 
 TEST(Lexer, Identifier_SimpleLettersDigitsUnderscore) {
-  auto tokens = lex("foo bar_123 _baz");
+  auto tokens = Lex("foo bar_123 _baz");
   ASSERT_EQ(tokens.size(), 4);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[0].text, "foo");
@@ -122,7 +122,7 @@ TEST(Lexer, Identifier_SimpleLettersDigitsUnderscore) {
 
 TEST(Lexer, Identifier_WithDollarSign) {
   // §5.6: $ is allowed in simple identifiers (but not first char)
-  auto tokens = lex("n$657");
+  auto tokens = Lex("n$657");
   ASSERT_GE(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[0].text, "n$657");
@@ -130,7 +130,7 @@ TEST(Lexer, Identifier_WithDollarSign) {
 
 TEST(Lexer, Identifier_CaseSensitive) {
   // §5.6: identifiers are case sensitive
-  auto tokens = lex("Foo foo FOO");
+  auto tokens = Lex("Foo foo FOO");
   ASSERT_EQ(tokens.size(), 4);
   EXPECT_EQ(tokens[0].text, "Foo");
   EXPECT_EQ(tokens[1].text, "foo");
@@ -141,7 +141,7 @@ TEST(Lexer, Identifier_CaseSensitive) {
 
 TEST(Lexer, Identifier_UnderscoreStart) {
   // §5.6: first char can be underscore
-  auto tokens = lex("_bus3");
+  auto tokens = Lex("_bus3");
   ASSERT_GE(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[0].text, "_bus3");
@@ -151,7 +151,7 @@ TEST(Lexer, Identifier_LrmExamples) {
   // §5.6 examples: shiftreg_a, busa_index, error_condition, merge_ab
   for (const char *id :
        {"shiftreg_a", "busa_index", "error_condition", "merge_ab"}) {
-    auto tokens = lex(id);
+    auto tokens = Lex(id);
     ASSERT_GE(tokens.size(), 2) << id;
     EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier) << id;
     EXPECT_EQ(tokens[0].text, id) << id;
@@ -161,7 +161,7 @@ TEST(Lexer, Identifier_LrmExamples) {
 // --- §5.7: Numbers (dispatch: integral vs real vs time) ---
 
 TEST(Lexer, Number_IntegerLiterals) {
-  auto tokens = lex("42 8'hFF 4'b1010");
+  auto tokens = Lex("42 8'hFF 4'b1010");
   struct Case {
     TokenKind kind;
     std::string text;
@@ -180,7 +180,7 @@ TEST(Lexer, Number_IntegerLiterals) {
 
 TEST(Lexer, Number_DispatchIntRealTime) {
   // §5.7: number is integral_number or real_number; time_literal adds unit
-  auto tokens = lex("42 3.14 100ns");
+  auto tokens = Lex("42 3.14 100ns");
   ASSERT_EQ(tokens.size(), 4);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
   EXPECT_EQ(tokens[1].kind, TokenKind::kRealLiteral);
@@ -190,41 +190,41 @@ TEST(Lexer, Number_DispatchIntRealTime) {
 // --- §5.9: String literals ---
 
 TEST(Lexer, String_Basic) {
-  auto tokens = lex("\"Hello, World!\"");
+  auto tokens = Lex("\"Hello, World!\"");
   ASSERT_EQ(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
   EXPECT_EQ(tokens[0].text, "\"Hello, World!\"");
 }
 
 TEST(Lexer, String_Empty) {
-  auto tokens = lex("\"\"");
+  auto tokens = Lex("\"\"");
   ASSERT_EQ(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
   EXPECT_EQ(tokens[0].text, "\"\"");
 }
 
 TEST(Lexer, String_WithEscapedQuote) {
-  auto tokens = lex("\"say \\\"hi\\\"\"");
+  auto tokens = Lex("\"say \\\"hi\\\"\"");
   ASSERT_EQ(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
 }
 
 TEST(Lexer, String_WithEscapedBackslash) {
-  auto tokens = lex("\"path\\\\dir\"");
+  auto tokens = Lex("\"path\\\\dir\"");
   ASSERT_EQ(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
 }
 
 TEST(Lexer, String_TripleQuotedWithUnescapedQuotes) {
   // §5.9: triple-quoted strings allow " without escape
-  auto tokens = lex(R"("""a "quoted" word""")");
+  auto tokens = Lex(R"("""a "quoted" word""")");
   ASSERT_EQ(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
 }
 
 TEST(Lexer, String_TripleQuotedWithNewline) {
   // §5.9: triple-quoted strings allow direct newlines
-  auto tokens = lex("\"\"\"line1\nline2\"\"\"");
+  auto tokens = Lex("\"\"\"line1\nline2\"\"\"");
   ASSERT_EQ(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
 }
@@ -232,7 +232,7 @@ TEST(Lexer, String_TripleQuotedWithNewline) {
 // --- §5.6.3: System tasks and system functions ---
 
 TEST(Lexer, SystemTf_Basic) {
-  auto tokens = lex("$display $finish");
+  auto tokens = Lex("$display $finish");
   ASSERT_EQ(tokens.size(), 3);
   EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
   EXPECT_EQ(tokens[0].text, "$display");
@@ -241,7 +241,7 @@ TEST(Lexer, SystemTf_Basic) {
 
 TEST(Lexer, SystemTf_EmbeddedDollar) {
   // §5.6.3: system_tf_identifier allows $ within the name
-  auto tokens = lex("$test$plusargs $value$plusargs");
+  auto tokens = Lex("$test$plusargs $value$plusargs");
   ASSERT_EQ(tokens.size(), 3);
   EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
   EXPECT_EQ(tokens[0].text, "$test$plusargs");
@@ -250,7 +250,7 @@ TEST(Lexer, SystemTf_EmbeddedDollar) {
 }
 
 TEST(Lexer, SystemTf_WithDigitsAndUnderscore) {
-  auto tokens = lex("$urandom_range $stime");
+  auto tokens = Lex("$urandom_range $stime");
   ASSERT_EQ(tokens.size(), 3);
   EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
   EXPECT_EQ(tokens[0].text, "$urandom_range");
@@ -259,7 +259,7 @@ TEST(Lexer, SystemTf_WithDigitsAndUnderscore) {
 
 TEST(Lexer, SystemTf_LrmExamples) {
   // §5.6.3 examples
-  auto tokens = lex("$display $finish");
+  auto tokens = Lex("$display $finish");
   ASSERT_GE(tokens.size(), 3);
   EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
   EXPECT_EQ(tokens[1].kind, TokenKind::kSystemIdentifier);
@@ -267,7 +267,7 @@ TEST(Lexer, SystemTf_LrmExamples) {
 
 TEST(Lexer, SystemTf_DollarAloneIsNotSystem) {
   // Bare $ followed by non-alpha is just kDollar, not a system identifier
-  auto tokens = lex("$");
+  auto tokens = Lex("$");
   ASSERT_GE(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kDollar);
 }
@@ -290,7 +290,7 @@ TEST(Lexer, CompilerDirective_BacktickIsUnexpected) {
 // --- §5.5: Operators ---
 
 TEST(Lexer, Operators_SingleChar) {
-  auto tokens = lex("+ - * / % & | ^ ~ ! = < > ?");
+  auto tokens = Lex("+ - * / % & | ^ ~ ! = < > ?");
   TokenKind expected[] = {
       TokenKind::kPlus,  TokenKind::kMinus,    TokenKind::kStar,
       TokenKind::kSlash, TokenKind::kPercent,  TokenKind::kAmp,
@@ -306,7 +306,7 @@ TEST(Lexer, Operators_SingleChar) {
 
 TEST(Lexer, Operators_DoubleChar) {
   auto tokens =
-      lex("== != <= >= << >> && || ** ++ -- -> => :: ~& ~| ~^ ^~ .* ## @@");
+      Lex("== != <= >= << >> && || ** ++ -- -> => :: ~& ~| ~^ ^~ .* ## @@");
   TokenKind expected[] = {
       TokenKind::kEqEq,      TokenKind::kBangEq,     TokenKind::kLtEq,
       TokenKind::kGtEq,      TokenKind::kLtLt,       TokenKind::kGtGt,
@@ -323,7 +323,7 @@ TEST(Lexer, Operators_DoubleChar) {
 }
 
 TEST(Lexer, Operators_TripleChar) {
-  auto tokens = lex("=== !== ==? !=? <<< >>> ->> |-> |=> <-> &&&");
+  auto tokens = Lex("=== !== ==? !=? <<< >>> ->> |-> |=> <-> &&&");
   TokenKind expected[] = {
       TokenKind::kEqEqEq,       TokenKind::kBangEqEq,
       TokenKind::kEqEqQuestion, TokenKind::kBangEqQuestion,
@@ -339,7 +339,7 @@ TEST(Lexer, Operators_TripleChar) {
 }
 
 TEST(Lexer, Operators_CompoundAssignment) {
-  auto tokens = lex("+= -= *= /= %= &= |= ^= <<= >>= <<<= >>>=");
+  auto tokens = Lex("+= -= *= /= %= &= |= ^= <<= >>= <<<= >>>=");
   TokenKind expected[] = {
       TokenKind::kPlusEq,  TokenKind::kMinusEq,   TokenKind::kStarEq,
       TokenKind::kSlashEq, TokenKind::kPercentEq, TokenKind::kAmpEq,
@@ -353,25 +353,25 @@ TEST(Lexer, Operators_CompoundAssignment) {
 }
 
 TEST(Lexer, Operators_IndexedPartSelect) {
-  auto tokens = lex("+: -:");
+  auto tokens = Lex("+: -:");
   EXPECT_EQ(tokens[0].kind, TokenKind::kPlusColon);
   EXPECT_EQ(tokens[1].kind, TokenKind::kMinusColon);
 }
 
 TEST(Lexer, Operators_Tolerance) {
-  auto tokens = lex("+/- +%-");
+  auto tokens = Lex("+/- +%-");
   EXPECT_EQ(tokens[0].kind, TokenKind::kPlusSlashMinus);
   EXPECT_EQ(tokens[1].kind, TokenKind::kPlusPercentMinus);
 }
 
 TEST(Lexer, Operators_StarGt) {
-  auto tokens = lex("*>");
+  auto tokens = Lex("*>");
   ASSERT_GE(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStarGt);
 }
 
 TEST(Lexer, Punctuation) {
-  auto tokens = lex("( ) [ ] { } ; , . : # @");
+  auto tokens = Lex("( ) [ ] { } ; , . : # @");
   TokenKind expected[] = {
       TokenKind::kLParen,    TokenKind::kRParen, TokenKind::kLBracket,
       TokenKind::kRBracket,  TokenKind::kLBrace, TokenKind::kRBrace,
@@ -385,7 +385,7 @@ TEST(Lexer, Punctuation) {
 }
 
 TEST(Lexer, Operators_Dollar) {
-  auto tokens = lex("$");
+  auto tokens = Lex("$");
   ASSERT_GE(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kDollar);
 }
@@ -393,14 +393,14 @@ TEST(Lexer, Operators_Dollar) {
 // --- §5.4: Comments ---
 
 TEST(Lexer, Comment_LineComment) {
-  auto tokens = lex("a // comment\nb");
+  auto tokens = Lex("a // comment\nb");
   ASSERT_EQ(tokens.size(), 3);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
 TEST(Lexer, Comment_BlockComment) {
-  auto tokens = lex("a /* block */ b");
+  auto tokens = Lex("a /* block */ b");
   ASSERT_EQ(tokens.size(), 3);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
@@ -408,7 +408,7 @@ TEST(Lexer, Comment_BlockComment) {
 
 TEST(Lexer, Comment_LineInsideBlock) {
   // §5.4: // has no special meaning inside /* */
-  auto tokens = lex("a /* // not a line comment */ b");
+  auto tokens = Lex("a /* // not a line comment */ b");
   ASSERT_EQ(tokens.size(), 3);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
@@ -416,42 +416,42 @@ TEST(Lexer, Comment_LineInsideBlock) {
 
 TEST(Lexer, Comment_BlockInsideLine) {
   // §5.4: /* */ has no special meaning inside //
-  auto tokens = lex("a // /* not a block comment\nb");
+  auto tokens = Lex("a // /* not a block comment\nb");
   ASSERT_EQ(tokens.size(), 3);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
 TEST(Lexer, Comment_MultilineBlock) {
-  auto tokens = lex("a /* line1\nline2\nline3 */ b");
+  auto tokens = Lex("a /* line1\nline2\nline3 */ b");
   ASSERT_EQ(tokens.size(), 3);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
 TEST(Lexer, Comment_AdjacentComments) {
-  auto tokens = lex("a /* c1 */ /* c2 */ b");
+  auto tokens = Lex("a /* c1 */ /* c2 */ b");
   ASSERT_EQ(tokens.size(), 3);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
 TEST(Lexer, Comment_LineCommentAtEof) {
-  auto tokens = lex("a // trailing");
+  auto tokens = Lex("a // trailing");
   ASSERT_EQ(tokens.size(), 2);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_TRUE(tokens[1].IsEof());
 }
 
 TEST(Lexer, Comment_EmptyBlockComment) {
-  auto tokens = lex("a /**/ b");
+  auto tokens = Lex("a /**/ b");
   ASSERT_EQ(tokens.size(), 3);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
 TEST(Lexer, HelloSv) {
-  auto tokens = lex(
+  auto tokens = Lex(
       "module hello;\n  initial $display(\"Hello, DeltaHDL!\");\nendmodule\n");
   struct Case {
     size_t idx;
@@ -476,21 +476,21 @@ TEST(Lexer, HelloSv) {
 // --- §5.7.2: Real literal constants ---
 
 TEST(Lexer, RealLiteral_FixedPoint) {
-  auto tokens = lex("3.14");
+  auto tokens = Lex("3.14");
   ASSERT_EQ(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kRealLiteral);
   EXPECT_EQ(tokens[0].text, "3.14");
 }
 
 TEST(Lexer, RealLiteral_Exponent) {
-  auto tokens = lex("1e10");
+  auto tokens = Lex("1e10");
   ASSERT_EQ(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kRealLiteral);
   EXPECT_EQ(tokens[0].text, "1e10");
 }
 
 TEST(Lexer, RealLiteral_FixedExponent) {
-  auto tokens = lex("2.5e3");
+  auto tokens = Lex("2.5e3");
   ASSERT_EQ(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kRealLiteral);
   EXPECT_EQ(tokens[0].text, "2.5e3");
@@ -501,21 +501,21 @@ TEST(Lexer, RealLiteral_LrmExamples) {
   //                  23E10, 29E-2, 236.123_763_e-12
   for (const char *src : {"1.2", "0.1", "2394.26331", "1.2E12", "1.30e-2",
                           "0.1e-0", "23E10", "29E-2", "236.123_763_e-12"}) {
-    auto tokens = lex(src);
+    auto tokens = Lex(src);
     ASSERT_GE(tokens.size(), 2) << src;
     EXPECT_EQ(tokens[0].kind, TokenKind::kRealLiteral) << src;
   }
 }
 
 TEST(Lexer, RealLiteral_NegativeExponent) {
-  auto tokens = lex("1.30e-2");
+  auto tokens = Lex("1.30e-2");
   ASSERT_EQ(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kRealLiteral);
   EXPECT_EQ(tokens[0].text, "1.30e-2");
 }
 
 TEST(Lexer, RealLiteral_UppercaseE) {
-  auto tokens = lex("1.2E12");
+  auto tokens = Lex("1.2E12");
   ASSERT_EQ(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kRealLiteral);
   EXPECT_EQ(tokens[0].text, "1.2E12");
@@ -526,7 +526,7 @@ TEST(Lexer, RealLiteral_UppercaseE) {
 TEST(Lexer, TimeLiteral_AllUnits) {
   // §5.8: time_unit ::= s | ms | us | ns | ps | fs
   for (const char *src : {"100s", "10ms", "5us", "100ns", "40ps", "1fs"}) {
-    auto tokens = lex(src);
+    auto tokens = Lex(src);
     ASSERT_GE(tokens.size(), 2) << src;
     EXPECT_EQ(tokens[0].kind, TokenKind::kTimeLiteral) << src;
   }
@@ -534,23 +534,23 @@ TEST(Lexer, TimeLiteral_AllUnits) {
 
 TEST(Lexer, TimeLiteral_LrmExamples) {
   // §5.8 examples: 2.1ns, 40ps
-  auto t1 = lex("2.1ns");
+  auto t1 = Lex("2.1ns");
   EXPECT_EQ(t1[0].kind, TokenKind::kTimeLiteral);
   EXPECT_EQ(t1[0].text, "2.1ns");
-  auto t2 = lex("40ps");
+  auto t2 = Lex("40ps");
   EXPECT_EQ(t2[0].kind, TokenKind::kTimeLiteral);
   EXPECT_EQ(t2[0].text, "40ps");
 }
 
 TEST(Lexer, TimeLiteral_FixedPointBase) {
-  auto tokens = lex("1.5us");
+  auto tokens = Lex("1.5us");
   ASSERT_EQ(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kTimeLiteral);
   EXPECT_EQ(tokens[0].text, "1.5us");
 }
 
 TEST(Lexer, SourceLocations) {
-  auto tokens = lex("a\nb c");
+  auto tokens = Lex("a\nb c");
   struct Case {
     size_t idx;
     int line;
@@ -570,7 +570,7 @@ TEST(Lexer, SourceLocations) {
 // --- §5.10/5.11: Assignment pattern token ---
 
 TEST(Lexer, ApostropheLBrace) {
-  auto tokens = lex("'{0, 1}");
+  auto tokens = Lex("'{0, 1}");
   ASSERT_GE(tokens.size(), 5);
   EXPECT_EQ(tokens[0].kind, TokenKind::kApostropheLBrace);
   EXPECT_EQ(tokens[0].text, "'{");
@@ -578,14 +578,14 @@ TEST(Lexer, ApostropheLBrace) {
 }
 
 TEST(Lexer, ApostropheLBraceNested) {
-  auto tokens = lex("'{'{1, 2}, '{3, 4}}");
+  auto tokens = Lex("'{'{1, 2}, '{3, 4}}");
   EXPECT_EQ(tokens[0].kind, TokenKind::kApostropheLBrace);
   EXPECT_EQ(tokens[1].kind, TokenKind::kApostropheLBrace);
 }
 
 TEST(Lexer, ApostropheLBrace_TypePrefixed) {
   // §5.10: ab'{int:1, shortreal:1.0} — type prefix then '{
-  auto tokens = lex("ab'{int:1}");
+  auto tokens = Lex("ab'{int:1}");
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[0].text, "ab");
   EXPECT_EQ(tokens[1].kind, TokenKind::kApostropheLBrace);
@@ -593,14 +593,14 @@ TEST(Lexer, ApostropheLBrace_TypePrefixed) {
 
 TEST(Lexer, ApostropheLBrace_Replication) {
   // §5.10: '{3{1}} — replication inside assignment pattern
-  auto tokens = lex("'{3{1}}");
+  auto tokens = Lex("'{3{1}}");
   EXPECT_EQ(tokens[0].kind, TokenKind::kApostropheLBrace);
   EXPECT_EQ(tokens[1].kind, TokenKind::kIntLiteral);
 }
 
 TEST(Lexer, ApostropheLBrace_ArrayLiteral) {
   // §5.11: '{'{0,1,2},'{3{4}}} — multi-dim array literal
-  auto tokens = lex("'{'{0,1,2},'{3{4}}}");
+  auto tokens = Lex("'{'{0,1,2},'{3{4}}}");
   EXPECT_EQ(tokens[0].kind, TokenKind::kApostropheLBrace);
   EXPECT_EQ(tokens[1].kind, TokenKind::kApostropheLBrace);
   EXPECT_EQ(tokens[2].kind, TokenKind::kIntLiteral);
@@ -608,7 +608,7 @@ TEST(Lexer, ApostropheLBrace_ArrayLiteral) {
 
 TEST(Lexer, ApostropheLBrace_ArrayTypePrefixed) {
   // §5.11: triple'{0,1,2} — type-prefixed array literal
-  auto tokens = lex("triple'{0,1,2}");
+  auto tokens = Lex("triple'{0,1,2}");
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[0].text, "triple");
   EXPECT_EQ(tokens[1].kind, TokenKind::kApostropheLBrace);
@@ -617,7 +617,7 @@ TEST(Lexer, ApostropheLBrace_ArrayTypePrefixed) {
 // --- §5.12: Attribute tokens ---
 
 TEST(Lexer, AttrStart) {
-  auto tokens = lex("(* full_case *)");
+  auto tokens = Lex("(* full_case *)");
   ASSERT_GE(tokens.size(), 4);
   struct Case {
     size_t idx;
@@ -637,7 +637,7 @@ TEST(Lexer, AttrStart) {
 
 TEST(Lexer, AttrWithValue) {
   // §5.12: (* attr_name = constant_expression *)
-  auto tokens = lex("(* synthesis = 1 *)");
+  auto tokens = Lex("(* synthesis = 1 *)");
   struct Case {
     size_t idx;
     TokenKind kind;
@@ -660,7 +660,7 @@ TEST(Lexer, AttrWithValue) {
 
 TEST(Lexer, AttrMultipleSpecs) {
   // §5.12: (* attr1, attr2 *)
-  auto tokens = lex("(* full_case, parallel_case *)");
+  auto tokens = Lex("(* full_case, parallel_case *)");
   struct Case {
     size_t idx;
     TokenKind kind;
@@ -683,7 +683,7 @@ TEST(Lexer, AttrMultipleSpecs) {
 
 TEST(Lexer, AttrDoesNotConfuseMultiply) {
   // (a * b) should NOT produce kAttrStart.
-  auto tokens = lex("(a * b)");
+  auto tokens = Lex("(a * b)");
   EXPECT_EQ(tokens[0].kind, TokenKind::kLParen);
   EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[2].kind, TokenKind::kStar);

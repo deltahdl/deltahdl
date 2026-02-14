@@ -61,6 +61,22 @@ static RtlirDesign* ElaborateSource(const std::string& src,
   return elab.Elaborate(top_name);
 }
 
+static bool HasItemOfKind(const std::vector<ModuleItem*>& items,
+                          ModuleItemKind kind) {
+  for (const auto* item : items) {
+    if (item->kind == kind) return true;
+  }
+  return false;
+}
+
+static const ModuleItem* FindItemOfKind(const std::vector<ModuleItem*>& items,
+                                        ModuleItemKind kind) {
+  for (const auto* item : items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
+}
+
 // =============================================================================
 // §17.1 Basic checker declaration
 // =============================================================================
@@ -143,11 +159,8 @@ TEST_F(CheckerParseTest, CheckerWithPropertyDecl) {
   )");
   ASSERT_EQ(unit->checkers.size(), 1u);
   EXPECT_FALSE(unit->checkers[0]->items.empty());
-  bool found_property = false;
-  for (const auto* item : unit->checkers[0]->items) {
-    if (item->kind == ModuleItemKind::kPropertyDecl) found_property = true;
-  }
-  EXPECT_TRUE(found_property);
+  EXPECT_TRUE(
+      HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kPropertyDecl));
 }
 
 TEST_F(CheckerParseTest, CheckerWithSequenceDecl) {
@@ -160,11 +173,8 @@ TEST_F(CheckerParseTest, CheckerWithSequenceDecl) {
   )");
   ASSERT_EQ(unit->checkers.size(), 1u);
   EXPECT_FALSE(unit->checkers[0]->items.empty());
-  bool found_seq = false;
-  for (const auto* item : unit->checkers[0]->items) {
-    if (item->kind == ModuleItemKind::kSequenceDecl) found_seq = true;
-  }
-  EXPECT_TRUE(found_seq);
+  EXPECT_TRUE(
+      HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kSequenceDecl));
 }
 
 // =============================================================================
@@ -204,11 +214,8 @@ TEST_F(CheckerParseTest, CheckerWithAlwaysBlock) {
     endchecker
   )");
   ASSERT_EQ(unit->checkers.size(), 1u);
-  bool found_always = false;
-  for (const auto* item : unit->checkers[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysBlock) found_always = true;
-  }
-  EXPECT_TRUE(found_always);
+  EXPECT_TRUE(
+      HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kAlwaysBlock));
 }
 
 TEST_F(CheckerParseTest, CheckerWithInitialBlock) {
@@ -220,11 +227,8 @@ TEST_F(CheckerParseTest, CheckerWithInitialBlock) {
     endchecker
   )");
   ASSERT_EQ(unit->checkers.size(), 1u);
-  bool found_initial = false;
-  for (const auto* item : unit->checkers[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) found_initial = true;
-  }
-  EXPECT_TRUE(found_initial);
+  EXPECT_TRUE(
+      HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kInitialBlock));
 }
 
 // =============================================================================
@@ -243,15 +247,11 @@ TEST_F(CheckerParseTest, CheckerInstantiatedInModule) {
   )");
   ASSERT_EQ(unit->checkers.size(), 1u);
   ASSERT_EQ(unit->modules.size(), 1u);
-  bool found_inst = false;
-  for (const auto* item : unit->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kModuleInst) {
-      found_inst = true;
-      EXPECT_EQ(item->inst_module, "my_checker");
-      EXPECT_EQ(item->inst_name, "chk_inst");
-    }
-  }
-  EXPECT_TRUE(found_inst);
+  const auto* inst =
+      FindItemOfKind(unit->modules[0]->items, ModuleItemKind::kModuleInst);
+  ASSERT_NE(inst, nullptr);
+  EXPECT_EQ(inst->inst_module, "my_checker");
+  EXPECT_EQ(inst->inst_name, "chk_inst");
 }
 
 // =============================================================================
@@ -296,11 +296,8 @@ TEST_F(CheckerParseTest, CheckerWithAssertProperty) {
     endchecker
   )");
   ASSERT_EQ(unit->checkers.size(), 1u);
-  bool found_assert = false;
-  for (const auto* item : unit->checkers[0]->items) {
-    if (item->kind == ModuleItemKind::kAssertProperty) found_assert = true;
-  }
-  EXPECT_TRUE(found_assert);
+  EXPECT_TRUE(
+      HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kAssertProperty));
 }
 
 // =============================================================================
@@ -316,11 +313,8 @@ TEST_F(CheckerParseTest, CheckerWithFunctionDecl) {
     endchecker
   )");
   ASSERT_EQ(unit->checkers.size(), 1u);
-  bool found_func = false;
-  for (const auto* item : unit->checkers[0]->items) {
-    if (item->kind == ModuleItemKind::kFunctionDecl) found_func = true;
-  }
-  EXPECT_TRUE(found_func);
+  EXPECT_TRUE(
+      HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kFunctionDecl));
 }
 
 // =============================================================================
@@ -388,11 +382,8 @@ TEST_F(CheckerParseTest, CheckerWithContAssign) {
     endchecker
   )");
   ASSERT_EQ(unit->checkers.size(), 1u);
-  bool found_assign = false;
-  for (const auto* item : unit->checkers[0]->items) {
-    if (item->kind == ModuleItemKind::kContAssign) found_assign = true;
-  }
-  EXPECT_TRUE(found_assign);
+  EXPECT_TRUE(
+      HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kContAssign));
 }
 
 // =============================================================================
@@ -408,11 +399,8 @@ TEST_F(CheckerParseTest, CheckerWithCovergroup) {
     endchecker
   )");
   ASSERT_EQ(unit->checkers.size(), 1u);
-  bool found_cg = false;
-  for (const auto* item : unit->checkers[0]->items) {
-    if (item->kind == ModuleItemKind::kCovergroupDecl) found_cg = true;
-  }
-  EXPECT_TRUE(found_cg);
+  EXPECT_TRUE(
+      HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kCovergroupDecl));
 }
 
 }  // namespace

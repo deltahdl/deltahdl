@@ -11,10 +11,10 @@ using namespace delta;
 struct ParseResult5 {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
 };
 
-static ParseResult5 Parse(const std::string &src) {
+static ParseResult5 Parse(const std::string& src) {
   ParseResult5 result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -24,8 +24,8 @@ static ParseResult5 Parse(const std::string &src) {
   return result;
 }
 
-static Stmt *FirstInitialStmt(ParseResult5 &r) {
-  for (auto *item : r.cu->modules[0]->items) {
+static Stmt* FirstInitialStmt(ParseResult5& r) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kInitialBlock) {
       if (item->body && item->body->kind == StmtKind::kBlock) {
         return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
@@ -36,7 +36,7 @@ static Stmt *FirstInitialStmt(ParseResult5 &r) {
   return nullptr;
 }
 
-static bool ParseOk5(const std::string &src) {
+static bool ParseOk5(const std::string& src) {
   SourceManager mgr;
   Arena arena;
   auto fid = mgr.AddFile("<test>", src);
@@ -50,11 +50,11 @@ static bool ParseOk5(const std::string &src) {
 struct ParseDiag5 {
   SourceManager mgr;
   Arena arena;
-  DiagEngine *diag = nullptr;
-  CompilationUnit *cu = nullptr;
+  DiagEngine* diag = nullptr;
+  CompilationUnit* cu = nullptr;
 };
 
-static ParseDiag5 ParseWithDiag(const std::string &src) {
+static ParseDiag5 ParseWithDiag(const std::string& src) {
   ParseDiag5 result;
   auto fid = result.mgr.AddFile("<test>", src);
   result.diag = new DiagEngine(result.mgr);
@@ -72,10 +72,10 @@ TEST(ParserSection5, AssignmentPatternPositional_Parse) {
       "  initial x = '{1, 2, 3};\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  auto *rhs = stmt->rhs;
+  auto* rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
 }
@@ -86,12 +86,20 @@ TEST(ParserSection5, AssignmentPatternPositional_Elements) {
       "  initial x = '{1, 2, 3};\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto *rhs = stmt->rhs;
+  auto* rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->elements.size(), 3u);
   EXPECT_TRUE(rhs->pattern_keys.empty());
+}
+
+static void VerifyPatternKeys(const Expr* rhs,
+                              const std::string expected_keys[], size_t count) {
+  ASSERT_EQ(rhs->pattern_keys.size(), count);
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(rhs->pattern_keys[i], expected_keys[i]) << "key " << i;
+  }
 }
 
 TEST(ParserSection5, AssignmentPatternNamed) {
@@ -100,17 +108,14 @@ TEST(ParserSection5, AssignmentPatternNamed) {
       "  initial x = '{a: 0, b: 1};\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto *rhs = stmt->rhs;
+  auto* rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
   EXPECT_EQ(rhs->elements.size(), 2u);
   std::string expected_keys[] = {"a", "b"};
-  ASSERT_EQ(rhs->pattern_keys.size(), std::size(expected_keys));
-  for (size_t i = 0; i < std::size(expected_keys); ++i) {
-    EXPECT_EQ(rhs->pattern_keys[i], expected_keys[i]) << "key " << i;
-  }
+  VerifyPatternKeys(rhs, expected_keys, std::size(expected_keys));
 }
 
 TEST(ParserSection5, AssignmentPatternDefault) {
@@ -119,16 +124,13 @@ TEST(ParserSection5, AssignmentPatternDefault) {
       "  initial x = '{default: 0};\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto *rhs = stmt->rhs;
+  auto* rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
   std::string expected_keys[] = {"default"};
-  ASSERT_EQ(rhs->pattern_keys.size(), std::size(expected_keys));
-  for (size_t i = 0; i < std::size(expected_keys); ++i) {
-    EXPECT_EQ(rhs->pattern_keys[i], expected_keys[i]) << "key " << i;
-  }
+  VerifyPatternKeys(rhs, expected_keys, std::size(expected_keys));
 }
 
 // --- §5.12: Attributes ---
@@ -141,10 +143,18 @@ TEST(ParserSection5, AttributeOnModuleItem) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   ASSERT_EQ(item->attrs.size(), 1u);
   EXPECT_EQ(item->attrs[0].name, "full_case");
   EXPECT_EQ(item->attrs[0].value, nullptr);
+}
+
+static void VerifyAttrNames(const ModuleItem* item,
+                            const std::string expected_names[], size_t count) {
+  ASSERT_EQ(item->attrs.size(), count);
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(item->attrs[i].name, expected_names[i]) << "attr " << i;
+  }
 }
 
 TEST(ParserSection5, AttributeWithValue_Names) {
@@ -155,12 +165,9 @@ TEST(ParserSection5, AttributeWithValue_Names) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
-  auto *item = r.cu->modules[0]->items[0];
   std::string expected_names[] = {"synthesis", "optimize_power"};
-  ASSERT_EQ(item->attrs.size(), std::size(expected_names));
-  for (size_t i = 0; i < std::size(expected_names); ++i) {
-    EXPECT_EQ(item->attrs[i].name, expected_names[i]) << "attr " << i;
-  }
+  VerifyAttrNames(r.cu->modules[0]->items[0], expected_names,
+                  std::size(expected_names));
 }
 
 TEST(ParserSection5, AttributeWithValue_Values) {
@@ -171,7 +178,7 @@ TEST(ParserSection5, AttributeWithValue_Values) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   ASSERT_EQ(item->attrs.size(), 2u);
   EXPECT_EQ(item->attrs[0].value, nullptr);
   ASSERT_NE(item->attrs[1].value, nullptr);
@@ -185,10 +192,10 @@ TEST(ParserSection5, BuiltInMethodCall_Parse) {
       "  initial x = arr.size();\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  auto *rhs = stmt->rhs;
+  auto* rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
 }
@@ -200,9 +207,9 @@ TEST(ParserSection5, BuiltInMethodCall_Callee) {
       "  initial x = arr.size();\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto *rhs = stmt->rhs;
+  auto* rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   ASSERT_NE(rhs->lhs, nullptr);
   EXPECT_EQ(rhs->lhs->kind, ExprKind::kMemberAccess);
@@ -256,7 +263,7 @@ TEST(ParserSection5, StructMembers_CommaSeparated) {
       "  struct { int X, Y, Z; } s;\n"
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->data_type.struct_members.size(), 3u);
 }
 
@@ -328,9 +335,9 @@ TEST(ParserSection5, BlockVarDecl_BuiltinType_Block) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   ASSERT_EQ(item->kind, ModuleItemKind::kInitialBlock);
-  auto *blk = item->body;
+  auto* blk = item->body;
   ASSERT_NE(blk, nullptr);
   ASSERT_EQ(blk->kind, StmtKind::kBlock);
   ASSERT_EQ(blk->stmts.size(), 1u);
@@ -344,7 +351,7 @@ TEST(ParserSection5, BlockVarDecl_BuiltinType_Stmt) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *blk = r.cu->modules[0]->items[0]->body;
+  auto* blk = r.cu->modules[0]->items[0]->body;
   ASSERT_NE(blk, nullptr);
   ASSERT_EQ(blk->stmts.size(), 1u);
   EXPECT_EQ(blk->stmts[0]->kind, StmtKind::kVarDecl);
@@ -362,6 +369,16 @@ TEST(ParserSection5, BlockVarDecl_UserDefinedType) {
                "endmodule\n"));
 }
 
+static void VerifyBlockVarDecls(const Stmt* blk,
+                                const std::string expected_names[],
+                                size_t count) {
+  ASSERT_EQ(blk->stmts.size(), count);
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(blk->stmts[i]->kind, StmtKind::kVarDecl) << "stmt " << i;
+    EXPECT_EQ(blk->stmts[i]->var_name, expected_names[i]) << "stmt " << i;
+  }
+}
+
 TEST(ParserSection5, BlockVarDecl_CommaSeparated) {
   auto r = Parse(
       "module m;\n"
@@ -370,14 +387,10 @@ TEST(ParserSection5, BlockVarDecl_CommaSeparated) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *blk = r.cu->modules[0]->items[0]->body;
+  auto* blk = r.cu->modules[0]->items[0]->body;
   ASSERT_NE(blk, nullptr);
   std::string expected_names[] = {"a", "b", "c"};
-  ASSERT_EQ(blk->stmts.size(), std::size(expected_names));
-  for (size_t i = 0; i < std::size(expected_names); ++i) {
-    EXPECT_EQ(blk->stmts[i]->kind, StmtKind::kVarDecl) << "stmt " << i;
-    EXPECT_EQ(blk->stmts[i]->var_name, expected_names[i]) << "stmt " << i;
-  }
+  VerifyBlockVarDecls(blk, expected_names, std::size(expected_names));
 }
 
 TEST(ParserSection5, BlockVarDecl_WithInit) {
@@ -388,7 +401,7 @@ TEST(ParserSection5, BlockVarDecl_WithInit) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *blk = r.cu->modules[0]->items[0]->body;
+  auto* blk = r.cu->modules[0]->items[0]->body;
   ASSERT_NE(blk, nullptr);
   ASSERT_EQ(blk->stmts.size(), 1u);
   EXPECT_EQ(blk->stmts[0]->kind, StmtKind::kVarDecl);

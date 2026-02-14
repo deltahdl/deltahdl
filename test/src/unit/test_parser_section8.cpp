@@ -26,6 +26,28 @@ static ParseResult Parse(const std::string &src) {
   return result;
 }
 
+// Returns the first class member of kind kMethod, or nullptr if not found.
+static ClassMember *FindMethodMember(ClassDecl *cls) {
+  for (auto *m : cls->members) {
+    if (m->kind == ClassMemberKind::kMethod) {
+      return m;
+    }
+  }
+  return nullptr;
+}
+
+// Returns the ClassDecl from the first module item of kind kClassDecl,
+// or nullptr if not found.
+static ClassDecl *FindClassDeclItem(
+    const std::vector<ModuleItem *> &items) {
+  for (auto *item : items) {
+    if (item->kind == ModuleItemKind::kClassDecl) {
+      return item->class_decl;
+    }
+  }
+  return nullptr;
+}
+
 // =============================================================================
 // §8 Class declarations — parsing
 // =============================================================================
@@ -154,16 +176,10 @@ TEST(ParserSection8, ClassWithTask) {
       "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto *cls = r.cu->classes[0];
-  bool found = false;
-  for (auto *m : cls->members) {
-    if (m->kind == ClassMemberKind::kMethod) {
-      found = true;
-      ASSERT_NE(m->method, nullptr);
-      EXPECT_EQ(m->method->kind, ModuleItemKind::kTaskDecl);
-    }
-  }
-  EXPECT_TRUE(found);
+  auto *m = FindMethodMember(r.cu->classes[0]);
+  ASSERT_NE(m, nullptr);
+  ASSERT_NE(m->method, nullptr);
+  EXPECT_EQ(m->method->kind, ModuleItemKind::kTaskDecl);
 }
 
 TEST(ParserSection8, ClassWithConstraint) {
@@ -315,16 +331,9 @@ TEST(ParserSection8, ClassInsideModule) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto &items = r.cu->modules[0]->items;
-  bool found = false;
-  for (auto *item : items) {
-    if (item->kind == ModuleItemKind::kClassDecl) {
-      found = true;
-      ASSERT_NE(item->class_decl, nullptr);
-      EXPECT_EQ(item->class_decl->name, "inner_cls");
-    }
-  }
-  EXPECT_TRUE(found);
+  auto *cls = FindClassDeclItem(r.cu->modules[0]->items);
+  ASSERT_NE(cls, nullptr);
+  EXPECT_EQ(cls->name, "inner_cls");
 }
 
 // §8.5 — Parameterized class inside module (the sv-tests TIMEOUT case)
@@ -336,16 +345,9 @@ TEST(ParserSection8, ParameterizedClassInsideModuleName) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto &items = r.cu->modules[0]->items;
-  bool found = false;
-  for (auto *item : items) {
-    if (item->kind == ModuleItemKind::kClassDecl) {
-      found = true;
-      ASSERT_NE(item->class_decl, nullptr);
-      EXPECT_EQ(item->class_decl->name, "test_cls");
-    }
-  }
-  EXPECT_TRUE(found);
+  auto *cls = FindClassDeclItem(r.cu->modules[0]->items);
+  ASSERT_NE(cls, nullptr);
+  EXPECT_EQ(cls->name, "test_cls");
 }
 
 TEST(ParserSection8, ParameterizedClassInsideModuleParams) {
@@ -356,14 +358,10 @@ TEST(ParserSection8, ParameterizedClassInsideModuleParams) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto &items = r.cu->modules[0]->items;
-  for (auto *item : items) {
-    if (item->kind == ModuleItemKind::kClassDecl) {
-      ASSERT_NE(item->class_decl, nullptr);
-      ASSERT_EQ(item->class_decl->params.size(), 1u);
-      EXPECT_EQ(item->class_decl->params[0].first, "a");
-    }
-  }
+  auto *cls = FindClassDeclItem(r.cu->modules[0]->items);
+  ASSERT_NE(cls, nullptr);
+  ASSERT_EQ(cls->params.size(), 1u);
+  EXPECT_EQ(cls->params[0].first, "a");
 }
 
 // §8.26 — Typedef class (forward declaration)
@@ -444,16 +442,10 @@ TEST(ParserSection8, ClassConstructor) {
       "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto *cls = r.cu->classes[0];
-  bool found = false;
-  for (auto *m : cls->members) {
-    if (m->kind == ClassMemberKind::kMethod) {
-      found = true;
-      ASSERT_NE(m->method, nullptr);
-      EXPECT_EQ(m->method->name, "new");
-    }
-  }
-  EXPECT_TRUE(found);
+  auto *m = FindMethodMember(r.cu->classes[0]);
+  ASSERT_NE(m, nullptr);
+  ASSERT_NE(m->method, nullptr);
+  EXPECT_EQ(m->method->name, "new");
 }
 
 // §8.7 — Constructor with parameters

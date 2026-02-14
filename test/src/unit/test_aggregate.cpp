@@ -46,6 +46,15 @@ static Expr *ParseExprFrom(const std::string &src, AggFixture &f) {
 // §7.2 Struct type metadata — StructTypeInfo registration
 // =============================================================================
 
+static void VerifyStructField(const StructFieldInfo &field,
+                              const char *expected_name,
+                              uint32_t expected_offset,
+                              uint32_t expected_width, size_t index) {
+  EXPECT_EQ(field.name, expected_name) << "field " << index;
+  EXPECT_EQ(field.bit_offset, expected_offset) << "field " << index;
+  EXPECT_EQ(field.width, expected_width) << "field " << index;
+}
+
 TEST(StructType, RegisterAndFind_Metadata) {
   AggFixture f;
   StructTypeInfo info;
@@ -78,21 +87,8 @@ TEST(StructType, RegisterAndFind_Fields) {
   ASSERT_NE(found, nullptr);
   ASSERT_EQ(found->fields.size(), 2u);
 
-  struct Expected {
-    const char *name;
-    uint32_t bit_offset;
-    uint32_t width;
-  };
-  const Expected kExpected[] = {
-      {"x", 8, 8},
-      {"y", 0, 8},
-  };
-  for (size_t i = 0; i < 2; ++i) {
-    EXPECT_EQ(found->fields[i].name, kExpected[i].name) << "field " << i;
-    EXPECT_EQ(found->fields[i].bit_offset, kExpected[i].bit_offset)
-        << "field " << i;
-    EXPECT_EQ(found->fields[i].width, kExpected[i].width) << "field " << i;
-  }
+  VerifyStructField(found->fields[0], "x", 8, 8, 0);
+  VerifyStructField(found->fields[1], "y", 0, 8, 1);
 }
 
 TEST(StructType, FindNonexistent) {

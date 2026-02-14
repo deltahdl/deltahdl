@@ -170,6 +170,28 @@ TEST(ParserSection28, StrengthWithDelay) {
   ASSERT_EQ(item->gate_terminals.size(), 3);
 }
 
+// --- Helpers for multiple-instance and UDP tests ---
+
+static void VerifyGateInstances(const std::vector<ModuleItem *> &items,
+                                GateKind kind,
+                                const std::string expected_names[],
+                                size_t count) {
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(items[i]->gate_kind, kind);
+    EXPECT_EQ(items[i]->gate_inst_name, expected_names[i]);
+    EXPECT_EQ(items[i]->gate_terminals.size(), 3);
+  }
+}
+
+static void VerifyStrengthDelayInstances(
+    const std::vector<ModuleItem *> &items, size_t count, int str0, int str1) {
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(items[i]->drive_strength0, str0);
+    EXPECT_EQ(items[i]->drive_strength1, str1);
+    EXPECT_NE(items[i]->gate_delay, nullptr);
+  }
+}
+
 // --- Multiple instances per statement (LRM section 28.3) ---
 
 TEST(ParserSection28, MultipleInstances) {
@@ -180,13 +202,8 @@ TEST(ParserSection28, MultipleInstances) {
   ASSERT_NE(r.cu, nullptr);
   auto *mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 2);
-
   std::string expected_names[] = {"g1", "g2"};
-  for (size_t i = 0; i < 2; ++i) {
-    EXPECT_EQ(mod->items[i]->gate_kind, GateKind::kAnd);
-    EXPECT_EQ(mod->items[i]->gate_inst_name, expected_names[i]);
-    EXPECT_EQ(mod->items[i]->gate_terminals.size(), 3);
-  }
+  VerifyGateInstances(mod->items, GateKind::kAnd, expected_names, 2);
 }
 
 TEST(ParserSection28, MultipleInstancesThree) {
@@ -222,11 +239,7 @@ TEST(ParserSection28, MultipleInstancesWithStrengthAndDelay) {
   ASSERT_NE(r.cu, nullptr);
   auto *mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 2);
-  for (size_t i = 0; i < 2; ++i) {
-    EXPECT_EQ(mod->items[i]->drive_strength0, 4);
-    EXPECT_EQ(mod->items[i]->drive_strength1, 4);
-    EXPECT_NE(mod->items[i]->gate_delay, nullptr);
-  }
+  VerifyStrengthDelayInstances(mod->items, 2, 4, 4);
 }
 
 // --- All gate kinds ---
@@ -286,6 +299,54 @@ TEST(ParserSection28, PullGates) {
 // Section 29: User-Defined Primitives
 // =============================================================
 
+// --- UDP verification helpers ---
+
+static void VerifyUdpRowInputs(const UdpTableRow &row,
+                                const std::string &expected) {
+  ASSERT_EQ(row.inputs.size(), expected.size());
+  for (size_t j = 0; j < expected.size(); ++j) {
+    EXPECT_EQ(row.inputs[j], expected[j]);
+  }
+}
+
+struct CombUdpRow {
+  std::string inputs;
+  char output;
+};
+
+static void VerifyCombUdpTable(const UdpDecl *udp,
+                                const CombUdpRow expected[], size_t count) {
+  ASSERT_EQ(udp->table.size(), count);
+  for (size_t i = 0; i < count; ++i) {
+    VerifyUdpRowInputs(udp->table[i], expected[i].inputs);
+    EXPECT_EQ(udp->table[i].output, expected[i].output);
+  }
+}
+
+struct SeqUdpRow {
+  std::string inputs;
+  char state;
+  char output;
+};
+
+static void VerifySeqUdpTable(const UdpDecl *udp, const SeqUdpRow expected[],
+                               size_t count) {
+  ASSERT_EQ(udp->table.size(), count);
+  for (size_t i = 0; i < count; ++i) {
+    VerifyUdpRowInputs(udp->table[i], expected[i].inputs);
+    EXPECT_EQ(udp->table[i].current_state, expected[i].state);
+    EXPECT_EQ(udp->table[i].output, expected[i].output);
+  }
+}
+
+static void VerifyUdpInputNames(const UdpDecl *udp,
+                                 const std::string expected[], size_t count) {
+  ASSERT_EQ(udp->input_names.size(), count);
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(udp->input_names[i], expected[i]);
+  }
+}
+
 TEST(ParserSection29, CombinationalUdp) {
   auto r = Parse(
       "primitive mux(output out, input a, b, sel);\n"
@@ -302,27 +363,11 @@ TEST(ParserSection29, CombinationalUdp) {
   EXPECT_EQ(udp->name, "mux");
   EXPECT_EQ(udp->output_name, "out");
   EXPECT_FALSE(udp->is_sequential);
-
   std::string expected_inputs[] = {"a", "b", "sel"};
-  ASSERT_EQ(udp->input_names.size(), std::size(expected_inputs));
-  for (size_t i = 0; i < std::size(expected_inputs); ++i) {
-    EXPECT_EQ(udp->input_names[i], expected_inputs[i]);
-  }
-
-  struct Row {
-    std::string inputs;
-    char output;
-  };
-  Row expected_rows[] = {
+  VerifyUdpInputNames(udp, expected_inputs, std::size(expected_inputs));
+  CombUdpRow expected_rows[] = {
       {"0?0", '0'}, {"1?0", '1'}, {"?01", '0'}, {"?11", '1'}};
-  ASSERT_EQ(udp->table.size(), std::size(expected_rows));
-  for (size_t i = 0; i < std::size(expected_rows); ++i) {
-    ASSERT_EQ(udp->table[i].inputs.size(), expected_rows[i].inputs.size());
-    for (size_t j = 0; j < expected_rows[i].inputs.size(); ++j) {
-      EXPECT_EQ(udp->table[i].inputs[j], expected_rows[i].inputs[j]);
-    }
-    EXPECT_EQ(udp->table[i].output, expected_rows[i].output);
-  }
+  VerifyCombUdpTable(udp, expected_rows, std::size(expected_rows));
   EXPECT_EQ(udp->table[0].current_state, 0);
 }
 
@@ -340,21 +385,8 @@ TEST(ParserSection29, SequentialUdp) {
   EXPECT_EQ(udp->name, "dff");
   EXPECT_TRUE(udp->is_sequential);
   EXPECT_EQ(udp->output_name, "q");
-
-  struct Row {
-    std::string inputs;
-    char state;
-    char output;
-  };
-  Row expected[] = {{"0r", '?', '0'}, {"1r", '?', '1'}};
-  ASSERT_EQ(udp->table.size(), std::size(expected));
-  for (size_t i = 0; i < std::size(expected); ++i) {
-    for (size_t j = 0; j < expected[i].inputs.size(); ++j) {
-      EXPECT_EQ(udp->table[i].inputs[j], expected[i].inputs[j]);
-    }
-    EXPECT_EQ(udp->table[i].current_state, expected[i].state);
-    EXPECT_EQ(udp->table[i].output, expected[i].output);
-  }
+  SeqUdpRow expected[] = {{"0r", '?', '0'}, {"1r", '?', '1'}};
+  VerifySeqUdpTable(udp, expected, std::size(expected));
 }
 
 TEST(ParserSection29, UdpTableSpecialChars) {
@@ -450,6 +482,19 @@ TEST(ParserSection29, SequentialUdpInitial) {
 
 // --- §29.8 UDP instances ---
 
+static bool FindModuleInst(const std::vector<ModuleItem *> &items,
+                            std::string_view module_name,
+                            std::string_view expected_inst_name) {
+  for (auto *item : items) {
+    if (item->kind == ModuleItemKind::kModuleInst &&
+        item->inst_module == module_name) {
+      EXPECT_EQ(item->inst_name, expected_inst_name);
+      return true;
+    }
+  }
+  return false;
+}
+
 TEST(ParserSection29, UdpInstance) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
@@ -465,20 +510,25 @@ TEST(ParserSection29, UdpInstance) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->udps.size(), 1);
   ASSERT_EQ(r.cu->modules.size(), 1);
-  auto &items = r.cu->modules[0]->items;
-  // The UDP instance should be parsed as a module instance.
-  bool found = false;
-  for (auto *item : items) {
-    if (item->kind == ModuleItemKind::kModuleInst &&
-        item->inst_module == "inv") {
-      found = true;
-      EXPECT_EQ(item->inst_name, "u1");
-    }
-  }
-  EXPECT_TRUE(found);
+  EXPECT_TRUE(FindModuleInst(r.cu->modules[0]->items, "inv", "u1"));
 }
 
 // --- §29.9 Mixing level-sensitive and edge-sensitive descriptions ---
+
+struct UdpSpotCheck {
+  size_t row;
+  char input0;
+  char output;
+};
+
+static void VerifyUdpTableSpotChecks(const UdpDecl *udp,
+                                      const UdpSpotCheck checks[],
+                                      size_t count) {
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(udp->table[checks[i].row].inputs[0], checks[i].input0);
+    EXPECT_EQ(udp->table[checks[i].row].output, checks[i].output);
+  }
+}
 
 TEST(ParserSection29, MixedLevelEdgeSensitive) {
   auto r = Parse(
@@ -496,22 +546,12 @@ TEST(ParserSection29, MixedLevelEdgeSensitive) {
   auto *udp = r.cu->udps[0];
   EXPECT_TRUE(udp->is_sequential);
   ASSERT_EQ(udp->table.size(), 5);
-
-  // Verify first input char and output for representative rows.
-  struct Check {
-    size_t row;
-    char input0;
-    char output;
-  };
-  Check checks[] = {
+  UdpSpotCheck checks[] = {
       {0, '?', '1'},  // Level-sensitive entry
       {2, 'r', '1'},  // Edge-sensitive entry
       {4, 'f', '-'},  // Falling edge with no-change output
   };
-  for (const auto &c : checks) {
-    EXPECT_EQ(udp->table[c.row].inputs[0], c.input0);
-    EXPECT_EQ(udp->table[c.row].output, c.output);
-  }
+  VerifyUdpTableSpotChecks(udp, checks, std::size(checks));
 }
 
 // =============================================================

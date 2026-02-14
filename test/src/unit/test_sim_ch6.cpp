@@ -382,6 +382,16 @@ TEST(SimCh6, BitStreamShortArrayToInt) {
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEBABEu);
 }
 
+static void VerifyNetByName(const RtlirModule* mod, std::string_view name,
+                            uint32_t expected_width, bool& found) {
+  for (const auto& n : mod->nets) {
+    if (n.name == name) {
+      found = true;
+      EXPECT_EQ(n.width, expected_width);
+    }
+  }
+}
+
 // §6.6.7: User-defined nettype creates a net with correct width.
 TEST(SimCh6, NettypeCreatesNet) {
   SimCh6Fixture f;
@@ -398,12 +408,7 @@ TEST(SimCh6, NettypeCreatesNet) {
   ASSERT_FALSE(design->top_modules.empty());
   auto* mod = design->top_modules[0];
   bool found_net = false;
-  for (const auto& n : mod->nets) {
-    if (n.name == "x") {
-      found_net = true;
-      EXPECT_EQ(n.width, 8u);
-    }
-  }
+  VerifyNetByName(mod, "x", 8u, found_net);
   EXPECT_TRUE(found_net) << "x should be elaborated as a net, not a variable";
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -429,11 +434,6 @@ TEST(SimCh6, NettypeWideNet) {
   ASSERT_FALSE(design->top_modules.empty());
   auto* mod = design->top_modules[0];
   bool found_net = false;
-  for (const auto& n : mod->nets) {
-    if (n.name == "y") {
-      found_net = true;
-      EXPECT_EQ(n.width, 16u);
-    }
-  }
+  VerifyNetByName(mod, "y", 16u, found_net);
   EXPECT_TRUE(found_net) << "y should be elaborated as a net";
 }

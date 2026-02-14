@@ -298,9 +298,9 @@ TEST(ParserSection12, ForeachMultipleVars) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kForeach);
   ASSERT_EQ(stmt->foreach_vars.size(), 2u);
-  const std::vector<std::string> expected = {"i", "j"};
-  for (size_t k = 0; k < expected.size(); ++k) {
-    EXPECT_EQ(stmt->foreach_vars[k], expected[k]);
+  const std::vector<std::string> kExpected = {"i", "j"};
+  for (size_t k = 0; k < kExpected.size(); ++k) {
+    EXPECT_EQ(stmt->foreach_vars[k], kExpected[k]);
   }
 }
 

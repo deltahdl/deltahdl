@@ -42,7 +42,6 @@ StrengthLevel MapStrengthKeyword0(uint8_t keyword_index) {
   // 0=none, 1=highz, 2=weak, 3=pull, 4=strong, 5=supply
   switch (keyword_index) {
     case 0:
-      return StrengthLevel::kHighz;
     case 1:
       return StrengthLevel::kHighz;
     case 2:
@@ -62,7 +61,6 @@ StrengthLevel MapStrengthKeyword1(uint8_t keyword_index) {
   // 0=none, 1=highz, 2=weak, 3=pull, 4=strong, 5=supply
   switch (keyword_index) {
     case 0:
-      return StrengthLevel::kHighz;
     case 1:
       return StrengthLevel::kHighz;
     case 2:
@@ -80,10 +78,7 @@ StrengthLevel MapStrengthKeyword1(uint8_t keyword_index) {
 
 bool ValidateStrengthPair(StrengthLevel s0, StrengthLevel s1) {
   // Both highz is illegal; all other combinations are legal.
-  if (s0 == StrengthLevel::kHighz && s1 == StrengthLevel::kHighz) {
-    return false;
-  }
-  return true;
+  return s0 != StrengthLevel::kHighz || s1 != StrengthLevel::kHighz;
 }
 
 StrengthSignal CombineUnambiguous(StrengthSignal a, StrengthSignal b) {
@@ -145,7 +140,7 @@ StrengthSignal CombineWithWiredLogic(StrengthSignal a, StrengthSignal b,
   }
 
   // Same strength, opposite values: apply wired logic.
-  Val4 resolved;
+  Val4 resolved = Val4::kX;
   if (logic == WiredLogicKind::kAnd) {
     // AND: 1&0=0, 1&1=1, 0&0=0
     if (a.value == Val4::kV1 && b.value == Val4::kV1) {
@@ -188,21 +183,16 @@ StrengthLevel ReduceResistive(StrengthLevel input) {
   //   weak → medium, medium → small, small → small, highz → highz.
   switch (input) {
     case StrengthLevel::kSupply:
-      return StrengthLevel::kPull;
     case StrengthLevel::kStrong:
       return StrengthLevel::kPull;
     case StrengthLevel::kPull:
       return StrengthLevel::kWeak;
     case StrengthLevel::kLarge:
-      return StrengthLevel::kMedium;
     case StrengthLevel::kWeak:
       return StrengthLevel::kMedium;
     case StrengthLevel::kMedium:
-      return StrengthLevel::kSmall;
     case StrengthLevel::kSmall:
       return StrengthLevel::kSmall;
-    case StrengthLevel::kHighz:
-      return StrengthLevel::kHighz;
     default:
       return StrengthLevel::kHighz;
   }
