@@ -17,11 +17,11 @@ namespace {
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-ParseResult Parse(const std::string &src) {
+ParseResult Parse(const std::string& src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -32,8 +32,8 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-Stmt *FirstInitialStmt(ParseResult &r) {
-  for (auto *item : r.cu->modules[0]->items) {
+Stmt* FirstInitialStmt(ParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
@@ -132,7 +132,7 @@ TEST(ParserAnnexA, A1ModulePortDirections) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto &ports = r.cu->modules[0]->ports;
+  auto& ports = r.cu->modules[0]->ports;
   ASSERT_EQ(ports.size(), 4u);
   const Direction kExpected[] = {Direction::kInput, Direction::kOutput,
                                  Direction::kInout, Direction::kRef};
@@ -212,7 +212,7 @@ TEST(ParserAnnexA, A2FunctionDeclAutomaticParse) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_EQ(item->name, "add");
 }
@@ -225,7 +225,7 @@ TEST(ParserAnnexA, A2FunctionDeclAutomaticProps) {
       "  endfunction\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_TRUE(item->is_automatic);
   EXPECT_EQ(item->func_args.size(), 2u);
 }
@@ -239,7 +239,7 @@ TEST(ParserAnnexA, A2TaskDecl) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
   EXPECT_EQ(item->name, "drive");
 }
@@ -285,7 +285,7 @@ TEST(ParserAnnexA, A2ContinuousAssignWithDelay) {
   auto r = Parse("module m; wire y; assign #5 y = a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
       EXPECT_NE(item->assign_delay, nullptr);
     }
@@ -306,7 +306,7 @@ TEST(ParserAnnexA, A3GateInstNInput) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   int gate_count = 0;
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kGateInst) gate_count++;
   }
   EXPECT_EQ(gate_count, 3);
@@ -326,7 +326,7 @@ TEST(ParserAnnexA, A4ModuleInstPositional) {
   auto r = Parse("module m; sub u0(a, b, c); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
   EXPECT_EQ(item->inst_module, "sub");
   EXPECT_EQ(item->inst_name, "u0");
@@ -336,7 +336,7 @@ TEST(ParserAnnexA, A4ModuleInstNamed) {
   auto r = Parse("module m; sub u0(.clk(clk), .data(data)); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
   EXPECT_EQ(item->inst_ports.size(), 2u);
 }
@@ -345,7 +345,7 @@ TEST(ParserAnnexA, A4ModuleInstWithParams) {
   auto r = Parse("module m; sub #(8, 4) u0(.clk(clk)); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
   EXPECT_EQ(item->inst_params.size(), 2u);
 }
@@ -361,7 +361,7 @@ TEST(ParserAnnexA, A4GenerateForBlock) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   bool found = false;
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kGenerateFor) found = true;
   }
   EXPECT_TRUE(found);
@@ -379,7 +379,7 @@ TEST(ParserAnnexA, A4GenerateIfElse) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   bool found = false;
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kGenerateIf) {
       found = true;
       EXPECT_NE(item->gen_else, nullptr);
@@ -402,7 +402,7 @@ TEST(ParserAnnexA, A4GenerateCase) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGenerateCase);
   EXPECT_EQ(item->gen_case_items.size(), 2u);
 }
@@ -465,7 +465,7 @@ TEST(ParserAnnexA, A6AlwaysFFWithSensitivity) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   bool found = false;
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kAlwaysBlock &&
         item->always_kind == AlwaysKind::kAlwaysFF)
       found = true;
@@ -491,7 +491,7 @@ TEST(ParserAnnexA, A6InitialAndFinalBlocks) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   bool found_init = false, found_final = false;
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kInitialBlock) found_init = true;
     if (item->kind == ModuleItemKind::kFinalBlock) found_final = true;
   }
@@ -506,7 +506,7 @@ TEST(ParserAnnexA, A6BlockingAndNonblocking) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *blk = r.cu->modules[0]->items[0]->body;
+  auto* blk = r.cu->modules[0]->items[0]->body;
   ASSERT_NE(blk, nullptr);
   ASSERT_EQ(blk->stmts.size(), 2u);
   const StmtKind kExpected[] = {StmtKind::kBlockingAssign,
@@ -523,7 +523,7 @@ TEST(ParserAnnexA, A6IfElseStmt) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_NE(stmt->else_branch, nullptr);
@@ -538,7 +538,7 @@ TEST(ParserAnnexA, A6ForLoopParse) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
 }
@@ -551,7 +551,7 @@ TEST(ParserAnnexA, A6ForLoopParts) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_NE(stmt->for_init, nullptr);
   EXPECT_NE(stmt->for_cond, nullptr);
@@ -565,7 +565,7 @@ TEST(ParserAnnexA, A6WhileLoop) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kWhile);
 }
@@ -577,7 +577,7 @@ TEST(ParserAnnexA, A6DoWhileLoop) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDoWhile);
 }
@@ -589,7 +589,7 @@ TEST(ParserAnnexA, A6ForeverLoop) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kForever);
 }
@@ -601,7 +601,7 @@ TEST(ParserAnnexA, A6RepeatLoop) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kRepeat);
 }
@@ -615,7 +615,7 @@ TEST(ParserAnnexA, A6CaseStmtParse) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
 }
@@ -628,7 +628,7 @@ TEST(ParserAnnexA, A6CaseStmtItems) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_EQ(stmt->case_items.size(), 2u);
   EXPECT_FALSE(stmt->case_items[0].is_default);
@@ -644,7 +644,7 @@ TEST(ParserAnnexA, A6ForkJoinVariants) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFork);
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoin);
@@ -659,7 +659,7 @@ TEST(ParserAnnexA, A6ForkJoinAny) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinAny);
 }
 
@@ -672,7 +672,7 @@ TEST(ParserAnnexA, A6ForkJoinNone) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinNone);
 }
 
@@ -680,7 +680,7 @@ TEST(ParserAnnexA, A6EventTrigger) {
   auto r = Parse("module m; initial begin -> ev; end endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kEventTrigger);
 }
@@ -689,7 +689,7 @@ TEST(ParserAnnexA, A6WaitStmt) {
   auto r = Parse("module m; initial begin wait (ready) x = 1; end endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   EXPECT_EQ(stmt->kind, StmtKind::kWait);
 }
 
@@ -697,7 +697,7 @@ TEST(ParserAnnexA, A6DelayControl) {
   auto r = Parse("module m; initial begin #10 x = 1; end endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
 }
 
@@ -706,7 +706,7 @@ TEST(ParserAnnexA, A6EventControl) {
       Parse("module m; initial begin @(posedge clk) x = 1; end endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
 }
 
@@ -720,7 +720,7 @@ TEST(ParserAnnexA, A6ProceduralAssignForce) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *blk = r.cu->modules[0]->items[0]->body;
+  auto* blk = r.cu->modules[0]->items[0]->body;
   ASSERT_EQ(blk->stmts.size(), 4u);
   const StmtKind kExpected[] = {StmtKind::kAssign, StmtKind::kDeassign,
                                 StmtKind::kForce, StmtKind::kRelease};
@@ -736,7 +736,7 @@ TEST(ParserAnnexA, A6ReturnStmt) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   ASSERT_EQ(item->func_body_stmts.size(), 1u);
   EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kReturn);
 }
@@ -748,7 +748,7 @@ TEST(ParserAnnexA, A6ForeachStmt) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   EXPECT_EQ(stmt->kind, StmtKind::kForeach);
 }
 
@@ -756,7 +756,7 @@ TEST(ParserAnnexA, A6DisableStmt) {
   auto r = Parse("module m; initial begin disable blk; end endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   EXPECT_EQ(stmt->kind, StmtKind::kDisable);
 }
 
@@ -817,7 +817,7 @@ TEST(ParserAnnexA, A8TernaryExpr) {
   auto r = Parse("module m; initial x = (a > b) ? a : b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
 }
@@ -826,7 +826,7 @@ TEST(ParserAnnexA, A8Concatenation) {
   auto r = Parse("module m; initial x = {a, b, c}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
   EXPECT_EQ(stmt->rhs->elements.size(), 3u);
 }
@@ -835,7 +835,7 @@ TEST(ParserAnnexA, A8Replication) {
   auto r = Parse("module m; initial x = {4{a}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kReplicate);
 }
 
@@ -851,7 +851,7 @@ TEST(ParserAnnexA, A8MemberAccess) {
   auto r = Parse("module m; initial x = s.field; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
 }
 
@@ -868,7 +868,7 @@ TEST(ParserAnnexA, A8FunctionCallExpr) {
   auto r = Parse("module m; initial x = func(a, b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
 }
 
@@ -902,7 +902,7 @@ TEST(ParserAnnexA, A9DefparamDecl) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   bool found = false;
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kDefparam) found = true;
   }
   EXPECT_TRUE(found);
@@ -915,7 +915,7 @@ TEST(ParserAnnexA, A9DefparamDecl) {
 TEST(ParserAnnexD, AnnexDCountdrivers) {
   auto r = Parse("module m; initial $countdrivers(sig); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
   EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
@@ -924,7 +924,7 @@ TEST(ParserAnnexD, AnnexDCountdrivers) {
 TEST(ParserAnnexD, AnnexDList) {
   auto r = Parse("module m; initial $list; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
   EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);

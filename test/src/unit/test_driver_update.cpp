@@ -28,7 +28,7 @@ TEST(DriverUpdate, DefaultConstruction_StrengthAndIndex) {
 TEST(DriverUpdatePool, AcquireCreatesNew) {
   Arena arena;
   DriverUpdatePool pool(arena);
-  DriverUpdate *du = pool.Acquire();
+  DriverUpdate* du = pool.Acquire();
   ASSERT_NE(du, nullptr);
   EXPECT_EQ(du->value.width, 0);
   EXPECT_EQ(du->drive_strength_0, Strength::kStrong);
@@ -38,7 +38,7 @@ TEST(DriverUpdatePool, AcquireCreatesNew) {
 TEST(DriverUpdatePool, AcquireCreatesNewDefaults) {
   Arena arena;
   DriverUpdatePool pool(arena);
-  DriverUpdate *du = pool.Acquire();
+  DriverUpdate* du = pool.Acquire();
   ASSERT_NE(du, nullptr);
   EXPECT_EQ(du->driver_index, 0);
   EXPECT_EQ(du->next, nullptr);
@@ -47,7 +47,7 @@ TEST(DriverUpdatePool, AcquireCreatesNewDefaults) {
 TEST(DriverUpdatePool, ReleaseAndReuse_SamePointer) {
   Arena arena;
   DriverUpdatePool pool(arena);
-  DriverUpdate *du = pool.Acquire();
+  DriverUpdate* du = pool.Acquire();
 
   // Modify all fields.
   du->value = MakeLogic4VecVal(arena, 8, 0xFF);
@@ -58,7 +58,7 @@ TEST(DriverUpdatePool, ReleaseAndReuse_SamePointer) {
   pool.Release(du);
   EXPECT_EQ(pool.FreeCount(), 1);
 
-  DriverUpdate *reused = pool.Acquire();
+  DriverUpdate* reused = pool.Acquire();
   EXPECT_EQ(reused, du);  // Same pointer returned.
   EXPECT_EQ(pool.FreeCount(), 0);
 }
@@ -66,7 +66,7 @@ TEST(DriverUpdatePool, ReleaseAndReuse_SamePointer) {
 TEST(DriverUpdatePool, ReleaseAndReuse_FieldsReset) {
   Arena arena;
   DriverUpdatePool pool(arena);
-  DriverUpdate *du = pool.Acquire();
+  DriverUpdate* du = pool.Acquire();
 
   // Modify all fields.
   du->value = MakeLogic4VecVal(arena, 8, 0xFF);
@@ -75,7 +75,7 @@ TEST(DriverUpdatePool, ReleaseAndReuse_FieldsReset) {
   du->driver_index = 42;
 
   pool.Release(du);
-  DriverUpdate *reused = pool.Acquire();
+  DriverUpdate* reused = pool.Acquire();
   // All fields reset to defaults.
   EXPECT_EQ(reused->value.width, 0);
   EXPECT_EQ(reused->drive_strength_0, Strength::kStrong);
@@ -89,8 +89,8 @@ TEST(DriverUpdatePool, FreeCount) {
   DriverUpdatePool pool(arena);
   EXPECT_EQ(pool.FreeCount(), 0);
 
-  DriverUpdate *du1 = pool.Acquire();
-  DriverUpdate *du2 = pool.Acquire();
+  DriverUpdate* du1 = pool.Acquire();
+  DriverUpdate* du2 = pool.Acquire();
   pool.Release(du1);
   pool.Release(du2);
   EXPECT_EQ(pool.FreeCount(), 2);
@@ -105,7 +105,7 @@ TEST(DriverUpdatePool, MultipleAcquireReleaseCycles) {
 
   // Acquire several, release all, acquire again.
   constexpr size_t kCount = 10;
-  DriverUpdate *updates[kCount];
+  DriverUpdate* updates[kCount];
   for (size_t i = 0; i < kCount; ++i) {
     updates[i] = pool.Acquire();
     ASSERT_NE(updates[i], nullptr);
@@ -130,16 +130,16 @@ TEST(DriverUpdatePool, AcquireAfterPartialRelease) {
   Arena arena;
   DriverUpdatePool pool(arena);
 
-  DriverUpdate *du1 = pool.Acquire();
-  DriverUpdate *du2 = pool.Acquire();
-  DriverUpdate *du3 = pool.Acquire();
+  DriverUpdate* du1 = pool.Acquire();
+  DriverUpdate* du2 = pool.Acquire();
+  DriverUpdate* du3 = pool.Acquire();
 
   // Release du2 only.
   pool.Release(du2);
   EXPECT_EQ(pool.FreeCount(), 1);
 
   // Next acquire should return du2.
-  DriverUpdate *reused = pool.Acquire();
+  DriverUpdate* reused = pool.Acquire();
   EXPECT_EQ(reused, du2);
   EXPECT_EQ(pool.FreeCount(), 0);
 

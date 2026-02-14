@@ -17,7 +17,7 @@ using namespace delta;
 // Helpers
 // ---------------------------------------------------------------------------
 
-static std::vector<Token> Lex(const std::string &src) {
+static std::vector<Token> Lex(const std::string& src) {
   static SourceManager mgr;
   auto fid = mgr.AddFile("<test>", src);
   DiagEngine diag(mgr);
@@ -28,10 +28,10 @@ static std::vector<Token> Lex(const std::string &src) {
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
 };
 
-static ParseResult Parse(const std::string &src) {
+static ParseResult Parse(const std::string& src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -46,7 +46,7 @@ struct PreprocFixture {
   DiagEngine diag{mgr};
 };
 
-static std::string Preprocess(const std::string &src, PreprocFixture &f,
+static std::string Preprocess(const std::string& src, PreprocFixture& f,
                               PreprocConfig config = {}) {
   auto fid = f.mgr.AddFile("<test>", src);
   Preprocessor pp(f.mgr, f.diag, std::move(config));
@@ -240,7 +240,7 @@ TEST(Lexical, Timeunit_StoredInModuleDecl_Values) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   EXPECT_EQ(mod->time_unit, TimeUnit::kNs);
   EXPECT_EQ(mod->time_prec, TimeUnit::kPs);
 }
@@ -253,7 +253,7 @@ TEST(Lexical, Timeunit_StoredInModuleDecl_Flags) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   EXPECT_TRUE(mod->has_timeunit);
   EXPECT_TRUE(mod->has_timeprecision);
 }
@@ -294,9 +294,9 @@ TEST(Lexical, Define_EmptyArgUsesDefault) {
 // 5. Continuous assignment with delay (LRM SS10.3.3)
 // ===========================================================================
 
-static const ModuleItem *FindItemByKind(
-    const std::vector<ModuleItem *> &items, ModuleItemKind kind) {
-  for (auto *item : items) {
+static const ModuleItem* FindItemByKind(const std::vector<ModuleItem*>& items,
+                                        ModuleItemKind kind) {
+  for (auto* item : items) {
     if (item->kind == kind) return item;
   }
   return nullptr;
@@ -310,7 +310,7 @@ TEST(Lexical, ContAssign_WithDelay) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1);
-  const auto *assign_item =
+  const auto* assign_item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kContAssign);
   ASSERT_NE(assign_item, nullptr) << "no continuous assignment found";
   ASSERT_NE(assign_item->assign_delay, nullptr);
@@ -326,7 +326,7 @@ TEST(Lexical, ContAssign_WithParenDelay) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   bool found = false;
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind != ModuleItemKind::kContAssign) continue;
     found = true;
     ASSERT_NE(item->assign_delay, nullptr);
@@ -342,7 +342,7 @@ TEST(Lexical, ContAssign_NoDelay) {
       "  assign a = b;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind != ModuleItemKind::kContAssign) continue;
     EXPECT_EQ(item->assign_delay, nullptr);
   }
@@ -473,7 +473,7 @@ TEST(Lexical, EscapedIdentifier_InVarDecl) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1);
   bool found = false;
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind != ModuleItemKind::kVarDecl) continue;
     if (item->name == "\\data+bus") {
       found = true;

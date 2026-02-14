@@ -11,10 +11,10 @@ using namespace delta;
 struct ParseResult7b {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
 };
 
-static ParseResult7b Parse(const std::string &src) {
+static ParseResult7b Parse(const std::string& src) {
   ParseResult7b result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -24,14 +24,14 @@ static ParseResult7b Parse(const std::string &src) {
   return result;
 }
 
-static ModuleItem *FirstItem(ParseResult7b &r) {
+static ModuleItem* FirstItem(ParseResult7b& r) {
   if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto &items = r.cu->modules[0]->items;
+  auto& items = r.cu->modules[0]->items;
   return items.empty() ? nullptr : items[0];
 }
 
-static Stmt *FirstInitialStmt(ParseResult7b &r) {
-  for (auto *item : r.cu->modules[0]->items) {
+static Stmt* FirstInitialStmt(ParseResult7b& r) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kInitialBlock) {
       if (item->body && item->body->kind == StmtKind::kBlock) {
         return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
@@ -52,7 +52,7 @@ TEST(ParserSection7, StructVariableDecl) {
       "  struct { int a; int b; } my_var;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kStruct);
   EXPECT_EQ(item->name, "my_var");
@@ -70,7 +70,7 @@ TEST(ParserSection7, ArrayLocatorUnique) {
       "  initial qi = s.unique;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
@@ -87,7 +87,7 @@ TEST(ParserSection7, ArrayReductionAnd) {
       "  initial y = b.and;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
@@ -100,7 +100,7 @@ TEST(ParserSection7, ArrayReductionOr) {
       "  initial y = b.or;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
@@ -113,7 +113,7 @@ TEST(ParserSection7, ArrayReductionXor) {
       "  initial y = b.xor;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
@@ -130,7 +130,7 @@ TEST(ParserSection7, EmptyConcatClearQueue_Parse) {
       "  initial q = {};\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
   ASSERT_NE(stmt->rhs, nullptr);
@@ -143,7 +143,7 @@ TEST(ParserSection7, EmptyConcatClearQueue_Rhs) {
       "  initial q = {};\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
@@ -161,7 +161,7 @@ TEST(ParserSection7, UnionWithNestedStruct) {
       "  } Instr;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kUnion);
   EXPECT_TRUE(item->typedef_type.is_tagged);

@@ -6,7 +6,7 @@
 
 using namespace delta;
 
-static std::vector<Token> Lex(const std::string &src) {
+static std::vector<Token> Lex(const std::string& src) {
   static SourceManager mgr;
   auto fid = mgr.AddFile("<test>", src);
   DiagEngine diag(mgr);
@@ -149,7 +149,7 @@ TEST(Lexer, Identifier_UnderscoreStart) {
 
 TEST(Lexer, Identifier_LrmExamples) {
   // §5.6 examples: shiftreg_a, busa_index, error_condition, merge_ab
-  for (const char *id :
+  for (const char* id :
        {"shiftreg_a", "busa_index", "error_condition", "merge_ab"}) {
     auto tokens = Lex(id);
     ASSERT_GE(tokens.size(), 2) << id;
@@ -456,7 +456,7 @@ TEST(Lexer, HelloSv) {
   struct Case {
     size_t idx;
     TokenKind kind;
-    const char *text;
+    const char* text;
   };
   Case expected[] = {
       {0, TokenKind::kKwModule, nullptr},
@@ -465,7 +465,7 @@ TEST(Lexer, HelloSv) {
       {3, TokenKind::kKwInitial, nullptr},
       {4, TokenKind::kSystemIdentifier, "$display"},
   };
-  for (const auto &c : expected) {
+  for (const auto& c : expected) {
     EXPECT_EQ(tokens[c.idx].kind, c.kind) << "token " << c.idx;
     if (c.text) {
       EXPECT_EQ(tokens[c.idx].text, c.text) << "token " << c.idx;
@@ -499,7 +499,7 @@ TEST(Lexer, RealLiteral_FixedExponent) {
 TEST(Lexer, RealLiteral_LrmExamples) {
   // §5.7.2 examples: 1.2, 0.1, 2394.26331, 1.2E12, 1.30e-2, 0.1e-0,
   //                  23E10, 29E-2, 236.123_763_e-12
-  for (const char *src : {"1.2", "0.1", "2394.26331", "1.2E12", "1.30e-2",
+  for (const char* src : {"1.2", "0.1", "2394.26331", "1.2E12", "1.30e-2",
                           "0.1e-0", "23E10", "29E-2", "236.123_763_e-12"}) {
     auto tokens = Lex(src);
     ASSERT_GE(tokens.size(), 2) << src;
@@ -525,7 +525,7 @@ TEST(Lexer, RealLiteral_UppercaseE) {
 
 TEST(Lexer, TimeLiteral_AllUnits) {
   // §5.8: time_unit ::= s | ms | us | ns | ps | fs
-  for (const char *src : {"100s", "10ms", "5us", "100ns", "40ps", "1fs"}) {
+  for (const char* src : {"100s", "10ms", "5us", "100ns", "40ps", "1fs"}) {
     auto tokens = Lex(src);
     ASSERT_GE(tokens.size(), 2) << src;
     EXPECT_EQ(tokens[0].kind, TokenKind::kTimeLiteral) << src;
@@ -561,7 +561,7 @@ TEST(Lexer, SourceLocations) {
       {1, 2, 1},
       {2, 2, 3},
   };
-  for (const auto &c : expected) {
+  for (const auto& c : expected) {
     EXPECT_EQ(tokens[c.idx].loc.line, c.line) << "token " << c.idx;
     EXPECT_EQ(tokens[c.idx].loc.column, c.column) << "token " << c.idx;
   }
@@ -622,14 +622,14 @@ TEST(Lexer, AttrStart) {
   struct Case {
     size_t idx;
     TokenKind kind;
-    const char *text;
+    const char* text;
   };
   Case expected[] = {
       {0, TokenKind::kAttrStart, "(*"},
       {1, TokenKind::kIdentifier, "full_case"},
       {2, TokenKind::kAttrEnd, "*)"},
   };
-  for (const auto &c : expected) {
+  for (const auto& c : expected) {
     EXPECT_EQ(tokens[c.idx].kind, c.kind) << "token " << c.idx;
     EXPECT_EQ(tokens[c.idx].text, c.text) << "token " << c.idx;
   }
@@ -641,7 +641,7 @@ TEST(Lexer, AttrWithValue) {
   struct Case {
     size_t idx;
     TokenKind kind;
-    const char *text;
+    const char* text;
   };
   Case expected[] = {
       {0, TokenKind::kAttrStart, nullptr},
@@ -650,7 +650,7 @@ TEST(Lexer, AttrWithValue) {
       {3, TokenKind::kIntLiteral, nullptr},
       {4, TokenKind::kAttrEnd, nullptr},
   };
-  for (const auto &c : expected) {
+  for (const auto& c : expected) {
     EXPECT_EQ(tokens[c.idx].kind, c.kind) << "token " << c.idx;
     if (c.text) {
       EXPECT_EQ(tokens[c.idx].text, c.text) << "token " << c.idx;
@@ -664,7 +664,7 @@ TEST(Lexer, AttrMultipleSpecs) {
   struct Case {
     size_t idx;
     TokenKind kind;
-    const char *text;
+    const char* text;
   };
   Case expected[] = {
       {0, TokenKind::kAttrStart, nullptr},
@@ -673,7 +673,7 @@ TEST(Lexer, AttrMultipleSpecs) {
       {3, TokenKind::kIdentifier, "parallel_case"},
       {4, TokenKind::kAttrEnd, nullptr},
   };
-  for (const auto &c : expected) {
+  for (const auto& c : expected) {
     EXPECT_EQ(tokens[c.idx].kind, c.kind) << "token " << c.idx;
     if (c.text) {
       EXPECT_EQ(tokens[c.idx].text, c.text) << "token " << c.idx;

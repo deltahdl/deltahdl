@@ -28,7 +28,7 @@ TEST(SvVpiUser, VariableTypes) {
       {vpiStringVar, 616},  {vpiEnumVar, 617},  {vpiStructVar, 618},
       {vpiBitVar, 620},     {vpiClassObj, 621}, {vpiChandleVar, 622},
   };
-  for (const auto &c : kCases) {
+  for (const auto& c : kCases) {
     EXPECT_EQ(c.actual, c.expected);
   }
 }
@@ -65,7 +65,7 @@ TEST(SvVpiUser, OperatorConstants) {
       {vpiStreamLROp, 71}, {vpiInsideOp, 95},     {vpiNexttimeOp, 89},
       {vpiAlwaysOp, 90},   {vpiEventuallyOp, 91},
   };
-  for (const auto &c : kCases) {
+  for (const auto& c : kCases) {
     EXPECT_EQ(c.actual, c.expected);
   }
 }

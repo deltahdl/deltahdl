@@ -107,7 +107,7 @@ TEST(TristateGates, Bufif0TruthTable) {
       {Val4::kX, Val4::kZ, Val4Ext::kX},
       {Val4::kZ, Val4::kZ, Val4Ext::kX},
   };
-  for (const auto &c : cases) {
+  for (const auto& c : cases) {
     EXPECT_EQ(EvalTristateGate(TristateKind::kBufif0, c.data, c.control),
               c.expected)
         << "Bufif0(" << static_cast<int>(c.data) << ", "
@@ -131,7 +131,7 @@ TEST(TristateGates, Bufif1TruthTable) {
       {Val4::kV0, Val4::kX, Val4Ext::kL},
       {Val4::kV1, Val4::kX, Val4Ext::kH},
   };
-  for (const auto &c : cases) {
+  for (const auto& c : cases) {
     EXPECT_EQ(EvalTristateGate(TristateKind::kBufif1, c.data, c.control),
               c.expected)
         << "Bufif1(" << static_cast<int>(c.data) << ", "
@@ -155,7 +155,7 @@ TEST(TristateGates, Notif0TruthTable) {
       {Val4::kV0, Val4::kX, Val4Ext::kH},
       {Val4::kV1, Val4::kX, Val4Ext::kL},
   };
-  for (const auto &c : cases) {
+  for (const auto& c : cases) {
     EXPECT_EQ(EvalTristateGate(TristateKind::kNotif0, c.data, c.control),
               c.expected)
         << "Notif0(" << static_cast<int>(c.data) << ", "
@@ -179,7 +179,7 @@ TEST(TristateGates, Notif1TruthTable) {
       {Val4::kV0, Val4::kX, Val4Ext::kH},
       {Val4::kV1, Val4::kX, Val4Ext::kL},
   };
-  for (const auto &c : cases) {
+  for (const auto& c : cases) {
     EXPECT_EQ(EvalTristateGate(TristateKind::kNotif1, c.data, c.control),
               c.expected)
         << "Notif1(" << static_cast<int>(c.data) << ", "

@@ -13,10 +13,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
 };
 
-static ParseResult Parse(const std::string &src) {
+static ParseResult Parse(const std::string& src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -26,8 +26,8 @@ static ParseResult Parse(const std::string &src) {
   return result;
 }
 
-static Stmt *FirstInitialStmt(ParseResult &r) {
-  for (auto *item : r.cu->modules[0]->items) {
+static Stmt* FirstInitialStmt(ParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
@@ -37,8 +37,8 @@ static Stmt *FirstInitialStmt(ParseResult &r) {
   return nullptr;
 }
 
-static ModuleItem *FirstAlwaysItem(ParseResult &r) {
-  for (auto *item : r.cu->modules[0]->items) {
+static ModuleItem* FirstAlwaysItem(ParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kAlwaysBlock) return item;
   }
   return nullptr;
@@ -54,9 +54,9 @@ TEST(ParserSection9, InitialBlock) {
       "  initial x = 1;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   bool found = false;
-  for (auto *item : mod->items) {
+  for (auto* item : mod->items) {
     if (item->kind == ModuleItemKind::kInitialBlock) {
       found = true;
       ASSERT_NE(item->body, nullptr);
@@ -71,9 +71,9 @@ TEST(ParserSection9, FinalBlock) {
       "  final $display(\"done\");\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   bool found = false;
-  for (auto *item : mod->items) {
+  for (auto* item : mod->items) {
     if (item->kind == ModuleItemKind::kFinalBlock) {
       found = true;
       ASSERT_NE(item->body, nullptr);
@@ -93,7 +93,7 @@ TEST(ParserSection9, AlwaysBlock) {
       "  always @(posedge clk) q <= d;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstAlwaysItem(r);
+  auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlways);
   ASSERT_FALSE(item->sensitivity.empty());
@@ -106,7 +106,7 @@ TEST(ParserSection9, AlwaysComb) {
       "  always_comb a = b & c;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstAlwaysItem(r);
+  auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
   ASSERT_NE(item->body, nullptr);
@@ -118,7 +118,7 @@ TEST(ParserSection9, AlwaysFF) {
       "  always_ff @(posedge clk) q <= d;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstAlwaysItem(r);
+  auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysFF);
   ASSERT_FALSE(item->sensitivity.empty());
@@ -132,7 +132,7 @@ TEST(ParserSection9, AlwaysLatch) {
       "    if (en) q <= d;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstAlwaysItem(r);
+  auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysLatch);
   ASSERT_NE(item->body, nullptr);
@@ -153,7 +153,7 @@ TEST(ParserSection9, ForkJoin) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFork);
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoin);
@@ -171,7 +171,7 @@ TEST(ParserSection9, ForkJoinAny) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFork);
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinAny);
@@ -187,7 +187,7 @@ TEST(ParserSection9, ForkJoinNone) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFork);
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinNone);
@@ -205,7 +205,7 @@ TEST(ParserSection9, DelayControl) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
   EXPECT_NE(stmt->delay, nullptr);
@@ -224,7 +224,7 @@ TEST(ParserSection9, EventControlPosedgeKind) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
   EXPECT_NE(stmt->body, nullptr);
@@ -238,7 +238,7 @@ TEST(ParserSection9, EventControlPosedgeEdge) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_FALSE(stmt->events.empty());
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
@@ -252,7 +252,7 @@ TEST(ParserSection9, EventControlNegedge) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
   ASSERT_FALSE(stmt->events.empty());
@@ -267,7 +267,7 @@ TEST(ParserSection9, EventControlMultiple) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
   ASSERT_GE(stmt->events.size(), 2u);
@@ -285,7 +285,7 @@ TEST(ParserSection9, EventControlComma) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
   ASSERT_GE(stmt->events.size(), 2u);
@@ -303,7 +303,7 @@ TEST(ParserSection9, WaitStatement) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kWait);
   EXPECT_NE(stmt->condition, nullptr);
@@ -321,7 +321,7 @@ TEST(ParserSection9, StarEventBareAlways) {
       "  always @* a = b;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstAlwaysItem(r);
+  auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->sensitivity.empty());
   ASSERT_NE(item->body, nullptr);
@@ -335,7 +335,7 @@ TEST(ParserSection9, StarEventParenAlways) {
       "  always @(*) begin a = b; end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstAlwaysItem(r);
+  auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->sensitivity.empty());
   ASSERT_NE(item->body, nullptr);
@@ -351,7 +351,7 @@ TEST(ParserSection9, StarEventBareStmt) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
   EXPECT_TRUE(stmt->is_star_event);
@@ -367,7 +367,7 @@ TEST(ParserSection9, StarEventParenStmt) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
   EXPECT_TRUE(stmt->is_star_event);
@@ -385,7 +385,7 @@ TEST(ParserSection9, IffGuardPosedgeEdge) {
       "  always @(posedge clk iff reset == 0) a <= b;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstAlwaysItem(r);
+  auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
   // iff guard goes through always-block sensitivity path.
   ASSERT_EQ(item->sensitivity.size(), 1u);
@@ -399,7 +399,7 @@ TEST(ParserSection9, IffGuardPosedgeFields) {
       "  always @(posedge clk iff reset == 0) a <= b;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstAlwaysItem(r);
+  auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->sensitivity.size(), 1u);
   EXPECT_NE(item->sensitivity[0].signal, nullptr);
@@ -413,7 +413,7 @@ TEST(ParserSection9, IffGuardNoEdge) {
       "  always @(clk iff en) a <= b;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstAlwaysItem(r);
+  auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->sensitivity.size(), 1u);
   EXPECT_EQ(item->sensitivity[0].edge, Edge::kNone);
@@ -427,7 +427,7 @@ TEST(ParserSection9, IffGuardMultipleEventsFirst) {
       "  always @(posedge clk iff reset == 0 or negedge reset) a <= b;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstAlwaysItem(r);
+  auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->sensitivity.size(), 2u);
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
@@ -440,7 +440,7 @@ TEST(ParserSection9, IffGuardMultipleEventsSecond) {
       "  always @(posedge clk iff reset == 0 or negedge reset) a <= b;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstAlwaysItem(r);
+  auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->sensitivity.size(), 2u);
   EXPECT_EQ(item->sensitivity[1].iff_condition, nullptr);
@@ -454,7 +454,7 @@ TEST(ParserSection9, IffGuardStmtLevelKind) {
       "  initial @(posedge clk iff reset == 0) a <= b;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
   ASSERT_EQ(stmt->events.size(), 1u);
@@ -467,7 +467,7 @@ TEST(ParserSection9, IffGuardStmtLevelEvent) {
       "  initial @(posedge clk iff reset == 0) a <= b;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_EQ(stmt->events.size(), 1u);
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
@@ -489,10 +489,10 @@ TEST(ParserSection9, WaitFork) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *body = r.cu->modules[0]->items[0]->body;
+  auto* body = r.cu->modules[0]->items[0]->body;
   ASSERT_NE(body, nullptr);
   ASSERT_GE(body->stmts.size(), 2u);
-  auto *wf = body->stmts[1];
+  auto* wf = body->stmts[1];
   EXPECT_EQ(wf->kind, StmtKind::kWaitFork);
 }
 
@@ -504,7 +504,7 @@ TEST(ParserSection9, WaitExprStillWorks) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kWait);
 }
@@ -524,10 +524,10 @@ TEST(ParserSection9, DisableFork) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *body = r.cu->modules[0]->items[0]->body;
+  auto* body = r.cu->modules[0]->items[0]->body;
   ASSERT_NE(body, nullptr);
   ASSERT_GE(body->stmts.size(), 2u);
-  auto *df = body->stmts[1];
+  auto* df = body->stmts[1];
   EXPECT_EQ(df->kind, StmtKind::kDisableFork);
 }
 
@@ -539,7 +539,7 @@ TEST(ParserSection9, DisableIdentStillWorks) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDisable);
 }
@@ -555,7 +555,7 @@ TEST(ParserSection9, RepeatEventControl) {
       "  initial a = repeat(3) @(posedge clk) b;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
   EXPECT_NE(stmt->repeat_event_count, nullptr);
@@ -569,7 +569,7 @@ TEST(ParserSection9, RepeatEventControlNonblocking) {
       "  initial a <= repeat(2) @(posedge clk) b;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
   EXPECT_NE(stmt->repeat_event_count, nullptr);
@@ -589,7 +589,7 @@ TEST(ParserSection9, StatementLabelOnBeginBlock) {
       "    end: name\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   ASSERT_NE(item, nullptr);
   ASSERT_NE(item->body, nullptr);
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
@@ -605,7 +605,7 @@ TEST(ParserSection9, StatementLabelOnForkBlock) {
       "    join: name\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFork);
   EXPECT_EQ(stmt->label, "name");
@@ -623,7 +623,7 @@ TEST(ParserSection9, EventControlEdge) {
       "  always @(edge clk) a = ~a;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstAlwaysItem(r);
+  auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->sensitivity.size(), 1u);
   EXPECT_EQ(item->sensitivity[0].edge, Edge::kEdge);
@@ -640,7 +640,7 @@ TEST(ParserSection9, DynamicArrayNew) {
       "  initial arr = new[5];\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
@@ -660,7 +660,7 @@ TEST(ParserSection9, AutomaticVarInFork) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFork);
   ASSERT_GE(stmt->fork_stmts.size(), 1u);

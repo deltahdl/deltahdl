@@ -17,10 +17,10 @@ namespace {
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
 };
 
-ParseResult Parse(const std::string &src) {
+ParseResult Parse(const std::string& src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -30,8 +30,8 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-Stmt *FirstInitialStmt(ParseResult &r) {
-  for (auto *item : r.cu->modules[0]->items) {
+Stmt* FirstInitialStmt(ParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
@@ -41,8 +41,8 @@ Stmt *FirstInitialStmt(ParseResult &r) {
   return nullptr;
 }
 
-bool HasItemKind(ParseResult &r, ModuleItemKind kind) {
-  for (auto *item : r.cu->modules[0]->items) {
+bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == kind) return true;
   }
   return false;
@@ -62,7 +62,7 @@ TEST(ParserAnnexD2, AnnexDGetpatternParse) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
@@ -73,7 +73,7 @@ TEST(ParserAnnexD2, AnnexDGetpatternRhs) {
       "  initial x = $getpattern(mem_addr);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
@@ -87,7 +87,7 @@ TEST(ParserAnnexD2, AnnexDIncsaveParse) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
@@ -98,7 +98,7 @@ TEST(ParserAnnexD2, AnnexDIncsaveExpr) {
       "  initial $incsave(\"incremental.sav\");\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->expr, nullptr);
   EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
@@ -112,7 +112,7 @@ TEST(ParserAnnexD2, AnnexDInput) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
@@ -152,7 +152,7 @@ TEST(ParserAnnexD2, AnnexDScaleParse) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
@@ -163,7 +163,7 @@ TEST(ParserAnnexD2, AnnexDScaleRhs) {
       "  initial x = $scale(hier_ref);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
@@ -177,7 +177,7 @@ TEST(ParserAnnexD2, AnnexDShowscopesArg) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
@@ -190,7 +190,7 @@ TEST(ParserAnnexD2, AnnexDCountonesParse) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
@@ -201,7 +201,7 @@ TEST(ParserAnnexD2, AnnexDCountonesRhs) {
       "  initial x = $countones(data);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
@@ -215,7 +215,7 @@ TEST(ParserAnnexD2, AnnexDIsunknownParse) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
@@ -226,7 +226,7 @@ TEST(ParserAnnexD2, AnnexDIsunknownRhs) {
       "  initial x = $isunknown(data);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
@@ -321,7 +321,7 @@ TEST(ParserAnnexF, AnnexFAssertPropertySimple) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
   bool found = false;
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kAssertProperty) {
       found = true;
       EXPECT_NE(item->assert_expr, nullptr);
@@ -338,7 +338,7 @@ TEST(ParserAnnexF, AnnexFAssumeProperty) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
   bool found = false;
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kAssumeProperty) {
       found = true;
       EXPECT_NE(item->assert_expr, nullptr);
@@ -355,7 +355,7 @@ TEST(ParserAnnexF, AnnexFCoverProperty) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
   bool found = false;
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kCoverProperty) {
       found = true;
       EXPECT_NE(item->assert_expr, nullptr);
@@ -374,7 +374,7 @@ TEST(ParserAnnexF, AnnexFPropertyDecl) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
   bool found = false;
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kPropertyDecl) {
       found = true;
       EXPECT_EQ(item->name, "p1");
@@ -393,7 +393,7 @@ TEST(ParserAnnexF, AnnexFSequenceDecl) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
   bool found = false;
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kSequenceDecl) {
       found = true;
       EXPECT_EQ(item->name, "s1");
@@ -626,7 +626,7 @@ TEST(ParserAnnexF, AnnexFAssertActionBlocks) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
   bool found = false;
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kAssertProperty) {
       found = true;
       EXPECT_NE(item->assert_expr, nullptr);
@@ -697,7 +697,7 @@ TEST(ParserAnnexN, AnnexNDistUniform) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
@@ -709,7 +709,7 @@ TEST(ParserAnnexN, AnnexNDistNormal) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
@@ -721,7 +721,7 @@ TEST(ParserAnnexN, AnnexNDistExponential) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
@@ -733,7 +733,7 @@ TEST(ParserAnnexN, AnnexNDistPoisson) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
@@ -745,7 +745,7 @@ TEST(ParserAnnexN, AnnexNDistChiSquare) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }

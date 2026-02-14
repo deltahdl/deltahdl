@@ -20,11 +20,11 @@ struct ElabFixture {
   DiagEngine diag{mgr};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, ElabFixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -33,7 +33,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabFixture &f) {
 
 TEST(Elaboration, PortBinding_ResolvesChild) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module child(input logic a, output logic b);\n"
       "  assign b = a;\n"
       "endmodule\n"
@@ -43,7 +43,7 @@ TEST(Elaboration, PortBinding_ResolvesChild) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   ASSERT_EQ(mod->children.size(), 1);
   EXPECT_NE(mod->children[0].resolved, nullptr);
   EXPECT_EQ(mod->children[0].resolved->name, "child");
@@ -52,7 +52,7 @@ TEST(Elaboration, PortBinding_ResolvesChild) {
 
 TEST(Elaboration, PortBinding_Direction) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module child(input logic a, output logic b);\n"
       "  assign b = a;\n"
       "endmodule\n"
@@ -62,13 +62,13 @@ TEST(Elaboration, PortBinding_Direction) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   ASSERT_EQ(mod->children.size(), 1);
-  const auto &bindings = mod->children[0].port_bindings;
+  const auto& bindings = mod->children[0].port_bindings;
   ASSERT_EQ(bindings.size(), 2);
 
   struct {
-    const char *port_name;
+    const char* port_name;
     Direction direction;
   } const kExpected[] = {
       {"a", Direction::kInput},
@@ -82,21 +82,21 @@ TEST(Elaboration, PortBinding_Direction) {
 
 TEST(Elaboration, PortBinding_UnknownModule) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module top;\n"
       "  logic x;\n"
       "  nonexistent u0(.a(x));\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   ASSERT_EQ(mod->children.size(), 1);
   EXPECT_EQ(mod->children[0].resolved, nullptr);
 }
 
 TEST(Elaboration, PortBinding_PortMismatch) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module child(input logic a);\n"
       "endmodule\n"
       "module top;\n"
@@ -105,7 +105,7 @@ TEST(Elaboration, PortBinding_PortMismatch) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   ASSERT_EQ(mod->children.size(), 1);
   // Port binding still created, but with warning.
   EXPECT_EQ(mod->children[0].port_bindings.size(), 1);
@@ -116,14 +116,14 @@ TEST(Elaboration, PortBinding_PortMismatch) {
 
 TEST(Elaboration, WidthInference_ContAssignWidth) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module top;\n"
       "  logic [7:0] a, b;\n"
       "  assign a = b;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   ASSERT_EQ(mod->assigns.size(), 1);
   EXPECT_EQ(mod->assigns[0].width, 8);
 }
@@ -178,7 +178,7 @@ TEST(Elaboration, WidthInference_Concatenation) {
 
 TEST(Elaboration, Defparam_OverridesDefault) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module child #(parameter WIDTH = 4)();\n"
       "endmodule\n"
       "module top;\n"
@@ -187,16 +187,16 @@ TEST(Elaboration, Defparam_OverridesDefault) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   ASSERT_EQ(mod->children.size(), 1);
-  auto *child = mod->children[0].resolved;
+  auto* child = mod->children[0].resolved;
   ASSERT_NE(child, nullptr);
   ASSERT_EQ(child->params.size(), 1);
 }
 
 TEST(Elaboration, Defparam_OverridesDefault_Value) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module child #(parameter WIDTH = 4)();\n"
       "endmodule\n"
       "module top;\n"
@@ -205,14 +205,14 @@ TEST(Elaboration, Defparam_OverridesDefault_Value) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  auto *child = design->top_modules[0]->children[0].resolved;
+  auto* child = design->top_modules[0]->children[0].resolved;
   EXPECT_EQ(child->params[0].resolved_value, 16);
   EXPECT_TRUE(child->params[0].is_resolved);
 }
 
 TEST(Elaboration, Defparam_NotFoundWarns) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module child #(parameter WIDTH = 4)();\n"
       "endmodule\n"
       "module top;\n"
@@ -228,7 +228,7 @@ TEST(Elaboration, Defparam_NotFoundWarns) {
 
 TEST(Elaborator, GenerateForCreatesVars) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t #(parameter N = 3) ();\n"
       "  generate\n"
       "    for (i = 0; i < N; i = i + 1) begin\n"
@@ -239,7 +239,7 @@ TEST(Elaborator, GenerateForCreatesVars) {
       f);
   ASSERT_NE(design, nullptr);
 
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   EXPECT_EQ(mod->variables.size(), 3u);
   EXPECT_EQ(mod->variables[0].name, "i_0_x");
   EXPECT_EQ(mod->variables[1].name, "i_1_x");
@@ -248,7 +248,7 @@ TEST(Elaborator, GenerateForCreatesVars) {
 
 TEST(Elaborator, GenerateForZeroIterations) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t #(parameter N = 0) ();\n"
       "  generate\n"
       "    for (i = 0; i < N; i = i + 1) begin\n"
@@ -259,13 +259,13 @@ TEST(Elaborator, GenerateForZeroIterations) {
       f);
   ASSERT_NE(design, nullptr);
 
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   EXPECT_EQ(mod->variables.size(), 0u);
 }
 
 TEST(Elaborator, GenerateForWithAssign) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t #(parameter N = 2) ();\n"
       "  generate\n"
       "    for (i = 0; i < N; i = i + 1) begin\n"
@@ -277,7 +277,7 @@ TEST(Elaborator, GenerateForWithAssign) {
       f);
   ASSERT_NE(design, nullptr);
 
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   ASSERT_EQ(mod->variables.size(), 2u);
   EXPECT_EQ(mod->assigns.size(), 2u);
   EXPECT_EQ(mod->variables[0].name, "i_0_w");
@@ -286,10 +286,10 @@ TEST(Elaborator, GenerateForWithAssign) {
 
 // --- Typedef tests ---
 
-static void VerifyVariableByName(const std::vector<RtlirVariable> &vars,
+static void VerifyVariableByName(const std::vector<RtlirVariable>& vars,
                                  std::string_view name, uint32_t width,
-                                 bool is_4state, bool &found) {
-  for (const auto &v : vars) {
+                                 bool is_4state, bool& found) {
+  for (const auto& v : vars) {
     if (v.name == name) {
       EXPECT_EQ(v.width, width);
       EXPECT_TRUE(is_4state);
@@ -300,7 +300,7 @@ static void VerifyVariableByName(const std::vector<RtlirVariable> &vars,
 
 TEST(Elaborator, TypedefNamedResolution) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  typedef logic [15:0] word_t;\n"
       "  word_t data;\n"
@@ -309,7 +309,7 @@ TEST(Elaborator, TypedefNamedResolution) {
       f);
   ASSERT_NE(design, nullptr);
 
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   bool found = false;
   VerifyVariableByName(mod->variables, "data", 16u, true, found);
   EXPECT_TRUE(found);
@@ -317,7 +317,7 @@ TEST(Elaborator, TypedefNamedResolution) {
 
 TEST(Elaborator, TypedefChain) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  typedef logic [7:0] byte_t;\n"
       "  typedef byte_t octet_t;\n"
@@ -327,9 +327,9 @@ TEST(Elaborator, TypedefChain) {
       f);
   ASSERT_NE(design, nullptr);
 
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   bool found = false;
-  for (const auto &v : mod->variables) {
+  for (const auto& v : mod->variables) {
     if (v.name == "val") {
       EXPECT_EQ(v.width, 8u);
       found = true;
@@ -342,7 +342,7 @@ TEST(Elaborator, TypedefChain) {
 
 TEST(Elaborator, AlwaysCombSensitivityInferred) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] a, b;\n"
       "  always_comb b = a + 1;\n"
@@ -350,14 +350,14 @@ TEST(Elaborator, AlwaysCombSensitivityInferred) {
       f);
   ASSERT_NE(design, nullptr);
 
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   ASSERT_FALSE(mod->processes.empty());
-  const auto &proc = mod->processes[0];
+  const auto& proc = mod->processes[0];
   EXPECT_EQ(proc.kind, RtlirProcessKind::kAlwaysComb);
   EXPECT_FALSE(proc.sensitivity.empty());
 
   bool found_a = false;
-  for (const auto &ev : proc.sensitivity) {
+  for (const auto& ev : proc.sensitivity) {
     if (ev.signal && ev.signal->text == "a") found_a = true;
   }
   EXPECT_TRUE(found_a);
@@ -591,17 +591,17 @@ TEST(Elaboration, SpecparamInParam_Error) {
 TEST(Elaboration, ImplicitNetOnAssignLhs) {
   // Undeclared identifier on continuous assign LHS creates implicit wire.
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module top;\n"
       "  assign w = 1'b1;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   // The implicit net 'w' should appear in nets.
   bool found = false;
-  for (const auto &n : mod->nets) {
+  for (const auto& n : mod->nets) {
     if (n.name == "w") {
       found = true;
       EXPECT_EQ(n.width, 1) << "implicit net should be scalar";
@@ -619,7 +619,7 @@ TEST(Elaboration, ImplicitNetNone_Error) {
                            "endmodule\n");
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   cu->default_nettype = NetType::kNone;
   Elaborator elab(f.arena, f.diag, cu);
   elab.Elaborate("top");
@@ -629,7 +629,7 @@ TEST(Elaboration, ImplicitNetNone_Error) {
 TEST(Elaboration, ImplicitNetOnInstancePort) {
   // Undeclared identifier in instance port connection creates implicit wire.
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module child(input logic a, output logic b);\n"
       "  assign b = a;\n"
       "endmodule\n"
@@ -639,10 +639,10 @@ TEST(Elaboration, ImplicitNetOnInstancePort) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   bool found_x = false;
   bool found_y = false;
-  for (const auto &n : mod->nets) {
+  for (const auto& n : mod->nets) {
     if (n.name == "x") found_x = true;
     if (n.name == "y") found_y = true;
   }
@@ -666,7 +666,7 @@ TEST(Elaboration, ConstVarNoInit_Error) {
 TEST(Elaboration, ConstVarWithInit_OK) {
   // const variable with initializer is fine.
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module top;\n"
       "  const int x = 42;\n"
       "endmodule\n",
@@ -726,7 +726,7 @@ TEST(Elaboration, ChandleSensitivity_Error) {
 TEST(Elaboration, ChandleVarDecl_OK) {
   // §6.14: chandle variable declaration is legal.
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module top;\n"
       "  chandle ch;\n"
       "endmodule\n",
@@ -752,7 +752,7 @@ TEST(Elaboration, InterconnectContAssign_Error) {
 TEST(Elaboration, InterconnectDecl_OK) {
   // §6.6.8: interconnect declaration is legal.
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module top;\n"
       "  interconnect bus;\n"
       "endmodule\n",
@@ -762,9 +762,9 @@ TEST(Elaboration, InterconnectDecl_OK) {
 
   // Check that bus is created as a net.
   ASSERT_FALSE(design->top_modules.empty());
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   bool found = false;
-  for (const auto &n : mod->nets) {
+  for (const auto& n : mod->nets) {
     if (n.name == "bus") found = true;
   }
   EXPECT_TRUE(found);
@@ -775,7 +775,7 @@ TEST(Elaboration, InterconnectDecl_OK) {
 TEST(Elaboration, ParameterizedType_Basic) {
   // §6.25: C#(logic)::my_type resolves to logic (width 1).
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "class C #(type T = int);\n"
       "  typedef T my_type;\n"
       "endclass\n"
@@ -785,7 +785,7 @@ TEST(Elaboration, ParameterizedType_Basic) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   ASSERT_EQ(mod->variables.size(), 1);
   EXPECT_EQ(mod->variables[0].name, "x");
   EXPECT_EQ(mod->variables[0].width, 1);
@@ -794,7 +794,7 @@ TEST(Elaboration, ParameterizedType_Basic) {
 TEST(Elaboration, ParameterizedType_Vector) {
   // §6.25: C#(logic [7:0])::my_type resolves to logic [7:0] (width 8).
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "class C #(type T = int);\n"
       "  typedef T my_type;\n"
       "endclass\n"
@@ -804,7 +804,7 @@ TEST(Elaboration, ParameterizedType_Vector) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   ASSERT_EQ(mod->variables.size(), 1);
   EXPECT_EQ(mod->variables[0].name, "x");
   EXPECT_EQ(mod->variables[0].width, 8);
@@ -892,14 +892,14 @@ TEST(Elaboration, UnpackedStructMemberDefault_Allowed) {
 // §7.9.8: Assoc array index width propagated to RtlirVariable.
 TEST(Elaboration, AssocArrayByteIndexWidth) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module top;\n"
       "  int map[byte];\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
   ASSERT_FALSE(design->top_modules.empty());
-  auto &vars = design->top_modules[0]->variables;
+  auto& vars = design->top_modules[0]->variables;
   ASSERT_FALSE(vars.empty());
   EXPECT_TRUE(vars[0].is_assoc);
   EXPECT_EQ(vars[0].assoc_index_width, 8u);
@@ -907,14 +907,14 @@ TEST(Elaboration, AssocArrayByteIndexWidth) {
 
 TEST(Elaboration, AssocArrayIntIndexWidth) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module top;\n"
       "  int map[int];\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
   ASSERT_FALSE(design->top_modules.empty());
-  auto &vars = design->top_modules[0]->variables;
+  auto& vars = design->top_modules[0]->variables;
   ASSERT_FALSE(vars.empty());
   EXPECT_TRUE(vars[0].is_assoc);
   EXPECT_EQ(vars[0].assoc_index_width, 32u);
@@ -924,23 +924,23 @@ TEST(Elaboration, AssocArrayIntIndexWidth) {
 // §9.2.2.2: Implicit sensitivity from longest static prefix
 // ==========================================================================
 
-static Expr *SensId(Arena &arena, std::string_view name) {
-  auto *e = arena.Create<Expr>();
+static Expr* SensId(Arena& arena, std::string_view name) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
   e->text = name;
   return e;
 }
 
-static Expr *SensSelect(Arena &arena, Expr *base, Expr *index) {
-  auto *e = arena.Create<Expr>();
+static Expr* SensSelect(Arena& arena, Expr* base, Expr* index) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kSelect;
   e->base = base;
   e->index = index;
   return e;
 }
 
-static Expr *SensIntLit(Arena &arena, uint64_t val) {
-  auto *e = arena.Create<Expr>();
+static Expr* SensIntLit(Arena& arena, uint64_t val) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
   e->int_val = val;
   return e;
@@ -949,7 +949,7 @@ static Expr *SensIntLit(Arena &arena, uint64_t val) {
 TEST(Sensitivity, SelectConstIdxUsesLSP) {
   // a[1] → LSP is "a[1]", sensitivity should include "a[1]" not "a".
   Arena arena;
-  auto *expr = SensSelect(arena, SensId(arena, "a"), SensIntLit(arena, 1));
+  auto* expr = SensSelect(arena, SensId(arena, "a"), SensIntLit(arena, 1));
   std::unordered_set<std::string> reads;
   CollectExprReads(expr, reads);
   EXPECT_TRUE(reads.count("a[1]"));
@@ -959,7 +959,7 @@ TEST(Sensitivity, SelectConstIdxUsesLSP) {
 TEST(Sensitivity, SelectVarIdxUsesLSP) {
   // a[i] → LSP is "a", sensitivity includes "a" and "i".
   Arena arena;
-  auto *expr = SensSelect(arena, SensId(arena, "a"), SensId(arena, "i"));
+  auto* expr = SensSelect(arena, SensId(arena, "a"), SensId(arena, "i"));
   std::unordered_set<std::string> reads;
   CollectExprReads(expr, reads);
   EXPECT_TRUE(reads.count("a"));
@@ -969,8 +969,8 @@ TEST(Sensitivity, SelectVarIdxUsesLSP) {
 TEST(Sensitivity, NestedSelectUsesLSP) {
   // a[1][i] → LSP is "a[1]", sensitivity includes "a[1]" and "i".
   Arena arena;
-  auto *inner = SensSelect(arena, SensId(arena, "a"), SensIntLit(arena, 1));
-  auto *outer = SensSelect(arena, inner, SensId(arena, "i"));
+  auto* inner = SensSelect(arena, SensId(arena, "a"), SensIntLit(arena, 1));
+  auto* outer = SensSelect(arena, inner, SensId(arena, "i"));
   std::unordered_set<std::string> reads;
   CollectExprReads(outer, reads);
   EXPECT_TRUE(reads.count("a[1]"));

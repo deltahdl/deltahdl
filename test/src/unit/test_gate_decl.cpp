@@ -58,13 +58,13 @@ struct GateDeclInfo {
   uint32_t terminal_count = 0;
 };
 
-bool ValidateGateDecl(const GateDeclInfo &info);
+bool ValidateGateDecl(const GateDeclInfo& info);
 bool CanHaveStrengthSpec(GateType type);
 uint32_t ComputeArraySize(int32_t lhi, int32_t rhi);
 bool ValidateStrengthSpec(StrengthLvl s0, StrengthLvl s1, GateType type);
 uint32_t MaxDelays(GateType type);
 
-bool ValidateGateDecl(const GateDeclInfo &info) {
+bool ValidateGateDecl(const GateDeclInfo& info) {
   return !info.has_range || info.has_name;
 }
 
@@ -229,7 +229,7 @@ TEST(GateDecl, MaxDelaysByGateType) {
       {GateType::kPullup, 0u}, {GateType::kPulldown, 0u}, {GateType::kAnd, 2u},
       {GateType::kBufif0, 3u}, {GateType::kNmos, 3u},
   };
-  for (const auto &c : kCases) {
+  for (const auto& c : kCases) {
     EXPECT_EQ(MaxDelays(c.gate), c.expected);
   }
 }

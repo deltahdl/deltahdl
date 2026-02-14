@@ -15,11 +15,11 @@ using namespace delta;
 
 TEST(Coverage, CreateGroupAndFind) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg_addr");
+  auto* g = db.CreateGroup("cg_addr");
   ASSERT_NE(g, nullptr);
   EXPECT_EQ(g->name, "cg_addr");
   EXPECT_EQ(db.GroupCount(), 1u);
-  auto *found = db.FindGroup("cg_addr");
+  auto* found = db.FindGroup("cg_addr");
   EXPECT_EQ(found, g);
 }
 
@@ -30,8 +30,8 @@ TEST(Coverage, FindNonexistentGroupReturnsNull) {
 
 TEST(Coverage, MultipleGroupInstances) {
   CoverageDB db;
-  auto *g1 = db.CreateGroup("cg1");
-  auto *g2 = db.CreateGroup("cg2");
+  auto* g1 = db.CreateGroup("cg1");
+  auto* g2 = db.CreateGroup("cg2");
   EXPECT_EQ(db.GroupCount(), 2u);
   EXPECT_NE(g1, g2);
   EXPECT_EQ(db.FindGroup("cg1")->name, "cg1");
@@ -44,8 +44,8 @@ TEST(Coverage, MultipleGroupInstances) {
 
 TEST(Coverage, AddCoverPointToGroup) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "addr");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "addr");
   ASSERT_NE(cp, nullptr);
   EXPECT_EQ(cp->name, "addr");
   EXPECT_EQ(g->coverpoints.size(), 1u);
@@ -57,13 +57,13 @@ TEST(Coverage, AddCoverPointToGroup) {
 
 TEST(Coverage, ExplicitBinCreation) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "addr");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "addr");
   CoverBin bin;
   bin.name = "low";
   bin.kind = CoverBinKind::kExplicit;
   bin.values = {0, 1, 2, 3};
-  auto *b = CoverageDB::AddBin(cp, bin);
+  auto* b = CoverageDB::AddBin(cp, bin);
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(b->name, "low");
   EXPECT_EQ(b->values.size(), 4u);
@@ -71,8 +71,8 @@ TEST(Coverage, ExplicitBinCreation) {
 
 TEST(Coverage, SampleHitsExplicitBin) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "val");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "val");
   CoverBin bin;
   bin.name = "ones";
   bin.values = {1};
@@ -94,8 +94,8 @@ TEST(Coverage, SampleHitsExplicitBin) {
 
 TEST(Coverage, AutoBinCreation) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "addr");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "addr");
   cp->auto_bin_count = 4;
   CoverageDB::AutoCreateBins(cp, 0, 7);
   EXPECT_EQ(cp->bins.size(), 4u);
@@ -111,7 +111,7 @@ TEST(Coverage, AutoBinCreation) {
       {3, 0, 6},
       {3, 1, 7},
   };
-  for (const auto &c : kCases) {
+  for (const auto& c : kCases) {
     EXPECT_EQ(cp->bins[c.bin_idx].values[c.val_idx], c.expected);
   }
   EXPECT_EQ(cp->bins[0].values.size(), 2u);
@@ -119,8 +119,8 @@ TEST(Coverage, AutoBinCreation) {
 
 TEST(Coverage, AutoBinSmallRange) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "x");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "x");
   cp->auto_bin_count = 64;
   CoverageDB::AutoCreateBins(cp, 0, 3);
   // Range is 4, smaller than auto_bin_count=64, so only 4 bins.
@@ -131,8 +131,8 @@ TEST(Coverage, AutoBinSmallRange) {
 
 TEST(Coverage, AutoBinSampleAndCoverage) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "x");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "x");
   cp->auto_bin_count = 4;
   CoverageDB::AutoCreateBins(cp, 0, 3);
 
@@ -151,8 +151,8 @@ TEST(Coverage, AutoBinSampleAndCoverage) {
 
 TEST(Coverage, TransitionBinNotMatchedByScalar) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "sig");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "sig");
   CoverBin tbin;
   tbin.name = "t_01";
   tbin.kind = CoverBinKind::kTransition;
@@ -171,8 +171,8 @@ TEST(Coverage, TransitionBinNotMatchedByScalar) {
 
 TEST(Coverage, WildcardBinMatchesValues) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "data");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "data");
   CoverBin wbin;
   wbin.name = "w_even";
   wbin.kind = CoverBinKind::kWildcard;
@@ -192,8 +192,8 @@ TEST(Coverage, WildcardBinMatchesValues) {
 
 TEST(Coverage, IllegalBinsNotSampled) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "addr");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "addr");
   CoverBin ib;
   ib.name = "bad_addr";
   ib.kind = CoverBinKind::kIllegal;
@@ -207,8 +207,8 @@ TEST(Coverage, IllegalBinsNotSampled) {
 
 TEST(Coverage, IllegalBinsExcludedFromCoverage) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "x");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "x");
 
   CoverBin good;
   good.name = "valid";
@@ -232,8 +232,8 @@ TEST(Coverage, IllegalBinsExcludedFromCoverage) {
 
 TEST(Coverage, IgnoreBinsNotSampled) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "data");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "data");
   CoverBin ign;
   ign.name = "skip_zero";
   ign.kind = CoverBinKind::kIgnore;
@@ -246,8 +246,8 @@ TEST(Coverage, IgnoreBinsNotSampled) {
 
 TEST(Coverage, IgnoreBinsExcludedFromCoverage) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "x");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "x");
 
   CoverBin good;
   good.name = "valid";
@@ -270,7 +270,7 @@ TEST(Coverage, IgnoreBinsExcludedFromCoverage) {
 
 TEST(Coverage, CrossCoverageCreation) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
+  auto* g = db.CreateGroup("cg");
   CoverageDB::AddCoverPoint(g, "a");
   CoverageDB::AddCoverPoint(g, "b");
 
@@ -294,7 +294,7 @@ TEST(Coverage, CrossCoverageCreation) {
 
 TEST(Coverage, CrossCoverageSampling) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
+  auto* g = db.CreateGroup("cg");
   CoverageDB::AddCoverPoint(g, "a");
   CoverageDB::AddCoverPoint(g, "b");
 
@@ -327,7 +327,7 @@ TEST(Coverage, CrossCoverageSampling) {
 
 TEST(Coverage, CrossCoverageComputation) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
+  auto* g = db.CreateGroup("cg");
   CoverageDB::AddCoverPoint(g, "a");
   CoverageDB::AddCoverPoint(g, "b");
 
@@ -354,8 +354,8 @@ TEST(Coverage, CrossCoverageComputation) {
 
 TEST(Coverage, AtLeastOption) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "x");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "x");
   CoverBin bin;
   bin.name = "b0";
   bin.values = {0};
@@ -374,18 +374,18 @@ TEST(Coverage, AtLeastOption) {
 
 TEST(Coverage, WeightOption) {
   CoverageDB db;
-  auto *g1 = db.CreateGroup("cg1");
+  auto* g1 = db.CreateGroup("cg1");
   g1->options.weight = 2;
-  auto *cp1 = CoverageDB::AddCoverPoint(g1, "x");
+  auto* cp1 = CoverageDB::AddCoverPoint(g1, "x");
   CoverBin b1;
   b1.name = "b";
   b1.values = {0};
   CoverageDB::AddBin(cp1, b1);
   db.Sample(g1, {{"x", 0}});  // 100% coverage, weight=2.
 
-  auto *g2 = db.CreateGroup("cg2");
+  auto* g2 = db.CreateGroup("cg2");
   g2->options.weight = 1;
-  auto *cp2 = CoverageDB::AddCoverPoint(g2, "y");
+  auto* cp2 = CoverageDB::AddCoverPoint(g2, "y");
   CoverBin b2;
   b2.name = "b";
   b2.values = {0};
@@ -399,7 +399,7 @@ TEST(Coverage, WeightOption) {
 
 TEST(Coverage, GoalOption) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
+  auto* g = db.CreateGroup("cg");
   g->options.goal = 90.0;
   EXPECT_DOUBLE_EQ(g->options.goal, 90.0);
 }
@@ -410,7 +410,7 @@ TEST(Coverage, GoalOption) {
 
 TEST(Coverage, SampleCountIncremented) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
+  auto* g = db.CreateGroup("cg");
   CoverageDB::AddCoverPoint(g, "x");
 
   EXPECT_EQ(g->sample_count, 0u);
@@ -422,8 +422,8 @@ TEST(Coverage, SampleCountIncremented) {
 
 TEST(Coverage, GetCoveragePercentage) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "x");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "x");
   CoverBin b1;
   b1.name = "b0";
   b1.values = {0};
@@ -441,8 +441,8 @@ TEST(Coverage, GetCoveragePercentage) {
 
 TEST(Coverage, GetInstCoverageMatchesGetCoverage) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "x");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "x");
   CoverBin b;
   b.name = "b0";
   b.values = {0};
@@ -463,8 +463,8 @@ TEST(Coverage, GlobalCoverageEmpty) {
 
 TEST(Coverage, GlobalCoverageSingleGroup) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "x");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "x");
   CoverBin b;
   b.name = "b0";
   b.values = {0};
@@ -482,7 +482,7 @@ TEST(Coverage, CoverGroupAsClassMember) {
   // Simulates a covergroup embedded in a class: just a struct.
   struct MyClass {
     CoverageDB db;
-    CoverGroup *cg = nullptr;
+    CoverGroup* cg = nullptr;
     void Init() { cg = db.CreateGroup("cg_in_class"); }
   };
   MyClass obj;
@@ -497,8 +497,8 @@ TEST(Coverage, CoverGroupAsClassMember) {
 
 TEST(Coverage, IffGuardBlocksSampling) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "x");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "x");
   cp->has_iff_guard = true;
   cp->iff_guard_value = false;  // Guard is disabled.
 
@@ -513,8 +513,8 @@ TEST(Coverage, IffGuardBlocksSampling) {
 
 TEST(Coverage, IffGuardAllowsSampling) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "x");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "x");
   cp->has_iff_guard = true;
   cp->iff_guard_value = true;  // Guard is enabled.
 
@@ -533,9 +533,9 @@ TEST(Coverage, IffGuardAllowsSampling) {
 
 TEST(Coverage, AutoBinMaxControl) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
+  auto* g = db.CreateGroup("cg");
   g->options.auto_bin_max = 8;
-  auto *cp = CoverageDB::AddCoverPoint(g, "addr");
+  auto* cp = CoverageDB::AddCoverPoint(g, "addr");
   // auto_bin_count should inherit from group options.
   EXPECT_EQ(cp->auto_bin_count, 8u);
 }
@@ -546,7 +546,7 @@ TEST(Coverage, AutoBinMaxControl) {
 
 TEST(Coverage, EmptyGroupCoverageIsZero) {
   CoverageDB db;
-  auto *g = db.CreateGroup("empty");
+  auto* g = db.CreateGroup("empty");
   EXPECT_DOUBLE_EQ(CoverageDB::GetCoverage(g), 0.0);
 }
 
@@ -562,15 +562,15 @@ TEST(Coverage, PointCoverageWithNoBinsIs100) {
 
 TEST(Coverage, MultipleCoverpointsAveraged) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
+  auto* g = db.CreateGroup("cg");
 
-  auto *cp1 = CoverageDB::AddCoverPoint(g, "a");
+  auto* cp1 = CoverageDB::AddCoverPoint(g, "a");
   CoverBin b1;
   b1.name = "b0";
   b1.values = {0};
   CoverageDB::AddBin(cp1, b1);
 
-  auto *cp2 = CoverageDB::AddCoverPoint(g, "b");
+  auto* cp2 = CoverageDB::AddCoverPoint(g, "b");
   CoverBin b2;
   b2.name = "b0";
   b2.values = {0};

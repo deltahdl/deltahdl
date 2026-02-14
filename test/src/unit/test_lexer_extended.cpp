@@ -8,7 +8,7 @@
 
 using namespace delta;
 
-static std::vector<Token> Lex(const std::string &src) {
+static std::vector<Token> Lex(const std::string& src) {
   static SourceManager mgr;
   auto fid = mgr.AddFile("<test>", src);
   DiagEngine diag(mgr);
@@ -20,7 +20,7 @@ TEST(Lexer, AllAnnexBKeywords) {
   // Every IEEE 1800-2023 Annex B keyword must lex as a keyword, not
   // kIdentifier.  If this test fails, a keyword is missing from the
   // keyword table in keywords.cpp or token.h.
-  const char *const kKeywords[] = {
+  const char* const kKeywords[] = {
       "accept_on",
       "alias",
       "always",
@@ -270,7 +270,7 @@ TEST(Lexer, AllAnnexBKeywords) {
       "xnor",
       "xor",
   };
-  for (const char *kw : kKeywords) {
+  for (const char* kw : kKeywords) {
     auto tokens = Lex(kw);
     ASSERT_GE(tokens.size(), 2) << "keyword: " << kw;
     EXPECT_NE(tokens[0].kind, TokenKind::kIdentifier)
@@ -348,7 +348,7 @@ TEST(Lexer, KeywordVersionMarker_RestoresToDefault) {
 TEST(Lexer, ParseKeywordVersion_ValidVersions) {
   // §22.14: all nine version specifiers
   struct Case {
-    const char *input;
+    const char* input;
     KeywordVersion expected;
   };
   const Case kCases[] = {
@@ -362,7 +362,7 @@ TEST(Lexer, ParseKeywordVersion_ValidVersions) {
       {"1800-2017", KeywordVersion::kVer18002017},
       {"1800-2023", KeywordVersion::kVer18002023},
   };
-  for (const auto &c : kCases) {
+  for (const auto& c : kCases) {
     EXPECT_EQ(ParseKeywordVersion(c.input), std::optional(c.expected))
         << c.input;
   }
@@ -391,7 +391,7 @@ TEST(Lexer, IntLiteral_LrmExample2_Sized) {
   auto t1 = Lex("4'b1001");
   EXPECT_EQ(t1[0].kind, TokenKind::kIntLiteral);
   EXPECT_EQ(t1[0].text, "4'b1001");
-  for (const char *src : {"5 'D 3", "3'b01x", "12'hx", "16'hz"}) {
+  for (const char* src : {"5 'D 3", "3'b01x", "12'hx", "16'hz"}) {
     auto tokens = Lex(src);
     EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral) << src;
   }
@@ -407,7 +407,7 @@ TEST(Lexer, IntLiteral_LrmExample3_Signed) {
 
 TEST(Lexer, IntLiteral_UnbasedUnsized) {
   // §5.7.1: '0, '1, 'x, 'X, 'z, 'Z are unbased unsized literals
-  for (const char *src : {"'0", "'1", "'x", "'X", "'z", "'Z"}) {
+  for (const char* src : {"'0", "'1", "'x", "'X", "'z", "'Z"}) {
     auto tokens = Lex(src);
     ASSERT_GE(tokens.size(), 2) << src;
     EXPECT_EQ(tokens[0].kind, TokenKind::kUnbasedUnsizedLiteral) << src;
@@ -503,7 +503,7 @@ TEST(Lexer, TripleQuotedString_WithEscape) {
 TEST(Lexer, InterpretEscapes_NamedChars) {
   using delta::InterpretStringEscapes;
   struct Case {
-    const char *input;
+    const char* input;
     std::string expected;
   };
   const Case kCases[] = {
@@ -515,7 +515,7 @@ TEST(Lexer, InterpretEscapes_NamedChars) {
       {R"(a\fb)", std::string("a\fb")},
       {R"(a\ab)", std::string("a\ab")},
   };
-  for (const auto &c : kCases) {
+  for (const auto& c : kCases) {
     EXPECT_EQ(InterpretStringEscapes(c.input), c.expected) << c.input;
   }
 }
@@ -589,7 +589,7 @@ TEST(Lexer, EscapedIdentifier_SpecialChars) {
 
 TEST(Lexer, EscapedIdentifier_LrmExamples) {
   // §5.6.1 examples
-  for (const char *src :
+  for (const char* src :
        {"\\busa+index ", "\\-clock ", "\\***error-condition*** ", "\\{a,b} ",
         "\\a*(b+c) "}) {
     auto tokens = Lex(src);
@@ -683,7 +683,7 @@ TEST(Lexer, UnterminatedTripleQuotedString_Error) {
 
 TEST(Lexer, DecimalXZ_SingleDigit_Valid) {
   // 8'dx, 8'dz, 8'd? — single x/z/? is valid (all bits)
-  for (const char *src : {"8'dx", "8'dz", "8'd?"}) {
+  for (const char* src : {"8'dx", "8'dz", "8'd?"}) {
     SourceManager mgr;
     DiagEngine diag(mgr);
     auto fid = mgr.AddFile("<test>", src);

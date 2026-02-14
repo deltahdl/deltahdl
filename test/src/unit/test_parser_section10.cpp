@@ -13,10 +13,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
 };
 
-static ParseResult Parse(const std::string &src) {
+static ParseResult Parse(const std::string& src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -26,8 +26,8 @@ static ParseResult Parse(const std::string &src) {
   return result;
 }
 
-static Stmt *FirstInitialStmt(ParseResult &r) {
-  for (auto *item : r.cu->modules[0]->items) {
+static Stmt* FirstInitialStmt(ParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
@@ -37,8 +37,8 @@ static Stmt *FirstInitialStmt(ParseResult &r) {
   return nullptr;
 }
 
-static Stmt *NthInitialStmt(ParseResult &r, size_t n) {
-  for (auto *item : r.cu->modules[0]->items) {
+static Stmt* NthInitialStmt(ParseResult& r, size_t n) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       if (n < item->body->stmts.size()) return item->body->stmts[n];
@@ -60,7 +60,7 @@ TEST(ParserSection10, ProceduralAssignKind) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kAssign);
   ASSERT_NE(stmt->rhs, nullptr);
@@ -75,7 +75,7 @@ TEST(ParserSection10, ProceduralAssignLhs) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->lhs, nullptr);
   EXPECT_EQ(stmt->lhs->text, "q");
@@ -90,7 +90,7 @@ TEST(ParserSection10, ProceduralDeassignKind) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDeassign);
   EXPECT_EQ(stmt->rhs, nullptr);
@@ -105,7 +105,7 @@ TEST(ParserSection10, ProceduralDeassignLhs) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->lhs, nullptr);
   EXPECT_EQ(stmt->lhs->text, "q");
@@ -121,8 +121,8 @@ TEST(ParserSection10, ProceduralAssignThenDeassign) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *s0 = NthInitialStmt(r, 0);
-  auto *s1 = NthInitialStmt(r, 1);
+  auto* s0 = NthInitialStmt(r, 0);
+  auto* s1 = NthInitialStmt(r, 1);
   ASSERT_NE(s0, nullptr);
   ASSERT_NE(s1, nullptr);
   EXPECT_EQ(s0->kind, StmtKind::kAssign);
@@ -142,7 +142,7 @@ TEST(ParserSection10, ForceKind) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kForce);
   ASSERT_NE(stmt->rhs, nullptr);
@@ -157,7 +157,7 @@ TEST(ParserSection10, ForceLhs) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->lhs, nullptr);
   EXPECT_EQ(stmt->lhs->text, "w");
@@ -172,7 +172,7 @@ TEST(ParserSection10, ReleaseKind) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kRelease);
   EXPECT_EQ(stmt->rhs, nullptr);
@@ -187,7 +187,7 @@ TEST(ParserSection10, ReleaseLhs) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->lhs, nullptr);
   EXPECT_EQ(stmt->lhs->text, "w");
@@ -203,8 +203,8 @@ TEST(ParserSection10, ForceThenRelease) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *s0 = NthInitialStmt(r, 0);
-  auto *s1 = NthInitialStmt(r, 1);
+  auto* s0 = NthInitialStmt(r, 0);
+  auto* s1 = NthInitialStmt(r, 1);
   ASSERT_NE(s0, nullptr);
   ASSERT_NE(s1, nullptr);
   EXPECT_EQ(s0->kind, StmtKind::kForce);
@@ -224,7 +224,7 @@ TEST(ParserSection10, BlockingIntraAssignDelayKind) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
   EXPECT_NE(stmt->delay, nullptr);
@@ -239,7 +239,7 @@ TEST(ParserSection10, BlockingIntraAssignDelayOperands) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_NE(stmt->lhs, nullptr);
   EXPECT_NE(stmt->rhs, nullptr);
@@ -254,7 +254,7 @@ TEST(ParserSection10, NonblockingIntraAssignDelayKind) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
   EXPECT_NE(stmt->delay, nullptr);
@@ -269,7 +269,7 @@ TEST(ParserSection10, NonblockingIntraAssignDelayOperands) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_NE(stmt->lhs, nullptr);
   EXPECT_NE(stmt->rhs, nullptr);
@@ -288,7 +288,7 @@ TEST(ParserSection10, BlockingIntraAssignEventKind) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
   EXPECT_NE(stmt->lhs, nullptr);
@@ -304,7 +304,7 @@ TEST(ParserSection10, BlockingIntraAssignEventEdge) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_FALSE(stmt->events.empty());
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
@@ -319,7 +319,7 @@ TEST(ParserSection10, NonblockingIntraAssignEventKind) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
   EXPECT_NE(stmt->lhs, nullptr);
@@ -335,7 +335,7 @@ TEST(ParserSection10, NonblockingIntraAssignEventEdge) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_FALSE(stmt->events.empty());
   EXPECT_EQ(stmt->events[0].edge, Edge::kNegedge);
@@ -353,10 +353,10 @@ TEST(ParserSection10, NetAliasTwoNets) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_FALSE(r.cu->modules.empty());
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   // Find the alias item.
-  ModuleItem *alias_item = nullptr;
-  for (auto *item : mod->items) {
+  ModuleItem* alias_item = nullptr;
+  for (auto* item : mod->items) {
     if (item->kind == ModuleItemKind::kAlias) {
       alias_item = item;
       break;
@@ -373,9 +373,9 @@ TEST(ParserSection10, NetAliasThreeNets) {
       "  alias a = b = c;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
-  ModuleItem *alias_item = nullptr;
-  for (auto *item : mod->items) {
+  auto* mod = r.cu->modules[0];
+  ModuleItem* alias_item = nullptr;
+  for (auto* item : mod->items) {
     if (item->kind == ModuleItemKind::kAlias) {
       alias_item = item;
       break;
@@ -389,9 +389,9 @@ TEST(ParserSection10, NetAliasThreeNets) {
 // LRM section 10.3.1/10.3.2 -- Continuous assignment
 // =============================================================================
 
-static ModuleItem *FindItemByKind(const std::vector<ModuleItem *> &items,
+static ModuleItem* FindItemByKind(const std::vector<ModuleItem*>& items,
                                   ModuleItemKind kind) {
-  for (auto *item : items) {
+  for (auto* item : items) {
     if (item->kind == kind) return item;
   }
   return nullptr;
@@ -404,8 +404,8 @@ TEST(ParserSection10, ContinuousAssignBasic) {
       "  assign a = b;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
-  auto *ca = FindItemByKind(mod->items, ModuleItemKind::kContAssign);
+  auto* mod = r.cu->modules[0];
+  auto* ca = FindItemByKind(mod->items, ModuleItemKind::kContAssign);
   ASSERT_NE(ca, nullptr);
   ASSERT_NE(ca->assign_lhs, nullptr);
   ASSERT_NE(ca->assign_rhs, nullptr);
@@ -417,9 +417,9 @@ TEST(ParserSection10, NetDeclAssignment) {
       "  wire a = 1'b0;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_FALSE(mod->items.empty());
-  auto *item = mod->items[0];
+  auto* item = mod->items[0];
   EXPECT_EQ(item->name, "a");
   EXPECT_NE(item->init_expr, nullptr);
 }
@@ -435,8 +435,8 @@ TEST(ParserSection10, ContinuousAssignDelay) {
       "  assign #10 a = b;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
-  for (auto *item : mod->items) {
+  auto* mod = r.cu->modules[0];
+  for (auto* item : mod->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
       EXPECT_NE(item->assign_delay, nullptr);
     }
@@ -453,9 +453,9 @@ TEST(ParserSection10, VarDeclAssignment) {
       "  int x = 42;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_FALSE(mod->items.empty());
-  auto *item = mod->items[0];
+  auto* item = mod->items[0];
   EXPECT_EQ(item->name, "x");
   EXPECT_NE(item->init_expr, nullptr);
 }
@@ -466,7 +466,7 @@ TEST(ParserSection10, VarDeclAssignmentLogic) {
       "  logic [7:0] data = 8'hFF;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_FALSE(mod->items.empty());
   EXPECT_NE(mod->items[0]->init_expr, nullptr);
 }
@@ -480,7 +480,7 @@ TEST(ParserSection10, BlockingAssignSimple) {
       "module m;\n"
       "  initial a = 1;\n"
       "endmodule\n");
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
@@ -490,7 +490,7 @@ TEST(ParserSection10, NonblockingAssignSimple) {
       "module m;\n"
       "  initial a <= 1;\n"
       "endmodule\n");
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
 }
@@ -507,7 +507,7 @@ TEST(ParserSection10, OperatorAssignPlusEq) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
   ASSERT_NE(stmt->rhs, nullptr);
@@ -521,7 +521,7 @@ TEST(ParserSection10, OperatorAssignMinusEq) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
@@ -534,7 +534,7 @@ TEST(ParserSection10, OperatorAssignStarEq) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
@@ -547,7 +547,7 @@ TEST(ParserSection10, OperatorAssignSlashEq) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
@@ -560,7 +560,7 @@ TEST(ParserSection10, OperatorAssignPercentEq) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
@@ -573,7 +573,7 @@ TEST(ParserSection10, OperatorAssignAmpEq) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
@@ -586,7 +586,7 @@ TEST(ParserSection10, OperatorAssignPipeEq) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
@@ -599,7 +599,7 @@ TEST(ParserSection10, OperatorAssignCaretEq) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
@@ -612,7 +612,7 @@ TEST(ParserSection10, OperatorAssignLtLtEq) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
@@ -625,7 +625,7 @@ TEST(ParserSection10, OperatorAssignGtGtEq) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
@@ -638,7 +638,7 @@ TEST(ParserSection10, OperatorAssignLtLtLtEq) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
@@ -651,7 +651,7 @@ TEST(ParserSection10, OperatorAssignGtGtGtEq) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
@@ -667,9 +667,9 @@ TEST(ParserSection10, ContinuousAssignMultipleTargets) {
       "  assign a = b, c = d;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   int count = 0;
-  for (auto *item : mod->items) {
+  for (auto* item : mod->items) {
     if (item->kind == ModuleItemKind::kContAssign) count++;
   }
   EXPECT_GE(count, 1);
@@ -683,9 +683,9 @@ TEST(ParserSection10, ContinuousAssignDriveStrength) {
       "  assign (strong0, weak1) w = 1'b1;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
-  ModuleItem *ca = nullptr;
-  for (auto *item : mod->items) {
+  auto* mod = r.cu->modules[0];
+  ModuleItem* ca = nullptr;
+  for (auto* item : mod->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
       ca = item;
       break;
@@ -706,9 +706,9 @@ TEST(ParserSection10, ContinuousAssignDriveStrengthReversed) {
       "  assign (pull1, supply0) w = 1'b0;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
-  ModuleItem *ca = nullptr;
-  for (auto *item : mod->items) {
+  auto* mod = r.cu->modules[0];
+  ModuleItem* ca = nullptr;
+  for (auto* item : mod->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
       ca = item;
       break;

@@ -9,7 +9,7 @@ TEST(Types, Logic4WordBasicValues_IsKnown) {
   struct Case {
     Logic4Word val;
     bool expected;
-    const char *label;
+    const char* label;
   };
   const Case kCases[] = {
       {{0, 0}, true, "zero"},
@@ -17,7 +17,7 @@ TEST(Types, Logic4WordBasicValues_IsKnown) {
       {{0, 1}, false, "x"},
       {{1, 1}, false, "z"},
   };
-  for (const auto &c : kCases) {
+  for (const auto& c : kCases) {
     EXPECT_EQ(c.val.IsKnown(), c.expected) << c.label;
   }
 }
@@ -42,14 +42,14 @@ TEST(Types, Logic4WordAnd) {
     Logic4Word b;
     uint64_t exp_aval;
     uint64_t exp_bval;
-    const char *label;
+    const char* label;
   };
   const Case kCases[] = {
       {one, one, 1, 0, "1 & 1 = 1"},
       {one, zero, 0, 0, "1 & 0 = 0"},
       {zero, x_val, 0, 0, "0 & x = 0"},
   };
-  for (const auto &c : kCases) {
+  for (const auto& c : kCases) {
     auto r = Logic4And(c.a, c.b);
     EXPECT_EQ(r.aval, c.exp_aval) << c.label;
     EXPECT_EQ(r.bval, c.exp_bval) << c.label;
@@ -70,14 +70,14 @@ TEST(Types, Logic4WordOr) {
     Logic4Word b;
     uint64_t exp_aval;
     uint64_t exp_bval;
-    const char *label;
+    const char* label;
   };
   const Case kCases[] = {
       {zero, zero, 0, 0, "0 | 0 = 0"},
       {one, zero, 1, 0, "1 | 0 = 1"},
       {one, x_val, 1, 0, "1 | x = 1"},
   };
-  for (const auto &c : kCases) {
+  for (const auto& c : kCases) {
     auto r = Logic4Or(c.a, c.b);
     EXPECT_EQ(r.aval, c.exp_aval) << c.label;
     EXPECT_EQ(r.bval, c.exp_bval) << c.label;
@@ -127,18 +127,18 @@ TEST(Types, Logic4VecCreationAndToString) {
 
 TEST(Arena, Allocation) {
   Arena arena;
-  const auto *p1 = arena.AllocArray<uint64_t>(10);
+  const auto* p1 = arena.AllocArray<uint64_t>(10);
   ASSERT_NE(p1, nullptr);
-  auto *p2 = arena.AllocArray<uint32_t>(100);
+  auto* p2 = arena.AllocArray<uint32_t>(100);
   ASSERT_NE(p2, nullptr);
-  EXPECT_NE(p1, reinterpret_cast<const uint64_t *>(p2));
+  EXPECT_NE(p1, reinterpret_cast<const uint64_t*>(p2));
   EXPECT_GT(arena.TotalAllocated(), 0);
 }
 
 TEST(Arena, StringAllocation) {
   Arena arena;
-  const char *src = "hello";
-  auto *s = arena.AllocString(src, 5);
+  const char* src = "hello";
+  auto* s = arena.AllocString(src, 5);
   EXPECT_EQ(std::string_view(s), "hello");
 }
 

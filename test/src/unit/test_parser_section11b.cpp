@@ -11,11 +11,11 @@ using namespace delta;
 struct ParseResult11b {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult11b Parse(const std::string &src) {
+static ParseResult11b Parse(const std::string& src) {
   ParseResult11b result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -86,10 +86,10 @@ TEST(ParserSection11, StreamingWithSimpleIndex) {
 }
 
 // --- Helper to get the first assignment RHS expression ---
-static Expr *FirstAssignRhs(ParseResult11b &r) {
-  for (auto *item : r.cu->modules[0]->items) {
+static Expr* FirstAssignRhs(ParseResult11b& r) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    auto *body = item->body;
+    auto* body = item->body;
     if (body && body->kind == StmtKind::kBlock && !body->stmts.empty()) {
       body = body->stmts[0];
     }
@@ -109,7 +109,7 @@ TEST(ParserSection11, ImplicationParsed) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kArrow);
@@ -123,7 +123,7 @@ TEST(ParserSection11, EquivalenceParsed) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kLtDashGt);
@@ -138,7 +138,7 @@ TEST(ParserSection11, ImplicationRightAssocParses) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kArrow);
@@ -151,7 +151,7 @@ TEST(ParserSection11, ImplicationRightAssocStructure) {
       "  logic a, b, c, d;\n"
       "  initial d = a -> b -> c;\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   // LHS is 'a', RHS is 'b -> c'
   EXPECT_EQ(rhs->lhs->kind, ExprKind::kIdentifier);

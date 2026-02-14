@@ -23,10 +23,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
 };
 
-static ParseResult Parse(const std::string &src) {
+static ParseResult Parse(const std::string& src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -62,10 +62,10 @@ TEST(Parser, ModuleWithPorts) {
       "  assign y = sel ? b : a;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   struct Expected {
     Direction dir;
-    const char *name;
+    const char* name;
   };
   Expected expected[] = {
       {Direction::kInput, "a"},
@@ -88,7 +88,7 @@ TEST(Parser, ContinuousAssignment) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   bool found_assign = false;
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
       found_assign = true;
     }
@@ -105,9 +105,9 @@ TEST(Parser, AlwaysFFBlock) {
       "    else count <= count + 1;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   bool found_ff = false;
-  for (auto *item : mod->items) {
+  for (auto* item : mod->items) {
     if (item->kind == ModuleItemKind::kAlwaysBlock &&
         item->always_kind == AlwaysKind::kAlwaysFF) {
       found_ff = true;
@@ -126,8 +126,8 @@ TEST(Parser, ExpressionPrecedence) {
 }
 
 // Helper to extract the first statement from an initial block.
-static Stmt *FirstInitialStmt(ParseResult &r) {
-  for (auto *item : r.cu->modules[0]->items) {
+static Stmt* FirstInitialStmt(ParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kInitialBlock) {
       if (item->body && item->body->kind == StmtKind::kBlock) {
         return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
@@ -146,7 +146,7 @@ TEST(Parser, DoWhileStatement) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDoWhile);
   EXPECT_NE(stmt->body, nullptr);
@@ -161,7 +161,7 @@ TEST(Parser, BreakStatement) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBreak);
 }
@@ -174,7 +174,7 @@ TEST(Parser, ContinueStatement) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kContinue);
 }
@@ -187,7 +187,7 @@ TEST(Parser, ReturnStatement) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kReturn);
 }
@@ -200,7 +200,7 @@ TEST(Parser, ReturnWithValue) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kReturn);
   EXPECT_NE(stmt->expr, nullptr);
@@ -214,7 +214,7 @@ TEST(Parser, WaitStatement) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kWait);
   EXPECT_NE(stmt->condition, nullptr);
@@ -229,7 +229,7 @@ TEST(Parser, DisableStatement) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDisable);
   EXPECT_NE(stmt->expr, nullptr);
@@ -241,7 +241,7 @@ TEST(Parser, TypedefEnum) {
       "  typedef enum { A, B, C } state_t;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
   EXPECT_EQ(item->name, "state_t");
   EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kEnum);
@@ -259,7 +259,7 @@ TEST(Parser, EnumWithValues) {
       "  typedef enum { IDLE=0, RUN=1, STOP=2 } cmd_t;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto &members = r.cu->modules[0]->items[0]->typedef_type.enum_members;
+  auto& members = r.cu->modules[0]->items[0]->typedef_type.enum_members;
   std::string expected[] = {"IDLE", "RUN", "STOP"};
   ASSERT_EQ(members.size(), std::size(expected));
   for (size_t i = 0; i < std::size(expected); ++i) {
@@ -274,7 +274,7 @@ TEST(Parser, InlineEnumVar) {
       "  enum { X, Y } my_var;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(item->name, "my_var");
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kEnum);
@@ -289,7 +289,7 @@ TEST(Parser, FunctionDecl) {
       "  endfunction\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_EQ(item->name, "add");
   std::string expected[] = {"a", "b"};
@@ -307,7 +307,7 @@ TEST(Parser, TaskDecl) {
       "  endtask\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 1);
   EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kTaskDecl);
   EXPECT_EQ(mod->items[0]->name, "my_task");
@@ -335,19 +335,19 @@ TEST(Parser, TypedefStruct) {
       "  } my_struct_t;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
   EXPECT_EQ(item->name, "my_struct_t");
   EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kStruct);
   struct Expected {
-    const char *name;
+    const char* name;
     DataTypeKind type_kind;
   };
   Expected expected[] = {
       {"a", DataTypeKind::kLogic},
       {"b", DataTypeKind::kInt},
   };
-  auto &members = item->typedef_type.struct_members;
+  auto& members = item->typedef_type.struct_members;
   ASSERT_EQ(members.size(), std::size(expected));
   for (size_t i = 0; i < std::size(expected); ++i) {
     EXPECT_EQ(members[i].name, expected[i].name) << "member " << i;
@@ -364,7 +364,7 @@ TEST(Parser, TypedefUnion) {
       "  } my_union_t;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
   EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kUnion);
   ASSERT_EQ(item->typedef_type.struct_members.size(), 2);
@@ -379,7 +379,7 @@ TEST(Parser, TypedefStructPacked) {
       "  } byte_t;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kStruct);
   EXPECT_TRUE(item->typedef_type.is_packed);
   ASSERT_EQ(item->typedef_type.struct_members.size(), 2);
@@ -391,7 +391,7 @@ TEST(Parser, InlineStructVar) {
       "  struct { int x; int y; } point;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(item->name, "point");
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kStruct);
@@ -423,7 +423,7 @@ TEST(Parser, ImportSpecific) {
       "  import my_pkg::WIDTH;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kImportDecl);
   EXPECT_EQ(item->import_item.package_name, "my_pkg");
   EXPECT_EQ(item->import_item.item_name, "WIDTH");
@@ -436,7 +436,7 @@ TEST(Parser, ImportWildcard) {
       "  import my_pkg::*;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kImportDecl);
   EXPECT_EQ(item->import_item.package_name, "my_pkg");
   EXPECT_TRUE(item->import_item.is_wildcard);
@@ -462,9 +462,9 @@ TEST(Parser, GenerateFor) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
-  ModuleItem *gen = nullptr;
-  for (auto *item : mod->items) {
+  auto* mod = r.cu->modules[0];
+  ModuleItem* gen = nullptr;
+  for (auto* item : mod->items) {
     if (item->kind == ModuleItemKind::kGenerateFor) {
       gen = item;
     }
@@ -484,7 +484,7 @@ TEST(Parser, GenerateIf) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 1);
   EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kGenerateIf);
   EXPECT_NE(mod->items[0]->gen_cond, nullptr);
@@ -501,7 +501,7 @@ TEST(Parser, GenerateIfElse) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGenerateIf);
   EXPECT_NE(item->gen_else, nullptr);
 }
@@ -516,9 +516,9 @@ TEST(Parser, GenerateRegion) {
       "  endgenerate\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   bool found_gen = false;
-  for (auto *item : mod->items) {
+  for (auto* item : mod->items) {
     if (item->kind == ModuleItemKind::kGenerateIf) {
       found_gen = true;
     }
@@ -539,7 +539,7 @@ TEST(Parser, GenerateCase) {
       "  endcase\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGenerateCase);
   EXPECT_NE(item->gen_cond, nullptr);
   ASSERT_EQ(item->gen_case_items.size(), 2);
@@ -563,7 +563,7 @@ TEST(Parser, GenerateCaseDefault) {
       "  endcase\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   ASSERT_EQ(item->gen_case_items.size(), 2);
   EXPECT_TRUE(item->gen_case_items[1].is_default);
 }
@@ -578,7 +578,7 @@ TEST(Parser, GenerateCaseMultiPattern) {
       "  endcase\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   ASSERT_EQ(item->gen_case_items.size(), 1);
   EXPECT_EQ(item->gen_case_items[0].patterns.size(), 2);
 }
@@ -596,7 +596,7 @@ TEST(Parser, GenerateCaseInRegion) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   bool found = false;
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kGenerateCase) {
       found = true;
     }
@@ -609,7 +609,7 @@ TEST(Parser, GenerateCaseInRegion) {
 TEST(Parser, GateAndInst) {
   auto r = Parse("module t; and g1(out, a, b); endmodule");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
   EXPECT_EQ(item->gate_kind, GateKind::kAnd);
   EXPECT_EQ(item->gate_inst_name, "g1");
@@ -619,7 +619,7 @@ TEST(Parser, GateAndInst) {
 TEST(Parser, GateNandWithDelay) {
   auto r = Parse("module t; nand #(5) g2(out, a, b); endmodule");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->gate_kind, GateKind::kNand);
   EXPECT_EQ(item->gate_inst_name, "g2");
   EXPECT_NE(item->gate_delay, nullptr);
@@ -629,7 +629,7 @@ TEST(Parser, GateNandWithDelay) {
 TEST(Parser, GateBufMultiOutput) {
   auto r = Parse("module t; buf (o1, o2, in); endmodule");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
   EXPECT_EQ(item->gate_kind, GateKind::kBuf);
   EXPECT_TRUE(item->gate_inst_name.empty());
@@ -639,7 +639,7 @@ TEST(Parser, GateBufMultiOutput) {
 TEST(Parser, GateBufif0) {
   auto r = Parse("module t; bufif0 b1(out, in, en); endmodule");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
   EXPECT_EQ(item->gate_kind, GateKind::kBufif0);
   EXPECT_EQ(item->gate_terminals.size(), 3);
@@ -648,7 +648,7 @@ TEST(Parser, GateBufif0) {
 TEST(Parser, GateTran) {
   auto r = Parse("module t; tran (a, b); endmodule");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
   EXPECT_EQ(item->gate_kind, GateKind::kTran);
   EXPECT_EQ(item->gate_terminals.size(), 2);
@@ -657,7 +657,7 @@ TEST(Parser, GateTran) {
 TEST(Parser, GateNmos) {
   auto r = Parse("module t; nmos (out, in, ctrl); endmodule");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
   EXPECT_EQ(item->gate_kind, GateKind::kNmos);
   EXPECT_EQ(item->gate_terminals.size(), 3);
@@ -666,7 +666,7 @@ TEST(Parser, GateNmos) {
 TEST(Parser, GateCmos) {
   auto r = Parse("module t; cmos (out, in, nctrl, pctrl); endmodule");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
   EXPECT_EQ(item->gate_kind, GateKind::kCmos);
   EXPECT_EQ(item->gate_terminals.size(), 4);
@@ -675,7 +675,7 @@ TEST(Parser, GateCmos) {
 TEST(Parser, GatePullup) {
   auto r = Parse("module t; pullup (o); endmodule");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
   EXPECT_EQ(item->gate_kind, GateKind::kPullup);
   EXPECT_EQ(item->gate_terminals.size(), 1);
@@ -684,7 +684,7 @@ TEST(Parser, GatePullup) {
 TEST(Parser, GateNoInstanceName) {
   auto r = Parse("module t; and (out, a, b); endmodule");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
   EXPECT_EQ(item->gate_kind, GateKind::kAnd);
   EXPECT_TRUE(item->gate_inst_name.empty());
@@ -718,11 +718,11 @@ TEST(Parser, InterfaceWithModport) {
       "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->interfaces[0]->modports.size(), 1);
-  auto *mp = r.cu->interfaces[0]->modports[0];
+  auto* mp = r.cu->interfaces[0]->modports[0];
   EXPECT_EQ(mp->name, "master");
   struct Expected {
     Direction dir;
-    const char *name;
+    const char* name;
   };
   Expected expected[] = {{Direction::kOutput, "data"}};
   ASSERT_EQ(mp->ports.size(), std::size(expected));
@@ -740,7 +740,7 @@ TEST(Parser, ModportMultipleGroups) {
       "  modport slave(input addr, input data);\n"
       "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mp = r.cu->interfaces[0]->modports[0];
+  auto* mp = r.cu->interfaces[0]->modports[0];
   EXPECT_EQ(mp->name, "slave");
   ASSERT_EQ(mp->ports.size(), 2);
   EXPECT_EQ(mp->ports[0].direction, Direction::kInput);
@@ -790,7 +790,7 @@ TEST(Parser, EmptyClass) {
 TEST(Parser, ClassWithProperty) {
   auto r = Parse("class pkt; int data; endclass");
   ASSERT_NE(r.cu, nullptr);
-  auto *cls = r.cu->classes[0];
+  auto* cls = r.cu->classes[0];
   ASSERT_EQ(cls->members.size(), 1);
   EXPECT_EQ(cls->members[0]->kind, ClassMemberKind::kProperty);
   EXPECT_EQ(cls->members[0]->name, "data");
@@ -805,7 +805,7 @@ TEST(Parser, ClassWithMethod) {
       "  endfunction\n"
       "endclass\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *cls = r.cu->classes[0];
+  auto* cls = r.cu->classes[0];
   ASSERT_EQ(cls->members.size(), 1);
   EXPECT_EQ(cls->members[0]->kind, ClassMemberKind::kMethod);
   EXPECT_NE(cls->members[0]->method, nullptr);
@@ -814,7 +814,7 @@ TEST(Parser, ClassWithMethod) {
 TEST(Parser, ClassExtends) {
   auto r = Parse("class child extends parent; endclass");
   ASSERT_NE(r.cu, nullptr);
-  auto *cls = r.cu->classes[0];
+  auto* cls = r.cu->classes[0];
   EXPECT_EQ(cls->name, "child");
   EXPECT_EQ(cls->base_class, "parent");
 }
@@ -832,7 +832,7 @@ TEST(Parser, ClassPropertyQualifiers) {
       "  local int secret;\n"
       "endclass\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *cls = r.cu->classes[0];
+  auto* cls = r.cu->classes[0];
   ASSERT_EQ(cls->members.size(), 2);
   EXPECT_TRUE(cls->members[0]->is_rand);
   EXPECT_TRUE(cls->members[1]->is_local);
@@ -846,7 +846,7 @@ TEST(Parser, DefparamSingle) {
       "  defparam u0.WIDTH = 8;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kDefparam);
   ASSERT_EQ(item->defparam_assigns.size(), 1);
   EXPECT_NE(item->defparam_assigns[0].first, nullptr);
@@ -859,7 +859,7 @@ TEST(Parser, DefparamMultiple) {
       "  defparam u0.WIDTH = 8, u1.DEPTH = 16;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kDefparam);
   EXPECT_EQ(item->defparam_assigns.size(), 2);
 }
@@ -872,7 +872,7 @@ TEST(Parser, EventDeclaration) {
       "  event ev;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kEvent);
   EXPECT_EQ(item->name, "ev");
@@ -885,7 +885,7 @@ TEST(Parser, EventTrigger) {
       "  initial ->ev;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = r.cu->modules[0]->items[1]->body;
+  auto* stmt = r.cu->modules[0]->items[1]->body;
   EXPECT_EQ(stmt->kind, StmtKind::kEventTrigger);
   ASSERT_NE(stmt->expr, nullptr);
   EXPECT_EQ(stmt->expr->kind, ExprKind::kIdentifier);
@@ -899,8 +899,8 @@ TEST(Parser, EventWaitWithParens) {
       "  initial @(ev) ;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[1];
-  auto *stmt = item->body;
+  auto* item = r.cu->modules[0]->items[1];
+  auto* stmt = item->body;
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
   ASSERT_EQ(stmt->events.size(), 1);
   EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
@@ -914,8 +914,8 @@ TEST(Parser, EventWaitBareIdentifier) {
       "  initial @ev ;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[1];
-  auto *stmt = item->body;
+  auto* item = r.cu->modules[0]->items[1];
+  auto* stmt = item->body;
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
   ASSERT_EQ(stmt->events.size(), 1);
   EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
@@ -930,7 +930,7 @@ TEST(Parser, NettypeDeclaration) {
       "  nettype logic [7:0] mynet;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
   EXPECT_EQ(item->name, "mynet");
 }
@@ -941,7 +941,7 @@ TEST(Parser, NettypeWithResolutionFunction) {
       "  nettype logic [7:0] mynet with resolve_fn;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
   EXPECT_EQ(item->name, "mynet");
   EXPECT_EQ(item->nettype_resolve_func, "resolve_fn");
@@ -956,7 +956,7 @@ TEST(Parser, NettypeUsedInDecl) {
   ASSERT_NE(r.cu, nullptr);
   // nettype registers as known type, so 'mynet x;' parses as a VarDecl.
   ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
-  auto *item = r.cu->modules[0]->items[1];
+  auto* item = r.cu->modules[0]->items[1];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(item->name, "x");
 }

@@ -13,10 +13,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
 };
 
-static ParseResult Parse(const std::string &src) {
+static ParseResult Parse(const std::string& src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -26,8 +26,8 @@ static ParseResult Parse(const std::string &src) {
   return result;
 }
 
-static ModuleItem *FindFunc(ParseResult &r, std::string_view name) {
-  for (auto *item : r.cu->modules[0]->items) {
+static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind != ModuleItemKind::kFunctionDecl &&
         item->kind != ModuleItemKind::kTaskDecl) {
       continue;
@@ -37,8 +37,8 @@ static ModuleItem *FindFunc(ParseResult &r, std::string_view name) {
   return nullptr;
 }
 
-static Stmt *FirstInitialStmt(ParseResult &r) {
-  for (auto *item : r.cu->modules[0]->items) {
+static Stmt* FirstInitialStmt(ParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
@@ -59,7 +59,7 @@ TEST(ParserSection13, DefaultArgValues) {
       "  endfunction\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *fn = FindFunc(r, "foo");
+  auto* fn = FindFunc(r, "foo");
   ASSERT_NE(fn, nullptr);
   ASSERT_EQ(fn->func_args.size(), 2u);
   EXPECT_NE(fn->func_args[0].default_value, nullptr);
@@ -73,7 +73,7 @@ TEST(ParserSection13, DefaultArgValueOnTask) {
       "  endtask\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *tk = FindFunc(r, "bar");
+  auto* tk = FindFunc(r, "bar");
   ASSERT_NE(tk, nullptr);
   ASSERT_EQ(tk->func_args.size(), 2u);
   EXPECT_EQ(tk->func_args[0].default_value, nullptr);
@@ -87,7 +87,7 @@ TEST(ParserSection13, DefaultArgNoDefault) {
       "  endfunction\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *fn = FindFunc(r, "foo");
+  auto* fn = FindFunc(r, "foo");
   ASSERT_NE(fn, nullptr);
   ASSERT_EQ(fn->func_args.size(), 2u);
   EXPECT_EQ(fn->func_args[0].default_value, nullptr);
@@ -105,7 +105,7 @@ TEST(ParserSection13, ConstRefArg) {
       "  endfunction\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *fn = FindFunc(r, "bar");
+  auto* fn = FindFunc(r, "bar");
   ASSERT_NE(fn, nullptr);
   ASSERT_EQ(fn->func_args.size(), 1u);
   EXPECT_TRUE(fn->func_args[0].is_const);
@@ -119,7 +119,7 @@ TEST(ParserSection13, RefWithoutConst) {
       "  endfunction\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *fn = FindFunc(r, "baz");
+  auto* fn = FindFunc(r, "baz");
   ASSERT_NE(fn, nullptr);
   ASSERT_EQ(fn->func_args.size(), 1u);
   EXPECT_FALSE(fn->func_args[0].is_const);
@@ -138,10 +138,10 @@ TEST(ParserSection13, NamedArgBindingParses) {
       "  initial foo(.b(2), .a(1));\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
-  auto *call = stmt->expr;
+  auto* call = stmt->expr;
   ASSERT_NE(call, nullptr);
   EXPECT_EQ(call->kind, ExprKind::kCall);
 }
@@ -153,9 +153,9 @@ TEST(ParserSection13, NamedArgBindingNames) {
       "  endfunction\n"
       "  initial foo(.b(2), .a(1));\n"
       "endmodule\n");
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto *call = stmt->expr;
+  auto* call = stmt->expr;
   ASSERT_NE(call, nullptr);
   ASSERT_EQ(call->args.size(), 2u);
   ASSERT_EQ(call->arg_names.size(), 2u);
@@ -173,9 +173,9 @@ TEST(ParserSection13, PositionalArgsHaveEmptyNames) {
       "  initial foo(1, 2);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto *call = stmt->expr;
+  auto* call = stmt->expr;
   ASSERT_NE(call, nullptr);
   EXPECT_EQ(call->kind, ExprKind::kCall);
 }
@@ -187,9 +187,9 @@ TEST(ParserSection13, PositionalArgsNoNamedArgs) {
       "  endfunction\n"
       "  initial foo(1, 2);\n"
       "endmodule\n");
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto *call = stmt->expr;
+  auto* call = stmt->expr;
   ASSERT_NE(call, nullptr);
   ASSERT_EQ(call->args.size(), 2u);
   // Positional calls: arg_names is empty (no named args detected)
@@ -207,7 +207,7 @@ TEST(ParserSection13, ArrayParamOnFuncArg) {
       "  endfunction\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *fn = FindFunc(r, "foo");
+  auto* fn = FindFunc(r, "foo");
   ASSERT_NE(fn, nullptr);
   ASSERT_EQ(fn->func_args.size(), 1u);
   EXPECT_EQ(fn->func_args[0].unpacked_dims.size(), 1u);
@@ -220,7 +220,7 @@ TEST(ParserSection13, MultipleDimsOnFuncArg) {
       "  endtask\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *tk = FindFunc(r, "bar");
+  auto* tk = FindFunc(r, "bar");
   ASSERT_NE(tk, nullptr);
   ASSERT_EQ(tk->func_args.size(), 1u);
   EXPECT_EQ(tk->func_args[0].unpacked_dims.size(), 2u);
@@ -233,7 +233,7 @@ TEST(ParserSection13, NoDimsOnFuncArg) {
       "  endfunction\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *fn = FindFunc(r, "foo");
+  auto* fn = FindFunc(r, "foo");
   ASSERT_NE(fn, nullptr);
   ASSERT_EQ(fn->func_args.size(), 1u);
   EXPECT_TRUE(fn->func_args[0].unpacked_dims.empty());
@@ -252,7 +252,7 @@ TEST(ParserSection13, OldStyleFunction) {
       "  endfunction\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *fn = FindFunc(r, "myfunc");
+  auto* fn = FindFunc(r, "myfunc");
   ASSERT_NE(fn, nullptr);
   ASSERT_EQ(fn->func_args.size(), 1u);
   EXPECT_EQ(fn->func_args[0].direction, Direction::kInput);
@@ -268,7 +268,7 @@ TEST(ParserSection13, OldStyleTask) {
       "  endtask\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *tk = FindFunc(r, "mytask");
+  auto* tk = FindFunc(r, "mytask");
   ASSERT_NE(tk, nullptr);
   ASSERT_EQ(tk->func_args.size(), 2u);
   EXPECT_EQ(tk->func_args[0].direction, Direction::kInput);
@@ -287,7 +287,7 @@ TEST(ParserSection13, FunctionReturnTypeInt) {
       "  endfunction\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *fn = FindFunc(r, "foo");
+  auto* fn = FindFunc(r, "foo");
   ASSERT_NE(fn, nullptr);
   EXPECT_EQ(fn->return_type.kind, DataTypeKind::kInt);
 }
@@ -299,7 +299,7 @@ TEST(ParserSection13, FunctionReturnTypeVoid) {
       "  endfunction\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *fn = FindFunc(r, "bar");
+  auto* fn = FindFunc(r, "bar");
   ASSERT_NE(fn, nullptr);
   EXPECT_EQ(fn->return_type.kind, DataTypeKind::kVoid);
 }
@@ -312,7 +312,7 @@ TEST(ParserSection13, FunctionReturnTypeLogicVec) {
       "  endfunction\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *fn = FindFunc(r, "get_byte");
+  auto* fn = FindFunc(r, "get_byte");
   ASSERT_NE(fn, nullptr);
   EXPECT_EQ(fn->return_type.kind, DataTypeKind::kLogic);
 }
@@ -330,7 +330,7 @@ TEST(ParserSection13, AutomaticFunction) {
       "  endfunction\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *fn = FindFunc(r, "fact");
+  auto* fn = FindFunc(r, "fact");
   ASSERT_NE(fn, nullptr);
   EXPECT_TRUE(fn->is_automatic);
   EXPECT_FALSE(fn->is_static);
@@ -343,7 +343,7 @@ TEST(ParserSection13, StaticTask) {
       "  endtask\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *tk = FindFunc(r, "do_stuff");
+  auto* tk = FindFunc(r, "do_stuff");
   ASSERT_NE(tk, nullptr);
   EXPECT_TRUE(tk->is_static);
   EXPECT_FALSE(tk->is_automatic);
@@ -359,9 +359,9 @@ TEST(ParserSection13, DpiImportFunction) {
       "  import \"DPI-C\" function int c_add(int a, int b);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
-  ModuleItem *dpi = nullptr;
-  for (auto *item : mod->items) {
+  auto* mod = r.cu->modules[0];
+  ModuleItem* dpi = nullptr;
+  for (auto* item : mod->items) {
     if (item->kind == ModuleItemKind::kDpiImport) {
       dpi = item;
       break;
@@ -379,9 +379,9 @@ TEST(ParserSection13, DpiImportPureFunction) {
       "  import \"DPI-C\" pure function int c_mul(int a, int b);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
-  ModuleItem *dpi = nullptr;
-  for (auto *item : mod->items) {
+  auto* mod = r.cu->modules[0];
+  ModuleItem* dpi = nullptr;
+  for (auto* item : mod->items) {
     if (item->kind == ModuleItemKind::kDpiImport) {
       dpi = item;
       break;
@@ -398,9 +398,9 @@ TEST(ParserSection13, DpiImportContextTask) {
       "  import \"DPI-C\" context task c_display(input int x);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
-  ModuleItem *dpi = nullptr;
-  for (auto *item : mod->items) {
+  auto* mod = r.cu->modules[0];
+  ModuleItem* dpi = nullptr;
+  for (auto* item : mod->items) {
     if (item->kind == ModuleItemKind::kDpiImport) {
       dpi = item;
       break;
@@ -417,9 +417,9 @@ TEST(ParserSection13, DpiImportWithCName) {
       "  import \"DPI-C\" c_real_name = function void sv_wrapper();\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
-  ModuleItem *dpi = nullptr;
-  for (auto *item : mod->items) {
+  auto* mod = r.cu->modules[0];
+  ModuleItem* dpi = nullptr;
+  for (auto* item : mod->items) {
     if (item->kind == ModuleItemKind::kDpiImport) {
       dpi = item;
       break;
@@ -436,9 +436,9 @@ TEST(ParserSection13, DpiExportFunction) {
       "  export \"DPI-C\" function my_sv_func;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
-  ModuleItem *dpi = nullptr;
-  for (auto *item : mod->items) {
+  auto* mod = r.cu->modules[0];
+  ModuleItem* dpi = nullptr;
+  for (auto* item : mod->items) {
     if (item->kind == ModuleItemKind::kDpiExport) {
       dpi = item;
       break;
@@ -454,9 +454,9 @@ TEST(ParserSection13, DpiExportTask) {
       "  export \"DPI-C\" task my_sv_task;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
-  ModuleItem *dpi = nullptr;
-  for (auto *item : mod->items) {
+  auto* mod = r.cu->modules[0];
+  ModuleItem* dpi = nullptr;
+  for (auto* item : mod->items) {
     if (item->kind == ModuleItemKind::kDpiExport) {
       dpi = item;
       break;
@@ -482,7 +482,7 @@ TEST(ParserSection13, OldStyleTaskMultipleInputs) {
       "  endtask\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *tk = FindFunc(r, "add");
+  auto* tk = FindFunc(r, "add");
   ASSERT_NE(tk, nullptr);
   ASSERT_EQ(tk->func_args.size(), 3u);
   const Direction kExpected[] = {Direction::kInput, Direction::kInput,

@@ -19,15 +19,15 @@ struct MemInferFixture {
   Arena arena;
 };
 
-static const RtlirModule *ElaborateSrc(MemInferFixture &f,
-                                       const std::string &src) {
+static const RtlirModule* ElaborateSrc(MemInferFixture& f,
+                                       const std::string& src) {
   auto fid = f.src_mgr.AddFile("<test>", src);
   Lexer lexer(f.src_mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   if (!cu || cu->modules.empty()) return nullptr;
   Elaborator elab(f.arena, f.diag, cu);
-  auto *design = elab.Elaborate(cu->modules.back()->name);
+  auto* design = elab.Elaborate(cu->modules.back()->name);
   if (!design || design->top_modules.empty()) return nullptr;
   return design->top_modules[0];
 }
@@ -38,7 +38,7 @@ static const RtlirModule *ElaborateSrc(MemInferFixture &f,
 
 TEST(MemInfer, DetectSinglePortWrite) {
   MemInferFixture f;
-  auto *mod = ElaborateSrc(f,
+  auto* mod = ElaborateSrc(f,
                            "module m(input clk, input logic [3:0] addr,\n"
                            "         input logic [7:0] wdata, input we);\n"
                            "  logic [7:0] mem;\n"
@@ -55,7 +55,7 @@ TEST(MemInfer, DetectSinglePortWrite) {
 
 TEST(MemInfer, DetectSinglePortWrite_PortDetails) {
   MemInferFixture f;
-  auto *mod = ElaborateSrc(f,
+  auto* mod = ElaborateSrc(f,
                            "module m(input clk, input logic [3:0] addr,\n"
                            "         input logic [7:0] wdata, input we);\n"
                            "  logic [7:0] mem;\n"
@@ -78,7 +78,7 @@ TEST(MemInfer, DetectSinglePortWrite_PortDetails) {
 
 TEST(MemInfer, DetectSinglePortRead) {
   MemInferFixture f;
-  auto *mod = ElaborateSrc(f,
+  auto* mod = ElaborateSrc(f,
                            "module m(input clk, input logic [3:0] addr,\n"
                            "         output logic [7:0] rdata);\n"
                            "  logic [7:0] mem;\n"
@@ -95,7 +95,7 @@ TEST(MemInfer, DetectSinglePortRead) {
 
 TEST(MemInfer, DetectSinglePortRead_PortDetails) {
   MemInferFixture f;
-  auto *mod = ElaborateSrc(f,
+  auto* mod = ElaborateSrc(f,
                            "module m(input clk, input logic [3:0] addr,\n"
                            "         output logic [7:0] rdata);\n"
                            "  logic [7:0] mem;\n"
@@ -118,7 +118,7 @@ TEST(MemInfer, DetectSinglePortRead_PortDetails) {
 
 TEST(MemInfer, DetectDualPort) {
   MemInferFixture f;
-  auto *mod = ElaborateSrc(f,
+  auto* mod = ElaborateSrc(f,
                            "module m(input clk, input logic [3:0] raddr,\n"
                            "         input logic [3:0] waddr,\n"
                            "         input logic [7:0] wdata, input we,\n"
@@ -144,7 +144,7 @@ TEST(MemInfer, DetectDualPort) {
 
 TEST(MemInfer, NoMemoryForScalarAssign) {
   MemInferFixture f;
-  auto *mod = ElaborateSrc(f,
+  auto* mod = ElaborateSrc(f,
                            "module m(input clk, input d, output reg q);\n"
                            "  always_ff @(posedge clk) begin\n"
                            "    q <= d;\n"
@@ -162,7 +162,7 @@ TEST(MemInfer, NoMemoryForScalarAssign) {
 
 TEST(MemInfer, RomInference) {
   MemInferFixture f;
-  auto *mod = ElaborateSrc(f,
+  auto* mod = ElaborateSrc(f,
                            "module m(input clk, input logic [3:0] addr,\n"
                            "         output logic [7:0] rdata);\n"
                            "  logic [7:0] rom;\n"

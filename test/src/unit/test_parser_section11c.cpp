@@ -11,11 +11,11 @@ using namespace delta;
 struct ParseResult11c {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult11c Parse(const std::string &src) {
+static ParseResult11c Parse(const std::string& src) {
   ParseResult11c result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -26,8 +26,8 @@ static ParseResult11c Parse(const std::string &src) {
   return result;
 }
 
-static Stmt *FirstInitialStmt(ParseResult11c &r) {
-  for (auto *item : r.cu->modules[0]->items) {
+static Stmt* FirstInitialStmt(ParseResult11c& r) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
@@ -38,8 +38,8 @@ static Stmt *FirstInitialStmt(ParseResult11c &r) {
 }
 
 // Helper: get the RHS of the first blocking assignment in initial block.
-static Expr *FirstAssignRhs(ParseResult11c &r) {
-  auto *stmt = FirstInitialStmt(r);
+static Expr* FirstAssignRhs(ParseResult11c& r) {
+  auto* stmt = FirstInitialStmt(r);
   if (!stmt) return nullptr;
   return stmt->rhs;
 }
@@ -53,7 +53,7 @@ TEST(ParserSection11, RelationalLt) {
       "module t;\n"
       "  initial x = (a < b);\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kLt);
 }
@@ -63,7 +63,7 @@ TEST(ParserSection11, RelationalGt) {
       "module t;\n"
       "  initial x = (a > b);\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kGt);
 }
@@ -73,7 +73,7 @@ TEST(ParserSection11, RelationalLtEq) {
       "module t;\n"
       "  initial x = (a <= b);\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kLtEq);
 }
@@ -83,7 +83,7 @@ TEST(ParserSection11, RelationalGtEq) {
       "module t;\n"
       "  initial x = (a >= b);\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kGtEq);
 }
@@ -97,7 +97,7 @@ TEST(ParserSection11, EqualityEq) {
       "module t;\n"
       "  initial x = (a == b);\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kEqEq);
 }
@@ -107,7 +107,7 @@ TEST(ParserSection11, EqualityNeq) {
       "module t;\n"
       "  initial x = (a != b);\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kBangEq);
 }
@@ -117,7 +117,7 @@ TEST(ParserSection11, CaseEqualityEq) {
       "module t;\n"
       "  initial x = (a === b);\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kEqEqEq);
 }
@@ -127,7 +127,7 @@ TEST(ParserSection11, CaseEqualityNeq) {
       "module t;\n"
       "  initial x = (a !== b);\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kBangEqEq);
 }
@@ -141,7 +141,7 @@ TEST(ParserSection11, WildcardEq) {
       "module t;\n"
       "  initial x = (a ==? b);\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kEqEqQuestion);
 }
@@ -151,7 +151,7 @@ TEST(ParserSection11, WildcardNeq) {
       "module t;\n"
       "  initial x = (a !=? b);\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kBangEqQuestion);
 }
@@ -165,7 +165,7 @@ TEST(ParserSection11, LogicalAnd) {
       "module t;\n"
       "  initial x = (a && b);\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kAmpAmp);
 }
@@ -175,7 +175,7 @@ TEST(ParserSection11, LogicalOr) {
       "module t;\n"
       "  initial x = (a || b);\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kPipePipe);
 }
@@ -185,7 +185,7 @@ TEST(ParserSection11, LogicalNot) {
       "module t;\n"
       "  initial x = !a;\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kBang);
@@ -200,7 +200,7 @@ TEST(ParserSection11, BitwiseAnd) {
       "module t;\n"
       "  initial x = a & b;\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kAmp);
 }
@@ -210,7 +210,7 @@ TEST(ParserSection11, BitwiseOr) {
       "module t;\n"
       "  initial x = a | b;\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kPipe);
 }
@@ -220,7 +220,7 @@ TEST(ParserSection11, BitwiseXor) {
       "module t;\n"
       "  initial x = a ^ b;\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kCaret);
 }
@@ -230,7 +230,7 @@ TEST(ParserSection11, BitwiseNot) {
       "module t;\n"
       "  initial x = ~a;\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kTilde);
@@ -245,7 +245,7 @@ TEST(ParserSection11, ReductionAnd) {
       "module t;\n"
       "  initial x = &a;\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kAmp);
@@ -256,7 +256,7 @@ TEST(ParserSection11, ReductionOr) {
       "module t;\n"
       "  initial x = |a;\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kPipe);
@@ -267,7 +267,7 @@ TEST(ParserSection11, ReductionXor) {
       "module t;\n"
       "  initial x = ^a;\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kCaret);
@@ -278,7 +278,7 @@ TEST(ParserSection11, ReductionNand) {
       "module t;\n"
       "  initial x = ~&a;\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kTildeAmp);
@@ -289,7 +289,7 @@ TEST(ParserSection11, ReductionNor) {
       "module t;\n"
       "  initial x = ~|a;\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kTildePipe);
@@ -300,7 +300,7 @@ TEST(ParserSection11, ReductionXnor) {
       "module t;\n"
       "  initial x = ~^a;\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kTildeCaret);
@@ -315,7 +315,7 @@ TEST(ParserSection11, ConditionalTernary) {
       "module t;\n"
       "  initial x = (a > b) ? a : b;\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
 }
@@ -329,7 +329,7 @@ TEST(ParserSection11, ConcatenationBasic) {
       "module t;\n"
       "  initial x = {a, b, c};\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kConcatenation);
   EXPECT_EQ(rhs->elements.size(), 3u);
@@ -340,7 +340,7 @@ TEST(ParserSection11, ReplicationOperator) {
       "module t;\n"
       "  initial x = {4{a}};\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kReplicate);
 }
@@ -354,7 +354,7 @@ TEST(ParserSection11, LogicalShiftLeft) {
       "module t;\n"
       "  initial x = a << 2;\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kLtLt);
 }
@@ -364,7 +364,7 @@ TEST(ParserSection11, LogicalShiftRight) {
       "module t;\n"
       "  initial x = a >> 2;\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kGtGt);
 }
@@ -380,7 +380,7 @@ TEST(ParserSection11, OperatorPrecedenceMixedArithParses) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   // * has higher precedence than +, so top-level is +
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
@@ -392,7 +392,7 @@ TEST(ParserSection11, OperatorPrecedenceMixedArithRhs) {
       "module t;\n"
       "  initial x = a + b * c;\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   ASSERT_NE(rhs->rhs, nullptr);
   EXPECT_EQ(rhs->rhs->op, TokenKind::kStar);
@@ -405,7 +405,7 @@ TEST(ParserSection11, OperatorPrecedenceCompareAndLogical) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kAmpAmp);
 }
@@ -419,7 +419,7 @@ TEST(ParserSection11, BitSelect) {
       "module t;\n"
       "  initial x = a[3];\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
 }
@@ -429,7 +429,7 @@ TEST(ParserSection11, PartSelectConstant) {
       "module t;\n"
       "  initial x = a[7:0];\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
 }
@@ -458,7 +458,7 @@ TEST(ParserSection11, SignedSystemCall) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSystemCall);
   EXPECT_EQ(rhs->callee, "$signed");
@@ -471,7 +471,7 @@ TEST(ParserSection11, UnsignedSystemCall) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSystemCall);
   EXPECT_EQ(rhs->callee, "$unsigned");

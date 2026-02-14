@@ -23,7 +23,7 @@ TEST(Process, MoveSemantics) {
   SimCoroutine a = MakeTestCoroutine();
   EXPECT_FALSE(a.Done());
 
-  SimCoroutine *pa = &a;
+  SimCoroutine* pa = &a;
   SimCoroutine b = std::move(a);
   EXPECT_FALSE(b.Done());
   EXPECT_TRUE(pa->Done());  // Moved-from state check via pre-move pointer.
@@ -44,7 +44,7 @@ TEST(Process, ProcessKindEnum) {
       {ProcessKind::kAlwaysFF, 4},   {ProcessKind::kFinal, 5},
       {ProcessKind::kContAssign, 6},
   };
-  for (const auto &c : kCases) {
+  for (const auto& c : kCases) {
     EXPECT_EQ(static_cast<uint8_t>(c.kind), c.expected);
   }
 }

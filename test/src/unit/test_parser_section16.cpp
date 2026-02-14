@@ -13,11 +13,11 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult Parse(const std::string &src) {
+static ParseResult Parse(const std::string& src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -28,8 +28,8 @@ static ParseResult Parse(const std::string &src) {
   return result;
 }
 
-static Stmt *FirstInitialStmt(ParseResult &r) {
-  for (auto *item : r.cu->modules[0]->items) {
+static Stmt* FirstInitialStmt(ParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
@@ -39,9 +39,9 @@ static Stmt *FirstInitialStmt(ParseResult &r) {
   return nullptr;
 }
 
-static ModuleItem *FindItemByKind(const std::vector<ModuleItem *> &items,
+static ModuleItem* FindItemByKind(const std::vector<ModuleItem*>& items,
                                   ModuleItemKind kind) {
-  for (auto *item : items) {
+  for (auto* item : items) {
     if (item->kind == kind) return item;
   }
   return nullptr;
@@ -59,7 +59,7 @@ TEST(ParserSection16, ImmediateAssertBasicKind) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
   EXPECT_NE(stmt->assert_expr, nullptr);
@@ -73,7 +73,7 @@ TEST(ParserSection16, ImmediateAssertBasicNoActions) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->assert_pass_stmt, nullptr);
   EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
@@ -87,7 +87,7 @@ TEST(ParserSection16, ImmediateAssertWithElseKind) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
   EXPECT_NE(stmt->assert_expr, nullptr);
@@ -101,7 +101,7 @@ TEST(ParserSection16, ImmediateAssertWithElseActions) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_NE(stmt->assert_pass_stmt, nullptr);
   EXPECT_NE(stmt->assert_fail_stmt, nullptr);
@@ -115,7 +115,7 @@ TEST(ParserSection16, ImmediateAssertPassOnly) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
   EXPECT_NE(stmt->assert_pass_stmt, nullptr);
@@ -134,7 +134,7 @@ TEST(ParserSection16, ImmediateAssumeBasic) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kAssumeImmediate);
   EXPECT_NE(stmt->assert_expr, nullptr);
@@ -148,7 +148,7 @@ TEST(ParserSection16, ImmediateAssumeWithElse) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kAssumeImmediate);
   EXPECT_NE(stmt->assert_pass_stmt, nullptr);
@@ -167,7 +167,7 @@ TEST(ParserSection16, ImmediateCoverBasic) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kCoverImmediate);
   EXPECT_NE(stmt->assert_expr, nullptr);
@@ -181,7 +181,7 @@ TEST(ParserSection16, ImmediateCoverWithPass) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kCoverImmediate);
   EXPECT_NE(stmt->assert_pass_stmt, nullptr);
@@ -201,7 +201,7 @@ TEST(ParserSection16, DeferredAssertHash0) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
   EXPECT_TRUE(stmt->is_deferred);
@@ -220,7 +220,7 @@ TEST(ParserSection16, AssertPropertyModuleLevel) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_FALSE(r.cu->modules.empty());
   bool found = false;
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kAssertProperty) {
       found = true;
       EXPECT_NE(item->assert_expr, nullptr);
@@ -236,7 +236,7 @@ TEST(ParserSection16, AssertPropertyWithElse) {
       "    $display(\"ok\"); else $error(\"fail\");\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *ap =
+  auto* ap =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty);
   ASSERT_NE(ap, nullptr);
   EXPECT_NE(ap->assert_pass_stmt, nullptr);
@@ -254,7 +254,7 @@ TEST(ParserSection16, AssumePropertyModuleLevel) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   bool found = false;
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kAssumeProperty) {
       found = true;
     }
@@ -273,7 +273,7 @@ TEST(ParserSection16, CoverPropertyModuleLevel) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   bool found = false;
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kCoverProperty) {
       found = true;
     }
@@ -294,7 +294,7 @@ TEST(ParserSection16, PropertyDeclaration) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   bool found = false;
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kPropertyDecl) {
       found = true;
       EXPECT_EQ(item->name, "p_req_ack");
@@ -316,7 +316,7 @@ TEST(ParserSection16, SequenceDeclaration) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   bool found = false;
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kSequenceDecl) {
       found = true;
       EXPECT_EQ(item->name, "s_req");
@@ -340,7 +340,7 @@ TEST(ParserSection16, PropertyDeclAndAssertProperty) {
   ASSERT_NE(r.cu, nullptr);
   bool found_prop = false;
   bool found_assert = false;
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kPropertyDecl) found_prop = true;
     if (item->kind == ModuleItemKind::kAssertProperty) found_assert = true;
   }

@@ -13,10 +13,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
 };
 
-static ParseResult Parse(const std::string &src) {
+static ParseResult Parse(const std::string& src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -26,8 +26,8 @@ static ParseResult Parse(const std::string &src) {
   return result;
 }
 
-static Stmt *FirstInitialStmt(ParseResult &r) {
-  for (auto *item : r.cu->modules[0]->items) {
+static Stmt* FirstInitialStmt(ParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
@@ -37,8 +37,8 @@ static Stmt *FirstInitialStmt(ParseResult &r) {
   return nullptr;
 }
 
-static Stmt *InitialBody(ParseResult &r) {
-  for (auto *item : r.cu->modules[0]->items) {
+static Stmt* InitialBody(ParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kInitialBlock) return item->body;
   }
   return nullptr;
@@ -56,7 +56,7 @@ TEST(ParserSection12, NamedBeginEnd) {
       "  end : my_block\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *body = InitialBody(r);
+  auto* body = InitialBody(r);
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->kind, StmtKind::kBlock);
   EXPECT_EQ(body->label, "my_block");
@@ -70,7 +70,7 @@ TEST(ParserSection12, NamedBeginEndNoEndLabel) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *body = InitialBody(r);
+  auto* body = InitialBody(r);
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->kind, StmtKind::kBlock);
   EXPECT_EQ(body->label, "blk");
@@ -84,7 +84,7 @@ TEST(ParserSection12, NamedForkJoin) {
       "  join : my_fork\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *body = InitialBody(r);
+  auto* body = InitialBody(r);
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->kind, StmtKind::kFork);
   EXPECT_EQ(body->label, "my_fork");
@@ -98,7 +98,7 @@ TEST(ParserSection12, NamedForkJoinAny) {
       "  join_any : par_blk\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *body = InitialBody(r);
+  auto* body = InitialBody(r);
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->kind, StmtKind::kFork);
   EXPECT_EQ(body->label, "par_blk");
@@ -113,7 +113,7 @@ TEST(ParserSection12, UnlabeledBlockHasEmptyLabel) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *body = InitialBody(r);
+  auto* body = InitialBody(r);
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->kind, StmtKind::kBlock);
   EXPECT_TRUE(body->label.empty());
@@ -132,7 +132,7 @@ TEST(ParserSection12, UniqueIf) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
@@ -147,7 +147,7 @@ TEST(ParserSection12, PriorityIf) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
@@ -161,7 +161,7 @@ TEST(ParserSection12, Unique0If) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
@@ -178,7 +178,7 @@ TEST(ParserSection12, UniqueCase) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
@@ -195,7 +195,7 @@ TEST(ParserSection12, PriorityCase) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
@@ -211,7 +211,7 @@ TEST(ParserSection12, PlainCaseHasNoQualifier) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kNone);
@@ -232,7 +232,7 @@ TEST(ParserSection12, CaseInside) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
   EXPECT_TRUE(stmt->case_inside);
@@ -248,7 +248,7 @@ TEST(ParserSection12, PlainCaseIsNotInside) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
   EXPECT_FALSE(stmt->case_inside);
@@ -266,7 +266,7 @@ TEST(ParserSection12, ForeachBasicParses) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kForeach);
   EXPECT_NE(stmt->expr, nullptr);
@@ -280,7 +280,7 @@ TEST(ParserSection12, ForeachBasicVars) {
       "    foreach (arr[i]) x = arr[i];\n"
       "  end\n"
       "endmodule\n");
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_EQ(stmt->foreach_vars.size(), 1u);
   EXPECT_EQ(stmt->foreach_vars[0], "i");
@@ -294,7 +294,7 @@ TEST(ParserSection12, ForeachMultipleVars) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kForeach);
   ASSERT_EQ(stmt->foreach_vars.size(), 2u);
@@ -312,7 +312,7 @@ TEST(ParserSection12, ForeachEmptyVar) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kForeach);
   ASSERT_EQ(stmt->foreach_vars.size(), 2u);
@@ -325,7 +325,7 @@ TEST(ParserSection12, ForeachEmptyVarValues) {
       "    foreach (arr[, j]) x = 1;\n"
       "  end\n"
       "endmodule\n");
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_TRUE(stmt->foreach_vars[0].empty());
   EXPECT_EQ(stmt->foreach_vars[1], "j");
@@ -341,7 +341,7 @@ TEST(ParserSection12, ForeachWithBlock) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kForeach);
   EXPECT_NE(stmt->body, nullptr);
@@ -360,7 +360,7 @@ TEST(ParserSection12, ForWithIntDeclParses) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
   EXPECT_NE(stmt->for_init, nullptr);
@@ -374,7 +374,7 @@ TEST(ParserSection12, ForWithIntDeclParts) {
       "    for (int i = 0; i < 10; i = i + 1) x = i;\n"
       "  end\n"
       "endmodule\n");
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_NE(stmt->for_step, nullptr);
   EXPECT_NE(stmt->for_body, nullptr);
@@ -389,7 +389,7 @@ TEST(ParserSection12, ForWithLogicDecl) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
   EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kLogic);
@@ -403,7 +403,7 @@ TEST(ParserSection12, ForWithoutDeclStillWorks) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
   EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kImplicit);
@@ -424,7 +424,7 @@ TEST(ParserSection12, CasexStatement) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
   EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasex);
@@ -442,7 +442,7 @@ TEST(ParserSection12, CasezStatement) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
   EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasez);
@@ -465,7 +465,7 @@ TEST(ParserSection12, WhileLoop) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kWhile);
   EXPECT_NE(stmt->condition, nullptr);
@@ -482,7 +482,7 @@ TEST(ParserSection12, WhileLoopWithBlock) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kWhile);
   EXPECT_NE(stmt->body, nullptr);
@@ -501,7 +501,7 @@ TEST(ParserSection12, DoWhileLoop) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDoWhile);
   EXPECT_NE(stmt->condition, nullptr);
@@ -518,7 +518,7 @@ TEST(ParserSection12, DoWhileLoopWithBlock) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDoWhile);
   EXPECT_NE(stmt->body, nullptr);
@@ -537,7 +537,7 @@ TEST(ParserSection12, RepeatLoop) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kRepeat);
   EXPECT_NE(stmt->condition, nullptr);
@@ -556,7 +556,7 @@ TEST(ParserSection12, ForeverLoop) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kForever);
   EXPECT_NE(stmt->body, nullptr);
@@ -573,7 +573,7 @@ TEST(ParserSection12, ForeverLoopWithBlock) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kForever);
   EXPECT_NE(stmt->body, nullptr);
@@ -585,11 +585,11 @@ TEST(ParserSection12, ForeverLoopWithBlock) {
 // =============================================================================
 
 // Helper: find a function declaration's first return statement.
-static Stmt *FindReturnStmt(ParseResult &r) {
-  auto *mod = r.cu->modules[0];
-  for (auto *item : mod->items) {
+static Stmt* FindReturnStmt(ParseResult& r) {
+  auto* mod = r.cu->modules[0];
+  for (auto* item : mod->items) {
     if (item->kind != ModuleItemKind::kFunctionDecl) continue;
-    for (auto *s : item->func_body_stmts) {
+    for (auto* s : item->func_body_stmts) {
       if (s->kind == StmtKind::kReturn) return s;
     }
   }
@@ -604,7 +604,7 @@ TEST(ParserSection12, ReturnWithValue) {
       "  endfunction\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *ret = FindReturnStmt(r);
+  auto* ret = FindReturnStmt(r);
   ASSERT_NE(ret, nullptr);
   EXPECT_EQ(ret->kind, StmtKind::kReturn);
   EXPECT_NE(ret->expr, nullptr);
@@ -618,7 +618,7 @@ TEST(ParserSection12, ReturnVoid) {
       "  endfunction\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *ret = FindReturnStmt(r);
+  auto* ret = FindReturnStmt(r);
   ASSERT_NE(ret, nullptr);
   EXPECT_EQ(ret->kind, StmtKind::kReturn);
   EXPECT_EQ(ret->expr, nullptr);
@@ -634,7 +634,7 @@ TEST(ParserSection12, BreakStatementParses) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kForever);
 }
@@ -648,10 +648,10 @@ TEST(ParserSection12, BreakStatementInBody) {
       "    end\n"
       "  end\n"
       "endmodule\n");
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   // The body contains an if whose then_branch is break.
-  auto *if_stmt = stmt->body->stmts[0];
+  auto* if_stmt = stmt->body->stmts[0];
   ASSERT_NE(if_stmt, nullptr);
   EXPECT_EQ(if_stmt->kind, StmtKind::kIf);
   ASSERT_NE(if_stmt->then_branch, nullptr);
@@ -669,10 +669,10 @@ TEST(ParserSection12, ContinueStatementParses) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
-  auto *body = stmt->for_body;
+  auto* body = stmt->for_body;
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->kind, StmtKind::kBlock);
 }
@@ -687,11 +687,11 @@ TEST(ParserSection12, ContinueStatementInBody) {
       "    end\n"
       "  end\n"
       "endmodule\n");
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto *body = stmt->for_body;
+  auto* body = stmt->for_body;
   ASSERT_NE(body, nullptr);
-  auto *if_stmt = body->stmts[0];
+  auto* if_stmt = body->stmts[0];
   EXPECT_EQ(if_stmt->kind, StmtKind::kIf);
   EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kContinue);
 }
@@ -708,7 +708,7 @@ TEST(ParserSection12, EventTrigger) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kEventTrigger);
   EXPECT_NE(stmt->expr, nullptr);
@@ -726,7 +726,7 @@ TEST(ParserSection12, DisableBlock) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDisable);
   EXPECT_NE(stmt->expr, nullptr);
@@ -740,7 +740,7 @@ TEST(ParserSection12, DisableFork) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDisableFork);
 }
@@ -760,7 +760,7 @@ TEST(ParserSection12, UniqueCasexQualifier) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
   EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasex);

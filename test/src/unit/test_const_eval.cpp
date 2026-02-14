@@ -14,13 +14,13 @@ struct EvalFixture {
   Arena arena;
 };
 
-static Expr *ParseExprFrom(const std::string &src, EvalFixture &f) {
+static Expr* ParseExprFrom(const std::string& src, EvalFixture& f) {
   std::string code = "module t #(parameter P = " + src + ") (); endmodule";
   auto fid = f.mgr.AddFile("<test>", code);
   DiagEngine diag(f.mgr);
   Lexer lexer(f.mgr.FileContent(fid), fid, diag);
   Parser parser(lexer, f.arena, diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   EXPECT_FALSE(cu->modules.empty());
   EXPECT_FALSE(cu->modules[0]->params.empty());
   return cu->modules[0]->params[0].second;
@@ -59,14 +59,14 @@ TEST(ConstEval, Shifts) {
 TEST(ConstEval, Comparison) {
   EvalFixture f;
   struct Case {
-    const char *expr;
+    const char* expr;
     int64_t expected;
   };
   const Case kCases[] = {
       {"3 < 5", 1},  {"5 < 3", 0},  {"5 > 3", 1},  {"3 >= 3", 1},
       {"3 <= 3", 1}, {"3 == 3", 1}, {"3 != 4", 1},
   };
-  for (const auto &c : kCases) {
+  for (const auto& c : kCases) {
     EXPECT_EQ(ConstEvalInt(ParseExprFrom(c.expr, f)), c.expected) << c.expr;
   }
 }
@@ -158,16 +158,16 @@ TEST(ConstEval, BitsExpr) {
 // ==========================================================================
 
 // Helper: build a simple identifier expression.
-static Expr *LspId(Arena &arena, std::string_view name) {
-  auto *e = arena.Create<Expr>();
+static Expr* LspId(Arena& arena, std::string_view name) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
   e->text = name;
   return e;
 }
 
 // Helper: build a select expression: base[index].
-static Expr *LspSelect(Arena &arena, Expr *base, Expr *index) {
-  auto *e = arena.Create<Expr>();
+static Expr* LspSelect(Arena& arena, Expr* base, Expr* index) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kSelect;
   e->base = base;
   e->index = index;
@@ -175,8 +175,8 @@ static Expr *LspSelect(Arena &arena, Expr *base, Expr *index) {
 }
 
 // Helper: build an integer literal.
-static Expr *LspInt(Arena &arena, uint64_t val) {
-  auto *e = arena.Create<Expr>();
+static Expr* LspInt(Arena& arena, uint64_t val) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
   e->int_val = val;
   return e;
@@ -191,22 +191,22 @@ TEST(ConstEval, LongestStaticPrefixSimpleId) {
 TEST(ConstEval, LongestStaticPrefixConstIdx) {
   Arena arena;
   // m[1] where 1 is constant → prefix is "m[1]".
-  auto *sel = LspSelect(arena, LspId(arena, "m"), LspInt(arena, 1));
+  auto* sel = LspSelect(arena, LspId(arena, "m"), LspInt(arena, 1));
   EXPECT_EQ(LongestStaticPrefix(sel), "m[1]");
 }
 
 TEST(ConstEval, LongestStaticPrefixVarIdx) {
   Arena arena;
   // m[i] where i is not constant → prefix is "m".
-  auto *sel = LspSelect(arena, LspId(arena, "m"), LspId(arena, "i"));
+  auto* sel = LspSelect(arena, LspId(arena, "m"), LspId(arena, "i"));
   EXPECT_EQ(LongestStaticPrefix(sel), "m");
 }
 
 TEST(ConstEval, LongestStaticPrefixNested) {
   Arena arena;
   // m[1][i] → m[1] is static, [i] is not → prefix is "m[1]".
-  auto *inner = LspSelect(arena, LspId(arena, "m"), LspInt(arena, 1));
-  auto *outer = LspSelect(arena, inner, LspId(arena, "i"));
+  auto* inner = LspSelect(arena, LspId(arena, "m"), LspInt(arena, 1));
+  auto* outer = LspSelect(arena, inner, LspId(arena, "i"));
   EXPECT_EQ(LongestStaticPrefix(outer), "m[1]");
 }
 
@@ -214,7 +214,7 @@ TEST(ConstEval, LongestStaticPrefixParamIdx) {
   Arena arena;
   // m[P] where P=7 in scope → prefix is "m[7]".
   ScopeMap scope = {{"P", 7}};
-  auto *sel = LspSelect(arena, LspId(arena, "m"), LspId(arena, "P"));
+  auto* sel = LspSelect(arena, LspId(arena, "m"), LspId(arena, "P"));
   EXPECT_EQ(LongestStaticPrefix(sel, scope), "m[7]");
 }
 
@@ -256,7 +256,7 @@ TEST(TypeEval, ImplicitlySignedTypes) {
   struct Case {
     DataTypeKind kind;
     bool expected;
-    const char *label;
+    const char* label;
   };
   const Case kCases[] = {
       {DataTypeKind::kInteger, true, "integer"},
@@ -268,7 +268,7 @@ TEST(TypeEval, ImplicitlySignedTypes) {
       {DataTypeKind::kReg, false, "reg"},
       {DataTypeKind::kBit, false, "bit"},
   };
-  for (const auto &c : kCases) {
+  for (const auto& c : kCases) {
     EXPECT_EQ(IsImplicitlySigned(c.kind), c.expected) << c.label;
   }
 }

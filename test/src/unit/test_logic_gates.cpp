@@ -135,7 +135,7 @@ TEST(LogicGates, AndGateTruthTable) {
       {Val4::kZ, Val4::kX, Val4::kX},
       {Val4::kZ, Val4::kZ, Val4::kX},
   };
-  for (const auto &c : cases) {
+  for (const auto& c : cases) {
     EXPECT_EQ(EvalNInputGate(GateKind::kAnd, c.a, c.b), c.expected)
         << "And(" << static_cast<int>(c.a) << ", " << static_cast<int>(c.b)
         << ")";
@@ -158,7 +158,7 @@ TEST(LogicGates, OrGateTruthTable) {
       {Val4::kZ, Val4::kV0, Val4::kX},   {Val4::kZ, Val4::kV1, Val4::kV1},
       {Val4::kZ, Val4::kX, Val4::kX},    {Val4::kZ, Val4::kZ, Val4::kX},
   };
-  for (const auto &c : cases) {
+  for (const auto& c : cases) {
     EXPECT_EQ(EvalNInputGate(GateKind::kOr, c.a, c.b), c.expected)
         << "Or(" << static_cast<int>(c.a) << ", " << static_cast<int>(c.b)
         << ")";
@@ -181,7 +181,7 @@ TEST(LogicGates, XorGateTruthTable) {
       {Val4::kZ, Val4::kV0, Val4::kX},   {Val4::kZ, Val4::kV1, Val4::kX},
       {Val4::kZ, Val4::kX, Val4::kX},    {Val4::kZ, Val4::kZ, Val4::kX},
   };
-  for (const auto &c : cases) {
+  for (const auto& c : cases) {
     EXPECT_EQ(EvalNInputGate(GateKind::kXor, c.a, c.b), c.expected)
         << "Xor(" << static_cast<int>(c.a) << ", " << static_cast<int>(c.b)
         << ")";
@@ -197,8 +197,8 @@ static void CheckInversion(GateKind gate, GateKind inverted_gate) {
       Val4 inv_result = EvalNInputGate(inverted_gate, a, b);
       EXPECT_EQ(inv_result, InvertVal4(result))
           << "Gate " << static_cast<int>(gate) << " inv "
-          << static_cast<int>(inverted_gate)
-          << " a=" << static_cast<int>(a) << " b=" << static_cast<int>(b);
+          << static_cast<int>(inverted_gate) << " a=" << static_cast<int>(a)
+          << " b=" << static_cast<int>(b);
     }
   }
 }

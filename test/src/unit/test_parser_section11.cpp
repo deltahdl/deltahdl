@@ -11,11 +11,11 @@ using namespace delta;
 struct ParseResult11 {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult11 Parse(const std::string &src) {
+static ParseResult11 Parse(const std::string& src) {
   ParseResult11 result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -26,8 +26,8 @@ static ParseResult11 Parse(const std::string &src) {
   return result;
 }
 
-static Stmt *FirstInitialStmt(ParseResult11 &r) {
-  for (auto *item : r.cu->modules[0]->items) {
+static Stmt* FirstInitialStmt(ParseResult11& r) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
@@ -38,8 +38,8 @@ static Stmt *FirstInitialStmt(ParseResult11 &r) {
 }
 
 // Helper: get the RHS of the first blocking assignment in initial block.
-static Expr *FirstAssignRhs(ParseResult11 &r) {
-  auto *stmt = FirstInitialStmt(r);
+static Expr* FirstAssignRhs(ParseResult11& r) {
+  auto* stmt = FirstInitialStmt(r);
   if (!stmt) return nullptr;
   return stmt->rhs;
 }
@@ -54,7 +54,7 @@ TEST(ParserSection11, CompoundAssignPlusEq) {
       "  initial a += 1;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   // Compound assignment is parsed as blocking assign with op
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
@@ -66,7 +66,7 @@ TEST(ParserSection11, CompoundAssignMinusEq) {
       "  initial a -= 1;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
@@ -190,7 +190,7 @@ TEST(ParserSection11, PostfixIncrementParses) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
@@ -200,7 +200,7 @@ TEST(ParserSection11, PostfixIncrementOp) {
       "module t;\n"
       "  initial a++;\n"
       "endmodule\n");
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->expr, nullptr);
   EXPECT_EQ(stmt->expr->kind, ExprKind::kPostfixUnary);
@@ -214,7 +214,7 @@ TEST(ParserSection11, PostfixDecrementParses) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
@@ -224,7 +224,7 @@ TEST(ParserSection11, PostfixDecrementOp) {
       "module t;\n"
       "  initial a--;\n"
       "endmodule\n");
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->expr, nullptr);
   EXPECT_EQ(stmt->expr->kind, ExprKind::kPostfixUnary);
@@ -244,7 +244,7 @@ TEST(ParserSection11, InsideBasicListParses) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
 }
@@ -256,9 +256,9 @@ TEST(ParserSection11, InsideBasicListCondition) {
       "    if (a inside {1, 2, 3}) x = 1;\n"
       "  end\n"
       "endmodule\n");
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto *cond = stmt->condition;
+  auto* cond = stmt->condition;
   ASSERT_NE(cond, nullptr);
   EXPECT_EQ(cond->kind, ExprKind::kInside);
   EXPECT_EQ(cond->elements.size(), 3u);
@@ -271,9 +271,9 @@ TEST(ParserSection11, InsideBasicListLhs) {
       "    if (a inside {1, 2, 3}) x = 1;\n"
       "  end\n"
       "endmodule\n");
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto *cond = stmt->condition;
+  auto* cond = stmt->condition;
   ASSERT_NE(cond, nullptr);
   ASSERT_NE(cond->lhs, nullptr);
   EXPECT_EQ(cond->lhs->kind, ExprKind::kIdentifier);
@@ -288,9 +288,9 @@ TEST(ParserSection11, InsideWithRange) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto *cond = stmt->condition;
+  auto* cond = stmt->condition;
   ASSERT_NE(cond, nullptr);
   EXPECT_EQ(cond->kind, ExprKind::kInside);
 }
@@ -302,9 +302,9 @@ TEST(ParserSection11, InsideWithRangeElements) {
       "    if (a inside {[16:23], [32:47]}) x = 1;\n"
       "  end\n"
       "endmodule\n");
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto *cond = stmt->condition;
+  auto* cond = stmt->condition;
   ASSERT_NE(cond, nullptr);
   EXPECT_EQ(cond->elements.size(), 2u);
 }
@@ -330,7 +330,7 @@ TEST(ParserSection11, StreamingRight) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
 }
@@ -340,7 +340,7 @@ TEST(ParserSection11, StreamingRightDetails) {
       "module t;\n"
       "  initial x = {>> {a, b, c}};\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kGtGt);
   EXPECT_EQ(rhs->elements.size(), 3u);
@@ -353,7 +353,7 @@ TEST(ParserSection11, StreamingLeft) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
   EXPECT_EQ(rhs->op, TokenKind::kLtLt);
@@ -366,7 +366,7 @@ TEST(ParserSection11, StreamingWithSliceSize) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
   EXPECT_NE(rhs->lhs, nullptr);  // slice_size
@@ -406,7 +406,7 @@ TEST(ParserSection11, ArithmeticShiftLeft) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kLtLtLt);
@@ -419,7 +419,7 @@ TEST(ParserSection11, ArithmeticShiftRight) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kGtGtGt);
@@ -486,7 +486,7 @@ TEST(ParserSection11, ArithmeticAdd) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
@@ -497,7 +497,7 @@ TEST(ParserSection11, ArithmeticSub) {
       "module t;\n"
       "  initial x = a - b;\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kMinus);
 }
@@ -507,7 +507,7 @@ TEST(ParserSection11, ArithmeticMul) {
       "module t;\n"
       "  initial x = a * b;\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kStar);
 }
@@ -517,7 +517,7 @@ TEST(ParserSection11, ArithmeticDiv) {
       "module t;\n"
       "  initial x = a / b;\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kSlash);
 }
@@ -527,7 +527,7 @@ TEST(ParserSection11, ArithmeticMod) {
       "module t;\n"
       "  initial x = a % b;\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kPercent);
 }
@@ -537,7 +537,7 @@ TEST(ParserSection11, ArithmeticPower) {
       "module t;\n"
       "  initial x = a ** b;\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kPower);
 }
@@ -547,7 +547,7 @@ TEST(ParserSection11, UnaryNegation) {
       "module t;\n"
       "  initial x = -a;\n"
       "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kMinus);

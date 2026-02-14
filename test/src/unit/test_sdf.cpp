@@ -203,7 +203,7 @@ TEST(SdfParser, ParseTimingCheck_Fields) {
     )
   )";
   ParseSdf(sdf, file);
-  auto &tc = file.cells[0].timing_checks[0];
+  auto& tc = file.cells[0].timing_checks[0];
   EXPECT_EQ(tc.check_type, SdfCheckType::kSetup);
   EXPECT_EQ(tc.data_port, "d");
   EXPECT_EQ(tc.ref_port, "clk");
@@ -247,7 +247,7 @@ TEST(SdfParser, ParseMinTypMaxDelay_RiseValues) {
     )
   )";
   ParseSdf(sdf, file);
-  auto &io = file.cells[0].iopaths[0];
+  auto& io = file.cells[0].iopaths[0];
   EXPECT_EQ(io.rise.min_val, 1u);
   EXPECT_EQ(io.rise.typ_val, 2u);
   EXPECT_EQ(io.rise.max_val, 3u);
@@ -269,7 +269,7 @@ TEST(SdfParser, ParseMinTypMaxDelay_FallValues) {
     )
   )";
   ParseSdf(sdf, file);
-  auto &io = file.cells[0].iopaths[0];
+  auto& io = file.cells[0].iopaths[0];
   EXPECT_EQ(io.fall.min_val, 4u);
   EXPECT_EQ(io.fall.typ_val, 5u);
   EXPECT_EQ(io.fall.max_val, 6u);
@@ -311,7 +311,7 @@ TEST(SdfParser, ParseHoldCheck) {
   )";
   bool ok = ParseSdf(sdf, file);
   EXPECT_TRUE(ok);
-  auto &tc = file.cells[0].timing_checks[0];
+  auto& tc = file.cells[0].timing_checks[0];
   EXPECT_EQ(tc.check_type, SdfCheckType::kHold);
   EXPECT_EQ(tc.limit.typ_val, 3u);
 }
@@ -381,7 +381,7 @@ TEST(SdfParser, AnnotateTimingChecks) {
   AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
 
   ASSERT_EQ(mgr.TimingCheckCount(), 1u);
-  auto &checks = mgr.GetTimingChecks();
+  auto& checks = mgr.GetTimingChecks();
   EXPECT_EQ(checks[0].kind, TimingCheckKind::kSetup);
   EXPECT_EQ(checks[0].ref_signal, "clk");
   EXPECT_EQ(checks[0].limit, 50u);

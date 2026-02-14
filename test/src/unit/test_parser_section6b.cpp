@@ -12,10 +12,10 @@ using namespace delta;
 struct ParseResult6b {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
 };
 
-static ParseResult6b Parse(const std::string &src) {
+static ParseResult6b Parse(const std::string& src) {
   ParseResult6b result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -25,14 +25,14 @@ static ParseResult6b Parse(const std::string &src) {
   return result;
 }
 
-static ModuleItem *FirstItem(ParseResult6b &r) {
+static ModuleItem* FirstItem(ParseResult6b& r) {
   if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto &items = r.cu->modules[0]->items;
+  auto& items = r.cu->modules[0]->items;
   return items.empty() ? nullptr : items[0];
 }
 
-static Stmt *FirstInitialStmt(ParseResult6b &r) {
-  for (auto *item : r.cu->modules[0]->items) {
+static Stmt* FirstInitialStmt(ParseResult6b& r) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kInitialBlock) {
       if (item->body && item->body->kind == StmtKind::kBlock) {
         return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
@@ -144,9 +144,9 @@ TEST(ParserSection6, TypeOperatorExpr_Kind) {
       "  initial x = type(y);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto *rhs = stmt->rhs;
+  auto* rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTypeRef);
 }
@@ -157,9 +157,9 @@ TEST(ParserSection6, TypeOperatorExpr_Inner) {
       "  initial x = type(y);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto *rhs = stmt->rhs;
+  auto* rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   ASSERT_NE(rhs->lhs, nullptr);
   EXPECT_EQ(rhs->lhs->kind, ExprKind::kIdentifier);
@@ -169,9 +169,9 @@ TEST(ParserSection6, TypeOperatorExpr_Inner) {
 TEST(ParserSection6, TypeRefInferWidth) {
   // §6.23: InferExprWidth on type(expr) returns inner expression's width.
   Arena arena;
-  auto *inner = arena.Create<Expr>();
+  auto* inner = arena.Create<Expr>();
   inner->kind = ExprKind::kIntegerLiteral;  // 32-bit default.
-  auto *ref = arena.Create<Expr>();
+  auto* ref = arena.Create<Expr>();
   ref->kind = ExprKind::kTypeRef;
   ref->lhs = inner;
   TypedefMap typedefs;
@@ -184,7 +184,7 @@ TEST(ParserSection6, TypeOperatorInDataType) {
       "  parameter type T = type(int);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
   // The init_expr should be a type reference.
@@ -204,9 +204,9 @@ TEST(ParserSection6, ScopeResolutionType) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   // Find the variable declaration.
-  auto &items = r.cu->modules[0]->items;
-  ModuleItem *var_item = nullptr;
-  for (auto *it : items) {
+  auto& items = r.cu->modules[0]->items;
+  ModuleItem* var_item = nullptr;
+  for (auto* it : items) {
     if (it->kind == ModuleItemKind::kVarDecl && it->name == "x") {
       var_item = it;
       break;
@@ -223,7 +223,7 @@ TEST(ParserSection6, ScopeResolutionType) {
 // =========================================================================
 
 // Helper: check parse succeeds with no errors.
-static bool ParseOk6(const std::string &src) {
+static bool ParseOk6(const std::string& src) {
   SourceManager mgr;
   Arena arena;
   auto fid = mgr.AddFile("<test>", src);
@@ -243,7 +243,7 @@ TEST(ParserSection6, BlockVarDecl_StringType) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
   EXPECT_EQ(stmt->var_decl_type.kind, DataTypeKind::kString);
@@ -255,7 +255,7 @@ TEST(ParserSection6, ParsePortDecl_ImplicitType) {
   auto r = Parse("module m(input [3:0] a, output [7:0] b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_FALSE(r.cu->modules.empty());
-  auto &ports = r.cu->modules[0]->ports;
+  auto& ports = r.cu->modules[0]->ports;
   std::string expected_names[] = {"a", "b"};
   ASSERT_EQ(ports.size(), std::size(expected_names));
   for (size_t i = 0; i < std::size(expected_names); ++i) {
@@ -357,7 +357,7 @@ TEST(ParserSection6, BlockVarDecl_Automatic) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
   EXPECT_TRUE(stmt->var_is_automatic);
@@ -371,7 +371,7 @@ TEST(ParserSection6, BlockVarDecl_Automatic_Props) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_FALSE(stmt->var_is_static);
   EXPECT_EQ(stmt->var_name, "auto1");
@@ -385,7 +385,7 @@ TEST(ParserSection6, BlockVarDecl_Static) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
   EXPECT_TRUE(stmt->var_is_static);
@@ -399,7 +399,7 @@ TEST(ParserSection6, BlockVarDecl_Static_Props) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_FALSE(stmt->var_is_automatic);
   EXPECT_EQ(stmt->var_name, "st2");
@@ -413,7 +413,7 @@ TEST(ParserSection6, BlockVarDecl_AutomaticWithInit) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
   EXPECT_TRUE(stmt->var_is_automatic);
@@ -449,7 +449,7 @@ TEST(ParserSection6, TriregChargeStrengthSmall) {
       "module t;\n"
       "  trireg (small) s1;\n"
       "endmodule\n");
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
   EXPECT_EQ(item->data_type.charge_strength, 1);
@@ -460,7 +460,7 @@ TEST(ParserSection6, TriregChargeStrengthLarge) {
       "module t;\n"
       "  trireg (large) l1;\n"
       "endmodule\n");
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.charge_strength, 4);
 }
@@ -470,7 +470,7 @@ TEST(ParserSection6, TriregThreeDelay_Strength) {
       "module t;\n"
       "  trireg (large) #(10, 20, 50) cap1;\n"
       "endmodule\n");
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.charge_strength, 4);
   ASSERT_NE(item->net_delay, nullptr);
@@ -482,7 +482,7 @@ TEST(ParserSection6, TriregThreeDelay_FallAndDecay) {
       "module t;\n"
       "  trireg (large) #(10, 20, 50) cap1;\n"
       "endmodule\n");
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   ASSERT_NE(item->net_delay_fall, nullptr);
   EXPECT_EQ(item->net_delay_fall->int_val, 20u);
@@ -495,7 +495,7 @@ TEST(ParserSection6, TriregSingleDelay) {
       "module t;\n"
       "  trireg #5 t1;\n"
       "endmodule\n");
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
   ASSERT_NE(item->net_delay, nullptr);
@@ -507,7 +507,7 @@ TEST(ParserSection6, TriregSingleDelay_NoFallDecay) {
       "module t;\n"
       "  trireg #5 t1;\n"
       "endmodule\n");
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->net_delay_fall, nullptr);
   EXPECT_EQ(item->net_delay_decay, nullptr);
@@ -554,7 +554,7 @@ TEST(ParserSection6, NetDeclDriveStrength) {
       "  wire (weak0, strong1) w = 1'b1;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   // 2=weak, 4=strong (parser encoding)

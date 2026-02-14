@@ -11,10 +11,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
 };
 
-static ParseResult Parse(const std::string &src) {
+static ParseResult Parse(const std::string& src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -34,10 +34,10 @@ TEST(ParserSection23, NonAnsiPortsBasic) {
       "  assign b = a;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->ports.size(), 2);
   struct Expected {
-    const char *name;
+    const char* name;
     Direction dir;
   };
   Expected expected[] = {{"a", Direction::kInput}, {"b", Direction::kOutput}};
@@ -54,7 +54,7 @@ TEST(ParserSection23, NonAnsiPortsWithTypesPortA) {
       "  output reg b;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->ports.size(), 2);
   EXPECT_EQ(mod->ports[0].name, "a");
   EXPECT_EQ(mod->ports[0].direction, Direction::kInput);
@@ -68,7 +68,7 @@ TEST(ParserSection23, NonAnsiPortsWithTypesPortB) {
       "  output reg b;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->ports.size(), 2);
   EXPECT_EQ(mod->ports[1].name, "b");
   EXPECT_EQ(mod->ports[1].direction, Direction::kOutput);
@@ -83,10 +83,10 @@ TEST(ParserSection23, NonAnsiPortsMixed) {
       "  inout d;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->ports.size(), 4);
   struct Expected {
-    const char *name;
+    const char* name;
     Direction dir;
   };
   Expected expected[] = {
@@ -110,7 +110,7 @@ TEST(ParserSection23, WildcardConnection) {
       "  sub m1(.*);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
   EXPECT_EQ(item->inst_module, "sub");
   EXPECT_EQ(item->inst_name, "m1");
@@ -123,7 +123,7 @@ TEST(ParserSection23, WildcardWithNamed) {
       "  sub m1(.*, .clk(sys_clk));\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
   EXPECT_TRUE(item->inst_wildcard);
   ASSERT_EQ(item->inst_ports.size(), 1);
@@ -136,7 +136,7 @@ TEST(ParserSection23, ExternModuleHeader) {
   auto r = Parse("extern module foo(input logic a, output logic b);\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   EXPECT_EQ(mod->name, "foo");
   EXPECT_TRUE(mod->is_extern);
   EXPECT_TRUE(mod->items.empty());
@@ -145,10 +145,10 @@ TEST(ParserSection23, ExternModuleHeader) {
 TEST(ParserSection23, ExternModulePorts) {
   auto r = Parse("extern module foo(input logic a, output logic b);\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->ports.size(), 2);
   struct Expected {
-    const char *name;
+    const char* name;
     Direction dir;
   };
   Expected expected[] = {{"a", Direction::kInput}, {"b", Direction::kOutput}};
@@ -165,7 +165,7 @@ TEST(ParserSection23, ExternModuleNoBody) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 2);
   struct Expected {
-    const char *name;
+    const char* name;
     bool is_extern;
   };
   Expected expected[] = {{"bar", true}, {"baz", false}};
@@ -183,7 +183,7 @@ TEST(ParserSection23, InstanceArrayKind) {
       "  sub inst[3:0] (.a(a), .b(b));\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
   EXPECT_EQ(item->inst_module, "sub");
   EXPECT_EQ(item->inst_name, "inst");
@@ -195,7 +195,7 @@ TEST(ParserSection23, InstanceArrayRange) {
       "  sub inst[3:0] (.a(a), .b(b));\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_NE(item->inst_range_left, nullptr);
   EXPECT_NE(item->inst_range_right, nullptr);
 }
@@ -206,7 +206,7 @@ TEST(ParserSection23, InstanceArraySingle) {
       "  sub inst[8] (.a(a));\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
   EXPECT_EQ(item->inst_name, "inst");
   EXPECT_NE(item->inst_range_left, nullptr);
@@ -260,8 +260,8 @@ TEST(ParserSection23, EndLabelClass) {
 
 // --- Multi-item import (LRM section 26.3) ---
 
-static void VerifyImportItem(const ModuleItem *item, const char *pkg,
-                             const char *name) {
+static void VerifyImportItem(const ModuleItem* item, const char* pkg,
+                             const char* name) {
   EXPECT_EQ(item->kind, ModuleItemKind::kImportDecl);
   EXPECT_EQ(item->import_item.package_name, pkg);
   EXPECT_EQ(item->import_item.item_name, name);
@@ -273,7 +273,7 @@ TEST(ParserSection23, MultiItemImport) {
       "  import pkg::a, pkg::b;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 2);
   VerifyImportItem(mod->items[0], "pkg", "a");
   VerifyImportItem(mod->items[1], "pkg", "b");
@@ -285,7 +285,7 @@ TEST(ParserSection23, MultiItemImportWithWildcardFirst) {
       "  import pkg::*, other::func;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 2);
   EXPECT_EQ(mod->items[0]->import_item.package_name, "pkg");
   EXPECT_TRUE(mod->items[0]->import_item.is_wildcard);
@@ -297,7 +297,7 @@ TEST(ParserSection23, MultiItemImportWithWildcardSecond) {
       "  import pkg::*, other::func;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 2);
   EXPECT_EQ(mod->items[1]->import_item.package_name, "other");
   EXPECT_EQ(mod->items[1]->import_item.item_name, "func");
@@ -311,7 +311,7 @@ TEST(ParserSection23, ExportDecl) {
       "  export pkg::*;\n"
       "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *pkg = r.cu->packages[0];
+  auto* pkg = r.cu->packages[0];
   ASSERT_EQ(pkg->items.size(), 1);
   EXPECT_EQ(pkg->items[0]->kind, ModuleItemKind::kExportDecl);
   EXPECT_EQ(pkg->items[0]->import_item.package_name, "pkg");
@@ -324,7 +324,7 @@ TEST(ParserSection23, ExportWildcardAll) {
       "  export *::*;\n"
       "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *pkg = r.cu->packages[0];
+  auto* pkg = r.cu->packages[0];
   ASSERT_EQ(pkg->items.size(), 1);
   EXPECT_EQ(pkg->items[0]->kind, ModuleItemKind::kExportDecl);
   EXPECT_EQ(pkg->items[0]->import_item.package_name, "*");
@@ -399,7 +399,7 @@ TEST(ParserSection23, ModuleHeaderImport) {
       "module m import pkg::*; ();\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   EXPECT_EQ(mod->name, "m");
   // The header import generates an import item in the module body.
   ASSERT_GE(mod->items.size(), 1);
@@ -411,7 +411,7 @@ TEST(ParserSection23, ModuleHeaderImportDetails) {
       "module m import pkg::*; ();\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_GE(mod->items.size(), 1);
   EXPECT_EQ(mod->items[0]->import_item.package_name, "pkg");
   EXPECT_TRUE(mod->items[0]->import_item.is_wildcard);
@@ -422,7 +422,7 @@ TEST(ParserSection23, ModuleHeaderImportWithParamsImport) {
       "module m import A::*; #(parameter N = 4) (input logic clk);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   EXPECT_EQ(mod->name, "m");
   ASSERT_GE(mod->items.size(), 1);
   EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kImportDecl);
@@ -433,7 +433,7 @@ TEST(ParserSection23, ModuleHeaderImportWithParamsPortsAndParams) {
       "module m import A::*; #(parameter N = 4) (input logic clk);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->params.size(), 1);
   ASSERT_EQ(mod->ports.size(), 1);
 }
@@ -443,7 +443,7 @@ TEST(ParserSection23, ModuleHeaderMultipleImportsFirst) {
       "module m import A::*, B::foo; ();\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   EXPECT_EQ(mod->name, "m");
   ASSERT_GE(mod->items.size(), 2);
   EXPECT_EQ(mod->items[0]->import_item.package_name, "A");
@@ -455,7 +455,7 @@ TEST(ParserSection23, ModuleHeaderMultipleImportsSecond) {
       "module m import A::*, B::foo; ();\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_GE(mod->items.size(), 2);
   EXPECT_EQ(mod->items[1]->import_item.package_name, "B");
   EXPECT_EQ(mod->items[1]->import_item.item_name, "foo");

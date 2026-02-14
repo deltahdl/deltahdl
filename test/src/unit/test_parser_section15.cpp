@@ -13,10 +13,10 @@ using namespace delta;
 struct ParseResult15 {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
 };
 
-static ParseResult15 Parse(const std::string &src) {
+static ParseResult15 Parse(const std::string& src) {
   ParseResult15 result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -26,8 +26,8 @@ static ParseResult15 Parse(const std::string &src) {
   return result;
 }
 
-static Stmt *FirstInitialStmt(ParseResult15 &r) {
-  for (auto *item : r.cu->modules[0]->items) {
+static Stmt* FirstInitialStmt(ParseResult15& r) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
@@ -50,7 +50,7 @@ TEST(ParserSection15, NonblockingEventTrigger) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kNbEventTrigger);
 }
@@ -61,7 +61,7 @@ TEST(ParserSection15, NonblockingEventTriggerHierarchical) {
       "  initial ->> top.e;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kNbEventTrigger);
 }
@@ -78,7 +78,7 @@ TEST(ParserSection15, MailboxParameterized) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
   // Should parse without errors — mailbox #(string) is a parameterized type
-  auto &items = r.cu->modules[0]->items;
+  auto& items = r.cu->modules[0]->items;
   ASSERT_FALSE(items.empty());
   EXPECT_EQ(items[0]->name, "m_box");
 }
@@ -95,7 +95,7 @@ TEST(ParserSection15, WaitOrderBasic) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kWaitOrder);
   ASSERT_EQ(stmt->wait_order_events.size(), 3u);
@@ -118,7 +118,7 @@ TEST(ParserSection15, WaitOrderWithElseKind) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kWaitOrder);
   ASSERT_EQ(stmt->wait_order_events.size(), 3u);
@@ -133,7 +133,7 @@ TEST(ParserSection15, WaitOrderWithElseBranches) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->then_branch, nullptr);
   ASSERT_NE(stmt->else_branch, nullptr);
@@ -151,7 +151,7 @@ TEST(ParserSection15, WaitOrderElseOnly) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kWaitOrder);
   ASSERT_EQ(stmt->wait_order_events.size(), 2u);
@@ -170,7 +170,7 @@ TEST(ParserSection15, WaitOrderTwoEvents) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kWaitOrder);
   ASSERT_EQ(stmt->wait_order_events.size(), 2u);
@@ -223,7 +223,7 @@ TEST(ParserSection15, EventTriggerAndWait) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kEventTrigger);
 }
@@ -240,7 +240,7 @@ TEST(ParserSection15, WaitOnEvent) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kWait);
 }
@@ -257,7 +257,7 @@ TEST(ParserSection15, WaitOrderNullAction) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kWaitOrder);
   // Null action: then_branch is null or a null stmt.

@@ -32,13 +32,13 @@ struct AggFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static Expr *ParseExprFrom(const std::string &src, AggFixture &f) {
+static Expr* ParseExprFrom(const std::string& src, AggFixture& f) {
   std::string code = "module t; initial x = " + src + "; endmodule";
   auto fid = f.mgr.AddFile("<test>", code);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
-  auto *item = cu->modules[0]->items[0];
+  auto* cu = parser.Parse();
+  auto* item = cu->modules[0]->items[0];
   return item->body->rhs;
 }
 
@@ -46,10 +46,10 @@ static Expr *ParseExprFrom(const std::string &src, AggFixture &f) {
 // §7.2 Struct type metadata — StructTypeInfo registration
 // =============================================================================
 
-static void VerifyStructField(const StructFieldInfo &field,
-                              const char *expected_name,
-                              uint32_t expected_offset,
-                              uint32_t expected_width, size_t index) {
+static void VerifyStructField(const StructFieldInfo& field,
+                              const char* expected_name,
+                              uint32_t expected_offset, uint32_t expected_width,
+                              size_t index) {
   EXPECT_EQ(field.name, expected_name) << "field " << index;
   EXPECT_EQ(field.bit_offset, expected_offset) << "field " << index;
   EXPECT_EQ(field.width, expected_width) << "field " << index;
@@ -65,7 +65,7 @@ TEST(StructType, RegisterAndFind_Metadata) {
   info.fields.push_back({"y", 0, 8});  // LSB field: bits [7:0]
 
   f.ctx.RegisterStructType("point_t", info);
-  auto *found = f.ctx.FindStructType("point_t");
+  auto* found = f.ctx.FindStructType("point_t");
   ASSERT_NE(found, nullptr);
   EXPECT_EQ(found->type_name, "point_t");
   EXPECT_TRUE(found->is_packed);
@@ -83,7 +83,7 @@ TEST(StructType, RegisterAndFind_Fields) {
   info.fields.push_back({"y", 0, 8});
 
   f.ctx.RegisterStructType("point_t", info);
-  auto *found = f.ctx.FindStructType("point_t");
+  auto* found = f.ctx.FindStructType("point_t");
   ASSERT_NE(found, nullptr);
   ASSERT_EQ(found->fields.size(), 2u);
 
@@ -110,7 +110,7 @@ TEST(StructType, SetVariableStructType) {
   f.ctx.CreateVariable("pixel", 24);
   f.ctx.SetVariableStructType("pixel", "color_t");
 
-  auto *type = f.ctx.GetVariableStructType("pixel");
+  auto* type = f.ctx.GetVariableStructType("pixel");
   ASSERT_NE(type, nullptr);
   EXPECT_EQ(type->type_name, "color_t");
   EXPECT_EQ(type->fields.size(), 3u);
@@ -130,7 +130,7 @@ TEST(StructType, FieldTypeKindPreserved) {
   info.fields.push_back({"a", 8, 32, DataTypeKind::kInt});
   info.fields.push_back({"b", 0, 8, DataTypeKind::kByte});
   f.ctx.RegisterStructType("typed_s", info);
-  auto *found = f.ctx.FindStructType("typed_s");
+  auto* found = f.ctx.FindStructType("typed_s");
   ASSERT_NE(found, nullptr);
   EXPECT_EQ(found->fields[0].type_kind, DataTypeKind::kInt);
   EXPECT_EQ(found->fields[1].type_kind, DataTypeKind::kByte);
@@ -140,8 +140,8 @@ TEST(StructType, FieldTypeKindPreserved) {
 // §10.9.2 Structure assignment patterns — named member
 // =============================================================================
 
-static Expr *MakeIntLit(Arena &arena, uint64_t val) {
-  auto *e = arena.Create<Expr>();
+static Expr* MakeIntLit(Arena& arena, uint64_t val) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
   e->int_val = val;
   return e;
@@ -157,7 +157,7 @@ TEST(StructPattern, NamedMemberTwoFields) {
   info.fields.push_back({"x", 8, 8, DataTypeKind::kLogic});
   info.fields.push_back({"y", 0, 8, DataTypeKind::kLogic});
 
-  auto *pat = f.arena.Create<Expr>();
+  auto* pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"x", "y"};
   pat->elements = {MakeIntLit(f.arena, 5), MakeIntLit(f.arena, 10)};
@@ -177,7 +177,7 @@ TEST(StructPattern, NamedMemberReversedOrder) {
   info.fields.push_back({"x", 8, 8, DataTypeKind::kLogic});
   info.fields.push_back({"y", 0, 8, DataTypeKind::kLogic});
 
-  auto *pat = f.arena.Create<Expr>();
+  auto* pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"y", "x"};
   pat->elements = {MakeIntLit(f.arena, 10), MakeIntLit(f.arena, 5)};
@@ -197,7 +197,7 @@ TEST(StructPattern, NamedMemberThreeFields) {
   info.fields.push_back({"g", 8, 8, DataTypeKind::kLogic});
   info.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
 
-  auto *pat = f.arena.Create<Expr>();
+  auto* pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"r", "g", "b"};
   pat->elements = {MakeIntLit(f.arena, 0xFF), MakeIntLit(f.arena, 0x80),
@@ -221,7 +221,7 @@ TEST(StructPattern, DefaultAllFields) {
   info.fields.push_back({"a", 8, 8, DataTypeKind::kLogic});
   info.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
 
-  auto *pat = f.arena.Create<Expr>();
+  auto* pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"default"};
   pat->elements = {MakeIntLit(f.arena, 0xFF)};
@@ -240,7 +240,7 @@ TEST(StructPattern, DefaultWithNamedOverride) {
   info.fields.push_back({"a", 8, 8, DataTypeKind::kLogic});
   info.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
 
-  auto *pat = f.arena.Create<Expr>();
+  auto* pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"a", "default"};
   pat->elements = {MakeIntLit(f.arena, 1), MakeIntLit(f.arena, 0)};
@@ -259,7 +259,7 @@ TEST(StructPattern, TypeKeyedInt) {
   info.fields.push_back({"a", 8, 32, DataTypeKind::kInt});
   info.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
 
-  auto *pat = f.arena.Create<Expr>();
+  auto* pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"int"};
   pat->elements = {MakeIntLit(f.arena, 42)};
@@ -282,7 +282,7 @@ TEST(StructPattern, MixedPrecedence) {
   info.fields.push_back({"b", 8, 8, DataTypeKind::kByte});
   info.fields.push_back({"c", 0, 8, DataTypeKind::kLogic});
 
-  auto *pat = f.arena.Create<Expr>();
+  auto* pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"a", "byte", "default"};
   pat->elements = {MakeIntLit(f.arena, 1), MakeIntLit(f.arena, 2),
@@ -300,11 +300,11 @@ TEST(StructPattern, MixedPrecedence) {
 TEST(AssignmentPattern, PositionalTwoElements) {
   // '{a, b} with 8-bit variables → 16-bit packed result
   AggFixture f;
-  auto *a = f.ctx.CreateVariable("a", 8);
-  auto *b = f.ctx.CreateVariable("b", 8);
+  auto* a = f.ctx.CreateVariable("a", 8);
+  auto* b = f.ctx.CreateVariable("b", 8);
   a->value = MakeLogic4VecVal(f.arena, 8, 5);
   b->value = MakeLogic4VecVal(f.arena, 8, 10);
-  auto *expr = ParseExprFrom("'{a, b}", f);
+  auto* expr = ParseExprFrom("'{a, b}", f);
   ASSERT_NE(expr, nullptr);
   EXPECT_EQ(expr->kind, ExprKind::kAssignmentPattern);
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -315,13 +315,13 @@ TEST(AssignmentPattern, PositionalTwoElements) {
 
 TEST(AssignmentPattern, PositionalThreeElements) {
   AggFixture f;
-  auto *a = f.ctx.CreateVariable("a", 4);
-  auto *b = f.ctx.CreateVariable("b", 4);
-  auto *c = f.ctx.CreateVariable("c", 4);
+  auto* a = f.ctx.CreateVariable("a", 4);
+  auto* b = f.ctx.CreateVariable("b", 4);
+  auto* c = f.ctx.CreateVariable("c", 4);
   a->value = MakeLogic4VecVal(f.arena, 4, 1);
   b->value = MakeLogic4VecVal(f.arena, 4, 2);
   c->value = MakeLogic4VecVal(f.arena, 4, 3);
-  auto *expr = ParseExprFrom("'{a, b, c}", f);
+  auto* expr = ParseExprFrom("'{a, b, c}", f);
   auto result = EvalExpr(expr, f.ctx, f.arena);
   // {1, 2, 3} → 12-bit: 0x123
   EXPECT_EQ(result.width, 12u);
@@ -330,16 +330,16 @@ TEST(AssignmentPattern, PositionalThreeElements) {
 
 TEST(AssignmentPattern, SingleElement) {
   AggFixture f;
-  auto *a = f.ctx.CreateVariable("a", 32);
+  auto* a = f.ctx.CreateVariable("a", 32);
   a->value = MakeLogic4VecVal(f.arena, 32, 42);
-  auto *expr = ParseExprFrom("'{a}", f);
+  auto* expr = ParseExprFrom("'{a}", f);
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 42u);
 }
 
 TEST(AssignmentPattern, EmptyPattern) {
   AggFixture f;
-  auto *expr = ParseExprFrom("'{}", f);
+  auto* expr = ParseExprFrom("'{}", f);
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.width, 0u);
 }
@@ -347,7 +347,7 @@ TEST(AssignmentPattern, EmptyPattern) {
 TEST(AssignmentPattern, SizedLiterals) {
   // Test the parser fix for integer literal first elements
   AggFixture f;
-  auto *expr = ParseExprFrom("'{32'd5, 32'd10}", f);
+  auto* expr = ParseExprFrom("'{32'd5, 32'd10}", f);
   ASSERT_NE(expr, nullptr);
   EXPECT_EQ(expr->kind, ExprKind::kAssignmentPattern);
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -365,7 +365,7 @@ TEST(AssignmentPattern, SizedLiterals) {
 TEST(Matches, ExactMatchTrue) {
   // 42 matches 42 should be 1
   AggFixture f;
-  auto *expr = ParseExprFrom("42 matches 42", f);
+  auto* expr = ParseExprFrom("42 matches 42", f);
   ASSERT_NE(expr, nullptr);
   EXPECT_EQ(expr->kind, ExprKind::kBinary);
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -375,16 +375,16 @@ TEST(Matches, ExactMatchTrue) {
 TEST(Matches, ExactMatchFalse) {
   // 42 matches 99 should be 0
   AggFixture f;
-  auto *expr = ParseExprFrom("42 matches 99", f);
+  auto* expr = ParseExprFrom("42 matches 99", f);
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
 TEST(Matches, VariableMatch) {
   AggFixture f;
-  auto *var = f.ctx.CreateVariable("sig", 8);
+  auto* var = f.ctx.CreateVariable("sig", 8);
   var->value = MakeLogic4VecVal(f.arena, 8, 0xAB);
-  auto *expr = ParseExprFrom("sig matches 8'hAB", f);
+  auto* expr = ParseExprFrom("sig matches 8'hAB", f);
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
@@ -395,7 +395,7 @@ TEST(Matches, VariableMatch) {
 
 TEST(TaggedUnion, SetAndGetTag) {
   AggFixture f;
-  auto *var = f.ctx.CreateVariable("u", 32);
+  auto* var = f.ctx.CreateVariable("u", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
   f.ctx.SetVariableTag("u", "field_a");
@@ -423,14 +423,14 @@ TEST(TaggedUnion, ChangeTag) {
 TEST(UnpackedArrayConcat, BasicConcat) {
   // Create two array elements as flat variables, verify concatenation concept.
   AggFixture f;
-  auto *a0 = f.ctx.CreateVariable("a[0]", 8);
-  auto *a1 = f.ctx.CreateVariable("a[1]", 8);
+  auto* a0 = f.ctx.CreateVariable("a[0]", 8);
+  auto* a1 = f.ctx.CreateVariable("a[1]", 8);
   a0->value = MakeLogic4VecVal(f.arena, 8, 10);
   a1->value = MakeLogic4VecVal(f.arena, 8, 20);
 
   // Verify the flat naming convention for array elements.
-  auto *found0 = f.ctx.FindVariable("a[0]");
-  auto *found1 = f.ctx.FindVariable("a[1]");
+  auto* found0 = f.ctx.FindVariable("a[0]");
+  auto* found1 = f.ctx.FindVariable("a[1]");
   ASSERT_NE(found0, nullptr);
   ASSERT_NE(found1, nullptr);
   EXPECT_EQ(found0->value.ToUint64(), 10u);
@@ -444,18 +444,18 @@ TEST(UnpackedArrayConcat, BasicConcat) {
 TEST(AggregateExpr, PackedStructInsideSet) {
   // A packed struct is just a bitvector — inside should work by value.
   AggFixture f;
-  auto *var = f.ctx.CreateVariable("s", 8);
+  auto* var = f.ctx.CreateVariable("s", 8);
   var->value = MakeLogic4VecVal(f.arena, 8, 5);
-  auto *expr = ParseExprFrom("s inside {5, 10, 15}", f);
+  auto* expr = ParseExprFrom("s inside {5, 10, 15}", f);
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
 TEST(AggregateExpr, PackedStructNotInSet) {
   AggFixture f;
-  auto *var = f.ctx.CreateVariable("s", 8);
+  auto* var = f.ctx.CreateVariable("s", 8);
   var->value = MakeLogic4VecVal(f.arena, 8, 7);
-  auto *expr = ParseExprFrom("s inside {5, 10, 15}", f);
+  auto* expr = ParseExprFrom("s inside {5, 10, 15}", f);
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
@@ -466,16 +466,16 @@ TEST(AggregateExpr, PackedStructNotInSet) {
 
 TEST(AssocArray, ReadMissingKeyWarns) {
   AggFixture f;
-  auto *aa = f.ctx.CreateAssocArray("aa", 32, false);
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
   aa->int_data[10] = MakeLogic4VecVal(f.arena, 32, 42);
   // Read key 99 (does not exist).  Should return default and warn.
-  auto *sel = f.arena.Create<Expr>();
+  auto* sel = f.arena.Create<Expr>();
   sel->kind = ExprKind::kSelect;
-  auto *base = f.arena.Create<Expr>();
+  auto* base = f.arena.Create<Expr>();
   base->kind = ExprKind::kIdentifier;
   base->text = "aa";
   sel->base = base;
-  auto *idx = f.arena.Create<Expr>();
+  auto* idx = f.arena.Create<Expr>();
   idx->kind = ExprKind::kIntegerLiteral;
   idx->int_val = 99;
   sel->index = idx;
@@ -487,16 +487,16 @@ TEST(AssocArray, ReadMissingKeyWarns) {
 
 TEST(AssocArray, ReadExistingKeyNoWarning) {
   AggFixture f;
-  auto *aa = f.ctx.CreateAssocArray("aa", 32, false);
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
   aa->int_data[10] = MakeLogic4VecVal(f.arena, 32, 42);
   // Read key 10 (exists).  Should NOT warn.
-  auto *sel = f.arena.Create<Expr>();
+  auto* sel = f.arena.Create<Expr>();
   sel->kind = ExprKind::kSelect;
-  auto *base = f.arena.Create<Expr>();
+  auto* base = f.arena.Create<Expr>();
   base->kind = ExprKind::kIdentifier;
   base->text = "aa";
   sel->base = base;
-  auto *idx = f.arena.Create<Expr>();
+  auto* idx = f.arena.Create<Expr>();
   idx->kind = ExprKind::kIntegerLiteral;
   idx->int_val = 10;
   sel->index = idx;
@@ -511,14 +511,14 @@ TEST(AssocArray, ReadExistingKeyNoWarning) {
 // =============================================================================
 
 // Helper: build arr[idx] select expression.
-static Expr *MkSelect(Arena &arena, std::string_view name, uint64_t idx) {
-  auto *sel = arena.Create<Expr>();
+static Expr* MkSelect(Arena& arena, std::string_view name, uint64_t idx) {
+  auto* sel = arena.Create<Expr>();
   sel->kind = ExprKind::kSelect;
-  auto *base = arena.Create<Expr>();
+  auto* base = arena.Create<Expr>();
   base->kind = ExprKind::kIdentifier;
   base->text = name;
   sel->base = base;
-  auto *idx_expr = arena.Create<Expr>();
+  auto* idx_expr = arena.Create<Expr>();
   idx_expr->kind = ExprKind::kIntegerLiteral;
   idx_expr->int_val = idx;
   sel->index = idx_expr;
@@ -531,8 +531,8 @@ TEST(ArrayAccess, OutOfBoundsReturnsX) {
   f.ctx.RegisterArray("arr", {0, 4, 8, false, false, false});
   for (uint32_t i = 0; i < 4; ++i) {
     auto tmp = "arr[" + std::to_string(i) + "]";
-    auto *s = f.arena.AllocString(tmp.c_str(), tmp.size());
-    auto *v = f.ctx.CreateVariable(std::string_view(s, tmp.size()), 8);
+    auto* s = f.arena.AllocString(tmp.c_str(), tmp.size());
+    auto* v = f.ctx.CreateVariable(std::string_view(s, tmp.size()), 8);
     v->value = MakeLogic4VecVal(f.arena, 8, static_cast<uint64_t>(i + 1) * 10);
   }
   // In-bounds: arr[2] should return 30.
@@ -546,7 +546,7 @@ TEST(ArrayAccess, OutOfBoundsReturnsX) {
 
 TEST(QueueAccess, OutOfBoundsReturnsX) {
   AggFixture f;
-  auto *q = f.ctx.CreateQueue("q", 16);
+  auto* q = f.ctx.CreateQueue("q", 16);
   q->elements.push_back(MakeLogic4VecVal(f.arena, 16, 100));
   q->elements.push_back(MakeLogic4VecVal(f.arena, 16, 200));
   // In-bounds: q[1] should return 200.
@@ -563,19 +563,19 @@ TEST(QueueAccess, OutOfBoundsReturnsX) {
 // =============================================================================
 
 // Helper: build arr[hi:lo] range select expression.
-static Expr *MkSlice(Arena &arena, std::string_view name, uint64_t hi,
+static Expr* MkSlice(Arena& arena, std::string_view name, uint64_t hi,
                      uint64_t lo) {
-  auto *sel = arena.Create<Expr>();
+  auto* sel = arena.Create<Expr>();
   sel->kind = ExprKind::kSelect;
-  auto *base = arena.Create<Expr>();
+  auto* base = arena.Create<Expr>();
   base->kind = ExprKind::kIdentifier;
   base->text = name;
   sel->base = base;
-  auto *hi_expr = arena.Create<Expr>();
+  auto* hi_expr = arena.Create<Expr>();
   hi_expr->kind = ExprKind::kIntegerLiteral;
   hi_expr->int_val = hi;
   sel->index = hi_expr;
-  auto *lo_expr = arena.Create<Expr>();
+  auto* lo_expr = arena.Create<Expr>();
   lo_expr->kind = ExprKind::kIntegerLiteral;
   lo_expr->int_val = lo;
   sel->index_end = lo_expr;
@@ -583,12 +583,12 @@ static Expr *MkSlice(Arena &arena, std::string_view name, uint64_t hi,
 }
 
 // Helper: register a 4-element array and populate variables.
-static void MakeArray4(AggFixture &f, std::string_view name) {
+static void MakeArray4(AggFixture& f, std::string_view name) {
   f.ctx.RegisterArray(name, {0, 4, 8, false, false, false});
   for (uint32_t i = 0; i < 4; ++i) {
     auto tmp = std::string(name) + "[" + std::to_string(i) + "]";
-    auto *s = f.arena.AllocString(tmp.c_str(), tmp.size());
-    auto *v = f.ctx.CreateVariable(std::string_view(s, tmp.size()), 8);
+    auto* s = f.arena.AllocString(tmp.c_str(), tmp.size());
+    auto* v = f.ctx.CreateVariable(std::string_view(s, tmp.size()), 8);
     v->value = MakeLogic4VecVal(f.arena, 8, static_cast<uint64_t>(i + 1) * 10);
   }
 }
@@ -609,14 +609,14 @@ TEST(ArraySlice, ReadSliceConcat) {
 // =============================================================================
 
 // Helper: build (lhs == rhs) binary expression.
-static Expr *MkEq(Arena &arena, std::string_view a, std::string_view b) {
-  auto *expr = arena.Create<Expr>();
+static Expr* MkEq(Arena& arena, std::string_view a, std::string_view b) {
+  auto* expr = arena.Create<Expr>();
   expr->kind = ExprKind::kBinary;
   expr->op = TokenKind::kEqEq;
-  auto *lhs = arena.Create<Expr>();
+  auto* lhs = arena.Create<Expr>();
   lhs->kind = ExprKind::kIdentifier;
   lhs->text = a;
-  auto *rhs = arena.Create<Expr>();
+  auto* rhs = arena.Create<Expr>();
   rhs->kind = ExprKind::kIdentifier;
   rhs->text = b;
   expr->lhs = lhs;
@@ -637,7 +637,7 @@ TEST(ArrayEquality, UnequalArrays) {
   MakeArray4(f, "a");
   MakeArray4(f, "b");
   // Modify b[2] to differ.
-  auto *v = f.ctx.FindVariable("b[2]");
+  auto* v = f.ctx.FindVariable("b[2]");
   ASSERT_NE(v, nullptr);
   v->value = MakeLogic4VecVal(f.arena, 8, 99);
   auto result = EvalExpr(MkEq(f.arena, "a", "b"), f.ctx, f.arena);
@@ -649,22 +649,22 @@ TEST(ArrayEquality, UnequalArrays) {
 // =============================================================================
 
 // Helper: build aa.method(ref) call expression.
-static Expr *MkAssocCall(Arena &arena, std::string_view var,
+static Expr* MkAssocCall(Arena& arena, std::string_view var,
                          std::string_view method, std::string_view ref) {
-  auto *expr = arena.Create<Expr>();
+  auto* expr = arena.Create<Expr>();
   expr->kind = ExprKind::kCall;
-  auto *access = arena.Create<Expr>();
+  auto* access = arena.Create<Expr>();
   access->kind = ExprKind::kMemberAccess;
-  auto *base = arena.Create<Expr>();
+  auto* base = arena.Create<Expr>();
   base->kind = ExprKind::kIdentifier;
   base->text = var;
-  auto *meth = arena.Create<Expr>();
+  auto* meth = arena.Create<Expr>();
   meth->kind = ExprKind::kIdentifier;
   meth->text = method;
   access->lhs = base;
   access->rhs = meth;
   expr->lhs = access;
-  auto *arg = arena.Create<Expr>();
+  auto* arg = arena.Create<Expr>();
   arg->kind = ExprKind::kIdentifier;
   arg->text = ref;
   expr->args.push_back(arg);
@@ -674,13 +674,13 @@ static Expr *MkAssocCall(Arena &arena, std::string_view var,
 TEST(AssocTraversal, FirstReturnsTruncationFlag) {
   AggFixture f;
   // 32-bit index type, ref variable is only 8 bits → truncation → returns -1.
-  auto *aa = f.ctx.CreateAssocArray("aa", 32, false);
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
   aa->index_width = 32;
   aa->int_data[1000] = MakeLogic4VecVal(f.arena, 32, 42);
-  auto *ref = f.ctx.CreateVariable("k", 8);
+  auto* ref = f.ctx.CreateVariable("k", 8);
   ref->value = MakeLogic4VecVal(f.arena, 8, 0);
   Logic4Vec out{};
-  auto *call = MkAssocCall(f.arena, "aa", "first", "k");
+  auto* call = MkAssocCall(f.arena, "aa", "first", "k");
   bool ok = TryEvalAssocMethodCall(call, f.ctx, f.arena, out);
   ASSERT_TRUE(ok);
   // ref width (8) < index_width (32) → result should be -1 (as uint64 = max).
@@ -695,13 +695,13 @@ TEST(AssocTraversal, FirstReturnsTruncationFlag) {
 TEST(AssocTraversal, FirstReturnsOneWhenWidthSufficient) {
   AggFixture f;
   // 32-bit index, ref variable is also 32 bits → no truncation → returns 1.
-  auto *aa = f.ctx.CreateAssocArray("aa", 32, false);
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
   aa->index_width = 32;
   aa->int_data[42] = MakeLogic4VecVal(f.arena, 32, 99);
-  auto *ref = f.ctx.CreateVariable("k", 32);
+  auto* ref = f.ctx.CreateVariable("k", 32);
   ref->value = MakeLogic4VecVal(f.arena, 32, 0);
   Logic4Vec out{};
-  auto *call = MkAssocCall(f.arena, "aa", "first", "k");
+  auto* call = MkAssocCall(f.arena, "aa", "first", "k");
   bool ok = TryEvalAssocMethodCall(call, f.ctx, f.arena, out);
   ASSERT_TRUE(ok);
   EXPECT_EQ(out.ToUint64(), 1u);
@@ -711,13 +711,13 @@ TEST(AssocTraversal, FirstReturnsOneWhenWidthSufficient) {
 TEST(AssocTraversal, ByteIndexFirstReturnsOneForByteRef) {
   AggFixture f;
   // byte index type → index_width should be 8.
-  auto *aa = f.ctx.CreateAssocArray("aa", 32, false);
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
   aa->index_width = 8;
   aa->int_data[200] = MakeLogic4VecVal(f.arena, 32, 99);
-  auto *ref = f.ctx.CreateVariable("ix", 8);
+  auto* ref = f.ctx.CreateVariable("ix", 8);
   ref->value = MakeLogic4VecVal(f.arena, 8, 0);
   Logic4Vec out{};
-  auto *call = MkAssocCall(f.arena, "aa", "first", "ix");
+  auto* call = MkAssocCall(f.arena, "aa", "first", "ix");
   bool ok = TryEvalAssocMethodCall(call, f.ctx, f.arena, out);
   ASSERT_TRUE(ok);
   // ref width (8) >= index_width (8) → returns 1 (no truncation).
@@ -730,9 +730,9 @@ TEST(AssocTraversal, ByteIndexFirstReturnsOneForByteRef) {
 // =============================================================================
 
 // Helper: register dynamic array with elements via QueueObject + ArrayInfo.
-static void MakeDynArray(AggFixture &f, std::string_view name,
-                         const std::vector<uint64_t> &vals) {
-  auto *q = f.ctx.CreateQueue(name, 32);
+static void MakeDynArray(AggFixture& f, std::string_view name,
+                         const std::vector<uint64_t>& vals) {
+  auto* q = f.ctx.CreateQueue(name, 32);
   for (auto v : vals) {
     q->elements.push_back(MakeLogic4VecVal(f.arena, 32, v));
   }
@@ -823,17 +823,17 @@ TEST(FormatArg, StringFromAscii) {
 TEST(TaskCall, SetupReturnsTaskItem) {
   AggFixture f;
   // Create a task declaration node.
-  auto *task = f.arena.Create<ModuleItem>();
+  auto* task = f.arena.Create<ModuleItem>();
   task->kind = ModuleItemKind::kTaskDecl;
   task->name = "my_task";
   f.ctx.RegisterFunction("my_task", task);
 
   // Build a kCall expression targeting the task.
-  auto *call = f.arena.Create<Expr>();
+  auto* call = f.arena.Create<Expr>();
   call->kind = ExprKind::kCall;
   call->callee = "my_task";
 
-  auto *result = SetupTaskCall(call, f.ctx, f.arena);
+  auto* result = SetupTaskCall(call, f.ctx, f.arena);
   ASSERT_NE(result, nullptr);
   EXPECT_EQ(result->name, "my_task");
   // Clean up scope pushed by SetupTaskCall.
@@ -843,26 +843,26 @@ TEST(TaskCall, SetupReturnsTaskItem) {
 TEST(TaskCall, SetupReturnsNullForFunction) {
   AggFixture f;
   // Create a function (not task) declaration.
-  auto *func = f.arena.Create<ModuleItem>();
+  auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "my_func";
   f.ctx.RegisterFunction("my_func", func);
 
-  auto *call = f.arena.Create<Expr>();
+  auto* call = f.arena.Create<Expr>();
   call->kind = ExprKind::kCall;
   call->callee = "my_func";
 
-  auto *result = SetupTaskCall(call, f.ctx, f.arena);
+  auto* result = SetupTaskCall(call, f.ctx, f.arena);
   EXPECT_EQ(result, nullptr);
 }
 
 TEST(TaskCall, SetupReturnsNullForUnknown) {
   AggFixture f;
-  auto *call = f.arena.Create<Expr>();
+  auto* call = f.arena.Create<Expr>();
   call->kind = ExprKind::kCall;
   call->callee = "nonexistent";
 
-  auto *result = SetupTaskCall(call, f.ctx, f.arena);
+  auto* result = SetupTaskCall(call, f.ctx, f.arena);
   EXPECT_EQ(result, nullptr);
 }
 

@@ -15,10 +15,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
 };
 
-static ParseResult Parse(const std::string &src) {
+static ParseResult Parse(const std::string& src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -36,11 +36,11 @@ struct ElabFixture {
   DiagEngine diag{mgr};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, ElabFixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -57,7 +57,7 @@ TEST(ParserSection28, BasicAndGate) {
       "  and g1(out, a, b);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
   EXPECT_EQ(item->gate_kind, GateKind::kAnd);
   EXPECT_EQ(item->gate_inst_name, "g1");
@@ -70,7 +70,7 @@ TEST(ParserSection28, BasicOrGate) {
       "  or (out, a, b, c);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->gate_kind, GateKind::kOr);
   EXPECT_TRUE(item->gate_inst_name.empty());
   ASSERT_EQ(item->gate_terminals.size(), 4);
@@ -82,7 +82,7 @@ TEST(ParserSection28, BasicBufGate) {
       "  buf b1(out, in);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->gate_kind, GateKind::kBuf);
   EXPECT_EQ(item->gate_inst_name, "b1");
   ASSERT_EQ(item->gate_terminals.size(), 2);
@@ -94,7 +94,7 @@ TEST(ParserSection28, BasicNotGate) {
       "  not n1(out, in);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->gate_kind, GateKind::kNot);
 }
 
@@ -104,7 +104,7 @@ TEST(ParserSection28, GateWithDelay) {
       "  and #5 g1(out, a, b);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->gate_kind, GateKind::kAnd);
   EXPECT_NE(item->gate_delay, nullptr);
   ASSERT_EQ(item->gate_terminals.size(), 3);
@@ -116,7 +116,7 @@ TEST(ParserSection28, GateWithParenDelay) {
       "  or #(10) g1(out, a, b);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_NE(item->gate_delay, nullptr);
 }
 
@@ -128,7 +128,7 @@ TEST(ParserSection28, StrengthSpec) {
       "  and (strong0, weak1) g1(out, a, b);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->gate_kind, GateKind::kAnd);
   EXPECT_EQ(item->drive_strength0, 4);  // strong0 = 4
   EXPECT_EQ(item->drive_strength1, 2);  // weak1 = 2
@@ -141,7 +141,7 @@ TEST(ParserSection28, StrengthSpecSupply) {
       "  nand (supply0, supply1) g1(out, a, b);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->drive_strength0, 5);  // supply0 = 5
   EXPECT_EQ(item->drive_strength1, 5);  // supply1 = 5
 }
@@ -152,7 +152,7 @@ TEST(ParserSection28, StrengthSpecHighz) {
       "  or (highz0, pull1) g1(out, a, b);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->drive_strength0, 1);  // highz0 = 1
   EXPECT_EQ(item->drive_strength1, 3);  // pull1 = 3
 }
@@ -163,7 +163,7 @@ TEST(ParserSection28, StrengthWithDelay) {
       "  and (strong0, strong1) #5 g1(out, a, b);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->drive_strength0, 4);  // strong0
   EXPECT_EQ(item->drive_strength1, 4);  // strong1
   EXPECT_NE(item->gate_delay, nullptr);
@@ -172,7 +172,7 @@ TEST(ParserSection28, StrengthWithDelay) {
 
 // --- Helpers for multiple-instance and UDP tests ---
 
-static void VerifyGateInstances(const std::vector<ModuleItem *> &items,
+static void VerifyGateInstances(const std::vector<ModuleItem*>& items,
                                 GateKind kind,
                                 const std::string expected_names[],
                                 size_t count) {
@@ -183,8 +183,8 @@ static void VerifyGateInstances(const std::vector<ModuleItem *> &items,
   }
 }
 
-static void VerifyStrengthDelayInstances(
-    const std::vector<ModuleItem *> &items, size_t count, int str0, int str1) {
+static void VerifyStrengthDelayInstances(const std::vector<ModuleItem*>& items,
+                                         size_t count, int str0, int str1) {
   for (size_t i = 0; i < count; ++i) {
     EXPECT_EQ(items[i]->drive_strength0, str0);
     EXPECT_EQ(items[i]->drive_strength1, str1);
@@ -200,7 +200,7 @@ TEST(ParserSection28, MultipleInstances) {
       "  and g1(a, b, c), g2(d, e, f);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 2);
   std::string expected_names[] = {"g1", "g2"};
   VerifyGateInstances(mod->items, GateKind::kAnd, expected_names, 2);
@@ -212,7 +212,7 @@ TEST(ParserSection28, MultipleInstancesThree) {
       "  nand n1(a, b, c), n2(d, e, f), n3(g, h, i);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 3);
   EXPECT_EQ(mod->items[0]->gate_inst_name, "n1");
   EXPECT_EQ(mod->items[1]->gate_inst_name, "n2");
@@ -225,7 +225,7 @@ TEST(ParserSection28, MultipleInstancesNoNames) {
       "  or (a, b, c), (d, e, f);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 2);
   EXPECT_TRUE(mod->items[0]->gate_inst_name.empty());
   EXPECT_TRUE(mod->items[1]->gate_inst_name.empty());
@@ -237,7 +237,7 @@ TEST(ParserSection28, MultipleInstancesWithStrengthAndDelay) {
       "  and (strong0, strong1) #5 g1(a, b, c), g2(d, e, f);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 2);
   VerifyStrengthDelayInstances(mod->items, 2, 4, 4);
 }
@@ -255,7 +255,7 @@ TEST(ParserSection28, AllNInputGates) {
       "  xnor (o, a, b);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 6);
   GateKind expected[] = {GateKind::kAnd, GateKind::kNand, GateKind::kOr,
                          GateKind::kNor, GateKind::kXor,  GateKind::kXnor};
@@ -273,7 +273,7 @@ TEST(ParserSection28, EnableGates) {
       "  notif1 (out, in, en);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 4);
   GateKind expected[] = {GateKind::kBufif0, GateKind::kBufif1,
                          GateKind::kNotif0, GateKind::kNotif1};
@@ -289,7 +289,7 @@ TEST(ParserSection28, PullGates) {
       "  pulldown (out);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 2);
   EXPECT_EQ(mod->items[0]->gate_kind, GateKind::kPullup);
   EXPECT_EQ(mod->items[1]->gate_kind, GateKind::kPulldown);
@@ -301,8 +301,8 @@ TEST(ParserSection28, PullGates) {
 
 // --- UDP verification helpers ---
 
-static void VerifyUdpRowInputs(const UdpTableRow &row,
-                                const std::string &expected) {
+static void VerifyUdpRowInputs(const UdpTableRow& row,
+                               const std::string& expected) {
   ASSERT_EQ(row.inputs.size(), expected.size());
   for (size_t j = 0; j < expected.size(); ++j) {
     EXPECT_EQ(row.inputs[j], expected[j]);
@@ -314,8 +314,8 @@ struct CombUdpRow {
   char output;
 };
 
-static void VerifyCombUdpTable(const UdpDecl *udp,
-                                const CombUdpRow expected[], size_t count) {
+static void VerifyCombUdpTable(const UdpDecl* udp, const CombUdpRow expected[],
+                               size_t count) {
   ASSERT_EQ(udp->table.size(), count);
   for (size_t i = 0; i < count; ++i) {
     VerifyUdpRowInputs(udp->table[i], expected[i].inputs);
@@ -329,8 +329,8 @@ struct SeqUdpRow {
   char output;
 };
 
-static void VerifySeqUdpTable(const UdpDecl *udp, const SeqUdpRow expected[],
-                               size_t count) {
+static void VerifySeqUdpTable(const UdpDecl* udp, const SeqUdpRow expected[],
+                              size_t count) {
   ASSERT_EQ(udp->table.size(), count);
   for (size_t i = 0; i < count; ++i) {
     VerifyUdpRowInputs(udp->table[i], expected[i].inputs);
@@ -339,8 +339,8 @@ static void VerifySeqUdpTable(const UdpDecl *udp, const SeqUdpRow expected[],
   }
 }
 
-static void VerifyUdpInputNames(const UdpDecl *udp,
-                                 const std::string expected[], size_t count) {
+static void VerifyUdpInputNames(const UdpDecl* udp,
+                                const std::string expected[], size_t count) {
   ASSERT_EQ(udp->input_names.size(), count);
   for (size_t i = 0; i < count; ++i) {
     EXPECT_EQ(udp->input_names[i], expected[i]);
@@ -359,7 +359,7 @@ TEST(ParserSection29, CombinationalUdp) {
       "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->udps.size(), 1);
-  auto *udp = r.cu->udps[0];
+  auto* udp = r.cu->udps[0];
   EXPECT_EQ(udp->name, "mux");
   EXPECT_EQ(udp->output_name, "out");
   EXPECT_FALSE(udp->is_sequential);
@@ -381,7 +381,7 @@ TEST(ParserSection29, SequentialUdp) {
       "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->udps.size(), 1);
-  auto *udp = r.cu->udps[0];
+  auto* udp = r.cu->udps[0];
   EXPECT_EQ(udp->name, "dff");
   EXPECT_TRUE(udp->is_sequential);
   EXPECT_EQ(udp->output_name, "q");
@@ -399,7 +399,7 @@ TEST(ParserSection29, UdpTableSpecialChars) {
       "  endtable\n"
       "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *udp = r.cu->udps[0];
+  auto* udp = r.cu->udps[0];
   ASSERT_EQ(udp->table.size(), 3);
 
   struct Check {
@@ -408,7 +408,7 @@ TEST(ParserSection29, UdpTableSpecialChars) {
     char val;
   };
   Check input_checks[] = {{0, 1, 'f'}, {1, 1, 'p'}, {2, 0, '*'}};
-  for (const auto &c : input_checks) {
+  for (const auto& c : input_checks) {
     EXPECT_EQ(udp->table[c.row].inputs[c.col], c.val);
   }
   EXPECT_EQ(udp->table[2].output, '-');
@@ -474,7 +474,7 @@ TEST(ParserSection29, SequentialUdpInitial) {
       "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->udps.size(), 1);
-  auto *udp = r.cu->udps[0];
+  auto* udp = r.cu->udps[0];
   EXPECT_TRUE(udp->is_sequential);
   EXPECT_TRUE(udp->has_initial);
   EXPECT_EQ(udp->initial_value, '1');
@@ -482,10 +482,10 @@ TEST(ParserSection29, SequentialUdpInitial) {
 
 // --- §29.8 UDP instances ---
 
-static bool FindModuleInst(const std::vector<ModuleItem *> &items,
-                            std::string_view module_name,
-                            std::string_view expected_inst_name) {
-  for (auto *item : items) {
+static bool FindModuleInst(const std::vector<ModuleItem*>& items,
+                           std::string_view module_name,
+                           std::string_view expected_inst_name) {
+  for (auto* item : items) {
     if (item->kind == ModuleItemKind::kModuleInst &&
         item->inst_module == module_name) {
       EXPECT_EQ(item->inst_name, expected_inst_name);
@@ -521,9 +521,9 @@ struct UdpSpotCheck {
   char output;
 };
 
-static void VerifyUdpTableSpotChecks(const UdpDecl *udp,
-                                      const UdpSpotCheck checks[],
-                                      size_t count) {
+static void VerifyUdpTableSpotChecks(const UdpDecl* udp,
+                                     const UdpSpotCheck checks[],
+                                     size_t count) {
   for (size_t i = 0; i < count; ++i) {
     EXPECT_EQ(udp->table[checks[i].row].inputs[0], checks[i].input0);
     EXPECT_EQ(udp->table[checks[i].row].output, checks[i].output);
@@ -543,7 +543,7 @@ TEST(ParserSection29, MixedLevelEdgeSensitive) {
       "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->udps.size(), 1);
-  auto *udp = r.cu->udps[0];
+  auto* udp = r.cu->udps[0];
   EXPECT_TRUE(udp->is_sequential);
   ASSERT_EQ(udp->table.size(), 5);
   UdpSpotCheck checks[] = {
@@ -560,17 +560,17 @@ TEST(ParserSection29, MixedLevelEdgeSensitive) {
 
 TEST(ParserSection28, ElaborateAndGate) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module top;\n"
       "  wire out, a, b;\n"
       "  and g1(out, a, b);\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   // Gate should produce a continuous assign.
   ASSERT_GE(mod->assigns.size(), 1);
-  auto &ca = mod->assigns[0];
+  auto& ca = mod->assigns[0];
   EXPECT_NE(ca.lhs, nullptr);
   EXPECT_NE(ca.rhs, nullptr);
   // The rhs should be a binary '&' expression.
@@ -579,31 +579,31 @@ TEST(ParserSection28, ElaborateAndGate) {
 
 TEST(ParserSection28, ElaborateOrGate) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module top;\n"
       "  wire out, a, b;\n"
       "  or g1(out, a, b);\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   ASSERT_GE(mod->assigns.size(), 1);
   EXPECT_EQ(mod->assigns[0].rhs->op, TokenKind::kPipe);
 }
 
 TEST(ParserSection28, ElaborateNandGate) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module top;\n"
       "  wire out, a, b;\n"
       "  nand g1(out, a, b);\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   ASSERT_GE(mod->assigns.size(), 1);
   // nand -> ~(a & b): unary kTilde wrapping binary kAmp.
-  auto *rhs = mod->assigns[0].rhs;
+  auto* rhs = mod->assigns[0].rhs;
   EXPECT_EQ(rhs->op, TokenKind::kTilde);
   EXPECT_NE(rhs->lhs, nullptr);
   EXPECT_EQ(rhs->lhs->op, TokenKind::kAmp);
@@ -611,28 +611,28 @@ TEST(ParserSection28, ElaborateNandGate) {
 
 TEST(ParserSection28, ElaborateXorGate) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module top;\n"
       "  wire out, a, b;\n"
       "  xor g1(out, a, b);\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   ASSERT_GE(mod->assigns.size(), 1);
   EXPECT_EQ(mod->assigns[0].rhs->op, TokenKind::kCaret);
 }
 
 TEST(ParserSection28, ElaborateBufGate) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module top;\n"
       "  wire out, in;\n"
       "  buf b1(out, in);\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   ASSERT_GE(mod->assigns.size(), 1);
   // buf: out = in (identity), rhs is an identifier.
   EXPECT_EQ(mod->assigns[0].rhs->kind, ExprKind::kIdentifier);
@@ -640,14 +640,14 @@ TEST(ParserSection28, ElaborateBufGate) {
 
 TEST(ParserSection28, ElaborateNotGate) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module top;\n"
       "  wire out, in;\n"
       "  not n1(out, in);\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   ASSERT_GE(mod->assigns.size(), 1);
   // not: out = ~in, rhs is unary kTilde.
   EXPECT_EQ(mod->assigns[0].rhs->op, TokenKind::kTilde);
@@ -655,30 +655,30 @@ TEST(ParserSection28, ElaborateNotGate) {
 
 TEST(ParserSection28, ElaborateMultiInputAnd) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module top;\n"
       "  wire out, a, b, c;\n"
       "  and g1(out, a, b, c);\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   ASSERT_GE(mod->assigns.size(), 1);
   // 3-input and: (a & b) & c -- nested binary.
-  auto *rhs = mod->assigns[0].rhs;
+  auto* rhs = mod->assigns[0].rhs;
   EXPECT_EQ(rhs->op, TokenKind::kAmp);
 }
 
 TEST(ParserSection28, ElaboratePullupGate) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module top;\n"
       "  wire out;\n"
       "  pullup (out);\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   ASSERT_GE(mod->assigns.size(), 1);
   // pullup: out = 1'b1
   EXPECT_EQ(mod->assigns[0].rhs->kind, ExprKind::kIntegerLiteral);
@@ -687,14 +687,14 @@ TEST(ParserSection28, ElaboratePullupGate) {
 
 TEST(ParserSection28, ElaboratePulldownGate) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module top;\n"
       "  wire out;\n"
       "  pulldown (out);\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   ASSERT_GE(mod->assigns.size(), 1);
   EXPECT_EQ(mod->assigns[0].rhs->kind, ExprKind::kIntegerLiteral);
   EXPECT_EQ(mod->assigns[0].rhs->int_val, 0);

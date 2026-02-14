@@ -13,10 +13,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
 };
 
-static ParseResult Parse(const std::string &src) {
+static ParseResult Parse(const std::string& src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -27,8 +27,8 @@ static ParseResult Parse(const std::string &src) {
 }
 
 // Returns the first class member of kind kMethod, or nullptr if not found.
-static ClassMember *FindMethodMember(ClassDecl *cls) {
-  for (auto *m : cls->members) {
+static ClassMember* FindMethodMember(ClassDecl* cls) {
+  for (auto* m : cls->members) {
     if (m->kind == ClassMemberKind::kMethod) {
       return m;
     }
@@ -38,9 +38,8 @@ static ClassMember *FindMethodMember(ClassDecl *cls) {
 
 // Returns the ClassDecl from the first module item of kind kClassDecl,
 // or nullptr if not found.
-static ClassDecl *FindClassDeclItem(
-    const std::vector<ModuleItem *> &items) {
-  for (auto *item : items) {
+static ClassDecl* FindClassDeclItem(const std::vector<ModuleItem*>& items) {
+  for (auto* item : items) {
     if (item->kind == ModuleItemKind::kClassDecl) {
       return item->class_decl;
     }
@@ -68,7 +67,7 @@ TEST(ParserSection8, ClassWithProperties) {
       "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto *cls = r.cu->classes[0];
+  auto* cls = r.cu->classes[0];
   ASSERT_GE(cls->members.size(), 2u);
   const std::string kExpectedNames[] = {"header", "payload"};
   for (size_t i = 0; i < 2; ++i) {
@@ -87,9 +86,9 @@ TEST(ParserSection8, ClassWithMethod) {
       "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto *cls = r.cu->classes[0];
+  auto* cls = r.cu->classes[0];
   bool found_method = false;
-  for (auto *m : cls->members) {
+  for (auto* m : cls->members) {
     if (m->kind == ClassMemberKind::kMethod) {
       found_method = true;
       ASSERT_NE(m->method, nullptr);
@@ -146,7 +145,7 @@ TEST(ParserSection8, ClassWithQualifiersLocalProtected) {
       "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto *cls = r.cu->classes[0];
+  auto* cls = r.cu->classes[0];
   ASSERT_GE(cls->members.size(), 4u);
   EXPECT_TRUE(cls->members[0]->is_local);
   EXPECT_TRUE(cls->members[1]->is_protected);
@@ -162,7 +161,7 @@ TEST(ParserSection8, ClassWithQualifiersStaticRand) {
       "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto *cls = r.cu->classes[0];
+  auto* cls = r.cu->classes[0];
   ASSERT_GE(cls->members.size(), 4u);
   EXPECT_TRUE(cls->members[2]->is_static);
   EXPECT_TRUE(cls->members[3]->is_rand);
@@ -176,7 +175,7 @@ TEST(ParserSection8, ClassWithTask) {
       "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto *m = FindMethodMember(r.cu->classes[0]);
+  auto* m = FindMethodMember(r.cu->classes[0]);
   ASSERT_NE(m, nullptr);
   ASSERT_NE(m->method, nullptr);
   EXPECT_EQ(m->method->kind, ModuleItemKind::kTaskDecl);
@@ -190,9 +189,9 @@ TEST(ParserSection8, ClassWithConstraint) {
       "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto *cls = r.cu->classes[0];
+  auto* cls = r.cu->classes[0];
   bool found = false;
-  for (auto *m : cls->members) {
+  for (auto* m : cls->members) {
     if (m->kind == ClassMemberKind::kConstraint) {
       found = true;
       EXPECT_EQ(m->name, "c1");
@@ -208,7 +207,7 @@ TEST(ParserSection8, ClassWithInitializer) {
       "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto *cls = r.cu->classes[0];
+  auto* cls = r.cu->classes[0];
   ASSERT_GE(cls->members.size(), 1u);
   EXPECT_NE(cls->members[0]->init_expr, nullptr);
 }
@@ -230,9 +229,9 @@ TEST(ParserSection8, ClassWithVirtualMethod) {
       "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto *cls = r.cu->classes[0];
+  auto* cls = r.cu->classes[0];
   bool found = false;
-  for (auto *m : cls->members) {
+  for (auto* m : cls->members) {
     if (m->kind == ClassMemberKind::kMethod && m->is_virtual) {
       found = true;
     }
@@ -248,7 +247,7 @@ TEST(ParserSection8, ParameterizedClass) {
       "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto *cls = r.cu->classes[0];
+  auto* cls = r.cu->classes[0];
   EXPECT_EQ(cls->name, "stack");
   ASSERT_EQ(cls->params.size(), 1u);
   EXPECT_EQ(cls->params[0].first, "DEPTH");
@@ -260,7 +259,7 @@ TEST(ParserSection8, ParameterizedClassMultipleParams) {
       "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto *cls = r.cu->classes[0];
+  auto* cls = r.cu->classes[0];
   ASSERT_EQ(cls->params.size(), 2u);
   EXPECT_EQ(cls->params[0].first, "WIDTH");
   EXPECT_EQ(cls->params[1].first, "DEPTH");
@@ -273,7 +272,7 @@ TEST(ParserSection8, ParameterizedClassTypeParam) {
       "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto *cls = r.cu->classes[0];
+  auto* cls = r.cu->classes[0];
   ASSERT_EQ(cls->params.size(), 1u);
   EXPECT_EQ(cls->params[0].first, "T");
 }
@@ -289,7 +288,7 @@ TEST(ParserSection8, ParameterizedClassExtendsName) {
       "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 2u);
-  auto *cls = r.cu->classes[1];
+  auto* cls = r.cu->classes[1];
   EXPECT_EQ(cls->name, "Derived");
   EXPECT_EQ(cls->base_class, "Base");
 }
@@ -304,7 +303,7 @@ TEST(ParserSection8, ParameterizedClassExtendsParams) {
       "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 2u);
-  auto *cls = r.cu->classes[1];
+  auto* cls = r.cu->classes[1];
   ASSERT_EQ(cls->params.size(), 1u);
   EXPECT_EQ(cls->params[0].first, "N");
 }
@@ -331,7 +330,7 @@ TEST(ParserSection8, ClassInsideModule) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto *cls = FindClassDeclItem(r.cu->modules[0]->items);
+  auto* cls = FindClassDeclItem(r.cu->modules[0]->items);
   ASSERT_NE(cls, nullptr);
   EXPECT_EQ(cls->name, "inner_cls");
 }
@@ -345,7 +344,7 @@ TEST(ParserSection8, ParameterizedClassInsideModuleName) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto *cls = FindClassDeclItem(r.cu->modules[0]->items);
+  auto* cls = FindClassDeclItem(r.cu->modules[0]->items);
   ASSERT_NE(cls, nullptr);
   EXPECT_EQ(cls->name, "test_cls");
 }
@@ -358,7 +357,7 @@ TEST(ParserSection8, ParameterizedClassInsideModuleParams) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto *cls = FindClassDeclItem(r.cu->modules[0]->items);
+  auto* cls = FindClassDeclItem(r.cu->modules[0]->items);
   ASSERT_NE(cls, nullptr);
   ASSERT_EQ(cls->params.size(), 1u);
   EXPECT_EQ(cls->params[0].first, "a");
@@ -442,7 +441,7 @@ TEST(ParserSection8, ClassConstructor) {
       "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto *m = FindMethodMember(r.cu->classes[0]);
+  auto* m = FindMethodMember(r.cu->classes[0]);
   ASSERT_NE(m, nullptr);
   ASSERT_NE(m->method, nullptr);
   EXPECT_EQ(m->method->name, "new");
@@ -648,7 +647,7 @@ TEST(ParserSection8, ConstProperty) {
       "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto *cls = r.cu->classes[0];
+  auto* cls = r.cu->classes[0];
   ASSERT_GE(cls->members.size(), 1u);
   EXPECT_TRUE(cls->members[0]->is_const);
   EXPECT_EQ(cls->members[0]->name, "MAX");
@@ -739,7 +738,7 @@ TEST(ParserSection8, MultiplePropertiesCommaSeparated) {
       "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto *cls = r.cu->classes[0];
+  auto* cls = r.cu->classes[0];
   ASSERT_EQ(cls->members.size(), 3u);
   const std::string kExpectedNames[] = {"a", "b", "c"};
   for (size_t i = 0; i < 3; ++i) {
@@ -785,7 +784,7 @@ TEST(ParserSection8, ExternConstraintDecl) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   bool found = false;
-  for (auto *m : r.cu->classes[0]->members) {
+  for (auto* m : r.cu->classes[0]->members) {
     if (m->kind == ClassMemberKind::kConstraint && m->name == "c1") {
       found = true;
     }
@@ -818,7 +817,7 @@ TEST(ParserSection8, StaticConstProperty) {
       "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto *cls = r.cu->classes[0];
+  auto* cls = r.cu->classes[0];
   ASSERT_GE(cls->members.size(), 1u);
   EXPECT_TRUE(cls->members[0]->is_static);
   EXPECT_TRUE(cls->members[0]->is_const);

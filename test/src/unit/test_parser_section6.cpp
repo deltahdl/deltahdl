@@ -12,10 +12,10 @@ using namespace delta;
 struct ParseResult6 {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
 };
 
-static ParseResult6 Parse(const std::string &src) {
+static ParseResult6 Parse(const std::string& src) {
   ParseResult6 result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -25,14 +25,14 @@ static ParseResult6 Parse(const std::string &src) {
   return result;
 }
 
-static ModuleItem *FirstItem(ParseResult6 &r) {
+static ModuleItem* FirstItem(ParseResult6& r) {
   if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto &items = r.cu->modules[0]->items;
+  auto& items = r.cu->modules[0]->items;
   return items.empty() ? nullptr : items[0];
 }
 
-static Stmt *FirstInitialStmt(ParseResult6 &r) {
-  for (auto *item : r.cu->modules[0]->items) {
+static Stmt* FirstInitialStmt(ParseResult6& r) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kInitialBlock) {
       if (item->body && item->body->kind == StmtKind::kBlock) {
         return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
@@ -53,7 +53,7 @@ TEST(ParserSection6, WireDeclaration_Kind) {
       "  wire [7:0] w;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kWire);
@@ -65,7 +65,7 @@ TEST(ParserSection6, WireDeclaration_Props) {
       "  wire [7:0] w;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->data_type.is_net);
   EXPECT_EQ(item->name, "w");
@@ -77,7 +77,7 @@ TEST(ParserSection6, TriDeclaration) {
       "  tri [3:0] t1;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_TRUE(item->data_type.is_net);
@@ -93,7 +93,7 @@ TEST(ParserSection6, LogicVarDecl) {
       "  logic [15:0] data;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
   EXPECT_EQ(item->name, "data");
@@ -105,7 +105,7 @@ TEST(ParserSection6, IntVarDecl) {
       "  int count;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
   EXPECT_EQ(item->name, "count");
@@ -117,7 +117,7 @@ TEST(ParserSection6, ByteVarDecl) {
       "  byte b;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kByte);
 }
@@ -128,7 +128,7 @@ TEST(ParserSection6, LongintVarDecl) {
       "  longint li;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLongint);
 }
@@ -143,7 +143,7 @@ TEST(ParserSection6, SignedVector) {
       "  logic signed [7:0] sv;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
   EXPECT_TRUE(item->data_type.is_signed);
@@ -159,7 +159,7 @@ TEST(ParserSection6, IntDefaultSigned) {
       "  int x;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
   EXPECT_TRUE(item->data_type.is_signed) << "int is signed by default";
@@ -171,7 +171,7 @@ TEST(ParserSection6, IntExplicitUnsigned) {
       "  int unsigned x;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
   EXPECT_FALSE(item->data_type.is_signed) << "int unsigned is unsigned";
@@ -183,7 +183,7 @@ TEST(ParserSection6, ByteDefaultSigned) {
       "  byte b;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kByte);
   EXPECT_TRUE(item->data_type.is_signed) << "byte is signed by default";
@@ -195,7 +195,7 @@ TEST(ParserSection6, ShortintDefaultSigned) {
       "  shortint s;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kShortint);
   EXPECT_TRUE(item->data_type.is_signed) << "shortint is signed by default";
@@ -207,7 +207,7 @@ TEST(ParserSection6, LongintDefaultSigned) {
       "  longint l;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLongint);
   EXPECT_TRUE(item->data_type.is_signed) << "longint is signed by default";
@@ -219,7 +219,7 @@ TEST(ParserSection6, IntegerDefaultSigned) {
       "  integer i;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kInteger);
   EXPECT_TRUE(item->data_type.is_signed) << "integer is signed by default";
@@ -231,7 +231,7 @@ TEST(ParserSection6, TimeDefaultUnsigned) {
       "  time t;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kTime);
   EXPECT_FALSE(item->data_type.is_signed) << "time is unsigned by default";
@@ -243,7 +243,7 @@ TEST(ParserSection6, LogicDefaultUnsigned) {
       "  logic l;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
   EXPECT_FALSE(item->data_type.is_signed) << "logic is unsigned by default";
@@ -255,7 +255,7 @@ TEST(ParserSection6, BitDefaultUnsigned) {
       "  bit b;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kBit);
   EXPECT_FALSE(item->data_type.is_signed) << "bit is unsigned by default";
@@ -267,7 +267,7 @@ TEST(ParserSection6, RegDefaultUnsigned) {
       "  reg r;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kReg);
   EXPECT_FALSE(item->data_type.is_signed) << "reg is unsigned by default";
@@ -283,7 +283,7 @@ TEST(ParserSection6, RealVarDecl) {
       "  real r;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kReal);
 }
@@ -294,7 +294,7 @@ TEST(ParserSection6, ShortrealVarDecl) {
       "  shortreal sr;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kShortreal);
 }
@@ -305,7 +305,7 @@ TEST(ParserSection6, RealtimeVarDecl) {
       "  realtime rt;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kRealtime);
 }
@@ -321,7 +321,7 @@ TEST(ParserSection6, VoidFunctionReturn) {
       "  endfunction\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kVoid);
@@ -337,7 +337,7 @@ TEST(ParserSection6, ChandleVarDecl) {
       "  chandle ch;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kChandle);
   EXPECT_EQ(item->name, "ch");
@@ -353,7 +353,7 @@ TEST(ParserSection6, EventVarDecl) {
       "  event e;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kEvent);
 }
@@ -370,7 +370,7 @@ TEST(ParserSection6, TypedefInt) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
-  auto *item = r.cu->modules[0]->items[1];
+  auto* item = r.cu->modules[0]->items[1];
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kNamed);
   EXPECT_EQ(item->data_type.type_name, "myint");
 }
@@ -385,7 +385,7 @@ TEST(ParserSection6, EnumBasic) {
       "  typedef enum { RED, GREEN, BLUE } color_t;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
   EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kEnum);
@@ -402,7 +402,7 @@ TEST(ParserSection6, ConstVarDecl) {
       "  const logic [7:0] MAX = 8'hFF;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
   EXPECT_TRUE(item->data_type.is_const);
@@ -414,7 +414,7 @@ TEST(ParserSection6, ConstVarDecl_NameAndInit) {
       "  const logic [7:0] MAX = 8'hFF;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "MAX");
   ASSERT_NE(item->init_expr, nullptr);
@@ -426,7 +426,7 @@ TEST(ParserSection6, ConstIntDecl) {
       "  const int LIMIT = 100;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
   EXPECT_TRUE(item->data_type.is_const);
@@ -444,7 +444,7 @@ TEST(ParserSection6, AutomaticVarDecl) {
       "  endfunction\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_TRUE(item->is_automatic);
@@ -458,7 +458,7 @@ TEST(ParserSection6, StaticFunction) {
       "  endfunction\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_TRUE(item->is_static);
@@ -474,9 +474,9 @@ TEST(ParserSection6, IntCast) {
       "  initial x = int'(y);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto *rhs = stmt->rhs;
+  auto* rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kCast);
 }
@@ -487,9 +487,9 @@ TEST(ParserSection6, IntCast_Details) {
       "  initial x = int'(y);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto *rhs = stmt->rhs;
+  auto* rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->text, "int");
   ASSERT_NE(rhs->lhs, nullptr);
@@ -501,9 +501,9 @@ TEST(ParserSection6, SignedCast) {
       "  initial x = signed'(y);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto *rhs = stmt->rhs;
+  auto* rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kCast);
   EXPECT_EQ(rhs->text, "signed");
@@ -515,9 +515,9 @@ TEST(ParserSection6, ConstCast) {
       "  initial x = const'(y);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto *rhs = stmt->rhs;
+  auto* rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kCast);
   EXPECT_EQ(rhs->text, "const");
@@ -552,9 +552,9 @@ TEST(ParserSection6, ClassVarDecl_VarType) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_FALSE(r.cu->modules.empty());
-  auto &items = r.cu->modules[0]->items;
-  ModuleItem *var_item = nullptr;
-  for (auto *it : items) {
+  auto& items = r.cu->modules[0]->items;
+  ModuleItem* var_item = nullptr;
+  for (auto* it : items) {
     if (it->kind == ModuleItemKind::kVarDecl && it->name == "obj") {
       var_item = it;
       break;
