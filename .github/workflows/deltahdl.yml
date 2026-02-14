@@ -80,7 +80,7 @@ jobs:
         name: Publish to GitHub Pages
         uses: actions/deploy-pages@v4
   build-asan-ubsan:
-    needs: static-analysis
+    needs: [clang-tidy-src, clang-tidy-test]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -105,7 +105,7 @@ jobs:
           path: build/
           retention-days: 1
   build-coverage:
-    needs: static-analysis
+    needs: [clang-tidy-src, clang-tidy-test]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -130,7 +130,7 @@ jobs:
           path: build/
           retention-days: 1
   build-macos-26-arm64-clang:
-    needs: static-analysis
+    needs: [clang-tidy-src, clang-tidy-test]
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
@@ -150,7 +150,7 @@ jobs:
           path: build/
           retention-days: 1
   build-tsan:
-    needs: static-analysis
+    needs: [clang-tidy-src, clang-tidy-test]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -175,7 +175,7 @@ jobs:
           path: build/
           retention-days: 1
   build-ubuntu-24-04-x86-64-clang:
-    needs: static-analysis
+    needs: [clang-tidy-src, clang-tidy-test]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -199,7 +199,7 @@ jobs:
           path: build/
           retention-days: 1
   build-ubuntu-24-04-x86-64-gcc:
-    needs: static-analysis
+    needs: [clang-tidy-src, clang-tidy-test]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -602,8 +602,7 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            clang-18 clang-tidy-18 clang-format-18
+          sudo apt-get install -y clang-format-18
           PMD=pmd-dist-7.21.0-bin.zip
           PMD_URL=https://github.com/pmd/pmd/releases
           wget -q "$PMD_URL/download/pmd_releases%2F7.21.0/$PMD"
@@ -641,6 +640,17 @@ jobs:
           assert-no-inline-directives \
             --tools clang-tidy,clang-format,clang-diagnostic \
             src/ test/
+  clang-tidy-src:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Install clang-tidy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-18 clang-tidy-18
       - name: Generate compile_commands.json
         run: |
           cmake -B build \
@@ -655,6 +665,22 @@ jobs:
           -extra-arg=-w
           -warnings-as-errors='*'
           '(?<!test/)src/.*\.cpp$'
+  clang-tidy-test:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Install clang-tidy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-18 clang-tidy-18
+      - name: Generate compile_commands.json
+        run: |
+          cmake -B build \
+            -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
       - name: Run clang-tidy (test)
         run: >-
           run-clang-tidy-18 -p build
