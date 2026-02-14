@@ -654,7 +654,7 @@ jobs:
           -extra-arg=-ferror-limit=0
           -extra-arg=-w
           -warnings-as-errors='*'
-          'src/.*\.cpp$'
+          '(?<!test/)src/.*\.cpp$'
       - name: Run clang-tidy (test)
         run: >-
           run-clang-tidy-18 -p build
@@ -663,7 +663,7 @@ jobs:
           -extra-arg=-ferror-limit=0
           -extra-arg=-w
           -warnings-as-errors='*'
-          'test/.*\.cpp$'
+          'test/src/unit/.*\.cpp$'
   unit-test-asan-ubsan:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
