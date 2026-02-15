@@ -102,28 +102,6 @@ jobs:
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
           --reporters console test/scripts/
-  # ── Gate: yamllint for workflow-only changes ──
-  yamllint:
-    if: >-
-      needs.detect.outputs.workflows-changed == 'true'
-      && needs.detect.outputs.scripts-changed != 'true'
-    needs: detect
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install yamllint
-        run: pip install yamllint
-      - name: Lint YAML
-        run: |
-          EMPTY='empty-lines: {max: 0, max-start: 0, max-end: 1}'
-          KEY='key-ordering: enable'
-          NL='new-line-at-end-of-file: enable'
-          TR='truthy: {allowed-values: ["true", "false", "on"]}'
-          RULES="$EMPTY, $KEY, $NL, $TR"
-          yamllint --strict \
-            --config-data \
-            "{extends: default, rules: {$RULES}}" \
-            .github/workflows/*.yml
   # ── Lane: run_sim_tests ──
   # DO NOT lower coverage thresholds. Uncovered code is untested code —
   # lowering it hides bugs and lets regressions slip through silently.
@@ -193,6 +171,28 @@ jobs:
           || needs.test-test-common.result != 'skipped'
           || needs.yamllint.result != 'skipped'
         run: echo "All CI checks passed"
+  # ── Gate: yamllint for workflow-only changes ──
+  yamllint:
+    if: >-
+      needs.detect.outputs.workflows-changed == 'true'
+      && needs.detect.outputs.scripts-changed != 'true'
+    needs: detect
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install yamllint
+        run: pip install yamllint
+      - name: Lint YAML
+        run: |
+          EMPTY='empty-lines: {max: 0, max-start: 0, max-end: 1}'
+          KEY='key-ordering: enable'
+          NL='new-line-at-end-of-file: enable'
+          TR='truthy: {allowed-values: ["true", "false", "on"]}'
+          RULES="$EMPTY, $KEY, $NL, $TR"
+          yamllint --strict \
+            --config-data \
+            "{extends: default, rules: {$RULES}}" \
+            .github/workflows/*.yml
 name: CI
 on:
   pull_request:
