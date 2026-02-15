@@ -1357,6 +1357,243 @@ TEST(SourceText, InterfaceMultipleItemTypes) {
 }
 
 // =============================================================================
+// A.1.7 Program items
+// =============================================================================
+
+// program_item ::= port_declaration ;
+TEST(SourceText, ProgramItemPortDecl) {
+  auto r = Parse(
+      "program prg(input logic clk, output logic done);\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  auto* p = r.cu->programs[0];
+  EXPECT_EQ(p->name, "prg");
+  EXPECT_EQ(p->ports.size(), 2u);
+  EXPECT_EQ(p->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(p->ports[1].direction, Direction::kOutput);
+}
+
+// non_port_program_item ::= continuous_assign
+TEST(SourceText, ProgramContinuousAssign) {
+  auto r = Parse(
+      "program prg;\n"
+      "  logic a, b;\n"
+      "  assign a = b;\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  bool found_assign = false;
+  for (auto* item : r.cu->programs[0]->items) {
+    if (item->kind == ModuleItemKind::kContAssign) found_assign = true;
+  }
+  EXPECT_TRUE(found_assign);
+}
+
+// non_port_program_item ::= module_or_generate_item_declaration
+TEST(SourceText, ProgramModuleOrGenerateItemDecl) {
+  auto r = Parse(
+      "program prg;\n"
+      "  int count;\n"
+      "  function void compute(); endfunction\n"
+      "  task run(); endtask\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  auto& items = r.cu->programs[0]->items;
+  bool found_var = false;
+  bool found_func = false;
+  bool found_task = false;
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kVarDecl && item->name == "count")
+      found_var = true;
+    if (item->kind == ModuleItemKind::kFunctionDecl && item->name == "compute")
+      found_func = true;
+    if (item->kind == ModuleItemKind::kTaskDecl && item->name == "run")
+      found_task = true;
+  }
+  EXPECT_TRUE(found_var);
+  EXPECT_TRUE(found_func);
+  EXPECT_TRUE(found_task);
+}
+
+// non_port_program_item ::= initial_construct
+TEST(SourceText, ProgramInitialConstruct) {
+  auto r = Parse(
+      "program prg;\n"
+      "  initial begin\n"
+      "    $display(\"hello\");\n"
+      "  end\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  bool found_initial = false;
+  for (auto* item : r.cu->programs[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) found_initial = true;
+  }
+  EXPECT_TRUE(found_initial);
+}
+
+// non_port_program_item ::= final_construct
+TEST(SourceText, ProgramFinalConstruct) {
+  auto r = Parse(
+      "program prg;\n"
+      "  final begin\n"
+      "    $display(\"done\");\n"
+      "  end\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  bool found_final = false;
+  for (auto* item : r.cu->programs[0]->items) {
+    if (item->kind == ModuleItemKind::kFinalBlock) found_final = true;
+  }
+  EXPECT_TRUE(found_final);
+}
+
+// non_port_program_item ::= concurrent_assertion_item
+TEST(SourceText, ProgramConcurrentAssertion) {
+  auto r = Parse(
+      "program prg;\n"
+      "  logic clk, a;\n"
+      "  assert property (@(posedge clk) a);\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  bool found_assert = false;
+  for (auto* item : r.cu->programs[0]->items) {
+    if (item->kind == ModuleItemKind::kAssertProperty) found_assert = true;
+  }
+  EXPECT_TRUE(found_assert);
+}
+
+// non_port_program_item ::= timeunits_declaration
+TEST(SourceText, ProgramTimeunitsDecl) {
+  auto r = Parse(
+      "program prg;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->name, "prg");
+}
+
+// program_generate_item ::= loop_generate_construct
+TEST(SourceText, ProgramGenerateLoop) {
+  auto r = Parse(
+      "program prg;\n"
+      "  genvar i;\n"
+      "  for (i = 0; i < 4; i = i + 1) begin : blk\n"
+      "    int x;\n"
+      "  end\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  bool found_for = false;
+  for (auto* item : r.cu->programs[0]->items) {
+    if (item->kind == ModuleItemKind::kGenerateFor) found_for = true;
+  }
+  EXPECT_TRUE(found_for);
+}
+
+// program_generate_item ::= conditional_generate_construct
+TEST(SourceText, ProgramGenerateConditional) {
+  auto r = Parse(
+      "program prg;\n"
+      "  parameter P = 1;\n"
+      "  if (P) begin : blk\n"
+      "    int x;\n"
+      "  end\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  bool found_if = false;
+  for (auto* item : r.cu->programs[0]->items) {
+    if (item->kind == ModuleItemKind::kGenerateIf) found_if = true;
+  }
+  EXPECT_TRUE(found_if);
+}
+
+// program_generate_item ::= generate_region
+TEST(SourceText, ProgramGenerateRegion) {
+  auto r = Parse(
+      "program prg;\n"
+      "  generate\n"
+      "    int x;\n"
+      "  endgenerate\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_FALSE(r.cu->programs[0]->items.empty());
+}
+
+// program_generate_item ::= elaboration_severity_system_task
+TEST(SourceText, ProgramElabSeverityTask) {
+  auto r = Parse(
+      "program prg;\n"
+      "  $info(\"program loaded\");\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  bool found_elab = false;
+  for (auto* item : r.cu->programs[0]->items) {
+    if (item->kind == ModuleItemKind::kElabSystemTask) found_elab = true;
+  }
+  EXPECT_TRUE(found_elab);
+}
+
+// Combined: program with multiple A.1.7 item types.
+TEST(SourceText, ProgramMultipleItemTypes) {
+  auto r = Parse(
+      "program prg(input logic clk);\n"
+      "  timeunit 1ns;\n"
+      "  int count;\n"
+      "  assign count = 0;\n"
+      "  initial begin $display(\"start\"); end\n"
+      "  final begin $display(\"end\"); end\n"
+      "  assert property (@(posedge clk) count >= 0);\n"
+      "  generate int g; endgenerate\n"
+      "  $warning(\"check\");\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  auto& items = r.cu->programs[0]->items;
+  bool found_var = false;
+  bool found_assign = false;
+  bool found_initial = false;
+  bool found_final = false;
+  bool found_assert = false;
+  bool found_elab = false;
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kVarDecl) found_var = true;
+    if (item->kind == ModuleItemKind::kContAssign) found_assign = true;
+    if (item->kind == ModuleItemKind::kInitialBlock) found_initial = true;
+    if (item->kind == ModuleItemKind::kFinalBlock) found_final = true;
+    if (item->kind == ModuleItemKind::kAssertProperty) found_assert = true;
+    if (item->kind == ModuleItemKind::kElabSystemTask) found_elab = true;
+  }
+  EXPECT_TRUE(found_var);
+  EXPECT_TRUE(found_assign);
+  EXPECT_TRUE(found_initial);
+  EXPECT_TRUE(found_final);
+  EXPECT_TRUE(found_assert);
+  EXPECT_TRUE(found_elab);
+}
+
+// =============================================================================
 // A.1.2 comprehensive: all description types in one source text.
 // =============================================================================
 
