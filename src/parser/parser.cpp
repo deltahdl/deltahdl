@@ -515,6 +515,20 @@ void Parser::ParseExportDecl(std::vector<ModuleItem*>& items) {
     }
   }
   items.push_back(item);
+  // A.2.1.3: export package_import_item { , package_import_item } ;
+  while (Match(TokenKind::kComma)) {
+    auto* next = arena_.Create<ModuleItem>();
+    next->kind = ModuleItemKind::kExportDecl;
+    next->loc = loc;
+    next->import_item.package_name = Expect(TokenKind::kIdentifier).text;
+    Expect(TokenKind::kColonColon);
+    if (Match(TokenKind::kStar)) {
+      next->import_item.is_wildcard = true;
+    } else {
+      next->import_item.item_name = Expect(TokenKind::kIdentifier).text;
+    }
+    items.push_back(next);
+  }
   Expect(TokenKind::kSemicolon);
 }
 
@@ -1171,11 +1185,18 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
     AttachAttrs(items, before, attrs);
     return;
   }
+  // A.2.1.3: data_declaration ::= [const] [var] [lifetime] ...
+  // Handle [lifetime] (automatic/static) before data declarations in module
+  // body.
+  bool is_automatic = Match(TokenKind::kKwAutomatic);
+  bool is_static = !is_automatic && Match(TokenKind::kKwStatic);
   // checker_or_generate_item_declaration: [rand] data_declaration (A.1.8)
   bool is_rand = Match(TokenKind::kKwRand);
   ParseTypedItemOrInst(items);
-  if (is_rand) {
-    for (size_t i = before; i < items.size(); ++i) items[i]->is_rand = true;
+  for (size_t i = before; i < items.size(); ++i) {
+    if (is_rand) items[i]->is_rand = true;
+    if (is_automatic) items[i]->is_automatic = true;
+    if (is_static) items[i]->is_static = true;
   }
   AttachAttrs(items, before, attrs);
 }

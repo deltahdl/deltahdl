@@ -142,7 +142,8 @@ ModuleItem* Parser::ParseTypedef() {
   item->loc = CurrentLoc();
   Expect(TokenKind::kKwTypedef);
 
-  // Forward declarations: typedef class/struct/union/enum X; (§8.26)
+  // A.2.1.3 forward_type: typedef [enum|struct|union|class|interface class] id
+  // ;
   if (Check(TokenKind::kKwClass) || Check(TokenKind::kKwInterface)) {
     Consume();
     if (Check(TokenKind::kKwClass)) Consume();  // "interface class"
@@ -150,6 +151,25 @@ ModuleItem* Parser::ParseTypedef() {
     known_types_.insert(item->name);
     Expect(TokenKind::kSemicolon);
     return item;
+  }
+  // Forward typedef for enum/struct/union: typedef enum|struct|union IDENT ;
+  if (Check(TokenKind::kKwEnum) || Check(TokenKind::kKwStruct) ||
+      Check(TokenKind::kKwUnion)) {
+    auto saved = lexer_.SavePos();
+    Consume();  // enum/struct/union
+    if (CheckIdentifier()) {
+      auto id_saved = lexer_.SavePos();
+      auto id_tok = Consume();
+      if (Check(TokenKind::kSemicolon)) {
+        // Forward declaration: typedef enum/struct/union IDENT ;
+        item->name = id_tok.text;
+        known_types_.insert(item->name);
+        Expect(TokenKind::kSemicolon);
+        return item;
+      }
+      lexer_.RestorePos(id_saved);
+    }
+    lexer_.RestorePos(saved);
   }
   if (Check(TokenKind::kKwEnum)) {
     item->typedef_type = ParseEnumType();
@@ -175,10 +195,16 @@ ModuleItem* Parser::ParseNettypeDecl() {
   Expect(TokenKind::kKwNettype);
   item->typedef_type = ParseDataType();
   item->name = Expect(TokenKind::kIdentifier).text;
-  // §6.6.7: Optional "with resolve_fn" clause.
+  // A.2.1.3: with [ package_scope | class_scope ] tf_identifier
   if (Check(TokenKind::kKwWith)) {
     Consume();
-    item->nettype_resolve_func = Expect(TokenKind::kIdentifier).text;
+    auto func_name = Expect(TokenKind::kIdentifier).text;
+    if (Match(TokenKind::kColonColon)) {
+      // Scoped: pkg::func or class::func — store the function name
+      item->nettype_resolve_func = Expect(TokenKind::kIdentifier).text;
+    } else {
+      item->nettype_resolve_func = func_name;
+    }
   }
   known_types_.insert(item->name);
   Expect(TokenKind::kSemicolon);
