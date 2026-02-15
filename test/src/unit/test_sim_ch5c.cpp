@@ -533,6 +533,132 @@ TEST(SimCh5c, StrEscMultiple) {
 }
 
 // ===========================================================================
+// §5.9 String literals — simulation-level tests
+//
+// LRM §5.9: "A string literal is a sequence of characters enclosed by a
+// single pair of double quotes ... or a triple pair of double quotes."
+// "String literals used as operands in expressions and assignments shall
+// be treated as unsigned integer constants represented by a sequence of
+// 8-bit ASCII values."
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// 1. Single-character string to byte — §5.9 example
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, StrLitSingleChar) {
+  // §5.9 example: byte c1 = "A"
+  auto v =
+      RunAndGet("module t;\n  byte c;\n  initial c = \"A\";\nendmodule\n", "c");
+  EXPECT_EQ(v, 0x41u);
+}
+
+// ---------------------------------------------------------------------------
+// 2. Multi-character string — 8-bit-per-character packing
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, StrLitMultiChar) {
+  // §5.9: "a sequence of 8-bit ASCII values"
+  auto v = RunAndGet(
+      "module t;\n  bit [23:0] s;\n  initial s = \"ABC\";\nendmodule\n", "s");
+  EXPECT_EQ(v, 0x414243u);
+}
+
+// ---------------------------------------------------------------------------
+// 3. Larger destination — right-justified, zero-padded
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, StrLitZeroPad) {
+  // §5.9: "the value is right-justified, and the leftmost bits are padded
+  // with zeros"
+  auto v = RunAndGet(
+      "module t;\n  bit [15:0] s;\n  initial s = \"A\";\nendmodule\n", "s");
+  EXPECT_EQ(v, 0x0041u);
+}
+
+// ---------------------------------------------------------------------------
+// 4. Smaller destination — right-justified, leftmost truncated
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, StrLitTruncateLeft) {
+  // §5.9: "the string is right-justified, and the leftmost characters are
+  // truncated."
+  auto v = RunAndGet(
+      "module t;\n  byte s;\n  initial s = \"ABCD\";\nendmodule\n", "s");
+  EXPECT_EQ(v, 0x44u);
+}
+
+// ---------------------------------------------------------------------------
+// 5. Triple-quoted string — basic
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, StrLitTripleBasic) {
+  // §5.9: "a triple pair of double quotes"
+  auto v = RunAndGet(
+      "module t;\n  bit [15:0] s;\n"
+      "  initial s = \"\"\"AB\"\"\";\nendmodule\n",
+      "s");
+  EXPECT_EQ(v, 0x4142u);
+}
+
+// ---------------------------------------------------------------------------
+// 6. Triple-quoted string — embedded newline (no escape needed)
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, StrLitTripleNewline) {
+  // §5.9: "allow for a newline character to be inserted directly"
+  auto v = RunAndGet(
+      "module t;\n  bit [23:0] s;\n"
+      "  initial s = \"\"\"A\nB\"\"\";\nendmodule\n",
+      "s");
+  EXPECT_EQ(v, 0x410A42u);
+}
+
+// ---------------------------------------------------------------------------
+// 7. Triple-quoted string — embedded double-quote (no escape needed)
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, StrLitTripleQuote) {
+  // §5.9: "allow for a \" character to be inserted directly"
+  auto v = RunAndGet(
+      "module t;\n  bit [23:0] s;\n"
+      "  initial s = \"\"\"A\"B\"\"\";\nendmodule\n",
+      "s");
+  EXPECT_EQ(v, 0x412242u);
+}
+
+// ---------------------------------------------------------------------------
+// 8. Line continuation — backslash-newline stripped in quoted string
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, StrLitLineContinuation) {
+  // §5.9: "the backslash and the newline character are ignored"
+  auto v = RunAndGet(
+      "module t;\n  bit [31:0] s;\n"
+      "  initial s = \"AB\\\nCD\";\nendmodule\n",
+      "s");
+  EXPECT_EQ(v, 0x41424344u);
+}
+
+// ---------------------------------------------------------------------------
+// 9. Double-backslash before newline — \\ escape + line continuation
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, StrLitDoubleBackslashNewline) {
+  // §5.9.1: \\\<newline> -> \\ is backslash escape, \<newline> is
+  // line continuation.  "A" + '\' + "B" = 0x415C42.
+  auto v = RunAndGet(
+      "module t;\n  bit [23:0] s;\n"
+      "  initial s = \"A\\\\\\\nB\";\nendmodule\n",
+      "s");
+  EXPECT_EQ(v, 0x415C42u);
+}
+
+// ---------------------------------------------------------------------------
+// 10. Triple-quoted line continuation — same behavior as quoted
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, StrLitTripleContinuation) {
+  // §5.9: "an escaped newline in a triple-quoted string literal is treated
+  // exactly like an escaped newline in a single-quoted string literal."
+  auto v = RunAndGet(
+      "module t;\n  bit [31:0] s;\n"
+      "  initial s = \"\"\"AB\\\nCD\"\"\";\nendmodule\n",
+      "s");
+  EXPECT_EQ(v, 0x41424344u);
+}
+
+// ===========================================================================
 // §5.7.2 Real literal constants — simulation-level tests
 //
 // LRM §5.7.2: "The real literal constant numbers shall be represented as

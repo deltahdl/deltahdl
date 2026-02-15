@@ -223,6 +223,7 @@ static std::vector<uint8_t> DecodeStringBody(std::string_view text) {
       bytes.push_back(ParseOctalEscape(c, text, i));
       continue;
     }
+    if (c == '\n') continue;
     bytes.push_back(static_cast<uint8_t>(c));
   }
   return bytes;
@@ -996,5 +997,4 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
       return MakeLogic4Vec(arena, 1);
   }
 }
-
 }  // namespace delta
