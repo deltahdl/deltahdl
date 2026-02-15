@@ -647,6 +647,12 @@ void Parser::ParseExtraPropertyDecls(std::vector<ClassMember*>& members,
 ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
   member->kind = ClassMemberKind::kConstraint;
   Consume();  // constraint keyword
+  // Optional dynamic_override_specifiers: [:initial|:extends] [:final]
+  if (Match(TokenKind::kColon)) {
+    Match(TokenKind::kKwInitial) || Match(TokenKind::kKwExtends) ||
+        Match(TokenKind::kKwFinal);
+  }
+  if (Match(TokenKind::kColon)) Match(TokenKind::kKwFinal);
   member->name = Expect(TokenKind::kIdentifier).text;
   // §18.5.1: extern/implicit constraint declaration — no body
   if (Match(TokenKind::kSemicolon)) return member;

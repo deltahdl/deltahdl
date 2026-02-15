@@ -227,9 +227,17 @@ BindDirective* Parser::ParseBindDirective() {
   return decl;
 }
 
-// §18.5.1: out-of-block constraint — constraint class_id::name { ... }
+// §18.5.1: out-of-block constraint —
+//   [static] constraint [dynamic_override_specifiers] class::name { ... }
 void Parser::ParseOutOfBlockConstraint(CompilationUnit* unit) {
-  Consume();  // constraint
+  Match(TokenKind::kKwStatic);
+  Expect(TokenKind::kKwConstraint);
+  // Optional dynamic_override_specifiers: [:initial|:extends] [:final]
+  if (Match(TokenKind::kColon)) {
+    Match(TokenKind::kKwInitial) || Match(TokenKind::kKwExtends) ||
+        Match(TokenKind::kKwFinal);
+  }
+  if (Match(TokenKind::kColon)) Match(TokenKind::kKwFinal);
   ExpectIdentifier();
   Expect(TokenKind::kColonColon);
   ExpectIdentifier();
@@ -313,6 +321,11 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
     return;
   }
   if (TryParseSecondaryTopLevel(unit)) return;
+  // extern_constraint_declaration: static constraint ... (A.1.10)
+  if (Check(TokenKind::kKwStatic)) {
+    ParseOutOfBlockConstraint(unit);
+    return;
+  }
   diag_.Error(CurrentLoc(), "expected top-level declaration");
   Consume();
 }
