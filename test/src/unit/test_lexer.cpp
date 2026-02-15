@@ -20,6 +20,106 @@ TEST(Lexer, EmptyInput) {
   EXPECT_TRUE(tokens[0].IsEof());
 }
 
+// --- §5.2: Lexical tokens ---
+
+TEST(Lexer, LexicalToken_SourceIsTokenStream) {
+  // §5.2: "SystemVerilog source text files shall be a stream of lexical
+  // tokens."
+  auto tokens = Lex("module m; endmodule");
+  ASSERT_GE(tokens.size(), 4);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwModule);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kSemicolon);
+  EXPECT_EQ(tokens[3].kind, TokenKind::kKwEndmodule);
+  EXPECT_TRUE(tokens.back().IsEof());
+}
+
+TEST(Lexer, LexicalToken_EachTokenHasOneOrMoreChars) {
+  // §5.2: "A lexical token shall consist of one or more characters."
+  auto tokens = Lex("module m; logic [7:0] x = 8'hFF + 1; endmodule");
+  for (size_t i = 0; i + 1 < tokens.size(); ++i) {
+    EXPECT_GE(tokens[i].text.size(), 1u)
+        << "token " << i << " (" << tokens[i].text << ") is empty";
+  }
+}
+
+TEST(Lexer, LexicalToken_FreeFormatLayout) {
+  // §5.2: "The layout of tokens in a source file shall be free format; that
+  // is, spaces and newline characters shall not be syntactically significant
+  // other than being token separators."
+  auto compact = Lex("module m;logic [7:0] x;endmodule");
+  auto spread =
+      Lex("module\n  m\n  ;\nlogic\n  [\n  7\n  :\n  0\n  ]\n  x\n  "
+          ";\nendmodule\n");
+  std::vector<TokenKind> ck, sk;
+  for (auto& t : compact)
+    if (!t.IsEof()) ck.push_back(t.kind);
+  for (auto& t : spread)
+    if (!t.IsEof()) sk.push_back(t.kind);
+  EXPECT_EQ(ck, sk);
+}
+
+TEST(Lexer, LexicalToken_FreeFormatTokenText) {
+  // §5.2: Free format — token text is identical regardless of layout.
+  auto compact = Lex("module m;logic [7:0] x;endmodule");
+  auto spread =
+      Lex("module\n  m\n  ;\nlogic\n  [\n  7\n  :\n  0\n  ]\n  x\n  "
+          ";\nendmodule\n");
+  std::vector<std::string> ct, st;
+  for (auto& t : compact)
+    if (!t.IsEof()) ct.emplace_back(t.text);
+  for (auto& t : spread)
+    if (!t.IsEof()) st.emplace_back(t.text);
+  EXPECT_EQ(ct, st);
+}
+
+TEST(Lexer, LexicalToken_AllSevenCategories) {
+  // §5.2: Token types — White space, Comment, Operator, Number, String
+  // literal, Identifier, Keyword. White space and comments are consumed by the
+  // lexer (not emitted as tokens). Verify the remaining 5 emitted categories.
+  auto tokens = Lex("module /* comment */ x ; x = 42 + \"hello\" ; endmodule");
+  bool has_keyword = false, has_id = false, has_op = false;
+  bool has_number = false, has_string = false;
+  for (auto& t : tokens) {
+    if (t.kind == TokenKind::kKwModule || t.kind == TokenKind::kKwEndmodule)
+      has_keyword = true;
+    if (t.kind == TokenKind::kIdentifier) has_id = true;
+    if (t.kind == TokenKind::kPlus || t.kind == TokenKind::kEq) has_op = true;
+    if (t.kind == TokenKind::kIntLiteral) has_number = true;
+    if (t.kind == TokenKind::kStringLiteral) has_string = true;
+  }
+  EXPECT_TRUE(has_keyword);
+  EXPECT_TRUE(has_id);
+  EXPECT_TRUE(has_op);
+  EXPECT_TRUE(has_number);
+  EXPECT_TRUE(has_string);
+}
+
+TEST(Lexer, LexicalToken_EscapedIdentifierException) {
+  // §5.2: "except for escaped identifiers (see 5.6.1)" — whitespace IS
+  // syntactically significant for escaped identifiers: it terminates them.
+  auto with_space = Lex("\\abc+def ");
+  ASSERT_GE(with_space.size(), 2);
+  EXPECT_EQ(with_space[0].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(with_space[0].text, "\\abc+def");
+
+  auto with_tab = Lex("\\abc+def\t");
+  EXPECT_EQ(with_tab[0].text, "\\abc+def");
+
+  auto with_newline = Lex("\\abc+def\n");
+  EXPECT_EQ(with_newline[0].text, "\\abc+def");
+}
+
+TEST(Lexer, LexicalToken_CommentsActAsSeparators) {
+  // §5.2: Comments are one of the 7 token types. Like whitespace, they
+  // separate adjacent tokens.
+  auto tokens = Lex("module/**/m;endmodule");
+  ASSERT_GE(tokens.size(), 5);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwModule);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].text, "m");
+}
+
 // --- §5.3: White space ---
 
 TEST(Lexer, Whitespace_SpaceSeparatesTokens) {
