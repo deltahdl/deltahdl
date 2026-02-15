@@ -540,7 +540,7 @@ ModuleItem* Parser::ParseDpiExport(SourceLoc loc) {
 
 void Parser::ParseParamPortDecl(
     std::vector<std::pair<std::string_view, Expr*>>& params) {
-  Match(TokenKind::kKwParameter);
+  Match(TokenKind::kKwParameter) || Match(TokenKind::kKwLocalparam);
   // Handle type parameter: #(type T = real)  (§6.20.3)
   if (Match(TokenKind::kKwType)) {
     auto name = Expect(TokenKind::kIdentifier);
