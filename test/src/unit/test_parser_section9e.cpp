@@ -542,16 +542,16 @@ TEST(ParserSection9, Sec9_3_2_EmptyForkJoin) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_ForkInTaskBody) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  task automatic run_parallel;\n"
-      "    fork\n"
-      "      #10 a = 1;\n"
-      "      #20 b = 2;\n"
-      "    join\n"
-      "  endtask\n"
-      "  initial run_parallel;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  task automatic run_parallel;\n"
+              "    fork\n"
+              "      #10 a = 1;\n"
+              "      #20 b = 2;\n"
+              "    join\n"
+              "  endtask\n"
+              "  initial run_parallel;\n"
+              "endmodule\n"));
 }
 
 // ---------------------------------------------------------------------------
@@ -640,15 +640,15 @@ TEST(ParserSection9, Sec9_3_2_MultipleSequentialForks) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_ForkWithSystemCalls) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      $display(\"thread 1\");\n"
-      "      $display(\"thread 2\");\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    fork\n"
+              "      $display(\"thread 1\");\n"
+              "      $display(\"thread 2\");\n"
+              "    join\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // ---------------------------------------------------------------------------
@@ -683,16 +683,16 @@ TEST(ParserSection9, Sec9_3_2_ForkJoinSingleBeginEnd) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_ForkWithForLoop) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      for (int i = 0; i < 4; i++) begin\n"
-      "        #10 a[i] = i;\n"
-      "      end\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    fork\n"
+              "      for (int i = 0; i < 4; i++) begin\n"
+              "        #10 a[i] = i;\n"
+              "      end\n"
+              "    join\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // ---------------------------------------------------------------------------
@@ -700,15 +700,15 @@ TEST(ParserSection9, Sec9_3_2_ForkWithForLoop) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_ForkJoinInProgramBlock) {
-  EXPECT_TRUE(ParseOk(
-      "program p;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      #10 a = 1;\n"
-      "      #20 b = 2;\n"
-      "    join\n"
-      "  end\n"
-      "endprogram\n"));
+  EXPECT_TRUE(
+      ParseOk("program p;\n"
+              "  initial begin\n"
+              "    fork\n"
+              "      #10 a = 1;\n"
+              "      #20 b = 2;\n"
+              "    join\n"
+              "  end\n"
+              "endprogram\n"));
 }
 
 // ---------------------------------------------------------------------------

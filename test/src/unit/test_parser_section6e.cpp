@@ -82,10 +82,10 @@ TEST(ParserSection6, Sec6_6_7_NettypeWithLogicType) {
 
 // §6.6.7: Nettype with a packed vector type.
 TEST(ParserSection6, Sec6_6_7_NettypeWithPackedVector) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  nettype logic [7:0] byte_net;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  nettype logic [7:0] byte_net;\n"
+              "endmodule\n"));
 }
 
 // §6.6.7: Nettype with a struct data type.
@@ -151,38 +151,38 @@ TEST(ParserSection6, Sec6_6_7_MultipleNettypesInModule) {
 
 // §6.6.7: Nettype with real data type.
 TEST(ParserSection6, Sec6_6_7_NettypeWithRealType) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  nettype real real_net;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  nettype real real_net;\n"
+              "endmodule\n"));
 }
 
 // §6.6.7: Nettype with shortreal data type.
 TEST(ParserSection6, Sec6_6_7_NettypeWithShortrealType) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  nettype shortreal sr_net;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  nettype shortreal sr_net;\n"
+              "endmodule\n"));
 }
 
 // §6.6.7: Nettype used to declare a net variable.
 TEST(ParserSection6, Sec6_6_7_NettypeUsedForNetDecl) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  typedef struct { real field1; bit field2; } T;\n"
-      "  nettype T wT;\n"
-      "  wT my_signal;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef struct { real field1; bit field2; } T;\n"
+              "  nettype T wT;\n"
+              "  wT my_signal;\n"
+              "endmodule\n"));
 }
 
 // §6.6.7: Nettype used with resolution function and net declaration.
 TEST(ParserSection6, Sec6_6_7_NettypeWithResolveAndNetDecl) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  typedef struct { real field1; bit field2; } T;\n"
-      "  nettype T wTsum with Tsum;\n"
-      "  wTsum bus;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef struct { real field1; bit field2; } T;\n"
+              "  nettype T wTsum with Tsum;\n"
+              "  wTsum bus;\n"
+              "endmodule\n"));
 }
 
 // §6.6.7: Nettype in a package scope.
@@ -199,38 +199,38 @@ TEST(ParserSection6, Sec6_6_7_NettypeInPackage) {
 
 // §6.6.7: Nettype with byte type.
 TEST(ParserSection6, Sec6_6_7_NettypeWithByteType) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  nettype byte byte_net;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  nettype byte byte_net;\n"
+              "endmodule\n"));
 }
 
 // §6.6.7: Nettype with bit type.
 TEST(ParserSection6, Sec6_6_7_NettypeWithBitType) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  nettype bit bit_net;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  nettype bit bit_net;\n"
+              "endmodule\n"));
 }
 
 // §6.6.7: Nettype with longint type.
 TEST(ParserSection6, Sec6_6_7_NettypeWithLongintType) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  nettype longint long_net;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  nettype longint long_net;\n"
+              "endmodule\n"));
 }
 
 // §6.6.7: Nettype with typedef'd type used as port type.
 TEST(ParserSection6, Sec6_6_7_NettypeAsPortType) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  typedef struct { logic [7:0] data; logic valid; } bus_t;\n"
-      "  nettype bus_t bus_net;\n"
-      "endmodule\n"
-      "module top;\n"
-      "  bus_t sig;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef struct { logic [7:0] data; logic valid; } bus_t;\n"
+              "  nettype bus_t bus_net;\n"
+              "endmodule\n"
+              "module top;\n"
+              "  bus_t sig;\n"
+              "endmodule\n"));
 }
 
 // §6.6.7: Nettype with packed struct type.
@@ -257,25 +257,25 @@ TEST(ParserSection6, Sec6_6_7_NettypeWithArrayTypedef) {
 
 // §6.6.7: Nettype alias used to declare nets.
 TEST(ParserSection6, Sec6_6_7_NettypeAliasForNetDecl) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  typedef real TR[5];\n"
-      "  nettype TR wTR;\n"
-      "  nettype wTR alias_net;\n"
-      "  alias_net sig;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef real TR[5];\n"
+              "  nettype TR wTR;\n"
+              "  nettype wTR alias_net;\n"
+              "  alias_net sig;\n"
+              "endmodule\n"));
 }
 
 // §6.6.7: Nettype with resolution function — multiple drivers scenario.
 TEST(ParserSection6, Sec6_6_7_NettypeResolveFuncMultipleDrivers) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  typedef struct { real val; } S;\n"
-      "  function S resolve_S(input S drivers[]);\n"
-      "    resolve_S = drivers[0];\n"
-      "  endfunction\n"
-      "  nettype S net_S with resolve_S;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef struct { real val; } S;\n"
+              "  function S resolve_S(input S drivers[]);\n"
+              "    resolve_S = drivers[0];\n"
+              "  endfunction\n"
+              "  nettype S net_S with resolve_S;\n"
+              "endmodule\n"));
 }
 
 // §6.6.7: Multiple nettypes with different resolution functions.
@@ -311,10 +311,10 @@ TEST(ParserSection6, Sec6_6_7_NettypeNoResolveFunc) {
 
 // §6.6.7: Nettype with shortint type.
 TEST(ParserSection6, Sec6_6_7_NettypeWithShortintType) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  nettype shortint si_net;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  nettype shortint si_net;\n"
+              "endmodule\n"));
 }
 
 // §6.6.7: Nettype coexisting with wire and other net declarations.

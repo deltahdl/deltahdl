@@ -601,11 +601,11 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardThreeEventsOr) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_4_2_4_IffGuardNonblockingAssign) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  always @(posedge clk iff valid)\n"
-      "    data_out <= data_in;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  always @(posedge clk iff valid)\n"
+              "    data_out <= data_in;\n"
+              "endmodule\n"));
 }
 
 // ---------------------------------------------------------------------------

@@ -167,16 +167,16 @@ TEST(ParserSection8, StringTypeBlockLevel) {
 TEST(ParserSection8, TypeParameterModule) {
   EXPECT_TRUE(
       ParseOk("module m #(parameter type T = int);\n"
-               "  T data;\n"
-               "endmodule\n"));
+              "  T data;\n"
+              "endmodule\n"));
 }
 
 // Module with type parameter defaulting to logic vector.
 TEST(ParserSection8, TypeParameterLogicVector) {
   EXPECT_TRUE(
       ParseOk("module m #(parameter type T = logic [7:0]);\n"
-               "  T bus;\n"
-               "endmodule\n"));
+              "  T bus;\n"
+              "endmodule\n"));
 }
 
 // Class with type parameter used as member type.
@@ -200,20 +200,20 @@ TEST(ParserSection8, TypeParameterClassMember) {
 TEST(ParserSection8, ThisKeywordPropertyAccess) {
   EXPECT_TRUE(
       ParseOk("class MyClass;\n"
-               "  int value;\n"
-               "  function void set_value(int value);\n"
-               "    this.value = value;\n"
-               "  endfunction\n"
-               "endclass\n"));
+              "  int value;\n"
+              "  function void set_value(int value);\n"
+              "    this.value = value;\n"
+              "  endfunction\n"
+              "endclass\n"));
 }
 
 // Use of type(this) as return type for singleton pattern.
 TEST(ParserSection8, TypeOfThisReturnType) {
   EXPECT_TRUE(
       ParseOk("class Singleton #(type T = int);\n"
-               "  static function type(this) get();\n"
-               "  endfunction\n"
-               "endclass\n"));
+              "  static function type(this) get();\n"
+              "  endfunction\n"
+              "endclass\n"));
 }
 
 // =============================================================================
@@ -224,45 +224,45 @@ TEST(ParserSection8, TypeOfThisReturnType) {
 TEST(ParserSection8, DynamicCastClassHandles) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
-               "  class Base;\n"
-               "    int x;\n"
-               "  endclass\n"
-               "  class Derived extends Base;\n"
-               "    int y;\n"
-               "  endclass\n"
-               "  initial begin\n"
-               "    Base b;\n"
-               "    Derived d;\n"
-               "    d = new;\n"
-               "    b = d;\n"
-               "    $cast(d, b);\n"
-               "  end\n"
-               "endmodule\n"));
+              "  class Base;\n"
+              "    int x;\n"
+              "  endclass\n"
+              "  class Derived extends Base;\n"
+              "    int y;\n"
+              "  endclass\n"
+              "  initial begin\n"
+              "    Base b;\n"
+              "    Derived d;\n"
+              "    d = new;\n"
+              "    b = d;\n"
+              "    $cast(d, b);\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // Static cast with type apostrophe syntax: type'(expr).
 TEST(ParserSection8, StaticCastTypeSyntax) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
-               "  initial begin\n"
-               "    int a;\n"
-               "    real r;\n"
-               "    r = 3.14;\n"
-               "    a = int'(r);\n"
-               "  end\n"
-               "endmodule\n"));
+              "  initial begin\n"
+              "    int a;\n"
+              "    real r;\n"
+              "    r = 3.14;\n"
+              "    a = int'(r);\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // Size cast: N'(expr).
 TEST(ParserSection8, SizeCastExpression) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
-               "  initial begin\n"
-               "    logic [31:0] wide;\n"
-               "    logic [7:0] narrow;\n"
-               "    narrow = 8'(wide);\n"
-               "  end\n"
-               "endmodule\n"));
+              "  initial begin\n"
+              "    logic [31:0] wide;\n"
+              "    logic [7:0] narrow;\n"
+              "    narrow = 8'(wide);\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -288,9 +288,9 @@ TEST(ParserSection8, TypedefSimpleBuiltin) {
 TEST(ParserSection8, TypedefForwardEnum) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
-               "  typedef enum my_enum;\n"
-               "  typedef enum {A, B, C} my_enum;\n"
-               "endmodule\n"));
+              "  typedef enum my_enum;\n"
+              "  typedef enum {A, B, C} my_enum;\n"
+              "endmodule\n"));
 }
 
 // Typedef of enum with named type for reuse.
@@ -315,28 +315,28 @@ TEST(ParserSection8, TypedefEnumWithMembers) {
 TEST(ParserSection8, TypeRefVarDecl) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
-               "  real a = 1.0;\n"
-               "  real b = 2.0;\n"
-               "  var type(a + b) c;\n"
-               "endmodule\n"));
+              "  real a = 1.0;\n"
+              "  real b = 2.0;\n"
+              "  var type(a + b) c;\n"
+              "endmodule\n"));
 }
 
 // type(data_type) in parameter default.
 TEST(ParserSection8, TypeRefDataTypeParam) {
   EXPECT_TRUE(
       ParseOk("module m #(parameter type T = type(logic [11:0]));\n"
-               "endmodule\n"));
+              "endmodule\n"));
 }
 
 // type() comparison in expressions.
 TEST(ParserSection8, TypeRefComparison) {
   EXPECT_TRUE(
       ParseOk("module m #(parameter type T = int)\n"
-               "  ();\n"
-               "  initial begin\n"
-               "    if (type(T) == type(int)) $display(\"int\");\n"
-               "  end\n"
-               "endmodule\n"));
+              "  ();\n"
+              "  initial begin\n"
+              "    if (type(T) == type(int)) $display(\"int\");\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -364,9 +364,9 @@ TEST(ParserSection8, EnumAnonymousDeclMembers) {
 TEST(ParserSection8, EnumExplicitBaseTypeValues) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
-               "  enum bit [3:0] {BRONZE = 4'h3, SILVER, GOLD = 4'h5}"
-               " medal;\n"
-               "endmodule\n"));
+              "  enum bit [3:0] {BRONZE = 4'h3, SILVER, GOLD = 4'h5}"
+              " medal;\n"
+              "endmodule\n"));
 }
 
 // Typedef enum used as a named type for variable declarations.
@@ -404,17 +404,17 @@ TEST(ParserSection8, InterfaceClassDecl) {
 TEST(ParserSection8, ClassImplementsMultipleInterfaces) {
   EXPECT_TRUE(
       ParseOk("interface class A;\n"
-               "  pure virtual function void fa();\n"
-               "endclass\n"
-               "interface class B;\n"
-               "  pure virtual function void fb();\n"
-               "endclass\n"
-               "class C implements A, B;\n"
-               "  virtual function void fa();\n"
-               "  endfunction\n"
-               "  virtual function void fb();\n"
-               "  endfunction\n"
-               "endclass\n"));
+              "  pure virtual function void fa();\n"
+              "endclass\n"
+              "interface class B;\n"
+              "  pure virtual function void fb();\n"
+              "endclass\n"
+              "class C implements A, B;\n"
+              "  virtual function void fa();\n"
+              "  endfunction\n"
+              "  virtual function void fb();\n"
+              "  endfunction\n"
+              "endclass\n"));
 }
 
 // Forward typedef class followed by full class definition.

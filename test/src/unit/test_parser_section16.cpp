@@ -543,8 +543,8 @@ TEST(ParserSection16, ConcurrentAssumePropertyWithAction) {
       "    else $error(\"assumption failed\");\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto* ap = FindItemByKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kAssumeProperty);
+  auto* ap =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssumeProperty);
   ASSERT_NE(ap, nullptr);
   EXPECT_NE(ap->assert_fail_stmt, nullptr);
 }
@@ -556,8 +556,8 @@ TEST(ParserSection16, ConcurrentCoverPropertyWithStmt) {
       "    $display(\"covered\");\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto* cp = FindItemByKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kCoverProperty);
+  auto* cp =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kCoverProperty);
   ASSERT_NE(cp, nullptr);
 }
 
@@ -656,8 +656,8 @@ TEST(ParserSection16, SequenceThroughoutInSeqDecl) {
       "  endsequence\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto* sq = FindItemByKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kSequenceDecl);
+  auto* sq =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kSequenceDecl);
   ASSERT_NE(sq, nullptr);
 }
 
@@ -705,8 +705,8 @@ TEST(ParserSection16, PropertyDeclWithFormals) {
       "  endproperty\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto* pd = FindItemByKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kPropertyDecl);
+  auto* pd =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kPropertyDecl);
   ASSERT_NE(pd, nullptr);
   EXPECT_EQ(pd->name, "p_req_ack");
 }

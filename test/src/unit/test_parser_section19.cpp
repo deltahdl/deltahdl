@@ -167,52 +167,52 @@ TEST(ParserSection19, ClockingBlock_MultipleSignalsSameDirection) {
 
 // Use a clocking block name as an event in an always block.
 TEST(ParserSection19, ClockingBlockEvent_AlwaysAt) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  clocking dram @(posedge phi1);\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "  always @(dram)\n"
-      "    $display(\"clocking block event\");\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking dram @(posedge phi1);\n"
+              "    input data;\n"
+              "  endclocking\n"
+              "  always @(dram)\n"
+              "    $display(\"clocking block event\");\n"
+              "endmodule\n"));
 }
 
 // Clocking event used alongside a posedge always for comparison.
 TEST(ParserSection19, ClockingBlockEvent_BothTriggers) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  clocking dram @(posedge phi1);\n"
-      "    input data;\n"
-      "    output negedge #1 address;\n"
-      "  endclocking\n"
-      "  always @(posedge phi1) $display(\"clocking event\");\n"
-      "  always @(dram) $display(\"clocking block event\");\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking dram @(posedge phi1);\n"
+              "    input data;\n"
+              "    output negedge #1 address;\n"
+              "  endclocking\n"
+              "  always @(posedge phi1) $display(\"clocking event\");\n"
+              "  always @(dram) $display(\"clocking block event\");\n"
+              "endmodule\n"));
 }
 
 // Clocking block event used in an initial block with @(cb).
 TEST(ParserSection19, ClockingBlockEvent_InitialBlock) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input v;\n"
-      "  endclocking\n"
-      "  initial begin\n"
-      "    @(cb);\n"
-      "    $display(cb.v);\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking cb @(posedge clk);\n"
+              "    input v;\n"
+              "  endclocking\n"
+              "  initial begin\n"
+              "    @(cb);\n"
+              "    $display(cb.v);\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // Access clocking block signal via dot notation (cb.v) in always block.
 TEST(ParserSection19, ClockingBlockEvent_DotAccess) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  clocking cb @(negedge clk);\n"
-      "    input v;\n"
-      "  endclocking\n"
-      "  always @(cb) $display(cb.v);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking cb @(negedge clk);\n"
+              "    input v;\n"
+              "  endclocking\n"
+              "  always @(cb) $display(cb.v);\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -251,39 +251,39 @@ TEST(ParserSection19, DefaultClocking_Unnamed) {
 
 // Assigning an existing clocking block as default via a separate statement.
 TEST(ParserSection19, DefaultClocking_SeparateStatement) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  clocking busA @(posedge clk1);\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "  default clocking busA;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking busA @(posedge clk1);\n"
+              "    input data;\n"
+              "  endclocking\n"
+              "  default clocking busA;\n"
+              "endmodule\n"));
 }
 
 // Default clocking in a program with cycle delay usage.
 TEST(ParserSection19, DefaultClocking_ProgramWithCycleDelay) {
-  EXPECT_TRUE(ParseOk(
-      "program test_prog(input logic clk, input logic [15:0] data);\n"
-      "  default clocking bus @(posedge clk);\n"
-      "    inout data;\n"
-      "  endclocking\n"
-      "  initial begin\n"
-      "    ##5;\n"
-      "    if (bus.data == 10)\n"
-      "      ##1;\n"
-      "  end\n"
-      "endprogram\n"));
+  EXPECT_TRUE(
+      ParseOk("program test_prog(input logic clk, input logic [15:0] data);\n"
+              "  default clocking bus @(posedge clk);\n"
+              "    inout data;\n"
+              "  endclocking\n"
+              "  initial begin\n"
+              "    ##5;\n"
+              "    if (bus.data == 10)\n"
+              "      ##1;\n"
+              "  end\n"
+              "endprogram\n"));
 }
 
 // Default clocking in an interface.
 TEST(ParserSection19, DefaultClocking_InInterface) {
-  EXPECT_TRUE(ParseOk(
-      "interface my_if (input clk);\n"
-      "  logic [7:0] data;\n"
-      "  default clocking cb @(posedge clk);\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "endinterface\n"));
+  EXPECT_TRUE(
+      ParseOk("interface my_if (input clk);\n"
+              "  logic [7:0] data;\n"
+              "  default clocking cb @(posedge clk);\n"
+              "    input data;\n"
+              "  endclocking\n"
+              "endinterface\n"));
 }
 
 // =============================================================================
@@ -334,45 +334,45 @@ TEST(ParserSection19, ClockingBlockScope_MultipleBlocks) {
 
 // Clocking block in a program with initial block accessing signals.
 TEST(ParserSection19, ClockingBlockScope_ProgramAccess) {
-  EXPECT_TRUE(ParseOk(
-      "program test_prog(\n"
-      "  input phi1, input [15:0] data, output logic write,\n"
-      "  input phi2, inout [8:1] cmd, input enable\n"
-      ");\n"
-      "  clocking cd1 @(posedge phi1);\n"
-      "    input data;\n"
-      "    output write;\n"
-      "    input state = top.cpu1.state;\n"
-      "  endclocking\n"
-      "  clocking cd2 @(posedge phi2);\n"
-      "    input #2 output #4ps cmd;\n"
-      "    input enable;\n"
-      "  endclocking\n"
-      "  initial begin\n"
-      "    @(cd1);\n"
-      "  end\n"
-      "endprogram\n"));
+  EXPECT_TRUE(
+      ParseOk("program test_prog(\n"
+              "  input phi1, input [15:0] data, output logic write,\n"
+              "  input phi2, inout [8:1] cmd, input enable\n"
+              ");\n"
+              "  clocking cd1 @(posedge phi1);\n"
+              "    input data;\n"
+              "    output write;\n"
+              "    input state = top.cpu1.state;\n"
+              "  endclocking\n"
+              "  clocking cd2 @(posedge phi2);\n"
+              "    input #2 output #4ps cmd;\n"
+              "    input enable;\n"
+              "  endclocking\n"
+              "  initial begin\n"
+              "    @(cd1);\n"
+              "  end\n"
+              "endprogram\n"));
 }
 
 // Clocking block in an interface (valid scope per LRM).
 TEST(ParserSection19, ClockingBlockScope_InInterface) {
-  EXPECT_TRUE(ParseOk(
-      "interface bus_if (input clk);\n"
-      "  logic [7:0] data;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "endinterface\n"));
+  EXPECT_TRUE(
+      ParseOk("interface bus_if (input clk);\n"
+              "  logic [7:0] data;\n"
+              "  clocking cb @(posedge clk);\n"
+              "    input data;\n"
+              "  endclocking\n"
+              "endinterface\n"));
 }
 
 // Clocking block in a checker (valid scope per LRM).
 TEST(ParserSection19, ClockingBlockScope_InChecker) {
-  EXPECT_TRUE(ParseOk(
-      "checker my_check(input clk, input data);\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "endchecker\n"));
+  EXPECT_TRUE(
+      ParseOk("checker my_check(input clk, input data);\n"
+              "  clocking cb @(posedge clk);\n"
+              "    input data;\n"
+              "  endclocking\n"
+              "endchecker\n"));
 }
 
 // =============================================================================
@@ -434,54 +434,54 @@ TEST(ParserSection19, InputOutputSkew_CombinedInputOutput) {
 
 // Input skew with time-unit suffix (e.g., #1ps).
 TEST(ParserSection19, InputOutputSkew_TimeUnitSuffix) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  clocking dram @(clk);\n"
-      "    input #1ps address;\n"
-      "    input #5 output #6 data;\n"
-      "  endclocking\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking dram @(clk);\n"
+              "    input #1ps address;\n"
+              "    input #5 output #6 data;\n"
+              "  endclocking\n"
+              "endmodule\n"));
 }
 
 // Input skew of #1step (special 1step literal).
 TEST(ParserSection19, InputOutputSkew_OneStep) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  clocking cd1 @(posedge phi1);\n"
-      "    input #1step state = top.cpu1.state;\n"
-      "  endclocking\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking cd1 @(posedge phi1);\n"
+              "    input #1step state = top.cpu1.state;\n"
+              "  endclocking\n"
+              "endmodule\n"));
 }
 
 // Output skew with negedge and numeric delay combined.
 TEST(ParserSection19, InputOutputSkew_OutputNegedgeWithDelay) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    output negedge #1 address;\n"
-      "  endclocking\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking cb @(posedge clk);\n"
+              "    output negedge #1 address;\n"
+              "  endclocking\n"
+              "endmodule\n"));
 }
 
 // Input skew with explicit #0 (Observed region sampling).
 TEST(ParserSection19, InputOutputSkew_ExplicitZero) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input #0 data;\n"
-      "  endclocking\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking cb @(posedge clk);\n"
+              "    input #0 data;\n"
+              "  endclocking\n"
+              "endmodule\n"));
 }
 
 // Combined input/output with time-unit suffix on output (#4ps).
 TEST(ParserSection19, InputOutputSkew_MixedUnitSuffix) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  clocking cd2 @(posedge phi2);\n"
-      "    input #2 output #4ps cmd;\n"
-      "    input enable;\n"
-      "  endclocking\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking cd2 @(posedge phi2);\n"
+              "    input #2 output #4ps cmd;\n"
+              "    input enable;\n"
+              "  endclocking\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -506,75 +506,75 @@ TEST(ParserSection19, DefaultSkew_InputOutputTimeUnits) {
 
 // Default input skew only (no output skew specified).
 TEST(ParserSection19, DefaultSkew_InputOnly) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    default input #5;\n"
-      "    input a;\n"
-      "    output b;\n"
-      "  endclocking\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking cb @(posedge clk);\n"
+              "    default input #5;\n"
+              "    input a;\n"
+              "    output b;\n"
+              "  endclocking\n"
+              "endmodule\n"));
 }
 
 // Default output skew only (no input skew specified).
 TEST(ParserSection19, DefaultSkew_OutputOnly) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    default output #3;\n"
-      "    input a;\n"
-      "    output b;\n"
-      "  endclocking\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking cb @(posedge clk);\n"
+              "    default output #3;\n"
+              "    input a;\n"
+              "    output b;\n"
+              "  endclocking\n"
+              "endmodule\n"));
 }
 
 // Default input #1step with output negedge.
 TEST(ParserSection19, DefaultSkew_1StepInputNegedgeOutput) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  clocking ck1 @(posedge clk);\n"
-      "    default input #1step output negedge;\n"
-      "    input a;\n"
-      "    output b;\n"
-      "  endclocking\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking ck1 @(posedge clk);\n"
+              "    default input #1step output negedge;\n"
+              "    input a;\n"
+              "    output b;\n"
+              "  endclocking\n"
+              "endmodule\n"));
 }
 
 // Default skew with per-signal override: addr overrides input to #1step.
 TEST(ParserSection19, DefaultSkew_PerSignalOverride) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  clocking bus @(posedge clock1);\n"
-      "    default input #10ns output #2ns;\n"
-      "    input data, ready, enable = top.mem1.enable;\n"
-      "    output negedge ack;\n"
-      "    input #1step addr;\n"
-      "  endclocking\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking bus @(posedge clock1);\n"
+              "    default input #10ns output #2ns;\n"
+              "    input data, ready, enable = top.mem1.enable;\n"
+              "    output negedge ack;\n"
+              "    input #1step addr;\n"
+              "  endclocking\n"
+              "endmodule\n"));
 }
 
 // Default skew on a clocking block with no edge in the event.
 TEST(ParserSection19, DefaultSkew_NoEdgeEvent) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  clocking ck2 @(clk);\n"
-      "    default input #1step output negedge;\n"
-      "    input a;\n"
-      "    output b;\n"
-      "  endclocking\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking ck2 @(clk);\n"
+              "    default input #1step output negedge;\n"
+              "    input a;\n"
+              "    output b;\n"
+              "  endclocking\n"
+              "endmodule\n"));
 }
 
 // Default skew with numeric literals (no time-unit suffix).
 TEST(ParserSection19, DefaultSkew_NumericLiterals) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    default input #3 output #7;\n"
-      "    input x;\n"
-      "    output y;\n"
-      "  endclocking\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking cb @(posedge clk);\n"
+              "    default input #3 output #7;\n"
+              "    input x;\n"
+              "    output y;\n"
+              "  endclocking\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -583,12 +583,12 @@ TEST(ParserSection19, DefaultSkew_NumericLiterals) {
 
 // End label on clocking block.
 TEST(ParserSection19, ClockingBlock_EndLabel) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input a;\n"
-      "  endclocking : cb\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking cb @(posedge clk);\n"
+              "    input a;\n"
+              "  endclocking : cb\n"
+              "endmodule\n"));
 }
 
 // Hierarchical expression assignment to a clocking signal.
@@ -608,12 +608,12 @@ TEST(ParserSection19, ClockingBlock_HierarchicalExpr) {
 
 // Clocking block within a program.
 TEST(ParserSection19, ClockingBlock_InProgram) {
-  EXPECT_TRUE(ParseOk(
-      "program test_prog(input clk, input [7:0] data);\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "endprogram\n"));
+  EXPECT_TRUE(
+      ParseOk("program test_prog(input clk, input [7:0] data);\n"
+              "  clocking cb @(posedge clk);\n"
+              "    input data;\n"
+              "  endclocking\n"
+              "endprogram\n"));
 }
 
 // Global clocking block (no signals allowed inside).
@@ -633,20 +633,20 @@ TEST(ParserSection19, GlobalClocking_Basic) {
 
 // Global clocking with compound event expression (or).
 TEST(ParserSection19, GlobalClocking_CompoundEvent) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  global clocking sys @(clk1 or clk2);\n"
-      "  endclocking\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  global clocking sys @(clk1 or clk2);\n"
+              "  endclocking\n"
+              "endmodule\n"));
 }
 
 // Global clocking with end label.
 TEST(ParserSection19, GlobalClocking_EndLabel) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  global clocking gclk @(posedge clk);\n"
-      "  endclocking : gclk\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  global clocking gclk @(posedge clk);\n"
+              "  endclocking : gclk\n"
+              "endmodule\n"));
 }
 
 // Full LRM example: bus clocking block with default skew,
@@ -683,29 +683,29 @@ TEST(ParserSection19, FullExample_BusClockingBlock) {
 
 // Cycle delay ## operator depends on default clocking.
 TEST(ParserSection19, CycleDelay_WithDefaultClocking) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  default clocking cb @(posedge clk);\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "  initial begin\n"
-      "    ##5;\n"
-      "    ##(j + 1);\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  default clocking cb @(posedge clk);\n"
+              "    input data;\n"
+              "  endclocking\n"
+              "  initial begin\n"
+              "    ##5;\n"
+              "    ##(j + 1);\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // Clocking block inside an interface with modport.
 TEST(ParserSection19, InterfaceClockingWithModport) {
-  EXPECT_TRUE(ParseOk(
-      "interface bus_A (input clk);\n"
-      "  logic [15:0] data;\n"
-      "  logic write;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input data;\n"
-      "    output write;\n"
-      "  endclocking\n"
-      "  modport test (input data, output write, input clk);\n"
-      "  modport dut (output data, input write, input clk);\n"
-      "endinterface\n"));
+  EXPECT_TRUE(
+      ParseOk("interface bus_A (input clk);\n"
+              "  logic [15:0] data;\n"
+              "  logic write;\n"
+              "  clocking cb @(posedge clk);\n"
+              "    input data;\n"
+              "    output write;\n"
+              "  endclocking\n"
+              "  modport test (input data, output write, input clk);\n"
+              "  modport dut (output data, input write, input clk);\n"
+              "endinterface\n"));
 }

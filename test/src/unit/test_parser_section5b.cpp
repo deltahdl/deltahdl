@@ -99,8 +99,7 @@ TEST(ParserSection5, EscapedIdent_Keyword) {
 
 TEST(ParserSection5, EscapedIdent_SpecialChars) {
   // Escaped identifiers can contain any printable ASCII character.
-  EXPECT_TRUE(
-      ParseOk("module m; wire \\***error-condition*** ; endmodule"));
+  EXPECT_TRUE(ParseOk("module m; wire \\***error-condition*** ; endmodule"));
 }
 
 // =========================================================================
@@ -288,19 +287,16 @@ TEST(ParserSection5, IntLiteral_SizedHex) {
 
 TEST(ParserSection5, IntLiteral_UnsizedHex) {
   // 'h 837FF -- unsized hexadecimal.
-  EXPECT_TRUE(
-      ParseOk("module m; initial x = 'h837FF; endmodule"));
+  EXPECT_TRUE(ParseOk("module m; initial x = 'h837FF; endmodule"));
 }
 
 TEST(ParserSection5, IntLiteral_SizedOctal) {
-  EXPECT_TRUE(
-      ParseOk("module m; initial x = 8'o77; endmodule"));
+  EXPECT_TRUE(ParseOk("module m; initial x = 8'o77; endmodule"));
 }
 
 TEST(ParserSection5, IntLiteral_SignedLiteral) {
   // 4'shf is a signed 4-bit number (value -1 in two's complement).
-  EXPECT_TRUE(
-      ParseOk("module m; initial x = 4'shf; endmodule"));
+  EXPECT_TRUE(ParseOk("module m; initial x = 4'shf; endmodule"));
 }
 
 TEST(ParserSection5, IntLiteral_UnbasedUnsized_One) {
@@ -340,8 +336,7 @@ TEST(ParserSection5, IntLiteral_ZValue) {
 
 TEST(ParserSection5, IntLiteral_QuestionMark) {
   // ? is an alternative for z in literal constants.
-  EXPECT_TRUE(
-      ParseOk("module m; initial x = 16'sd?; endmodule"));
+  EXPECT_TRUE(ParseOk("module m; initial x = 16'sd?; endmodule"));
 }
 
 // =========================================================================
@@ -402,13 +397,11 @@ TEST(ParserSection5, TimeLiteral_IntegerNs) {
 
 TEST(ParserSection5, TimeLiteral_FixedPointNs) {
   // 2.1ns -- a time literal with a fixed-point value.
-  EXPECT_TRUE(
-      ParseOk("module m; initial #2.1ns; endmodule"));
+  EXPECT_TRUE(ParseOk("module m; initial #2.1ns; endmodule"));
 }
 
 TEST(ParserSection5, TimeLiteral_Ps) {
-  EXPECT_TRUE(
-      ParseOk("module m; initial #40ps; endmodule"));
+  EXPECT_TRUE(ParseOk("module m; initial #40ps; endmodule"));
 }
 
 // =========================================================================
@@ -631,13 +624,11 @@ TEST(ParserSection5, BuiltInMethod_WithArgs) {
 // =========================================================================
 
 TEST(ParserSection5, Operator_LogicalShiftLeft) {
-  EXPECT_TRUE(
-      ParseOk("module m; initial x = a <<< 2; endmodule"));
+  EXPECT_TRUE(ParseOk("module m; initial x = a <<< 2; endmodule"));
 }
 
 TEST(ParserSection5, Operator_ArithShiftRight) {
-  EXPECT_TRUE(
-      ParseOk("module m; initial x = a >>> 1; endmodule"));
+  EXPECT_TRUE(ParseOk("module m; initial x = a >>> 1; endmodule"));
 }
 
 TEST(ParserSection5, Operator_CaseEquality) {
@@ -657,8 +648,7 @@ TEST(ParserSection5, Operator_CaseEquality) {
 
 TEST(ParserSection5, Operator_CaseInequality) {
   // !== is the case inequality operator.
-  EXPECT_TRUE(
-      ParseOk("module m; initial x = (a !== b); endmodule"));
+  EXPECT_TRUE(ParseOk("module m; initial x = (a !== b); endmodule"));
 }
 
 // =========================================================================
@@ -667,14 +657,12 @@ TEST(ParserSection5, Operator_CaseInequality) {
 
 TEST(ParserSection5, IntLiteral_NegativeUnsized) {
   // -8'd6 defines the two's-complement of 6 held in 8 bits.
-  EXPECT_TRUE(
-      ParseOk("module m; initial x = -8'd6; endmodule"));
+  EXPECT_TRUE(ParseOk("module m; initial x = -8'd6; endmodule"));
 }
 
 TEST(ParserSection5, IntLiteral_SizedDecimal) {
   // 5'D 3 is a 5-bit decimal number.
-  EXPECT_TRUE(
-      ParseOk("module m; initial x = 5'D3; endmodule"));
+  EXPECT_TRUE(ParseOk("module m; initial x = 5'D3; endmodule"));
 }
 
 // =========================================================================
@@ -743,8 +731,7 @@ TEST(ParserSection5, Operator_ReductionAnd) {
 }
 
 TEST(ParserSection5, Operator_ReductionXnor) {
-  EXPECT_TRUE(
-      ParseOk("module m; initial x = ~^y; endmodule"));
+  EXPECT_TRUE(ParseOk("module m; initial x = ~^y; endmodule"));
 }
 
 // =========================================================================
@@ -808,14 +795,12 @@ TEST(ParserSection5, Attribute_MultipleSeparateInstances) {
 
 TEST(ParserSection5, EscapedIdent_ForwardSlash) {
   // \net1/\net2 is a valid escaped identifier containing a slash.
-  EXPECT_TRUE(
-      ParseOk("module m; wire \\net1/\\net2 ; endmodule"));
+  EXPECT_TRUE(ParseOk("module m; wire \\net1/\\net2 ; endmodule"));
 }
 
 TEST(ParserSection5, EscapedIdent_Braces) {
   // \{a,b} is a valid escaped identifier containing braces.
-  EXPECT_TRUE(
-      ParseOk("module m; wire \\{a,b} ; endmodule"));
+  EXPECT_TRUE(ParseOk("module m; wire \\{a,b} ; endmodule"));
 }
 
 // =========================================================================
@@ -843,14 +828,12 @@ TEST(ParserSection5, BuiltInMethod_PushBack) {
 // =========================================================================
 
 TEST(ParserSection5, Operator_Power) {
-  EXPECT_TRUE(
-      ParseOk("module m; initial x = 2 ** 10; endmodule"));
+  EXPECT_TRUE(ParseOk("module m; initial x = 2 ** 10; endmodule"));
 }
 
 TEST(ParserSection5, Operator_WildcardEquality) {
   // ==? is the wildcard equality operator.
-  EXPECT_TRUE(
-      ParseOk("module m; initial x = (a ==? b); endmodule"));
+  EXPECT_TRUE(ParseOk("module m; initial x = (a ==? b); endmodule"));
 }
 
 // =========================================================================
@@ -859,8 +842,7 @@ TEST(ParserSection5, Operator_WildcardEquality) {
 
 TEST(ParserSection5, IntLiteral_SpaceBetweenBaseAndDigits) {
   // Space between base format and unsigned number is legal.
-  EXPECT_TRUE(
-      ParseOk("module m; initial x = 32 'h 12ab_f001; endmodule"));
+  EXPECT_TRUE(ParseOk("module m; initial x = 32 'h 12ab_f001; endmodule"));
 }
 
 TEST(ParserSection5, IntLiteral_LargeUnsized) {

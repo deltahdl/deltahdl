@@ -809,17 +809,17 @@ TEST(ParserSection9, Sec9_2_2_UniqueIf) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_2_2_ParseOkComplexMuxPattern) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  logic [3:0] sel;\n"
-      "  logic [7:0] inputs [0:15];\n"
-      "  logic [7:0] out;\n"
-      "  always_comb begin\n"
-      "    out = 8'd0;\n"
-      "    for (int i = 0; i < 16; i++) begin\n"
-      "      if (sel == i[3:0])\n"
-      "        out = inputs[i];\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic [3:0] sel;\n"
+              "  logic [7:0] inputs [0:15];\n"
+              "  logic [7:0] out;\n"
+              "  always_comb begin\n"
+              "    out = 8'd0;\n"
+              "    for (int i = 0; i < 16; i++) begin\n"
+              "      if (sel == i[3:0])\n"
+              "        out = inputs[i];\n"
+              "    end\n"
+              "  end\n"
+              "endmodule\n"));
 }

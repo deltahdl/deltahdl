@@ -522,12 +522,10 @@ TEST(ParserSection10, Sec10_4_2_MixedBlockingNonblocking) {
   for (auto* item : mod->items) {
     if (item->kind == ModuleItemKind::kAlwaysBlock) {
       always_count++;
-      if (item->body &&
-          item->body->kind == StmtKind::kNonblockingAssign) {
+      if (item->body && item->body->kind == StmtKind::kNonblockingAssign) {
         found_nonblocking = true;
       }
-      if (item->body &&
-          item->body->kind == StmtKind::kBlockingAssign) {
+      if (item->body && item->body->kind == StmtKind::kBlockingAssign) {
         found_blocking = true;
       }
     }
@@ -644,15 +642,15 @@ TEST(ParserSection10, Sec10_4_2_NamedBlockNonblocking) {
 
 // --- 28. Pipeline pattern with multiple nonblocking assignments ---
 TEST(ParserSection10, Sec10_4_2_PipelinePattern) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  reg [7:0] stage1, stage2, stage3, d;\n"
-      "  always_ff @(posedge clk) begin\n"
-      "    stage1 <= d;\n"
-      "    stage2 <= stage1;\n"
-      "    stage3 <= stage2;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  reg [7:0] stage1, stage2, stage3, d;\n"
+              "  always_ff @(posedge clk) begin\n"
+              "    stage1 <= d;\n"
+              "    stage2 <= stage1;\n"
+              "    stage3 <= stage2;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // --- 29. Nonblocking swap pattern ---

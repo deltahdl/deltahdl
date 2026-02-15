@@ -407,18 +407,18 @@ TEST(ParserSection10, Sec10_6_1_AssignInsideForLoop) {
 
 // --- 18. D-FF with clear/preset pattern (LRM example) ---
 TEST(ParserSection10, Sec10_6_1_DFlipFlopClearPreset) {
-  EXPECT_TRUE(ParseOk(
-      "module dff_cp(output reg q, input d, clear, preset, clock);\n"
-      "  always @(clear or preset)\n"
-      "    if (!clear)\n"
-      "      assign q = 0;\n"
-      "    else if (!preset)\n"
-      "      assign q = 1;\n"
-      "    else\n"
-      "      deassign q;\n"
-      "  always @(posedge clock)\n"
-      "    q <= d;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module dff_cp(output reg q, input d, clear, preset, clock);\n"
+              "  always @(clear or preset)\n"
+              "    if (!clear)\n"
+              "      assign q = 0;\n"
+              "    else if (!preset)\n"
+              "      assign q = 1;\n"
+              "    else\n"
+              "      deassign q;\n"
+              "  always @(posedge clock)\n"
+              "    q <= d;\n"
+              "endmodule\n"));
 }
 
 // --- 19. Assign in named block ---
@@ -610,16 +610,16 @@ TEST(ParserSection10, Sec10_6_1_AssignToVector) {
 
 // --- 28. Assign in task body ---
 TEST(ParserSection10, Sec10_6_1_AssignInTaskBody) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  reg q;\n"
-      "  task set_q;\n"
-      "    assign q = 1;\n"
-      "  endtask\n"
-      "  task clear_q;\n"
-      "    deassign q;\n"
-      "  endtask\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  reg q;\n"
+              "  task set_q;\n"
+              "    assign q = 1;\n"
+              "  endtask\n"
+              "  task clear_q;\n"
+              "    deassign q;\n"
+              "  endtask\n"
+              "endmodule\n"));
 }
 
 // --- 29. Assign/deassign interleaved with nonblocking assigns ---

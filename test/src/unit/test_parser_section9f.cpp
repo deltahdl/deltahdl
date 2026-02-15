@@ -330,7 +330,8 @@ TEST(ParserSection9, Sec9_4_5_NonblockingIntraEventNegedge) {
 // LRM section 9.4.5 -- Repeat event with multiple events (or)
 // =============================================================================
 
-// Repeat event with multiple events: a = repeat(3) @(posedge clk or negedge rst) b;
+// Repeat event with multiple events: a = repeat(3) @(posedge clk or negedge
+// rst) b;
 TEST(ParserSection9, Sec9_4_5_RepeatMultipleEventsOr) {
   auto r = Parse(
       "module m;\n"
@@ -352,7 +353,8 @@ TEST(ParserSection9, Sec9_4_5_RepeatMultipleEventsOr) {
 // LRM section 9.4.5 -- Repeat event with multiple events (comma)
 // =============================================================================
 
-// Repeat event with comma-separated events: a = repeat(2) @(posedge clk, negedge rst) b;
+// Repeat event with comma-separated events: a = repeat(2) @(posedge clk,
+// negedge rst) b;
 TEST(ParserSection9, Sec9_4_5_RepeatMultipleEventsComma) {
   auto r = Parse(
       "module m;\n"
@@ -631,13 +633,13 @@ TEST(ParserSection9, Sec9_4_5_IntraEventMultipleSignals) {
 
 // Repeat event inside an automatic task.
 TEST(ParserSection9, Sec9_4_5_RepeatInAutoTask) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  reg clk, a, b;\n"
-      "  task automatic sample;\n"
-      "    a = repeat(4) @(posedge clk) b;\n"
-      "  endtask\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  reg clk, a, b;\n"
+              "  task automatic sample;\n"
+              "    a = repeat(4) @(posedge clk) b;\n"
+              "  endtask\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -665,14 +667,14 @@ TEST(ParserSection9, Sec9_4_5_RepeatEventSignalField) {
 
 // Validate ParseOk for a complete repeat event control scenario.
 TEST(ParserSection9, Sec9_4_5_ParseOkRepeatEvent) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  reg clk, a, b;\n"
-      "  initial begin\n"
-      "    a = repeat(10) @(posedge clk) b;\n"
-      "    a <= repeat(5) @(negedge clk) b;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  reg clk, a, b;\n"
+              "  initial begin\n"
+              "    a = repeat(10) @(posedge clk) b;\n"
+              "    a <= repeat(5) @(negedge clk) b;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // =============================================================================

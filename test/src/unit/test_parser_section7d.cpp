@@ -111,7 +111,8 @@ TEST(ParserSection7, Sec7_2_1_PackedTypedefBitMembers) {
   EXPECT_NE(item->typedef_type.struct_members[0].packed_dim_right, nullptr);
 }
 
-// --- Packed struct with integer type members (byte, shortint, int, longint) ---
+// --- Packed struct with integer type members (byte, shortint, int, longint)
+// ---
 
 TEST(ParserSection7, Sec7_2_1_PackedIntegerTypes) {
   auto r = Parse(
@@ -129,7 +130,8 @@ TEST(ParserSection7, Sec7_2_1_PackedIntegerTypes) {
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->typedef_type.is_packed);
   ASSERT_EQ(item->typedef_type.struct_members.size(), 4u);
-  EXPECT_EQ(item->typedef_type.struct_members[0].type_kind, DataTypeKind::kByte);
+  EXPECT_EQ(item->typedef_type.struct_members[0].type_kind,
+            DataTypeKind::kByte);
   EXPECT_EQ(item->typedef_type.struct_members[1].type_kind,
             DataTypeKind::kShortint);
   EXPECT_EQ(item->typedef_type.struct_members[2].type_kind, DataTypeKind::kInt);
@@ -301,17 +303,17 @@ TEST(ParserSection7, Sec7_2_1_PackedAssignFromPattern) {
 // --- Packed struct as function return type ---
 
 TEST(ParserSection7, Sec7_2_1_PackedAsFuncReturn) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  typedef struct packed {\n"
-      "    logic [7:0] a;\n"
-      "    logic [7:0] b;\n"
-      "  } pair_t;\n"
-      "  function pair_t make_pair;\n"
-      "    input logic [7:0] x, y;\n"
-      "    make_pair = {x, y};\n"
-      "  endfunction\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  typedef struct packed {\n"
+              "    logic [7:0] a;\n"
+              "    logic [7:0] b;\n"
+              "  } pair_t;\n"
+              "  function pair_t make_pair;\n"
+              "    input logic [7:0] x, y;\n"
+              "    make_pair = {x, y};\n"
+              "  endfunction\n"
+              "endmodule\n"));
 }
 
 // --- Packed struct as port type (inline struct in port list) ---
@@ -344,8 +346,7 @@ TEST(ParserSection7, Sec7_2_1_PackedWithPackedArrayMember) {
   ASSERT_EQ(item->typedef_type.struct_members.size(), 2u);
   EXPECT_EQ(item->typedef_type.struct_members[0].name, "bytes");
   EXPECT_NE(item->typedef_type.struct_members[0].packed_dim_left, nullptr);
-  EXPECT_FALSE(
-      item->typedef_type.struct_members[0].extra_packed_dims.empty());
+  EXPECT_FALSE(item->typedef_type.struct_members[0].extra_packed_dims.empty());
 }
 
 // --- Packed struct with multiple packed dimensions on a member ---
@@ -373,44 +374,44 @@ TEST(ParserSection7, Sec7_2_1_PackedMemberMultiPackedDims) {
 // --- Nested packed struct (packed struct inside packed struct) ---
 
 TEST(ParserSection7, Sec7_2_1_NestedPackedStruct) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  typedef struct packed {\n"
-      "    struct packed {\n"
-      "      logic [7:0] x;\n"
-      "      logic [7:0] y;\n"
-      "    } coord;\n"
-      "    logic [7:0] color;\n"
-      "  } pixel_t;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  typedef struct packed {\n"
+              "    struct packed {\n"
+              "      logic [7:0] x;\n"
+              "      logic [7:0] y;\n"
+              "    } coord;\n"
+              "    logic [7:0] color;\n"
+              "  } pixel_t;\n"
+              "endmodule\n"));
 }
 
 // --- Packed struct containing packed union ---
 
 TEST(ParserSection7, Sec7_2_1_PackedStructWithPackedUnion) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  typedef struct packed {\n"
-      "    logic [7:0] tag;\n"
-      "    union packed {\n"
-      "      logic [31:0] word;\n"
-      "      logic [3:0][7:0] bytes;\n"
-      "    } payload;\n"
-      "  } tagged_data_t;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  typedef struct packed {\n"
+              "    logic [7:0] tag;\n"
+              "    union packed {\n"
+              "      logic [31:0] word;\n"
+              "      logic [3:0][7:0] bytes;\n"
+              "    } payload;\n"
+              "  } tagged_data_t;\n"
+              "endmodule\n"));
 }
 
 // --- Packed struct with enum member (named type) ---
 
 TEST(ParserSection7, Sec7_2_1_PackedWithEnumMember) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  typedef enum logic [1:0] { IDLE, RUN, STOP } state_e;\n"
-      "  typedef struct packed {\n"
-      "    state_e state;\n"
-      "    logic [5:0] data;\n"
-      "  } ctrl_t;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  typedef enum logic [1:0] { IDLE, RUN, STOP } state_e;\n"
+              "  typedef struct packed {\n"
+              "    state_e state;\n"
+              "    logic [5:0] data;\n"
+              "  } ctrl_t;\n"
+              "endmodule\n"));
 }
 
 // --- Packed struct typedef in a package ---
@@ -627,7 +628,8 @@ TEST(ParserSection7, Sec7_2_1_PackedMemberDefaultInit) {
   EXPECT_EQ(item->typedef_type.struct_members[1].init_expr, nullptr);
 }
 
-// --- Packed struct with multiple members of the same type (comma-separated) ---
+// --- Packed struct with multiple members of the same type (comma-separated)
+// ---
 
 TEST(ParserSection7, Sec7_2_1_PackedMultiMembersSameType) {
   auto r = Parse(
@@ -650,13 +652,13 @@ TEST(ParserSection7, Sec7_2_1_PackedMultiMembersSameType) {
 // --- Packed struct continuous assignment ---
 
 TEST(ParserSection7, Sec7_2_1_PackedContAssign) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  typedef struct packed {\n"
-      "    logic [7:0] a;\n"
-      "    logic [7:0] b;\n"
-      "  } pair_t;\n"
-      "  pair_t p;\n"
-      "  assign p = 16'h1234;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  typedef struct packed {\n"
+              "    logic [7:0] a;\n"
+              "    logic [7:0] b;\n"
+              "  } pair_t;\n"
+              "  pair_t p;\n"
+              "  assign p = 16'h1234;\n"
+              "endmodule\n"));
 }

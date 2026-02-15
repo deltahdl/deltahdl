@@ -262,12 +262,12 @@ TEST(ParserSection3, TopLevelFunctionAutomatic) {
 
 TEST(ParserSection3, ProgramAutomaticLifetime) {
   // program with automatic lifetime
-  EXPECT_TRUE(ParseOk(
-      "program automatic test_prog;\n"
-      "  initial begin\n"
-      "    $display(\"hello\");\n"
-      "  end\n"
-      "endprogram\n"));
+  EXPECT_TRUE(
+      ParseOk("program automatic test_prog;\n"
+              "  initial begin\n"
+              "    $display(\"hello\");\n"
+              "  end\n"
+              "endprogram\n"));
 }
 
 // =============================================================================
@@ -369,40 +369,40 @@ TEST(ParserSection3, TimeunitInInterface) {
 
 TEST(ParserSection3, TimeLiteralInDelay) {
   // Time literals: integer or fixed-point followed by a time unit (LRM 5.8)
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  initial #10ns $display(\"done\");\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial #10ns $display(\"done\");\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection3, TimeLiteralPicoseconds) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  initial #40ps $display(\"done\");\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial #40ps $display(\"done\");\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection3, TimeLiteralFractional) {
   // Fractional time literal: 2.1ns
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  initial #2.1ns $display(\"done\");\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial #2.1ns $display(\"done\");\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection3, TimeLiteralAllUnits) {
   // All time unit suffixes: s, ms, us, ns, ps, fs
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  initial begin\n"
-      "    #1s $display(\"s\");\n"
-      "    #1ms $display(\"ms\");\n"
-      "    #1us $display(\"us\");\n"
-      "    #1ns $display(\"ns\");\n"
-      "    #1ps $display(\"ps\");\n"
-      "    #1fs $display(\"fs\");\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    #1s $display(\"s\");\n"
+              "    #1ms $display(\"ms\");\n"
+              "    #1us $display(\"us\");\n"
+              "    #1ns $display(\"ns\");\n"
+              "    #1ps $display(\"ps\");\n"
+              "    #1fs $display(\"fs\");\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -477,23 +477,23 @@ TEST(ParserSection3, AnsiPortMultipleDirections) {
 
 TEST(ParserSection3, AnsiPortInputVar) {
   // input var int -- variable port type (LRM 23.2.2.3)
-  EXPECT_TRUE(ParseOk(
-      "module m (input var int in1, input var shortreal in2);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m (input var int in1, input var shortreal in2);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection3, AnsiPortOutputRegister) {
   // output reg (ANSI style)
-  EXPECT_TRUE(ParseOk(
-      "module m (output reg [7:0] q);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m (output reg [7:0] q);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection3, AnsiPortSigned) {
   // Signed port declaration
-  EXPECT_TRUE(ParseOk(
-      "module m (input signed [7:0] s_data);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m (input signed [7:0] s_data);\n"
+              "endmodule\n"));
 }
 
 // --- Non-ANSI style ports ---
@@ -513,19 +513,19 @@ TEST(ParserSection3, NonAnsiPortDeclaration) {
 
 TEST(ParserSection3, NonAnsiPortWithWidth) {
   // Non-ANSI ports with vector width
-  EXPECT_TRUE(ParseOk(
-      "module m (addr, data);\n"
-      "  input [15:0] addr;\n"
-      "  inout [7:0] data;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m (addr, data);\n"
+              "  input [15:0] addr;\n"
+              "  inout [7:0] data;\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection3, NonAnsiPortInoutBidirectional) {
-  EXPECT_TRUE(ParseOk(
-      "module m (a, b);\n"
-      "  inout [7:0] a;\n"
-      "  inout [7:0] b;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m (a, b);\n"
+              "  inout [7:0] a;\n"
+              "  inout [7:0] b;\n"
+              "endmodule\n"));
 }
 
 // --- Port declarations in program and interface ---
@@ -581,21 +581,21 @@ TEST(ParserSection3, DotStarPortImplicit) {
 // --- Port with default values ---
 
 TEST(ParserSection3, AnsiPortWithDefaultValue) {
-  EXPECT_TRUE(ParseOk(
-      "module m (input int x = 10);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m (input int x = 10);\n"
+              "endmodule\n"));
 }
 
 // --- Interface port in module ---
 
 TEST(ParserSection3, InterfacePortInModule) {
   // LRM 23.2.2: interface port declaration
-  EXPECT_TRUE(ParseOk(
-      "interface myif;\n"
-      "  logic [7:0] data;\n"
-      "endinterface\n"
-      "module m (myif bus);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("interface myif;\n"
+              "  logic [7:0] data;\n"
+              "endinterface\n"
+              "module m (myif bus);\n"
+              "endmodule\n"));
 }
 
 // --- Module instantiation creating hierarchy ---
@@ -682,33 +682,33 @@ TEST(ParserSection3, InterfaceWithModport) {
 
 TEST(ParserSection3, TimeunitAllMagnitudes) {
   // LRM Table 3-1: 1, 10, or 100 with s, ms, us, ns, ps, fs
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  timeunit 100ns;\n"
-      "  timeprecision 10ps;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  timeunit 100ns;\n"
+              "  timeprecision 10ps;\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection3, TimeunitMicroseconds) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  timeunit 1us;\n"
-      "  timeprecision 1ns;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  timeunit 1us;\n"
+              "  timeprecision 1ns;\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection3, TimeunitFemtoseconds) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  timeunit 1ps;\n"
-      "  timeprecision 1fs;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  timeunit 1ps;\n"
+              "  timeprecision 1fs;\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection3, TimeunitMilliseconds) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  timeunit 10ms;\n"
-      "  timeprecision 100us;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  timeunit 10ms;\n"
+              "  timeprecision 100us;\n"
+              "endmodule\n"));
 }

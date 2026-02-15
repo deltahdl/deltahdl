@@ -470,27 +470,27 @@ TEST(ParserSection9c, EventControlMixedEdgesComma) {
 
 TEST(ParserSection9c, SequenceEventInEventControl) {
   // LRM example: @ abc $display("Saw a-b-c");
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  sequence abc;\n"
-      "    @(posedge clk) a ##1 b ##1 c;\n"
-      "  endsequence\n"
-      "  initial begin\n"
-      "    @ abc $display(\"Saw a-b-c\");\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  sequence abc;\n"
+              "    @(posedge clk) a ##1 b ##1 c;\n"
+              "  endsequence\n"
+              "  initial begin\n"
+              "    @ abc $display(\"Saw a-b-c\");\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection9c, SequenceEventParenthesized) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  sequence s1;\n"
-      "    @(posedge clk) a ##1 b;\n"
-      "  endsequence\n"
-      "  initial begin\n"
-      "    @(s1) $display(\"matched\");\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  sequence s1;\n"
+              "    @(posedge clk) a ##1 b;\n"
+              "  endsequence\n"
+              "  initial begin\n"
+              "    @(s1) $display(\"matched\");\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -500,32 +500,32 @@ TEST(ParserSection9c, SequenceEventParenthesized) {
 
 TEST(ParserSection9c, WaitSequenceTriggeredWithAction) {
   // After wait(seq.triggered), execute a procedural statement.
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  sequence req_ack;\n"
-      "    @(posedge clk) req ##[1:5] ack;\n"
-      "  endsequence\n"
-      "  initial begin\n"
-      "    wait(req_ack.triggered);\n"
-      "    $display(\"handshake complete\");\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  sequence req_ack;\n"
+              "    @(posedge clk) req ##[1:5] ack;\n"
+              "  endsequence\n"
+              "  initial begin\n"
+              "    wait(req_ack.triggered);\n"
+              "    $display(\"handshake complete\");\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection9c, WaitTriggeredInLoop) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  sequence s;\n"
-      "    @(posedge clk) a ##1 b;\n"
-      "  endsequence\n"
-      "  initial begin\n"
-      "    forever begin\n"
-      "      wait(s.triggered);\n"
-      "      count = count + 1;\n"
-      "      @(posedge clk);\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  sequence s;\n"
+              "    @(posedge clk) a ##1 b;\n"
+              "  endsequence\n"
+              "  initial begin\n"
+              "    forever begin\n"
+              "      wait(s.triggered);\n"
+              "      count = count + 1;\n"
+              "      @(posedge clk);\n"
+              "    end\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -579,20 +579,20 @@ TEST(ParserSection9c, DisableWithIfCondition) {
 }
 
 TEST(ParserSection9c, DisableHierarchicalTaskName) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  task my_task;\n"
-      "    begin\n"
-      "      #100 x = 1;\n"
-      "    end\n"
-      "  endtask\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      my_task;\n"
-      "    join_none\n"
-      "    #50 disable my_task;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  task my_task;\n"
+              "    begin\n"
+              "      #100 x = 1;\n"
+              "    end\n"
+              "  endtask\n"
+              "  initial begin\n"
+              "    fork\n"
+              "      my_task;\n"
+              "    join_none\n"
+              "    #50 disable my_task;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -602,41 +602,41 @@ TEST(ParserSection9c, DisableHierarchicalTaskName) {
 
 TEST(ParserSection9c, ProcessSelfAssignment) {
   // process p = process::self(); is valid usage.
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  initial begin\n"
-      "    process p;\n"
-      "    p = process::self();\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    process p;\n"
+              "    p = process::self();\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection9c, ProcessKillCall) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  initial begin\n"
-      "    process p;\n"
-      "    p = process::self();\n"
-      "    fork\n"
-      "      begin\n"
-      "        #100;\n"
-      "      end\n"
-      "    join_none\n"
-      "    p.kill();\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    process p;\n"
+              "    p = process::self();\n"
+              "    fork\n"
+              "      begin\n"
+              "        #100;\n"
+              "      end\n"
+              "    join_none\n"
+              "    p.kill();\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection9c, ProcessStatusCheck) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  initial begin\n"
-      "    process p;\n"
-      "    p = process::self();\n"
-      "    if (p.status() != process::FINISHED)\n"
-      "      $display(\"still running\");\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    process p;\n"
+              "    p = process::self();\n"
+              "    if (p.status() != process::FINISHED)\n"
+              "      $display(\"still running\");\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -809,34 +809,34 @@ TEST(ParserSection9c, IffGuardAlwaysFF) {
 // =============================================================================
 
 TEST(ParserSection9c, InitialWithTaskCall) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  task my_task;\n"
-      "    #10 a = 1;\n"
-      "  endtask\n"
-      "  initial begin\n"
-      "    my_task;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  task my_task;\n"
+              "    #10 a = 1;\n"
+              "  endtask\n"
+              "  initial begin\n"
+              "    my_task;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection9c, AlwaysFFWithNegedge) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  always_ff @(negedge clk)\n"
-      "    q <= d;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  always_ff @(negedge clk)\n"
+              "    q <= d;\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection9c, AlwaysCombWithFunctionCall) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  function logic [3:0] mux(input logic sel,\n"
-      "                           input logic [3:0] a, b);\n"
-      "    return sel ? a : b;\n"
-      "  endfunction\n"
-      "  logic sel;\n"
-      "  logic [3:0] a, b, y;\n"
-      "  always_comb y = mux(sel, a, b);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function logic [3:0] mux(input logic sel,\n"
+              "                           input logic [3:0] a, b);\n"
+              "    return sel ? a : b;\n"
+              "  endfunction\n"
+              "  logic sel;\n"
+              "  logic [3:0] a, b, y;\n"
+              "  always_comb y = mux(sel, a, b);\n"
+              "endmodule\n"));
 }

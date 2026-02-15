@@ -606,30 +606,30 @@ TEST(ParserSection6, VoidTaskReturnType) {
 // =========================================================================
 
 TEST(ParserSection6, TypeParameterWithMultipleParams) {
-  EXPECT_TRUE(ParseOk6(
-      "module m #(parameter type T = int, parameter type U = real)\n"
-      "  ();\n"
-      "  T x;\n"
-      "  U y;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk6("module m #(parameter type T = int, parameter type U = real)\n"
+               "  ();\n"
+               "  T x;\n"
+               "  U y;\n"
+               "endmodule\n"));
 }
 
 TEST(ParserSection6, TypeParameterOverride) {
-  EXPECT_TRUE(ParseOk6(
-      "module m #(parameter type T = int) ();\n"
-      "  T x;\n"
-      "endmodule\n"
-      "module top;\n"
-      "  m #(.T(logic [7:0])) inst();\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk6("module m #(parameter type T = int) ();\n"
+               "  T x;\n"
+               "endmodule\n"
+               "module top;\n"
+               "  m #(.T(logic [7:0])) inst();\n"
+               "endmodule\n"));
 }
 
 TEST(ParserSection6, TypeParameterDefaultShortint) {
-  EXPECT_TRUE(ParseOk6(
-      "module ma #(parameter p1 = 1, parameter type p2 = shortint)\n"
-      "  (input logic [p1:0] i, output logic [p1:0] o);\n"
-      "  p2 j = 0;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk6("module ma #(parameter p1 = 1, parameter type p2 = shortint)\n"
+               "  (input logic [p1:0] i, output logic [p1:0] o);\n"
+               "  p2 j = 0;\n"
+               "endmodule\n"));
 }
 
 // =========================================================================

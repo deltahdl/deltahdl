@@ -472,14 +472,14 @@ TEST(ParserSection10, Sec10_4_1_CompoundMinusEq) {
 
 // --- 21. Compound assignment operators *=, /=, %= ---
 TEST(ParserSection10, Sec10_4_1_CompoundMulDivMod) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  initial begin\n"
-      "    a *= 3;\n"
-      "    b /= 4;\n"
-      "    c %= 5;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    a *= 3;\n"
+              "    b /= 4;\n"
+              "    c %= 5;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // --- 22. Compound assignment operators &=, |=, ^= ---
@@ -639,20 +639,20 @@ TEST(ParserSection10, Sec10_4_1_NestedIfElseWithExpressions) {
 
 // --- 29. Full blocking assignment pattern in always block ---
 TEST(ParserSection10, Sec10_4_1_FullPatternAlwaysComb) {
-  EXPECT_TRUE(ParseOk(
-      "module m(\n"
-      "  input [7:0] a, b,\n"
-      "  input sel,\n"
-      "  output reg [7:0] result\n"
-      ");\n"
-      "  always @(*) begin\n"
-      "    result = 0;\n"
-      "    if (sel)\n"
-      "      result = a + b;\n"
-      "    else\n"
-      "      result = a - b;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m(\n"
+              "  input [7:0] a, b,\n"
+              "  input sel,\n"
+              "  output reg [7:0] result\n"
+              ");\n"
+              "  always @(*) begin\n"
+              "    result = 0;\n"
+              "    if (sel)\n"
+              "      result = a + b;\n"
+              "    else\n"
+              "      result = a - b;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // --- 30. Blocking assignment with complex LHS and RHS combinations ---

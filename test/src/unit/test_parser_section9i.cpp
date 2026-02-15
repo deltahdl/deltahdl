@@ -262,13 +262,13 @@ TEST(ParserSection9, Sec9_2_3_BitSelect) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_2_3_PartSelect) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  logic en;\n"
-      "  logic [7:0] q, d;\n"
-      "  always_latch\n"
-      "    if (en) q[3:0] <= d[3:0];\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic en;\n"
+              "  logic [7:0] q, d;\n"
+              "  always_latch\n"
+              "    if (en) q[3:0] <= d[3:0];\n"
+              "endmodule\n"));
 }
 
 // ---------------------------------------------------------------------------
@@ -276,18 +276,18 @@ TEST(ParserSection9, Sec9_2_3_PartSelect) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_2_3_StructMemberAccess) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  typedef struct packed {\n"
-      "    logic [7:0] data;\n"
-      "    logic valid;\n"
-      "  } packet_t;\n"
-      "  packet_t pkt;\n"
-      "  logic en;\n"
-      "  logic [7:0] d;\n"
-      "  always_latch\n"
-      "    if (en) pkt.data <= d;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef struct packed {\n"
+              "    logic [7:0] data;\n"
+              "    logic valid;\n"
+              "  } packet_t;\n"
+              "  packet_t pkt;\n"
+              "  logic en;\n"
+              "  logic [7:0] d;\n"
+              "  always_latch\n"
+              "    if (en) pkt.data <= d;\n"
+              "endmodule\n"));
 }
 
 // ---------------------------------------------------------------------------
@@ -295,16 +295,16 @@ TEST(ParserSection9, Sec9_2_3_StructMemberAccess) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_2_3_FunctionCallRHS) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  function logic [7:0] compute(input logic [7:0] x);\n"
-      "    return x + 1;\n"
-      "  endfunction\n"
-      "  logic en;\n"
-      "  logic [7:0] q, d;\n"
-      "  always_latch\n"
-      "    if (en) q <= compute(d);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function logic [7:0] compute(input logic [7:0] x);\n"
+              "    return x + 1;\n"
+              "  endfunction\n"
+              "  logic en;\n"
+              "  logic [7:0] q, d;\n"
+              "  always_latch\n"
+              "    if (en) q <= compute(d);\n"
+              "endmodule\n"));
 }
 
 // ---------------------------------------------------------------------------
@@ -312,13 +312,13 @@ TEST(ParserSection9, Sec9_2_3_FunctionCallRHS) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_2_3_TernaryExpressionRHS) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  logic en, sel;\n"
-      "  logic [7:0] q, a, b;\n"
-      "  always_latch\n"
-      "    if (en) q <= sel ? a : b;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic en, sel;\n"
+              "  logic [7:0] q, a, b;\n"
+              "  always_latch\n"
+              "    if (en) q <= sel ? a : b;\n"
+              "endmodule\n"));
 }
 
 // ---------------------------------------------------------------------------
@@ -587,12 +587,12 @@ TEST(ParserSection9, Sec9_2_3_BlockingAssignment) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_2_3_TernaryInCondition) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  logic sel, en_a, en_b, d, q;\n"
-      "  always_latch\n"
-      "    if (sel ? en_a : en_b) q <= d;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic sel, en_a, en_b, d, q;\n"
+              "  always_latch\n"
+              "    if (sel ? en_a : en_b) q <= d;\n"
+              "endmodule\n"));
 }
 
 // ---------------------------------------------------------------------------
@@ -686,17 +686,17 @@ TEST(ParserSection9, Sec9_2_3_DeepIfElseIfChain) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_2_3_SystemFunctionCall) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  logic en;\n"
-      "  logic [7:0] q, d;\n"
-      "  always_latch begin\n"
-      "    if (en) begin\n"
-      "      q <= d;\n"
-      "      $display(\"latch update\");\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic en;\n"
+              "  logic [7:0] q, d;\n"
+              "  always_latch begin\n"
+              "    if (en) begin\n"
+              "      q <= d;\n"
+              "      $display(\"latch update\");\n"
+              "    end\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // ---------------------------------------------------------------------------

@@ -643,32 +643,32 @@ TEST(ParserSection9, Sec9_4_2_3_MultipleAtStarInInitial) {
 
 // ParseOk: @* parses without errors in a typical combinational module
 TEST(ParserSection9, Sec9_4_2_3_ParseOkAtStarCombiModule) {
-  EXPECT_TRUE(ParseOk(
-      "module mux4(\n"
-      "  input [1:0] sel,\n"
-      "  input [7:0] a, b, c, d,\n"
-      "  output reg [7:0] out\n"
-      ");\n"
-      "  always @* begin\n"
-      "    case (sel)\n"
-      "      2'd0: out = a;\n"
-      "      2'd1: out = b;\n"
-      "      2'd2: out = c;\n"
-      "      default: out = d;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module mux4(\n"
+              "  input [1:0] sel,\n"
+              "  input [7:0] a, b, c, d,\n"
+              "  output reg [7:0] out\n"
+              ");\n"
+              "  always @* begin\n"
+              "    case (sel)\n"
+              "      2'd0: out = a;\n"
+              "      2'd1: out = b;\n"
+              "      2'd2: out = c;\n"
+              "      default: out = d;\n"
+              "    endcase\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // ParseOk: @(*) parses without errors in a typical combinational module
 TEST(ParserSection9, Sec9_4_2_3_ParseOkAtStarParenCombiModule) {
-  EXPECT_TRUE(ParseOk(
-      "module adder(\n"
-      "  input [7:0] a, b,\n"
-      "  output reg [8:0] sum\n"
-      ");\n"
-      "  always @(*) begin\n"
-      "    sum = a + b;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module adder(\n"
+              "  input [7:0] a, b,\n"
+              "  output reg [8:0] sum\n"
+              ");\n"
+              "  always @(*) begin\n"
+              "    sum = a + b;\n"
+              "  end\n"
+              "endmodule\n"));
 }

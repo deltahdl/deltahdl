@@ -44,8 +44,7 @@ static ModuleItem* FirstItem(ParseResult7e& r) {
 }
 
 static ModuleItem* NthItem(ParseResult7e& r, size_t n) {
-  if (!r.cu || r.cu->modules.empty() ||
-      r.cu->modules[0]->items.size() <= n)
+  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.size() <= n)
     return nullptr;
   return r.cu->modules[0]->items[n];
 }
@@ -249,14 +248,14 @@ TEST(ParserSection7, Sec7_2_2_DefaultMemberValues) {
 
 // 10. Struct assigned in initial block with begin/end.
 TEST(ParserSection7, Sec7_2_2_AssignInInitialBlock) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  typedef struct { int a; int b; } s_t;\n"
-      "  s_t s;\n"
-      "  initial begin\n"
-      "    s = '{10, 20};\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  typedef struct { int a; int b; } s_t;\n"
+              "  s_t s;\n"
+              "  initial begin\n"
+              "    s = '{10, 20};\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // 11. Struct assigned in always_comb block.
@@ -316,14 +315,14 @@ TEST(ParserSection7, Sec7_2_2_FunctionReturnStruct) {
 
 // 14. Struct as function argument.
 TEST(ParserSection7, Sec7_2_2_FunctionArgStruct) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  typedef struct { int a; int b; } pair_t;\n"
-      "  function int sum_pair;\n"
-      "    input pair_t p;\n"
-      "    sum_pair = p.a + p.b;\n"
-      "  endfunction\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  typedef struct { int a; int b; } pair_t;\n"
+              "  function int sum_pair;\n"
+              "    input pair_t p;\n"
+              "    sum_pair = p.a + p.b;\n"
+              "  endfunction\n"
+              "endmodule\n"));
 }
 
 // 15. Nested struct assignment pattern.
@@ -348,15 +347,15 @@ TEST(ParserSection7, Sec7_2_2_NestedStructPattern) {
 
 // 16. Array of structs with assignment pattern.
 TEST(ParserSection7, Sec7_2_2_ArrayOfStructsPattern) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  typedef struct { int a; int b; } pair_t;\n"
-      "  pair_t arr[2];\n"
-      "  initial begin\n"
-      "    arr[0] = '{1, 2};\n"
-      "    arr[1] = '{3, 4};\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  typedef struct { int a; int b; } pair_t;\n"
+              "  pair_t arr[2];\n"
+              "  initial begin\n"
+              "    arr[0] = '{1, 2};\n"
+              "    arr[1] = '{3, 4};\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // 17. Struct type cast from integer using type'(expr).
@@ -484,16 +483,16 @@ TEST(ParserSection7, Sec7_2_2_VarDeclWithInit) {
 
 // 24. Struct assigned in for loop body.
 TEST(ParserSection7, Sec7_2_2_AssignInForLoop) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  typedef struct { int idx; int val; } entry_t;\n"
-      "  entry_t table[4];\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 4; i = i + 1) begin\n"
-      "      table[i] = '{i, i * 10};\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  typedef struct { int idx; int val; } entry_t;\n"
+              "  entry_t table[4];\n"
+              "  initial begin\n"
+              "    for (int i = 0; i < 4; i = i + 1) begin\n"
+              "      table[i] = '{i, i * 10};\n"
+              "    end\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // 25. Struct with packed array member assigned.
@@ -524,15 +523,15 @@ TEST(ParserSection7, Sec7_2_2_PackedArrayMemberAssign) {
 
 // 26. Struct output port assigned in module body.
 TEST(ParserSection7, Sec7_2_2_StructOutputPort) {
-  EXPECT_TRUE(ParseOk(
-      "module t(\n"
-      "  output logic [15:0] result\n"
-      ");\n"
-      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } s_t;\n"
-      "  s_t s;\n"
-      "  assign s = 16'hDEAD;\n"
-      "  assign result = s;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t(\n"
+              "  output logic [15:0] result\n"
+              ");\n"
+              "  typedef struct packed { logic [7:0] a; logic [7:0] b; } s_t;\n"
+              "  s_t s;\n"
+              "  assign s = 16'hDEAD;\n"
+              "  assign result = s;\n"
+              "endmodule\n"));
 }
 
 // 27. Positional assignment pattern elements count.
@@ -601,11 +600,11 @@ TEST(ParserSection7, Sec7_2_2_NamedPatternKeysThreeMembers) {
 
 // 30. Multiple struct variables with different initializers.
 TEST(ParserSection7, Sec7_2_2_MultipleVarsWithInit) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  typedef struct { int a; int b; } pair_t;\n"
-      "  pair_t p1 = '{1, 2};\n"
-      "  pair_t p2 = '{3, 4};\n"
-      "  pair_t p3 = '{default: 0};\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  typedef struct { int a; int b; } pair_t;\n"
+              "  pair_t p1 = '{1, 2};\n"
+              "  pair_t p2 = '{3, 4};\n"
+              "  pair_t p3 = '{default: 0};\n"
+              "endmodule\n"));
 }

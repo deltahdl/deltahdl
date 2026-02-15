@@ -610,16 +610,16 @@ TEST(ParserSection9, Sec9_3_1_StaticVarDeclInBlock) {
 // =============================================================================
 
 TEST(ParserSection9, Sec9_3_1_BlockWithReturnInFunction) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  function int compute(input int a, input int b);\n"
-      "    begin\n"
-      "      int tmp;\n"
-      "      tmp = a + b;\n"
-      "      return tmp;\n"
-      "    end\n"
-      "  endfunction\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function int compute(input int a, input int b);\n"
+              "    begin\n"
+              "      int tmp;\n"
+              "      tmp = a + b;\n"
+              "      return tmp;\n"
+              "    end\n"
+              "  endfunction\n"
+              "endmodule\n"));
 }
 
 // =============================================================================

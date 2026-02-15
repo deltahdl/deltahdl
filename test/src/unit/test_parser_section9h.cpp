@@ -455,32 +455,32 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarVarDecls) {
 // 21. always_comb with function call in body.
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_AlwaysCombFunctionCall) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  function logic [3:0] mux2(input logic sel,\n"
-      "                            input logic [3:0] a, b);\n"
-      "    return sel ? a : b;\n"
-      "  endfunction\n"
-      "  logic sel;\n"
-      "  logic [3:0] a, b, y;\n"
-      "  always_comb y = mux2(sel, a, b);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function logic [3:0] mux2(input logic sel,\n"
+              "                            input logic [3:0] a, b);\n"
+              "    return sel ? a : b;\n"
+              "  endfunction\n"
+              "  logic sel;\n"
+              "  logic [3:0] a, b, y;\n"
+              "  always_comb y = mux2(sel, a, b);\n"
+              "endmodule\n"));
 }
 
 // ---------------------------------------------------------------------------
 // 22. always @* with function call in body.
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_AlwaysStarFunctionCall) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  function logic [3:0] mux2(input logic sel,\n"
-      "                            input logic [3:0] a, b);\n"
-      "    return sel ? a : b;\n"
-      "  endfunction\n"
-      "  logic sel;\n"
-      "  logic [3:0] a, b, y;\n"
-      "  always @* y = mux2(sel, a, b);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function logic [3:0] mux2(input logic sel,\n"
+              "                            input logic [3:0] a, b);\n"
+              "    return sel ? a : b;\n"
+              "  endfunction\n"
+              "  logic sel;\n"
+              "  logic [3:0] a, b, y;\n"
+              "  always @* y = mux2(sel, a, b);\n"
+              "endmodule\n"));
 }
 
 // ---------------------------------------------------------------------------
@@ -655,29 +655,29 @@ TEST(ParserSection9, Sec9_2_2_2_BothFormsWithBlocksInModule) {
 //     case, if-else, and variable declarations, verifying all parse OK.
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_FullComboModuleParseOk) {
-  EXPECT_TRUE(ParseOk(
-      "module combo_module;\n"
-      "  logic [3:0] sel, a, b, c, d;\n"
-      "  logic [3:0] out1, out2, out3;\n"
-      "  always_comb begin\n"
-      "    int tmp;\n"
-      "    tmp = a + b;\n"
-      "    case (sel)\n"
-      "      4'b0001: out1 = a;\n"
-      "      4'b0010: out1 = b;\n"
-      "      default: out1 = 0;\n"
-      "    endcase\n"
-      "  end\n"
-      "  always @* begin\n"
-      "    int tmp2;\n"
-      "    tmp2 = c - d;\n"
-      "    if (sel[0])\n"
-      "      out2 = c;\n"
-      "    else\n"
-      "      out2 = d;\n"
-      "  end\n"
-      "  always @(*) begin\n"
-      "    out3 = a ^ b ^ c ^ d;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module combo_module;\n"
+              "  logic [3:0] sel, a, b, c, d;\n"
+              "  logic [3:0] out1, out2, out3;\n"
+              "  always_comb begin\n"
+              "    int tmp;\n"
+              "    tmp = a + b;\n"
+              "    case (sel)\n"
+              "      4'b0001: out1 = a;\n"
+              "      4'b0010: out1 = b;\n"
+              "      default: out1 = 0;\n"
+              "    endcase\n"
+              "  end\n"
+              "  always @* begin\n"
+              "    int tmp2;\n"
+              "    tmp2 = c - d;\n"
+              "    if (sel[0])\n"
+              "      out2 = c;\n"
+              "    else\n"
+              "      out2 = d;\n"
+              "  end\n"
+              "  always @(*) begin\n"
+              "    out3 = a ^ b ^ c ^ d;\n"
+              "  end\n"
+              "endmodule\n"));
 }

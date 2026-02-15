@@ -151,30 +151,30 @@ TEST(ParserSection13, Sec13_8_MixedStaticFuncAndTask) {
 
 // §13.8: Parameterized class with type parameter.
 TEST(ParserSection13, Sec13_8_TypeParameter) {
-  EXPECT_TRUE(ParseOk(
-      "virtual class Converter#(parameter type T = int);\n"
-      "  static function T identity(input T val);\n"
-      "    return val;\n"
-      "  endfunction\n"
-      "endclass\n"));
+  EXPECT_TRUE(
+      ParseOk("virtual class Converter#(parameter type T = int);\n"
+              "  static function T identity(input T val);\n"
+              "    return val;\n"
+              "  endfunction\n"
+              "endclass\n"));
 }
 
 // §13.8: Call to parameterized class with type parameter override.
 TEST(ParserSection13, Sec13_8_TypeParamOverrideCall) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  logic [7:0] x, y;\n"
-      "  assign y = Converter#(logic [7:0])::identity(x);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic [7:0] x, y;\n"
+              "  assign y = Converter#(logic [7:0])::identity(x);\n"
+              "endmodule\n"));
 }
 
 // §13.8: Static method with return value used in expression.
 TEST(ParserSection13, Sec13_8_StaticMethodInExpr) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  int val;\n"
-      "  assign val = Utils#(8)::max_val() + 1;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int val;\n"
+              "  assign val = Utils#(8)::max_val() + 1;\n"
+              "endmodule\n"));
 }
 
 // §13.8: Static method with no arguments.
@@ -192,23 +192,23 @@ TEST(ParserSection13, Sec13_8_StaticMethodNoArgs) {
 
 // §13.8: Static method with multiple arguments of parameterized width.
 TEST(ParserSection13, Sec13_8_MultiArgParameterizedWidth) {
-  EXPECT_TRUE(ParseOk(
-      "virtual class Arith#(parameter W = 16);\n"
-      "  static function logic [W-1:0] add(\n"
-      "      input logic [W-1:0] a,\n"
-      "      input logic [W-1:0] b);\n"
-      "    return a + b;\n"
-      "  endfunction\n"
-      "endclass\n"));
+  EXPECT_TRUE(
+      ParseOk("virtual class Arith#(parameter W = 16);\n"
+              "  static function logic [W-1:0] add(\n"
+              "      input logic [W-1:0] a,\n"
+              "      input logic [W-1:0] b);\n"
+              "    return a + b;\n"
+              "  endfunction\n"
+              "endclass\n"));
 }
 
 // §13.8: Chained call — result of parameterized call used as argument.
 TEST(ParserSection13, Sec13_8_ChainedParameterizedCalls) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  logic [7:0] a, b, c;\n"
-      "  assign c = Arith#(8)::add(a, Arith#(8)::add(a, b));\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic [7:0] a, b, c;\n"
+              "  assign c = Arith#(8)::add(a, Arith#(8)::add(a, b));\n"
+              "endmodule\n"));
 }
 
 // §13.8: Parameterized class with no default parameter value.
@@ -226,117 +226,117 @@ TEST(ParserSection13, Sec13_8_NoDefaultParam) {
 
 // §13.8: Specialized call with explicit parameter (no default).
 TEST(ParserSection13, Sec13_8_ExplicitParamSpecialization) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  logic [31:0] d, r;\n"
-      "  assign r = Shifter#(4)::left(d);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic [31:0] d, r;\n"
+              "  assign r = Shifter#(4)::left(d);\n"
+              "endmodule\n"));
 }
 
 // §13.8: Parameterized class with parameter used in local variable.
 TEST(ParserSection13, Sec13_8_ParamInLocalVar) {
-  EXPECT_TRUE(ParseOk(
-      "virtual class BitOps#(parameter W = 8);\n"
-      "  static function logic [W-1:0] invert(input logic [W-1:0] x);\n"
-      "    logic [W-1:0] mask;\n"
-      "    mask = '1;\n"
-      "    return x ^ mask;\n"
-      "  endfunction\n"
-      "endclass\n"));
+  EXPECT_TRUE(
+      ParseOk("virtual class BitOps#(parameter W = 8);\n"
+              "  static function logic [W-1:0] invert(input logic [W-1:0] x);\n"
+              "    logic [W-1:0] mask;\n"
+              "    mask = '1;\n"
+              "    return x ^ mask;\n"
+              "  endfunction\n"
+              "endclass\n"));
 }
 
 // §13.8: Parameterized class extending another class.
 TEST(ParserSection13, Sec13_8_ClassExtends) {
-  EXPECT_TRUE(ParseOk(
-      "class Base;\n"
-      "  virtual function void display();\n"
-      "  endfunction\n"
-      "endclass\n"
-      "virtual class Derived#(parameter N = 1) extends Base;\n"
-      "  static function int count();\n"
-      "    return N;\n"
-      "  endfunction\n"
-      "endclass\n"));
+  EXPECT_TRUE(
+      ParseOk("class Base;\n"
+              "  virtual function void display();\n"
+              "  endfunction\n"
+              "endclass\n"
+              "virtual class Derived#(parameter N = 1) extends Base;\n"
+              "  static function int count();\n"
+              "    return N;\n"
+              "  endfunction\n"
+              "endclass\n"));
 }
 
 // §13.8: Parameterized class with for loop using parameter as bound.
 TEST(ParserSection13, Sec13_8_ForLoopWithParamBound) {
-  EXPECT_TRUE(ParseOk(
-      "virtual class Popcount#(parameter W = 8);\n"
-      "  static function int count_ones(input logic [W-1:0] val);\n"
-      "    int cnt;\n"
-      "    cnt = 0;\n"
-      "    for (int i = 0; i < W; i++) begin\n"
-      "      if (val[i]) cnt = cnt + 1;\n"
-      "    end\n"
-      "    return cnt;\n"
-      "  endfunction\n"
-      "endclass\n"));
+  EXPECT_TRUE(
+      ParseOk("virtual class Popcount#(parameter W = 8);\n"
+              "  static function int count_ones(input logic [W-1:0] val);\n"
+              "    int cnt;\n"
+              "    cnt = 0;\n"
+              "    for (int i = 0; i < W; i++) begin\n"
+              "      if (val[i]) cnt = cnt + 1;\n"
+              "    end\n"
+              "    return cnt;\n"
+              "  endfunction\n"
+              "endclass\n"));
 }
 
 // §13.8: Calling parameterized task from initial block.
 TEST(ParserSection13, Sec13_8_CallParamTaskFromInitial) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  initial Utils#(16)::report();\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial Utils#(16)::report();\n"
+              "endmodule\n"));
 }
 
 // §13.8: Parameter with string type default.
 TEST(ParserSection13, Sec13_8_StringTypeParam) {
-  EXPECT_TRUE(ParseOk(
-      "virtual class Logger#(parameter string PREFIX = \"LOG\");\n"
-      "  static task info(string msg);\n"
-      "    $display(\"%s: %s\", PREFIX, msg);\n"
-      "  endtask\n"
-      "endclass\n"));
+  EXPECT_TRUE(
+      ParseOk("virtual class Logger#(parameter string PREFIX = \"LOG\");\n"
+              "  static task info(string msg);\n"
+              "    $display(\"%s: %s\", PREFIX, msg);\n"
+              "  endtask\n"
+              "endclass\n"));
 }
 
 // §13.8: Return type uses parameter.
 TEST(ParserSection13, Sec13_8_ReturnTypeUsesParam) {
-  EXPECT_TRUE(ParseOk(
-      "virtual class Pack#(parameter W = 8);\n"
-      "  static function logic [2*W-1:0] double(\n"
-      "      input logic [W-1:0] x);\n"
-      "    return {x, x};\n"
-      "  endfunction\n"
-      "endclass\n"));
+  EXPECT_TRUE(
+      ParseOk("virtual class Pack#(parameter W = 8);\n"
+              "  static function logic [2*W-1:0] double(\n"
+              "      input logic [W-1:0] x);\n"
+              "    return {x, x};\n"
+              "  endfunction\n"
+              "endclass\n"));
 }
 
 // §13.8: Parameterized class with multiple methods calling each other.
 TEST(ParserSection13, Sec13_8_MethodsCallEachOther) {
-  EXPECT_TRUE(ParseOk(
-      "virtual class Math#(parameter W = 32);\n"
-      "  static function logic [W-1:0] abs_val(\n"
-      "      input logic signed [W-1:0] x);\n"
-      "    return negate(x);\n"
-      "  endfunction\n"
-      "  static function logic [W-1:0] negate(\n"
-      "      input logic signed [W-1:0] x);\n"
-      "    return -x;\n"
-      "  endfunction\n"
-      "endclass\n"));
+  EXPECT_TRUE(
+      ParseOk("virtual class Math#(parameter W = 32);\n"
+              "  static function logic [W-1:0] abs_val(\n"
+              "      input logic signed [W-1:0] x);\n"
+              "    return negate(x);\n"
+              "  endfunction\n"
+              "  static function logic [W-1:0] negate(\n"
+              "      input logic signed [W-1:0] x);\n"
+              "    return -x;\n"
+              "  endfunction\n"
+              "endclass\n"));
 }
 
 // §13.8: Assign result of parameterized call to variable.
 TEST(ParserSection13, Sec13_8_AssignParamCallResult) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    result = Popcount#(32)::count_ones(32'hDEAD_BEEF);\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int result;\n"
+              "  initial begin\n"
+              "    result = Popcount#(32)::count_ones(32'hDEAD_BEEF);\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // §13.8: Parameterized class scope in conditional expression.
 TEST(ParserSection13, Sec13_8_ParamCallInTernary) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  logic [7:0] x, y;\n"
-      "  logic sel;\n"
-      "  assign y = sel ? C#(8)::ENCODER_f(x) : '0;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic [7:0] x, y;\n"
+              "  logic sel;\n"
+              "  assign y = sel ? C#(8)::ENCODER_f(x) : '0;\n"
+              "endmodule\n"));
 }
 
 // §13.8: Virtual class with only a static task (no function).

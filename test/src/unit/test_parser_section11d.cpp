@@ -72,10 +72,10 @@ TEST(ParserSection11, NestedParenthesizedExpression) {
 }
 
 TEST(ParserSection11, ComplexMixedExpressionParses) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  initial x = (a + b) * c - d / e % f;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial x = (a + b) * c - d / e % f;\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection11, LiteralAsExpression) {
@@ -326,12 +326,12 @@ TEST(ParserSection11, NestedTernaryRightAssoc) {
 }
 
 TEST(ParserSection11, TernaryTristateDriver) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  wire drive_busa;\n"
-      "  wire [15:0] data;\n"
-      "  wire [15:0] busa = drive_busa ? data : 16'bz;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  wire drive_busa;\n"
+              "  wire [15:0] data;\n"
+              "  wire [15:0] busa = drive_busa ? data : 16'bz;\n"
+              "endmodule\n"));
 }
 
 // =========================================================================
@@ -353,11 +353,11 @@ TEST(ParserSection11, ConcatWithPartSelects) {
 }
 
 TEST(ParserSection11, ConcatOnLhsOfAssign) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  logic log1, log2, log3;\n"
-      "  initial {log1, log2, log3} = 3'b111;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  logic log1, log2, log3;\n"
+              "  initial {log1, log2, log3} = 3'b111;\n"
+              "endmodule\n"));
 }
 
 // =========================================================================
@@ -391,26 +391,26 @@ TEST(ParserSection11, ConcatSingleElement) {
 // =========================================================================
 
 TEST(ParserSection11, StringConcatenation) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  string hello, s;\n"
-      "  initial begin\n"
-      "    hello = \"hello\";\n"
-      "    s = {hello, \" \", \"world\"};\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  string hello, s;\n"
+              "  initial begin\n"
+              "    hello = \"hello\";\n"
+              "    s = {hello, \" \", \"world\"};\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection11, StringReplication) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  initial begin\n"
-      "    int n;\n"
-      "    string s;\n"
-      "    n = 3;\n"
-      "    s = {n{\"boo \"}};\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial begin\n"
+              "    int n;\n"
+              "    string s;\n"
+              "    n = 3;\n"
+              "    s = {n{\"boo \"}};\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // =========================================================================
@@ -418,23 +418,23 @@ TEST(ParserSection11, StringReplication) {
 // =========================================================================
 
 TEST(ParserSection11, InsideWithWildcardBits) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  logic [2:0] val;\n"
-      "  initial begin\n"
-      "    while (val inside {3'b1?1}) val = val + 1;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  logic [2:0] val;\n"
+              "  initial begin\n"
+              "    while (val inside {3'b1?1}) val = val + 1;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection11, InsideWithDollarRange) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  int a;\n"
-      "  initial begin\n"
-      "    if (a inside {[$:10]}) a = 0;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  int a;\n"
+              "  initial begin\n"
+              "    if (a inside {[$:10]}) a = 0;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection11, InsideMixedValuesAndRanges) {
@@ -558,27 +558,27 @@ TEST(ParserSection11, IndexedPartSelectVariableBase) {
 // =========================================================================
 
 TEST(ParserSection11, MinTypMaxInParenExpr) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  initial #((1:2:3) + (4:5:6)) x = 1;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial #((1:2:3) + (4:5:6)) x = 1;\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection11, MinTypMaxInGateDelay) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  wire a, b, c;\n"
-      "  and #(2:3:4) g1(c, a, b);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  wire a, b, c;\n"
+              "  and #(2:3:4) g1(c, a, b);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection11, MinTypMaxInSpecparam) {
-  EXPECT_TRUE(ParseOk(
-      "module t(input a, output b);\n"
-      "  specify\n"
-      "    specparam tRise = 1:2:3;\n"
-      "  endspecify\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t(input a, output b);\n"
+              "  specify\n"
+              "    specparam tRise = 1:2:3;\n"
+              "  endspecify\n"
+              "endmodule\n"));
 }
 
 // =========================================================================
@@ -599,24 +599,24 @@ TEST(ParserSection11, StringLiteralToVector) {
 }
 
 TEST(ParserSection11, StringConcatToVector) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  bit [8*14:1] stringvar;\n"
-      "  initial begin\n"
-      "    stringvar = \"Hello world\";\n"
-      "    stringvar = {stringvar, \"!!!\"};\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  bit [8*14:1] stringvar;\n"
+              "  initial begin\n"
+              "    stringvar = \"Hello world\";\n"
+              "    stringvar = {stringvar, \"!!!\"};\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection11, StringCompareEquality) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  string s1, s2;\n"
-      "  initial begin\n"
-      "    s1 = \"hello\";\n"
-      "    s2 = \"hello\";\n"
-      "    if (s1 == s2) $display(\"equal\");\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  string s1, s2;\n"
+              "  initial begin\n"
+              "    s1 = \"hello\";\n"
+              "    s2 = \"hello\";\n"
+              "    if (s1 == s2) $display(\"equal\");\n"
+              "  end\n"
+              "endmodule\n"));
 }

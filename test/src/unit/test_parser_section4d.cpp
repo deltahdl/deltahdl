@@ -403,11 +403,9 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncMultiTypedLocalVars) {
   EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kVarDecl);
   EXPECT_EQ(item->func_body_stmts[0]->var_decl_type.kind, DataTypeKind::kInt);
   EXPECT_EQ(item->func_body_stmts[1]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(item->func_body_stmts[1]->var_decl_type.kind,
-            DataTypeKind::kLogic);
+  EXPECT_EQ(item->func_body_stmts[1]->var_decl_type.kind, DataTypeKind::kLogic);
   EXPECT_EQ(item->func_body_stmts[2]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(item->func_body_stmts[2]->var_decl_type.kind,
-            DataTypeKind::kReal);
+  EXPECT_EQ(item->func_body_stmts[2]->var_decl_type.kind, DataTypeKind::kReal);
 }
 
 // =============================================================================
@@ -535,12 +533,12 @@ TEST(ParserSection4, Sec4_9_3_AutomaticTaskWithDelay) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_AutoFuncInClass) {
-  EXPECT_TRUE(ParseOk(
-      "class my_class;\n"
-      "  function automatic int get_id();\n"
-      "    return 42;\n"
-      "  endfunction\n"
-      "endclass\n"));
+  EXPECT_TRUE(
+      ParseOk("class my_class;\n"
+              "  function automatic int get_id();\n"
+              "    return 42;\n"
+              "  endfunction\n"
+              "endclass\n"));
 }
 
 // =============================================================================
@@ -689,12 +687,12 @@ TEST(ParserSection4, Sec4_9_3_TaskNoLifetimeQualifier) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_StaticModuleLifetime) {
-  EXPECT_TRUE(ParseOk(
-      "module static m;\n"
-      "  function int fn();\n"
-      "    return 0;\n"
-      "  endfunction\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module static m;\n"
+              "  function int fn();\n"
+              "    return 0;\n"
+              "  endfunction\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -745,12 +743,12 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncWithConstRefArg) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_TaskInProgramBlock) {
-  EXPECT_TRUE(ParseOk(
-      "program test_prog;\n"
-      "  task run_test();\n"
-      "    int x;\n"
-      "    x = 1;\n"
-      "    $display(\"x=%0d\", x);\n"
-      "  endtask\n"
-      "endprogram\n"));
+  EXPECT_TRUE(
+      ParseOk("program test_prog;\n"
+              "  task run_test();\n"
+              "    int x;\n"
+              "    x = 1;\n"
+              "    $display(\"x=%0d\", x);\n"
+              "  endtask\n"
+              "endprogram\n"));
 }

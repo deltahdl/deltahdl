@@ -30,8 +30,7 @@ struct SimCh13Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign* ElaborateSrc(const std::string& src,
-                                 SimCh13Fixture& f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimCh13Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
@@ -715,13 +714,13 @@ TEST(SimCh13, EncoderDecoderSameClass) {
 TEST(SimCh13, ParserPreservesParams) {
   SimCh13Fixture f;
   auto fid = f.mgr.AddFile("<test>",
-      "module t;\n"
-      "  class C #(parameter W = 8);\n"
-      "    static function int f; f = W; endfunction\n"
-      "  endclass\n"
-      "  int x;\n"
-      "  initial x = C#(16)::f();\n"
-      "endmodule\n");
+                           "module t;\n"
+                           "  class C #(parameter W = 8);\n"
+                           "    static function int f; f = W; endfunction\n"
+                           "  endclass\n"
+                           "  int x;\n"
+                           "  initial x = C#(16)::f();\n"
+                           "endmodule\n");
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
   auto* cu = parser.Parse();

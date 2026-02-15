@@ -258,25 +258,25 @@ TEST(ParserSection4, IntWithInitializer) {
 
 TEST(ParserSection4, All2StateTypes) {
   // Verify all 2-state types parse correctly together
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  byte b;\n"
-      "  shortint si;\n"
-      "  int i;\n"
-      "  longint li;\n"
-      "  bit bv;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  byte b;\n"
+              "  shortint si;\n"
+              "  int i;\n"
+              "  longint li;\n"
+              "  bit bv;\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection4, All4StateTypes) {
   // Verify all 4-state types parse correctly together
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  logic l;\n"
-      "  reg r;\n"
-      "  integer ig;\n"
-      "  time t;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic l;\n"
+              "  reg r;\n"
+              "  integer ig;\n"
+              "  time t;\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -363,12 +363,12 @@ TEST(ParserSection4, MultipleRealDecls) {
 
 TEST(ParserSection4, AllRealTypes) {
   // All three real-family types in one module
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  real r;\n"
-      "  shortreal sr;\n"
-      "  realtime rt;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r;\n"
+              "  shortreal sr;\n"
+              "  realtime rt;\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -377,49 +377,49 @@ TEST(ParserSection4, AllRealTypes) {
 
 TEST(ParserSection4, RealLiteralDecimalPoint) {
   // Standard decimal point real literal
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  real r = 1.5;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r = 1.5;\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection4, RealLiteralScientificNotation) {
   // Scientific notation: 1.3e2 = 130.0
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  real r = 1.3e2;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r = 1.3e2;\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection4, RealLiteralNegativeExponent) {
   // Negative exponent: 1.0e-3 = 0.001
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  real r = 1.0e-3;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r = 1.0e-3;\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection4, RealLiteralPositiveExponent) {
   // Explicit positive exponent
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  real r = 2.5E+4;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r = 2.5E+4;\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection4, RealLiteralUnderscoresInValue) {
   // Underscores in real literals for readability
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  real r = 1_000.000_1;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r = 1_000.000_1;\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection4, RealLiteralZeroPointSomething) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  real r = 0.123;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r = 0.123;\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -428,51 +428,51 @@ TEST(ParserSection4, RealLiteralZeroPointSomething) {
 
 TEST(ParserSection4, RealToIntAssignment) {
   // Implicit conversion from real to integer (rounds, not truncates)
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  real r;\n"
-      "  int i;\n"
-      "  initial begin\n"
-      "    r = 35.7;\n"
-      "    i = r;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r;\n"
+              "  int i;\n"
+              "  initial begin\n"
+              "    r = 35.7;\n"
+              "    i = r;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection4, IntToRealAssignment) {
   // Implicit conversion from integer to real
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  real r;\n"
-      "  int i;\n"
-      "  initial begin\n"
-      "    i = 42;\n"
-      "    r = i;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r;\n"
+              "  int i;\n"
+              "  initial begin\n"
+              "    i = 42;\n"
+              "    r = i;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection4, RealCastExplicit) {
   // Explicit cast: int'(real_val) (LRM 6.24)
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  real r = 3.7;\n"
-      "  int i;\n"
-      "  initial i = int'(r);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r = 3.7;\n"
+              "  int i;\n"
+              "  initial i = int'(r);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection4, RealInExpression) {
   // Real values in arithmetic expressions
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  real a, b, c;\n"
-      "  initial begin\n"
-      "    a = 1.5;\n"
-      "    b = 2.5;\n"
-      "    c = a + b;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real a, b, c;\n"
+              "  initial begin\n"
+              "    a = 1.5;\n"
+              "    b = 2.5;\n"
+              "    c = a + b;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -494,31 +494,31 @@ TEST(ParserSection4, ShortrealInModule) {
 
 TEST(ParserSection4, ShortrealInFunctionArg) {
   // shortreal as function argument type
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  function shortreal scale(shortreal val, shortreal factor);\n"
-      "    return val * factor;\n"
-      "  endfunction\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function shortreal scale(shortreal val, shortreal factor);\n"
+              "    return val * factor;\n"
+              "  endfunction\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection4, ShortrealCast) {
   // Cast to shortreal
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  int i = 42;\n"
-      "  shortreal sr;\n"
-      "  initial sr = shortreal'(i);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int i = 42;\n"
+              "  shortreal sr;\n"
+              "  initial sr = shortreal'(i);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection4, ShortrealInPort) {
   // shortreal as port type (LRM 23.2.2)
-  EXPECT_TRUE(ParseOk(
-      "module m (input var shortreal in_val,\n"
-      "          output var shortreal out_val);\n"
-      "  assign out_val = in_val;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m (input var shortreal in_val,\n"
+              "          output var shortreal out_val);\n"
+              "  assign out_val = in_val;\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -555,65 +555,65 @@ TEST(ParserSection4, StringDeclWithInitializer) {
 
 TEST(ParserSection4, StringDeclEmptyInit) {
   // string initialized to empty string
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  string s = \"\";\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  string s = \"\";\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection4, StringParameterDecl) {
   // parameter string (LRM 6.16)
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  parameter string DEFAULT_NAME = \"John Smith\";\n"
-      "  string myName = DEFAULT_NAME;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  parameter string DEFAULT_NAME = \"John Smith\";\n"
+              "  string myName = DEFAULT_NAME;\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection4, StringInFunctionArg) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  function void greet(string name);\n"
-      "    $display(\"Hello %s\", name);\n"
-      "  endfunction\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function void greet(string name);\n"
+              "    $display(\"Hello %s\", name);\n"
+              "  endfunction\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection4, StringFunctionReturn) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  function string get_msg();\n"
-      "    return \"ok\";\n"
-      "  endfunction\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function string get_msg();\n"
+              "    return \"ok\";\n"
+              "  endfunction\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection4, StringConcatOp) {
   // String concatenation using {} operator
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  string a, b, c;\n"
-      "  initial begin\n"
-      "    a = \"hello\";\n"
-      "    b = \" world\";\n"
-      "    c = {a, b};\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  string a, b, c;\n"
+              "  initial begin\n"
+              "    a = \"hello\";\n"
+              "    b = \" world\";\n"
+              "    c = {a, b};\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection4, StringComparison) {
   // String comparison operators
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  string a, b;\n"
-      "  initial begin\n"
-      "    a = \"abc\";\n"
-      "    b = \"def\";\n"
-      "    if (a == b) $display(\"equal\");\n"
-      "    if (a != b) $display(\"not equal\");\n"
-      "    if (a < b) $display(\"less\");\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  string a, b;\n"
+              "  initial begin\n"
+              "    a = \"abc\";\n"
+              "    b = \"def\";\n"
+              "    if (a == b) $display(\"equal\");\n"
+              "    if (a != b) $display(\"not equal\");\n"
+              "    if (a < b) $display(\"less\");\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection4, MultipleStringDecls) {
@@ -630,56 +630,56 @@ TEST(ParserSection4, MultipleStringDecls) {
 
 TEST(ParserSection4, MixedIntegerRealStringTypes) {
   // All major type families coexisting
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  int i;\n"
-      "  real r;\n"
-      "  shortreal sr;\n"
-      "  string s;\n"
-      "  byte b;\n"
-      "  logic [7:0] l;\n"
-      "  integer ig;\n"
-      "  realtime rt;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int i;\n"
+              "  real r;\n"
+              "  shortreal sr;\n"
+              "  string s;\n"
+              "  byte b;\n"
+              "  logic [7:0] l;\n"
+              "  integer ig;\n"
+              "  realtime rt;\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection4, IntegerTypesInProcedural) {
   // All integer types declared inside initial block
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  initial begin\n"
-      "    byte b;\n"
-      "    shortint si;\n"
-      "    int i;\n"
-      "    longint li;\n"
-      "    integer ig;\n"
-      "    bit bv;\n"
-      "    logic l;\n"
-      "    reg r;\n"
-      "    time t;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    byte b;\n"
+              "    shortint si;\n"
+              "    int i;\n"
+              "    longint li;\n"
+              "    integer ig;\n"
+              "    bit bv;\n"
+              "    logic l;\n"
+              "    reg r;\n"
+              "    time t;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection4, RealTypesInProcedural) {
   // All real types declared inside initial block
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  initial begin\n"
-      "    real r;\n"
-      "    shortreal sr;\n"
-      "    realtime rt;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    real r;\n"
+              "    shortreal sr;\n"
+              "    realtime rt;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection4, StringInProcedural) {
   // String declared inside procedural block
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  initial begin\n"
-      "    string s = \"test\";\n"
-      "    $display(s);\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    string s = \"test\";\n"
+              "    $display(s);\n"
+              "  end\n"
+              "endmodule\n"));
 }
