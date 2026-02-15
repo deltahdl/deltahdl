@@ -84,6 +84,84 @@ TEST(Lexer, Whitespace_OnlyWhitespace) {
   EXPECT_TRUE(tokens[0].IsEof());
 }
 
+TEST(Lexer, Whitespace_VerticalTab) {
+  // \v (vertical tab) is whitespace per std::isspace.
+  auto tokens = Lex("a\vb");
+  ASSERT_EQ(tokens.size(), 3);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+TEST(Lexer, Whitespace_NotInTokenText) {
+  // §5.3: whitespace is ignored — it must not appear in token text.
+  auto tokens = Lex("  module  \t endmodule \n ");
+  ASSERT_GE(tokens.size(), 3);
+  EXPECT_EQ(tokens[0].text, "module");
+  EXPECT_EQ(tokens[1].text, "endmodule");
+}
+
+TEST(Lexer, Whitespace_SeparatesAdjacentIdentifiers) {
+  // §5.3: whitespace serves to separate tokens — without it,
+  // "ab" is one identifier; with space, "a b" is two.
+  auto one = Lex("ab");
+  ASSERT_EQ(one.size(), 2);
+  EXPECT_EQ(one[0].text, "ab");
+
+  auto two = Lex("a b");
+  ASSERT_EQ(two.size(), 3);
+  EXPECT_EQ(two[0].text, "a");
+  EXPECT_EQ(two[1].text, "b");
+}
+
+TEST(Lexer, Whitespace_NotRequiredBetweenPunctuationAndIdentifier) {
+  // §5.3: whitespace only *serves* to separate when needed;
+  // punctuation self-delimits, so no whitespace is required.
+  auto tokens = Lex("a;b");
+  ASSERT_EQ(tokens.size(), 4);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kSemicolon);
+  EXPECT_EQ(tokens[2].text, "b");
+}
+
+TEST(Lexer, Whitespace_EofTerminatesTokenStream) {
+  // §5.3: end of file is a whitespace character — it terminates the stream.
+  auto tokens = Lex("x");
+  ASSERT_EQ(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].text, "x");
+  EXPECT_TRUE(tokens[1].IsEof());
+}
+
+TEST(Lexer, Whitespace_StringLiteralPreservesSpacesAndTabs) {
+  // §5.3: blanks and tabs are significant in string literals.
+  auto tokens = Lex("\"a \t b\"");
+  ASSERT_GE(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
+  EXPECT_NE(tokens[0].text.find(" \t "), std::string_view::npos);
+}
+
+TEST(Lexer, Whitespace_StringLiteralPreservesMultipleSpaces) {
+  // §5.3: blanks are significant — multiple spaces are not collapsed.
+  auto tokens = Lex("\"   \"");
+  ASSERT_GE(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
+  EXPECT_NE(tokens[0].text.find("   "), std::string_view::npos);
+}
+
+TEST(Lexer, Whitespace_FormfeedOnly) {
+  // §5.3: formfeed is whitespace; a source with only formfeed yields EOF.
+  auto tokens = Lex("\f");
+  ASSERT_EQ(tokens.size(), 1);
+  EXPECT_TRUE(tokens[0].IsEof());
+}
+
+TEST(Lexer, Whitespace_ConsecutiveFormfeeds) {
+  // §5.3: multiple formfeeds act as whitespace, separating tokens.
+  auto tokens = Lex("a\f\f\fb");
+  ASSERT_EQ(tokens.size(), 3);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
 // --- §5.6.2: Keywords ---
 
 TEST(Lexer, Keyword_Basic) {
