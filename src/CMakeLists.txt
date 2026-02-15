@@ -9,6 +9,7 @@ add_library(deltahdl_lib STATIC
     lexer/lexer.cpp
     lexer/string_escape.cpp
     parser/parser.cpp
+    parser/parser_port.cpp
     parser/parser_decl.cpp
     parser/parser_generate.cpp
     parser/parser_toplevel.cpp
