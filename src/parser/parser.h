@@ -150,7 +150,8 @@ class Parser {
   void ParseVarDeclList(std::vector<ModuleItem*>& items, const DataType& dtype);
   ModuleItem* ParseContinuousAssign();
   ModuleItem* ParseAlias();
-  ModuleItem* ParseParamDecl();
+  void ParseParamDecl(std::vector<ModuleItem*>& items);
+  void ParseTypeParamDecl(std::vector<ModuleItem*>& items, SourceLoc loc);
   ModuleItem* ParseAlwaysBlock(AlwaysKind kind);
   ModuleItem* ParseInitialBlock();
   ModuleItem* ParseFinalBlock();

@@ -793,13 +793,24 @@ void Parser::ParseVarDeclList(std::vector<ModuleItem*>& items,
 
 // --- Parameter declarations ---
 
-ModuleItem* Parser::ParseParamDecl() {
-  auto* item = arena_.Create<ModuleItem>();
-  item->kind = ModuleItemKind::kParamDecl;
-  item->loc = CurrentLoc();
-  Consume();  // parameter or localparam
-  // Handle "parameter type T = ..." (type parameter, §6.20.3).
-  if (Match(TokenKind::kKwType)) {
+// type_parameter_declaration: type [forward_type] list_of_type_assignments
+void Parser::ParseTypeParamDecl(std::vector<ModuleItem*>& items,
+                                SourceLoc loc) {
+  // Optional forward_type: enum | struct | union | class | interface class
+  if (Check(TokenKind::kKwEnum) || Check(TokenKind::kKwStruct) ||
+      Check(TokenKind::kKwUnion) || Check(TokenKind::kKwClass) ||
+      Check(TokenKind::kKwInterface)) {
+    if (Match(TokenKind::kKwInterface)) {
+      Expect(TokenKind::kKwClass);
+    } else {
+      Consume();
+    }
+  }
+  // list_of_type_assignments: type_assignment { , type_assignment }
+  do {
+    auto* item = arena_.Create<ModuleItem>();
+    item->kind = ModuleItemKind::kParamDecl;
+    item->loc = loc;
     item->data_type.kind = DataTypeKind::kVoid;  // Marker for type params.
     item->name = Expect(TokenKind::kIdentifier).text;
     if (Match(TokenKind::kEq)) {
@@ -811,29 +822,43 @@ ModuleItem* Parser::ParseParamDecl() {
       }
     }
     known_types_.insert(item->name);
-    Expect(TokenKind::kSemicolon);
-    return item;
-  } else {
-    item->data_type = ParseDataType();
-    // Handle implicit type with packed dims: localparam [10:0] p (§6.10)
-    if (item->data_type.kind == DataTypeKind::kImplicit &&
-        Check(TokenKind::kLBracket)) {
-      item->data_type.kind = DataTypeKind::kLogic;
-      Consume();
-      item->data_type.packed_dim_left = ParseExpr();
-      Expect(TokenKind::kColon);
-      item->data_type.packed_dim_right = ParseExpr();
-      Expect(TokenKind::kRBracket);
-    }
-  }
-  auto name_tok = Expect(TokenKind::kIdentifier);
-  item->name = name_tok.text;
-  ParseUnpackedDims(item->unpacked_dims);
-  if (Match(TokenKind::kEq)) {
-    item->init_expr = ParseExpr();
-  }
+    items.push_back(item);
+  } while (Match(TokenKind::kComma));
   Expect(TokenKind::kSemicolon);
-  return item;
+}
+
+void Parser::ParseParamDecl(std::vector<ModuleItem*>& items) {
+  auto loc = CurrentLoc();
+  Consume();  // parameter or localparam
+  // type_parameter_declaration: type [forward_type] list_of_type_assignments
+  if (Match(TokenKind::kKwType)) {
+    ParseTypeParamDecl(items, loc);
+    return;
+  }
+  DataType dtype = ParseDataType();
+  // Handle implicit type with packed dims: localparam [10:0] p (§6.10)
+  if (dtype.kind == DataTypeKind::kImplicit && Check(TokenKind::kLBracket)) {
+    dtype.kind = DataTypeKind::kLogic;
+    Consume();
+    dtype.packed_dim_left = ParseExpr();
+    Expect(TokenKind::kColon);
+    dtype.packed_dim_right = ParseExpr();
+    Expect(TokenKind::kRBracket);
+  }
+  // list_of_param_assignments: param_assignment { , param_assignment }
+  do {
+    auto* item = arena_.Create<ModuleItem>();
+    item->kind = ModuleItemKind::kParamDecl;
+    item->loc = loc;
+    item->data_type = dtype;
+    item->name = Expect(TokenKind::kIdentifier).text;
+    ParseUnpackedDims(item->unpacked_dims);
+    if (Match(TokenKind::kEq)) {
+      item->init_expr = ParseExpr();
+    }
+    items.push_back(item);
+  } while (Match(TokenKind::kComma));
+  Expect(TokenKind::kSemicolon);
 }
 
 }  // namespace delta

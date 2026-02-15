@@ -590,9 +590,14 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
     return;
   }
   if (Check(TokenKind::kKwParameter) || Check(TokenKind::kKwLocalparam)) {
-    member->kind = ClassMemberKind::kProperty;
-    member->name = ParseParamDecl()->name;
-    members.push_back(member);
+    std::vector<ModuleItem*> param_items;
+    ParseParamDecl(param_items);
+    for (size_t i = 0; i < param_items.size(); ++i) {
+      auto* m = (i == 0) ? member : arena_.Create<ClassMember>();
+      m->kind = ClassMemberKind::kProperty;
+      m->name = param_items[i]->name;
+      members.push_back(m);
+    }
     return;
   }
   // class_item: class_declaration | interface_class_declaration (A.1.9)

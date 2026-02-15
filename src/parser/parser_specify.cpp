@@ -43,6 +43,12 @@ ModuleItem* Parser::ParseSpecparamDecl() {
   item->name = Expect(TokenKind::kIdentifier).text;
   Expect(TokenKind::kEq);
   item->init_expr = ParseExpr();
+  // list_of_specparam_assignments: skip additional assignments (A.2.1.1)
+  while (Match(TokenKind::kComma)) {
+    Expect(TokenKind::kIdentifier);
+    Expect(TokenKind::kEq);
+    ParseExpr();
+  }
   Expect(TokenKind::kSemicolon);
   return item;
 }
@@ -341,16 +347,31 @@ SpecifyItem* Parser::ParseShowcancelledDecl() {
 
 // Parse: specparam name = expr ;  (inside specify block)
 SpecifyItem* Parser::ParseSpecparamInSpecify() {
-  auto* item = arena_.Create<SpecifyItem>();
-  item->kind = SpecifyItemKind::kSpecparam;
-  item->loc = CurrentLoc();
+  auto* first = arena_.Create<SpecifyItem>();
+  first->kind = SpecifyItemKind::kSpecparam;
+  first->loc = CurrentLoc();
   Expect(TokenKind::kKwSpecparam);
 
-  item->param_name = Expect(TokenKind::kIdentifier).text;
+  // Optional packed dimension [msb:lsb] (A.2.1.1)
+  if (Check(TokenKind::kLBracket)) {
+    Consume();
+    ParseExpr();
+    Expect(TokenKind::kColon);
+    ParseExpr();
+    Expect(TokenKind::kRBracket);
+  }
+
+  // list_of_specparam_assignments (A.2.1.1)
+  first->param_name = Expect(TokenKind::kIdentifier).text;
   Expect(TokenKind::kEq);
-  item->param_value = ParseExpr();
+  first->param_value = ParseExpr();
+  while (Match(TokenKind::kComma)) {
+    Expect(TokenKind::kIdentifier);
+    Expect(TokenKind::kEq);
+    ParseExpr();
+  }
   Expect(TokenKind::kSemicolon);
-  return item;
+  return first;
 }
 
 }  // namespace delta

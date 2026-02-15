@@ -1116,7 +1116,7 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
     return;
   }
   if (Check(TokenKind::kKwParameter) || Check(TokenKind::kKwLocalparam)) {
-    items.push_back(ParseParamDecl());
+    ParseParamDecl(items);
     AttachAttrs(items, before, attrs);
     return;
   }

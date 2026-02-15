@@ -198,14 +198,17 @@ bool Parser::IsBlockVarDeclStart() {
 void Parser::ParseBlockVarDecls(std::vector<Stmt*>& stmts) {
   // §6.20.1: parameter/localparam as block-level declarations
   if (Check(TokenKind::kKwParameter) || Check(TokenKind::kKwLocalparam)) {
-    auto* s = arena_.Create<Stmt>();
-    s->kind = StmtKind::kVarDecl;
-    s->range.start = CurrentLoc();
-    auto* param = ParseParamDecl();
-    s->var_decl_type = param->data_type;
-    s->var_name = param->name;
-    s->var_init = param->init_expr;
-    stmts.push_back(s);
+    std::vector<ModuleItem*> param_items;
+    ParseParamDecl(param_items);
+    for (auto* param : param_items) {
+      auto* s = arena_.Create<Stmt>();
+      s->kind = StmtKind::kVarDecl;
+      s->range.start = param->loc;
+      s->var_decl_type = param->data_type;
+      s->var_name = param->name;
+      s->var_init = param->init_expr;
+      stmts.push_back(s);
+    }
     return;
   }
   bool is_automatic = Match(TokenKind::kKwAutomatic);             // §6.21
