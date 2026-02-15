@@ -336,6 +336,43 @@ TEST(Lexer, Identifier_LrmExamples) {
   }
 }
 
+// --- §5.6.1: Escaped identifiers ---
+
+TEST(Lexer, EscapedIdent_StartBackslashEndWhitespace) {
+  // §5.6.1: Start with \, end with white space; whitespace not in token.
+  auto sp = Lex("\\foo ");
+  ASSERT_GE(sp.size(), 2);
+  EXPECT_EQ(sp[0].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(sp[0].text, "\\foo");
+  EXPECT_EQ(Lex("\\bar\t")[0].text, "\\bar");
+  EXPECT_EQ(Lex("\\baz\n")[0].text, "\\baz");
+  // §5.6.1: Printable ASCII 33-126 allowed.
+  EXPECT_EQ(Lex("\\!@#$%^&*() ")[0].text, "\\!@#$%^&*()");
+}
+
+TEST(Lexer, EscapedIdent_LrmExamples) {
+  // §5.6.1 examples from the LRM.
+  const char* cases[][2] = {
+      {"\\busa+index ", "\\busa+index"},
+      {"\\-clock ", "\\-clock"},
+      {"\\***error-condition*** ", "\\***error-condition***"},
+      {"\\{a,b} ", "\\{a,b}"},
+      {"\\a*(b+c) ", "\\a*(b+c)"}};
+  for (auto& c : cases) {
+    EXPECT_EQ(Lex(c[0])[0].kind, TokenKind::kEscapedIdentifier) << c[0];
+    EXPECT_EQ(Lex(c[0])[0].text, c[1]) << c[0];
+  }
+}
+
+TEST(Lexer, EscapedIdent_MultipleEscapedKeywords) {
+  // §5.6.1: An escaped keyword is treated as a user-defined identifier.
+  for (const char* kw : {"\\module ", "\\begin ", "\\wire ", "\\always "}) {
+    auto tokens = Lex(kw);
+    ASSERT_GE(tokens.size(), 2) << kw;
+    EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier) << kw;
+  }
+}
+
 // --- §5.7: Numbers (dispatch: integral vs real vs time) ---
 
 TEST(Lexer, Number_IntegerLiterals) {
