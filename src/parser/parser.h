@@ -116,6 +116,9 @@ class Parser {
   IncludeStmt* ParseLibraryIncludeStmt();
   std::string_view ParseFilePathSpec();
 
+  // Bind directive (§23.11 / A.1.2)
+  BindDirective* ParseBindDirective();
+
   // Configuration (parser_config.cpp — §33)
   ConfigDecl* ParseConfigDecl();
   void ParseDesignStatement(ConfigDecl* decl);

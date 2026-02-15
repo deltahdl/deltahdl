@@ -186,6 +186,47 @@ IncludeStmt* Parser::ParseLibraryIncludeStmt() {
   return stmt;
 }
 
+// --- Bind directive (§23.11 / A.1.2) ---
+
+BindDirective* Parser::ParseBindDirective() {
+  auto* decl = arena_.Create<BindDirective>();
+  decl->loc = CurrentLoc();
+  Expect(TokenKind::kKwBind);
+
+  // Parse target: identifier (potentially hierarchical for form 2).
+  auto first = ExpectIdentifier().text;
+  std::string path(first);
+  while (Match(TokenKind::kDot)) {
+    path.push_back('.');
+    auto next = ExpectIdentifier().text;
+    path.append(next.data(), next.size());
+  }
+  auto* buf = static_cast<char*>(arena_.Allocate(path.size(), 1));
+  std::copy_n(path.data(), path.size(), buf);
+  decl->target = std::string_view(buf, path.size());
+
+  // Optional : bind_target_instance_list
+  if (Match(TokenKind::kColon)) {
+    do {
+      auto inst = ExpectIdentifier().text;
+      std::string inst_path(inst);
+      while (Match(TokenKind::kDot)) {
+        inst_path.push_back('.');
+        auto next = ExpectIdentifier().text;
+        inst_path.append(next.data(), next.size());
+      }
+      auto* ibuf = static_cast<char*>(arena_.Allocate(inst_path.size(), 1));
+      std::copy_n(inst_path.data(), inst_path.size(), ibuf);
+      decl->target_instances.emplace_back(ibuf, inst_path.size());
+    } while (Match(TokenKind::kComma));
+  }
+
+  // Parse bind_instantiation (module/interface/program/checker instantiation).
+  auto mod_tok = ExpectIdentifier();
+  decl->instantiation = ParseModuleInst(mod_tok);
+  return decl;
+}
+
 // §18.5.1: out-of-block constraint — constraint class_id::name { ... }
 void Parser::ParseOutOfBlockConstraint(CompilationUnit* unit) {
   Consume();  // constraint
@@ -267,6 +308,10 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
     ParseModuleItem(discard);
     return;
   }
+  if (Check(TokenKind::kKwBind)) {
+    unit->bind_directives.push_back(ParseBindDirective());
+    return;
+  }
   if (TryParseSecondaryTopLevel(unit)) return;
   diag_.Error(CurrentLoc(), "expected top-level declaration");
   Consume();
@@ -322,6 +367,10 @@ PackageDecl* Parser::ParsePackageDecl() {
   auto* pkg = arena_.Create<PackageDecl>();
   pkg->range.start = CurrentLoc();
   Expect(TokenKind::kKwPackage);
+
+  // Optional lifetime qualifier (§26.2 / A.1.2)
+  Match(TokenKind::kKwAutomatic) || Match(TokenKind::kKwStatic);
+
   pkg->name = Expect(TokenKind::kIdentifier).text;
   Expect(TokenKind::kSemicolon);
   while (!Check(TokenKind::kKwEndpackage) && !AtEnd()) {

@@ -756,6 +756,15 @@ struct IncludeStmt {
   SourceLoc loc;
 };
 
+// --- Bind directive (§23.11 / A.1.2) ---
+
+struct BindDirective {
+  std::string_view target;
+  std::vector<std::string_view> target_instances;
+  ModuleItem* instantiation = nullptr;
+  SourceLoc loc;
+};
+
 // --- Configuration declarations (§33) ---
 
 enum class ConfigRuleKind : uint8_t {
@@ -791,10 +800,11 @@ struct CompilationUnit {
   std::vector<ModuleDecl*> programs;
   std::vector<ClassDecl*> classes;
   std::vector<UdpDecl*> udps;
-  std::vector<ModuleDecl*> checkers;       // checker ... endchecker (§17)
-  std::vector<ConfigDecl*> configs;        // config ... endconfig (§33)
-  std::vector<LibraryDecl*> libraries;     // library declarations (A.1.1)
-  std::vector<IncludeStmt*> lib_includes;  // include statements (A.1.1)
+  std::vector<ModuleDecl*> checkers;            // checker ... endchecker (§17)
+  std::vector<ConfigDecl*> configs;             // config ... endconfig (§33)
+  std::vector<LibraryDecl*> libraries;          // library declarations (A.1.1)
+  std::vector<IncludeStmt*> lib_includes;       // include statements (A.1.1)
+  std::vector<BindDirective*> bind_directives;  // bind directives (§23.11)
   std::vector<ModuleItem*> cu_items;  // top-level functions/tasks (§3.12.1)
   NetType default_nettype = NetType::kWire;  // §6.10/§22.8
 };
