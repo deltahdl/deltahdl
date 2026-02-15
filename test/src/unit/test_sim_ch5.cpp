@@ -7,6 +7,7 @@
 #include "elaboration/rtlir.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
+#include "preprocessor/preprocessor.h"
 #include "simulation/lowerer.h"
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
@@ -926,4 +927,70 @@ TEST(SimCh5, SystemFunctionInExpression) {
       "endmodule\n",
       "result");
   EXPECT_EQ(result, 9u);  // 5 + 4
+}
+
+// ===========================================================================
+// §5.6.4 Compiler directives — simulation-level tests
+// ===========================================================================
+
+static uint64_t PreprocessAndGet(const std::string& src, const char* var_name) {
+  SimCh5Fixture f;
+  auto fid = f.mgr.AddFile("<test>", src);
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto preprocessed = pp.Preprocess(fid);
+  auto fid2 = f.mgr.AddFile("<preprocessed>", preprocessed);
+  Lexer lexer(f.mgr.FileContent(fid2), fid2, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto* cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  auto* design = elab.Elaborate(cu->modules.back()->name);
+  EXPECT_NE(design, nullptr);
+  if (!design) return 0;
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable(var_name);
+  EXPECT_NE(var, nullptr);
+  if (!var) return 0;
+  return var->value.ToUint64();
+}
+
+TEST(SimCh5, DefineMacroAffectsSimulation) {
+  // §5.6.4: ` introduces a compiler directive (`define) that takes effect
+  // immediately, expanding the macro during compilation.
+  auto result = PreprocessAndGet(
+      "`define MY_VAL 8'd42\n"
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial result = `MY_VAL;\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(result, 42u);
+}
+
+TEST(SimCh5, DirectivePersistsInCompilationUnit) {
+  // §5.6.4: A directive remains in effect for the rest of the compilation
+  // unit unless a different compiler directive specifies otherwise.
+  auto result = PreprocessAndGet(
+      "`define CONST 8'd99\n"
+      "module other; endmodule\n"
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial result = `CONST;\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(result, 99u);
+}
+
+TEST(SimCh5, DirectiveCanBeOverridden) {
+  // §5.6.4: "unless a different compiler directive specifies otherwise."
+  auto result = PreprocessAndGet(
+      "`define X 8'd10\n"
+      "`define X 8'd20\n"
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial result = `X;\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(result, 20u);
 }
