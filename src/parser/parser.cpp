@@ -720,14 +720,19 @@ PortDecl Parser::ParsePortDecl() {
   }
 
   // Handle implicit type with packed dims: input [3:0] a (§6.10)
-  if (port.data_type.kind == DataTypeKind::kImplicit &&
-      Check(TokenKind::kLBracket)) {
-    port.data_type.kind = DataTypeKind::kLogic;
-    Consume();
-    port.data_type.packed_dim_left = ParseExpr();
-    Expect(TokenKind::kColon);
-    port.data_type.packed_dim_right = ParseExpr();
-    Expect(TokenKind::kRBracket);
+  // Also handles signing already parsed: input signed [7:0] a (A.2.2.1)
+  if (port.data_type.kind == DataTypeKind::kImplicit) {
+    if (port.data_type.packed_dim_left) {
+      // Packed dims already parsed by ParseDataType (signing path)
+      port.data_type.kind = DataTypeKind::kLogic;
+    } else if (Check(TokenKind::kLBracket)) {
+      port.data_type.kind = DataTypeKind::kLogic;
+      Consume();
+      port.data_type.packed_dim_left = ParseExpr();
+      Expect(TokenKind::kColon);
+      port.data_type.packed_dim_right = ParseExpr();
+      Expect(TokenKind::kRBracket);
+    }
   }
 
   auto name_tok = ExpectIdentifier();
@@ -1041,6 +1046,13 @@ bool Parser::TryParseKeywordItem(std::vector<ModuleItem*>& items) {
     dtype.kind = DataTypeKind::kWire;
     dtype.is_net = true;
     dtype.is_interconnect = true;
+    // A.2.2.1: interconnect implicit_data_type [signing] {packed_dimension}
+    if (Match(TokenKind::kKwSigned)) {
+      dtype.is_signed = true;
+    } else {
+      Match(TokenKind::kKwUnsigned);
+    }
+    ParsePackedDims(dtype);
     ParseVarDeclList(items, dtype);
     return true;
   }
@@ -1224,6 +1236,23 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items) {
     ParseVarDeclList(items, dtype);
     return;
   }
+  // A.2.2.1: data_type ::= ... | type_reference
+  // type(expr) name; — type_reference used as data_type in declaration
+  if (Check(TokenKind::kKwType)) {
+    Consume();  // type
+    Expect(TokenKind::kLParen);
+    auto* type_expr = ParseExpr();
+    Expect(TokenKind::kRParen);
+    auto* item = arena_.Create<ModuleItem>();
+    item->kind = ModuleItemKind::kVarDecl;
+    item->loc = CurrentLoc();
+    item->data_type.type_ref_expr = type_expr;
+    item->name = ExpectIdentifier().text;
+    ParseUnpackedDims(item->unpacked_dims);
+    Expect(TokenKind::kSemicolon);
+    items.push_back(item);
+    return;
+  }
   if (Check(TokenKind::kKwCase)) {
     items.push_back(ParseGenerateCase());
     return;
@@ -1243,7 +1272,9 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items) {
     return;
   }
   auto dtype = ParseDataType();
-  if (dtype.kind != DataTypeKind::kImplicit) {
+  // A.2.2.1: implicit_data_type with signing/dims is a real type
+  if (dtype.kind != DataTypeKind::kImplicit || dtype.packed_dim_left ||
+      dtype.is_signed || dtype.is_const) {
     ParseVarDeclList(items, dtype);
     return;
   }

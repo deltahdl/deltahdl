@@ -150,12 +150,15 @@ struct EnumMember {
 struct StructMember {
   DataTypeKind type_kind = DataTypeKind::kImplicit;
   bool is_signed = false;
+  bool is_rand = false;   // random_qualifier: rand (§7.2)
+  bool is_randc = false;  // random_qualifier: randc (§7.2)
   Expr* packed_dim_left = nullptr;
   Expr* packed_dim_right = nullptr;
   std::vector<std::pair<Expr*, Expr*>> extra_packed_dims;  // §7.4.1
   std::string_view name;
   Expr* init_expr = nullptr;         // Default member value (§7.2.2)
   std::vector<Expr*> unpacked_dims;  // Unpacked dims on member (§7.4)
+  std::vector<Attribute> attrs;      // attribute_instance (§5.12)
 };
 
 struct DataType {

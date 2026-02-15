@@ -105,6 +105,11 @@ DataType Parser::ParseStructOrUnionBody(TokenKind kw) {
 void Parser::ParseStructMembers(DataType& dtype) {
   Expect(TokenKind::kLBrace);
   while (!Check(TokenKind::kRBrace) && !AtEnd()) {
+    // A.2.2.1: {attribute_instance} [random_qualifier] data_type_or_void ...
+    auto member_attrs = ParseAttributes();
+    bool is_rand = Match(TokenKind::kKwRand);
+    bool is_randc = !is_rand && Match(TokenKind::kKwRandc);
+
     DataType member_type;
     if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
       member_type = ParseStructOrUnionType();
@@ -119,6 +124,9 @@ void Parser::ParseStructMembers(DataType& dtype) {
       StructMember member;
       member.type_kind = member_type.kind;
       member.is_signed = member_type.is_signed;
+      member.is_rand = is_rand;
+      member.is_randc = is_randc;
+      member.attrs = member_attrs;
       member.packed_dim_left = member_type.packed_dim_left;
       member.packed_dim_right = member_type.packed_dim_right;
       member.extra_packed_dims = member_type.extra_packed_dims;
@@ -683,6 +691,15 @@ DataType Parser::ParseDataType() {
     auto named = ParseNamedType();
     named.is_const = dtype.is_const;
     return named;
+  }
+
+  // A.2.2.1: implicit_data_type ::= [signing] {packed_dimension}
+  // Handle bare signed/unsigned before packed dimensions.
+  if (Check(TokenKind::kKwSigned) || Check(TokenKind::kKwUnsigned)) {
+    dtype.is_signed = Match(TokenKind::kKwSigned);
+    if (!dtype.is_signed) Consume();  // unsigned
+    ParsePackedDims(dtype);
+    return dtype;
   }
 
   auto tok_kind = CurrentToken().kind;
