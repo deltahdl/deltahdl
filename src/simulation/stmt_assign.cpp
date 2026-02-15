@@ -171,13 +171,36 @@ static void WriteBitSelect(Variable* var, const Expr* lhs,
 static Logic4Vec ResizeToWidth(Logic4Vec val, uint32_t target_width,
                                Arena& arena) {
   if (val.width == target_width || target_width == 0) return val;
-  uint64_t v = val.ToUint64();
-  if (val.is_signed && target_width > val.width && val.width > 0 &&
-      val.width < 64) {
-    uint64_t sign_bit = uint64_t{1} << (val.width - 1);
-    if (v & sign_bit) v |= ~uint64_t{0} << val.width;
+  // Check for x/z bits that need preserving.
+  bool has_xz = false;
+  for (uint32_t i = 0; i < val.nwords && !has_xz; ++i)
+    has_xz = val.words[i].bval != 0;
+  if (!has_xz) {
+    uint64_t v = val.ToUint64();
+    if (val.is_signed && target_width > val.width && val.width > 0 &&
+        val.width < 64) {
+      uint64_t sign_bit = uint64_t{1} << (val.width - 1);
+      if (v & sign_bit) v |= ~uint64_t{0} << val.width;
+    }
+    return MakeLogic4VecVal(arena, target_width, v);
   }
-  return MakeLogic4VecVal(arena, target_width, v);
+  // Preserve x/z bits during resize.
+  auto result = MakeLogic4Vec(arena, target_width);
+  result.is_signed = val.is_signed;
+  uint32_t copy_words = std::min(val.nwords, result.nwords);
+  for (uint32_t i = 0; i < copy_words; ++i) {
+    result.words[i].aval = val.words[i].aval;
+    result.words[i].bval = val.words[i].bval;
+  }
+  // Mask off bits beyond target_width in the last word.
+  uint32_t last_bit = target_width % 64;
+  if (last_bit != 0) {
+    uint32_t last_word = (target_width - 1) / 64;
+    uint64_t mask = (uint64_t{1} << last_bit) - 1;
+    result.words[last_word].aval &= mask;
+    result.words[last_word].bval &= mask;
+  }
+  return result;
 }
 
 // §7.6: Copy elements from one array to another (B = A).

@@ -30,11 +30,11 @@ static bool IsCastTypeToken(TokenKind kind) {
 // Parse a SystemVerilog integer literal text into a uint64_t value.
 // Handles: decimal "42", based "8'hFF", underscore "1_000".
 static uint64_t ParseIntText(std::string_view text) {
-  // Strip underscores into a local buffer.
+  // Strip underscores and whitespace into a local buffer.
   std::string buf;
   buf.reserve(text.size());
   for (char c : text) {
-    if (c != '_') buf.push_back(c);
+    if (c != '_' && c != ' ' && c != '\t') buf.push_back(c);
   }
 
   // Find tick for based literals (e.g., 8'hFF).

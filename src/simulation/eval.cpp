@@ -15,6 +15,9 @@ namespace delta {
 
 // --- Literal evaluation ---
 
+static bool IsXChar(char c) { return c == 'x' || c == 'X'; }
+static bool IsZChar(char c) { return c == 'z' || c == 'Z' || c == '?'; }
+
 static uint32_t LiteralWidth(std::string_view text, uint64_t val) {
   auto tick = text.find('\'');
   if (tick != std::string_view::npos && tick > 0) {
@@ -28,29 +31,25 @@ static uint32_t LiteralWidth(std::string_view text, uint64_t val) {
 }
 
 static Logic4Vec EvalUnbasedUnsized(const Expr* expr, Arena& arena) {
-  // §5.7.1: '0, '1, 'x, 'z — single-bit unbased unsized literal.
+  // §5.7.1: '0, '1, 'x, 'z — return 64-bit fill pattern for ResizeToWidth.
   auto text = expr->text;
   if (text.size() >= 2 && text[0] == '\'') {
     char c = text[1];
-    if (c == '1') return MakeLogic4VecVal(arena, 1, 1);
-    if (c == '0') return MakeLogic4VecVal(arena, 1, 0);
-    // 'x and 'z: set bval to indicate unknown.
-    auto vec = MakeLogic4Vec(arena, 1);
-    if (c == 'x' || c == 'X') vec.words[0] = {1, 1};
-    if (c == 'z' || c == 'Z' || c == '?') vec.words[0] = {0, 1};
+    if (c == '1') return MakeLogic4VecVal(arena, 64, ~uint64_t{0});
+    if (c == '0') return MakeLogic4VecVal(arena, 64, 0);
+    auto vec = MakeLogic4Vec(arena, 64);
+    if (c == 'x' || c == 'X') vec.words[0] = {~uint64_t{0}, ~uint64_t{0}};
+    if (c == 'z' || c == 'Z' || c == '?') vec.words[0] = {0, ~uint64_t{0}};
     return vec;
   }
-  return MakeLogic4VecVal(arena, 1, expr->int_val);
+  return MakeLogic4VecVal(arena, 64, expr->int_val);
 }
 
-// Check if a based literal's digit string contains x/z characters.
 static bool TextHasXZ(std::string_view text) {
   auto tick = text.find('\'');
   if (tick == std::string_view::npos) return false;
-  for (size_t i = tick + 1; i < text.size(); ++i) {
-    char c = text[i];
-    if (c == 'x' || c == 'X' || c == 'z' || c == 'Z' || c == '?') return true;
-  }
+  for (size_t i = tick + 1; i < text.size(); ++i)
+    if (IsXChar(text[i]) || IsZChar(text[i])) return true;
   return false;
 }
 
@@ -82,8 +81,8 @@ static int DigitValue(char c) {
 // Set bit_count bits starting at bit_pos in vec for an x/z/normal digit.
 static void SetDigitBits(Logic4Vec& vec, uint32_t& bit_pos, int bit_count,
                          char digit, uint32_t width) {
-  bool is_x = (digit == 'x' || digit == 'X');
-  bool is_z = (digit == 'z' || digit == 'Z' || digit == '?');
+  bool is_x = IsXChar(digit);
+  bool is_z = IsZChar(digit);
   int dval = DigitValue(digit);
   for (int b = 0; b < bit_count && bit_pos < width; ++b, ++bit_pos) {
     uint32_t word = bit_pos / 64;
@@ -99,28 +98,55 @@ static void SetDigitBits(Logic4Vec& vec, uint32_t& bit_pos, int bit_count,
   }
 }
 
-// Parse a based literal with x/z digits into a Logic4Vec.
+static void FillXZ(Logic4Vec& vec, uint32_t start, uint32_t end, bool is_x) {
+  for (uint32_t b = start; b < end; ++b) {
+    uint32_t word = b / 64;
+    uint64_t mask = uint64_t{1} << (b % 64);
+    if (is_x) vec.words[word].aval |= mask;
+    vec.words[word].bval |= mask;
+  }
+}
+
+static size_t ParseLiteralBase(std::string_view text, std::string& buf,
+                               int& bpd) {
+  buf.clear();
+  buf.reserve(text.size());
+  for (char c : text)
+    if (c != '_' && c != ' ' && c != '\t') buf.push_back(c);
+  auto tick = buf.find('\'');
+  if (tick == std::string::npos) return 0;
+  size_t i = tick + 1;
+  if (i < buf.size() && (buf[i] == 's' || buf[i] == 'S')) ++i;
+  bpd = (i < buf.size()) ? BitsPerDigit(buf[i]) : 0;
+  return i;
+}
+
 static Logic4Vec ParseBasedXZLiteral(std::string_view text, uint32_t width,
                                      Arena& arena) {
   auto vec = MakeLogic4Vec(arena, width);
   std::string buf;
-  buf.reserve(text.size());
-  for (char c : text)
-    if (c != '_') buf.push_back(c);
-  auto tick = buf.find('\'');
-  if (tick == std::string::npos) return vec;
-  size_t i = tick + 1;
-  if (i < buf.size() && (buf[i] == 's' || buf[i] == 'S')) ++i;
-  int bpd = (i < buf.size()) ? BitsPerDigit(buf[i]) : 0;
-  if (bpd == 0) return vec;  // Decimal x/z: leave as zero.
+  int bpd = 0;
+  size_t i = ParseLiteralBase(text, buf, bpd);
+  if (i == 0) return vec;
+  if (bpd == 0) {
+    // §5.7.1: Decimal single-digit x/z fills all bits.
+    ++i;
+    char first = (i < buf.size()) ? buf[i] : '\0';
+    if (IsXChar(first) || IsZChar(first)) FillXZ(vec, 0, width, IsXChar(first));
+    return vec;
+  }
   ++i;
   uint32_t bit_pos = 0;
   for (auto j = buf.size(); j > i && bit_pos < width; --j)
     SetDigitBits(vec, bit_pos, bpd, buf[j - 1], width);
+  // §5.7.1: Left-pad remaining bits with x or z if leftmost digit is x/z.
+  if (bit_pos < width && i < buf.size()) {
+    char lm = buf[i];
+    if (IsXChar(lm) || IsZChar(lm)) FillXZ(vec, bit_pos, width, IsXChar(lm));
+  }
   return vec;
 }
 
-// §11.3.3: Check if a based literal has a signed base marker ('s or 'S).
 static bool IsSignedLiteral(std::string_view text) {
   auto tick = text.find('\'');
   if (tick == std::string_view::npos || tick + 1 >= text.size()) return false;
