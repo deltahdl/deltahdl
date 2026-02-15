@@ -462,6 +462,10 @@ struct ModuleItem {
   bool is_automatic = false;
   bool is_static = false;
 
+  // extern_tf_declaration (A.1.6)
+  bool is_extern = false;    // extern method_prototype / task_prototype
+  bool is_forkjoin = false;  // extern forkjoin task_prototype
+
   // Declarations
   DataType data_type;
   std::string_view name;

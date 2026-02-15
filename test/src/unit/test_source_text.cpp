@@ -1161,6 +1161,202 @@ TEST(SourceText, ConfigCellUnqualified) {
 }
 
 // =============================================================================
+// A.1.6 Interface items
+// =============================================================================
+
+// interface_or_generate_item ::= { attribute_instance } module_common_item
+// Verify that a module_common_item (continuous assign) is accepted inside an
+// interface body, producing an item in the interface's items list.
+TEST(SourceText, InterfaceOrGenerateItemModuleCommon) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  assign a = b;\n"
+      "endinterface\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  auto* ifc = r.cu->interfaces[0];
+  ASSERT_GE(ifc->items.size(), 1u);
+  EXPECT_EQ(ifc->items[0]->kind, ModuleItemKind::kContAssign);
+}
+
+// interface_or_generate_item ::= { attribute_instance } extern_tf_declaration
+// extern_tf_declaration ::= extern method_prototype ;
+// Verify extern function prototype inside an interface.
+TEST(SourceText, ExternFunctionPrototypeInInterface) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  extern function void compute(input int x);\n"
+      "endinterface\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  auto* ifc = r.cu->interfaces[0];
+  ASSERT_GE(ifc->items.size(), 1u);
+  EXPECT_EQ(ifc->items[0]->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(ifc->items[0]->name, "compute");
+  EXPECT_TRUE(ifc->items[0]->is_extern);
+  // Prototype only — no body statements.
+  EXPECT_TRUE(ifc->items[0]->func_body_stmts.empty());
+}
+
+// extern_tf_declaration ::= extern method_prototype ;
+// method_prototype ::= task_prototype — extern task prototype.
+TEST(SourceText, ExternTaskPrototypeInInterface) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  extern task run();\n"
+      "endinterface\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  auto* ifc = r.cu->interfaces[0];
+  ASSERT_GE(ifc->items.size(), 1u);
+  EXPECT_EQ(ifc->items[0]->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_EQ(ifc->items[0]->name, "run");
+  EXPECT_TRUE(ifc->items[0]->is_extern);
+  EXPECT_TRUE(ifc->items[0]->func_body_stmts.empty());
+}
+
+// extern_tf_declaration ::= extern forkjoin task_prototype ;
+TEST(SourceText, ExternForkjoinTaskPrototype) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  extern forkjoin task parallel_run();\n"
+      "endinterface\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  auto* ifc = r.cu->interfaces[0];
+  ASSERT_GE(ifc->items.size(), 1u);
+  EXPECT_EQ(ifc->items[0]->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_EQ(ifc->items[0]->name, "parallel_run");
+  EXPECT_TRUE(ifc->items[0]->is_extern);
+  EXPECT_TRUE(ifc->items[0]->is_forkjoin);
+  EXPECT_TRUE(ifc->items[0]->func_body_stmts.empty());
+}
+
+// extern_tf_declaration inside a module (interface_or_generate_item applies
+// to modules too via module_or_generate_item).
+TEST(SourceText, ExternFunctionPrototypeInModule) {
+  auto r = Parse(
+      "module m;\n"
+      "  extern function int compute(input int a, input int b);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto* mod = r.cu->modules[0];
+  ASSERT_GE(mod->items.size(), 1u);
+  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(mod->items[0]->name, "compute");
+  EXPECT_TRUE(mod->items[0]->is_extern);
+  EXPECT_TRUE(mod->items[0]->func_body_stmts.empty());
+}
+
+// interface_item ::= port_declaration ;
+// Verify that port declarations are accepted in interface ANSI port list.
+TEST(SourceText, InterfaceItemPortDecl) {
+  auto r = Parse(
+      "interface ifc(input logic clk, output logic data);\n"
+      "endinterface\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 2u);
+  EXPECT_EQ(r.cu->interfaces[0]->ports[0].name, "clk");
+  EXPECT_EQ(r.cu->interfaces[0]->ports[1].name, "data");
+}
+
+// non_port_interface_item ::= generate_region
+TEST(SourceText, NonPortInterfaceItemGenerateRegion) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  generate\n"
+      "    assign a = b;\n"
+      "  endgenerate\n"
+      "endinterface\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_GE(r.cu->interfaces[0]->items.size(), 1u);
+}
+
+// non_port_interface_item ::= program_declaration
+TEST(SourceText, NonPortInterfaceItemProgram) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  program p; endprogram\n"
+      "endinterface\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  ASSERT_GE(r.cu->interfaces[0]->items.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->items[0]->kind,
+            ModuleItemKind::kNestedModuleDecl);
+}
+
+// non_port_interface_item ::= modport_declaration
+TEST(SourceText, NonPortInterfaceItemModport) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  modport master(input clk, output data);\n"
+      "endinterface\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  ASSERT_EQ(r.cu->interfaces[0]->modports.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->modports[0]->name, "master");
+}
+
+// non_port_interface_item ::= interface_declaration (nested interface)
+TEST(SourceText, NonPortInterfaceItemNestedInterface) {
+  auto r = Parse(
+      "interface outer;\n"
+      "  interface inner; endinterface\n"
+      "endinterface\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  ASSERT_GE(r.cu->interfaces[0]->items.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->items[0]->kind,
+            ModuleItemKind::kNestedModuleDecl);
+}
+
+// non_port_interface_item ::= timeunits_declaration
+TEST(SourceText, NonPortInterfaceItemTimeunits) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  timeunit 1ns;\n"
+      "endinterface\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+}
+
+// Combined: interface with multiple A.1.6 item types.
+TEST(SourceText, InterfaceMultipleItemTypes) {
+  auto r = Parse(
+      "interface bus_if;\n"
+      "  logic [7:0] data;\n"
+      "  extern function void validate();\n"
+      "  extern forkjoin task run_parallel();\n"
+      "  modport master(output data);\n"
+      "  modport slave(input data);\n"
+      "endinterface\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  auto* ifc = r.cu->interfaces[0];
+  // data var + extern function + extern forkjoin task = 3 items
+  ASSERT_GE(ifc->items.size(), 3u);
+  EXPECT_EQ(ifc->modports.size(), 2u);
+  // Verify the extern function.
+  bool found_extern_func = false;
+  bool found_forkjoin_task = false;
+  for (auto* item : ifc->items) {
+    if (item->kind == ModuleItemKind::kFunctionDecl && item->is_extern) {
+      found_extern_func = true;
+      EXPECT_EQ(item->name, "validate");
+    }
+    if (item->kind == ModuleItemKind::kTaskDecl && item->is_forkjoin) {
+      found_forkjoin_task = true;
+      EXPECT_EQ(item->name, "run_parallel");
+    }
+  }
+  EXPECT_TRUE(found_extern_func);
+  EXPECT_TRUE(found_forkjoin_task);
+}
+
+// =============================================================================
 // A.1.2 comprehensive: all description types in one source text.
 // =============================================================================
 

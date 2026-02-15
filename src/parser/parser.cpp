@@ -913,6 +913,22 @@ bool Parser::TryParseKeywordItem(std::vector<ModuleItem*>& items) {
     items.push_back(ParseTaskDecl());
     return true;
   }
+  // extern_tf_declaration (A.1.6): extern method_prototype ;
+  //                               | extern forkjoin task_prototype ;
+  if (Check(TokenKind::kKwExtern)) {
+    Consume();
+    bool forkjoin = Match(TokenKind::kKwForkjoin);
+    ModuleItem* item;
+    if (forkjoin || Check(TokenKind::kKwTask)) {
+      item = ParseTaskDecl(/*prototype_only=*/true);
+    } else {
+      item = ParseFunctionDecl(/*prototype_only=*/true);
+    }
+    item->is_extern = true;
+    item->is_forkjoin = forkjoin;
+    items.push_back(item);
+    return true;
+  }
   if (Check(TokenKind::kKwAssign)) {
     items.push_back(ParseContinuousAssign());
     return true;
