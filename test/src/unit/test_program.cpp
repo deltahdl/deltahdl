@@ -62,14 +62,6 @@ static RtlirDesign* ElaborateSource(const std::string& src,
   return elab.Elaborate(top_name);
 }
 
-static bool HasItemOfKind(const std::vector<ModuleItem*>& items,
-                          ModuleItemKind kind) {
-  for (const auto* item : items) {
-    if (item->kind == kind) return true;
-  }
-  return false;
-}
-
 static const ModuleItem* FindItemOfKind(const std::vector<ModuleItem*>& items,
                                         ModuleItemKind kind) {
   for (const auto* item : items) {

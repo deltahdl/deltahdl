@@ -643,14 +643,30 @@ jobs:
   clang-tidy-src:
     needs: static-analysis
     runs-on: ubuntu-24.04
+    env:
+      CTCACHE_DIR: ${{ github.workspace }}/.ctcache
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
-      - name: Install clang-tidy
+      - name: Install tools
         run: |
           sudo apt-get update
           sudo apt-get install -y clang-18 clang-tidy-18
+          pip install git+https://github.com/matus-chochlik/ctcache.git
+      - name: Create clang-tidy wrapper
+        run: |
+          sudo tee /usr/local/bin/clang-tidy-cached << 'WRAPPER'
+          #!/bin/bash
+          exec clang-tidy-cache /usr/bin/clang-tidy-18 "${@}"
+          WRAPPER
+          sudo chmod +x /usr/local/bin/clang-tidy-cached
+      - name: Restore ctcache
+        uses: actions/cache@v4
+        with:
+          path: .ctcache
+          key: ctcache-src-${{ hashFiles('.clang-tidy') }}
+          restore-keys: ctcache-src-
       - name: Generate compile_commands.json
         run: |
           cmake -B build \
@@ -660,6 +676,7 @@ jobs:
         run: >-
           run-clang-tidy-18 -p build
           -j "$(nproc)"
+          -clang-tidy-binary /usr/local/bin/clang-tidy-cached
           -config-file=.clang-tidy
           -extra-arg=-ferror-limit=0
           -extra-arg=-w
@@ -668,14 +685,30 @@ jobs:
   clang-tidy-test:
     needs: static-analysis
     runs-on: ubuntu-24.04
+    env:
+      CTCACHE_DIR: ${{ github.workspace }}/.ctcache
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
-      - name: Install clang-tidy
+      - name: Install tools
         run: |
           sudo apt-get update
           sudo apt-get install -y clang-18 clang-tidy-18
+          pip install git+https://github.com/matus-chochlik/ctcache.git
+      - name: Create clang-tidy wrapper
+        run: |
+          sudo tee /usr/local/bin/clang-tidy-cached << 'WRAPPER'
+          #!/bin/bash
+          exec clang-tidy-cache /usr/bin/clang-tidy-18 "${@}"
+          WRAPPER
+          sudo chmod +x /usr/local/bin/clang-tidy-cached
+      - name: Restore ctcache
+        uses: actions/cache@v4
+        with:
+          path: .ctcache
+          key: ctcache-test-${{ hashFiles('test/src/unit/.clang-tidy') }}
+          restore-keys: ctcache-test-
       - name: Generate compile_commands.json
         run: |
           cmake -B build \
@@ -685,6 +718,7 @@ jobs:
         run: >-
           run-clang-tidy-18 -p build
           -j "$(nproc)"
+          -clang-tidy-binary /usr/local/bin/clang-tidy-cached
           -config-file=test/src/unit/.clang-tidy
           -extra-arg=-ferror-limit=0
           -extra-arg=-w
