@@ -628,6 +628,51 @@ TEST(Lexer, Comment_EmptyBlockComment) {
   EXPECT_EQ(tokens[1].text, "b");
 }
 
+TEST(Lexer, Comment_BlockNotNested) {
+  // §5.4: "Block comments shall not be nested."
+  // /* outer /* inner */ ends at first */ — "still_here" is a token.
+  auto tokens = Lex("a /* outer /* inner */ still_here");
+  ASSERT_GE(tokens.size(), 3);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "still_here");
+}
+
+TEST(Lexer, Comment_BlockNotNestedCloseStar) {
+  // §5.4: Nested /* has no special meaning; first */ closes the comment.
+  auto tokens = Lex("x /* a /* b */ y /* c */ z");
+  ASSERT_GE(tokens.size(), 4);
+  EXPECT_EQ(tokens[0].text, "x");
+  EXPECT_EQ(tokens[1].text, "y");
+  // "/* c */" is a separate block comment
+  EXPECT_EQ(tokens[2].text, "z");
+}
+
+TEST(Lexer, Comment_StarsInsideBlock) {
+  // Stars that don't form */ should not end the block comment.
+  auto tokens = Lex("a /* ** * *** */ b");
+  ASSERT_EQ(tokens.size(), 3);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+TEST(Lexer, Comment_SlashesInsideBlock) {
+  // Slashes inside block comment don't start new comments or end the block.
+  auto tokens = Lex("a /* / // /// */ b");
+  ASSERT_EQ(tokens.size(), 3);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+TEST(Lexer, Comment_LineCommentEndsAtNewline) {
+  // §5.4: "A one-line comment shall start with // and end with a newline
+  // character." — code on the next line is not part of the comment.
+  auto tokens = Lex("a // comment text\nb // more\nc");
+  ASSERT_EQ(tokens.size(), 4);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+  EXPECT_EQ(tokens[2].text, "c");
+}
+
 TEST(Lexer, HelloSv) {
   auto tokens = Lex(
       "module hello;\n  initial $display(\"Hello, DeltaHDL!\");\nendmodule\n");

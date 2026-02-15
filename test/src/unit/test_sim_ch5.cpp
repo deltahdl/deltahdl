@@ -454,3 +454,140 @@ TEST(SimCh5, LexicalTokenFreeFormatAlwaysComb) {
       "result");
   EXPECT_EQ(result, 15u);
 }
+
+// ===========================================================================
+// §5.4 Comments — simulation-level tests
+//
+// LRM §5.4: "SystemVerilog has two forms to introduce comments. A one-line
+// comment shall start with the two characters // and end with a newline
+// character. A block comment shall start with /* and end with */. Block
+// comments shall not be nested. The one-line comment token // shall not have
+// any special meaning inside a block comment, and the block comment tokens
+// /* and */ shall not have any special meaning inside a one-line comment."
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// 1. Line comments stripped — simulation produces correct result
+// ---------------------------------------------------------------------------
+TEST(SimCh5, CommentLineCommentStripped) {
+  // §5.4: One-line comment starts with // and ends with newline.
+  auto result = RunAndGet(
+      "module t; // module declaration\n"
+      "  logic [7:0] result; // variable\n"
+      "  initial result = 8'd77; // assignment\n"
+      "endmodule // end\n",
+      "result");
+  EXPECT_EQ(result, 77u);
+}
+
+// ---------------------------------------------------------------------------
+// 2. Block comments stripped — simulation produces correct result
+// ---------------------------------------------------------------------------
+TEST(SimCh5, CommentBlockCommentStripped) {
+  // §5.4: Block comment starts with /* and ends with */.
+  auto result = RunAndGet(
+      "module /* module */ t /* name */;\n"
+      "  logic /* type */ [7:0] /* width */ result /* var */;\n"
+      "  initial /* process */ result = /* assign */ 8'd55 /* val */;\n"
+      "endmodule /* end */\n",
+      "result");
+  EXPECT_EQ(result, 55u);
+}
+
+// ---------------------------------------------------------------------------
+// 3. Block comments not nested — first */ ends the comment
+// ---------------------------------------------------------------------------
+TEST(SimCh5, CommentBlockNotNested) {
+  // §5.4: "Block comments shall not be nested."
+  // "/* outer /* inner */" ends at first */ — remaining code is active.
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial /* outer /* inner */ result = 8'd33;\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(result, 33u);
+}
+
+// ---------------------------------------------------------------------------
+// 4. // inside block comment has no special meaning
+// ---------------------------------------------------------------------------
+TEST(SimCh5, CommentLineInsideBlockNoEffect) {
+  // §5.4: "The one-line comment token // shall not have any special meaning
+  // inside a block comment."
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  /* // this is not a line comment\n"
+      "     still inside block comment */\n"
+      "  initial result = 8'd99;\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(result, 99u);
+}
+
+// ---------------------------------------------------------------------------
+// 5. /* and */ inside line comment have no special meaning
+// ---------------------------------------------------------------------------
+TEST(SimCh5, CommentBlockInsideLineNoEffect) {
+  // §5.4: "The block comment tokens /* and */ shall not have any special
+  // meaning inside a one-line comment."
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  // /* this does not start a block comment\n"
+      "  initial result = 8'd22;\n"
+      "  // */ this does not end a block comment\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(result, 22u);
+}
+
+// ---------------------------------------------------------------------------
+// 6. Mixed line and block comments in expressions
+// ---------------------------------------------------------------------------
+TEST(SimCh5, CommentMixedInExpression) {
+  // Both comment forms within an expression do not alter results.
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] a, b, result;\n"
+      "  initial begin\n"
+      "    a = 8'd10; // ten\n"
+      "    b = /* twenty */ 8'd20;\n"
+      "    result = a /* plus */ + /* b */ b; // sum\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(result, 30u);
+}
+
+// ---------------------------------------------------------------------------
+// 7. Multiline block comment spans code lines
+// ---------------------------------------------------------------------------
+TEST(SimCh5, CommentMultilineBlockSpan) {
+  // A block comment spanning multiple lines removes all enclosed text.
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial begin\n"
+      "    /* This block comment\n"
+      "       spans multiple\n"
+      "       lines */\n"
+      "    result = 8'd11;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(result, 11u);
+}
+
+// ---------------------------------------------------------------------------
+// 8. Block comment as token separator in simulation
+// ---------------------------------------------------------------------------
+TEST(SimCh5, CommentBlockAsSeparator) {
+  // §5.4: Block comments serve as token separators, just like whitespace.
+  auto result = RunAndGet(
+      "module/**/t;logic/**/[7:0]/**/result;initial/**/result=8'd71;"
+      "endmodule",
+      "result");
+  EXPECT_EQ(result, 71u);
+}
