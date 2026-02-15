@@ -37,6 +37,9 @@ class Parser {
   void ParseModuleBody(ModuleDecl& mod);
   void ParseNonAnsiPortDecls(ModuleDecl& mod);
   void ParseModuleItem(std::vector<ModuleItem*>& items);
+  void ParseDataDeclItem(std::vector<ModuleItem*>& items, size_t before,
+                         const std::vector<Attribute>& attrs);
+  bool TryParseTypeRef(std::vector<ModuleItem*>& items);
   bool TryParseProcessBlock(std::vector<ModuleItem*>& items);
   bool TryParseKeywordItem(std::vector<ModuleItem*>& items);
   bool TryParseNonPortItem(std::vector<ModuleItem*>& items);

@@ -847,9 +847,12 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
     AttachAttrs(items, before, attrs);
     return;
   }
+  ParseDataDeclItem(items, before, attrs);
+}
+
+void Parser::ParseDataDeclItem(std::vector<ModuleItem*>& items, size_t before,
+                               const std::vector<Attribute>& attrs) {
   // A.2.1.3: data_declaration ::= [const] [var] [lifetime] ...
-  // Handle [lifetime] (automatic/static) before data declarations in module
-  // body.
   bool is_automatic = Match(TokenKind::kKwAutomatic);
   bool is_static = !is_automatic && Match(TokenKind::kKwStatic);
   // checker_or_generate_item_declaration: [rand] data_declaration (A.1.8)
@@ -863,32 +866,33 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
   AttachAttrs(items, before, attrs);
 }
 
-void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items) {
+bool Parser::TryParseTypeRef(std::vector<ModuleItem*>& items) {
   // §6.23 / A.2.2.1: type_reference used as data_type in declaration.
-  auto try_parse_type_ref = [&]() -> bool {
-    if (!Check(TokenKind::kKwType)) return false;
-    Consume();  // type
-    Expect(TokenKind::kLParen);
-    auto* type_expr = ParseExpr();
-    Expect(TokenKind::kRParen);
-    auto* item = arena_.Create<ModuleItem>();
-    item->kind = ModuleItemKind::kVarDecl;
-    item->loc = CurrentLoc();
-    item->data_type.type_ref_expr = type_expr;
-    item->name = ExpectIdentifier().text;
-    ParseUnpackedDims(item->unpacked_dims);
-    Expect(TokenKind::kSemicolon);
-    items.push_back(item);
-    return true;
-  };
+  if (!Check(TokenKind::kKwType)) return false;
+  Consume();  // type
+  Expect(TokenKind::kLParen);
+  auto* type_expr = ParseExpr();
+  Expect(TokenKind::kRParen);
+  auto* item = arena_.Create<ModuleItem>();
+  item->kind = ModuleItemKind::kVarDecl;
+  item->loc = CurrentLoc();
+  item->data_type.type_ref_expr = type_expr;
+  item->name = ExpectIdentifier().text;
+  ParseUnpackedDims(item->unpacked_dims);
+  Expect(TokenKind::kSemicolon);
+  items.push_back(item);
+  return true;
+}
+
+void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items) {
   // Handle 'var' prefix: var type(expr) name; or var data_type name; (§6.8)
   if (Match(TokenKind::kKwVar)) {
-    if (try_parse_type_ref()) return;
+    if (TryParseTypeRef(items)) return;
     auto dtype = ParseDataType();
     ParseVarDeclList(items, dtype);
     return;
   }
-  if (try_parse_type_ref()) return;
+  if (TryParseTypeRef(items)) return;
   if (Check(TokenKind::kKwCase)) {
     items.push_back(ParseGenerateCase());
     return;

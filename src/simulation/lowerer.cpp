@@ -161,8 +161,9 @@ static void InitArrayFromReplicate(const RtlirVariable& var, uint32_t elem_idx,
 }
 
 // §5.11: Initialize array element from named pattern (index keys / default).
-static void InitArrayFromNamed(const Expr* init, uint32_t idx, Variable* elem,
-                               uint32_t width, SimContext& ctx, Arena& arena) {
+static void InitArrayFromNamed(const RtlirVariable& var, uint32_t idx,
+                               Variable* elem, SimContext& ctx, Arena& arena) {
+  auto* init = var.init_expr;
   // Pass 1: explicit index key.
   for (size_t i = 0; i < init->pattern_keys.size(); ++i) {
     if (i >= init->elements.size()) break;
@@ -182,7 +183,7 @@ static void InitArrayFromNamed(const Expr* init, uint32_t idx, Variable* elem,
       return;
     }
   }
-  elem->value = MakeLogic4VecVal(arena, width, 0);
+  elem->value = MakeLogic4VecVal(arena, var.width, 0);
 }
 
 // §7.4: Create individual element variables for unpacked arrays.
@@ -206,7 +207,7 @@ static void CreateArrayElements(const RtlirVariable& var, SimContext& ctx,
     auto* elem = ctx.CreateVariable(*stored, var.width);
     uint32_t pat_idx = var.is_descending ? (var.unpacked_size - 1 - i) : i;
     if (named) {
-      InitArrayFromNamed(var.init_expr, idx, elem, var.width, ctx, arena);
+      InitArrayFromNamed(var, idx, elem, ctx, arena);
     } else if (replicate) {
       InitArrayFromReplicate(var, pat_idx, elem, ctx, arena);
     } else {
