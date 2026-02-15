@@ -454,18 +454,21 @@ Expr* Parser::ParseMemberAccessChain(Token tok) {
   return result;
 }
 
-// §8.25.1: ClassName#(params)::member — parameterized class scope resolution.
-// Consumes #(balanced-parens), then continues with :: / . member chain.
+// §8.25.1/§13.8: ClassName#(params)::member — parameterized class scope
+// resolution.  Parse the parameter expressions and store them on the base
+// identifier's `elements` vector so the evaluator can bind them at call time.
 Expr* Parser::ParseParameterizedScope(Expr* base) {
   Consume();  // #
   if (!Check(TokenKind::kLParen)) return base;
   Consume();  // (
-  int depth = 1;
-  while (depth > 0 && !AtEnd()) {
-    auto t = Consume();
-    if (t.kind == TokenKind::kLParen) ++depth;
-    if (t.kind == TokenKind::kRParen) --depth;
+  if (!Check(TokenKind::kRParen)) {
+    base->elements.push_back(ParseExpr());
+    while (Check(TokenKind::kComma)) {
+      Consume();
+      base->elements.push_back(ParseExpr());
+    }
   }
+  Expect(TokenKind::kRParen);
   while (Check(TokenKind::kDot) || Check(TokenKind::kColonColon)) {
     base = MakeMemberAccess(base);
   }

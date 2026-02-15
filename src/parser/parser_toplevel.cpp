@@ -551,12 +551,15 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
   if (Check(TokenKind::kKwFunction)) {
     member->kind = ClassMemberKind::kMethod;
     member->method = ParseFunctionDecl(proto);
+    // §13.8: Propagate static qualifier to the method's ModuleItem.
+    if (member->is_static) member->method->is_static = true;
     members.push_back(member);
     return;
   }
   if (Check(TokenKind::kKwTask)) {
     member->kind = ClassMemberKind::kMethod;
     member->method = ParseTaskDecl(proto);
+    if (member->is_static) member->method->is_static = true;
     members.push_back(member);
     return;
   }

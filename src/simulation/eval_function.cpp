@@ -481,6 +481,31 @@ static bool ExecFuncBlock(const Stmt* stmt, Variable* ret_var, SimContext& ctx,
   return false;
 }
 
+// §13.8: For-loop execution inside function bodies.
+static bool ExecFuncFor(const Stmt* stmt, Variable* ret_var, SimContext& ctx,
+                        Arena& arena) {
+  if (stmt->for_init_type.kind != DataTypeKind::kImplicit && stmt->for_init &&
+      stmt->for_init->lhs &&
+      stmt->for_init->lhs->kind == ExprKind::kIdentifier) {
+    uint32_t w = EvalTypeWidth(stmt->for_init_type);
+    if (w == 0) w = 32;
+    auto* v = ctx.CreateLocalVariable(stmt->for_init->lhs->text, w);
+    if (stmt->for_init->rhs)
+      v->value = EvalExpr(stmt->for_init->rhs, ctx, arena);
+  } else if (stmt->for_init) {
+    ExecFuncStmt(stmt->for_init, ret_var, ctx, arena);
+  }
+  while (stmt->for_cond &&
+         EvalExpr(stmt->for_cond, ctx, arena).ToUint64() != 0) {
+    if (stmt->for_body &&
+        ExecFuncStmt(stmt->for_body, ret_var, ctx, arena))
+      return true;
+    if (stmt->for_step)
+      ExecFuncStmt(stmt->for_step, ret_var, ctx, arena);
+  }
+  return false;
+}
+
 // Execute a single statement in a function body; returns true on 'return'.
 static bool ExecFuncStmt(const Stmt* stmt, Variable* ret_var, SimContext& ctx,
                          Arena& arena) {
@@ -508,6 +533,8 @@ static bool ExecFuncStmt(const Stmt* stmt, Variable* ret_var, SimContext& ctx,
       return ExecFuncIf(stmt, ret_var, ctx, arena);
     case StmtKind::kBlock:
       return ExecFuncBlock(stmt, ret_var, ctx, arena);
+    case StmtKind::kFor:
+      return ExecFuncFor(stmt, ret_var, ctx, arena);
     default:
       return false;
   }
@@ -591,6 +618,54 @@ static bool TryEvalClassMethodCall(const Expr* expr, SimContext& ctx,
   return true;
 }
 
+// §13.8: Bind class parameters from specialization values into the scope.
+static void BindClassParams(const ClassTypeInfo* cls, const Expr* base_id,
+                            SimContext& ctx, Arena& arena) {
+  if (!cls->decl) return;
+  const auto& params = cls->decl->params;
+  const auto& values = base_id->elements;
+  for (size_t i = 0; i < params.size(); ++i) {
+    Logic4Vec val;
+    if (i < values.size()) {
+      val = EvalExpr(values[i], ctx, arena);
+    } else if (params[i].second) {
+      val = EvalExpr(params[i].second, ctx, arena);
+    } else {
+      val = MakeLogic4VecVal(arena, 32, 0);
+    }
+    auto* v = ctx.CreateLocalVariable(params[i].first, val.width);
+    v->value = val;
+  }
+}
+
+// §13.8: Dispatch a parameterized class scope call — C#(N)::method(args).
+static bool TryEvalParameterizedScopeCall(const Expr* expr, SimContext& ctx,
+                                          Arena& arena, Logic4Vec& out) {
+  if (!expr->lhs || expr->lhs->kind != ExprKind::kMemberAccess) return false;
+  auto* access = expr->lhs;
+  if (!access->lhs || access->lhs->kind != ExprKind::kIdentifier) return false;
+  if (access->lhs->elements.empty()) return false;
+  if (!access->rhs || access->rhs->kind != ExprKind::kIdentifier) return false;
+
+  auto* cls = ctx.FindClassType(access->lhs->text);
+  if (!cls) return false;
+  auto it = cls->methods.find(std::string(access->rhs->text));
+  if (it == cls->methods.end()) return false;
+  auto* method = it->second;
+  bool is_void = (method->return_type.kind == DataTypeKind::kVoid);
+
+  ctx.PushScope();
+  BindClassParams(cls, access->lhs, ctx, arena);
+  BindFunctionArgs(method, expr, ctx, arena);
+  Variable dummy_ret;
+  Variable* ret_var = &dummy_ret;
+  if (!is_void) ret_var = ctx.CreateLocalVariable(method->name, 32);
+  ExecFunctionBody(method, ret_var, ctx, arena);
+  out = is_void ? MakeLogic4VecVal(arena, 1, 0) : ret_var->value;
+  ctx.PopScope();
+  return true;
+}
+
 // Try dispatching to built-in type methods (enum, string, array, queue).
 static bool TryBuiltinMethodCall(const Expr* expr, SimContext& ctx,
                                  Arena& arena, Logic4Vec& out) {
@@ -643,6 +718,10 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
     return method_result;
   }
   if (TryEvalClassMethodCall(expr, ctx, arena, method_result)) {
+    return method_result;
+  }
+  // §13.8: Parameterized class scope call — C#(N)::method(args).
+  if (TryEvalParameterizedScopeCall(expr, ctx, arena, method_result)) {
     return method_result;
   }
 
