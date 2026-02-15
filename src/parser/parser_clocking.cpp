@@ -17,7 +17,25 @@ void Parser::ParseClockingSkew(Edge& edge, Expr*& delay) {
   }
   if (Check(TokenKind::kHash)) {
     Consume();
-    delay = ParsePrimaryExpr();
+    // Handle 1step: integer 1 followed by identifier "step" (§14.4).
+    if (Check(TokenKind::kIntLiteral) && CurrentToken().text == "1") {
+      auto saved = lexer_.SavePos();
+      auto one_tok = CurrentToken();
+      Consume();
+      if (Check(TokenKind::kIdentifier) && CurrentToken().text == "step") {
+        Consume();
+        delay = arena_.Create<Expr>();
+        delay->kind = ExprKind::kIntegerLiteral;
+        delay->text = "1step";
+        delay->int_val = 0;
+        delay->range.start = one_tok.loc;
+      } else {
+        lexer_.RestorePos(saved);
+        delay = ParsePrimaryExpr();
+      }
+    } else {
+      delay = ParsePrimaryExpr();
+    }
   }
 }
 

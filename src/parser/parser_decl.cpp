@@ -796,10 +796,10 @@ void Parser::ParseNetDelay(Expr*& d1, Expr*& d2, Expr*& d3) {
   if (!Check(TokenKind::kHash)) return;
   Consume();  // '#'
   if (Match(TokenKind::kLParen)) {
-    d1 = ParseExpr();
+    d1 = ParseMinTypMaxExpr();
     if (Match(TokenKind::kComma)) {
-      d2 = ParseExpr();
-      if (Match(TokenKind::kComma)) d3 = ParseExpr();
+      d2 = ParseMinTypMaxExpr();
+      if (Match(TokenKind::kComma)) d3 = ParseMinTypMaxExpr();
     }
     Expect(TokenKind::kRParen);
   } else {

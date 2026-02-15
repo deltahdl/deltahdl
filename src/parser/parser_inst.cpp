@@ -127,12 +127,16 @@ ModuleItem* Parser::ParseContinuousAssign() {
       lexer_.RestorePos(saved);
     }
   }
-  // Optional delay: assign #(delay) or assign #delay (§10.3.3)
+  // Optional delay3: assign #(rise, fall, decay) or assign #delay (§10.3.3)
   if (Check(TokenKind::kHash)) {
     Consume();
-    if (Check(TokenKind::kLParen)) {
-      Consume();
+    if (Match(TokenKind::kLParen)) {
       item->assign_delay = ParseMinTypMaxExpr();
+      if (Match(TokenKind::kComma)) {
+        item->assign_delay_fall = ParseMinTypMaxExpr();
+        if (Match(TokenKind::kComma))
+          item->assign_delay_decay = ParseMinTypMaxExpr();
+      }
       Expect(TokenKind::kRParen);
     } else {
       item->assign_delay = ParsePrimaryExpr();

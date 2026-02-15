@@ -483,6 +483,8 @@ struct ModuleItem {
   Expr* assign_lhs = nullptr;
   Expr* assign_rhs = nullptr;
   Expr* assign_delay = nullptr;  // Optional delay: assign #5 out = in (§10.3.3)
+  Expr* assign_delay_fall = nullptr;
+  Expr* assign_delay_decay = nullptr;
 
   // Net declaration delay: #(rise, fall, charge_decay) (§6.6.4/§28.16)
   Expr* net_delay = nullptr;
@@ -523,6 +525,8 @@ struct ModuleItem {
   std::string_view gate_inst_name;
   std::vector<Expr*> gate_terminals;
   Expr* gate_delay = nullptr;
+  Expr* gate_delay_fall = nullptr;
+  Expr* gate_delay_decay = nullptr;
 
   // Gate drive strengths (§28.7)
   // 0=none, 1=highz, 2=weak, 3=pull, 4=strong, 5=supply

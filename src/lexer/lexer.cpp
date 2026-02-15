@@ -310,6 +310,11 @@ void Lexer::LexRealSuffix() {
   LexExponentPart();
 }
 
+bool Lexer::IsWordBoundary(uint32_t p) const {
+  return p >= source_.size() ||
+         (!std::isalnum(source_[p]) && source_[p] != '_');
+}
+
 bool Lexer::TryLexTimeSuffix() {
   if (AtEnd()) return false;
   uint32_t save = pos_;
@@ -320,14 +325,14 @@ bool Lexer::TryLexTimeSuffix() {
     bool is_two_char =
         (c0 == 'm' || c0 == 'u' || c0 == 'n' || c0 == 'p' || c0 == 'f') &&
         c1 == 's';
-    if (is_two_char) {
+    if (is_two_char && IsWordBoundary(pos_ + 2)) {
       Advance();
       Advance();
       return true;
     }
   }
   // Single character: just 's'.
-  if (source_[pos_] == 's') {
+  if (source_[pos_] == 's' && IsWordBoundary(pos_ + 1)) {
     Advance();
     return true;
   }

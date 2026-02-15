@@ -199,15 +199,19 @@ static bool IsStrength1Token(TokenKind k) {
   }
 }
 
-Expr* Parser::ParseGateDelay() {
-  if (!Check(TokenKind::kHash)) return nullptr;
+void Parser::ParseGateDelay(Expr*& d1, Expr*& d2, Expr*& d3) {
+  if (!Check(TokenKind::kHash)) return;
   Consume();
   if (Match(TokenKind::kLParen)) {
-    auto* e = ParseExpr();
+    d1 = ParseMinTypMaxExpr();
+    if (Match(TokenKind::kComma)) {
+      d2 = ParseMinTypMaxExpr();
+      if (Match(TokenKind::kComma)) d3 = ParseMinTypMaxExpr();
+    }
     Expect(TokenKind::kRParen);
-    return e;
+  } else {
+    d1 = ParsePrimaryExpr();
   }
-  return ParsePrimaryExpr();
 }
 
 void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
@@ -242,13 +246,18 @@ void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
     Expect(TokenKind::kRParen);
   }
 
-  Expr* delay = ParseGateDelay();
+  Expr* delay = nullptr;
+  Expr* delay_fall = nullptr;
+  Expr* delay_decay = nullptr;
+  ParseGateDelay(delay, delay_fall, delay_decay);
 
   // Parse comma-separated instances.
   auto* first = ParseOneGateInstance(gate_kind, loc);
   first->drive_strength0 = str0;
   first->drive_strength1 = str1;
   first->gate_delay = delay;
+  first->gate_delay_fall = delay_fall;
+  first->gate_delay_decay = delay_decay;
   items.push_back(first);
 
   while (Match(TokenKind::kComma)) {
@@ -256,6 +265,8 @@ void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
     next->drive_strength0 = str0;
     next->drive_strength1 = str1;
     next->gate_delay = delay;
+    next->gate_delay_fall = delay_fall;
+    next->gate_delay_decay = delay_decay;
     items.push_back(next);
   }
   Expect(TokenKind::kSemicolon);

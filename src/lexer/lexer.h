@@ -69,6 +69,7 @@ class Lexer {
   void LexRealSuffix();
   void LexFractionalPart();
   void LexExponentPart();
+  bool IsWordBoundary(uint32_t p) const;
   bool TryLexTimeSuffix();
 
   // Operator sub-helpers

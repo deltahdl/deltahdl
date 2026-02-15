@@ -81,7 +81,7 @@ class Parser {
   ModuleItem* ParseOneGateInstance(GateKind kind, SourceLoc loc);
   uint8_t ParseStrength0();
   uint8_t ParseStrength1();
-  Expr* ParseGateDelay();
+  void ParseGateDelay(Expr*& d1, Expr*& d2, Expr*& d3);
 
   // User-defined primitives (parser_toplevel.cpp)
   UdpDecl* ParseUdpDecl();
