@@ -568,6 +568,56 @@ TEST(Lexer, Operators_Dollar) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kDollar);
 }
 
+TEST(Lexer, Operators_MaximalMunch) {
+  // §5.5: Triple-character operators are distinct from double+single.
+  // "===" must lex as kEqEqEq, not kEqEq + kEq.
+  auto tokens = Lex("===");
+  ASSERT_GE(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEqEqEq);
+}
+
+TEST(Lexer, Operators_UnaryAdjacentToOperand) {
+  // §5.5: Unary operators to the left of their operand, no space required.
+  auto tokens = Lex("~a !b");
+  ASSERT_GE(tokens.size(), 5);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kTilde);
+  EXPECT_EQ(tokens[1].text, "a");
+  EXPECT_EQ(tokens[2].kind, TokenKind::kBang);
+  EXPECT_EQ(tokens[3].text, "b");
+}
+
+TEST(Lexer, Operators_BinaryBetweenOperands) {
+  // §5.5: Binary operators between operands.
+  auto tokens = Lex("a + b");
+  ASSERT_GE(tokens.size(), 4);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kPlus);
+  EXPECT_EQ(tokens[2].text, "b");
+}
+
+TEST(Lexer, Operators_ConditionalTwoChars) {
+  // §5.5: Conditional operator has two operator characters (? and :)
+  // separating three operands.
+  auto tokens = Lex("a ? b : c");
+  ASSERT_GE(tokens.size(), 6);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kQuestion);
+  EXPECT_EQ(tokens[2].text, "b");
+  EXPECT_EQ(tokens[3].kind, TokenKind::kColon);
+  EXPECT_EQ(tokens[4].text, "c");
+}
+
+TEST(Lexer, Operators_NoSpaceBetweenOperators) {
+  // Operators adjacent to identifiers without whitespace.
+  auto tokens = Lex("a+b*c");
+  ASSERT_GE(tokens.size(), 6);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kPlus);
+  EXPECT_EQ(tokens[2].text, "b");
+  EXPECT_EQ(tokens[3].kind, TokenKind::kStar);
+  EXPECT_EQ(tokens[4].text, "c");
+}
+
 // --- §5.4: Comments ---
 
 TEST(Lexer, Comment_LineComment) {
