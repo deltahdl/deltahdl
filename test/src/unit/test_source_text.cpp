@@ -470,6 +470,155 @@ TEST(SourceText, TimeunitAndTimeprecisionSeparate) {
   EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
 }
 
+// description: { attribute_instance } package_item (file-scope function/task)
+TEST(SourceText, DescriptionPackageItem) {
+  auto r = Parse("function int add(int a, int b); return a + b; endfunction\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->cu_items.size(), 1u);
+}
+
+// description: { attribute_instance } package_item (file-scope task)
+TEST(SourceText, DescriptionPackageItemTask) {
+  auto r = Parse("task my_task; endtask\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->cu_items.size(), 1u);
+}
+
+// =============================================================================
+// A.1.2 module_declaration — wildcard port form: module m (.*);
+// =============================================================================
+
+TEST(SourceText, ModuleWildcardPorts) {
+  auto r = Parse("module m(.*); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->name, "m");
+  EXPECT_TRUE(r.cu->modules[0]->has_wildcard_ports);
+}
+
+// =============================================================================
+// A.1.2 interface_declaration — all 5 forms
+// =============================================================================
+
+// Interface with ANSI ports.
+TEST(SourceText, InterfaceAnsiHeader) {
+  auto r = Parse("interface ifc(input logic clk); endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 1u);
+}
+
+// Interface with non-ANSI ports.
+TEST(SourceText, InterfaceNonAnsiHeader) {
+  auto r = Parse(
+      "interface ifc(clk);\n"
+      "  input clk;\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 1u);
+}
+
+// Interface with wildcard ports: interface i(.*);
+TEST(SourceText, InterfaceWildcardPorts) {
+  auto r = Parse("interface ifc(.*); endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_TRUE(r.cu->interfaces[0]->has_wildcard_ports);
+}
+
+// Extern interface declaration.
+TEST(SourceText, ExternInterface) {
+  auto r = Parse("extern interface ifc(input logic clk);\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_TRUE(r.cu->interfaces[0]->is_extern);
+  EXPECT_EQ(r.cu->interfaces[0]->name, "ifc");
+}
+
+// =============================================================================
+// A.1.2 program_declaration — all 5 forms
+// =============================================================================
+
+// Program with ANSI ports.
+TEST(SourceText, ProgramAnsiHeader) {
+  auto r = Parse("program prg(input logic clk); endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->ports.size(), 1u);
+}
+
+// Program with non-ANSI ports.
+TEST(SourceText, ProgramNonAnsiHeader) {
+  auto r = Parse(
+      "program prg(clk);\n"
+      "  input clk;\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->ports.size(), 1u);
+}
+
+// Program with wildcard ports: program p(.*);
+TEST(SourceText, ProgramWildcardPorts) {
+  auto r = Parse("program prg(.*); endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_TRUE(r.cu->programs[0]->has_wildcard_ports);
+}
+
+// Extern program declaration.
+TEST(SourceText, ExternProgram) {
+  auto r = Parse("extern program prg(input logic clk);\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_TRUE(r.cu->programs[0]->is_extern);
+  EXPECT_EQ(r.cu->programs[0]->name, "prg");
+}
+
+// =============================================================================
+// A.1.2 class_declaration — additional forms
+// =============================================================================
+
+// Class with final_specifier: class :final C;
+TEST(SourceText, ClassWithFinal) {
+  auto r = Parse("class :final C; endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_TRUE(r.cu->classes[0]->is_final);
+  EXPECT_EQ(r.cu->classes[0]->name, "C");
+}
+
+// Class with implements clause.
+TEST(SourceText, ClassWithImplements) {
+  auto r = Parse("class C implements I; endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->name, "C");
+}
+
+// interface_class_declaration: interface class.
+TEST(SourceText, InterfaceClassDecl) {
+  auto r = Parse("interface class IC; endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->name, "IC");
+}
+
 // =============================================================================
 // A.1.2 comprehensive: all description types in one source text.
 // =============================================================================

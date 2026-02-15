@@ -285,6 +285,11 @@ class Parser {
   ModuleDecl* current_module_ = nullptr;  // Set during module body parsing
 };
 
+inline bool IsPortDirection(TokenKind tk) {
+  return tk == TokenKind::kKwInput || tk == TokenKind::kKwOutput ||
+         tk == TokenKind::kKwInout || tk == TokenKind::kKwRef;
+}
+
 // Skip a brace-delimited block: consume tokens until matching '}'.
 // The opening '{' must already have been consumed before calling this.
 inline void SkipBraceBlock(Lexer& lexer) {

@@ -575,7 +575,8 @@ struct ModportDecl {
 
 struct ModuleDecl {
   ModuleDeclKind decl_kind = ModuleDeclKind::kModule;
-  bool is_extern = false;  // extern module declaration (§23.2.1)
+  bool is_extern = false;           // extern module declaration (§23.2.1)
+  bool has_wildcard_ports = false;  // (.* ) port form (A.1.2)
   std::string_view name;
   SourceRange range;
   std::vector<PortDecl> ports;
@@ -633,6 +634,7 @@ struct ClassDecl {
   std::string_view name;
   SourceRange range;
   bool is_virtual = false;
+  bool is_final = false;  // class :final (§8.20)
   std::string_view base_class;
   std::vector<ClassMember*> members;
   std::vector<std::pair<std::string_view, Expr*>> params;

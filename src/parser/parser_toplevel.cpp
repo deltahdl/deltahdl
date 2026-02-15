@@ -344,9 +344,14 @@ ModuleDecl* Parser::ParseInterfaceDecl() {
 
   auto* prev_module = current_module_;
   current_module_ = decl;
+  bool non_ansi =
+      !decl->ports.empty() && decl->ports[0].direction == Direction::kNone;
   while (!Check(TokenKind::kKwEndinterface) && !AtEnd()) {
+    if (Match(TokenKind::kSemicolon)) continue;
     if (Check(TokenKind::kKwModport)) {
       ParseModportDecl(decl->modports);
+    } else if (non_ansi && IsPortDirection(CurrentToken().kind)) {
+      ParseNonAnsiPortDecls(*decl);
     } else {
       ParseModuleItem(decl->items);
     }
@@ -436,8 +441,15 @@ ModuleDecl* Parser::ParseProgramDecl() {
 
   auto* prev_module = current_module_;
   current_module_ = decl;
+  bool non_ansi =
+      !decl->ports.empty() && decl->ports[0].direction == Direction::kNone;
   while (!Check(TokenKind::kKwEndprogram) && !AtEnd()) {
-    ParseModuleItem(decl->items);
+    if (Match(TokenKind::kSemicolon)) continue;
+    if (non_ansi && IsPortDirection(CurrentToken().kind)) {
+      ParseNonAnsiPortDecls(*decl);
+    } else {
+      ParseModuleItem(decl->items);
+    }
   }
   current_module_ = prev_module;
   Expect(TokenKind::kKwEndprogram);
@@ -476,6 +488,11 @@ ClassDecl* Parser::ParseClassDecl() {
   decl->is_virtual = Match(TokenKind::kKwVirtual);
   Match(TokenKind::kKwInterface);
   Expect(TokenKind::kKwClass);
+  // final_specifier ::= : final (A.1.2 / §8.20)
+  if (Match(TokenKind::kColon)) {
+    Expect(TokenKind::kKwFinal);
+    decl->is_final = true;
+  }
   Match(TokenKind::kKwAutomatic);
   Match(TokenKind::kKwStatic);
   decl->name = Expect(TokenKind::kIdentifier).text;
@@ -485,11 +502,9 @@ ClassDecl* Parser::ParseClassDecl() {
   if (Check(TokenKind::kHash)) {
     Consume();
     Expect(TokenKind::kLParen);
-    if (!Check(TokenKind::kRParen)) {
+    while (!Check(TokenKind::kRParen) && !AtEnd()) {
       ParseParamPortDecl(decl->params);
-      while (Match(TokenKind::kComma)) {
-        ParseParamPortDecl(decl->params);
-      }
+      Match(TokenKind::kComma);
     }
     Expect(TokenKind::kRParen);
   }

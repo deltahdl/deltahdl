@@ -323,6 +323,30 @@ void Parser::ParseExternTopLevel(CompilationUnit* unit) {
     unit->modules.push_back(ParseExternModuleDecl());
     return;
   }
+  if (Check(TokenKind::kKwInterface)) {
+    auto* decl = arena_.Create<ModuleDecl>();
+    decl->decl_kind = ModuleDeclKind::kInterface;
+    decl->is_extern = true;
+    decl->range.start = CurrentLoc();
+    Consume();  // interface
+    Match(TokenKind::kKwAutomatic) || Match(TokenKind::kKwStatic);
+    decl->name = Expect(TokenKind::kIdentifier).text;
+    ParseParamsPortsAndSemicolon(*decl);
+    unit->interfaces.push_back(decl);
+    return;
+  }
+  if (Check(TokenKind::kKwProgram)) {
+    auto* decl = arena_.Create<ModuleDecl>();
+    decl->decl_kind = ModuleDeclKind::kProgram;
+    decl->is_extern = true;
+    decl->range.start = CurrentLoc();
+    Consume();  // program
+    Match(TokenKind::kKwAutomatic) || Match(TokenKind::kKwStatic);
+    decl->name = Expect(TokenKind::kIdentifier).text;
+    ParseParamsPortsAndSemicolon(*decl);
+    unit->programs.push_back(decl);
+    return;
+  }
   SkipToSemicolon(lexer_);
 }
 
@@ -562,15 +586,17 @@ void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
   Expect(TokenKind::kSemicolon);
 }
 
-static bool IsPortDirection(TokenKind tk) {
-  return tk == TokenKind::kKwInput || tk == TokenKind::kKwOutput ||
-         tk == TokenKind::kKwInout || tk == TokenKind::kKwRef;
-}
-
 void Parser::ParsePortList(ModuleDecl& mod) {
   Expect(TokenKind::kLParen);
   if (Check(TokenKind::kRParen)) {
     Consume();
+    return;
+  }
+  // (.* ) wildcard port form (A.1.2)
+  if (Check(TokenKind::kDotStar)) {
+    Consume();
+    mod.has_wildcard_ports = true;
+    Expect(TokenKind::kRParen);
     return;
   }
   // Detect non-ANSI style: first token is an identifier (no direction).
