@@ -328,6 +328,7 @@ struct PortDecl {
   Direction direction = Direction::kNone;
   DataType data_type;
   std::string_view name;
+  std::vector<Expr*> unpacked_dims;
   Expr* default_value = nullptr;
   SourceLoc loc;
 };

@@ -694,7 +694,16 @@ PortDecl Parser::ParsePortDecl() {
     Consume();
   }
 
-  port.data_type = ParseDataType();
+  // A.2.1.2: variable_port_type ::= var_data_type
+  // var_data_type ::= data_type | var data_type_or_implicit
+  if (Match(TokenKind::kKwVar)) {
+    port.data_type = ParseDataType();
+    if (port.data_type.kind == DataTypeKind::kImplicit) {
+      port.data_type.kind = DataTypeKind::kLogic;
+    }
+  } else {
+    port.data_type = ParseDataType();
+  }
 
   // Handle implicit type with packed dims: input [3:0] a (§6.10)
   if (port.data_type.kind == DataTypeKind::kImplicit &&
@@ -709,6 +718,10 @@ PortDecl Parser::ParsePortDecl() {
 
   auto name_tok = ExpectIdentifier();
   port.name = name_tok.text;
+
+  // A.2.1.2: unpacked dimensions (list_of_port_identifiers,
+  // list_of_variable_identifiers, list_of_variable_port_identifiers)
+  ParseUnpackedDims(port.unpacked_dims);
 
   if (Match(TokenKind::kEq)) {
     port.default_value = ParseExpr();
@@ -756,13 +769,17 @@ void Parser::ParseNonAnsiPortDecls(ModuleDecl& mod) {
     Expect(TokenKind::kRBracket);
   }
 
-  // Parse comma-separated names: input [7:0] a, b;
+  // Parse comma-separated names with optional unpacked dims: input [7:0] a, b;
+  // A.2.1.2: list_of_port_identifiers / list_of_variable_port_identifiers
   do {
     auto name = Expect(TokenKind::kIdentifier).text;
+    std::vector<Expr*> dims;
+    ParseUnpackedDims(dims);
     for (auto& port : mod.ports) {
       if (port.name != name) continue;
       port.direction = dir;
       port.data_type = dtype;
+      port.unpacked_dims = std::move(dims);
       break;
     }
   } while (Match(TokenKind::kComma));
