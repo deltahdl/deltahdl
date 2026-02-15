@@ -7,13 +7,14 @@ jobs:
   detect:
     outputs:
       scripts-changed: ${{ steps.check.outputs.scripts_changed }}
+      workflows-changed: ${{ steps.check.outputs.workflows_changed }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - id: check
-        name: Detect script changes
+        name: Detect changes
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             BASE="${{ github.event.pull_request.base.sha }}"
@@ -23,14 +24,19 @@ jobs:
           ZERO="0000000000000000000000000000000000000000"
           if [ -z "$BASE" ] || [ "$BASE" = "$ZERO" ]; then
             echo "scripts_changed=true" >> "$GITHUB_OUTPUT"
+            echo "workflows_changed=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          PATTERN='^(scripts/|test/scripts/|\.github/workflows/ci\.yml)'
-          if git diff --name-only "$BASE" "${{ github.sha }}" \
-             | grep -qE "$PATTERN"; then
+          CHANGED=$(git diff --name-only "$BASE" "${{ github.sha }}")
+          if echo "$CHANGED" | grep -qE '^(scripts/|test/scripts/)'; then
             echo "scripts_changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "scripts_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+          if echo "$CHANGED" | grep -qE '^\.github/workflows/.*\.yml'; then
+            echo "workflows_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "workflows_changed=false" >> "$GITHUB_OUTPUT"
           fi
   # ── Gate: static analysis for all scripts ──
   static-analysis:
@@ -96,6 +102,28 @@ jobs:
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
           --reporters console test/scripts/
+  # ── Gate: yamllint for workflow-only changes ──
+  yamllint:
+    if: >-
+      needs.detect.outputs.workflows-changed == 'true'
+      && needs.detect.outputs.scripts-changed != 'true'
+    needs: detect
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install yamllint
+        run: pip install yamllint
+      - name: Lint YAML
+        run: |
+          EMPTY='empty-lines: {max: 0, max-start: 0, max-end: 1}'
+          KEY='key-ordering: enable'
+          NL='new-line-at-end-of-file: enable'
+          TR='truthy: {allowed-values: ["true", "false", "on"]}'
+          RULES="$EMPTY, $KEY, $NL, $TR"
+          yamllint --strict \
+            --config-data \
+            "{extends: default, rules: {$RULES}}" \
+            .github/workflows/*.yml
   # ── Lane: run_sim_tests ──
   # DO NOT lower coverage thresholds. Uncovered code is untested code —
   # lowering it hides bugs and lets regressions slip through silently.
@@ -150,18 +178,21 @@ jobs:
       - test-run-sim-tests
       - test-run-sv-tests
       - test-test-common
+      - yamllint
     runs-on: ubuntu-24.04
     steps:
       - if: >-
           needs.test-run-sim-tests.result == 'skipped'
           && needs.test-run-sv-tests.result == 'skipped'
           && needs.test-test-common.result == 'skipped'
-        run: echo "Script tests skipped (no script changes)"
+          && needs.yamllint.result == 'skipped'
+        run: echo "No script or workflow changes detected"
       - if: >-
           needs.test-run-sim-tests.result != 'skipped'
           || needs.test-run-sv-tests.result != 'skipped'
           || needs.test-test-common.result != 'skipped'
-        run: echo "All tools tests passed"
+          || needs.yamllint.result != 'skipped'
+        run: echo "All CI checks passed"
 name: CI
 on:
   pull_request:
