@@ -12,7 +12,6 @@
 #include "simulation/sim_context.h"
 
 namespace delta {
-
 // --- Literal evaluation ---
 
 static bool IsXChar(char c) { return c == 'x' || c == 'X'; }
@@ -184,7 +183,6 @@ static Logic4Vec EvalStringLiteral(const Expr* expr, Arena& arena) {
   }
   return vec;
 }
-
 // --- Identifier evaluation ---
 static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
@@ -198,7 +196,6 @@ static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
   }
   return MakeLogic4Vec(arena, 1);  // X for unknown
 }
-
 // --- Helpers for X/Z propagation ---
 bool HasUnknownBits(const Logic4Vec& v) {
   for (uint32_t i = 0; i < v.nwords; ++i) {
@@ -260,7 +257,6 @@ static Logic4Vec EvalReductionOp(TokenKind op, Logic4Vec operand,
   result.words[0] = acc;
   return result;
 }
-
 // --- Unary operations ---
 static bool IsReductionOp(TokenKind op) {
   switch (op) {
@@ -310,7 +306,6 @@ static Logic4Vec EvalUnaryOp(TokenKind op, Logic4Vec operand, Arena& arena) {
       return operand;
   }
 }
-
 // --- Binary arithmetic ---
 static uint64_t IntPow(uint64_t base, uint64_t exp) {
   uint64_t result = 1;
@@ -459,7 +454,6 @@ static Logic4Vec EvalBinaryArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
   }
   return MakeLogic4VecVal(arena, width, result);
 }
-
 // --- Binary bitwise ---
 static Logic4Vec EvalBinaryBitwise(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
                                    Arena& arena) {
@@ -499,7 +493,6 @@ static Logic4Vec EvalBinaryBitwise(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
   }
   return result;
 }
-
 // --- Case equality (compares both aval and bval) ---
 static bool EvalCaseEquality(Logic4Vec lhs, Logic4Vec rhs) {
   if (lhs.width != rhs.width) return false;
@@ -509,7 +502,6 @@ static bool EvalCaseEquality(Logic4Vec lhs, Logic4Vec rhs) {
   }
   return true;
 }
-
 // --- Shift operations ---
 static Logic4Vec MakeSignedResult(Arena& arena, uint32_t width, uint64_t val,
                                   bool is_signed) {
@@ -549,7 +541,6 @@ static Logic4Vec EvalShift(TokenKind op, Logic4Vec lhs, uint64_t rv,
 
 // Return 2 to indicate X result (neither 0 nor 1).
 static constexpr uint64_t kResultX = 2;
-
 // --- Wildcard equality ---
 static uint64_t EvalWildcardEq(Logic4Vec lhs, Logic4Vec rhs) {
   uint64_t rhs_dc = rhs.nwords > 0 ? rhs.words[0].bval : 0;
@@ -558,7 +549,6 @@ static uint64_t EvalWildcardEq(Logic4Vec lhs, Logic4Vec rhs) {
   if (lhs_x & ~rhs_dc) return kResultX;
   return (((lhs.ToUint64() ^ rhs.ToUint64()) & ~rhs_dc) == 0) ? 1 : 0;
 }
-
 // --- Equality operations (§11.4.5, §11.4.6) ---
 static uint64_t EvalEqualityOp(TokenKind op, Logic4Vec lhs, Logic4Vec rhs) {
   switch (op) {
@@ -580,14 +570,12 @@ static uint64_t EvalEqualityOp(TokenKind op, Logic4Vec lhs, Logic4Vec rhs) {
       return 0;
   }
 }
-
 // --- Signed helpers ---
 int64_t SignExtend(uint64_t val, uint32_t width) {
   if (width == 0 || width >= 64) return static_cast<int64_t>(val);
   uint64_t mask = uint64_t{1} << (width - 1);
   return static_cast<int64_t>((val ^ mask) - mask);
 }
-
 // --- Relational and logical operations (§11.4.4, §11.4.7) ---
 static uint64_t EvalRelationalOp(TokenKind op, uint64_t lv, uint64_t rv) {
   switch (op) {
@@ -618,7 +606,6 @@ static uint64_t EvalSignedRelOp(TokenKind op, int64_t lv, int64_t rv) {
       return 0;
   }
 }
-
 // --- Binary comparison dispatch ---
 static bool IsEqualityOp(TokenKind op) {
   return op == TokenKind::kEqEq || op == TokenKind::kEqEqEq ||
@@ -924,7 +911,16 @@ static Logic4Vec EvalTaggedExpr(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-// --- Main dispatch ---
+// §5.8: Scale a time literal's value to the default time unit (ns).
+static double ScaleTimeLiteral(const Expr* e) {
+  double v = e->real_val;
+  TimeUnit u = TimeUnit::kNs;
+  auto t = e->text;
+  if (t.size() < 2 || !ParseTimeUnitStr(t.substr(t.size() - 2), u))
+    if (!t.empty()) ParseTimeUnitStr(t.substr(t.size() - 1), u);
+  return v *
+         std::pow(10.0, static_cast<int>(u) - static_cast<int>(TimeUnit::kNs));
+}
 
 Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
                    uint32_t context_width) {
@@ -937,9 +933,12 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
       return EvalUnbasedUnsized(expr, arena);
     case ExprKind::kStringLiteral:
       return EvalStringLiteral(expr, arena);
-    case ExprKind::kRealLiteral: {
+    case ExprKind::kRealLiteral:
+    case ExprKind::kTimeLiteral: {
+      double v = (expr->kind == ExprKind::kTimeLiteral) ? ScaleTimeLiteral(expr)
+                                                        : expr->real_val;
       uint64_t bits = 0;
-      std::memcpy(&bits, &expr->real_val, sizeof(double));
+      std::memcpy(&bits, &v, sizeof(double));
       auto rv = MakeLogic4VecVal(arena, 64, bits);
       rv.is_real = true;
       return rv;

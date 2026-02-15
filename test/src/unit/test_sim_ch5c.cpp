@@ -280,6 +280,117 @@ TEST(SimCh5c, NumberUnderscoreInIntegral) {
 }
 
 // ===========================================================================
+// §5.8 Time literals — simulation-level tests
+//
+// LRM §5.8: "Time is written in integer or fixed-point format, followed
+// without a space by a time unit (fs ps ns us ms s)."
+// "The time literal is interpreted as a realtime value scaled to the
+// current time unit."
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// 1. Integer format with ns unit (default time unit)
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, TimeLitIntegerNs) {
+  // §5.8: "Time is written in integer ... format, followed without a space
+  // by a time unit"  Example: 40ps.  Here we use ns (default unit).
+  auto v = RunAndGetReal(
+      "module t;\n  realtime r;\n  initial r = 10ns;\nendmodule\n", "r");
+  EXPECT_DOUBLE_EQ(v, 10.0);
+}
+
+// ---------------------------------------------------------------------------
+// 2. Fixed-point format with ns unit
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, TimeLitFixedPointNs) {
+  // §5.8: "Time is written in ... fixed-point format, followed without a
+  // space by a time unit"  Example from LRM: 2.1ns.
+  auto v = RunAndGetReal(
+      "module t;\n  realtime r;\n  initial r = 2.1ns;\nendmodule\n", "r");
+  EXPECT_DOUBLE_EQ(v, 2.1);
+}
+
+// ---------------------------------------------------------------------------
+// 3. ps unit — scaled to default time unit (ns)
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, TimeLitPs) {
+  // §5.8 example: 40ps.  With default timeunit 1ns: 40ps = 0.04 ns.
+  auto v = RunAndGetReal(
+      "module t;\n  realtime r;\n  initial r = 40ps;\nendmodule\n", "r");
+  EXPECT_DOUBLE_EQ(v, 0.04);
+}
+
+// ---------------------------------------------------------------------------
+// 4. fs unit — scaled to default time unit (ns)
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, TimeLitFs) {
+  // §5.8 unit: fs.  100fs = 0.0001 ns.
+  auto v = RunAndGetReal(
+      "module t;\n  realtime r;\n  initial r = 100fs;\nendmodule\n", "r");
+  EXPECT_DOUBLE_EQ(v, 0.0001);
+}
+
+// ---------------------------------------------------------------------------
+// 5. us unit — scaled to default time unit (ns)
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, TimeLitUs) {
+  // §5.8 unit: us.  1us = 1000.0 ns.
+  auto v = RunAndGetReal(
+      "module t;\n  realtime r;\n  initial r = 1us;\nendmodule\n", "r");
+  EXPECT_DOUBLE_EQ(v, 1000.0);
+}
+
+// ---------------------------------------------------------------------------
+// 6. ms unit — scaled to default time unit (ns)
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, TimeLitMs) {
+  // §5.8 unit: ms.  1ms = 1e6 ns.
+  auto v = RunAndGetReal(
+      "module t;\n  realtime r;\n  initial r = 1ms;\nendmodule\n", "r");
+  EXPECT_DOUBLE_EQ(v, 1e6);
+}
+
+// ---------------------------------------------------------------------------
+// 7. s unit — scaled to default time unit (ns)
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, TimeLitS) {
+  // §5.8 unit: s.  1s = 1e9 ns.
+  auto v = RunAndGetReal(
+      "module t;\n  realtime r;\n  initial r = 1s;\nendmodule\n", "r");
+  EXPECT_DOUBLE_EQ(v, 1e9);
+}
+
+// ---------------------------------------------------------------------------
+// 8. Fixed-point format with non-ns unit
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, TimeLitFixedPointUs) {
+  // §5.8: fixed-point format with us unit.  2.5us = 2500.0 ns.
+  auto v = RunAndGetReal(
+      "module t;\n  realtime r;\n  initial r = 2.5us;\nendmodule\n", "r");
+  EXPECT_DOUBLE_EQ(v, 2500.0);
+}
+
+// ---------------------------------------------------------------------------
+// 9. LRM example: 2.1ns
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, TimeLitLrmExample2p1ns) {
+  // §5.8 example verbatim: "2.1ns"
+  auto v = RunAndGetReal(
+      "module t;\n  realtime r;\n  initial r = 2.1ns;\nendmodule\n", "r");
+  EXPECT_DOUBLE_EQ(v, 2.1);
+}
+
+// ---------------------------------------------------------------------------
+// 10. LRM example: 40ps
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, TimeLitLrmExample40ps) {
+  // §5.8 example verbatim: "40ps"
+  auto v = RunAndGetReal(
+      "module t;\n  realtime r;\n  initial r = 40ps;\nendmodule\n", "r");
+  EXPECT_DOUBLE_EQ(v, 0.04);
+}
+
+// ===========================================================================
 // §5.7.2 Real literal constants — simulation-level tests
 //
 // LRM §5.7.2: "The real literal constant numbers shall be represented as
