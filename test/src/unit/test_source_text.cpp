@@ -1594,6 +1594,237 @@ TEST(SourceText, ProgramMultipleItemTypes) {
 }
 
 // =============================================================================
+// A.1.8 Checker items
+// =============================================================================
+
+// checker_port_list / checker_port_item / checker_port_direction
+TEST(SourceText, CheckerPortList) {
+  auto r = Parse(
+      "checker chk(input logic clk, output bit valid);\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  auto* chk = r.cu->checkers[0];
+  EXPECT_EQ(chk->name, "chk");
+  EXPECT_EQ(chk->decl_kind, ModuleDeclKind::kChecker);
+  ASSERT_EQ(chk->ports.size(), 2u);
+  EXPECT_EQ(chk->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(chk->ports[0].name, "clk");
+  EXPECT_EQ(chk->ports[1].direction, Direction::kOutput);
+  EXPECT_EQ(chk->ports[1].name, "valid");
+}
+
+// checker_port_item with default value (= property_actual_arg)
+TEST(SourceText, CheckerPortDefaultValue) {
+  auto r = Parse(
+      "checker chk(input logic clk = 1'b0);\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  ASSERT_EQ(r.cu->checkers[0]->ports.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(r.cu->checkers[0]->ports[0].name, "clk");
+  EXPECT_NE(r.cu->checkers[0]->ports[0].default_value, nullptr);
+}
+
+// checker_or_generate_item ::= continuous_assign
+TEST(SourceText, CheckerContinuousAssign) {
+  auto r = Parse(
+      "checker chk;\n"
+      "  assign a = b;\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  ASSERT_GE(r.cu->checkers[0]->items.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->items[0]->kind, ModuleItemKind::kContAssign);
+}
+
+// checker_or_generate_item ::= initial_construct | always_construct |
+// final_construct
+TEST(SourceText, CheckerInitialAlwaysFinal) {
+  auto r = Parse(
+      "checker chk;\n"
+      "  initial begin end\n"
+      "  always @(posedge clk) x <= 1;\n"
+      "  final begin end\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  auto& items = r.cu->checkers[0]->items;
+  ASSERT_GE(items.size(), 3u);
+  bool found_initial = false, found_always = false, found_final = false;
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) found_initial = true;
+    if (item->kind == ModuleItemKind::kAlwaysBlock) found_always = true;
+    if (item->kind == ModuleItemKind::kFinalBlock) found_final = true;
+  }
+  EXPECT_TRUE(found_initial);
+  EXPECT_TRUE(found_always);
+  EXPECT_TRUE(found_final);
+}
+
+// checker_or_generate_item ::= assertion_item
+TEST(SourceText, CheckerAssertionItem) {
+  auto r = Parse(
+      "checker chk;\n"
+      "  assert property (@(posedge clk) a |-> b);\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  ASSERT_GE(r.cu->checkers[0]->items.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->items[0]->kind, ModuleItemKind::kAssertProperty);
+}
+
+// checker_or_generate_item_declaration ::= [rand] data_declaration
+TEST(SourceText, CheckerRandDataDecl) {
+  auto r = Parse(
+      "checker chk;\n"
+      "  rand bit [3:0] val;\n"
+      "  logic [7:0] data;\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  ASSERT_GE(r.cu->checkers[0]->items.size(), 2u);
+  EXPECT_EQ(r.cu->checkers[0]->items[0]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_TRUE(r.cu->checkers[0]->items[0]->is_rand);
+  EXPECT_EQ(r.cu->checkers[0]->items[1]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_FALSE(r.cu->checkers[0]->items[1]->is_rand);
+}
+
+// checker_or_generate_item_declaration ::= function_declaration
+TEST(SourceText, CheckerFunctionDecl) {
+  auto r = Parse(
+      "checker chk;\n"
+      "  function automatic int add(int a, int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  ASSERT_GE(r.cu->checkers[0]->items.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->items[0]->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(r.cu->checkers[0]->items[0]->name, "add");
+}
+
+// checker_or_generate_item_declaration ::= checker_declaration (nested)
+TEST(SourceText, CheckerNestedChecker) {
+  auto r = Parse(
+      "checker outer;\n"
+      "  checker inner;\n"
+      "    logic a;\n"
+      "  endchecker\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->name, "outer");
+}
+
+// checker_or_generate_item_declaration ::= genvar_declaration
+TEST(SourceText, CheckerGenvarDecl) {
+  auto r = Parse(
+      "checker chk;\n"
+      "  genvar i;\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  ASSERT_GE(r.cu->checkers[0]->items.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->items[0]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(r.cu->checkers[0]->items[0]->name, "i");
+}
+
+// checker_or_generate_item_declaration ::= default disable iff expr ;
+TEST(SourceText, CheckerDefaultDisableIff) {
+  auto r = Parse(
+      "checker chk;\n"
+      "  default disable iff rst;\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  ASSERT_GE(r.cu->checkers[0]->items.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->items[0]->kind,
+            ModuleItemKind::kDefaultDisableIff);
+}
+
+// checker_generate_item ::= loop | conditional | generate_region | elab task
+TEST(SourceText, CheckerGenerateItems) {
+  auto r = Parse(
+      "checker chk;\n"
+      "  for (genvar i = 0; i < 4; i++) begin end\n"
+      "  if (1) begin end\n"
+      "  generate endgenerate\n"
+      "  $info(\"checker ok\");\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  auto& items = r.cu->checkers[0]->items;
+  bool found_for = false, found_if = false, found_elab = false;
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kGenerateFor) found_for = true;
+    if (item->kind == ModuleItemKind::kGenerateIf) found_if = true;
+    if (item->kind == ModuleItemKind::kElabSystemTask) found_elab = true;
+  }
+  EXPECT_TRUE(found_for);
+  EXPECT_TRUE(found_if);
+  EXPECT_TRUE(found_elab);
+}
+
+// Combined: checker with multiple A.1.8 item types.
+TEST(SourceText, CheckerMultipleItemTypes) {
+  auto r = Parse(
+      "checker chk(input logic clk, output bit ok);\n"
+      "  logic sig;\n"
+      "  assign ok = sig;\n"
+      "  initial begin end\n"
+      "  always @(posedge clk) sig <= 1;\n"
+      "  final begin end\n"
+      "  assert property (@(posedge clk) sig);\n"
+      "  default disable iff !ok;\n"
+      "  function int f(); return 0; endfunction\n"
+      "  $warning(\"test\");\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  auto* chk = r.cu->checkers[0];
+  EXPECT_EQ(chk->name, "chk");
+  ASSERT_EQ(chk->ports.size(), 2u);
+  bool found_var = false, found_assign = false, found_initial = false;
+  bool found_always = false, found_final = false, found_assert = false;
+  bool found_disable = false, found_func = false, found_elab = false;
+  for (auto* item : chk->items) {
+    if (item->kind == ModuleItemKind::kVarDecl) found_var = true;
+    if (item->kind == ModuleItemKind::kContAssign) found_assign = true;
+    if (item->kind == ModuleItemKind::kInitialBlock) found_initial = true;
+    if (item->kind == ModuleItemKind::kAlwaysBlock) found_always = true;
+    if (item->kind == ModuleItemKind::kFinalBlock) found_final = true;
+    if (item->kind == ModuleItemKind::kAssertProperty) found_assert = true;
+    if (item->kind == ModuleItemKind::kDefaultDisableIff) found_disable = true;
+    if (item->kind == ModuleItemKind::kFunctionDecl) found_func = true;
+    if (item->kind == ModuleItemKind::kElabSystemTask) found_elab = true;
+  }
+  EXPECT_TRUE(found_var);
+  EXPECT_TRUE(found_assign);
+  EXPECT_TRUE(found_initial);
+  EXPECT_TRUE(found_always);
+  EXPECT_TRUE(found_final);
+  EXPECT_TRUE(found_assert);
+  EXPECT_TRUE(found_disable);
+  EXPECT_TRUE(found_func);
+  EXPECT_TRUE(found_elab);
+}
+
+// =============================================================================
 // A.1.2 comprehensive: all description types in one source text.
 // =============================================================================
 

@@ -1041,6 +1041,15 @@ bool Parser::TryParseNonPortItem(std::vector<ModuleItem*>& items) {
     items.push_back(item);
     return true;
   }
+  // checker_or_generate_item_declaration: nested checker_declaration (A.1.8)
+  if (Check(TokenKind::kKwChecker)) {
+    auto* item = arena_.Create<ModuleItem>();
+    item->kind = ModuleItemKind::kNestedModuleDecl;
+    item->loc = CurrentLoc();
+    item->nested_module_decl = ParseCheckerDecl();
+    items.push_back(item);
+    return true;
+  }
   return false;
 }
 
@@ -1091,7 +1100,12 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
     AttachAttrs(items, before, attrs);
     return;
   }
+  // checker_or_generate_item_declaration: [rand] data_declaration (A.1.8)
+  bool is_rand = Match(TokenKind::kKwRand);
   ParseTypedItemOrInst(items);
+  if (is_rand) {
+    for (size_t i = before; i < items.size(); ++i) items[i]->is_rand = true;
+  }
   AttachAttrs(items, before, attrs);
 }
 

@@ -466,6 +466,9 @@ struct ModuleItem {
   bool is_extern = false;    // extern method_prototype / task_prototype
   bool is_forkjoin = false;  // extern forkjoin task_prototype
 
+  // checker_or_generate_item_declaration (A.1.8)
+  bool is_rand = false;  // [rand] data_declaration in checker body
+
   // Declarations
   DataType data_type;
   std::string_view name;
