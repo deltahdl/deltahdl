@@ -692,6 +692,9 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kDpiImport:
     case ModuleItemKind::kDpiExport:
     case ModuleItemKind::kLetDecl:
+    case ModuleItemKind::kElabSystemTask:
+    case ModuleItemKind::kDefaultDisableIff:
+    case ModuleItemKind::kNestedModuleDecl:
     case ModuleItemKind::kClassDecl:
       if (item->class_decl) {
         class_names_.insert(item->class_decl->name);

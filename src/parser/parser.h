@@ -39,6 +39,7 @@ class Parser {
   void ParseModuleItem(std::vector<ModuleItem*>& items);
   bool TryParseProcessBlock(std::vector<ModuleItem*>& items);
   bool TryParseKeywordItem(std::vector<ModuleItem*>& items);
+  bool TryParseNonPortItem(std::vector<ModuleItem*>& items);
   bool TryParseClassOrVerification(std::vector<ModuleItem*>& items);
   bool TryParseVerificationItem(std::vector<ModuleItem*>& items);
   ModuleItem* ParseLetDecl();

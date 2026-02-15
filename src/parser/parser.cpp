@@ -837,9 +837,22 @@ bool Parser::TryParseClockingOrVerification(std::vector<ModuleItem*>& items) {
     auto saved = lexer_.SavePos();
     Consume();
     bool is_clocking = Check(TokenKind::kKwClocking);
+    bool is_disable = Check(TokenKind::kKwDisable);
     lexer_.RestorePos(saved);
     if (is_clocking) {
       items.push_back(ParseClockingDecl());
+      return true;
+    }
+    if (is_disable) {
+      Consume();  // default
+      Consume();  // disable
+      Expect(TokenKind::kKwIff);
+      auto* item = arena_.Create<ModuleItem>();
+      item->kind = ModuleItemKind::kDefaultDisableIff;
+      item->loc = CurrentLoc();
+      item->init_expr = ParseExpr();
+      Expect(TokenKind::kSemicolon);
+      items.push_back(item);
       return true;
     }
   }
@@ -875,6 +888,12 @@ bool Parser::IsAtClassDecl() {
   bool result = Check(TokenKind::kKwClass);
   lexer_.RestorePos(saved);
   return result;
+}
+
+static bool IsElabSeverityTask(TokenKind kind, std::string_view text) {
+  return kind == TokenKind::kSystemIdentifier &&
+         (text == "$fatal" || text == "$error" || text == "$warning" ||
+          text == "$info");
 }
 
 bool Parser::TryParseKeywordItem(std::vector<ModuleItem*>& items) {
@@ -937,6 +956,16 @@ bool Parser::TryParseClassOrVerification(std::vector<ModuleItem*>& items) {
     items.push_back(item);
     return true;
   }
+  // Nested interface declaration (non_port_module_item) — IsAtClassDecl
+  // already ruled out 'interface class', so this is a nested interface.
+  if (Check(TokenKind::kKwInterface)) {
+    auto* item = arena_.Create<ModuleItem>();
+    item->kind = ModuleItemKind::kNestedModuleDecl;
+    item->loc = CurrentLoc();
+    item->nested_module_decl = ParseInterfaceDecl();
+    items.push_back(item);
+    return true;
+  }
   return TryParseClockingOrVerification(items);
 }
 
@@ -963,6 +992,37 @@ bool Parser::TryParseVerificationItem(std::vector<ModuleItem*>& items) {
   }
   if (Check(TokenKind::kKwCovergroup)) {
     ParseCovergroupDecl(items);
+    return true;
+  }
+  return false;
+}
+
+// A.1.4 non_port_module_item additions: elaboration severity tasks,
+// nested module/program/interface declarations.
+bool Parser::TryParseNonPortItem(std::vector<ModuleItem*>& items) {
+  if (IsElabSeverityTask(CurrentToken().kind, CurrentToken().text)) {
+    auto* item = arena_.Create<ModuleItem>();
+    item->kind = ModuleItemKind::kElabSystemTask;
+    item->loc = CurrentLoc();
+    item->init_expr = ParseExpr();
+    Expect(TokenKind::kSemicolon);
+    items.push_back(item);
+    return true;
+  }
+  if (Check(TokenKind::kKwModule) || Check(TokenKind::kKwMacromodule)) {
+    auto* item = arena_.Create<ModuleItem>();
+    item->kind = ModuleItemKind::kNestedModuleDecl;
+    item->loc = CurrentLoc();
+    item->nested_module_decl = ParseModuleDecl();
+    items.push_back(item);
+    return true;
+  }
+  if (Check(TokenKind::kKwProgram)) {
+    auto* item = arena_.Create<ModuleItem>();
+    item->kind = ModuleItemKind::kNestedModuleDecl;
+    item->loc = CurrentLoc();
+    item->nested_module_decl = ParseProgramDecl();
+    items.push_back(item);
     return true;
   }
   return false;
@@ -1008,6 +1068,10 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
   }
   if (Check(TokenKind::kKwIf)) {
     items.push_back(ParseGenerateIf());
+    AttachAttrs(items, before, attrs);
+    return;
+  }
+  if (TryParseNonPortItem(items)) {
     AttachAttrs(items, before, attrs);
     return;
   }

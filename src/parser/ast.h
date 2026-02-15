@@ -15,6 +15,7 @@ namespace delta {
 struct Expr;
 struct Stmt;
 struct ModuleItem;
+struct ModuleDecl;
 struct SpecifyItem;
 
 // --- Expressions ---
@@ -353,21 +354,24 @@ enum class ModuleItemKind : uint8_t {
   kExportDecl,
   kGateInst,
   kDefparam,
-  kAlias,           // Net alias (§10.11)
-  kPropertyDecl,    // property ... endproperty (§16.12)
-  kSequenceDecl,    // sequence ... endsequence (§16.8)
-  kAssertProperty,  // assert property (§16.5)
-  kAssumeProperty,  // assume property (§16.5)
-  kCoverProperty,   // cover property (§16.5)
-  kClockingBlock,   // Clocking block (§14)
-  kCovergroupDecl,  // covergroup ... endgroup (§19)
-  kSpecifyBlock,    // specify ... endspecify (§30)
-  kSpecparam,       // specparam declarations (§30.2)
-  kDpiImport,       // import "DPI-C" function/task (§35)
-  kDpiExport,       // export "DPI-C" function/task (§35)
-  kClassDecl,       // class ... endclass inside module (§8.3)
-  kNettypeDecl,     // nettype <type> <name> [with <func>] (§6.6.7)
-  kLetDecl,         // let name(args) = expr; (§11.12)
+  kAlias,              // Net alias (§10.11)
+  kPropertyDecl,       // property ... endproperty (§16.12)
+  kSequenceDecl,       // sequence ... endsequence (§16.8)
+  kAssertProperty,     // assert property (§16.5)
+  kAssumeProperty,     // assume property (§16.5)
+  kCoverProperty,      // cover property (§16.5)
+  kClockingBlock,      // Clocking block (§14)
+  kCovergroupDecl,     // covergroup ... endgroup (§19)
+  kSpecifyBlock,       // specify ... endspecify (§30)
+  kSpecparam,          // specparam declarations (§30.2)
+  kDpiImport,          // import "DPI-C" function/task (§35)
+  kDpiExport,          // export "DPI-C" function/task (§35)
+  kClassDecl,          // class ... endclass inside module (§8.3)
+  kNettypeDecl,        // nettype <type> <name> [with <func>] (§6.6.7)
+  kLetDecl,            // let name(args) = expr; (§11.12)
+  kElabSystemTask,     // $fatal/$error/$warning/$info (§20.11)
+  kDefaultDisableIff,  // default disable iff expr; (§16.14)
+  kNestedModuleDecl,   // Nested module/interface/program (§23.2.1)
 };
 
 enum class GateKind : uint8_t {
@@ -548,6 +552,9 @@ struct ModuleItem {
 
   // Specify block body (§30, §31)
   std::vector<SpecifyItem*> specify_items;
+
+  // Nested module/interface/program declaration (§23.2.1)
+  ModuleDecl* nested_module_decl = nullptr;
 };
 
 // --- Top-level declarations ---
