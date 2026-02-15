@@ -391,6 +391,148 @@ TEST(SimCh5c, TimeLitLrmExample40ps) {
 }
 
 // ===========================================================================
+// §5.9.1 Special characters in strings — simulation-level tests
+//
+// LRM §5.9.1: Table 5-1 lists escape sequences for special characters in
+// string literals.  An escaped character not in Table 5-1 "is treated the
+// same as if the character was not escaped."
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// 1. \n — Newline character (0x0A)
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, StrEscNewline) {
+  // §5.9.1 Table 5-1: \n → newline character
+  auto v = RunAndGet(
+      "module t;\n  byte c;\n  initial c = \"\\n\";\nendmodule\n", "c");
+  EXPECT_EQ(v, 0x0Au);
+}
+
+// ---------------------------------------------------------------------------
+// 2. \t — Tab character (0x09)
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, StrEscTab) {
+  // §5.9.1 Table 5-1: \t → tab character
+  auto v = RunAndGet(
+      "module t;\n  byte c;\n  initial c = \"\\t\";\nendmodule\n", "c");
+  EXPECT_EQ(v, 0x09u);
+}
+
+// ---------------------------------------------------------------------------
+// 3. \\ — Backslash character (0x5C)
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, StrEscBackslash) {
+  // §5.9.1 Table 5-1: \\ → \ character
+  auto v = RunAndGet(
+      "module t;\n  byte c;\n  initial c = \"\\\\\";\nendmodule\n", "c");
+  EXPECT_EQ(v, 0x5Cu);
+}
+
+// ---------------------------------------------------------------------------
+// 4. \" — Double-quote character (0x22)
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, StrEscDoubleQuote) {
+  // §5.9.1 Table 5-1: \" → " character
+  auto v = RunAndGet(
+      "module t;\n  byte c;\n  initial c = \"\\\"\";\nendmodule\n", "c");
+  EXPECT_EQ(v, 0x22u);
+}
+
+// ---------------------------------------------------------------------------
+// 5. \v — Vertical tab (0x0B)
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, StrEscVerticalTab) {
+  // §5.9.1 Table 5-1: \v → vertical tab
+  auto v = RunAndGet(
+      "module t;\n  byte c;\n  initial c = \"\\v\";\nendmodule\n", "c");
+  EXPECT_EQ(v, 0x0Bu);
+}
+
+// ---------------------------------------------------------------------------
+// 6. \f — Form feed (0x0C)
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, StrEscFormFeed) {
+  // §5.9.1 Table 5-1: \f → form feed
+  auto v = RunAndGet(
+      "module t;\n  byte c;\n  initial c = \"\\f\";\nendmodule\n", "c");
+  EXPECT_EQ(v, 0x0Cu);
+}
+
+// ---------------------------------------------------------------------------
+// 7. \a — Bell (0x07)
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, StrEscBell) {
+  // §5.9.1 Table 5-1: \a → bell
+  auto v = RunAndGet(
+      "module t;\n  byte c;\n  initial c = \"\\a\";\nendmodule\n", "c");
+  EXPECT_EQ(v, 0x07u);
+}
+
+// ---------------------------------------------------------------------------
+// 8. \ddd — Octal escape, three digits
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, StrEscOctalThreeDigit) {
+  // §5.9.1 Table 5-1: \ddd → character specified in 1-3 octal digits.
+  // \101 = 65 decimal = 'A'
+  auto v = RunAndGet(
+      "module t;\n  byte c;\n  initial c = \"\\101\";\nendmodule\n", "c");
+  EXPECT_EQ(v, 0x41u);
+}
+
+// ---------------------------------------------------------------------------
+// 9. \ddd — Octal escape, one digit
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, StrEscOctalOneDigit) {
+  // §5.9.1: 1-digit octal.  \7 = 7 = BEL.
+  auto v = RunAndGet(
+      "module t;\n  byte c;\n  initial c = \"\\7\";\nendmodule\n", "c");
+  EXPECT_EQ(v, 0x07u);
+}
+
+// ---------------------------------------------------------------------------
+// 10. \xdd — Hex escape, two digits
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, StrEscHexTwoDigit) {
+  // §5.9.1 Table 5-1: \xdd → character specified in 1-2 hex digits.
+  // \x41 = 65 = 'A'
+  auto v = RunAndGet(
+      "module t;\n  byte c;\n  initial c = \"\\x41\";\nendmodule\n", "c");
+  EXPECT_EQ(v, 0x41u);
+}
+
+// ---------------------------------------------------------------------------
+// 11. \xd — Hex escape, one digit
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, StrEscHexOneDigit) {
+  // §5.9.1: 1-digit hex.  \xA = 10 = newline.
+  auto v = RunAndGet(
+      "module t;\n  byte c;\n  initial c = \"\\xA\";\nendmodule\n", "c");
+  EXPECT_EQ(v, 0x0Au);
+}
+
+// ---------------------------------------------------------------------------
+// 12. Unrecognized escape — treated as literal character
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, StrEscUnrecognized) {
+  // §5.9.1: "An escaped character not appearing in Table 5-1 is treated
+  // the same as if the character was not escaped."  \b → 'b' (0x62).
+  auto v = RunAndGet(
+      "module t;\n  byte c;\n  initial c = \"\\b\";\nendmodule\n", "c");
+  EXPECT_EQ(v, 0x62u);
+}
+
+// ---------------------------------------------------------------------------
+// 13. Multiple escape sequences in one string
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, StrEscMultiple) {
+  // §5.9.1: Multiple escapes in a single string: "A\nB" → 3 bytes: 0x41
+  // 0x0A 0x42 → packed 24-bit value 0x410A42.
+  auto v = RunAndGet(
+      "module t;\n  bit [23:0] s;\n  initial s = \"A\\nB\";\nendmodule\n", "s");
+  EXPECT_EQ(v, 0x410A42u);
+}
+
+// ===========================================================================
 // §5.7.2 Real literal constants — simulation-level tests
 //
 // LRM §5.7.2: "The real literal constant numbers shall be represented as
