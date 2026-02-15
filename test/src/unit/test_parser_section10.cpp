@@ -820,8 +820,8 @@ TEST(ParserSection10, ContinuousAssignExpression) {
       "  assign sum = a + b;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* ca = FindItemByKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kContAssign);
+  auto* ca =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kContAssign);
   ASSERT_NE(ca, nullptr);
   ASSERT_NE(ca->assign_rhs, nullptr);
   EXPECT_EQ(ca->assign_rhs->kind, ExprKind::kBinary);
@@ -834,8 +834,8 @@ TEST(ParserSection10, ContinuousAssignTernary) {
       "  assign y = sel ? a : b;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* ca = FindItemByKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kContAssign);
+  auto* ca =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kContAssign);
   ASSERT_NE(ca, nullptr);
   ASSERT_NE(ca->assign_rhs, nullptr);
 }

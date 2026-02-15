@@ -373,15 +373,15 @@ TEST(ParserSection12, RepeatWithExpression) {
 
 // Forever loop wrapping a timing control.
 TEST(ParserSection12, ForeverWithTimingControl) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  initial begin\n"
-      "    forever begin\n"
-      "      @(posedge clk);\n"
-      "      x = ~x;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial begin\n"
+              "    forever begin\n"
+              "      @(posedge clk);\n"
+              "      x = ~x;\n"
+              "    end\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // Nested loops: for inside while.
@@ -411,13 +411,13 @@ TEST(ParserSection12, NestedForInsideWhile) {
 
 // For loop with multiple init assignments (comma-separated).
 TEST(ParserSection12, ForWithMultipleInits) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  initial begin\n"
-      "    for (int i = 0, j = 10; i < j; i = i + 1)\n"
-      "      x = i;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial begin\n"
+              "    for (int i = 0, j = 10; i < j; i = i + 1)\n"
+              "      x = i;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // For loop with increment expression in step.
@@ -624,19 +624,19 @@ TEST(ParserSection12, ReturnFromVoidFunctionEarly) {
 
 // Case inside always_comb with unique qualifier.
 TEST(ParserSection12, UniqueCaseInsideAlwaysComb) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  logic [1:0] sel;\n"
-      "  logic [7:0] out;\n"
-      "  always_comb begin\n"
-      "    unique case (sel)\n"
-      "      2'd0: out = 8'hAA;\n"
-      "      2'd1: out = 8'hBB;\n"
-      "      2'd2: out = 8'hCC;\n"
-      "      2'd3: out = 8'hDD;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  logic [1:0] sel;\n"
+              "  logic [7:0] out;\n"
+              "  always_comb begin\n"
+              "    unique case (sel)\n"
+              "      2'd0: out = 8'hAA;\n"
+              "      2'd1: out = 8'hBB;\n"
+              "      2'd2: out = 8'hCC;\n"
+              "      2'd3: out = 8'hDD;\n"
+              "    endcase\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // If-else inside for loop body.
@@ -662,18 +662,18 @@ TEST(ParserSection12, IfElseInsideForBody) {
 
 // Case inside a for loop.
 TEST(ParserSection12, CaseInsideForLoop) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 4; i = i + 1) begin\n"
-      "      case (mode)\n"
-      "        0: data[i] = 0;\n"
-      "        1: data[i] = i;\n"
-      "        default: data[i] = 8'hFF;\n"
-      "      endcase\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial begin\n"
+              "    for (int i = 0; i < 4; i = i + 1) begin\n"
+              "      case (mode)\n"
+              "        0: data[i] = 0;\n"
+              "        1: data[i] = i;\n"
+              "        default: data[i] = 8'hFF;\n"
+              "      endcase\n"
+              "    end\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // Unique0 case with empty default.
@@ -716,29 +716,29 @@ TEST(ParserSection12, CaseStatementExprIsNotNull) {
 
 // Casez inside always_ff.
 TEST(ParserSection12, CasezInsideAlwaysFF) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  logic clk;\n"
-      "  logic [1:0] sel;\n"
-      "  logic [3:0] q;\n"
-      "  always_ff @(posedge clk) begin\n"
-      "    casez (sel)\n"
-      "      2'b1?: q <= 4'd1;\n"
-      "      2'b01: q <= 4'd2;\n"
-      "      default: q <= 4'd0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  logic clk;\n"
+              "  logic [1:0] sel;\n"
+              "  logic [3:0] q;\n"
+              "  always_ff @(posedge clk) begin\n"
+              "    casez (sel)\n"
+              "      2'b1?: q <= 4'd1;\n"
+              "      2'b01: q <= 4'd2;\n"
+              "      default: q <= 4'd0;\n"
+              "    endcase\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // While loop with null body (semicolon).
 TEST(ParserSection12, WhileWithNullBody) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  initial begin\n"
-      "    while (0) ;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial begin\n"
+              "    while (0) ;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // Multiple case items without default.

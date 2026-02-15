@@ -497,11 +497,9 @@ static bool ExecFuncFor(const Stmt* stmt, Variable* ret_var, SimContext& ctx,
   }
   while (stmt->for_cond &&
          EvalExpr(stmt->for_cond, ctx, arena).ToUint64() != 0) {
-    if (stmt->for_body &&
-        ExecFuncStmt(stmt->for_body, ret_var, ctx, arena))
+    if (stmt->for_body && ExecFuncStmt(stmt->for_body, ret_var, ctx, arena))
       return true;
-    if (stmt->for_step)
-      ExecFuncStmt(stmt->for_step, ret_var, ctx, arena);
+    if (stmt->for_step) ExecFuncStmt(stmt->for_step, ret_var, ctx, arena);
   }
   return false;
 }
