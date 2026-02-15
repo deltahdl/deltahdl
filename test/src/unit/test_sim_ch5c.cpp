@@ -66,6 +66,220 @@ static double RunAndGetReal(const std::string& src, const char* var_name) {
 }
 
 // ===========================================================================
+// §5.7 Numbers — simulation-level tests
+//
+// LRM §5.7: "Constant numbers can be specified as integer constants
+// (see 5.7.1) or real constants (see 5.7.2)."
+// Syntax 5-2: number ::= integral_number | real_number
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// 1. number ::= integral_number | real_number — both forms coexist
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, NumberBothFormsCoexist) {
+  // §5.7: Both integer and real constants in the same module.
+  SimCh5cFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] i;\n"
+      "  real r;\n"
+      "  initial begin\n"
+      "    i = 42;\n"
+      "    r = 3.14;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(design, nullptr);
+  if (!design) return;
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* vi = f.ctx.FindVariable("i");
+  auto* vr = f.ctx.FindVariable("r");
+  EXPECT_NE(vi, nullptr);
+  EXPECT_NE(vr, nullptr);
+  if (!vi || !vr) return;
+  EXPECT_EQ(vi->value.ToUint64(), 42u);
+  double d = 0.0;
+  uint64_t bits = vr->value.ToUint64();
+  std::memcpy(&d, &bits, sizeof(double));
+  EXPECT_DOUBLE_EQ(d, 3.14);
+}
+
+// ---------------------------------------------------------------------------
+// 2. number ::= integral_number — decimal_number (unsigned_number form)
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, NumberIntegralDecimal) {
+  // Syntax 5-2: integral_number ::= decimal_number
+  // decimal_number ::= unsigned_number
+  auto v = RunAndGet(
+      "module t;\n  logic [31:0] x;\n  initial x = 100;\nendmodule\n", "x");
+  EXPECT_EQ(v, 100u);
+}
+
+// ---------------------------------------------------------------------------
+// 3. number ::= integral_number — binary_number
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, NumberIntegralBinary) {
+  // Syntax 5-2: integral_number ::= binary_number
+  auto v = RunAndGet(
+      "module t;\n  logic [7:0] x;\n  initial x = 8'b1010_0101;\nendmodule\n",
+      "x");
+  EXPECT_EQ(v, 0xA5u);
+}
+
+// ---------------------------------------------------------------------------
+// 4. number ::= integral_number — octal_number
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, NumberIntegralOctal) {
+  // Syntax 5-2: integral_number ::= octal_number
+  auto v = RunAndGet(
+      "module t;\n  logic [11:0] x;\n  initial x = 12'o7654;\nendmodule\n",
+      "x");
+  EXPECT_EQ(v, 07654u);
+}
+
+// ---------------------------------------------------------------------------
+// 5. number ::= integral_number — hex_number
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, NumberIntegralHex) {
+  // Syntax 5-2: integral_number ::= hex_number
+  auto v = RunAndGet(
+      "module t;\n  logic [15:0] x;\n  initial x = 16'hCAFE;\nendmodule\n",
+      "x");
+  EXPECT_EQ(v, 0xCAFEu);
+}
+
+// ---------------------------------------------------------------------------
+// 6. number ::= real_number — fixed_point_number
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, NumberRealFixedPoint) {
+  // Syntax 5-2: real_number ::= fixed_point_number
+  auto v = RunAndGetReal(
+      "module t;\n  real x;\n  initial x = 42.5;\nendmodule\n", "x");
+  EXPECT_DOUBLE_EQ(v, 42.5);
+}
+
+// ---------------------------------------------------------------------------
+// 7. number ::= real_number — scientific notation form
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, NumberRealScientific) {
+  // Syntax 5-2: real_number ::= unsigned_number [.unsigned_number] exp
+  //                              [sign] unsigned_number
+  auto v = RunAndGetReal(
+      "module t;\n  real x;\n  initial x = 5.0e3;\nendmodule\n", "x");
+  EXPECT_DOUBLE_EQ(v, 5000.0);
+}
+
+// ---------------------------------------------------------------------------
+// 8. All four integral bases in one module
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, NumberAllIntegralBases) {
+  // §5.7 + Syntax 5-2: decimal, hex, octal, binary all work as number.
+  SimCh5cFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, c, d;\n"
+      "  initial begin\n"
+      "    a = 255;\n"
+      "    b = 8'hFF;\n"
+      "    c = 8'o377;\n"
+      "    d = 8'b1111_1111;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(design, nullptr);
+  if (!design) return;
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
+  auto* vc = f.ctx.FindVariable("c");
+  auto* vd = f.ctx.FindVariable("d");
+  EXPECT_NE(va, nullptr);
+  EXPECT_NE(vb, nullptr);
+  EXPECT_NE(vc, nullptr);
+  EXPECT_NE(vd, nullptr);
+  if (!va || !vb || !vc || !vd) return;
+  EXPECT_EQ(va->value.ToUint64(), 255u);
+  EXPECT_EQ(vb->value.ToUint64(), 255u);
+  EXPECT_EQ(vc->value.ToUint64(), 255u);
+  EXPECT_EQ(vd->value.ToUint64(), 255u);
+}
+
+// ---------------------------------------------------------------------------
+// 9. Integer and real numbers in arithmetic expressions
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, NumberMixedInExpression) {
+  // §5.7: Both number forms usable in expression contexts.
+  // Integer literal 10 used in expression assigned to logic; real 2.5 to real.
+  SimCh5cFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] i;\n"
+      "  real r;\n"
+      "  initial begin\n"
+      "    i = 10 + 20;\n"
+      "    r = 1.5 + 2.5;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(design, nullptr);
+  if (!design) return;
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* vi = f.ctx.FindVariable("i");
+  auto* vr = f.ctx.FindVariable("r");
+  EXPECT_NE(vi, nullptr);
+  EXPECT_NE(vr, nullptr);
+  if (!vi || !vr) return;
+  EXPECT_EQ(vi->value.ToUint64(), 30u);
+  double d = 0.0;
+  uint64_t bits = vr->value.ToUint64();
+  std::memcpy(&d, &bits, sizeof(double));
+  EXPECT_DOUBLE_EQ(d, 4.0);
+}
+
+// ---------------------------------------------------------------------------
+// 10. number as primary_literal in conditional expression
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, NumberAsPrimaryLiteralInTernary) {
+  // Syntax 5-2: primary_literal ::= number | ...
+  // Verify number works as primary_literal in ternary expression.
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 1 ? 8'd99 : 8'd0;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(v, 99u);
+}
+
+// ---------------------------------------------------------------------------
+// 11. Sized decimal with base format
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, NumberSizedDecimalBase) {
+  // Syntax 5-2: decimal_number ::= [size] decimal_base unsigned_number
+  auto v = RunAndGet(
+      "module t;\n  logic [7:0] x;\n  initial x = 8'd200;\nendmodule\n", "x");
+  EXPECT_EQ(v, 200u);
+}
+
+// ---------------------------------------------------------------------------
+// 12. Underscore in integral number (Syntax 5-2 note 38)
+// ---------------------------------------------------------------------------
+TEST(SimCh5c, NumberUnderscoreInIntegral) {
+  // Syntax 5-2: unsigned_number ::= decimal_digit { _ | decimal_digit }
+  // "Embedded spaces are illegal" (note 38), but underscores are legal.
+  auto v = RunAndGet(
+      "module t;\n  logic [31:0] x;\n  initial x = 1_000_000;\nendmodule\n",
+      "x");
+  EXPECT_EQ(v, 1000000u);
+}
+
+// ===========================================================================
 // §5.7.2 Real literal constants — simulation-level tests
 //
 // LRM §5.7.2: "The real literal constant numbers shall be represented as
