@@ -822,3 +822,100 @@ TEST(ParserSection8, StaticConstProperty) {
   EXPECT_TRUE(cls->members[0]->is_static);
   EXPECT_TRUE(cls->members[0]->is_const);
 }
+
+// =============================================================================
+// §8.23 -- Class scope resolution operator ::
+// =============================================================================
+
+TEST(ParserSection8, ClassScopeResolutionStaticMethod) {
+  auto r = Parse(
+      "class Base;\n"
+      "  static function void display();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial Base::display();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
+TEST(ParserSection8, ClassScopeResolutionEnum) {
+  auto r = Parse(
+      "class Base;\n"
+      "  typedef enum {bin, oct, dec, hex} radix;\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial x = Base::bin;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
+TEST(ParserSection8, ClassScopeResolutionTypedef) {
+  auto r = Parse(
+      "class Outer;\n"
+      "  typedef int my_type;\n"
+      "endclass\n"
+      "module m;\n"
+      "  Outer::my_type x;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
+TEST(ParserSection8, ClassScopeResolutionParameter) {
+  auto r = Parse(
+      "class Cfg;\n"
+      "  parameter int WIDTH = 8;\n"
+      "endclass\n"
+      "module m;\n"
+      "  logic [Cfg::WIDTH-1:0] data;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
+// =============================================================================
+// §8.25 -- Parameterized classes (additional tests)
+// =============================================================================
+
+TEST(ParserSection8, ParameterizedClassSpecialization) {
+  auto r = Parse(
+      "class vector #(int size = 1);\n"
+      "  bit [size-1:0] a;\n"
+      "endclass\n"
+      "module m;\n"
+      "  vector #(10) vten;\n"
+      "  vector #(.size(2)) vtwo;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
+TEST(ParserSection8, ParameterizedClassStackType) {
+  auto r = Parse(
+      "class stack #(type T = int);\n"
+      "  T items[];\n"
+      "  function void push(T a);\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto* cls = r.cu->classes[0];
+  ASSERT_EQ(cls->params.size(), 1u);
+  EXPECT_EQ(cls->params[0].first, "T");
+}
+
+TEST(ParserSection8, ParameterizedClassDefaultInstantiation) {
+  auto r = Parse(
+      "class stack #(type T = int);\n"
+      "  T items[];\n"
+      "endclass\n"
+      "module m;\n"
+      "  stack is_default;\n"
+      "  stack #(real) rs;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}

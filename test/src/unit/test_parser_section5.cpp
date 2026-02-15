@@ -494,3 +494,78 @@ TEST(ParserSection5, AttributeValue_NoNesting_Ok) {
                "  (* foo = 1 + 2 *) logic x;\n"
                "endmodule\n"));
 }
+
+// --- §5.1: General / Lexical conventions overview ---
+
+TEST(ParserSection5, FreeFormatLayout) {
+  // Spaces and newlines are not syntactically significant (except in
+  // escaped identifiers and string literals). Tokens can be on one line.
+  EXPECT_TRUE(ParseOk5("module t; logic a; endmodule"));
+}
+
+TEST(ParserSection5, FreeFormatMultiline) {
+  // Same construct spread over many lines.
+  EXPECT_TRUE(
+      ParseOk5("module\n"
+               "  t\n"
+               ";\n"
+               "  logic\n"
+               "    a\n"
+               ";\n"
+               "endmodule\n"));
+}
+
+TEST(ParserSection5, AllTokenTypesPresent) {
+  // §5.1 lists: white space, comments, operators, numbers, string
+  // literals, identifiers, keywords. This test exercises them all.
+  EXPECT_TRUE(
+      ParseOk5("module t; // one-line comment\n"
+               "  /* block comment */\n"
+               "  logic [7:0] data = 8'hAB;\n"
+               "  initial $display(\"hello\");\n"
+               "endmodule\n"));
+}
+
+TEST(ParserSection5, EscapedIdentifierAsName) {
+  // §5.6.1: escaped identifiers include special characters.
+  EXPECT_TRUE(ParseOk5("module t; wire \\bus+index ; endmodule"));
+}
+
+TEST(ParserSection5, EscapedKeywordAsIdentifier) {
+  // §5.6.1: escaped keyword is treated as a user-defined identifier.
+  EXPECT_TRUE(ParseOk5("module t; wire \\module ; endmodule"));
+}
+
+TEST(ParserSection5, BlockCommentSpanningLines) {
+  EXPECT_TRUE(
+      ParseOk5("module t;\n"
+               "  /* this comment\n"
+               "     spans multiple\n"
+               "     lines */\n"
+               "  logic a;\n"
+               "endmodule\n"));
+}
+
+TEST(ParserSection5, OneLineCommentEndsAtNewline) {
+  EXPECT_TRUE(
+      ParseOk5("module t;\n"
+               "  logic a; // comment\n"
+               "  logic b;\n"
+               "endmodule\n"));
+}
+
+// --- §5.13: Built-in method calls (additional) ---
+
+TEST(ParserSection5, BuiltInMethodCall_ChainedAccess) {
+  // Chained member access: obj.arr.size() parses as a call.
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = obj.arr.size();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kCall);
+}

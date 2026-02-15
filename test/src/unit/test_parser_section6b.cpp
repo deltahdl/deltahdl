@@ -561,3 +561,263 @@ TEST(ParserSection6, NetDeclDriveStrength) {
   EXPECT_EQ(item->drive_strength0, 2u);
   EXPECT_EQ(item->drive_strength1, 4u);
 }
+
+// =========================================================================
+// §6.6.8: Void data type (additional tests)
+// =========================================================================
+
+TEST(ParserSection6, VoidCastExpression) {
+  auto r = Parse(
+      "module t;\n"
+      "  function int foo(); return 1; endfunction\n"
+      "  initial void'(foo());\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
+}
+
+TEST(ParserSection6, VoidFunctionInClass) {
+  auto r = Parse(
+      "class C;\n"
+      "  function void setup();\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+}
+
+TEST(ParserSection6, VoidTaskReturnType) {
+  // Tasks implicitly return void; verify parse is correct.
+  auto r = Parse(
+      "module t;\n"
+      "  task do_nothing();\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
+}
+
+// =========================================================================
+// §6.20.3: Type parameters (additional tests)
+// =========================================================================
+
+TEST(ParserSection6, TypeParameterWithMultipleParams) {
+  EXPECT_TRUE(ParseOk6(
+      "module m #(parameter type T = int, parameter type U = real)\n"
+      "  ();\n"
+      "  T x;\n"
+      "  U y;\n"
+      "endmodule\n"));
+}
+
+TEST(ParserSection6, TypeParameterOverride) {
+  EXPECT_TRUE(ParseOk6(
+      "module m #(parameter type T = int) ();\n"
+      "  T x;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  m #(.T(logic [7:0])) inst();\n"
+      "endmodule\n"));
+}
+
+TEST(ParserSection6, TypeParameterDefaultShortint) {
+  EXPECT_TRUE(ParseOk6(
+      "module ma #(parameter p1 = 1, parameter type p2 = shortint)\n"
+      "  (input logic [p1:0] i, output logic [p1:0] o);\n"
+      "  p2 j = 0;\n"
+      "endmodule\n"));
+}
+
+// =========================================================================
+// §6.21: Scope and lifetime (additional tests)
+// =========================================================================
+
+TEST(ParserSection6, AutomaticTaskDecl) {
+  auto r = Parse(
+      "module t;\n"
+      "  task automatic my_task();\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_TRUE(item->is_automatic);
+}
+
+TEST(ParserSection6, StaticTaskDecl) {
+  auto r = Parse(
+      "module t;\n"
+      "  task static my_task();\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_TRUE(item->is_static);
+}
+
+TEST(ParserSection6, ModuleLifetimeAutomatic) {
+  auto r = Parse("module automatic t; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->name, "t");
+}
+
+// =========================================================================
+// §6.22.1 -- Matching types
+// =========================================================================
+
+TEST(ParserSection6, MatchingTypesBuiltinTypedef) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef bit node;\n"
+      "  node n1;\n"
+      "  bit n2;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
+}
+
+TEST(ParserSection6, MatchingTypesAnonymousStruct) {
+  auto r = Parse(
+      "module m;\n"
+      "  struct packed {int A; int B;} AB1, AB2;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
+}
+
+TEST(ParserSection6, MatchingTypesNamedTypedefStruct) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct packed {int A; int B;} AB_t;\n"
+      "  AB_t x1;\n"
+      "  AB_t x2;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
+}
+
+TEST(ParserSection6, MatchingTypesSignedBitVector) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef bit signed [7:0] BYTE;\n"
+      "  BYTE b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
+}
+
+TEST(ParserSection6, MatchingTypesArrayTypedef) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef byte MEM_BYTES [256];\n"
+      "  MEM_BYTES mem;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
+}
+
+// =========================================================================
+// §6.22: Type compatibility — additional tests
+// =========================================================================
+
+TEST(ParserSection6, TypesMatchNamedSame) {
+  // Two named types with the same name should match.
+  DataType a;
+  a.kind = DataTypeKind::kNamed;
+  a.type_name = "mytype";
+  DataType b;
+  b.kind = DataTypeKind::kNamed;
+  b.type_name = "mytype";
+  EXPECT_TRUE(TypesMatch(a, b));
+}
+
+TEST(ParserSection6, TypesMatchNamedDifferent) {
+  // Two named types with different names should not match.
+  DataType a;
+  a.kind = DataTypeKind::kNamed;
+  a.type_name = "type_a";
+  DataType b;
+  b.kind = DataTypeKind::kNamed;
+  b.type_name = "type_b";
+  EXPECT_FALSE(TypesMatch(a, b));
+}
+
+TEST(ParserSection6, TypesEquivalentSameKind) {
+  // §6.22.2: Same kind, same signedness, same state-ness -> equivalent.
+  DataType a;
+  a.kind = DataTypeKind::kInt;
+  a.is_signed = true;
+  DataType b;
+  b.kind = DataTypeKind::kInt;
+  b.is_signed = true;
+  EXPECT_TRUE(TypesEquivalent(a, b));
+}
+
+TEST(ParserSection6, TypesNotEquivalentDifferentSign) {
+  DataType a;
+  a.kind = DataTypeKind::kInt;
+  a.is_signed = true;
+  DataType b;
+  b.kind = DataTypeKind::kInt;
+  b.is_signed = false;
+  EXPECT_FALSE(TypesEquivalent(a, b));
+}
+
+TEST(ParserSection6, AssignmentCompatibleRealToReal) {
+  DataType a;
+  a.kind = DataTypeKind::kReal;
+  DataType b;
+  b.kind = DataTypeKind::kShortreal;
+  EXPECT_TRUE(IsAssignmentCompatible(a, b));
+}
+
+TEST(ParserSection6, CastCompatibleRealToInt) {
+  DataType a;
+  a.kind = DataTypeKind::kReal;
+  DataType b;
+  b.kind = DataTypeKind::kInt;
+  EXPECT_TRUE(IsCastCompatible(a, b));
+}
+
+TEST(ParserSection6, MatchingTypesSameSigningModifier) {
+  // §6.22.1g: Explicitly adding signed to a type that is already signed
+  // creates a matching type.
+  DataType a;
+  a.kind = DataTypeKind::kByte;
+  a.is_signed = true;
+  DataType b;
+  b.kind = DataTypeKind::kByte;
+  b.is_signed = true;
+  EXPECT_TRUE(TypesMatch(a, b));
+}
+
+TEST(ParserSection6, TypeCompatibilityTypedefParsing) {
+  // §6.22.1b: A simple typedef that renames a built-in type matches it.
+  auto r = Parse(
+      "module m;\n"
+      "  typedef bit node;\n"
+      "  typedef int type1;\n"
+      "  typedef type1 type2;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_GE(r.cu->modules[0]->items.size(), 3u);
+}
+
+TEST(ParserSection6, TypeCompatibilityAnonymousStruct) {
+  // §6.22.1c: Anonymous struct matches itself within same declaration.
+  auto r = Parse(
+      "module m;\n"
+      "  struct packed { int A; int B; } AB1, AB2;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  // AB1 and AB2 should both be declared
+  EXPECT_GE(r.cu->modules[0]->items.size(), 2u);
+}

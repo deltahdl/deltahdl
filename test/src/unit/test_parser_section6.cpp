@@ -149,6 +149,31 @@ TEST(ParserSection6, SignedVector) {
   EXPECT_TRUE(item->data_type.is_signed);
 }
 
+TEST(ParserSection6, UnsignedVector) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic unsigned [15:0] uv;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
+  EXPECT_FALSE(item->data_type.is_signed);
+  EXPECT_EQ(item->name, "uv");
+}
+
+TEST(ParserSection6, VectorWithMultipleDims) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic [7:0] mem [0:255];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
+  EXPECT_EQ(item->name, "mem");
+}
+
 // =========================================================================
 // §6.11.3: Default signedness per Table 6-8
 // =========================================================================
@@ -524,6 +549,109 @@ TEST(ParserSection6, ConstCast) {
 }
 
 // =========================================================================
+// §6.24.1 -- Static casting (additional tests)
+// =========================================================================
+
+TEST(ParserSection6, SizeCast) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = 8'(y);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kCast);
+}
+
+// =========================================================================
+// §6.24.2 -- Dynamic casting ($cast)
+// =========================================================================
+
+TEST(ParserSection6, DynamicCastCall) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    $cast(d, b);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
+  ASSERT_NE(stmt->expr, nullptr);
+  EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
+  EXPECT_EQ(stmt->expr->callee, "$cast");
+}
+
+TEST(ParserSection6, DynamicCastInCondition) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if ($cast(d, b))\n"
+      "      $display(\"cast ok\");\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+}
+
+TEST(ParserSection6, DynamicCastAssignResult) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    int ok;\n"
+      "    ok = $cast(d, b);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+}
+
+// =========================================================================
+// §6.24.3 -- Bit-stream casting
+// =========================================================================
+
+TEST(ParserSection6, BitStreamCastToType) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct { logic [3:0] a; logic [3:0] b; } pair_t;\n"
+      "  initial begin\n"
+      "    pair_t p;\n"
+      "    p = pair_t'(8'hAB);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+}
+
+TEST(ParserSection6, BitStreamCastFromStruct) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct { logic [3:0] a; logic [3:0] b; } pair_t;\n"
+      "  initial begin\n"
+      "    pair_t p;\n"
+      "    logic [7:0] flat;\n"
+      "    flat = logic [7:0]'(p);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+}
+
+TEST(ParserSection6, BitStreamCastStreaming) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    byte a;\n"
+      "    int b;\n"
+      "    b = int'({<< byte {a}});\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+}
+
+// =========================================================================
 // §6.15: Class
 // =========================================================================
 
@@ -563,4 +691,250 @@ TEST(ParserSection6, ClassVarDecl_VarType) {
   ASSERT_NE(var_item, nullptr);
   EXPECT_EQ(var_item->data_type.kind, DataTypeKind::kNamed);
   EXPECT_EQ(var_item->data_type.type_name, "MyClass");
+}
+
+// =========================================================================
+// §6.5: Nets and variables
+// =========================================================================
+
+TEST(ParserSection6, NetsCantBeProcAssigned) {
+  // Nets are driven by continuous assignments, variables by procedural.
+  // This test verifies both constructs parse correctly.
+  auto r = Parse(
+      "module t;\n"
+      "  wire a;\n"
+      "  assign a = 1'b1;\n"
+      "  logic b;\n"
+      "  initial b = 1'b0;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_GE(r.cu->modules[0]->items.size(), 4u);
+}
+
+TEST(ParserSection6, VariableContinuousAssign) {
+  // §6.5: Variables can be written by one continuous assignment.
+  auto r = Parse(
+      "module t;\n"
+      "  logic vw;\n"
+      "  assign vw = 1'b1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto& items = r.cu->modules[0]->items;
+  bool found_ca = false;
+  for (auto* it : items) {
+    if (it->kind == ModuleItemKind::kContAssign) found_ca = true;
+  }
+  EXPECT_TRUE(found_ca);
+}
+
+TEST(ParserSection6, NetWithImplicitContAssign) {
+  // §6.5: Unlike nets, a variable cannot have an implicit continuous
+  // assignment. Wire with inline assignment is a net continuous assign.
+  auto r = Parse(
+      "module t;\n"
+      "  wire w = 1'b0;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_NE(item->init_expr, nullptr);
+}
+
+TEST(ParserSection6, VariableInitialization) {
+  // §6.5: Assignment as part of variable declaration is an initialization,
+  // not a continuous assignment.
+  auto r = Parse(
+      "module t;\n"
+      "  logic v = 1'b1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_NE(item->init_expr, nullptr);
+}
+
+TEST(ParserSection6, RealVariableContinuousAssign) {
+  auto r = Parse(
+      "module t;\n"
+      "  real circ;\n"
+      "  assign circ = 2.0 * 3.14;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto& items = r.cu->modules[0]->items;
+  bool found_ca = false;
+  for (auto* it : items) {
+    if (it->kind == ModuleItemKind::kContAssign) found_ca = true;
+  }
+  EXPECT_TRUE(found_ca);
+}
+
+// =========================================================================
+// §6.6.7: User-defined nettypes
+// =========================================================================
+
+TEST(ParserSection6, NettypeDeclBasic) {
+  // nettype data_type nettype_identifier ;
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct { real field1; bit field2; } T;\n"
+      "  nettype T wT;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto& items = r.cu->modules[0]->items;
+  ModuleItem* nt = nullptr;
+  for (auto* it : items) {
+    if (it->kind == ModuleItemKind::kNettypeDecl) {
+      nt = it;
+      break;
+    }
+  }
+  ASSERT_NE(nt, nullptr);
+  EXPECT_EQ(nt->name, "wT");
+}
+
+TEST(ParserSection6, NettypeDeclWithResolveFunc) {
+  // nettype data_type nettype_identifier with tf_identifier ;
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct { real field1; bit field2; } T;\n"
+      "  nettype T wTsum with Tsum;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto& items = r.cu->modules[0]->items;
+  ModuleItem* nt = nullptr;
+  for (auto* it : items) {
+    if (it->kind == ModuleItemKind::kNettypeDecl) {
+      nt = it;
+      break;
+    }
+  }
+  ASSERT_NE(nt, nullptr);
+  EXPECT_EQ(nt->name, "wTsum");
+  EXPECT_EQ(nt->nettype_resolve_func, "Tsum");
+}
+
+TEST(ParserSection6, NettypeDeclAlias) {
+  // nettype nettype_identifier nettype_identifier ;  (alias form)
+  auto r = Parse(
+      "module t;\n"
+      "  typedef real TR[5];\n"
+      "  nettype TR wTR;\n"
+      "  nettype wTR nettypeid2;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto& items = r.cu->modules[0]->items;
+  int nettype_count = 0;
+  for (auto* it : items) {
+    if (it->kind == ModuleItemKind::kNettypeDecl) nettype_count++;
+  }
+  EXPECT_GE(nettype_count, 2);
+}
+
+// =========================================================================
+// §6.7.1: Net declarations with built-in net types
+// =========================================================================
+
+TEST(ParserSection6, WireImplicitLogic) {
+  // §6.7.1: If no data type specified, net is implicitly logic.
+  auto r = Parse(
+      "module t;\n"
+      "  wire w;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_TRUE(item->data_type.is_net);
+}
+
+TEST(ParserSection6, WireWithRange) {
+  // wire [15:0] ww; — equivalent to "wire logic [15:0] ww;"
+  auto r = Parse(
+      "module t;\n"
+      "  wire [15:0] ww;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_NE(item->data_type.packed_dim_left, nullptr);
+}
+
+TEST(ParserSection6, WireExplicitLogicType) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire logic [7:0] w;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+}
+
+TEST(ParserSection6, TriregDefaultInit) {
+  // §6.7.1: trireg defaults to value x.
+  auto r = Parse(
+      "module t;\n"
+      "  trireg t1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
+}
+
+TEST(ParserSection6, InterconnectNet) {
+  // §6.7.1: interconnect net has no data type, optional packed/unpacked dims.
+  auto r = Parse(
+      "module t;\n"
+      "  interconnect w1;\n"
+      "  interconnect [3:0] w2;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_GE(r.cu->modules[0]->items.size(), 2u);
+}
+
+TEST(ParserSection6, AllBuiltinNetTypes) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire w;\n"
+      "  tri t;\n"
+      "  wand wa;\n"
+      "  wor wo;\n"
+      "  triand ta;\n"
+      "  trior to_;\n"
+      "  tri0 t0;\n"
+      "  tri1 t1;\n"
+      "  supply0 s0;\n"
+      "  supply1 s1;\n"
+      "  uwire uw;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_GE(r.cu->modules[0]->items.size(), 11u);
+}
+
+TEST(ParserSection6, WireWithPackedStruct) {
+  // §6.7.1 example: wire struct packed {logic ecc; ...} memsig;
+  auto r = Parse(
+      "module t;\n"
+      "  wire struct packed { logic ecc; logic [7:0] data; } memsig;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->name, "memsig");
+}
+
+TEST(ParserSection6, WireWithTypedef) {
+  // §6.7.1 example: typedef logic [31:0] addressT; wire addressT w1;
+  auto r = Parse(
+      "module t;\n"
+      "  typedef logic [31:0] addressT;\n"
+      "  wire addressT w1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_GE(items.size(), 2u);
+  EXPECT_EQ(items[1]->name, "w1");
 }

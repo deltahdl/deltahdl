@@ -766,3 +766,212 @@ TEST(ParserSection12, UniqueCasexQualifier) {
   EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasex);
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
 }
+
+// =============================================================================
+// LRM section 12.8 -- Block names and statement labels (additional tests)
+// =============================================================================
+
+TEST(ParserSection12, StatementLabelOnAssign) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    assign_val: x = 42;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->label, "assign_val");
+}
+
+TEST(ParserSection12, StatementLabelOnWhile) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    loop: while (x > 0) x = x - 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kWhile);
+}
+
+TEST(ParserSection12, StatementLabelOnForever) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    inf: forever @(posedge clk) x = ~x;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kForever);
+}
+
+TEST(ParserSection12, NestedNamedBlocks) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin : outer\n"
+      "    begin : inner\n"
+      "      x = 1;\n"
+      "    end : inner\n"
+      "  end : outer\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->label, "outer");
+  ASSERT_GE(body->stmts.size(), 1u);
+  EXPECT_EQ(body->stmts[0]->label, "inner");
+}
+
+// =============================================================================
+// LRM section 12.4 -- Conditional if-else statement
+// =============================================================================
+
+TEST(ParserSection12, BasicIfElse) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (a) x = 1;\n"
+      "    else x = 2;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  EXPECT_NE(stmt->condition, nullptr);
+  ASSERT_NE(stmt->then_branch, nullptr);
+  ASSERT_NE(stmt->else_branch, nullptr);
+}
+
+TEST(ParserSection12, IfWithoutElse) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (a) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  EXPECT_NE(stmt->then_branch, nullptr);
+  EXPECT_EQ(stmt->else_branch, nullptr);
+}
+
+TEST(ParserSection12, NestedIfElse) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (a)\n"
+      "      if (b) x = 1;\n"
+      "      else x = 2;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  // Else associates with the inner if
+  EXPECT_EQ(stmt->else_branch, nullptr);
+  ASSERT_NE(stmt->then_branch, nullptr);
+  EXPECT_EQ(stmt->then_branch->kind, StmtKind::kIf);
+  EXPECT_NE(stmt->then_branch->else_branch, nullptr);
+}
+
+TEST(ParserSection12, IfElseIfChain) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (a) x = 1;\n"
+      "    else if (b) x = 2;\n"
+      "    else if (c) x = 3;\n"
+      "    else x = 4;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  ASSERT_NE(stmt->else_branch, nullptr);
+  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kIf);
+  ASSERT_NE(stmt->else_branch->else_branch, nullptr);
+  EXPECT_EQ(stmt->else_branch->else_branch->kind, StmtKind::kIf);
+}
+
+TEST(ParserSection12, IfWithBlockBody) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (a) begin\n"
+      "      x = 1;\n"
+      "      y = 2;\n"
+      "    end else begin\n"
+      "      x = 3;\n"
+      "      y = 4;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  ASSERT_NE(stmt->then_branch, nullptr);
+  EXPECT_EQ(stmt->then_branch->kind, StmtKind::kBlock);
+  ASSERT_NE(stmt->else_branch, nullptr);
+  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kBlock);
+}
+
+// =============================================================================
+// LRM section 12.7.1 -- for-loop (additional coverage)
+// =============================================================================
+
+TEST(ParserSection12, ForLoopPostIncrementStep) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 10; i++) x = i;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFor);
+  EXPECT_NE(stmt->for_step, nullptr);
+}
+
+TEST(ParserSection12, ForLoopPostDecrementStep) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    for (int i = 255; i >= 0; i--) x = i;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFor);
+  EXPECT_NE(stmt->for_step, nullptr);
+}
+
+TEST(ParserSection12, ForLoopWithBlockBody) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 8; i++) begin\n"
+      "      $display(\"%d\", i);\n"
+      "      x = x + i;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFor);
+  ASSERT_NE(stmt->for_body, nullptr);
+  EXPECT_EQ(stmt->for_body->kind, StmtKind::kBlock);
+}

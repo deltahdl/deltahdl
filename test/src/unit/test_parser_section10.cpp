@@ -718,3 +718,218 @@ TEST(ParserSection10, ContinuousAssignDriveStrengthReversed) {
   EXPECT_EQ(ca->drive_strength0, 5u);  // supply0
   EXPECT_EQ(ca->drive_strength1, 3u);  // pull1
 }
+
+// =============================================================================
+// LRM section 10.9 -- Assignment patterns
+// =============================================================================
+
+TEST(ParserSection10, AssignmentPatternPositional) {
+  auto r = Parse(
+      "module m;\n"
+      "  int A[4] = '{1, 2, 3, 4};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_FALSE(mod->items.empty());
+  EXPECT_NE(mod->items[0]->init_expr, nullptr);
+  EXPECT_EQ(mod->items[0]->init_expr->kind, ExprKind::kAssignmentPattern);
+}
+
+TEST(ParserSection10, AssignmentPatternDefault) {
+  auto r = Parse(
+      "module m;\n"
+      "  int A[4] = '{default:0};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_FALSE(mod->items.empty());
+  EXPECT_NE(mod->items[0]->init_expr, nullptr);
+}
+
+TEST(ParserSection10, AssignmentPatternStruct) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct { int x; int y; } point_t;\n"
+      "  point_t p = '{x: 1, y: 2};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_GE(mod->items.size(), 2u);
+}
+
+TEST(ParserSection10, AssignmentPatternTypePrefixed) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef int T[3];\n"
+      "  T a = T'{1, 2, 3};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
+// =============================================================================
+// LRM section 10.10 -- Unpacked array concatenation
+// =============================================================================
+
+TEST(ParserSection10, UnpackedArrayConcat) {
+  auto r = Parse(
+      "module m;\n"
+      "  int A[3];\n"
+      "  initial A = {1, 2, 3};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
+TEST(ParserSection10, UnpackedArrayConcatEmpty) {
+  auto r = Parse(
+      "module m;\n"
+      "  int q[$];\n"
+      "  initial q = {};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
+}
+
+TEST(ParserSection10, UnpackedArrayConcatNested) {
+  auto r = Parse(
+      "module m;\n"
+      "  int A[2], B[2], C[4];\n"
+      "  initial C = {A, B};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
+// =============================================================================
+// LRM section 10.3 -- Continuous assignments (additional tests)
+// =============================================================================
+
+TEST(ParserSection10, ContinuousAssignExpression) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire [3:0] a, b, sum;\n"
+      "  assign sum = a + b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* ca = FindItemByKind(r.cu->modules[0]->items,
+                            ModuleItemKind::kContAssign);
+  ASSERT_NE(ca, nullptr);
+  ASSERT_NE(ca->assign_rhs, nullptr);
+  EXPECT_EQ(ca->assign_rhs->kind, ExprKind::kBinary);
+}
+
+TEST(ParserSection10, ContinuousAssignTernary) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire a, b, sel, y;\n"
+      "  assign y = sel ? a : b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* ca = FindItemByKind(r.cu->modules[0]->items,
+                            ModuleItemKind::kContAssign);
+  ASSERT_NE(ca, nullptr);
+  ASSERT_NE(ca->assign_rhs, nullptr);
+}
+
+TEST(ParserSection10, NetDeclAssignmentWithRange) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire [7:0] data = 8'hAB;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_FALSE(mod->items.empty());
+  EXPECT_NE(mod->items[0]->init_expr, nullptr);
+}
+
+// =============================================================================
+// LRM section 10.6.1 -- Assign/deassign additional patterns
+// =============================================================================
+
+TEST(ParserSection10, AssignInAlwaysBlock) {
+  // LRM example: D-type flip-flop with clear/preset using assign/deassign.
+  auto r = Parse(
+      "module dff(output q, input d, clear, preset, clock);\n"
+      "  logic q;\n"
+      "  always @(clear or preset)\n"
+      "    if (!clear) assign q = 0;\n"
+      "    else if (!preset) assign q = 1;\n"
+      "    else deassign q;\n"
+      "  always @(posedge clock) q = d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->name, "dff");
+}
+
+TEST(ParserSection10, AssignConcatLhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial begin\n"
+      "    assign {a, b} = 2'b10;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssign);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
+}
+
+TEST(ParserSection10, DeassignConcatLhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial begin\n"
+      "    deassign {a, b};\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDeassign);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
+}
+
+TEST(ParserSection10, ForceNet) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire [7:0] bus;\n"
+      "  initial begin\n"
+      "    force bus = 8'hFF;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kForce);
+  ASSERT_NE(stmt->lhs, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
+TEST(ParserSection10, ReleaseNet) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire [7:0] bus;\n"
+      "  initial begin\n"
+      "    release bus;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kRelease);
+  ASSERT_NE(stmt->lhs, nullptr);
+}

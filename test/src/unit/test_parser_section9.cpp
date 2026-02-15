@@ -666,3 +666,335 @@ TEST(ParserSection9, AutomaticVarInFork) {
   ASSERT_GE(stmt->fork_stmts.size(), 1u);
   EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kVarDecl);
 }
+
+// =============================================================================
+// §9.3.5 -- Statement labels (additional tests)
+// =============================================================================
+
+TEST(ParserSection9, StatementLabelOnAssignment) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    my_label: a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->label, "my_label");
+}
+
+TEST(ParserSection9, StatementLabelOnIf) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    check: if (x) a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->label, "check");
+}
+
+TEST(ParserSection9, StatementLabelOnForLoop) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    loop: for (int i = 0; i < 10; i++) a = i;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFor);
+}
+
+// =============================================================================
+// §9.4.4 -- Level-sensitive sequence controls
+// =============================================================================
+
+TEST(ParserSection9, WaitSequenceTriggered) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence abc;\n"
+      "    @(posedge clk) a ##1 b ##1 c;\n"
+      "  endsequence\n"
+      "  initial begin\n"
+      "    wait(abc.triggered);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
+TEST(ParserSection9, WaitSequenceTriggeredOr) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s1;\n"
+      "    @(posedge clk) a ##1 b;\n"
+      "  endsequence\n"
+      "  sequence s2;\n"
+      "    @(negedge clk) c ##1 d;\n"
+      "  endsequence\n"
+      "  initial begin\n"
+      "    wait(s1.triggered || s2.triggered);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
+TEST(ParserSection9, WaitSequenceTriggeredIfCheck) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence abc;\n"
+      "    @(posedge clk) a ##1 b;\n"
+      "  endsequence\n"
+      "  initial begin\n"
+      "    wait(abc.triggered);\n"
+      "    if (abc.triggered) $display(\"ok\");\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
+// =============================================================================
+// §9.6.2 -- Disable statement (additional tests)
+// =============================================================================
+
+TEST(ParserSection9, DisableNamedBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : blk\n"
+      "    disable blk;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  ASSERT_GE(body->stmts.size(), 1u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kDisable);
+}
+
+TEST(ParserSection9, DisableTaskName) {
+  auto r = Parse(
+      "module m;\n"
+      "  task my_task;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    disable my_task;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDisable);
+}
+
+TEST(ParserSection9, DisableForkAfterJoinNone) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      #100;\n"
+      "    join_none\n"
+      "    #50;\n"
+      "    disable fork;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  ASSERT_GE(body->stmts.size(), 3u);
+  EXPECT_EQ(body->stmts[2]->kind, StmtKind::kDisableFork);
+}
+
+// =============================================================================
+// LRM section 9.4 -- Procedural timing controls (additional coverage)
+// =============================================================================
+
+TEST(ParserSection9, DelayControlReal) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    #3.5 a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDelay);
+  EXPECT_NE(stmt->delay, nullptr);
+}
+
+TEST(ParserSection9, DelayControlParenthesized) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    #(5) a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDelay);
+}
+
+TEST(ParserSection9, EventControlBareSignal) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(data) a = data;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  ASSERT_FALSE(stmt->events.empty());
+  EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
+}
+
+TEST(ParserSection9, WaitStatementWithBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    wait (ready) begin\n"
+      "      a = 1;\n"
+      "      b = 2;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kWait);
+  EXPECT_NE(stmt->condition, nullptr);
+  ASSERT_NE(stmt->body, nullptr);
+  EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
+}
+
+// =============================================================================
+// LRM section 9.3.1 -- Sequential blocks (additional tests)
+// =============================================================================
+
+TEST(ParserSection9, SequentialBlockNamedBeginEnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : my_seq\n"
+      "    a = 1;\n"
+      "    b = 2;\n"
+      "  end : my_seq\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  EXPECT_EQ(item->body->label, "my_seq");
+  EXPECT_EQ(item->body->stmts.size(), 2u);
+}
+
+TEST(ParserSection9, SequentialBlockVarDecl) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int temp;\n"
+      "    temp = 42;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kBlock);
+  ASSERT_GE(body->stmts.size(), 2u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
+}
+
+TEST(ParserSection9, SequentialBlockNestedBeginEnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    begin\n"
+      "      a = 1;\n"
+      "    end\n"
+      "    begin\n"
+      "      b = 2;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  ASSERT_EQ(body->stmts.size(), 2u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kBlock);
+  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kBlock);
+}
+
+TEST(ParserSection9, SequentialBlockMultipleVarDecls) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin int x; logic [7:0] y; x = 1; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  ASSERT_GE(body->stmts.size(), 3u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kVarDecl);
+}
+
+// =============================================================================
+// LRM section 9.3.2 -- Parallel blocks (additional tests)
+// =============================================================================
+
+TEST(ParserSection9, ParallelBlockNamedForkJoin) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork : par_blk\n"
+      "      #10 a = 1;\n"
+      "      #20 b = 2;\n"
+      "    join : par_blk\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  EXPECT_EQ(stmt->label, "par_blk");
+  EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoin);
+}
+
+TEST(ParserSection9, ParallelBlockVarDeclInFork) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial fork\n"
+      "    int local_var;\n"
+      "    begin local_var = 1; end\n"
+      "  join\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  ASSERT_GE(stmt->fork_stmts.size(), 1u);
+}
+
+TEST(ParserSection9, ParallelBlockNestedBeginInFork) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial fork\n"
+      "    begin #10 a = 1; #20 a = 2; end\n"
+      "    begin #15 b = 3; end\n"
+      "  join\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  ASSERT_EQ(stmt->fork_stmts.size(), 2u);
+  EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kBlock);
+  EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kBlock);
+}

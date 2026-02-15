@@ -384,3 +384,429 @@ TEST(ParserSection14, ClockingEventBareIdentifier) {
   ASSERT_EQ(item->clocking_event.size(), 1u);
   EXPECT_EQ(item->clocking_event[0].edge, Edge::kNone);
 }
+
+// =============================================================================
+// LRM section 14.1 -- Clocking block overview
+// =============================================================================
+
+// §14.1 introduces clocking blocks as grouping clock-synchronous signals.
+// A minimal clocking block with a single input validates the core construct.
+TEST(ParserSection14, OverviewMinimalClockingBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking bus @(posedge clk);\n"
+      "    input addr;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  EXPECT_EQ(item->kind, ModuleItemKind::kClockingBlock);
+  EXPECT_EQ(item->name, "bus");
+  ASSERT_EQ(item->clocking_event.size(), 1u);
+  EXPECT_EQ(item->clocking_event[0].edge, Edge::kPosedge);
+  ASSERT_EQ(item->clocking_signals.size(), 1u);
+  EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInput);
+  EXPECT_EQ(item->clocking_signals[0].name, "addr");
+}
+
+// §14.1 overview: clocking block with multiple direction groups.
+TEST(ParserSection14, OverviewMixedDirectionSignals) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data_in;\n"
+      "    output data_out;\n"
+      "    inout ctrl;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_EQ(item->clocking_signals.size(), 3u);
+
+  struct Expected {
+    Direction dir;
+    const char* name;
+  };
+  const Expected kExpected[] = {
+      {Direction::kInput, "data_in"},
+      {Direction::kOutput, "data_out"},
+      {Direction::kInout, "ctrl"},
+  };
+  for (size_t i = 0; i < std::size(kExpected); ++i) {
+    EXPECT_EQ(item->clocking_signals[i].direction, kExpected[i].dir)
+        << "signal " << i;
+    EXPECT_EQ(item->clocking_signals[i].name, kExpected[i].name)
+        << "signal " << i;
+  }
+}
+
+// §14.1 overview: clocking block with negedge event.
+TEST(ParserSection14, OverviewNegedgeClockEvent) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(negedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_EQ(item->clocking_event.size(), 1u);
+  EXPECT_EQ(item->clocking_event[0].edge, Edge::kNegedge);
+}
+
+// §14.1 overview: clocking block with input skew and output skew together.
+TEST(ParserSection14, OverviewInputOutputSkews) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input #1 data_in;\n"
+      "    output #2 data_out;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_EQ(item->clocking_signals.size(), 2u);
+  EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInput);
+  ASSERT_NE(item->clocking_signals[0].skew_delay, nullptr);
+  EXPECT_EQ(item->clocking_signals[1].direction, Direction::kOutput);
+  ASSERT_NE(item->clocking_signals[1].skew_delay, nullptr);
+}
+
+// §14.1 overview: clocking block inside a program (not just module).
+TEST(ParserSection14, OverviewClockingInProgram) {
+  auto r = Parse(
+      "program test;\n"
+      "  clocking bus @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_FALSE(r.cu->modules.empty());
+  auto* item = FindClockingBlock(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->name, "bus");
+}
+
+// =============================================================================
+// LRM section 14.10 -- Clocking block events
+// =============================================================================
+
+// §14.10: clocking block event used in always block (from LRM example).
+// The clocking block name itself acts as an event trigger in the Observed
+// region. This tests the LRM example: always @(dram) $display(...);
+TEST(ParserSection14, ClockingBlockEventAlwaysAt) {
+  auto r = Parse(
+      "module foo(input phi1, input [7:0] data);\n"
+      "  clocking dram @(posedge phi1);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "  always @(dram)\n"
+      "    $display(\"clocking block event\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_FALSE(r.cu->modules.empty());
+  auto* item = FindClockingBlock(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->name, "dram");
+  // The always block should also have been parsed (at least 2 items).
+  EXPECT_GE(r.cu->modules[0]->items.size(), 2u);
+}
+
+// §14.10: clocking block with output negedge skew (from LRM example).
+TEST(ParserSection14, ClockingBlockEventOutputNegedgeSkew) {
+  auto r = Parse(
+      "module foo(input phi1, input [7:0] data);\n"
+      "  clocking dram @(posedge phi1);\n"
+      "    input data;\n"
+      "    output negedge #1 address;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_EQ(item->clocking_signals.size(), 2u);
+  auto& out_sig = item->clocking_signals[1];
+  EXPECT_EQ(out_sig.direction, Direction::kOutput);
+  EXPECT_EQ(out_sig.name, "address");
+  EXPECT_EQ(out_sig.skew_edge, Edge::kNegedge);
+  ASSERT_NE(out_sig.skew_delay, nullptr);
+}
+
+// §14.10: clocking event alongside a posedge always block.
+TEST(ParserSection14, ClockingBlockEventWithPosedgeAlways) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking dram @(posedge phi1);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "  always @(posedge phi1) $display(\"clocking event\");\n"
+      "  always @(dram) $display(\"clocking block event\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FindClockingBlock(r);
+  ASSERT_NE(item, nullptr);
+  // Three items: clocking block + two always blocks.
+  EXPECT_GE(r.cu->modules[0]->items.size(), 3u);
+}
+
+// §14.10: clocking block with multiple input signals triggers one event.
+TEST(ParserSection14, ClockingBlockEventMultipleInputs) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input a, b, c;\n"
+      "  endclocking\n"
+      "  always @(cb) $display(\"triggered\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FindClockingBlock(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->clocking_signals.size(), 3u);
+  EXPECT_GE(r.cu->modules[0]->items.size(), 2u);
+}
+
+// =============================================================================
+// LRM section 14.12 -- Default clocking
+// =============================================================================
+
+// §14.12: default clocking declared inline with signals (from LRM Example 1).
+TEST(ParserSection14, DefaultClockingInlineDecl) {
+  auto r = Parse(
+      "program test(input logic clk, input logic [15:0] data);\n"
+      "  default clocking bus @(posedge clk);\n"
+      "    inout data;\n"
+      "  endclocking\n"
+      "endprogram\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  EXPECT_TRUE(item->is_default_clocking);
+  EXPECT_EQ(item->name, "bus");
+  ASSERT_EQ(item->clocking_signals.size(), 1u);
+  EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInout);
+  EXPECT_EQ(item->clocking_signals[0].name, "data");
+}
+
+// §14.12: default clocking with negedge (variation of the LRM examples).
+TEST(ParserSection14, DefaultClockingNegedge) {
+  auto r = Parse(
+      "module m;\n"
+      "  default clocking cb @(negedge clk);\n"
+      "    input data;\n"
+      "    output ack;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  EXPECT_TRUE(item->is_default_clocking);
+  ASSERT_EQ(item->clocking_event.size(), 1u);
+  EXPECT_EQ(item->clocking_event[0].edge, Edge::kNegedge);
+  ASSERT_EQ(item->clocking_signals.size(), 2u);
+}
+
+// §14.12: default clocking block with end label.
+TEST(ParserSection14, DefaultClockingEndLabel) {
+  auto r = Parse(
+      "module m;\n"
+      "  default clocking bus @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking : bus\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  EXPECT_TRUE(item->is_default_clocking);
+  EXPECT_EQ(item->name, "bus");
+}
+
+// §14.12: unnamed default clocking block with multiple signals.
+TEST(ParserSection14, DefaultClockingUnnamedMultipleSignals) {
+  auto r = Parse(
+      "module m;\n"
+      "  default clocking @(posedge clk);\n"
+      "    input a, b;\n"
+      "    output c;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  EXPECT_TRUE(item->is_default_clocking);
+  EXPECT_TRUE(item->name.empty());
+  ASSERT_EQ(item->clocking_signals.size(), 3u);
+}
+
+// §14.12: default clocking in an interface context.
+TEST(ParserSection14, DefaultClockingInInterface) {
+  auto r = Parse(
+      "interface bus_if(input logic clk);\n"
+      "  default clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_FALSE(r.cu->modules.empty());
+  auto* item = FindClockingBlock(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->is_default_clocking);
+  EXPECT_EQ(item->name, "cb");
+}
+
+// =============================================================================
+// LRM section 14.13 -- Input sampling
+// =============================================================================
+
+// §14.13: input sampled at clocking event (basic pattern from LRM).
+// Validates: clocking cb @(negedge clk); input v; endclocking
+TEST(ParserSection14, InputSamplingBasic) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(negedge clk);\n"
+      "    input v;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_EQ(item->clocking_signals.size(), 1u);
+  EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInput);
+  EXPECT_EQ(item->clocking_signals[0].name, "v");
+  EXPECT_EQ(item->clocking_signals[0].skew_delay, nullptr);
+}
+
+// §14.13: input with explicit #0 skew (samples in the Observed region).
+TEST(ParserSection14, InputSamplingExplicitZeroSkew) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input #0 data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_EQ(item->clocking_signals.size(), 1u);
+  auto& sig = item->clocking_signals[0];
+  EXPECT_EQ(sig.direction, Direction::kInput);
+  ASSERT_NE(sig.skew_delay, nullptr);
+  EXPECT_EQ(sig.skew_delay->kind, ExprKind::kIntegerLiteral);
+}
+
+// §14.13: inout signals are also sampled as inputs at the clocking event.
+TEST(ParserSection14, InputSamplingInoutSignal) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    inout data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_EQ(item->clocking_signals.size(), 1u);
+  EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInout);
+  EXPECT_EQ(item->clocking_signals[0].name, "data");
+}
+
+// §14.13: input with nonzero skew samples from a prior time step.
+TEST(ParserSection14, InputSamplingNonzeroSkew) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input #3 addr;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_EQ(item->clocking_signals.size(), 1u);
+  auto& sig = item->clocking_signals[0];
+  EXPECT_EQ(sig.direction, Direction::kInput);
+  EXPECT_EQ(sig.name, "addr");
+  ASSERT_NE(sig.skew_delay, nullptr);
+  EXPECT_EQ(sig.skew_delay->kind, ExprKind::kIntegerLiteral);
+}
+
+// §14.13: multiple inputs with same skew declaration.
+TEST(ParserSection14, InputSamplingMultipleSignals) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(negedge clk);\n"
+      "    input #1 a, b, c;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_EQ(item->clocking_signals.size(), 3u);
+  for (size_t i = 0; i < 3; ++i) {
+    EXPECT_EQ(item->clocking_signals[i].direction, Direction::kInput)
+        << "signal " << i;
+    ASSERT_NE(item->clocking_signals[i].skew_delay, nullptr) << "signal " << i;
+  }
+}
+
+// =============================================================================
+// LRM section 14.14 -- Global clocking
+// =============================================================================
+
+// §14.14: global clocking with compound event expression (from LRM example).
+TEST(ParserSection14, GlobalClockingCompoundEvent) {
+  auto r = Parse(
+      "module top;\n"
+      "  logic clk1, clk2;\n"
+      "  global clocking sys @(clk1 or clk2); endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  EXPECT_TRUE(item->is_global_clocking);
+  EXPECT_EQ(item->name, "sys");
+  EXPECT_TRUE(item->clocking_signals.empty());
+  EXPECT_GE(item->clocking_event.size(), 2u);
+}
+
+// §14.14: global clocking with unnamed identifier (name is optional).
+TEST(ParserSection14, GlobalClockingUnnamed) {
+  auto r = Parse(
+      "module m;\n"
+      "  global clocking @(posedge sys_clk); endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  EXPECT_TRUE(item->is_global_clocking);
+  EXPECT_TRUE(item->name.empty());
+  EXPECT_TRUE(item->clocking_signals.empty());
+}
+
+// §14.14: global clocking with end label.
+TEST(ParserSection14, GlobalClockingEndLabel) {
+  auto r = Parse(
+      "module m;\n"
+      "  global clocking gclk @(posedge sys_clk);\n"
+      "  endclocking : gclk\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  EXPECT_TRUE(item->is_global_clocking);
+  EXPECT_EQ(item->name, "gclk");
+}
+
+// §14.14: global clocking has no signal declarations (shall be empty body).
+TEST(ParserSection14, GlobalClockingNoSignals) {
+  auto r = Parse(
+      "module m;\n"
+      "  global clocking gc @(negedge clk); endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  EXPECT_TRUE(item->is_global_clocking);
+  EXPECT_TRUE(item->clocking_signals.empty());
+  ASSERT_EQ(item->clocking_event.size(), 1u);
+  EXPECT_EQ(item->clocking_event[0].edge, Edge::kNegedge);
+}
+
+// §14.14: global clocking in subsystem pattern (from LRM hierarchical example).
+TEST(ParserSection14, GlobalClockingSubsystemPattern) {
+  auto r = Parse(
+      "module subsystem1;\n"
+      "  logic subclk1;\n"
+      "  global clocking sub_sys1 @(subclk1); endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  EXPECT_TRUE(item->is_global_clocking);
+  EXPECT_EQ(item->name, "sub_sys1");
+  ASSERT_EQ(item->clocking_event.size(), 1u);
+  EXPECT_EQ(item->clocking_event[0].edge, Edge::kNone);
+}

@@ -266,3 +266,47 @@ TEST(ParserSection25, MultipleModportThreeItems) {
   }
   EXPECT_EQ(iface->modports[2]->ports[0].direction, Direction::kInout);
 }
+
+// --- Virtual interface with parameter (LRM §25.9) ---
+
+TEST(ParserSection25, VirtualInterfaceInClass) {
+  auto r = Parse(
+      "class driver;\n"
+      "  virtual interface simple_bus bus_if;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1);
+  auto* cls = r.cu->classes[0];
+  ASSERT_FALSE(cls->members.empty());
+  EXPECT_EQ(cls->members[0]->data_type.kind, DataTypeKind::kVirtualInterface);
+  EXPECT_EQ(cls->members[0]->data_type.type_name, "simple_bus");
+}
+
+TEST(ParserSection25, VirtualInterfaceAssignment) {
+  auto r = Parse(
+      "module top;\n"
+      "  virtual interface simple_bus vif;\n"
+      "  initial begin\n"
+      "    vif = null;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_GE(mod->items.size(), 2);
+  EXPECT_EQ(mod->items[0]->data_type.kind, DataTypeKind::kVirtualInterface);
+}
+
+TEST(ParserSection25, VirtualInterfaceMultipleDecls) {
+  auto r = Parse(
+      "module top;\n"
+      "  virtual interface bus_if a_if;\n"
+      "  virtual bus_if b_if;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_GE(mod->items.size(), 2);
+  EXPECT_EQ(mod->items[0]->data_type.kind, DataTypeKind::kVirtualInterface);
+  EXPECT_EQ(mod->items[0]->name, "a_if");
+  EXPECT_EQ(mod->items[1]->data_type.kind, DataTypeKind::kVirtualInterface);
+  EXPECT_EQ(mod->items[1]->name, "b_if");
+}

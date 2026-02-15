@@ -184,4 +184,82 @@ TEST_F(DpiParseTest, DpiImportCoexistsWithPackageImport) {
   EXPECT_EQ(items[2]->kind, ModuleItemKind::kDpiExport);
 }
 
+// =============================================================================
+// §35.2.1 Attributes on modules/instances
+// =============================================================================
+
+TEST_F(DpiParseTest, AttributeOnModuleDefinition) {
+  auto* unit = Parse(R"(
+    (* optimize_power *)
+    module m;
+      wire a;
+    endmodule
+  )");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  EXPECT_EQ(unit->modules[0]->name, "m");
+}
+
+TEST_F(DpiParseTest, AttributeOnModuleInstantiation) {
+  auto* unit = Parse(R"(
+    module m;
+      (* dont_touch *)
+      sub u1(.a(x));
+    endmodule
+  )");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kModuleInst);
+  ASSERT_FALSE(items[0]->attrs.empty());
+  EXPECT_EQ(items[0]->attrs[0].name, "dont_touch");
+}
+
+TEST_F(DpiParseTest, AttributeWithValueOnInstance) {
+  auto* unit = Parse(R"(
+    module m;
+      (* optimize_power = 0 *)
+      sub u1(.a(x));
+    endmodule
+  )");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  ASSERT_FALSE(items[0]->attrs.empty());
+  EXPECT_EQ(items[0]->attrs[0].name, "optimize_power");
+  EXPECT_NE(items[0]->attrs[0].value, nullptr);
+}
+
+// =============================================================================
+// §35.5 Attribute compatibility (multiple attributes)
+// =============================================================================
+
+TEST_F(DpiParseTest, MultipleAttributesOnDecl) {
+  auto* unit = Parse(R"(
+    module m;
+      (* full_case, parallel_case *)
+      wire a;
+    endmodule
+  )");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  ASSERT_GE(items[0]->attrs.size(), 2u);
+  EXPECT_EQ(items[0]->attrs[0].name, "full_case");
+  EXPECT_EQ(items[0]->attrs[1].name, "parallel_case");
+}
+
+TEST_F(DpiParseTest, AttributeWithAndWithoutValue) {
+  auto* unit = Parse(R"(
+    module m;
+      (* full_case, parallel_case = 1 *)
+      wire a;
+    endmodule
+  )");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_GE(items[0]->attrs.size(), 2u);
+  EXPECT_EQ(items[0]->attrs[0].value, nullptr);
+  EXPECT_NE(items[0]->attrs[1].value, nullptr);
+}
+
 }  // namespace

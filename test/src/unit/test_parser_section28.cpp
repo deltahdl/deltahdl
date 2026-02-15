@@ -699,3 +699,287 @@ TEST(ParserSection28, ElaboratePulldownGate) {
   EXPECT_EQ(mod->assigns[0].rhs->kind, ExprKind::kIntegerLiteral);
   EXPECT_EQ(mod->assigns[0].rhs->int_val, 0);
 }
+
+// =============================================================
+// Section 28.1: Gate declarations (additional)
+// =============================================================
+
+TEST(ParserSection28, PassGateTran) {
+  auto r = Parse(
+      "module m;\n"
+      "  tran (a, b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
+  EXPECT_EQ(item->gate_kind, GateKind::kTran);
+  ASSERT_EQ(item->gate_terminals.size(), 2);
+}
+
+TEST(ParserSection28, MosSwitchNmos) {
+  auto r = Parse(
+      "module m;\n"
+      "  nmos n1(out, data, control);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->gate_kind, GateKind::kNmos);
+  EXPECT_EQ(item->gate_inst_name, "n1");
+  ASSERT_EQ(item->gate_terminals.size(), 3);
+}
+
+TEST(ParserSection28, CmosSwitchCmos) {
+  auto r = Parse(
+      "module m;\n"
+      "  cmos c1(out, data, ncontrol, pcontrol);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->gate_kind, GateKind::kCmos);
+  EXPECT_EQ(item->gate_inst_name, "c1");
+  ASSERT_EQ(item->gate_terminals.size(), 4);
+}
+
+// =============================================================
+// Section 28.3.5: Gate arrays (range specification)
+// =============================================================
+
+TEST(ParserSection28, GateArrayRange) {
+  auto r = Parse(
+      "module m;\n"
+      "  nand n[0:3](out, a, b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
+  EXPECT_EQ(item->gate_kind, GateKind::kNand);
+}
+
+TEST(ParserSection28, GateArrayWithDelay) {
+  auto r = Parse(
+      "module m;\n"
+      "  and #5 g[0:7](out, a, b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->gate_kind, GateKind::kAnd);
+  EXPECT_NE(item->gate_delay, nullptr);
+}
+
+// =============================================================
+// Section 28.12: Specify blocks
+// =============================================================
+
+TEST(ParserSection28, SpecifyBlockSimplePath) {
+  auto r = Parse(
+      "module m(input a, output b);\n"
+      "  specify\n"
+      "    (a => b) = 10;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  bool found_spec = false;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kSpecifyBlock) {
+      found_spec = true;
+      ASSERT_GE(item->specify_items.size(), 1u);
+      EXPECT_EQ(item->specify_items[0]->kind, SpecifyItemKind::kPathDecl);
+      EXPECT_EQ(item->specify_items[0]->path.path_kind,
+                SpecifyPathKind::kParallel);
+    }
+  }
+  EXPECT_TRUE(found_spec);
+}
+
+TEST(ParserSection28, SpecifyBlockFullPath) {
+  auto r = Parse(
+      "module m(input a, b, output c);\n"
+      "  specify\n"
+      "    (a, b *> c) = (5, 10);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  bool found_full = false;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kSpecifyBlock) {
+      for (auto* si : item->specify_items) {
+        if (si->kind == SpecifyItemKind::kPathDecl &&
+            si->path.path_kind == SpecifyPathKind::kFull) {
+          found_full = true;
+        }
+      }
+    }
+  }
+  EXPECT_TRUE(found_full);
+}
+
+TEST(ParserSection28, SpecifyBlockWithSpecparam) {
+  auto r = Parse(
+      "module m(input clk, output q);\n"
+      "  specify\n"
+      "    specparam tDelay = 10;\n"
+      "    (clk => q) = tDelay;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  bool found_specparam = false;
+  bool found_path = false;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kSpecifyBlock) {
+      for (auto* si : item->specify_items) {
+        if (si->kind == SpecifyItemKind::kSpecparam) found_specparam = true;
+        if (si->kind == SpecifyItemKind::kPathDecl) found_path = true;
+      }
+    }
+  }
+  EXPECT_TRUE(found_specparam);
+  EXPECT_TRUE(found_path);
+}
+
+// =============================================================
+// Section 28.16: Timing checks
+// =============================================================
+
+TEST(ParserSection28, TimingCheckSetup) {
+  auto r = Parse(
+      "module m(input d, clk);\n"
+      "  specify\n"
+      "    $setup(d, posedge clk, 10);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  bool found_tc = false;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kSpecifyBlock) {
+      for (auto* si : item->specify_items) {
+        if (si->kind == SpecifyItemKind::kTimingCheck) {
+          found_tc = true;
+          EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kSetup);
+          EXPECT_EQ(si->timing_check.ref_signal, "d");
+          EXPECT_EQ(si->timing_check.data_edge, SpecifyEdge::kPosedge);
+          EXPECT_EQ(si->timing_check.data_signal, "clk");
+        }
+      }
+    }
+  }
+  EXPECT_TRUE(found_tc);
+}
+
+TEST(ParserSection28, TimingCheckHold) {
+  auto r = Parse(
+      "module m(input d, clk);\n"
+      "  specify\n"
+      "    $hold(posedge clk, d, 5);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  bool found_tc = false;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kSpecifyBlock) {
+      for (auto* si : item->specify_items) {
+        if (si->kind == SpecifyItemKind::kTimingCheck) {
+          found_tc = true;
+          EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kHold);
+          EXPECT_EQ(si->timing_check.ref_edge, SpecifyEdge::kPosedge);
+          EXPECT_EQ(si->timing_check.ref_signal, "clk");
+        }
+      }
+    }
+  }
+  EXPECT_TRUE(found_tc);
+}
+
+// =============================================================
+// Section 28.16.2: System timing check args (notifier)
+// =============================================================
+
+TEST(ParserSection28, TimingCheckSetupWithNotifier) {
+  auto r = Parse(
+      "module m(input d, clk);\n"
+      "  reg notif;\n"
+      "  specify\n"
+      "    $setup(d, posedge clk, 10, notif);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  bool found_tc = false;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kSpecifyBlock) {
+      for (auto* si : item->specify_items) {
+        if (si->kind == SpecifyItemKind::kTimingCheck) {
+          found_tc = true;
+          EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kSetup);
+          EXPECT_EQ(si->timing_check.notifier, "notif");
+        }
+      }
+    }
+  }
+  EXPECT_TRUE(found_tc);
+}
+
+TEST(ParserSection28, TimingCheckWidth) {
+  auto r = Parse(
+      "module m(input clk);\n"
+      "  specify\n"
+      "    $width(posedge clk, 50);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  bool found_tc = false;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kSpecifyBlock) {
+      for (auto* si : item->specify_items) {
+        if (si->kind == SpecifyItemKind::kTimingCheck) {
+          found_tc = true;
+          EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kWidth);
+          EXPECT_EQ(si->timing_check.ref_edge, SpecifyEdge::kPosedge);
+          EXPECT_EQ(si->timing_check.ref_signal, "clk");
+        }
+      }
+    }
+  }
+  EXPECT_TRUE(found_tc);
+}
+
+// =============================================================
+// Section 28.16: Gate and net delays (additional)
+// =============================================================
+
+// Two-delay specification: rise and fall delays (LRM 28.16).
+TEST(ParserSection28, GateWithTwoDelays) {
+  auto r = Parse(
+      "module m;\n"
+      "  and #(10, 12) a2(out, in1, in2);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->gate_kind, GateKind::kAnd);
+  EXPECT_NE(item->gate_delay, nullptr);
+}
+
+// Three-delay specification: rise, fall, and turn-off delays.
+TEST(ParserSection28, GateWithThreeDelays) {
+  auto r = Parse(
+      "module m;\n"
+      "  bufif0 #(10, 12, 11) b3(out, in, ctrl);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->gate_kind, GateKind::kBufif0);
+  EXPECT_NE(item->gate_delay, nullptr);
+}
+
+// Min:typ:max delay specification (LRM 28.16.1).
+TEST(ParserSection28, GateMinTypMaxDelay) {
+  auto r = Parse(
+      "module m;\n"
+      "  bufif0 #(5:7:9, 8:10:12, 15:18:21) b1(io1, io2, dir);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->gate_kind, GateKind::kBufif0);
+  EXPECT_NE(item->gate_delay, nullptr);
+}

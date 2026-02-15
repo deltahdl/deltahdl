@@ -460,3 +460,297 @@ TEST(ParserSection23, ModuleHeaderMultipleImportsSecond) {
   EXPECT_EQ(mod->items[1]->import_item.package_name, "B");
   EXPECT_EQ(mod->items[1]->import_item.item_name, "foo");
 }
+
+// =============================================================================
+// LRM section 23.2 -- Module definitions (additional)
+// =============================================================================
+
+TEST(ParserSection23, ModuleWithParameters) {
+  auto r = Parse(
+      "module m #(parameter WIDTH = 8, parameter DEPTH = 16)(\n"
+      "  input logic [WIDTH-1:0] data_in,\n"
+      "  output logic [WIDTH-1:0] data_out\n"
+      ");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  EXPECT_EQ(mod->name, "m");
+  ASSERT_EQ(mod->params.size(), 2u);
+  EXPECT_EQ(mod->params[0].first, "WIDTH");
+  EXPECT_EQ(mod->params[1].first, "DEPTH");
+  ASSERT_EQ(mod->ports.size(), 2u);
+}
+
+TEST(ParserSection23, ModuleEmptyPortList) {
+  auto r = Parse("module m(); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_EQ(r.cu->modules[0]->name, "m");
+  EXPECT_TRUE(r.cu->modules[0]->ports.empty());
+}
+
+TEST(ParserSection23, ModuleNoPortList) {
+  auto r = Parse("module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_EQ(r.cu->modules[0]->name, "m");
+  EXPECT_TRUE(r.cu->modules[0]->ports.empty());
+}
+
+// =============================================================================
+// LRM section 23.3 -- Ports (additional)
+// =============================================================================
+
+TEST(ParserSection23, AnsiPortsInputOutput) {
+  auto r = Parse(
+      "module m(input logic clk, input logic rst, output logic q);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->ports.size(), 3u);
+  EXPECT_EQ(mod->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(mod->ports[0].name, "clk");
+  EXPECT_EQ(mod->ports[2].direction, Direction::kOutput);
+  EXPECT_EQ(mod->ports[2].name, "q");
+}
+
+TEST(ParserSection23, AnsiPortsWithDefaultType) {
+  auto r = Parse(
+      "module m(input a, output b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->ports.size(), 2u);
+  EXPECT_EQ(mod->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(mod->ports[1].direction, Direction::kOutput);
+}
+
+TEST(ParserSection23, AnsiPortsInout) {
+  auto r = Parse(
+      "module m(inout wire [7:0] data);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->ports.size(), 1u);
+  EXPECT_EQ(mod->ports[0].direction, Direction::kInout);
+  EXPECT_EQ(mod->ports[0].name, "data");
+}
+
+// =============================================================================
+// LRM section 23.10 -- Module instantiation / parameter override
+// =============================================================================
+
+TEST(ParserSection23, ModuleInstBasic) {
+  auto r = Parse(
+      "module top;\n"
+      "  sub u1(.a(w1), .b(w2));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
+  EXPECT_EQ(item->inst_module, "sub");
+  EXPECT_EQ(item->inst_name, "u1");
+  ASSERT_EQ(item->inst_ports.size(), 2u);
+}
+
+TEST(ParserSection23, ModuleInstWithParamOverride) {
+  auto r = Parse(
+      "module top;\n"
+      "  sub #(8, 16) u1(.a(w1));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
+  EXPECT_EQ(item->inst_module, "sub");
+  ASSERT_EQ(item->inst_params.size(), 2u);
+}
+
+TEST(ParserSection23, ModuleInstNamedParamOverride) {
+  auto r = Parse(
+      "module top;\n"
+      "  sub #(.WIDTH(8), .DEPTH(16)) u1(.a(w1));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
+  EXPECT_EQ(item->inst_module, "sub");
+}
+
+// =============================================================================
+// LRM section 23.10.2 -- Generated instantiation
+// =============================================================================
+
+TEST(ParserSection23, GenerateForInstantiation) {
+  auto r = Parse(
+      "module top;\n"
+      "  for (genvar i = 0; i < 4; i++) begin : gen_blk\n"
+      "    sub u(.a(w[i]));\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 1u);
+  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kGenerateFor);
+  ASSERT_EQ(mod->items[0]->gen_body.size(), 1u);
+  EXPECT_EQ(mod->items[0]->gen_body[0]->kind, ModuleItemKind::kModuleInst);
+}
+
+// =============================================================================
+// LRM section 23.10.2.1 -- Generate blocks
+// =============================================================================
+
+TEST(ParserSection23, GenerateBlockLabeled) {
+  auto r = Parse(
+      "module top;\n"
+      "  if (1) begin : blk\n"
+      "    wire a;\n"
+      "    assign a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 1u);
+  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kGenerateIf);
+  ASSERT_GE(mod->items[0]->gen_body.size(), 2u);
+}
+
+// =============================================================================
+// LRM section 23.10.2.2 -- Conditional generate
+// =============================================================================
+
+TEST(ParserSection23, ConditionalGenerateIfElse) {
+  auto r = Parse(
+      "module top;\n"
+      "  if (WIDTH == 8) begin\n"
+      "    assign out = a;\n"
+      "  end else begin\n"
+      "    assign out = b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* gen = r.cu->modules[0]->items[0];
+  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateIf);
+  ASSERT_NE(gen->gen_else, nullptr);
+}
+
+TEST(ParserSection23, ConditionalGenerateCase) {
+  auto r = Parse(
+      "module top;\n"
+      "  case (MODE)\n"
+      "    0: assign out = a;\n"
+      "    1: assign out = b;\n"
+      "    default: assign out = 0;\n"
+      "  endcase\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* gen = r.cu->modules[0]->items[0];
+  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateCase);
+  ASSERT_EQ(gen->gen_case_items.size(), 3u);
+}
+
+// =============================================================================
+// LRM section 23.10.4 -- Port connection rules (additional)
+// =============================================================================
+
+TEST(ParserSection23, PortConnectionPositional) {
+  auto r = Parse(
+      "module top;\n"
+      "  sub u1(a, b, c);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
+  EXPECT_EQ(item->inst_module, "sub");
+  ASSERT_EQ(item->inst_ports.size(), 3u);
+}
+
+TEST(ParserSection23, PortConnectionNamed) {
+  auto r = Parse(
+      "module top;\n"
+      "  sub u1(.clk(sys_clk), .rst(sys_rst), .data(bus));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
+  ASSERT_EQ(item->inst_ports.size(), 3u);
+  EXPECT_EQ(item->inst_ports[0].first, "clk");
+  EXPECT_EQ(item->inst_ports[1].first, "rst");
+  EXPECT_EQ(item->inst_ports[2].first, "data");
+}
+
+TEST(ParserSection23, PortConnectionEmptyNamed) {
+  auto r = Parse(
+      "module top;\n"
+      "  sub u1(.clk(sys_clk), .unused());\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
+  ASSERT_EQ(item->inst_ports.size(), 2u);
+  EXPECT_EQ(item->inst_ports[1].first, "unused");
+  EXPECT_EQ(item->inst_ports[1].second, nullptr);
+}
+
+// =============================================================================
+// LRM section 23.3.2 -- Module instantiation syntax (additional)
+// =============================================================================
+
+// Multiple module instances in a single instantiation statement.
+TEST(ParserSection23, MultipleInstancesSingleStatement) {
+  auto r = Parse(
+      "module top;\n"
+      "  sub u1(.a(w1)), u2(.a(w2));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 2u);
+  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kModuleInst);
+  EXPECT_EQ(mod->items[0]->inst_module, "sub");
+  EXPECT_EQ(mod->items[0]->inst_name, "u1");
+  EXPECT_EQ(mod->items[1]->kind, ModuleItemKind::kModuleInst);
+  EXPECT_EQ(mod->items[1]->inst_module, "sub");
+  EXPECT_EQ(mod->items[1]->inst_name, "u2");
+}
+
+// Implicit named port connection: .name (no expression in parens).
+TEST(ParserSection23, ImplicitNamedPortConnection) {
+  auto r = Parse(
+      "module top;\n"
+      "  sub u1(.clk, .rst, .data);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
+  ASSERT_EQ(item->inst_ports.size(), 3u);
+  EXPECT_EQ(item->inst_ports[0].first, "clk");
+  EXPECT_EQ(item->inst_ports[1].first, "rst");
+  EXPECT_EQ(item->inst_ports[2].first, "data");
+}
+
+// Mixed named port connections: explicit .name(expr) and implicit .name.
+TEST(ParserSection23, MixedExplicitImplicitNamedPorts) {
+  auto r = Parse(
+      "module top;\n"
+      "  sub u1(.clk(sys_clk), .rst, .data(bus));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
+  ASSERT_EQ(item->inst_ports.size(), 3u);
+  EXPECT_EQ(item->inst_ports[0].first, "clk");
+  EXPECT_EQ(item->inst_ports[1].first, "rst");
+  EXPECT_EQ(item->inst_ports[2].first, "data");
+}
+
+// Module instantiation with positional blank (unconnected) port.
+TEST(ParserSection23, PositionalBlankPort) {
+  auto r = Parse(
+      "module top;\n"
+      "  alu u1(alu_out, , ain, bin, opcode);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
+  EXPECT_EQ(item->inst_module, "alu");
+  ASSERT_EQ(item->inst_ports.size(), 5u);
+  // Second port is blank (unconnected).
+  EXPECT_EQ(item->inst_ports[1].second, nullptr);
+}
