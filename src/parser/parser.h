@@ -146,7 +146,6 @@ class Parser {
   uint8_t ParseChargeStrength();
   void ParseDriveStrength(uint8_t& s0, uint8_t& s1);
   void ParseNetStrength(DataType& dtype);
-  void ParseNetDelay(Expr*& d1, Expr*& d2, Expr*& d3);
   void ParseVarDeclList(std::vector<ModuleItem*>& items, const DataType& dtype);
   ModuleItem* ParseContinuousAssign();
   ModuleItem* ParseAlias();
@@ -269,6 +268,7 @@ class Parser {
   EventExpr ParseSingleEvent();
 
   // Utilities
+  std::string_view ParseDottedPath();
   Token Expect(TokenKind kind);
   Token ExpectIdentifier();
   bool CheckIdentifier();

@@ -792,27 +792,12 @@ void Parser::ParseUnpackedDims(std::vector<Expr*>& dims) {
 
 // --- Variable declaration list ---
 
-void Parser::ParseNetDelay(Expr*& d1, Expr*& d2, Expr*& d3) {
-  if (!Check(TokenKind::kHash)) return;
-  Consume();  // '#'
-  if (Match(TokenKind::kLParen)) {
-    d1 = ParseMinTypMaxExpr();
-    if (Match(TokenKind::kComma)) {
-      d2 = ParseMinTypMaxExpr();
-      if (Match(TokenKind::kComma)) d3 = ParseMinTypMaxExpr();
-    }
-    Expect(TokenKind::kRParen);
-  } else {
-    d1 = ParsePrimaryExpr();
-  }
-}
-
 void Parser::ParseVarDeclList(std::vector<ModuleItem*>& items,
                               const DataType& dtype) {
   Expr* nd1 = nullptr;
   Expr* nd2 = nullptr;
   Expr* nd3 = nullptr;
-  if (dtype.is_net) ParseNetDelay(nd1, nd2, nd3);
+  if (dtype.is_net) ParseGateDelay(nd1, nd2, nd3);
   do {
     auto* item = arena_.Create<ModuleItem>();
     item->kind =

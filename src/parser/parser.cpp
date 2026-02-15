@@ -31,6 +31,19 @@ bool Parser::Match(TokenKind kind) {
   return true;
 }
 
+std::string_view Parser::ParseDottedPath() {
+  auto first = ExpectIdentifier().text;
+  std::string path(first);
+  while (Match(TokenKind::kDot)) {
+    path.push_back('.');
+    auto next = ExpectIdentifier().text;
+    path.append(next.data(), next.size());
+  }
+  auto* buf = static_cast<char*>(arena_.Allocate(path.size(), 1));
+  std::copy_n(path.data(), path.size(), buf);
+  return {buf, path.size()};
+}
+
 Token Parser::Expect(TokenKind kind) {
   if (Check(kind)) {
     return Consume();
@@ -194,30 +207,12 @@ BindDirective* Parser::ParseBindDirective() {
   Expect(TokenKind::kKwBind);
 
   // Parse target: identifier (potentially hierarchical for form 2).
-  auto first = ExpectIdentifier().text;
-  std::string path(first);
-  while (Match(TokenKind::kDot)) {
-    path.push_back('.');
-    auto next = ExpectIdentifier().text;
-    path.append(next.data(), next.size());
-  }
-  auto* buf = static_cast<char*>(arena_.Allocate(path.size(), 1));
-  std::copy_n(path.data(), path.size(), buf);
-  decl->target = std::string_view(buf, path.size());
+  decl->target = ParseDottedPath();
 
   // Optional : bind_target_instance_list
   if (Match(TokenKind::kColon)) {
     do {
-      auto inst = ExpectIdentifier().text;
-      std::string inst_path(inst);
-      while (Match(TokenKind::kDot)) {
-        inst_path.push_back('.');
-        auto next = ExpectIdentifier().text;
-        inst_path.append(next.data(), next.size());
-      }
-      auto* ibuf = static_cast<char*>(arena_.Allocate(inst_path.size(), 1));
-      std::copy_n(inst_path.data(), inst_path.size(), ibuf);
-      decl->target_instances.emplace_back(ibuf, inst_path.size());
+      decl->target_instances.push_back(ParseDottedPath());
     } while (Match(TokenKind::kComma));
   }
 
@@ -869,31 +864,9 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
 }
 
 void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items) {
-  // Handle 'var' prefix: var type(expr) name; or var data_type name; (§6.8)
-  if (Match(TokenKind::kKwVar)) {
-    if (Check(TokenKind::kKwType)) {
-      Consume();  // type
-      Expect(TokenKind::kLParen);
-      auto* type_expr = ParseExpr();
-      Expect(TokenKind::kRParen);
-      auto* item = arena_.Create<ModuleItem>();
-      item->kind = ModuleItemKind::kVarDecl;
-      item->loc = CurrentLoc();
-      // §6.23: Store the type reference for elaboration.
-      item->data_type.type_ref_expr = type_expr;
-      item->name = ExpectIdentifier().text;
-      ParseUnpackedDims(item->unpacked_dims);
-      Expect(TokenKind::kSemicolon);
-      items.push_back(item);
-      return;
-    }
-    auto dtype = ParseDataType();
-    ParseVarDeclList(items, dtype);
-    return;
-  }
-  // A.2.2.1: data_type ::= ... | type_reference
-  // type(expr) name; — type_reference used as data_type in declaration
-  if (Check(TokenKind::kKwType)) {
+  // §6.23 / A.2.2.1: type_reference used as data_type in declaration.
+  auto try_parse_type_ref = [&]() -> bool {
+    if (!Check(TokenKind::kKwType)) return false;
     Consume();  // type
     Expect(TokenKind::kLParen);
     auto* type_expr = ParseExpr();
@@ -906,8 +879,16 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items) {
     ParseUnpackedDims(item->unpacked_dims);
     Expect(TokenKind::kSemicolon);
     items.push_back(item);
+    return true;
+  };
+  // Handle 'var' prefix: var type(expr) name; or var data_type name; (§6.8)
+  if (Match(TokenKind::kKwVar)) {
+    if (try_parse_type_ref()) return;
+    auto dtype = ParseDataType();
+    ParseVarDeclList(items, dtype);
     return;
   }
+  if (try_parse_type_ref()) return;
   if (Check(TokenKind::kKwCase)) {
     items.push_back(ParseGenerateCase());
     return;

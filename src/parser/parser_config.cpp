@@ -73,18 +73,7 @@ ConfigRule* Parser::ParseConfigRule() {
   } else if (Check(TokenKind::kKwInstance)) {
     Consume();
     rule->kind = ConfigRuleKind::kInstance;
-    // Hierarchical instance path: top.u1.u2
-    auto first = ExpectIdentifier().text;
-    std::string path(first);
-    while (Match(TokenKind::kDot)) {
-      path.push_back('.');
-      auto next = ExpectIdentifier().text;
-      path.append(next.data(), next.size());
-    }
-    // Store in arena so string_view remains valid.
-    auto* buf = static_cast<char*>(arena_.Allocate(path.size(), 1));
-    std::copy_n(path.data(), path.size(), buf);
-    rule->inst_path = std::string_view(buf, path.size());
+    rule->inst_path = ParseDottedPath();
     if (Check(TokenKind::kKwLiblist)) {
       ParseLiblistClause(rule);
     } else if (Check(TokenKind::kKwUse)) {
