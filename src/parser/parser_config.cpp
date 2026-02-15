@@ -41,13 +41,6 @@ void Parser::ParseUseClause(ConfigRule* rule) {
       rule->use_cell = first;
     }
   }
-  // Optional :config suffix
-  if (Match(TokenKind::kColon)) {
-    if (Check(TokenKind::kKwConfig)) {
-      Consume();
-      rule->use_config = true;
-    }
-  }
   // Optional named parameter assignments: #(.NAME(value), ...)
   if (Match(TokenKind::kHash)) {
     Expect(TokenKind::kLParen);
@@ -60,6 +53,13 @@ void Parser::ParseUseClause(ConfigRule* rule) {
       rule->use_params.emplace_back(pname, val);
     } while (Match(TokenKind::kComma));
     Expect(TokenKind::kRParen);
+  }
+  // Optional :config suffix (always last per BNF)
+  if (Match(TokenKind::kColon)) {
+    if (Check(TokenKind::kKwConfig)) {
+      Consume();
+      rule->use_config = true;
+    }
   }
 }
 
