@@ -13,25 +13,33 @@
 
 namespace delta {
 
-void Elaborator::ValidateArrayInitPattern(const ModuleItem* item) {
-  if (!item->init_expr || item->unpacked_dims.empty()) return;
-  if (item->init_expr->kind != ExprKind::kAssignmentPattern) return;
-  if (item->init_expr->repeat_count) return;           // replication form
-  if (!item->init_expr->pattern_keys.empty()) return;  // named form
+// §5.11: Check if an assignment pattern is a replication or named form.
+static bool IsArrayPatternSpecial(const Expr* init) {
+  if (init->repeat_count) return true;
+  if (init->elements.size() == 1 &&
+      init->elements[0]->kind == ExprKind::kReplicate)
+    return true;
+  return !init->pattern_keys.empty();
+}
 
-  const auto* dim = item->unpacked_dims[0];
-  if (!dim) return;  // dynamic array
-
-  std::optional<int64_t> dim_size;
+static std::optional<int64_t> ComputeDimSize(const Expr* dim) {
   if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
     auto left = ConstEvalInt(dim->lhs);
     auto right = ConstEvalInt(dim->rhs);
-    if (left && right) {
-      dim_size = std::abs(*left - *right) + 1;
-    }
-  } else {
-    dim_size = ConstEvalInt(dim);
+    if (left && right) return std::abs(*left - *right) + 1;
+    return std::nullopt;
   }
+  return ConstEvalInt(dim);
+}
+
+void Elaborator::ValidateArrayInitPattern(const ModuleItem* item) {
+  if (!item->init_expr || item->unpacked_dims.empty()) return;
+  if (item->init_expr->kind != ExprKind::kAssignmentPattern) return;
+  if (IsArrayPatternSpecial(item->init_expr)) return;
+
+  const auto* dim = item->unpacked_dims[0];
+  if (!dim) return;
+  auto dim_size = ComputeDimSize(dim);
   if (!dim_size) return;
 
   auto count = static_cast<int64_t>(item->init_expr->elements.size());

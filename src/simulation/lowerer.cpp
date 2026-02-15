@@ -147,6 +147,44 @@ static void InitArrayElement(const RtlirVariable& var, uint32_t elem_idx,
   elem->value = MakeLogic4VecVal(arena, var.width, 0);
 }
 
+// §5.11: Initialize array element from '{count{val}} replication pattern.
+static void InitArrayFromReplicate(const RtlirVariable& var, uint32_t elem_idx,
+                                   Variable* elem, SimContext& ctx,
+                                   Arena& arena) {
+  auto* rep = var.init_expr->elements[0];
+  auto inner_count = static_cast<uint32_t>(rep->elements.size());
+  if (inner_count == 0) {
+    elem->value = MakeLogic4VecVal(arena, var.width, 0);
+    return;
+  }
+  elem->value = EvalExpr(rep->elements[elem_idx % inner_count], ctx, arena);
+}
+
+// §5.11: Initialize array element from named pattern (index keys / default).
+static void InitArrayFromNamed(const Expr* init, uint32_t idx, Variable* elem,
+                               uint32_t width, SimContext& ctx, Arena& arena) {
+  // Pass 1: explicit index key.
+  for (size_t i = 0; i < init->pattern_keys.size(); ++i) {
+    if (i >= init->elements.size()) break;
+    auto& key = init->pattern_keys[i];
+    if (key == "default") continue;
+    auto key_idx = static_cast<uint32_t>(std::stoul(std::string(key)));
+    if (key_idx == idx) {
+      elem->value = EvalExpr(init->elements[i], ctx, arena);
+      return;
+    }
+  }
+  // Pass 2: default key.
+  for (size_t i = 0; i < init->pattern_keys.size(); ++i) {
+    if (i >= init->elements.size()) break;
+    if (init->pattern_keys[i] == "default") {
+      elem->value = EvalExpr(init->elements[i], ctx, arena);
+      return;
+    }
+  }
+  elem->value = MakeLogic4VecVal(arena, width, 0);
+}
+
 // §7.4: Create individual element variables for unpacked arrays.
 static void CreateArrayElements(const RtlirVariable& var, SimContext& ctx,
                                 Arena& arena) {
@@ -157,14 +195,23 @@ static void CreateArrayElements(const RtlirVariable& var, SimContext& ctx,
   info.elem_width = var.width;
   info.is_descending = var.is_descending;
   ctx.RegisterArray(var.name, info);
+  // §5.11: Detect replication and named array pattern forms.
+  bool named = var.init_expr && !var.init_expr->pattern_keys.empty();
+  bool replicate = var.init_expr && var.init_expr->elements.size() == 1 &&
+                   var.init_expr->elements[0]->kind == ExprKind::kReplicate;
   for (uint32_t i = 0; i < var.unpacked_size; ++i) {
     uint32_t idx = var.unpacked_lo + i;
     auto elem_name = std::string(var.name) + "[" + std::to_string(idx) + "]";
     auto* stored = arena.Create<std::string>(std::move(elem_name));
     auto* elem = ctx.CreateVariable(*stored, var.width);
-    // §7.4: For descending [hi:lo], pattern element 0 maps to highest index.
     uint32_t pat_idx = var.is_descending ? (var.unpacked_size - 1 - i) : i;
-    InitArrayElement(var, pat_idx, elem, ctx, arena);
+    if (named) {
+      InitArrayFromNamed(var.init_expr, idx, elem, var.width, ctx, arena);
+    } else if (replicate) {
+      InitArrayFromReplicate(var, pat_idx, elem, ctx, arena);
+    } else {
+      InitArrayElement(var, pat_idx, elem, ctx, arena);
+    }
   }
 }
 

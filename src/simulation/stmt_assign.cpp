@@ -224,17 +224,51 @@ static void CopyArrayElements(std::string_view dst_name, const ArrayInfo& dst,
   }
 }
 
+// §5.11: Find value for array index from named pattern (index/default keys).
+static Logic4Vec FindArrayKeyedValue(const Expr* rhs, uint32_t idx,
+                                     uint32_t width, SimContext& ctx,
+                                     Arena& arena) {
+  // Pass 1: explicit index key.
+  for (size_t i = 0; i < rhs->pattern_keys.size(); ++i) {
+    if (i >= rhs->elements.size()) break;
+    auto& key = rhs->pattern_keys[i];
+    if (key == "default") continue;
+    if (static_cast<uint32_t>(std::stoul(std::string(key))) == idx)
+      return EvalExpr(rhs->elements[i], ctx, arena);
+  }
+  // Pass 2: default key.
+  for (size_t i = 0; i < rhs->pattern_keys.size(); ++i) {
+    if (i >= rhs->elements.size()) break;
+    if (rhs->pattern_keys[i] == "default")
+      return EvalExpr(rhs->elements[i], ctx, arena);
+  }
+  return MakeLogic4VecVal(arena, width, 0);
+}
+
 // §7.4: Distribute assignment pattern elements to array element variables.
 static void DistributePatternToArray(std::string_view arr_name,
                                      const ArrayInfo& info, const Expr* rhs,
                                      SimContext& ctx, Arena& arena) {
+  bool named = !rhs->pattern_keys.empty();
+  bool replicate = rhs->elements.size() == 1 &&
+                   rhs->elements[0]->kind == ExprKind::kReplicate;
+  uint32_t inner_count =
+      replicate ? static_cast<uint32_t>(rhs->elements[0]->elements.size()) : 0;
   for (uint32_t i = 0; i < info.size; ++i) {
     uint32_t idx =
         info.is_descending ? (info.lo + info.size - 1 - i) : (info.lo + i);
     auto name = std::string(arr_name) + "[" + std::to_string(idx) + "]";
     auto* elem = ctx.FindVariable(name);
     if (!elem) continue;
-    if (i < rhs->elements.size()) {
+    if (named) {
+      elem->value = ResizeToWidth(
+          FindArrayKeyedValue(rhs, idx, info.elem_width, ctx, arena),
+          info.elem_width, arena);
+    } else if (replicate && inner_count > 0) {
+      auto val =
+          EvalExpr(rhs->elements[0]->elements[i % inner_count], ctx, arena);
+      elem->value = ResizeToWidth(val, info.elem_width, arena);
+    } else if (i < rhs->elements.size()) {
       auto val = EvalExpr(rhs->elements[i], ctx, arena);
       elem->value = ResizeToWidth(val, info.elem_width, arena);
     } else {
