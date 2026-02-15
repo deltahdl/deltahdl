@@ -168,6 +168,30 @@ Token Lexer::Peek() {
   return peeked_;
 }
 
+Token Lexer::NextFilePathSpec() {
+  has_peeked_ = false;
+  SkipWhitespaceAndComments();
+  if (AtEnd()) return MakeToken(TokenKind::kEof, MakeLoc());
+  auto loc = MakeLoc();
+  uint32_t start = pos_;
+  while (!AtEnd()) {
+    char c = Current();
+    if (std::isspace(static_cast<unsigned char>(c)) || c == ',' || c == ';') {
+      break;
+    }
+    Advance();
+  }
+  if (pos_ == start) {
+    diag_.Error(loc, "expected file path specification");
+    return MakeToken(TokenKind::kEof, loc);
+  }
+  Token tok;
+  tok.kind = TokenKind::kStringLiteral;
+  tok.loc = loc;
+  tok.text = source_.substr(start, pos_ - start);
+  return tok;
+}
+
 // ---------------------------------------------------------------------------
 // Identifiers
 // ---------------------------------------------------------------------------

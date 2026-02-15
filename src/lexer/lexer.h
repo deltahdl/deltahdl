@@ -17,6 +17,9 @@ class Lexer {
   Token Next();
   Token Peek();
 
+  // Read a file_path_spec token (A.1.1): raw text until whitespace/comma/semi.
+  Token NextFilePathSpec();
+
   std::vector<Token> LexAll();
 
   // Save/restore lexer position for backtracking (used by parser).

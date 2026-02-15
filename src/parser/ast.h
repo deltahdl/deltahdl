@@ -742,6 +742,20 @@ struct UdpDecl {
   std::vector<UdpTableRow> table;
 };
 
+// --- Library source text (A.1.1) ---
+
+struct LibraryDecl {
+  std::string_view name;
+  std::vector<std::string_view> file_paths;
+  std::vector<std::string_view> incdir_paths;
+  SourceRange range;
+};
+
+struct IncludeStmt {
+  std::string_view file_path;
+  SourceLoc loc;
+};
+
 // --- Configuration declarations (§33) ---
 
 enum class ConfigRuleKind : uint8_t {
@@ -777,8 +791,10 @@ struct CompilationUnit {
   std::vector<ModuleDecl*> programs;
   std::vector<ClassDecl*> classes;
   std::vector<UdpDecl*> udps;
-  std::vector<ModuleDecl*> checkers;  // checker ... endchecker (§17)
-  std::vector<ConfigDecl*> configs;   // config ... endconfig (§33)
+  std::vector<ModuleDecl*> checkers;       // checker ... endchecker (§17)
+  std::vector<ConfigDecl*> configs;        // config ... endconfig (§33)
+  std::vector<LibraryDecl*> libraries;     // library declarations (A.1.1)
+  std::vector<IncludeStmt*> lib_includes;  // include statements (A.1.1)
   std::vector<ModuleItem*> cu_items;  // top-level functions/tasks (§3.12.1)
   NetType default_nettype = NetType::kWire;  // §6.10/§22.8
 };

@@ -14,6 +14,7 @@ class Parser {
   Parser(Lexer& lexer, Arena& arena, DiagEngine& diag);
 
   CompilationUnit* Parse();
+  CompilationUnit* ParseLibraryText();
 
  private:
   void ParseTopLevel(CompilationUnit* unit);
@@ -109,6 +110,11 @@ class Parser {
   bool CheckNextIsCommaOrRParen();
   void ParseTimingCheckTrailingArgs(TimingCheckDecl& tc);
   void ParseExtendedTimingCheckArgs(TimingCheckDecl& tc);
+
+  // Library source text (A.1.1)
+  LibraryDecl* ParseLibraryDecl();
+  IncludeStmt* ParseLibraryIncludeStmt();
+  std::string_view ParseFilePathSpec();
 
   // Configuration (parser_config.cpp — §33)
   ConfigDecl* ParseConfigDecl();

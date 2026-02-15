@@ -101,6 +101,91 @@ CompilationUnit* Parser::Parse() {
   return unit;
 }
 
+// --- Library source text (A.1.1) ---
+
+CompilationUnit* Parser::ParseLibraryText() {
+  auto* unit = arena_.Create<CompilationUnit>();
+  while (!AtEnd()) {
+    if (Match(TokenKind::kSemicolon)) continue;
+    if (Check(TokenKind::kKwLibrary)) {
+      unit->libraries.push_back(ParseLibraryDecl());
+    } else if (Check(TokenKind::kKwInclude)) {
+      unit->lib_includes.push_back(ParseLibraryIncludeStmt());
+    } else if (Check(TokenKind::kKwConfig)) {
+      unit->configs.push_back(ParseConfigDecl());
+    } else {
+      diag_.Error(CurrentLoc(),
+                  "expected library declaration, include statement, "
+                  "config declaration, or ';'");
+      Consume();
+    }
+  }
+  return unit;
+}
+
+std::string_view Parser::ParseFilePathSpec() {
+  auto tok = lexer_.NextFilePathSpec();
+  if (tok.kind == TokenKind::kEof) {
+    diag_.Error(CurrentLoc(), "expected file path specification");
+    return {};
+  }
+  auto* buf = static_cast<char*>(arena_.Allocate(tok.text.size(), 1));
+  std::copy_n(tok.text.data(), tok.text.size(), buf);
+  return {buf, tok.text.size()};
+}
+
+LibraryDecl* Parser::ParseLibraryDecl() {
+  auto* decl = arena_.Create<LibraryDecl>();
+  decl->range.start = CurrentLoc();
+  Expect(TokenKind::kKwLibrary);
+  decl->name = Expect(TokenKind::kIdentifier).text;
+
+  // Parse first file_path_spec (required).
+  auto path = ParseFilePathSpec();
+  if (path.empty()) {
+    diag_.Error(CurrentLoc(), "expected at least one file path in library");
+    Synchronize();
+    return decl;
+  }
+  decl->file_paths.push_back(path);
+
+  // Parse additional comma-separated file_path_specs.
+  while (Match(TokenKind::kComma)) {
+    decl->file_paths.push_back(ParseFilePathSpec());
+  }
+
+  // Parse optional -incdir clause.
+  if (Check(TokenKind::kMinus)) {
+    auto saved = lexer_.SavePos();
+    Consume();  // '-'
+    if (Check(TokenKind::kKwIncdir)) {
+      Consume();  // 'incdir'
+      decl->incdir_paths.push_back(ParseFilePathSpec());
+      while (Match(TokenKind::kComma)) {
+        decl->incdir_paths.push_back(ParseFilePathSpec());
+      }
+    } else {
+      lexer_.RestorePos(saved);
+    }
+  }
+
+  Expect(TokenKind::kSemicolon);
+  decl->range.end = CurrentLoc();
+  return decl;
+}
+
+IncludeStmt* Parser::ParseLibraryIncludeStmt() {
+  auto* stmt = arena_.Create<IncludeStmt>();
+  stmt->loc = CurrentLoc();
+  Expect(TokenKind::kKwInclude);
+  stmt->file_path = ParseFilePathSpec();
+  if (stmt->file_path.empty()) {
+    diag_.Error(CurrentLoc(), "expected file path after 'include'");
+  }
+  Expect(TokenKind::kSemicolon);
+  return stmt;
+}
+
 // §18.5.1: out-of-block constraint — constraint class_id::name { ... }
 void Parser::ParseOutOfBlockConstraint(CompilationUnit* unit) {
   Consume();  // constraint
