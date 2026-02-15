@@ -486,7 +486,7 @@ ClassDecl* Parser::ParseClassDecl() {
   auto* decl = arena_.Create<ClassDecl>();
   decl->range.start = CurrentLoc();
   decl->is_virtual = Match(TokenKind::kKwVirtual);
-  Match(TokenKind::kKwInterface);
+  decl->is_interface = Match(TokenKind::kKwInterface);
   Expect(TokenKind::kKwClass);
   // final_specifier ::= : final (A.1.2 / §8.20)
   if (Match(TokenKind::kColon)) {
@@ -592,6 +592,23 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
   if (Check(TokenKind::kKwParameter) || Check(TokenKind::kKwLocalparam)) {
     member->kind = ClassMemberKind::kProperty;
     member->name = ParseParamDecl()->name;
+    members.push_back(member);
+    return;
+  }
+  // class_item: class_declaration | interface_class_declaration (A.1.9)
+  if (IsAtClassDecl()) {
+    member->kind = ClassMemberKind::kClassDecl;
+    member->nested_class = ParseClassDecl();
+    member->name = member->nested_class->name;
+    members.push_back(member);
+    return;
+  }
+  // class_item: covergroup_declaration (A.1.9)
+  if (Check(TokenKind::kKwCovergroup)) {
+    member->kind = ClassMemberKind::kCovergroup;
+    std::vector<ModuleItem*> temp;
+    ParseCovergroupDecl(temp);
+    if (!temp.empty()) member->name = temp[0]->name;
     members.push_back(member);
     return;
   }

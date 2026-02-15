@@ -617,7 +617,9 @@ enum class ClassMemberKind : uint8_t {
   kProperty,
   kMethod,
   kConstraint,
-  kTypedef,  // §6.25: class-scope typedef
+  kTypedef,     // §6.25: class-scope typedef
+  kClassDecl,   // nested class/interface class (A.1.9)
+  kCovergroup,  // covergroup_declaration (A.1.9)
 };
 
 struct ClassMember {
@@ -642,13 +644,17 @@ struct ClassMember {
   // Method (reuses ModuleItem for function/task)
   ModuleItem* method = nullptr;
   ModuleItem* typedef_item = nullptr;  // §6.25: class-scope typedef
+
+  // Nested class/interface class (A.1.9)
+  ClassDecl* nested_class = nullptr;
 };
 
 struct ClassDecl {
   std::string_view name;
   SourceRange range;
   bool is_virtual = false;
-  bool is_final = false;  // class :final (§8.20)
+  bool is_final = false;      // class :final (§8.20)
+  bool is_interface = false;  // interface class (A.1.9)
   std::string_view base_class;
   std::vector<ClassMember*> members;
   std::vector<std::pair<std::string_view, Expr*>> params;

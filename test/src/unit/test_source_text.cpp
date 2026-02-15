@@ -1825,6 +1825,279 @@ TEST(SourceText, CheckerMultipleItemTypes) {
 }
 
 // =============================================================================
+// A.1.9 Class items
+// =============================================================================
+
+// class_item ::= { attribute_instance } class_property (property_qualifier
+// path)
+TEST(SourceText, ClassPropertyWithQualifiers) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  randc bit [3:0] y;\n"
+      "  static int count;\n"
+      "  protected int secret;\n"
+      "  local int hidden;\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto& members = r.cu->classes[0]->members;
+  ASSERT_EQ(members.size(), 5u);
+  EXPECT_TRUE(members[0]->is_rand);
+  EXPECT_EQ(members[0]->name, "x");
+  EXPECT_TRUE(members[1]->is_randc);
+  EXPECT_EQ(members[1]->name, "y");
+  EXPECT_TRUE(members[2]->is_static);
+  EXPECT_TRUE(members[3]->is_protected);
+  EXPECT_TRUE(members[4]->is_local);
+}
+
+// class_property ::= const { class_item_qualifier } data_type id [ = expr ] ;
+TEST(SourceText, ClassConstProperty) {
+  auto r = Parse(
+      "class C;\n"
+      "  const int MAX = 100;\n"
+      "  const static int SMAX = 200;\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto& members = r.cu->classes[0]->members;
+  ASSERT_EQ(members.size(), 2u);
+  EXPECT_TRUE(members[0]->is_const);
+  EXPECT_EQ(members[0]->name, "MAX");
+  EXPECT_NE(members[0]->init_expr, nullptr);
+  EXPECT_TRUE(members[1]->is_const);
+  EXPECT_TRUE(members[1]->is_static);
+}
+
+// class_method ::= { method_qualifier } function_declaration
+//                | { method_qualifier } task_declaration
+TEST(SourceText, ClassMethods) {
+  auto r = Parse(
+      "class C;\n"
+      "  function void foo(); endfunction\n"
+      "  task bar(); endtask\n"
+      "  static function int sfn(); endfunction\n"
+      "  virtual task vtask(); endtask\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto& members = r.cu->classes[0]->members;
+  ASSERT_EQ(members.size(), 4u);
+  EXPECT_EQ(members[0]->kind, ClassMemberKind::kMethod);
+  EXPECT_EQ(members[0]->method->name, "foo");
+  EXPECT_EQ(members[1]->kind, ClassMemberKind::kMethod);
+  EXPECT_EQ(members[1]->method->name, "bar");
+  EXPECT_TRUE(members[2]->is_static);
+  EXPECT_TRUE(members[3]->is_virtual);
+}
+
+// class_method ::= pure virtual { class_item_qualifier } method_prototype ;
+//                | extern { method_qualifier } method_prototype ;
+TEST(SourceText, ClassPureVirtualAndExtern) {
+  auto r = Parse(
+      "class C;\n"
+      "  pure virtual function void pv_fn();\n"
+      "  pure virtual task pv_task();\n"
+      "  extern function void ext_fn();\n"
+      "  extern static task ext_task();\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto& members = r.cu->classes[0]->members;
+  ASSERT_EQ(members.size(), 4u);
+  for (auto* m : members) {
+    EXPECT_EQ(m->kind, ClassMemberKind::kMethod);
+  }
+  EXPECT_TRUE(members[0]->is_virtual);
+  EXPECT_TRUE(members[1]->is_virtual);
+  EXPECT_EQ(members[2]->method->name, "ext_fn");
+  EXPECT_TRUE(members[3]->is_static);
+}
+
+// class_method ::= { method_qualifier } class_constructor_declaration
+TEST(SourceText, ClassConstructorDecl) {
+  auto r = Parse(
+      "class C;\n"
+      "  function new(int val);\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto& members = r.cu->classes[0]->members;
+  ASSERT_EQ(members.size(), 1u);
+  EXPECT_EQ(members[0]->kind, ClassMemberKind::kMethod);
+  EXPECT_EQ(members[0]->method->name, "new");
+}
+
+// class_constructor_declaration with super.new()
+TEST(SourceText, ClassConstructorSuperNew) {
+  auto r = Parse(
+      "class Base;\n"
+      "  function new(int x); endfunction\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  function new();\n"
+      "    super.new(5);\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 2u);
+  EXPECT_EQ(r.cu->classes[1]->base_class, "Base");
+  EXPECT_EQ(r.cu->classes[1]->members[0]->method->name, "new");
+}
+
+// class_item ::= { attribute_instance } class_constraint
+TEST(SourceText, ClassConstraint) {
+  auto r = Parse(
+      "class C;\n"
+      "  int x;\n"
+      "  constraint c1 { x > 0; }\n"
+      "  constraint c2;\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto& members = r.cu->classes[0]->members;
+  ASSERT_EQ(members.size(), 3u);
+  EXPECT_EQ(members[1]->kind, ClassMemberKind::kConstraint);
+  EXPECT_EQ(members[1]->name, "c1");
+  EXPECT_EQ(members[2]->kind, ClassMemberKind::kConstraint);
+  EXPECT_EQ(members[2]->name, "c2");
+}
+
+// class_item ::= { attribute_instance } class_declaration (nested class)
+TEST(SourceText, ClassNestedClass) {
+  auto r = Parse(
+      "class Outer;\n"
+      "  class Inner;\n"
+      "    int val;\n"
+      "  endclass\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto& members = r.cu->classes[0]->members;
+  ASSERT_EQ(members.size(), 1u);
+  EXPECT_EQ(members[0]->kind, ClassMemberKind::kClassDecl);
+  EXPECT_EQ(members[0]->nested_class->name, "Inner");
+}
+
+// class_item ::= { attribute_instance } interface_class_declaration
+TEST(SourceText, ClassNestedInterfaceClass) {
+  auto r = Parse(
+      "class Outer;\n"
+      "  interface class IFace;\n"
+      "    pure virtual function void do_it();\n"
+      "  endclass\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto& members = r.cu->classes[0]->members;
+  ASSERT_EQ(members.size(), 1u);
+  EXPECT_EQ(members[0]->kind, ClassMemberKind::kClassDecl);
+  EXPECT_TRUE(members[0]->nested_class->is_interface);
+}
+
+// class_item ::= { attribute_instance } covergroup_declaration
+TEST(SourceText, ClassCovergroupDecl) {
+  auto r = Parse(
+      "class C;\n"
+      "  covergroup cg @(posedge clk);\n"
+      "  endgroup\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto& members = r.cu->classes[0]->members;
+  ASSERT_EQ(members.size(), 1u);
+  EXPECT_EQ(members[0]->kind, ClassMemberKind::kCovergroup);
+  EXPECT_EQ(members[0]->name, "cg");
+}
+
+// class_item ::= local_parameter_declaration ; | parameter_declaration ;
+TEST(SourceText, ClassParameters) {
+  auto r = Parse(
+      "class C;\n"
+      "  localparam int LP = 10;\n"
+      "  parameter int P = 20;\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto& members = r.cu->classes[0]->members;
+  ASSERT_EQ(members.size(), 2u);
+  EXPECT_EQ(members[0]->kind, ClassMemberKind::kProperty);
+  EXPECT_EQ(members[1]->kind, ClassMemberKind::kProperty);
+}
+
+// class_item ::= ; (empty statement)
+TEST(SourceText, ClassEmptyItem) {
+  auto r = Parse(
+      "class C;\n"
+      "  ;\n"
+      "  int x;\n"
+      "  ;\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  // Empty semicolons are consumed, only real members remain.
+  EXPECT_EQ(r.cu->classes[0]->members.size(), 1u);
+}
+
+// class_item_qualifier / property_qualifier / method_qualifier (footnote 10)
+TEST(SourceText, ClassQualifierCombinations) {
+  auto r = Parse(
+      "class C;\n"
+      "  static local int a;\n"
+      "  protected rand int b;\n"
+      "  static virtual function void sv_fn(); endfunction\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto& members = r.cu->classes[0]->members;
+  ASSERT_EQ(members.size(), 3u);
+  EXPECT_TRUE(members[0]->is_static);
+  EXPECT_TRUE(members[0]->is_local);
+  EXPECT_TRUE(members[1]->is_protected);
+  EXPECT_TRUE(members[1]->is_rand);
+  EXPECT_TRUE(members[2]->is_static);
+  EXPECT_TRUE(members[2]->is_virtual);
+}
+
+// interface_class_item ::= type_declaration | interface_class_method | params
+TEST(SourceText, InterfaceClassItems) {
+  auto r = Parse(
+      "interface class IC;\n"
+      "  pure virtual function void do_thing();\n"
+      "  pure virtual task do_task();\n"
+      "  typedef int my_int;\n"
+      "  localparam int LP = 5;\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_TRUE(r.cu->classes[0]->is_interface);
+  auto& members = r.cu->classes[0]->members;
+  ASSERT_EQ(members.size(), 4u);
+  EXPECT_EQ(members[0]->kind, ClassMemberKind::kMethod);
+  EXPECT_TRUE(members[0]->is_virtual);
+  EXPECT_EQ(members[1]->kind, ClassMemberKind::kMethod);
+  EXPECT_EQ(members[2]->kind, ClassMemberKind::kTypedef);
+  EXPECT_EQ(members[3]->kind, ClassMemberKind::kProperty);
+}
+
+// method_prototype ::= task_prototype | function_prototype
+TEST(SourceText, ClassMethodPrototype) {
+  auto r = Parse(
+      "class C;\n"
+      "  extern function int get_val();\n"
+      "  extern task do_work();\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto& members = r.cu->classes[0]->members;
+  ASSERT_EQ(members.size(), 2u);
+  EXPECT_EQ(members[0]->method->name, "get_val");
+  EXPECT_EQ(members[1]->method->name, "do_work");
+}
+
+// =============================================================================
 // A.1.2 comprehensive: all description types in one source text.
 // =============================================================================
 
