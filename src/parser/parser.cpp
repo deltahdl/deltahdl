@@ -308,6 +308,20 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
     return;
   }
   if (Check(TokenKind::kKwProgram)) {
+    // anonymous_program: program ; { ... } endprogram (A.1.11)
+    auto saved = lexer_.SavePos();
+    Consume();
+    if (Check(TokenKind::kSemicolon)) {
+      Consume();
+      while (!Check(TokenKind::kKwEndprogram) && !AtEnd()) {
+        if (Match(TokenKind::kSemicolon)) continue;
+        std::vector<ModuleItem*> discard;
+        ParseModuleItem(discard);
+      }
+      Expect(TokenKind::kKwEndprogram);
+      return;
+    }
+    lexer_.RestorePos(saved);
     unit->programs.push_back(ParseProgramDecl());
     return;
   }
@@ -411,6 +425,33 @@ PackageDecl* Parser::ParsePackageDecl() {
   pkg->name = Expect(TokenKind::kIdentifier).text;
   Expect(TokenKind::kSemicolon);
   while (!Check(TokenKind::kKwEndpackage) && !AtEnd()) {
+    if (Match(TokenKind::kSemicolon)) continue;  // null item (A.1.11)
+    // anonymous_program: program ; { ... } endprogram (A.1.11)
+    if (Check(TokenKind::kKwProgram)) {
+      Consume();
+      Expect(TokenKind::kSemicolon);
+      while (!Check(TokenKind::kKwEndprogram) && !AtEnd()) {
+        if (Match(TokenKind::kSemicolon)) continue;
+        ParseModuleItem(pkg->items);
+      }
+      Expect(TokenKind::kKwEndprogram);
+      continue;
+    }
+    // extern_constraint_declaration in package (A.1.11)
+    if (Check(TokenKind::kKwConstraint)) {
+      ParseOutOfBlockConstraint(nullptr);
+      continue;
+    }
+    if (Check(TokenKind::kKwStatic)) {
+      auto saved = lexer_.SavePos();
+      Consume();
+      if (Check(TokenKind::kKwConstraint)) {
+        lexer_.RestorePos(saved);
+        ParseOutOfBlockConstraint(nullptr);
+        continue;
+      }
+      lexer_.RestorePos(saved);
+    }
     ParseModuleItem(pkg->items);
   }
   Expect(TokenKind::kKwEndpackage);

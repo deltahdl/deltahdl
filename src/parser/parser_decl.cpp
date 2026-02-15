@@ -273,8 +273,10 @@ ModuleItem* Parser::ParseFunctionDecl(bool prototype_only) {
   item->name =
       Match(TokenKind::kKwNew) ? "new" : Expect(TokenKind::kIdentifier).text;
   // §8.24 out-of-block methods: class_name::method_name
+  // class_constructor_declaration: function class_scope new (A.1.11)
   while (Match(TokenKind::kColonColon)) {
-    item->name = Expect(TokenKind::kIdentifier).text;
+    item->name =
+        Match(TokenKind::kKwNew) ? "new" : Expect(TokenKind::kIdentifier).text;
   }
 
   if (Check(TokenKind::kLParen)) {

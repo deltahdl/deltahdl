@@ -2343,6 +2343,250 @@ TEST(SourceText, ConstraintFootnote11StaticWithOverride) {
 }
 
 // =============================================================================
+// A.1.11 Package items
+// =============================================================================
+
+// package_item: package_or_generate_item_declaration — net/data/task/function
+TEST(SourceText, PackageOrGenerateItemDecl) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  wire w;\n"
+      "  int x;\n"
+      "  function void f(); endfunction\n"
+      "  task t(); endtask\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_GE(r.cu->packages[0]->items.size(), 4u);
+}
+
+// package_or_generate_item_declaration: checker_declaration
+TEST(SourceText, PackageItemCheckerDecl) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  checker chk; endchecker\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
+// package_or_generate_item_declaration: dpi_import_export
+TEST(SourceText, PackageItemDpiImportExport) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  import \"DPI-C\" function void c_func();\n"
+      "  export \"DPI-C\" function sv_func;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_GE(r.cu->packages[0]->items.size(), 2u);
+}
+
+// package_or_generate_item_declaration: extern_constraint_declaration
+TEST(SourceText, PackageItemExternConstraint) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  constraint MyClass::c { x > 0; }\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
+// package_or_generate_item_declaration: static extern_constraint_declaration
+TEST(SourceText, PackageItemStaticExternConstraint) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  static constraint MyClass::c { x > 0; }\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
+// package_or_generate_item_declaration: class_declaration
+TEST(SourceText, PackageItemClassDecl) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  class C;\n"
+      "    int x;\n"
+      "  endclass\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
+// package_or_generate_item_declaration: interface_class_declaration
+TEST(SourceText, PackageItemInterfaceClassDecl) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  interface class IC;\n"
+      "    pure virtual function void f();\n"
+      "  endclass\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
+// package_or_generate_item_declaration: class_constructor_declaration
+TEST(SourceText, PackageItemClassConstructorDecl) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  function MyClass::new(); endfunction\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
+// package_or_generate_item_declaration: local_parameter_declaration
+TEST(SourceText, PackageItemLocalparamDecl) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  localparam int A = 1;\n"
+      "  parameter int B = 2;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_GE(r.cu->packages[0]->items.size(), 2u);
+}
+
+// package_or_generate_item_declaration: covergroup_declaration
+TEST(SourceText, PackageItemCovergroupDecl) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  covergroup cg; endgroup\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
+// package_or_generate_item_declaration: assertion_item_declaration
+TEST(SourceText, PackageItemAssertionDecl) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  property p; 1; endproperty\n"
+      "  sequence s; 1; endsequence\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
+// package_or_generate_item_declaration: ; (empty statement)
+TEST(SourceText, PackageItemEmptyStmt) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  ;\n"
+      "  ;;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
+// package_item: package_export_declaration — export *::*
+TEST(SourceText, PackageExportWildcard) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  export *::*;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  ASSERT_GE(r.cu->packages[0]->items.size(), 1u);
+  EXPECT_EQ(r.cu->packages[0]->items[0]->kind, ModuleItemKind::kExportDecl);
+}
+
+// package_item: package_export_declaration — export pkg::item
+TEST(SourceText, PackageExportNamed) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  export other_pkg::my_func;\n"
+      "  export another::*;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_GE(r.cu->packages[0]->items.size(), 2u);
+}
+
+// package_item: timeunits_declaration (footnote 3)
+TEST(SourceText, PackageItemTimeunitsDecl) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
+// anonymous_program: program ; { ... } endprogram
+TEST(SourceText, AnonymousProgram) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  program;\n"
+      "    function void f(); endfunction\n"
+      "    task t(); endtask\n"
+      "  endprogram\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
+// anonymous_program_item: class_declaration, interface_class_declaration
+TEST(SourceText, AnonymousProgramClasses) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  program;\n"
+      "    class C; endclass\n"
+      "    interface class IC;\n"
+      "      pure virtual function void f();\n"
+      "    endclass\n"
+      "  endprogram\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
+// anonymous_program_item: covergroup, class_constructor, ;
+TEST(SourceText, AnonymousProgramMisc) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  program;\n"
+      "    covergroup cg; endgroup\n"
+      "    function MyClass::new(); endfunction\n"
+      "    ;\n"
+      "  endprogram\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
+// anonymous_program at file scope (outside package)
+TEST(SourceText, AnonymousProgramTopLevel) {
+  auto r = Parse(
+      "program;\n"
+      "  function void f(); endfunction\n"
+      "  class C; endclass\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// =============================================================================
 // A.1.2 comprehensive: all description types in one source text.
 // =============================================================================
 
