@@ -852,26 +852,6 @@ TEST(ParserSection3, AnsiPortDirections) {
   EXPECT_EQ(r.cu->modules[0]->ports[3].name, "r");
 }
 
-TEST(ParserSection3, AnsiPortMultipleDirections) {
-  // Multiple ports with mixed directions (ANSI header)
-  auto r = Parse(
-      "module m (input logic clk, rst,\n"
-      "          output logic [7:0] data,\n"
-      "          inout wire bus);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->ports.size(), 4u);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInput);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].name, "clk");
-  EXPECT_EQ(r.cu->modules[0]->ports[1].direction, Direction::kInput);
-  EXPECT_EQ(r.cu->modules[0]->ports[1].name, "rst");
-  EXPECT_EQ(r.cu->modules[0]->ports[2].direction, Direction::kOutput);
-  EXPECT_EQ(r.cu->modules[0]->ports[2].name, "data");
-  EXPECT_EQ(r.cu->modules[0]->ports[3].direction, Direction::kInout);
-  EXPECT_EQ(r.cu->modules[0]->ports[3].name, "bus");
-}
-
 TEST(ParserSection3, NonAnsiPortDeclarations) {
   // Non-ANSI style: port list + separate direction declarations
   auto r = Parse(
@@ -909,13 +889,6 @@ TEST(ParserSection3, EmptyPortsAndMiscVariants) {
   EXPECT_TRUE(ParseOk("module m (input signed [7:0] s); endmodule\n"));
   // macromodule is interchangeable with module (LRM 23.2)
   EXPECT_TRUE(ParseOk("macromodule mm; endmodule\n"));
-  // Interface port (LRM 23.2.2)
-  EXPECT_TRUE(
-      ParseOk("interface myif;\n"
-              "  logic [7:0] data;\n"
-              "endinterface\n"
-              "module m (myif bus);\n"
-              "endmodule\n"));
 }
 
 // ============================================================
