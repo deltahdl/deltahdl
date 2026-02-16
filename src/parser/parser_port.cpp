@@ -5,6 +5,21 @@
 
 namespace delta {
 
+static Direction TokenToDirection(TokenKind kind) {
+  switch (kind) {
+    case TokenKind::kKwInput:
+      return Direction::kInput;
+    case TokenKind::kKwOutput:
+      return Direction::kOutput;
+    case TokenKind::kKwInout:
+      return Direction::kInout;
+    case TokenKind::kKwRef:
+      return Direction::kRef;
+    default:
+      return Direction::kNone;
+  }
+}
+
 ModuleItem* Parser::ParseImportItem() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kImportDecl;
@@ -239,17 +254,9 @@ PortDecl Parser::ParsePortDecl() {
   PortDecl port;
   port.loc = CurrentLoc();
 
-  if (Check(TokenKind::kKwInput)) {
-    port.direction = Direction::kInput;
-    Consume();
-  } else if (Check(TokenKind::kKwOutput)) {
-    port.direction = Direction::kOutput;
-    Consume();
-  } else if (Check(TokenKind::kKwInout)) {
-    port.direction = Direction::kInout;
-    Consume();
-  } else if (Check(TokenKind::kKwRef)) {
-    port.direction = Direction::kRef;
+  Direction dir = TokenToDirection(CurrentToken().kind);
+  if (dir != Direction::kNone) {
+    port.direction = dir;
     Consume();
   }
 
