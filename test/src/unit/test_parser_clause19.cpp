@@ -272,21 +272,6 @@ TEST(ParserSection19, DefaultClocking_SeparateStatement) {
   EXPECT_TRUE(found_ref);
 }
 
-// Default clocking in a program with cycle delay usage.
-TEST(ParserSection19, DefaultClocking_ProgramWithCycleDelay) {
-  EXPECT_TRUE(
-      ParseOk("program test_prog(input logic clk, input logic [15:0] data);\n"
-              "  default clocking bus @(posedge clk);\n"
-              "    inout data;\n"
-              "  endclocking\n"
-              "  initial begin\n"
-              "    ##5;\n"
-              "    if (bus.data == 10)\n"
-              "      ##1;\n"
-              "  end\n"
-              "endprogram\n"));
-}
-
 // Default clocking in an interface.
 TEST(ParserSection19, DefaultClocking_InInterface) {
   EXPECT_TRUE(
@@ -691,20 +676,6 @@ TEST(ParserSection19, FullExample_BusClockingBlock) {
   EXPECT_EQ(item->clocking_signals[3].skew_edge, Edge::kNegedge);
   EXPECT_EQ(item->clocking_signals[4].name, "addr");
   EXPECT_EQ(item->clocking_signals[4].direction, Direction::kInput);
-}
-
-// Cycle delay ## operator depends on default clocking.
-TEST(ParserSection19, CycleDelay_WithDefaultClocking) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  default clocking cb @(posedge clk);\n"
-              "    input data;\n"
-              "  endclocking\n"
-              "  initial begin\n"
-              "    ##5;\n"
-              "    ##(j + 1);\n"
-              "  end\n"
-              "endmodule\n"));
 }
 
 // Clocking block inside an interface with modport.

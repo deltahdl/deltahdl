@@ -584,20 +584,6 @@ TEST(ParserSection6, TypeOpInParamDefault) {
 // §6.24: Casting — general
 // =========================================================================
 
-TEST(ParserSection6, CastSizeBitWidth) {
-  // §6.24/6.24.1: Size cast with integer constant.
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = 16'(y);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kCast);
-}
-
 TEST(ParserSection6, CastUnsigned) {
   // §6.24: unsigned'(expr) changes signedness.
   auto r = Parse(

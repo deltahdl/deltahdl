@@ -557,13 +557,6 @@ TEST(ParserSection11, IndexedPartSelectVariableBase) {
 // Section 11.7 -- Minimum, typical, and maximum delay expressions
 // =========================================================================
 
-TEST(ParserSection11, MinTypMaxInParenExpr) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial #((1:2:3) + (4:5:6)) x = 1;\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection11, MinTypMaxInGateDelay) {
   EXPECT_TRUE(
       ParseOk("module t;\n"

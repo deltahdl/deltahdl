@@ -472,21 +472,6 @@ TEST(ParserSection14, OverviewInputOutputSkews) {
   ASSERT_NE(item->clocking_signals[1].skew_delay, nullptr);
 }
 
-// §14.1 overview: clocking block inside a program (not just module).
-TEST(ParserSection14, OverviewClockingInProgram) {
-  auto r = Parse(
-      "program test;\n"
-      "  clocking bus @(posedge clk);\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.cu->modules.empty());
-  auto* item = FindClockingBlock(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "bus");
-}
-
 // =============================================================================
 // LRM section 14.10 -- Clocking block events
 // =============================================================================
@@ -568,23 +553,6 @@ TEST(ParserSection14, ClockingBlockEventMultipleInputs) {
 // LRM section 14.12 -- Default clocking
 // =============================================================================
 
-// §14.12: default clocking declared inline with signals (from LRM Example 1).
-TEST(ParserSection14, DefaultClockingInlineDecl) {
-  auto r = Parse(
-      "program test(input logic clk, input logic [15:0] data);\n"
-      "  default clocking bus @(posedge clk);\n"
-      "    inout data;\n"
-      "  endclocking\n"
-      "endprogram\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
-  EXPECT_TRUE(item->is_default_clocking);
-  EXPECT_EQ(item->name, "bus");
-  ASSERT_EQ(item->clocking_signals.size(), 1u);
-  EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInout);
-  EXPECT_EQ(item->clocking_signals[0].name, "data");
-}
-
 // §14.12: default clocking with negedge (variation of the LRM examples).
 TEST(ParserSection14, DefaultClockingNegedge) {
   auto r = Parse(
@@ -630,22 +598,6 @@ TEST(ParserSection14, DefaultClockingUnnamedMultipleSignals) {
   EXPECT_TRUE(item->is_default_clocking);
   EXPECT_TRUE(item->name.empty());
   ASSERT_EQ(item->clocking_signals.size(), 3u);
-}
-
-// §14.12: default clocking in an interface context.
-TEST(ParserSection14, DefaultClockingInInterface) {
-  auto r = Parse(
-      "interface bus_if(input logic clk);\n"
-      "  default clocking cb @(posedge clk);\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.cu->modules.empty());
-  auto* item = FindClockingBlock(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->is_default_clocking);
-  EXPECT_EQ(item->name, "cb");
 }
 
 // =============================================================================

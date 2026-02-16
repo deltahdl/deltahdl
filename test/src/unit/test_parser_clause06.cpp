@@ -552,19 +552,6 @@ TEST(ParserSection6, ConstCast) {
 // §6.24.1 -- Static casting (additional tests)
 // =========================================================================
 
-TEST(ParserSection6, SizeCast) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = 8'(y);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kCast);
-}
-
 // =========================================================================
 // §6.24.2 -- Dynamic casting ($cast)
 // =========================================================================

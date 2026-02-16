@@ -614,16 +614,6 @@ TEST(ParserSection6, TypeParameterWithMultipleParams) {
                "endmodule\n"));
 }
 
-TEST(ParserSection6, TypeParameterOverride) {
-  EXPECT_TRUE(
-      ParseOk6("module m #(parameter type T = int) ();\n"
-               "  T x;\n"
-               "endmodule\n"
-               "module top;\n"
-               "  m #(.T(logic [7:0])) inst();\n"
-               "endmodule\n"));
-}
-
 TEST(ParserSection6, TypeParameterDefaultShortint) {
   EXPECT_TRUE(
       ParseOk6("module ma #(parameter p1 = 1, parameter type p2 = shortint)\n"

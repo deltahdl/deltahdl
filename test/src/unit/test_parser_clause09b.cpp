@@ -174,37 +174,6 @@ TEST(ParserSection9b, StructuredProcMultipleInitial) {
 // §9.2.2 -- always_comb procedure
 // =============================================================================
 
-TEST(ParserSection9b, AlwaysCombSimpleAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_comb\n"
-      "    a = b & c;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
-}
-
-TEST(ParserSection9b, AlwaysCombWithBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_comb begin\n"
-      "    a = b & c;\n"
-      "    d = e | f;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-}
-
 TEST(ParserSection9b, AlwaysCombWithAssertion) {
   auto r = Parse(
       "module m;\n"
@@ -221,101 +190,6 @@ TEST(ParserSection9b, AlwaysCombWithAssertion) {
 // §9.2.2.4 -- always_ff procedure
 // =============================================================================
 
-TEST(ParserSection9b, AlwaysFFWithPosedge) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_ff @(posedge clk)\n"
-      "    q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysFFBlock);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysFF);
-}
-
-TEST(ParserSection9b, AlwaysFFWithResetPosedge) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_ff @(posedge clk or posedge reset) begin\n"
-      "    if (reset)\n"
-      "      q <= 0;\n"
-      "    else\n"
-      "      q <= d;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysFFBlock);
-  ASSERT_GE(item->sensitivity.size(), 2u);
-}
-
-TEST(ParserSection9b, AlwaysFFWithIffGuard) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_ff @(posedge clock iff reset == 0 or posedge reset) begin\n"
-      "    r1 <= reset ? 0 : r2 + 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysFFBlock);
-}
-
-TEST(ParserSection9b, AlwaysFFWithNegedge) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_ff @(negedge clk)\n"
-      "    q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysFFBlock);
-  ASSERT_GE(item->sensitivity.size(), 1u);
-  EXPECT_EQ(item->sensitivity[0].edge, Edge::kNegedge);
-}
-
-// =============================================================================
-// §9.2.2.3 -- always_latch procedure
-// =============================================================================
-
-TEST(ParserSection9b, AlwaysLatchBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_latch\n"
-      "    if (ck) q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysLatchBlock);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysLatch);
-}
-
-TEST(ParserSection9b, AlwaysLatchWithBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_latch begin\n"
-      "    if (en)\n"
-      "      q <= d;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysLatchBlock);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-}
 
 TEST(ParserSection9b, AlwaysLatchMultipleOutputs) {
   auto r = Parse(

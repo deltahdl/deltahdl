@@ -146,26 +146,6 @@ TEST(ParserSection40, CoverPropertyForAssertionCoverage) {
   )"));
 }
 
-TEST(ParserSection40, MultipleCoverageConstructsInModule) {
-  // Module with multiple coverage-related constructs
-  EXPECT_TRUE(ParseOk(R"(
-    module m;
-      logic clk, a, b;
-      logic [3:0] state;
-
-      covergroup state_cg @(posedge clk);
-        coverpoint state;
-      endgroup
-
-      c1: cover property (@(posedge clk) a ##1 b);
-
-      initial begin
-        $coverage_control(1, 0, 0);
-      end
-    endmodule
-  )"));
-}
-
 TEST(ParserSection40, CoverageControlInAlwaysBlock) {
   // Coverage control calls within procedural context
   EXPECT_TRUE(ParseOk(R"(

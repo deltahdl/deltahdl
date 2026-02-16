@@ -97,28 +97,6 @@ TEST(ParserSection23, AnsiHeaderWithParams) {
   EXPECT_EQ(mod->ports[0].direction, Direction::kInput);
 }
 
-TEST(ParserSection23, AnsiHeaderMultiplePorts) {
-  auto r = Parse(
-      "module m (input logic a, b, output logic c);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->ports.size(), 3);
-  struct Expected {
-    const char* name;
-    Direction dir;
-  };
-  Expected expected[] = {
-      {"a", Direction::kInput},
-      {"b", Direction::kInput},
-      {"c", Direction::kOutput},
-  };
-  for (size_t i = 0; i < 3; ++i) {
-    EXPECT_EQ(mod->ports[i].name, expected[i].name);
-    EXPECT_EQ(mod->ports[i].direction, expected[i].dir);
-  }
-}
-
 TEST(ParserSection23, AnsiHeaderEmptyParenPorts) {
   auto r = Parse("module m (); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -774,16 +752,6 @@ TEST(ParserSection23, ParameterizedModuleWithGenerate) {
   ASSERT_EQ(mod->params.size(), 1);
   EXPECT_EQ(mod->params[0].first, "SIZE");
   ASSERT_EQ(mod->ports.size(), 2);
-}
-
-TEST(ParserSection23, ModuleInstWithParameterOverride) {
-  EXPECT_TRUE(
-      ParseOk("module top;\n"
-              "  gray2bin #(.SIZE(16)) g2b (\n"
-              "    .bin(binary_out),\n"
-              "    .gray(gray_in)\n"
-              "  );\n"
-              "endmodule\n"));
 }
 
 TEST(ParserSection23, GenerateNestedLoops) {

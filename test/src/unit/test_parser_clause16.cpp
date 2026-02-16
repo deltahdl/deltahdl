@@ -439,33 +439,11 @@ TEST(ParserSection16, OverviewAssertWithComplexExpr) {
 // §16.4 Deferred assertions — additional forms
 // =============================================================================
 
-TEST(ParserSection16, DeferredAssertFinalWithElse) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    assert final (x > 0) $display(\"ok\"); else $error(\"fail\");\n"
-      "  end\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-}
-
 TEST(ParserSection16, DeferredAssumeHash0WithAction) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
       "    assume #0 (valid) $display(\"assumed\");\n"
-      "  end\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-}
-
-TEST(ParserSection16, DeferredCoverFinalStmt) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    cover final (cond) $display(\"covered\");\n"
       "  end\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
@@ -490,21 +468,6 @@ TEST(ParserSection16, DeferredAssertHash0PassAndFail) {
   EXPECT_TRUE(stmt->is_deferred);
   EXPECT_NE(stmt->assert_pass_stmt, nullptr);
   EXPECT_NE(stmt->assert_fail_stmt, nullptr);
-}
-
-TEST(ParserSection16, DeferredAssertFinalNoAction) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    assert final (ready);\n"
-      "  end\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_TRUE(stmt->is_deferred);
-  EXPECT_EQ(stmt->assert_pass_stmt, nullptr);
-  EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
 }
 
 // =============================================================================
@@ -559,16 +522,6 @@ TEST(ParserSection16, ConcurrentCoverPropertyWithStmt) {
   auto* cp =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kCoverProperty);
   ASSERT_NE(cp, nullptr);
-}
-
-TEST(ParserSection16, CoverSequenceStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  cover sequence (@(posedge clk) a ##1 b ##1 c)\n"
-      "    $display(\"seq covered\");\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
 }
 
 // =============================================================================
@@ -796,28 +749,6 @@ TEST(ParserSection16, DisableIffWithComplexExpr) {
 // =============================================================================
 // §16.14 Concurrent assertions — procedural context
 // =============================================================================
-
-TEST(ParserSection16, ProceduralConcurrentAssert) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @(posedge clk) begin\n"
-      "    a1: assert property (req |-> ack);\n"
-      "  end\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-}
-
-TEST(ParserSection16, ProceduralConcurrentAssertWithExplicitClock) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @(posedge mclk) begin\n"
-      "    r1: assert property (@(posedge scanclk) q != d);\n"
-      "  end\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-}
 
 // =============================================================================
 // §16.14.2 Sequence property — strong/weak

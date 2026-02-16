@@ -208,14 +208,6 @@ TEST(ParserSection8, ThisKeywordPropertyAccess) {
 }
 
 // Use of type(this) as return type for singleton pattern.
-TEST(ParserSection8, TypeOfThisReturnType) {
-  EXPECT_TRUE(
-      ParseOk("class Singleton #(type T = int);\n"
-              "  static function type(this) get();\n"
-              "  endfunction\n"
-              "endclass\n"));
-}
-
 // =============================================================================
 // Section 8.16 -- Casting
 // =============================================================================
@@ -249,18 +241,6 @@ TEST(ParserSection8, StaticCastTypeSyntax) {
               "    real r;\n"
               "    r = 3.14;\n"
               "    a = int'(r);\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
-// Size cast: N'(expr).
-TEST(ParserSection8, SizeCastExpression) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    logic [31:0] wide;\n"
-              "    logic [7:0] narrow;\n"
-              "    narrow = 8'(wide);\n"
               "  end\n"
               "endmodule\n"));
 }

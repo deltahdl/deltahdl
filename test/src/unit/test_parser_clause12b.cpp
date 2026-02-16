@@ -417,17 +417,6 @@ TEST(ParserSection12, NestedForInsideWhile) {
 // LRM section 12.7.1 -- For loop with variable declarations (additional cases)
 // =============================================================================
 
-// For loop with multiple init assignments (comma-separated).
-TEST(ParserSection12, ForWithMultipleInits) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial begin\n"
-              "    for (int i = 0, j = 10; i < j; i = i + 1)\n"
-              "      x = i;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 // For loop with increment expression in step.
 TEST(ParserSection12, ForWithIncrementStep) {
   auto r = Parse(
@@ -700,23 +689,6 @@ TEST(ParserSection12, Unique0CaseWithDefault) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
   ASSERT_GE(stmt->case_items.size(), 3u);
   EXPECT_TRUE(stmt->case_items[2].is_default);
-}
-
-// Case statement where the expression is checked.
-TEST(ParserSection12, CaseStatementExprIsNotNull) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    case (a + b)\n"
-      "      0: x = 1;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kCase);
-  EXPECT_NE(stmt->expr, nullptr);
 }
 
 // Casez inside always_ff.

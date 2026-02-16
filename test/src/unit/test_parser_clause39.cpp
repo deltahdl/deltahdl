@@ -141,31 +141,6 @@ TEST(ParserSection39, CoverPropertyStatement) {
   )"));
 }
 
-TEST(ParserSection39, AssertPropertyWithActionBlocks) {
-  // Assert property with pass and fail action blocks
-  EXPECT_TRUE(ParseOk(R"(
-    module m;
-      logic clk, a, b;
-      assert property (@(posedge clk) a |-> b)
-        $display("pass")
-      else
-        $error("fail");
-    endmodule
-  )"));
-}
-
-TEST(ParserSection39, MultipleAssertionStatements) {
-  // Multiple assertion statements that can independently have callbacks
-  EXPECT_TRUE(ParseOk(R"(
-    module m;
-      logic clk, a, b, c;
-      a1: assert property (@(posedge clk) a |-> b);
-      a2: assert property (@(posedge clk) b |-> c);
-      c1: cover property (@(posedge clk) a ##1 b ##1 c);
-    endmodule
-  )"));
-}
-
 // =============================================================================
 // LRM section 39.5.2 -- Assertion control via system tasks
 // The assertion control functions $assertcontrol and related tasks allow

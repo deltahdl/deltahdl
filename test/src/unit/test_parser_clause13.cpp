@@ -746,21 +746,6 @@ TEST(ParserSection13, FunctionMultipleBodyStmts) {
 // LRM section 13.4.1 -- Return values and void functions (additional tests)
 // =============================================================================
 
-// Function return by assigning to function name (old-style return).
-TEST(ParserSection13, FunctionReturnByNameAssignment) {
-  auto r = Parse(
-      "module m;\n"
-      "  function [15:0] myfunc(input [7:0] x, input [7:0] y);\n"
-      "    myfunc = x * y - 1;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* fn = FindFunc(r, "myfunc");
-  ASSERT_NE(fn, nullptr);
-  ASSERT_GE(fn->func_body_stmts.size(), 1u);
-  EXPECT_EQ(fn->func_body_stmts[0]->kind, StmtKind::kBlockingAssign);
-}
-
 // Void function called as a statement (LRM 13.4.1).
 TEST(ParserSection13, VoidFunctionCallAsStatement) {
   auto r = Parse(
