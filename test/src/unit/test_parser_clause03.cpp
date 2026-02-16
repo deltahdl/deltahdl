@@ -441,28 +441,17 @@ TEST(ParserSection3, Sec3_4_LrmExample) {
   EXPECT_TRUE(has_initial);
 }
 
-// §3.4: "A program block can contain data declarations"
-TEST(ParserSection3, Sec3_4_DataDeclarations) {
+// §3.4: "A program block can contain data declarations, class definitions"
+TEST(ParserSection3, Sec3_4_DataAndClassDeclarations) {
   auto r = Parse(
       "program p;\n"
       "  logic [7:0] count;\n"
       "  int status;\n"
+      "  class my_trans; int data; endclass\n"
       "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_GE(r.cu->programs[0]->items.size(), 2u);
-}
-
-// §3.4: "A program block can contain ... class definitions"
-TEST(ParserSection3, Sec3_4_ClassDefinition) {
-  auto r = Parse(
-      "program p;\n"
-      "  class my_trans;\n"
-      "    int data;\n"
-      "  endclass\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
+  EXPECT_GE(r.cu->programs[0]->items.size(), 3u);
   bool has_class = false;
   for (const auto* item : r.cu->programs[0]->items) {
     if (item->kind == ModuleItemKind::kClassDecl) has_class = true;
@@ -539,6 +528,10 @@ TEST(ParserSection3, Sec3_4_RejectsDisallowedItems) {
       Parse("program p; always_latch begin end endprogram\n").has_errors);
   EXPECT_TRUE(Parse("module c; endmodule\n"
                     "program p; c i(); endprogram\n")
+                  .has_errors);
+  // Interface and program instances hit the same instantiation path.
+  EXPECT_TRUE(Parse("interface ifc; endinterface\n"
+                    "program p; ifc i(); endprogram\n")
                   .has_errors);
 }
 
