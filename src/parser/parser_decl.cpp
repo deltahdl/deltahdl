@@ -417,23 +417,38 @@ EventExpr Parser::ParseSingleEvent() {
 
 void Parser::ParseOldStylePortDecls(ModuleItem* item, TokenKind end_kw) {
   // Parse port direction declarations before the function/task body.
+  // tf_port_declaration ::= tf_port_direction [var] data_type_or_implicit
+  //     list_of_tf_variable_identifiers
+  // list_of_tf_variable_identifiers ::=
+  //     port_identifier { variable_dimension } [ = expression ]
+  //     { , port_identifier { variable_dimension } [ = expression ] }
   while (Check(TokenKind::kKwInput) || Check(TokenKind::kKwOutput) ||
          Check(TokenKind::kKwInout) || Check(TokenKind::kKwRef)) {
-    FunctionArg arg;
+    Direction dir = Direction::kNone;
     if (Check(TokenKind::kKwInput)) {
-      arg.direction = Direction::kInput;
+      dir = Direction::kInput;
     } else if (Check(TokenKind::kKwOutput)) {
-      arg.direction = Direction::kOutput;
+      dir = Direction::kOutput;
     } else if (Check(TokenKind::kKwInout)) {
-      arg.direction = Direction::kInout;
+      dir = Direction::kInout;
     } else {
-      arg.direction = Direction::kRef;
+      dir = Direction::kRef;
     }
     Consume();
-    arg.data_type = ParseDataType();
-    arg.name = Expect(TokenKind::kIdentifier).text;
+    DataType dt = ParseDataType();
+    // list_of_tf_variable_identifiers: comma-separated port names
+    do {
+      FunctionArg arg;
+      arg.direction = dir;
+      arg.data_type = dt;
+      arg.name = Expect(TokenKind::kIdentifier).text;
+      ParseUnpackedDims(arg.unpacked_dims);
+      if (Match(TokenKind::kEq)) {
+        arg.default_value = ParseExpr();
+      }
+      item->func_args.push_back(arg);
+    } while (Match(TokenKind::kComma));
     Expect(TokenKind::kSemicolon);
-    item->func_args.push_back(arg);
   }
   (void)end_kw;
 }
