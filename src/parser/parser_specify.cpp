@@ -42,12 +42,27 @@ ModuleItem* Parser::ParseSpecparamDecl() {
 
   item->name = Expect(TokenKind::kIdentifier).text;
   Expect(TokenKind::kEq);
-  item->init_expr = ParseExpr();
+  // pulse_control_specparam: PATHPULSE$ = ( reject [, error] ) (A.2.4)
+  if (item->name.starts_with("PATHPULSE$")) {
+    Expect(TokenKind::kLParen);
+    item->init_expr = ParseMinTypMaxExpr();
+    if (Match(TokenKind::kComma)) ParseMinTypMaxExpr();
+    Expect(TokenKind::kRParen);
+  } else {
+    item->init_expr = ParseMinTypMaxExpr();
+  }
   // list_of_specparam_assignments: skip additional assignments (A.2.1.1)
   while (Match(TokenKind::kComma)) {
-    Expect(TokenKind::kIdentifier);
+    auto name = Expect(TokenKind::kIdentifier).text;
     Expect(TokenKind::kEq);
-    ParseExpr();
+    if (name.starts_with("PATHPULSE$")) {
+      Expect(TokenKind::kLParen);
+      ParseMinTypMaxExpr();
+      if (Match(TokenKind::kComma)) ParseMinTypMaxExpr();
+      Expect(TokenKind::kRParen);
+    } else {
+      ParseMinTypMaxExpr();
+    }
   }
   Expect(TokenKind::kSemicolon);
   return item;
@@ -361,14 +376,29 @@ SpecifyItem* Parser::ParseSpecparamInSpecify() {
     Expect(TokenKind::kRBracket);
   }
 
-  // list_of_specparam_assignments (A.2.1.1)
+  // list_of_specparam_assignments (A.2.4)
   first->param_name = Expect(TokenKind::kIdentifier).text;
   Expect(TokenKind::kEq);
-  first->param_value = ParseExpr();
+  // pulse_control_specparam: PATHPULSE$ = ( reject [, error] ) (A.2.4)
+  if (first->param_name.starts_with("PATHPULSE$")) {
+    Expect(TokenKind::kLParen);
+    first->param_value = ParseMinTypMaxExpr();
+    if (Match(TokenKind::kComma)) ParseMinTypMaxExpr();
+    Expect(TokenKind::kRParen);
+  } else {
+    first->param_value = ParseMinTypMaxExpr();
+  }
   while (Match(TokenKind::kComma)) {
-    Expect(TokenKind::kIdentifier);
+    auto name = Expect(TokenKind::kIdentifier).text;
     Expect(TokenKind::kEq);
-    ParseExpr();
+    if (name.starts_with("PATHPULSE$")) {
+      Expect(TokenKind::kLParen);
+      ParseMinTypMaxExpr();
+      if (Match(TokenKind::kComma)) ParseMinTypMaxExpr();
+      Expect(TokenKind::kRParen);
+    } else {
+      ParseMinTypMaxExpr();
+    }
   }
   Expect(TokenKind::kSemicolon);
   return first;

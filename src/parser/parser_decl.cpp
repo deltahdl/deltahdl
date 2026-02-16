@@ -15,7 +15,7 @@ ModuleItem* Parser::ParseDefparam() {
   do {
     Expr* path = ParseExpr();
     Expect(TokenKind::kEq);
-    Expr* value = ParseExpr();
+    Expr* value = ParseMinTypMaxExpr();
     item->defparam_assigns.emplace_back(path, value);
   } while (Match(TokenKind::kComma));
   Expect(TokenKind::kSemicolon);
