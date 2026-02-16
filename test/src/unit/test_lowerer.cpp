@@ -918,4 +918,4 @@ TEST(Lowerer, SpecparamValue) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// Cast and type parameter tests moved to test_sim_ch6.cpp.
+// Cast and type parameter tests moved to test_sim_clause6.cpp.

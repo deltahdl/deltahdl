@@ -16,7 +16,7 @@
 using namespace delta;
 
 // ============================================================================
-// Test helpers (same pattern as test_parser_section20.cpp)
+// Test helpers (same pattern as test_parser_clause20.cpp)
 // ============================================================================
 
 struct SysTaskFixture {
