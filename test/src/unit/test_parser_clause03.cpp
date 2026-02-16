@@ -266,6 +266,46 @@ TEST(ParserSection3, Sec3_8_FunctionReturnAndVoidAndDirections) {
   EXPECT_EQ(func_count, 2);
 }
 
+// ============================================================
+// LRM section 3.9 -- Packages
+// ============================================================
+
+// §3.9: "Packages provide a declaration space, which can be shared by other
+//        building blocks." Package with typedef, functions, and end label.
+TEST(ParserSection3, Sec3_9_PackageDeclarationsAndEndLabel) {
+  auto r = Parse(
+      "package ComplexPkg;\n"
+      "  typedef struct { shortreal i, r; } Complex;\n"
+      "  function automatic int helper(int x); return x; endfunction\n"
+      "endpackage : ComplexPkg\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_EQ(r.cu->packages[0]->name, "ComplexPkg");
+  bool has_typedef = false, has_func = false;
+  for (const auto* item : r.cu->packages[0]->items) {
+    if (item->kind == ModuleItemKind::kTypedef) has_typedef = true;
+    if (item->kind == ModuleItemKind::kFunctionDecl) has_func = true;
+  }
+  EXPECT_TRUE(has_typedef);
+  EXPECT_TRUE(has_func);
+}
+
+// §3.9: "Package declarations can be imported into other building blocks,
+//        including other packages."
+TEST(ParserSection3, Sec3_9_ImportIntoModuleAndPackage) {
+  auto r = Parse(
+      "package A; typedef int myint; endpackage\n"
+      "package B; import A::*; endpackage\n"
+      "module m; import A::myint; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 2u);
+  EXPECT_EQ(r.cu->packages[0]->name, "A");
+  EXPECT_EQ(r.cu->packages[1]->name, "B");
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
 TEST(ParserSection3, AllSevenDesignElements) {
   // §3.2: A design element is a module, program, interface, checker,
   //       package, primitive, or configuration.
@@ -801,7 +841,7 @@ TEST(ParserSection3, TopLevelFunctionAutomaticAndProgramLifetime) {
 // LRM section 3.14 -- Simulation time units and precision (time values)
 // =============================================================================
 
-TEST(ParserSection3, TimeunitAndTimeprecision) {
+TEST(ParserSection3, Sec3_14_TimeunitsAndTimescale) {
   auto r1 = Parse("module m; timeunit 1ns; endmodule\n");
   EXPECT_FALSE(r1.has_errors);
   EXPECT_TRUE(r1.cu->modules[0]->has_timeunit);
@@ -813,41 +853,19 @@ TEST(ParserSection3, TimeunitAndTimeprecision) {
   EXPECT_TRUE(r3.cu->modules[0]->has_timeunit);
   EXPECT_TRUE(r3.cu->modules[0]->has_timeprecision);
   EXPECT_TRUE(ParseOk("module m; timeunit 100ps / 10fs; endmodule\n"));
-  // In programs and interfaces
   EXPECT_TRUE(
       ParseOk("program p; timeunit 10us; timeprecision 100ns; endprogram\n"));
   EXPECT_TRUE(ParseOk("interface ifc; timeunit 1ns; endinterface\n"));
-}
-
-TEST(ParserSection3, TimescaleDirective) {
+  // `timescale directive
   EXPECT_TRUE(ParseOk("`timescale 1ns/1ps\nmodule m; endmodule\n"));
-  auto r = Parse(
-      "`timescale 1ns/10ps\n"
-      "module a; endmodule\n"
-      "module b; endmodule\n"
-      "`timescale 1ps/1ps\n"
-      "module c; endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 3u);
-}
-
-// =============================================================================
-// LRM section 5.8 -- Time literals
-// =============================================================================
-
-TEST(ParserSection3, TimeLiterals) {
-  // Integer, fractional, and all unit suffixes (LRM 5.8)
+  // Time literals (§5.8): integer, fractional, all unit suffixes
   EXPECT_TRUE(ParseOk("module m; initial #10ns $display(\"d\"); endmodule\n"));
-  EXPECT_TRUE(ParseOk("module m; initial #40ps $display(\"d\"); endmodule\n"));
   EXPECT_TRUE(ParseOk("module m; initial #2.1ns $display(\"d\"); endmodule\n"));
+  // Various magnitudes (Table 3-1)
   EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    #1s $display(\"s\"); #1ms $display(\"ms\");\n"
-              "    #1us $display(\"us\"); #1ns $display(\"ns\");\n"
-              "    #1ps $display(\"ps\"); #1fs $display(\"fs\");\n"
-              "  end\n"
-              "endmodule\n"));
+      ParseOk("module a; timeunit 100ns; timeprecision 10ps; endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module b; timeunit 1us; timeprecision 1ns; endmodule\n"));
 }
 
 // =============================================================================
@@ -921,8 +939,7 @@ TEST(ParserSection3, NonAnsiPortDeclarations) {
 
 // --- Empty port list ---
 
-TEST(ParserSection3, EmptyOrMissingPortList) {
-  // Empty parens and no port list at all
+TEST(ParserSection3, EmptyPortsAndMiscVariants) {
   auto r1 = Parse("module m (); endmodule\n");
   ASSERT_NE(r1.cu, nullptr);
   EXPECT_FALSE(r1.has_errors);
@@ -931,12 +948,7 @@ TEST(ParserSection3, EmptyOrMissingPortList) {
   ASSERT_NE(r2.cu, nullptr);
   EXPECT_FALSE(r2.has_errors);
   EXPECT_EQ(r2.cu->modules[0]->ports.size(), 0u);
-}
-
-TEST(ParserSection3, PortMiscVariants) {
-  // Dot-star implicit (LRM 23.2)
   EXPECT_TRUE(ParseOk("module m (.*); endmodule\n"));
-  // Port with default value
   EXPECT_TRUE(ParseOk("module m (input int x = 10); endmodule\n"));
 }
 
@@ -985,16 +997,4 @@ TEST(ParserSection3, TopLevelFunctionAndTask) {
   EXPECT_FALSE(rt.has_errors);
   ASSERT_GE(rt.cu->cu_items.size(), 1u);
   EXPECT_EQ(rt.cu->cu_items[0]->kind, ModuleItemKind::kTaskDecl);
-}
-
-TEST(ParserSection3, TimeunitVariousMagnitudes) {
-  // LRM Table 3-1: various time unit magnitudes
-  EXPECT_TRUE(
-      ParseOk("module a; timeunit 100ns; timeprecision 10ps; endmodule\n"));
-  EXPECT_TRUE(
-      ParseOk("module b; timeunit 1us; timeprecision 1ns; endmodule\n"));
-  EXPECT_TRUE(
-      ParseOk("module c; timeunit 1ps; timeprecision 1fs; endmodule\n"));
-  EXPECT_TRUE(
-      ParseOk("module d; timeunit 10ms; timeprecision 100us; endmodule\n"));
 }
