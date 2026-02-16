@@ -26,12 +26,6 @@ static ParseResult6c Parse(const std::string& src) {
   return result;
 }
 
-static ModuleItem* FirstItem(ParseResult6c& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
-}
-
 // =============================================================================
 // LRM section 6.10 -- Implicit declarations
 // =============================================================================
