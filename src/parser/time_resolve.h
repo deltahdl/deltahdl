@@ -16,4 +16,13 @@ ResolvedTimescale ResolveModuleTimescale(const ModuleDecl* mod,
                                          const TimeScale& preproc_timescale,
                                          const ResolvedTimescale* enclosing);
 
+// §3.14.3 — Compute the global time precision (simulation time unit).
+// This is the minimum of all timeprecision statements, all precision
+// arguments to timeunit declarations, and the smallest `timescale precision.
+// preproc_global_precision: the preprocessor's min of all `timescale
+// precisions.
+TimeUnit ComputeGlobalTimePrecision(const CompilationUnit* cu,
+                                    bool has_preproc_timescale,
+                                    TimeUnit preproc_global_precision);
+
 }  // namespace delta

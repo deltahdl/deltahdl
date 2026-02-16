@@ -58,4 +58,56 @@ ResolvedTimescale ResolveModuleTimescale(const ModuleDecl* mod,
   return result;
 }
 
+// §3.14.3 — global time precision is min of all precision sources.
+static void UpdateMin(TimeUnit candidate, TimeUnit& current, bool& found) {
+  if (!found || static_cast<int>(candidate) < static_cast<int>(current)) {
+    current = candidate;
+    found = true;
+  }
+}
+
+static void CollectModulePrecisions(const ModuleDecl* mod, TimeUnit& current,
+                                    bool& found) {
+  if (mod->has_timeprecision) {
+    UpdateMin(mod->time_prec, current, found);
+  }
+  // Recurse into nested modules/interfaces.
+  for (const auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kNestedModuleDecl &&
+        item->nested_module_decl) {
+      CollectModulePrecisions(item->nested_module_decl, current, found);
+    }
+  }
+}
+
+TimeUnit ComputeGlobalTimePrecision(const CompilationUnit* cu,
+                                    bool has_preproc_timescale,
+                                    TimeUnit preproc_global_precision) {
+  TimeUnit result = TimeUnit::kNs;
+  bool found = false;
+
+  // Consider `timescale precision (preprocessor already tracks global min).
+  if (has_preproc_timescale) {
+    UpdateMin(preproc_global_precision, result, found);
+  }
+
+  // Consider CU-scope timeprecision.
+  if (cu->has_cu_timeprecision) {
+    UpdateMin(cu->cu_time_prec, result, found);
+  }
+
+  // Consider all modules, interfaces, programs.
+  for (const auto* mod : cu->modules) {
+    CollectModulePrecisions(mod, result, found);
+  }
+  for (const auto* iface : cu->interfaces) {
+    CollectModulePrecisions(iface, result, found);
+  }
+  for (const auto* prog : cu->programs) {
+    CollectModulePrecisions(prog, result, found);
+  }
+
+  return result;
+}
+
 }  // namespace delta
