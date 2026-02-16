@@ -50,9 +50,12 @@ static Stmt* FirstInitialStmt(ParseResult6d& r) {
 static bool ParseOk(const std::string& src) {
   SourceManager mgr;
   Arena arena;
-  auto fid = mgr.AddFile("<test>", src);
   DiagEngine diag(mgr);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  auto fid = mgr.AddFile("<test>", src);
+  Preprocessor preproc(mgr, diag, {});
+  auto pp = preproc.Preprocess(fid);
+  auto pp_fid = mgr.AddFile("<preprocessed>", pp);
+  Lexer lexer(mgr.FileContent(pp_fid), pp_fid, diag);
   Parser parser(lexer, arena, diag);
   parser.Parse();
   return !diag.HasErrors();
@@ -130,6 +133,77 @@ TEST(ParserSection6, VarKeywordImplicitType) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  var [3:0] nibble;\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection6, VarBareNoType) {
+  // §6.8: "var v;" — no type at all implies logic.
+  auto r = Parse(
+      "module t;\n"
+      "  var v;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->name, "v");
+}
+
+TEST(ParserSection6, VarWithEnumType) {
+  // §6.8: "var enum bit { clear, error } status;"
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  var enum bit { clear, error } status;\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection6, VarRegDecl) {
+  // §6.8: "var reg r;"
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  var reg r;\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection6, VarWithInitializer) {
+  // §6.8: Variable with initializer "int i = 0;"
+  auto r = Parse(
+      "module t;\n"
+      "  int i = 0;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
+  EXPECT_EQ(item->name, "i");
+  EXPECT_NE(item->init_expr, nullptr);
+}
+
+TEST(ParserSection6, MultipleVarDeclsSameStmt) {
+  // §6.8: "shortint s1, s2[0:9];" — multiple instances in one decl.
+  auto r = Parse(
+      "module t;\n"
+      "  shortint s1, s2;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->name, "s1");
+  EXPECT_EQ(r.cu->modules[0]->items[1]->name, "s2");
+}
+
+TEST(ParserSection6, VarImplicitInProcedural) {
+  // §6.8: "var [3:0] x;" in procedural context.
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial begin\n"
+              "    var [3:0] x;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection6, VarImplicitInPort) {
+  // §6.8: "input var [7:0] data_in;" in port list.
+  EXPECT_TRUE(
+      ParseOk("module t(input var [7:0] data_in);\n"
               "endmodule\n"));
 }
 

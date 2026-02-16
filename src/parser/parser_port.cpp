@@ -257,6 +257,11 @@ PortDecl Parser::ParsePortDecl() {
   // var_data_type ::= data_type | var data_type_or_implicit
   if (Match(TokenKind::kKwVar)) {
     port.data_type = ParseDataType();
+    // §6.8: implicit_data_type — bare packed dims after 'var'
+    if (port.data_type.kind == DataTypeKind::kImplicit &&
+        Check(TokenKind::kLBracket)) {
+      ParsePackedDims(port.data_type);
+    }
     if (port.data_type.kind == DataTypeKind::kImplicit) {
       port.data_type.kind = DataTypeKind::kLogic;
     }

@@ -213,8 +213,13 @@ void Parser::ParseBlockVarDecls(std::vector<Stmt*>& stmts) {
   }
   bool is_automatic = Match(TokenKind::kKwAutomatic);             // §6.21
   bool is_static = !is_automatic && Match(TokenKind::kKwStatic);  // §6.21
-  Match(TokenKind::kKwVar);  // optional 'var' prefix (§6.8)
+  bool saw_var = Match(TokenKind::kKwVar);  // optional 'var' prefix (§6.8)
   DataType dtype = ParseDataType();
+  // §6.8: implicit_data_type — bare packed dims after 'var' (e.g. var [3:0] x)
+  if (saw_var && dtype.kind == DataTypeKind::kImplicit &&
+      Check(TokenKind::kLBracket)) {
+    ParsePackedDims(dtype);
+  }
   do {
     auto* s = arena_.Create<Stmt>();
     s->kind = StmtKind::kVarDecl;

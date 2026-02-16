@@ -166,6 +166,7 @@ class Parser {
   ModuleItem* ParseAlwaysBlock(AlwaysKind kind);
   ModuleItem* ParseInitialBlock();
   ModuleItem* ParseFinalBlock();
+  void ParseVarPrefixed(std::vector<ModuleItem*>& items);
   void ParseTypedItemOrInst(std::vector<ModuleItem*>& items);
   void ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items);
   ModuleItem* ParseModuleInst(const Token& module_tok);

@@ -911,12 +911,31 @@ bool Parser::TryParseTypeRef(std::vector<ModuleItem*>& items) {
   return true;
 }
 
+// §6.8: Parse variable declaration after 'var' keyword.
+void Parser::ParseVarPrefixed(std::vector<ModuleItem*>& items) {
+  if (TryParseTypeRef(items)) return;
+  if (Check(TokenKind::kKwEnum)) {
+    auto dtype = ParseEnumType();
+    ParseVarDeclList(items, dtype);
+    return;
+  }
+  if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
+    auto dtype = ParseStructOrUnionType();
+    ParseVarDeclList(items, dtype);
+    return;
+  }
+  auto dtype = ParseDataType();
+  // §6.8: implicit_data_type — bare packed dims after 'var' (e.g. var [3:0] x)
+  if (dtype.kind == DataTypeKind::kImplicit && Check(TokenKind::kLBracket)) {
+    ParsePackedDims(dtype);
+  }
+  ParseVarDeclList(items, dtype);
+}
+
 void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items) {
   // Handle 'var' prefix: var type(expr) name; or var data_type name; (§6.8)
   if (Match(TokenKind::kKwVar)) {
-    if (TryParseTypeRef(items)) return;
-    auto dtype = ParseDataType();
-    ParseVarDeclList(items, dtype);
+    ParseVarPrefixed(items);
     return;
   }
   if (TryParseTypeRef(items)) return;
