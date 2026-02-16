@@ -12,6 +12,7 @@ struct ParseResult23b {
   SourceManager mgr;
   Arena arena;
   CompilationUnit* cu = nullptr;
+  bool has_errors = false;
 };
 
 static ParseResult23b Parse(const std::string& src) {
@@ -21,6 +22,7 @@ static ParseResult23b Parse(const std::string& src) {
   Lexer lexer(result.mgr.FileContent(fid), fid, diag);
   Parser parser(lexer, result.arena, diag);
   result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
   return result;
 }
 
@@ -798,4 +800,68 @@ TEST(ParserSection23, GenerateIfInsideForLoop) {
     if (inner->kind == ModuleItemKind::kGenerateIf) has_if = true;
   }
   EXPECT_TRUE(has_if);
+}
+
+// =============================================================================
+// LRM section 23.2.2 -- Port declarations
+// =============================================================================
+
+// --- ANSI style ports ---
+
+TEST(ParserSection23, Sec23_2_2_AnsiPortDirections) {
+  // All four port directions: input, output, inout, ref
+  auto r = Parse(
+      "module m (input logic a, output logic y,\n"
+      "          inout wire [7:0] data, ref logic [3:0] r);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->ports.size(), 4u);
+  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(r.cu->modules[0]->ports[0].name, "a");
+  EXPECT_EQ(r.cu->modules[0]->ports[1].direction, Direction::kOutput);
+  EXPECT_EQ(r.cu->modules[0]->ports[1].name, "y");
+  EXPECT_EQ(r.cu->modules[0]->ports[2].direction, Direction::kInout);
+  EXPECT_EQ(r.cu->modules[0]->ports[2].name, "data");
+  EXPECT_EQ(r.cu->modules[0]->ports[3].direction, Direction::kRef);
+  EXPECT_EQ(r.cu->modules[0]->ports[3].name, "r");
+}
+
+TEST(ParserSection23, Sec23_2_2_NonAnsiPortDeclarations) {
+  // Non-ANSI style: port list + separate direction declarations
+  auto r = Parse(
+      "module m (a, b, y);\n"
+      "  input a, b;\n"
+      "  output y;\n"
+      "  assign y = a & b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  // Variants with packed types and inout
+  EXPECT_TRUE(
+      ParseOk("module m (a, d); input [15:0] a; inout [7:0] d; endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m (a, b); inout [7:0] a; inout [7:0] b; endmodule\n"));
+}
+
+// --- Empty port list ---
+
+TEST(ParserSection23, Sec23_2_2_EmptyPortsAndMiscVariants) {
+  auto r1 = Parse("module m (); endmodule\n");
+  ASSERT_NE(r1.cu, nullptr);
+  EXPECT_FALSE(r1.has_errors);
+  EXPECT_EQ(r1.cu->modules[0]->ports.size(), 0u);
+  auto r2 = Parse("module m; endmodule\n");
+  ASSERT_NE(r2.cu, nullptr);
+  EXPECT_FALSE(r2.has_errors);
+  EXPECT_EQ(r2.cu->modules[0]->ports.size(), 0u);
+  EXPECT_TRUE(ParseOk("module m (.*); endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m (input int x = 10); endmodule\n"));
+  // ANSI port type variants
+  EXPECT_TRUE(ParseOk("module m (input var int in1); endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m (output reg [7:0] q); endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m (input signed [7:0] s); endmodule\n"));
+  // macromodule is interchangeable with module (LRM 23.2)
+  EXPECT_TRUE(ParseOk("macromodule mm; endmodule\n"));
 }

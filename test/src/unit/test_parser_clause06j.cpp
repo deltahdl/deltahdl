@@ -26,6 +26,17 @@ static ParseResult6j Parse(const std::string& src) {
   return result;
 }
 
+static bool ParseOk(const std::string& src) {
+  SourceManager mgr;
+  Arena arena;
+  auto fid = mgr.AddFile("<test>", src);
+  DiagEngine diag(mgr);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, arena, diag);
+  parser.Parse();
+  return !diag.HasErrors();
+}
+
 static ModuleItem* FirstItem(ParseResult6j& r) {
   if (!r.cu || r.cu->modules.empty()) return nullptr;
   auto& items = r.cu->modules[0]->items;
@@ -200,4 +211,60 @@ TEST(ParserSection6, Sec6_7_1_NetImplicitSigned) {
   EXPECT_TRUE(item->data_type.is_net);
   EXPECT_TRUE(item->data_type.is_signed);
   EXPECT_EQ(item->name, "ws");
+}
+
+// =============================================================================
+// LRM section 6.21 -- Scope and lifetime (automatic/static)
+// =============================================================================
+
+TEST(ParserSection6, Sec6_21_LifetimeAutomaticAndStatic) {
+  // Module lifetime qualifiers
+  EXPECT_TRUE(ParseOk("module automatic m; endmodule\n"));
+  EXPECT_TRUE(ParseOk("module static m; endmodule\n"));
+  auto fa = Parse(
+      "module m;\n"
+      "  function automatic int add(int a, int b); return a+b; endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(fa.cu, nullptr);
+  EXPECT_FALSE(fa.has_errors);
+  EXPECT_EQ(fa.cu->modules[0]->items[0]->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_TRUE(fa.cu->modules[0]->items[0]->is_automatic);
+  auto fs = Parse(
+      "module m;\n"
+      "  function static int mul(int a, int b); return a*b; endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(fs.cu, nullptr);
+  EXPECT_FALSE(fs.has_errors);
+  EXPECT_TRUE(fs.cu->modules[0]->items[0]->is_static);
+  auto ta =
+      Parse("module m; task automatic t(input int x); endtask endmodule\n");
+  ASSERT_NE(ta.cu, nullptr);
+  EXPECT_FALSE(ta.has_errors);
+  EXPECT_TRUE(ta.cu->modules[0]->items[0]->is_automatic);
+  auto ts = Parse("module m; task static t(input int x); endtask endmodule\n");
+  ASSERT_NE(ts.cu, nullptr);
+  EXPECT_FALSE(ts.has_errors);
+  EXPECT_TRUE(ts.cu->modules[0]->items[0]->is_static);
+  // Top-level function with automatic lifetime
+  auto tl = Parse(
+      "function automatic int foo(int x);\n"
+      "  return x + 1;\n"
+      "endfunction\n");
+  ASSERT_NE(tl.cu, nullptr);
+  EXPECT_FALSE(tl.has_errors);
+  ASSERT_GE(tl.cu->cu_items.size(), 1u);
+  EXPECT_EQ(tl.cu->cu_items[0]->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_TRUE(tl.cu->cu_items[0]->is_automatic);
+  EXPECT_EQ(tl.cu->cu_items[0]->name, "foo");
+  // Top-level task in compilation-unit scope
+  auto tt = Parse("task automatic my_task(input int x); endtask\n");
+  ASSERT_NE(tt.cu, nullptr);
+  EXPECT_FALSE(tt.has_errors);
+  ASSERT_GE(tt.cu->cu_items.size(), 1u);
+  EXPECT_EQ(tt.cu->cu_items[0]->kind, ModuleItemKind::kTaskDecl);
+  // Program with automatic lifetime
+  EXPECT_TRUE(
+      ParseOk("program automatic test_prog;\n"
+              "  initial begin $display(\"hello\"); end\n"
+              "endprogram\n"));
 }

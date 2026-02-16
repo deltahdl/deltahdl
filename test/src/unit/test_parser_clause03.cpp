@@ -741,62 +741,6 @@ TEST(ParserSection3, Sec3_5_Modport) {
 }
 
 // =============================================================================
-// LRM section 6.21 -- Scope and lifetime (automatic/static)
-// =============================================================================
-
-TEST(ParserSection3, LifetimeAutomaticAndStatic) {
-  // Module lifetime qualifiers
-  EXPECT_TRUE(ParseOk("module automatic m; endmodule\n"));
-  EXPECT_TRUE(ParseOk("module static m; endmodule\n"));
-  auto fa = Parse(
-      "module m;\n"
-      "  function automatic int add(int a, int b); return a+b; endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(fa.cu, nullptr);
-  EXPECT_FALSE(fa.has_errors);
-  EXPECT_EQ(fa.cu->modules[0]->items[0]->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_TRUE(fa.cu->modules[0]->items[0]->is_automatic);
-  auto fs = Parse(
-      "module m;\n"
-      "  function static int mul(int a, int b); return a*b; endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(fs.cu, nullptr);
-  EXPECT_FALSE(fs.has_errors);
-  EXPECT_TRUE(fs.cu->modules[0]->items[0]->is_static);
-  auto ta =
-      Parse("module m; task automatic t(input int x); endtask endmodule\n");
-  ASSERT_NE(ta.cu, nullptr);
-  EXPECT_FALSE(ta.has_errors);
-  EXPECT_TRUE(ta.cu->modules[0]->items[0]->is_automatic);
-  auto ts = Parse("module m; task static t(input int x); endtask endmodule\n");
-  ASSERT_NE(ts.cu, nullptr);
-  EXPECT_FALSE(ts.has_errors);
-  EXPECT_TRUE(ts.cu->modules[0]->items[0]->is_static);
-  // Top-level function with automatic lifetime
-  auto tl = Parse(
-      "function automatic int foo(int x);\n"
-      "  return x + 1;\n"
-      "endfunction\n");
-  ASSERT_NE(tl.cu, nullptr);
-  EXPECT_FALSE(tl.has_errors);
-  ASSERT_GE(tl.cu->cu_items.size(), 1u);
-  EXPECT_EQ(tl.cu->cu_items[0]->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_TRUE(tl.cu->cu_items[0]->is_automatic);
-  EXPECT_EQ(tl.cu->cu_items[0]->name, "foo");
-  // Top-level task in compilation-unit scope
-  auto tt = Parse("task automatic my_task(input int x); endtask\n");
-  ASSERT_NE(tt.cu, nullptr);
-  EXPECT_FALSE(tt.has_errors);
-  ASSERT_GE(tt.cu->cu_items.size(), 1u);
-  EXPECT_EQ(tt.cu->cu_items[0]->kind, ModuleItemKind::kTaskDecl);
-  // Program with automatic lifetime
-  EXPECT_TRUE(
-      ParseOk("program automatic test_prog;\n"
-              "  initial begin $display(\"hello\"); end\n"
-              "endprogram\n"));
-}
-
-// =============================================================================
 // LRM section 3.14 -- Simulation time units and precision (time values)
 // =============================================================================
 
@@ -825,70 +769,6 @@ TEST(ParserSection3, Sec3_14_TimeunitsAndTimescale) {
       ParseOk("module a; timeunit 100ns; timeprecision 10ps; endmodule\n"));
   EXPECT_TRUE(
       ParseOk("module b; timeunit 1us; timeprecision 1ns; endmodule\n"));
-}
-
-// =============================================================================
-// LRM section 23.2.2 -- Port declarations
-// =============================================================================
-
-// --- ANSI style ports ---
-
-TEST(ParserSection3, AnsiPortDirections) {
-  // All four port directions: input, output, inout, ref
-  auto r = Parse(
-      "module m (input logic a, output logic y,\n"
-      "          inout wire [7:0] data, ref logic [3:0] r);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->ports.size(), 4u);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInput);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].name, "a");
-  EXPECT_EQ(r.cu->modules[0]->ports[1].direction, Direction::kOutput);
-  EXPECT_EQ(r.cu->modules[0]->ports[1].name, "y");
-  EXPECT_EQ(r.cu->modules[0]->ports[2].direction, Direction::kInout);
-  EXPECT_EQ(r.cu->modules[0]->ports[2].name, "data");
-  EXPECT_EQ(r.cu->modules[0]->ports[3].direction, Direction::kRef);
-  EXPECT_EQ(r.cu->modules[0]->ports[3].name, "r");
-}
-
-TEST(ParserSection3, NonAnsiPortDeclarations) {
-  // Non-ANSI style: port list + separate direction declarations
-  auto r = Parse(
-      "module m (a, b, y);\n"
-      "  input a, b;\n"
-      "  output y;\n"
-      "  assign y = a & b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  // Variants with packed types and inout
-  EXPECT_TRUE(
-      ParseOk("module m (a, d); input [15:0] a; inout [7:0] d; endmodule\n"));
-  EXPECT_TRUE(
-      ParseOk("module m (a, b); inout [7:0] a; inout [7:0] b; endmodule\n"));
-}
-
-// --- Empty port list ---
-
-TEST(ParserSection3, EmptyPortsAndMiscVariants) {
-  auto r1 = Parse("module m (); endmodule\n");
-  ASSERT_NE(r1.cu, nullptr);
-  EXPECT_FALSE(r1.has_errors);
-  EXPECT_EQ(r1.cu->modules[0]->ports.size(), 0u);
-  auto r2 = Parse("module m; endmodule\n");
-  ASSERT_NE(r2.cu, nullptr);
-  EXPECT_FALSE(r2.has_errors);
-  EXPECT_EQ(r2.cu->modules[0]->ports.size(), 0u);
-  EXPECT_TRUE(ParseOk("module m (.*); endmodule\n"));
-  EXPECT_TRUE(ParseOk("module m (input int x = 10); endmodule\n"));
-  // ANSI port type variants
-  EXPECT_TRUE(ParseOk("module m (input var int in1); endmodule\n"));
-  EXPECT_TRUE(ParseOk("module m (output reg [7:0] q); endmodule\n"));
-  EXPECT_TRUE(ParseOk("module m (input signed [7:0] s); endmodule\n"));
-  // macromodule is interchangeable with module (LRM 23.2)
-  EXPECT_TRUE(ParseOk("macromodule mm; endmodule\n"));
 }
 
 // ============================================================
