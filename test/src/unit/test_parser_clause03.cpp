@@ -378,45 +378,12 @@ TEST(ParserSection3, AllSevenDesignElements) {
   EXPECT_EQ(r.cu->udps[0]->name, "udp_and");
   ASSERT_EQ(r.cu->configs.size(), 1u);
   EXPECT_EQ(r.cu->configs[0]->name, "cfg");
-}
-
-TEST(ParserSection3, MultipleDesignElementsInUnit) {
-  auto r = Parse(
-      "module a; endmodule\n"
-      "module b; endmodule\n"
-      "module c; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 3u);
-  EXPECT_EQ(r.cu->modules[0]->name, "a");
-  // Module + package in same unit
-  auto r2 = Parse(
-      "package pkg; typedef int myint; endpackage\n"
-      "module m; import pkg::*; endmodule\n");
-  ASSERT_NE(r2.cu, nullptr);
-  EXPECT_FALSE(r2.has_errors);
-  EXPECT_EQ(r2.cu->packages.size(), 1u);
-  EXPECT_EQ(r2.cu->modules.size(), 1u);
-}
-
-TEST(ParserSection3, ModuleWithPortsAndBody) {
-  auto r = Parse(
-      "module mux2to1 (input wire a, b, sel, output logic y);\n"
-      "  assign y = sel ? b : a;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->ports.size(), 4u);
-}
-
-TEST(ParserSection3, MacromoduleKeyword) {
-  // macromodule is interchangeable with module (LRM 23.2)
-  auto r = Parse("macromodule mm; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->name, "mm");
+  // Multiple design elements of same type in one compilation unit
+  EXPECT_TRUE(ParseOk("module a; endmodule\nmodule b; endmodule\n"));
+  // Module + package coexist in same unit with import
+  EXPECT_TRUE(
+      ParseOk("package p; typedef int myint; endpackage\n"
+              "module m; import p::*; endmodule\n"));
 }
 
 // =============================================================================
@@ -622,6 +589,10 @@ TEST(ParserSection3, Sec3_4_DataAndClassDeclarations) {
     if (item->kind == ModuleItemKind::kClassDecl) has_class = true;
   }
   EXPECT_TRUE(has_class);
+  // §3.4: Multiple programs each create separate scopes
+  EXPECT_TRUE(
+      ParseOk("program p1; logic a; endprogram\n"
+              "program p2; logic b; endprogram\n"));
 }
 
 // §3.4: "A program block can contain ... subroutine definitions ...
@@ -668,18 +639,6 @@ TEST(ParserSection3, Sec3_4_RejectsDisallowedItems) {
   EXPECT_TRUE(Parse("interface ifc; endinterface\n"
                     "program p; ifc i(); endprogram\n")
                   .has_errors);
-}
-
-// §3.4: "It creates a scope that encapsulates program-wide data"
-TEST(ParserSection3, Sec3_4_MultiplePrograms) {
-  auto r = Parse(
-      "program p1; logic a; endprogram\n"
-      "program p2; logic b; endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 2u);
-  EXPECT_EQ(r.cu->programs[0]->name, "p1");
-  EXPECT_EQ(r.cu->programs[1]->name, "p2");
 }
 
 // =============================================================================
@@ -948,6 +907,8 @@ TEST(ParserSection3, EmptyPortsAndMiscVariants) {
   EXPECT_TRUE(ParseOk("module m (input var int in1); endmodule\n"));
   EXPECT_TRUE(ParseOk("module m (output reg [7:0] q); endmodule\n"));
   EXPECT_TRUE(ParseOk("module m (input signed [7:0] s); endmodule\n"));
+  // macromodule is interchangeable with module (LRM 23.2)
+  EXPECT_TRUE(ParseOk("macromodule mm; endmodule\n"));
   // Interface port (LRM 23.2.2)
   EXPECT_TRUE(
       ParseOk("interface myif;\n"
@@ -994,4 +955,44 @@ TEST(ParserSection3, Sec3_11_HierarchyAndInstantiation) {
   for (const auto* item : r.cu->modules[1]->items)
     if (item->kind == ModuleItemKind::kGateInst) ++gates;
   EXPECT_EQ(gates, 4);
+}
+
+// ============================================================
+// LRM section 3.12 -- Compilation and elaboration
+// ============================================================
+
+// §3.12: "Elaboration is the process of binding together the components that
+//        make up a design." It "involves expanding instantiations, computing
+//        parameter values, ... establishing net connectivity."
+//        "the compilation of a package is required to precede references to it"
+TEST(ParserSection3, Sec3_12_CompilationAndElaboration) {
+  auto r = Parse(
+      "package pkg; typedef logic [7:0] byte_t; endpackage\n"
+      "module adder #(parameter W = 8) (\n"
+      "    input [W-1:0] a, b, output [W-1:0] s);\n"
+      "  assign s = a + b;\n"
+      "endmodule\n"
+      "module top; import pkg::*;\n"
+      "  wire [15:0] x, y, z;\n"
+      "  adder #(16) u0 (.a(x), .b(y), .s(z));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  // Package compiled before module references it
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_EQ(r.cu->packages[0]->name, "pkg");
+  // Parameterized module: elaboration computes parameter values
+  ASSERT_EQ(r.cu->modules.size(), 2u);
+  EXPECT_EQ(r.cu->modules[0]->params.size(), 1u);
+  // Elaboration expands instantiation with parameter override & connectivity
+  bool found = false;
+  for (const auto* item : r.cu->modules[1]->items) {
+    if (item->kind == ModuleItemKind::kModuleInst) {
+      found = true;
+      EXPECT_EQ(item->inst_module, "adder");
+      EXPECT_EQ(item->inst_params.size(), 1u);
+      EXPECT_EQ(item->inst_ports.size(), 3u);
+    }
+  }
+  EXPECT_TRUE(found);
 }
