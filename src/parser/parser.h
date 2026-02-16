@@ -273,6 +273,7 @@ class Parser {
 
   // Types
   DataType ParseDataType();
+  bool TryParseNetDataType(DataType& dtype);
   void ParsePackedDims(DataType& dtype);
   DataType ParseVirtualInterfaceType();
 

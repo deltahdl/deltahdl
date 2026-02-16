@@ -673,6 +673,52 @@ DataType Parser::ParseNamedType() {
   return dtype;
 }
 
+// Copy net-specific fields from outer net declaration into inner data type.
+static void ApplyNetInfo(DataType& inner, const DataType& net) {
+  inner.is_net = true;
+  inner.is_vectored = net.is_vectored;
+  inner.is_scalared = net.is_scalared;
+  inner.drive_strength0 = net.drive_strength0;
+  inner.drive_strength1 = net.drive_strength1;
+  inner.charge_strength = net.charge_strength;
+}
+
+// §6.7.1: Try to parse explicit data_type after net keyword.
+// Returns true if an explicit type was parsed and merged into dtype.
+// Returns false for implicit_data_type (caller continues with signing + dims).
+bool Parser::TryParseNetDataType(DataType& dtype) {
+  // Named type (user-defined): wire addressT w1;
+  if (CurrentToken().Is(TokenKind::kIdentifier) &&
+      known_types_.count(CurrentToken().text) != 0) {
+    auto inner = ParseNamedType();
+    ApplyNetInfo(inner, dtype);
+    dtype = inner;
+    return true;
+  }
+  // Struct/union type: wire struct packed { ... } memsig;
+  if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
+    auto inner = ParseStructOrUnionType();
+    ApplyNetInfo(inner, dtype);
+    dtype = inner;
+    return true;
+  }
+  // Enum type: wire enum { ... } e;
+  if (Check(TokenKind::kKwEnum)) {
+    auto inner = ParseEnumType();
+    ApplyNetInfo(inner, dtype);
+    dtype = inner;
+    return true;
+  }
+  // Non-net built-in type: wire logic [7:0] w; wire bit [3:0] b;
+  auto inner_kind = TokenToTypeKind(CurrentToken().kind);
+  if (inner_kind && !IsNetTypeToken(CurrentToken().kind)) {
+    dtype.kind = *inner_kind;
+    dtype.is_signed = IsDefaultSigned(dtype.kind);
+    Consume();
+  }
+  return false;
+}
+
 DataType Parser::ParseDataType() {
   DataType dtype;
 
@@ -694,10 +740,9 @@ DataType Parser::ParseDataType() {
   }
 
   // A.2.2.1: implicit_data_type ::= [signing] {packed_dimension}
-  // Handle bare signed/unsigned before packed dimensions.
   if (Check(TokenKind::kKwSigned) || Check(TokenKind::kKwUnsigned)) {
-    dtype.is_signed = Match(TokenKind::kKwSigned);
-    if (!dtype.is_signed) Consume();  // unsigned
+    dtype.is_signed = Check(TokenKind::kKwSigned);
+    Consume();
     ParsePackedDims(dtype);
     return dtype;
   }
@@ -719,6 +764,9 @@ DataType Parser::ParseDataType() {
   if (dtype.is_net && !dtype.is_vectored) {
     dtype.is_scalared = Match(TokenKind::kKwScalared);
   }
+
+  // §6.7.1: data_type_or_implicit — check for explicit type after net keyword.
+  if (dtype.is_net && TryParseNetDataType(dtype)) return dtype;
 
   // §6.11.3: Explicit signed/unsigned overrides the default.
   if (Match(TokenKind::kKwSigned)) {
