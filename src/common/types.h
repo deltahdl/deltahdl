@@ -108,6 +108,11 @@ struct TimeScale {
 uint64_t DelayToTicks(uint64_t delay, const TimeScale& scale,
                       TimeUnit global_precision);
 
+/// Convert a real-valued delay to ticks, rounding per §3.14.1.
+/// The precision step determines rounding granularity.
+uint64_t RealDelayToTicks(double delay, const TimeScale& scale,
+                          TimeUnit global_precision);
+
 /// Parse a time unit string (e.g. "ns") to TimeUnit.
 /// Returns false if the string is not a valid unit.
 bool ParseTimeUnitStr(std::string_view str, TimeUnit& out);

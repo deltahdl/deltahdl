@@ -1,5 +1,6 @@
 #include "common/types.h"
 
+#include <cmath>
 #include <sstream>
 
 #include "common/arena.h"
@@ -142,6 +143,31 @@ uint64_t DelayToTicks(uint64_t delay, const TimeScale& scale,
     ticks /= PowerOf10(-exp_diff);
   }
   return ticks;
+}
+
+uint64_t RealDelayToTicks(double delay, const TimeScale& scale,
+                          TimeUnit global_precision) {
+  // Convert delay (in time units) to raw ticks at global precision.
+  int exp_diff =
+      static_cast<int>(scale.unit) - static_cast<int>(global_precision);
+  double raw_ticks = delay * scale.magnitude;
+  if (exp_diff > 0) {
+    raw_ticks *= static_cast<double>(PowerOf10(exp_diff));
+  } else if (exp_diff < 0) {
+    raw_ticks /= static_cast<double>(PowerOf10(-exp_diff));
+  }
+
+  // Calculate precision step size in ticks at global precision.
+  int prec_diff =
+      static_cast<int>(scale.precision) - static_cast<int>(global_precision);
+  double prec_step = scale.prec_magnitude;
+  if (prec_diff > 0) {
+    prec_step *= static_cast<double>(PowerOf10(prec_diff));
+  }
+
+  // Round to nearest precision step (§3.14.1).
+  double rounded = std::round(raw_ticks / prec_step) * prec_step;
+  return static_cast<uint64_t>(rounded);
 }
 
 }  // namespace delta
