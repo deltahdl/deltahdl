@@ -94,6 +94,7 @@ class Preprocessor {
  public:
   const TimeScale& CurrentTimescale() const { return current_timescale_; }
   TimeUnit GlobalPrecision() const { return global_precision_; }
+  bool HasTimescale() const { return has_timescale_; }
   NetType DefaultNetType() const { return default_net_type_; }
   bool InCelldefine() const { return in_celldefine_; }
   NetType UnconnectedDrive() const { return unconnected_drive_; }
