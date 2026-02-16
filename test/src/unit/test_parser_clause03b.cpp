@@ -5,6 +5,7 @@
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
+#include "preprocessor/preprocessor.h"
 
 using namespace delta;
 
@@ -17,9 +18,12 @@ struct ParseResult3b {
 
 static ParseResult3b Parse(const std::string& src) {
   ParseResult3b result;
-  auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  auto fid = result.mgr.AddFile("<test>", src);
+  Preprocessor preproc(result.mgr, diag, {});
+  auto pp = preproc.Preprocess(fid);
+  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
+  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
   Parser parser(lexer, result.arena, diag);
   result.cu = parser.Parse();
   result.has_errors = diag.HasErrors();
@@ -29,9 +33,12 @@ static ParseResult3b Parse(const std::string& src) {
 static bool ParseOk(const std::string& src) {
   SourceManager mgr;
   Arena arena;
-  auto fid = mgr.AddFile("<test>", src);
   DiagEngine diag(mgr);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  auto fid = mgr.AddFile("<test>", src);
+  Preprocessor preproc(mgr, diag, {});
+  auto pp = preproc.Preprocess(fid);
+  auto pp_fid = mgr.AddFile("<preprocessed>", pp);
+  Lexer lexer(mgr.FileContent(pp_fid), pp_fid, diag);
   Parser parser(lexer, arena, diag);
   parser.Parse();
   return !diag.HasErrors();
@@ -604,4 +611,90 @@ TEST(ParserSection3, Sec3_13_NestedClassInModule) {
               "    endfunction\n"
               "  endclass\n"
               "endmodule\n"));
+}
+
+// 31. Text macro name space (d) — `define introduces names with leading '
+//     "The text macro names are defined in the linear order of appearance in
+//     the
+//      set of input files that make up the compilation unit."
+TEST(ParserSection3, Sec3_13_TextMacroNameSpace) {
+  // Macro defined and used; subsequent redefinition overrides previous
+  auto r = Parse(
+      "`define WIDTH 8\n"
+      "`define DEPTH 16\n"
+      "module m;\n"
+      "  logic [`WIDTH-1:0] data;\n"
+      "  logic [`DEPTH-1:0] addr;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  // Macro names are unambiguous with other name spaces (leading ` character)
+  EXPECT_TRUE(
+      ParseOk("`define data 42\n"
+              "module m; logic [7:0] data; endmodule\n"));
+}
+
+// 32. Attribute name space (h) — enclosed by (* and *)
+//     "An attribute name can be defined and used only in the attribute name
+//      space. Any other type of name cannot be defined in this name space."
+TEST(ParserSection3, Sec3_13_AttributeNameSpace) {
+  auto r = Parse(
+      "module m;\n"
+      "  (* synthesis *) logic flag;\n"
+      "  (* full_case, parallel_case *) logic [1:0] sel;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  // Verify attributes are parsed and attached to declarations
+  bool found_synthesis = false, found_full_case = false;
+  for (const auto* item : r.cu->modules[0]->items) {
+    for (const auto& attr : item->attrs) {
+      if (attr.name == "synthesis") found_synthesis = true;
+      if (attr.name == "full_case") found_full_case = true;
+    }
+  }
+  EXPECT_TRUE(found_synthesis);
+  EXPECT_TRUE(found_full_case);
+}
+
+// 33. All 8 name spaces coexist in a single compilation unit
+TEST(ParserSection3, Sec3_13_AllEightNameSpaces) {
+  auto r = Parse(
+      // (d) Text macro name space
+      "`define VAL 1\n"
+      // (b) Package name space
+      "package pkg; int x; endpackage\n"
+      // (c) Compilation-unit scope name space
+      "function automatic int cu_fn(int a); return a; endfunction\n"
+      // (a) Definitions name space: module, interface, program, primitive
+      "module m (input logic clk, output logic q);\n"  // (g) Port name space
+      "  (* keep *) logic flag;\n"                // (h) Attribute name space
+      "  import pkg::*;\n"                        // (e) Module name space
+      "  always_ff @(posedge clk) begin : blk\n"  // (f) Block name space
+      "    int cnt;\n"
+      "    cnt = `VAL;\n"
+      "    q <= flag;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  // (b) Package name space
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_EQ(r.cu->packages[0]->name, "pkg");
+  // (c) Compilation-unit scope
+  ASSERT_GE(r.cu->cu_items.size(), 1u);
+  EXPECT_EQ(r.cu->cu_items[0]->name, "cu_fn");
+  // (a) Definitions name space
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->name, "m");
+  // (g) Port name space
+  ASSERT_EQ(r.cu->modules[0]->ports.size(), 2u);
+  EXPECT_EQ(r.cu->modules[0]->ports[0].name, "clk");
+  // (h) Attribute name space
+  bool has_attr = false;
+  for (const auto* item : r.cu->modules[0]->items) {
+    if (!item->attrs.empty()) has_attr = true;
+  }
+  EXPECT_TRUE(has_attr);
 }
