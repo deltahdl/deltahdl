@@ -53,7 +53,7 @@ static Stmt* FirstInitialStmt(ParseResult9e& r) {
 //
 // This file provides extended coverage of fork...join / join_any / join_none
 // parallel block constructs beyond the basics already tested in
-// test_parser_clause9.cpp.
+// test_parser_clause09.cpp.
 // =============================================================================
 
 // ---------------------------------------------------------------------------
