@@ -10,15 +10,15 @@
 
 using namespace delta;
 
-struct ParseResult3c {
+struct ParseResult3_12_01 {
   SourceManager mgr;
   Arena arena;
   CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult3c Parse(const std::string& src) {
-  ParseResult3c result;
+static ParseResult3_12_01 Parse(const std::string& src) {
+  ParseResult3_12_01 result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});
