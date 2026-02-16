@@ -5,6 +5,7 @@
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
+#include "preprocessor/preprocessor.h"
 
 using namespace delta;
 
@@ -17,9 +18,12 @@ struct ParseResult6c {
 
 static ParseResult6c Parse(const std::string& src) {
   ParseResult6c result;
-  auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  auto fid = result.mgr.AddFile("<test>", src);
+  Preprocessor preproc(result.mgr, diag, {});
+  auto pp = preproc.Preprocess(fid);
+  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
+  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
   Parser parser(lexer, result.arena, diag);
   result.cu = parser.Parse();
   result.has_errors = diag.HasErrors();

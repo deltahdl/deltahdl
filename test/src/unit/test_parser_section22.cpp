@@ -5,6 +5,7 @@
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
+#include "preprocessor/preprocessor.h"
 
 using namespace delta;
 
@@ -16,9 +17,12 @@ struct ParseResult22 {
 
 static ParseResult22 Parse(const std::string& src) {
   ParseResult22 result;
-  auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  auto fid = result.mgr.AddFile("<test>", src);
+  Preprocessor preproc(result.mgr, diag, {});
+  auto pp = preproc.Preprocess(fid);
+  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
+  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
   Parser parser(lexer, result.arena, diag);
   result.cu = parser.Parse();
   return result;
@@ -27,9 +31,12 @@ static ParseResult22 Parse(const std::string& src) {
 static bool ParseOk(const std::string& src) {
   SourceManager mgr;
   Arena arena;
-  auto fid = mgr.AddFile("<test>", src);
   DiagEngine diag(mgr);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  auto fid = mgr.AddFile("<test>", src);
+  Preprocessor preproc(mgr, diag, {});
+  auto pp = preproc.Preprocess(fid);
+  auto pp_fid = mgr.AddFile("<preprocessed>", pp);
+  Lexer lexer(mgr.FileContent(pp_fid), pp_fid, diag);
   Parser parser(lexer, arena, diag);
   parser.Parse();
   return !diag.HasErrors();
