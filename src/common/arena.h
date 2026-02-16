@@ -28,7 +28,25 @@ class Arena {
   Arena(const Arena&) = delete;
   Arena& operator=(const Arena&) = delete;
   Arena(Arena&&) = default;
-  Arena& operator=(Arena&&) = default;
+
+  Arena& operator=(Arena&& other) noexcept {
+    if (this != &other) {
+      DestroyAll();
+      for (auto* block : blocks_) {
+        std::free(block);
+      }
+      block_size_ = other.block_size_;
+      ptr_ = other.ptr_;
+      remaining_ = other.remaining_;
+      total_allocated_ = other.total_allocated_;
+      blocks_ = std::move(other.blocks_);
+      dtors_ = std::move(other.dtors_);
+      other.ptr_ = nullptr;
+      other.remaining_ = 0;
+      other.total_allocated_ = 0;
+    }
+    return *this;
+  }
 
   void* Allocate(size_t size, size_t align) {
     void* ptr = ptr_;
