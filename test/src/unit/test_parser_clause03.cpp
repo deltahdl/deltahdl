@@ -785,12 +785,10 @@ TEST(ParserSection3, Sec3_5_Modport) {
 // LRM section 6.21 -- Scope and lifetime (automatic/static)
 // =============================================================================
 
-TEST(ParserSection3, ModuleLifetimeAutomaticAndStatic) {
+TEST(ParserSection3, LifetimeAutomaticAndStatic) {
+  // Module lifetime qualifiers
   EXPECT_TRUE(ParseOk("module automatic m; endmodule\n"));
   EXPECT_TRUE(ParseOk("module static m; endmodule\n"));
-}
-
-TEST(ParserSection3, FunctionAndTaskLifetime) {
   auto fa = Parse(
       "module m;\n"
       "  function automatic int add(int a, int b); return a+b; endfunction\n"
@@ -815,19 +813,23 @@ TEST(ParserSection3, FunctionAndTaskLifetime) {
   ASSERT_NE(ts.cu, nullptr);
   EXPECT_FALSE(ts.has_errors);
   EXPECT_TRUE(ts.cu->modules[0]->items[0]->is_static);
-}
-
-TEST(ParserSection3, TopLevelFunctionAutomaticAndProgramLifetime) {
   // Top-level function with automatic lifetime
-  auto r = Parse(
+  auto tl = Parse(
       "function automatic int foo(int x);\n"
       "  return x + 1;\n"
       "endfunction\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->cu_items.size(), 1u);
-  EXPECT_EQ(r.cu->cu_items[0]->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_TRUE(r.cu->cu_items[0]->is_automatic);
+  ASSERT_NE(tl.cu, nullptr);
+  EXPECT_FALSE(tl.has_errors);
+  ASSERT_GE(tl.cu->cu_items.size(), 1u);
+  EXPECT_EQ(tl.cu->cu_items[0]->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_TRUE(tl.cu->cu_items[0]->is_automatic);
+  EXPECT_EQ(tl.cu->cu_items[0]->name, "foo");
+  // Top-level task in compilation-unit scope
+  auto tt = Parse("task automatic my_task(input int x); endtask\n");
+  ASSERT_NE(tt.cu, nullptr);
+  EXPECT_FALSE(tt.has_errors);
+  ASSERT_GE(tt.cu->cu_items.size(), 1u);
+  EXPECT_EQ(tt.cu->cu_items[0]->kind, ModuleItemKind::kTaskDecl);
   // Program with automatic lifetime
   EXPECT_TRUE(
       ParseOk("program automatic test_prog;\n"
@@ -911,12 +913,6 @@ TEST(ParserSection3, AnsiPortMultipleDirections) {
   EXPECT_EQ(r.cu->modules[0]->ports[3].name, "bus");
 }
 
-TEST(ParserSection3, AnsiPortVariants) {
-  EXPECT_TRUE(ParseOk("module m (input var int in1); endmodule\n"));
-  EXPECT_TRUE(ParseOk("module m (output reg [7:0] q); endmodule\n"));
-  EXPECT_TRUE(ParseOk("module m (input signed [7:0] s); endmodule\n"));
-}
-
 TEST(ParserSection3, NonAnsiPortDeclarations) {
   // Non-ANSI style: port list + separate direction declarations
   auto r = Parse(
@@ -948,10 +944,11 @@ TEST(ParserSection3, EmptyPortsAndMiscVariants) {
   EXPECT_EQ(r2.cu->modules[0]->ports.size(), 0u);
   EXPECT_TRUE(ParseOk("module m (.*); endmodule\n"));
   EXPECT_TRUE(ParseOk("module m (input int x = 10); endmodule\n"));
-}
-
-TEST(ParserSection3, InterfacePortInModule) {
-  // LRM 23.2.2: interface port declaration
+  // ANSI port type variants
+  EXPECT_TRUE(ParseOk("module m (input var int in1); endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m (output reg [7:0] q); endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m (input signed [7:0] s); endmodule\n"));
+  // Interface port (LRM 23.2.2)
   EXPECT_TRUE(
       ParseOk("interface myif;\n"
               "  logic [7:0] data;\n"
@@ -960,39 +957,41 @@ TEST(ParserSection3, InterfacePortInModule) {
               "endmodule\n"));
 }
 
-// --- Module instantiation creating hierarchy ---
+// ============================================================
+// LRM section 3.11 -- Overview of hierarchy
+// ============================================================
 
-TEST(ParserSection3, ModuleInstantiationHierarchy) {
+// §3.11: "Hierarchy is created by one building block instantiating another."
+//        "Primitives cannot instantiate other building blocks; they are
+//        leaves." "SystemVerilog permits multiple top-level blocks."
+TEST(ParserSection3, Sec3_11_HierarchyAndInstantiation) {
   auto r = Parse(
       "module top;\n"
       "  logic in1, in2, sel;\n"
       "  wire out1;\n"
       "  mux2to1 m1 (.a(in1), .b(in2), .sel(sel), .y(out1));\n"
-      "endmodule\n");
+      "endmodule\n"
+      "module mux2to1 (input wire a, b, sel, output logic y);\n"
+      "  not g1 (sel_n, sel);\n"
+      "  and g2 (a_s, a, sel_n);\n"
+      "  and g3 (b_s, b, sel);\n"
+      "  or  g4 (y, a_s, b_s);\n"
+      "endmodule : mux2to1\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
+  // Multiple top-level blocks
+  ASSERT_EQ(r.cu->modules.size(), 2u);
+  EXPECT_EQ(r.cu->modules[0]->name, "top");
+  EXPECT_EQ(r.cu->modules[1]->name, "mux2to1");
+  // Hierarchy through instantiation with port connections for communication
   auto* inst = FindItemByKind(r, ModuleItemKind::kModuleInst);
   ASSERT_NE(inst, nullptr);
   EXPECT_EQ(inst->inst_module, "mux2to1");
   EXPECT_EQ(inst->inst_name, "m1");
-}
-
-// --- Compilation unit scope items ---
-
-TEST(ParserSection3, TopLevelFunctionAndTask) {
-  auto rf = Parse(
-      "function automatic int foo(int x);\n"
-      "  return x + 1;\n"
-      "endfunction\n");
-  ASSERT_NE(rf.cu, nullptr);
-  EXPECT_FALSE(rf.has_errors);
-  ASSERT_GE(rf.cu->cu_items.size(), 1u);
-  EXPECT_EQ(rf.cu->cu_items[0]->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_EQ(rf.cu->cu_items[0]->name, "foo");
-  auto rt = Parse("task automatic my_task(input int x); endtask\n");
-  ASSERT_NE(rt.cu, nullptr);
-  EXPECT_FALSE(rt.has_errors);
-  ASSERT_GE(rt.cu->cu_items.size(), 1u);
-  EXPECT_EQ(rt.cu->cu_items[0]->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_EQ(inst->inst_ports.size(), 4u);
+  // Primitives as leaves: gate primitives (not, and, or)
+  int gates = 0;
+  for (const auto* item : r.cu->modules[1]->items)
+    if (item->kind == ModuleItemKind::kGateInst) ++gates;
+  EXPECT_EQ(gates, 4);
 }
