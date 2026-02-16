@@ -9,15 +9,15 @@
 
 using namespace delta;
 
-struct ParseResult3_09 {
+struct ParseResult309 {
   SourceManager mgr;
   Arena arena;
   CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult3_09 Parse(const std::string& src) {
-  ParseResult3_09 result;
+static ParseResult309 Parse(const std::string& src) {
+  ParseResult309 result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});
@@ -28,6 +28,13 @@ static ParseResult3_09 Parse(const std::string& src) {
   result.cu = parser.Parse();
   result.has_errors = diag.HasErrors();
   return result;
+}
+
+static bool HasItemOfKind(const std::vector<ModuleItem*>& items,
+                          ModuleItemKind kind) {
+  for (const auto* item : items)
+    if (item->kind == kind) return true;
+  return false;
 }
 
 // =============================================================================
@@ -46,13 +53,10 @@ TEST(ParserClause03, Cl3_9_PackageDeclarationsAndEndLabel) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
   EXPECT_EQ(r.cu->packages[0]->name, "ComplexPkg");
-  bool has_typedef = false, has_func = false;
-  for (const auto* item : r.cu->packages[0]->items) {
-    if (item->kind == ModuleItemKind::kTypedef) has_typedef = true;
-    if (item->kind == ModuleItemKind::kFunctionDecl) has_func = true;
-  }
-  EXPECT_TRUE(has_typedef);
-  EXPECT_TRUE(has_func);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kTypedef));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kFunctionDecl));
 }
 
 // §3.9: "Package declarations can be imported into other building blocks,

@@ -9,15 +9,15 @@
 
 using namespace delta;
 
-struct ParseResult3_03 {
+struct ParseResult303 {
   SourceManager mgr;
   Arena arena;
   CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult3_03 Parse(const std::string& src) {
-  ParseResult3_03 result;
+static ParseResult303 Parse(const std::string& src) {
+  ParseResult303 result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});
@@ -44,11 +44,26 @@ static bool ParseOk(const std::string& src) {
   return !diag.HasErrors();
 }
 
-static ModuleItem* FindItemByKind(ParseResult3_03& r, ModuleItemKind kind) {
+static ModuleItem* FindItemByKind(ParseResult303& r, ModuleItemKind kind) {
   for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == kind) return item;
   }
   return nullptr;
+}
+
+static bool HasItemOfKind(const std::vector<ModuleItem*>& items,
+                          ModuleItemKind kind) {
+  for (const auto* item : items)
+    if (item->kind == kind) return true;
+  return false;
+}
+
+static bool HasAlwaysOfKind(const std::vector<ModuleItem*>& items,
+                            AlwaysKind kind) {
+  for (const auto* item : items)
+    if (item->kind == ModuleItemKind::kAlwaysBlock && item->always_kind == kind)
+      return true;
+  return false;
 }
 
 // =============================================================================
@@ -104,15 +119,11 @@ TEST(ParserClause03, Cl3_3_ModuleDeclarations) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  bool has_param = false, has_typedef = false, has_class = false;
-  for (const auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kParamDecl) has_param = true;
-    if (item->kind == ModuleItemKind::kTypedef) has_typedef = true;
-    if (item->kind == ModuleItemKind::kClassDecl) has_class = true;
-  }
-  EXPECT_TRUE(has_param);
-  EXPECT_TRUE(has_typedef);
-  EXPECT_TRUE(has_class);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kParamDecl));
+  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kTypedef));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kClassDecl));
   EXPECT_GE(r.cu->modules[0]->items.size(), 7u);
 }
 
@@ -130,25 +141,17 @@ TEST(ParserClause03, Cl3_3_SubroutinesAndProceduralBlocks) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  bool has_func = false, has_task = false;
-  bool has_initial = false, has_final = false;
-  bool has_always = false, has_always_comb = false;
-  for (const auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kFunctionDecl) has_func = true;
-    if (item->kind == ModuleItemKind::kTaskDecl) has_task = true;
-    if (item->kind == ModuleItemKind::kInitialBlock) has_initial = true;
-    if (item->kind == ModuleItemKind::kFinalBlock) has_final = true;
-    if (item->kind == ModuleItemKind::kAlwaysBlock) {
-      if (item->always_kind == AlwaysKind::kAlways) has_always = true;
-      if (item->always_kind == AlwaysKind::kAlwaysComb) has_always_comb = true;
-    }
-  }
-  EXPECT_TRUE(has_func);
-  EXPECT_TRUE(has_task);
-  EXPECT_TRUE(has_initial);
-  EXPECT_TRUE(has_final);
-  EXPECT_TRUE(has_always);
-  EXPECT_TRUE(has_always_comb);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kFunctionDecl));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kTaskDecl));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kFinalBlock));
+  EXPECT_TRUE(HasAlwaysOfKind(r.cu->modules[0]->items, AlwaysKind::kAlways));
+  EXPECT_TRUE(
+      HasAlwaysOfKind(r.cu->modules[0]->items, AlwaysKind::kAlwaysComb));
 }
 
 // §3.3: "Generate blocks"
@@ -201,9 +204,6 @@ TEST(ParserClause03, Cl3_3_DesignElementInstantiations) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 2u);
   // "top" is modules[1]; check it has the instantiation.
-  bool has_inst = false;
-  for (const auto* item : r.cu->modules[1]->items) {
-    if (item->kind == ModuleItemKind::kModuleInst) has_inst = true;
-  }
-  EXPECT_TRUE(has_inst);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[1]->items, ModuleItemKind::kModuleInst));
 }

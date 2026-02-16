@@ -12,7 +12,7 @@
 using namespace delta;
 
 // Helper: preprocess and parse, returning CU + preprocessor state.
-struct ParseResult3_14_03 {
+struct ParseResult31403 {
   SourceManager mgr;
   Arena arena;
   CompilationUnit* cu = nullptr;
@@ -22,8 +22,8 @@ struct ParseResult3_14_03 {
   TimeUnit preproc_global_precision = TimeUnit::kNs;
 };
 
-static ParseResult3_14_03 Parse(const std::string& src) {
-  ParseResult3_14_03 result;
+static ParseResult31403 Parse(const std::string& src) {
+  ParseResult31403 result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});

@@ -9,15 +9,15 @@
 
 using namespace delta;
 
-struct ParseResult3_06 {
+struct ParseResult306 {
   SourceManager mgr;
   Arena arena;
   CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult3_06 Parse(const std::string& src) {
-  ParseResult3_06 result;
+static ParseResult306 Parse(const std::string& src) {
+  ParseResult306 result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});
@@ -28,6 +28,13 @@ static ParseResult3_06 Parse(const std::string& src) {
   result.cu = parser.Parse();
   result.has_errors = diag.HasErrors();
   return result;
+}
+
+static bool HasItemOfKind(const std::vector<ModuleItem*>& items,
+                          ModuleItemKind kind) {
+  for (const auto* item : items)
+    if (item->kind == kind) return true;
+  return false;
 }
 
 // =============================================================================
@@ -50,15 +57,12 @@ TEST(ParserClause03, Cl3_6_AssertionsInChecker) {
   ASSERT_EQ(r.cu->checkers.size(), 1u);
   EXPECT_EQ(r.cu->checkers[0]->name, "req_ack_chk");
   ASSERT_GE(r.cu->checkers[0]->ports.size(), 3u);
-  bool has_prop = false, has_assert = false, has_cover = false;
-  for (const auto* item : r.cu->checkers[0]->items) {
-    if (item->kind == ModuleItemKind::kPropertyDecl) has_prop = true;
-    if (item->kind == ModuleItemKind::kAssertProperty) has_assert = true;
-    if (item->kind == ModuleItemKind::kCoverProperty) has_cover = true;
-  }
-  EXPECT_TRUE(has_prop);
-  EXPECT_TRUE(has_assert);
-  EXPECT_TRUE(has_cover);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kPropertyDecl));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kAssertProperty));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kCoverProperty));
 }
 
 // §3.6: Checker also encapsulates "modeling code" — variables, initial blocks,
@@ -73,12 +77,9 @@ TEST(ParserClause03, Cl3_6_ModelingCodeInChecker) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->checkers.size(), 1u);
-  bool has_initial = false, has_always = false;
-  for (const auto* item : r.cu->checkers[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) has_initial = true;
-    if (item->kind == ModuleItemKind::kAlwaysBlock) has_always = true;
-  }
-  EXPECT_TRUE(has_initial);
-  EXPECT_TRUE(has_always);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kInitialBlock));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kAlwaysBlock));
   EXPECT_GE(r.cu->checkers[0]->items.size(), 3u);  // var + initial + always
 }

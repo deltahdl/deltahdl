@@ -12,7 +12,7 @@
 using namespace delta;
 
 // Helper: preprocess and parse, returning CU + preprocessor state.
-struct ParseResult3_14_02_03 {
+struct ParseResult3140203 {
   SourceManager mgr;
   Arena arena;
   CompilationUnit* cu = nullptr;
@@ -22,8 +22,8 @@ struct ParseResult3_14_02_03 {
   TimeUnit preproc_global_precision = TimeUnit::kNs;
 };
 
-static ParseResult3_14_02_03 Parse(const std::string& src) {
-  ParseResult3_14_02_03 result;
+static ParseResult3140203 Parse(const std::string& src) {
+  ParseResult3140203 result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});
@@ -37,6 +37,13 @@ static ParseResult3_14_02_03 Parse(const std::string& src) {
   result.cu = parser.Parse();
   result.has_errors = diag.HasErrors();
   return result;
+}
+
+static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
+  for (auto* item : items)
+    if (item->kind == ModuleItemKind::kNestedModuleDecl)
+      return item->nested_module_decl;
+  return nullptr;
 }
 
 // =============================================================================
@@ -89,13 +96,7 @@ TEST(ParserClause03, Cl3_14_2_3_RuleA_NestedInheritsUnit) {
   EXPECT_EQ(outer_resolved.unit, TimeUnit::kPs);
 
   // Find the nested module.
-  ModuleDecl* inner = nullptr;
-  for (auto* item : outer->items) {
-    if (item->kind == ModuleItemKind::kNestedModuleDecl) {
-      inner = item->nested_module_decl;
-      break;
-    }
-  }
+  auto* inner = FindNestedModule(outer->items);
   ASSERT_NE(inner, nullptr);
   EXPECT_FALSE(inner->has_timeunit);
 
@@ -120,13 +121,7 @@ TEST(ParserClause03, Cl3_14_2_3_RuleA_NestedInterfaceInherits) {
   auto* outer = r.cu->interfaces[0];
   auto outer_resolved = ResolveModuleTimescale(outer, r.cu, false, {}, nullptr);
 
-  ModuleDecl* inner = nullptr;
-  for (auto* item : outer->items) {
-    if (item->kind == ModuleItemKind::kNestedModuleDecl) {
-      inner = item->nested_module_decl;
-      break;
-    }
-  }
+  auto* inner = FindNestedModule(outer->items);
   ASSERT_NE(inner, nullptr);
   auto inner_resolved =
       ResolveModuleTimescale(inner, r.cu, false, {}, &outer_resolved);
@@ -223,13 +218,7 @@ TEST(ParserClause03, Cl3_14_2_3_FullPrecedenceChain) {
   EXPECT_EQ(outer_resolved.unit, TimeUnit::kUs);
   EXPECT_EQ(outer_resolved.precision, TimeUnit::kNs);
 
-  ModuleDecl* inner = nullptr;
-  for (auto* item : outer->items) {
-    if (item->kind == ModuleItemKind::kNestedModuleDecl) {
-      inner = item->nested_module_decl;
-      break;
-    }
-  }
+  auto* inner = FindNestedModule(outer->items);
   ASSERT_NE(inner, nullptr);
   auto inner_resolved =
       ResolveModuleTimescale(inner, r.cu, r.has_preproc_timescale,
@@ -284,13 +273,7 @@ TEST(ParserClause03, Cl3_14_2_3_SameRulesForPrecision) {
   auto* outer = r.cu->modules[0];
   auto outer_resolved = ResolveModuleTimescale(outer, r.cu, false, {}, nullptr);
 
-  ModuleDecl* inner = nullptr;
-  for (auto* item : outer->items) {
-    if (item->kind == ModuleItemKind::kNestedModuleDecl) {
-      inner = item->nested_module_decl;
-      break;
-    }
-  }
+  auto* inner = FindNestedModule(outer->items);
   ASSERT_NE(inner, nullptr);
   auto inner_resolved =
       ResolveModuleTimescale(inner, r.cu, false, {}, &outer_resolved);
@@ -388,13 +371,7 @@ TEST(ParserClause03, Cl3_14_2_3_NestedOverridesInheritance) {
   auto* outer = r.cu->modules[0];
   auto outer_resolved = ResolveModuleTimescale(outer, r.cu, false, {}, nullptr);
 
-  ModuleDecl* inner = nullptr;
-  for (auto* item : outer->items) {
-    if (item->kind == ModuleItemKind::kNestedModuleDecl) {
-      inner = item->nested_module_decl;
-      break;
-    }
-  }
+  auto* inner = FindNestedModule(outer->items);
   ASSERT_NE(inner, nullptr);
   auto inner_resolved =
       ResolveModuleTimescale(inner, r.cu, false, {}, &outer_resolved);

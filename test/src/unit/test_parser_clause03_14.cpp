@@ -28,15 +28,15 @@ static LexResult LexOne(const std::string& src) {
 }
 
 // Helper: parse source and return the compilation unit.
-struct ParseResult3_14 {
+struct ParseResult314 {
   SourceManager mgr;
   Arena arena;
   CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult3_14 Parse(const std::string& src) {
-  ParseResult3_14 result;
+static ParseResult314 Parse(const std::string& src) {
+  ParseResult314 result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});

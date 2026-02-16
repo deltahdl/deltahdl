@@ -10,15 +10,15 @@
 
 using namespace delta;
 
-struct ParseResult3_13 {
+struct ParseResult313 {
   SourceManager mgr;
   Arena arena;
   CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult3_13 Parse(const std::string& src) {
-  ParseResult3_13 result;
+static ParseResult313 Parse(const std::string& src) {
+  ParseResult313 result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});
@@ -64,6 +64,21 @@ static bool ElabOk(const std::string& src) {
   return !diag.HasErrors();
 }
 
+static bool HasItemOfKindAndName(const std::vector<ModuleItem*>& items,
+                                 ModuleItemKind kind, const std::string& name) {
+  for (const auto* item : items)
+    if (item->kind == kind && item->name == name) return true;
+  return false;
+}
+
+static bool HasAttrNamed(const std::vector<ModuleItem*>& items,
+                         const std::string& name) {
+  for (const auto* item : items)
+    for (const auto& attr : item->attrs)
+      if (attr.name == name) return true;
+  return false;
+}
+
 // =============================================================================
 // LRM §3.13 — Name spaces
 // =============================================================================
@@ -97,18 +112,10 @@ TEST(ParserClause03, Cl3_13_SameNameVarsInDifferentModules) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 2u);
   // Both modules should have a 'data' variable in their own scope.
-  bool a_has_data = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kVarDecl && item->name == "data")
-      a_has_data = true;
-  }
-  bool b_has_data = false;
-  for (auto* item : r.cu->modules[1]->items) {
-    if (item->kind == ModuleItemKind::kVarDecl && item->name == "data")
-      b_has_data = true;
-  }
-  EXPECT_TRUE(a_has_data);
-  EXPECT_TRUE(b_has_data);
+  EXPECT_TRUE(HasItemOfKindAndName(r.cu->modules[0]->items,
+                                   ModuleItemKind::kVarDecl, "data"));
+  EXPECT_TRUE(HasItemOfKindAndName(r.cu->modules[1]->items,
+                                   ModuleItemKind::kVarDecl, "data"));
 }
 
 // 3. Named begin-end block creating a subscope
@@ -667,15 +674,8 @@ TEST(ParserClause03, Cl3_13_AttributeNameSpace) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   // Verify attributes are parsed and attached to declarations
-  bool found_synthesis = false, found_full_case = false;
-  for (const auto* item : r.cu->modules[0]->items) {
-    for (const auto& attr : item->attrs) {
-      if (attr.name == "synthesis") found_synthesis = true;
-      if (attr.name == "full_case") found_full_case = true;
-    }
-  }
-  EXPECT_TRUE(found_synthesis);
-  EXPECT_TRUE(found_full_case);
+  EXPECT_TRUE(HasAttrNamed(r.cu->modules[0]->items, "synthesis"));
+  EXPECT_TRUE(HasAttrNamed(r.cu->modules[0]->items, "full_case"));
 }
 
 // 33. All 8 name spaces coexist in a single compilation unit
@@ -712,11 +712,7 @@ TEST(ParserClause03, Cl3_13_AllEightNameSpaces) {
   ASSERT_EQ(r.cu->modules[0]->ports.size(), 2u);
   EXPECT_EQ(r.cu->modules[0]->ports[0].name, "clk");
   // (h) Attribute name space
-  bool has_attr = false;
-  for (const auto* item : r.cu->modules[0]->items) {
-    if (!item->attrs.empty()) has_attr = true;
-  }
-  EXPECT_TRUE(has_attr);
+  EXPECT_TRUE(HasAttrNamed(r.cu->modules[0]->items, "keep"));
 }
 
 // =============================================================================

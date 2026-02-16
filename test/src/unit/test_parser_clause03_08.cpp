@@ -9,15 +9,15 @@
 
 using namespace delta;
 
-struct ParseResult3_08 {
+struct ParseResult308 {
   SourceManager mgr;
   Arena arena;
   CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult3_08 Parse(const std::string& src) {
-  ParseResult3_08 result;
+static ParseResult308 Parse(const std::string& src) {
+  ParseResult308 result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});
@@ -30,10 +30,26 @@ static ParseResult3_08 Parse(const std::string& src) {
   return result;
 }
 
-static ModuleItem* FindItemByKind(ParseResult3_08& r, ModuleItemKind kind) {
+static ModuleItem* FindItemByKind(ParseResult308& r, ModuleItemKind kind) {
   for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == kind) return item;
   }
+  return nullptr;
+}
+
+static int CountItemsByKind(const std::vector<ModuleItem*>& items,
+                            ModuleItemKind kind) {
+  int count = 0;
+  for (const auto* item : items)
+    if (item->kind == kind) ++count;
+  return count;
+}
+
+static const ModuleItem* FindFunctionByName(
+    const std::vector<ModuleItem*>& items, const std::string& name) {
+  for (const auto* item : items)
+    if (item->kind == ModuleItemKind::kFunctionDecl && item->name == name)
+      return item;
   return nullptr;
 }
 
@@ -82,18 +98,14 @@ TEST(ParserClause03, Cl3_8_FunctionReturnAndVoidAndDirections) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  int func_count = 0;
-  for (const auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kFunctionDecl) {
-      ++func_count;
-      if (item->name == "compute") {
-        ASSERT_EQ(item->func_args.size(), 4u);
-        EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
-        EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
-        EXPECT_EQ(item->func_args[2].direction, Direction::kInout);
-        EXPECT_EQ(item->func_args[3].direction, Direction::kRef);
-      }
-    }
-  }
-  EXPECT_EQ(func_count, 2);
+  EXPECT_EQ(
+      CountItemsByKind(r.cu->modules[0]->items, ModuleItemKind::kFunctionDecl),
+      2);
+  const auto* compute = FindFunctionByName(r.cu->modules[0]->items, "compute");
+  ASSERT_NE(compute, nullptr);
+  ASSERT_EQ(compute->func_args.size(), 4u);
+  EXPECT_EQ(compute->func_args[0].direction, Direction::kInput);
+  EXPECT_EQ(compute->func_args[1].direction, Direction::kOutput);
+  EXPECT_EQ(compute->func_args[2].direction, Direction::kInout);
+  EXPECT_EQ(compute->func_args[3].direction, Direction::kRef);
 }

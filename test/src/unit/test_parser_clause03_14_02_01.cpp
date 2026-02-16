@@ -11,7 +11,7 @@
 using namespace delta;
 
 // Helper: preprocess source and return timescale state.
-struct PreprocResult3_14_02_01 {
+struct PreprocResult3140201 {
   SourceManager mgr;
   TimeScale timescale;
   TimeUnit global_precision;
@@ -19,8 +19,8 @@ struct PreprocResult3_14_02_01 {
   bool has_errors;
 };
 
-static PreprocResult3_14_02_01 Preprocess(const std::string& src) {
-  PreprocResult3_14_02_01 result;
+static PreprocResult3140201 Preprocess(const std::string& src) {
+  PreprocResult3140201 result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});
@@ -33,15 +33,15 @@ static PreprocResult3_14_02_01 Preprocess(const std::string& src) {
 }
 
 // Helper: parse source and return the compilation unit.
-struct ParseResult3_14_02_01 {
+struct ParseResult3140201 {
   SourceManager mgr;
   Arena arena;
   CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult3_14_02_01 Parse(const std::string& src) {
-  ParseResult3_14_02_01 result;
+static ParseResult3140201 Parse(const std::string& src) {
+  ParseResult3140201 result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});

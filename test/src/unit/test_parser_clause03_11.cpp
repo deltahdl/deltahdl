@@ -9,15 +9,15 @@
 
 using namespace delta;
 
-struct ParseResult3_11 {
+struct ParseResult311 {
   SourceManager mgr;
   Arena arena;
   CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult3_11 Parse(const std::string& src) {
-  ParseResult3_11 result;
+static ParseResult311 Parse(const std::string& src) {
+  ParseResult311 result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});
@@ -30,11 +30,19 @@ static ParseResult3_11 Parse(const std::string& src) {
   return result;
 }
 
-static ModuleItem* FindItemByKind(ParseResult3_11& r, ModuleItemKind kind) {
+static ModuleItem* FindItemByKind(ParseResult311& r, ModuleItemKind kind) {
   for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == kind) return item;
   }
   return nullptr;
+}
+
+static int CountItemsByKind(const std::vector<ModuleItem*>& items,
+                            ModuleItemKind kind) {
+  int count = 0;
+  for (const auto* item : items)
+    if (item->kind == kind) ++count;
+  return count;
 }
 
 // =============================================================================
@@ -70,8 +78,6 @@ TEST(ParserClause03, Cl3_11_HierarchyAndInstantiation) {
   EXPECT_EQ(inst->inst_name, "m1");
   EXPECT_EQ(inst->inst_ports.size(), 4u);
   // Primitives as leaves: gate primitives (not, and, or)
-  int gates = 0;
-  for (const auto* item : r.cu->modules[1]->items)
-    if (item->kind == ModuleItemKind::kGateInst) ++gates;
-  EXPECT_EQ(gates, 4);
+  EXPECT_EQ(
+      CountItemsByKind(r.cu->modules[1]->items, ModuleItemKind::kGateInst), 4);
 }

@@ -9,15 +9,15 @@
 
 using namespace delta;
 
-struct ParseResult3_05 {
+struct ParseResult305 {
   SourceManager mgr;
   Arena arena;
   CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult3_05 Parse(const std::string& src) {
-  ParseResult3_05 result;
+static ParseResult305 Parse(const std::string& src) {
+  ParseResult305 result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});
@@ -28,6 +28,13 @@ static ParseResult3_05 Parse(const std::string& src) {
   result.cu = parser.Parse();
   result.has_errors = diag.HasErrors();
   return result;
+}
+
+static bool HasItemOfKind(const std::vector<ModuleItem*>& items,
+                          ModuleItemKind kind) {
+  for (const auto* item : items)
+    if (item->kind == kind) return true;
+  return false;
 }
 
 // =============================================================================
@@ -80,13 +87,10 @@ TEST(ParserClause03, Cl3_5_FunctionsAndTasks) {
       "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  bool has_func = false, has_task = false;
-  for (const auto* item : r.cu->interfaces[0]->items) {
-    if (item->kind == ModuleItemKind::kFunctionDecl) has_func = true;
-    if (item->kind == ModuleItemKind::kTaskDecl) has_task = true;
-  }
-  EXPECT_TRUE(has_func);
-  EXPECT_TRUE(has_task);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kFunctionDecl));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kTaskDecl));
 }
 
 // §3.5: "an interface can also contain processes (i.e., initial or always
@@ -101,15 +105,12 @@ TEST(ParserClause03, Cl3_5_ProcessesAndContinuousAssign) {
       "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  bool has_initial = false, has_always = false, has_assign = false;
-  for (const auto* item : r.cu->interfaces[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) has_initial = true;
-    if (item->kind == ModuleItemKind::kAlwaysBlock) has_always = true;
-    if (item->kind == ModuleItemKind::kContAssign) has_assign = true;
-  }
-  EXPECT_TRUE(has_initial);
-  EXPECT_TRUE(has_always);
-  EXPECT_TRUE(has_assign);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kInitialBlock));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kAlwaysBlock));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kContAssign));
 }
 
 // §3.5: "the modport construct is provided"

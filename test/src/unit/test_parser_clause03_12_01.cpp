@@ -10,15 +10,15 @@
 
 using namespace delta;
 
-struct ParseResult3_12_01 {
+struct ParseResult31201 {
   SourceManager mgr;
   Arena arena;
   CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult3_12_01 Parse(const std::string& src) {
-  ParseResult3_12_01 result;
+static ParseResult31201 Parse(const std::string& src) {
+  ParseResult31201 result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});
@@ -62,6 +62,14 @@ static bool ElabOk(const std::string& src) {
   Elaborator elab(arena, diag, cu);
   elab.Elaborate(cu->modules.back()->name);
   return !diag.HasErrors();
+}
+
+static const ModuleItem* FindItemByKindAndName(
+    const std::vector<ModuleItem*>& items, ModuleItemKind kind,
+    const std::string& name) {
+  for (const auto* item : items)
+    if (item->kind == kind && item->name == name) return item;
+  return nullptr;
 }
 
 // =============================================================================
@@ -205,13 +213,9 @@ TEST(ParserClause03, Cl3_12_1_NameResolutionOrder) {
   EXPECT_EQ(r.cu->cu_items[0]->name, "helper");
   // Module has its own 'helper' — shadows the CU-scope one.
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  bool found = false;
-  for (const auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kFunctionDecl && item->name == "helper") {
-      found = true;
-    }
-  }
-  EXPECT_TRUE(found);
+  EXPECT_NE(FindItemByKindAndName(r.cu->modules[0]->items,
+                                  ModuleItemKind::kFunctionDecl, "helper"),
+            nullptr);
 }
 
 // 9. $unit:: scope resolution operator — used for disambiguation.

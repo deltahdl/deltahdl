@@ -9,15 +9,15 @@
 
 using namespace delta;
 
-struct ParseResult3_04 {
+struct ParseResult304 {
   SourceManager mgr;
   Arena arena;
   CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult3_04 Parse(const std::string& src) {
-  ParseResult3_04 result;
+static ParseResult304 Parse(const std::string& src) {
+  ParseResult304 result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});
@@ -44,6 +44,13 @@ static bool ParseOk(const std::string& src) {
   return !diag.HasErrors();
 }
 
+static bool HasItemOfKind(const std::vector<ModuleItem*>& items,
+                          ModuleItemKind kind) {
+  for (const auto* item : items)
+    if (item->kind == kind) return true;
+  return false;
+}
+
 // =============================================================================
 // LRM §3.4 — Programs
 // =============================================================================
@@ -67,11 +74,8 @@ TEST(ParserClause03, Cl3_4_LrmExample) {
   EXPECT_EQ(r.cu->programs[0]->ports[1].name, "addr");
   EXPECT_EQ(r.cu->programs[0]->ports[2].name, "data");
   EXPECT_EQ(r.cu->programs[0]->ports[2].direction, Direction::kInout);
-  bool has_initial = false;
-  for (const auto* item : r.cu->programs[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) has_initial = true;
-  }
-  EXPECT_TRUE(has_initial);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kInitialBlock));
 }
 
 // §3.4: "A program block can contain data declarations, class definitions"
@@ -85,11 +89,8 @@ TEST(ParserClause03, Cl3_4_DataAndClassDeclarations) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_GE(r.cu->programs[0]->items.size(), 3u);
-  bool has_class = false;
-  for (const auto* item : r.cu->programs[0]->items) {
-    if (item->kind == ModuleItemKind::kClassDecl) has_class = true;
-  }
-  EXPECT_TRUE(has_class);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kClassDecl));
   // §3.4: Multiple programs each create separate scopes
   EXPECT_TRUE(
       ParseOk("program p1; logic a; endprogram\n"
@@ -108,18 +109,14 @@ TEST(ParserClause03, Cl3_4_SubroutinesAndProcedures) {
       "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  bool has_func = false, has_task = false;
-  bool has_initial = false, has_final = false;
-  for (const auto* item : r.cu->programs[0]->items) {
-    if (item->kind == ModuleItemKind::kFunctionDecl) has_func = true;
-    if (item->kind == ModuleItemKind::kTaskDecl) has_task = true;
-    if (item->kind == ModuleItemKind::kInitialBlock) has_initial = true;
-    if (item->kind == ModuleItemKind::kFinalBlock) has_final = true;
-  }
-  EXPECT_TRUE(has_func);
-  EXPECT_TRUE(has_task);
-  EXPECT_TRUE(has_initial);
-  EXPECT_TRUE(has_final);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kFunctionDecl));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kTaskDecl));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kInitialBlock));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kFinalBlock));
 }
 
 // §3.4: "It cannot contain always procedures ... module instances"

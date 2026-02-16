@@ -9,15 +9,15 @@
 
 using namespace delta;
 
-struct ParseResult3_12 {
+struct ParseResult312 {
   SourceManager mgr;
   Arena arena;
   CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult3_12 Parse(const std::string& src) {
-  ParseResult3_12 result;
+static ParseResult312 Parse(const std::string& src) {
+  ParseResult312 result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});
@@ -28,6 +28,15 @@ static ParseResult3_12 Parse(const std::string& src) {
   result.cu = parser.Parse();
   result.has_errors = diag.HasErrors();
   return result;
+}
+
+static const ModuleItem* FindInstByModule(const std::vector<ModuleItem*>& items,
+                                          const std::string& module_name) {
+  for (const auto* item : items)
+    if (item->kind == ModuleItemKind::kModuleInst &&
+        item->inst_module == module_name)
+      return item;
+  return nullptr;
 }
 
 // =============================================================================
@@ -58,14 +67,8 @@ TEST(ParserClause03, Cl3_12_CompilationAndElaboration) {
   ASSERT_EQ(r.cu->modules.size(), 2u);
   EXPECT_EQ(r.cu->modules[0]->params.size(), 1u);
   // Elaboration expands instantiation with parameter override & connectivity
-  bool found = false;
-  for (const auto* item : r.cu->modules[1]->items) {
-    if (item->kind == ModuleItemKind::kModuleInst) {
-      found = true;
-      EXPECT_EQ(item->inst_module, "adder");
-      EXPECT_EQ(item->inst_params.size(), 1u);
-      EXPECT_EQ(item->inst_ports.size(), 3u);
-    }
-  }
-  EXPECT_TRUE(found);
+  const auto* inst = FindInstByModule(r.cu->modules[1]->items, "adder");
+  ASSERT_NE(inst, nullptr);
+  EXPECT_EQ(inst->inst_params.size(), 1u);
+  EXPECT_EQ(inst->inst_ports.size(), 3u);
 }
