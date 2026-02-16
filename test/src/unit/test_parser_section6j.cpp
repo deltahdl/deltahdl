@@ -111,12 +111,14 @@ TEST(ParserSection6, Sec6_7_1_MultipleNetsExplicitType) {
   EXPECT_FALSE(r.has_errors);
   auto& items = r.cu->modules[0]->items;
   ASSERT_EQ(items.size(), 3u);
-  for (auto* item : items) {
-    EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-    EXPECT_TRUE(item->data_type.is_net);
-  }
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kNetDecl);
+  EXPECT_TRUE(items[0]->data_type.is_net);
   EXPECT_EQ(items[0]->name, "a");
+  EXPECT_EQ(items[1]->kind, ModuleItemKind::kNetDecl);
+  EXPECT_TRUE(items[1]->data_type.is_net);
   EXPECT_EQ(items[1]->name, "b");
+  EXPECT_EQ(items[2]->kind, ModuleItemKind::kNetDecl);
+  EXPECT_TRUE(items[2]->data_type.is_net);
   EXPECT_EQ(items[2]->name, "c");
 }
 
