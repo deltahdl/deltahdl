@@ -114,6 +114,97 @@ TEST(ParserSection3, Sec3_6_ModelingCodeInChecker) {
   EXPECT_GE(r.cu->checkers[0]->items.size(), 3u);  // var + initial + always
 }
 
+// ============================================================
+// LRM section 3.7 -- Primitives
+// ============================================================
+
+// §3.7: "SystemVerilog includes a number of built-in primitive types"
+//       — logic gates and switches instantiated inside a module.
+TEST(ParserSection3, Sec3_7_BuiltInPrimitives) {
+  auto r = Parse(
+      "module gate_test(input a, b, c, output w, x, y, z);\n"
+      "  and g1(w, a, b);\n"
+      "  nand g2(x, a, b, c);\n"
+      "  bufif0 g3(y, a, b);\n"
+      "  nmos g4(z, a, b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  int gate_count = 0;
+  bool has_and = false, has_nand = false, has_bufif0 = false, has_nmos = false;
+  for (const auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kGateInst) {
+      ++gate_count;
+      if (item->gate_kind == GateKind::kAnd) has_and = true;
+      if (item->gate_kind == GateKind::kNand) has_nand = true;
+      if (item->gate_kind == GateKind::kBufif0) has_bufif0 = true;
+      if (item->gate_kind == GateKind::kNmos) has_nmos = true;
+    }
+  }
+  EXPECT_EQ(gate_count, 4);
+  EXPECT_TRUE(has_and);
+  EXPECT_TRUE(has_nand);
+  EXPECT_TRUE(has_bufif0);
+  EXPECT_TRUE(has_nmos);
+}
+
+// §3.7: "Designers can supplement the built-in primitives with user-defined
+//        primitives (UDPs). A UDP is enclosed between the keywords
+//        primitive...endprimitive."
+//        Combinational UDP with truth table for gate-level modeling.
+TEST(ParserSection3, Sec3_7_CombinationalUdp) {
+  auto r = Parse(
+      "primitive udp_or (output out, input a, b);\n"
+      "  table\n"
+      "    0 0 : 0;\n"
+      "    0 1 : 1;\n"
+      "    1 0 : 1;\n"
+      "    1 1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->udps.size(), 1u);
+  const auto* udp = r.cu->udps[0];
+  EXPECT_EQ(udp->name, "udp_or");
+  EXPECT_EQ(udp->output_name, "out");
+  ASSERT_EQ(udp->input_names.size(), 2u);
+  EXPECT_EQ(udp->input_names[0], "a");
+  EXPECT_EQ(udp->input_names[1], "b");
+  EXPECT_FALSE(udp->is_sequential);
+  ASSERT_EQ(udp->table.size(), 4u);
+  EXPECT_EQ(udp->table[0].output, '0');
+  EXPECT_EQ(udp->table[3].output, '1');
+}
+
+// §3.7: Sequential UDP with initial statement — timing-accurate modeling
+//        for sequential gate-level circuits.
+TEST(ParserSection3, Sec3_7_SequentialUdp) {
+  auto r = Parse(
+      "primitive udp_latch (output reg q, input d, en);\n"
+      "  initial q = 0;\n"
+      "  table\n"
+      "    1 1 : ? : 1;\n"
+      "    0 1 : ? : 0;\n"
+      "    ? 0 : ? : -;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->udps.size(), 1u);
+  const auto* udp = r.cu->udps[0];
+  EXPECT_EQ(udp->name, "udp_latch");
+  EXPECT_TRUE(udp->is_sequential);
+  EXPECT_TRUE(udp->has_initial);
+  EXPECT_EQ(udp->initial_value, '0');
+  ASSERT_EQ(udp->table.size(), 3u);
+  // Sequential rows have current_state field
+  EXPECT_EQ(udp->table[0].current_state, '?');
+  EXPECT_EQ(udp->table[0].output, '1');
+  EXPECT_EQ(udp->table[2].output, '-');
+}
+
 TEST(ParserSection3, AllSevenDesignElements) {
   // §3.2: A design element is a module, program, interface, checker,
   //       package, primitive, or configuration.
@@ -149,7 +240,7 @@ TEST(ParserSection3, AllSevenDesignElements) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg");
 }
 
-TEST(ParserSection3, MultipleModulesInCompilationUnit) {
+TEST(ParserSection3, MultipleDesignElementsInUnit) {
   auto r = Parse(
       "module a; endmodule\n"
       "module b; endmodule\n"
@@ -158,8 +249,14 @@ TEST(ParserSection3, MultipleModulesInCompilationUnit) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 3u);
   EXPECT_EQ(r.cu->modules[0]->name, "a");
-  EXPECT_EQ(r.cu->modules[1]->name, "b");
-  EXPECT_EQ(r.cu->modules[2]->name, "c");
+  // Module + package in same unit
+  auto r2 = Parse(
+      "package pkg; typedef int myint; endpackage\n"
+      "module m; import pkg::*; endmodule\n");
+  ASSERT_NE(r2.cu, nullptr);
+  EXPECT_FALSE(r2.has_errors);
+  EXPECT_EQ(r2.cu->packages.size(), 1u);
+  EXPECT_EQ(r2.cu->modules.size(), 1u);
 }
 
 TEST(ParserSection3, ModuleWithPortsAndBody) {
@@ -681,8 +778,8 @@ TEST(ParserSection3, TaskLifetime) {
   EXPECT_TRUE(rs.cu->modules[0]->items[0]->is_static);
 }
 
-TEST(ParserSection3, TopLevelFunctionAutomatic) {
-  // Top-level (compilation-unit scope) function with automatic lifetime
+TEST(ParserSection3, TopLevelFunctionAutomaticAndProgramLifetime) {
+  // Top-level function with automatic lifetime
   auto r = Parse(
       "function automatic int foo(int x);\n"
       "  return x + 1;\n"
@@ -692,15 +789,10 @@ TEST(ParserSection3, TopLevelFunctionAutomatic) {
   ASSERT_GE(r.cu->cu_items.size(), 1u);
   EXPECT_EQ(r.cu->cu_items[0]->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_TRUE(r.cu->cu_items[0]->is_automatic);
-}
-
-TEST(ParserSection3, ProgramAutomaticLifetime) {
-  // program with automatic lifetime
+  // Program with automatic lifetime
   EXPECT_TRUE(
       ParseOk("program automatic test_prog;\n"
-              "  initial begin\n"
-              "    $display(\"hello\");\n"
-              "  end\n"
+              "  initial begin $display(\"hello\"); end\n"
               "endprogram\n"));
 }
 
@@ -720,6 +812,10 @@ TEST(ParserSection3, TimeunitAndTimeprecision) {
   EXPECT_TRUE(r3.cu->modules[0]->has_timeunit);
   EXPECT_TRUE(r3.cu->modules[0]->has_timeprecision);
   EXPECT_TRUE(ParseOk("module m; timeunit 100ps / 10fs; endmodule\n"));
+  // In programs and interfaces
+  EXPECT_TRUE(
+      ParseOk("program p; timeunit 10us; timeprecision 100ns; endprogram\n"));
+  EXPECT_TRUE(ParseOk("interface ifc; timeunit 1ns; endinterface\n"));
 }
 
 TEST(ParserSection3, TimescaleDirective) {
@@ -732,14 +828,6 @@ TEST(ParserSection3, TimescaleDirective) {
       "module c; endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 3u);
-}
-
-TEST(ParserSection3, TimeunitInProgramAndInterface) {
-  EXPECT_TRUE(
-      ParseOk("program p; timeunit 10us; timeprecision 100ns; endprogram\n"));
-  auto r = Parse("interface ifc; timeunit 1ns; endinterface\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
 }
 
 // =============================================================================
@@ -767,48 +855,23 @@ TEST(ParserSection3, TimeLiterals) {
 
 // --- ANSI style ports ---
 
-TEST(ParserSection3, AnsiPortInput) {
+TEST(ParserSection3, AnsiPortDirections) {
+  // All four port directions: input, output, inout, ref
   auto r = Parse(
-      "module m (input logic a);\n"
+      "module m (input logic a, output logic y,\n"
+      "          inout wire [7:0] data, ref logic [3:0] r);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->ports.size(), 1u);
+  ASSERT_EQ(r.cu->modules[0]->ports.size(), 4u);
   EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInput);
   EXPECT_EQ(r.cu->modules[0]->ports[0].name, "a");
-}
-
-TEST(ParserSection3, AnsiPortOutput) {
-  auto r = Parse(
-      "module m (output logic y);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->ports.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kOutput);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].name, "y");
-}
-
-TEST(ParserSection3, AnsiPortInout) {
-  auto r = Parse(
-      "module m (inout wire [7:0] data);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->ports.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInout);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].name, "data");
-}
-
-TEST(ParserSection3, AnsiPortRef) {
-  auto r = Parse(
-      "module m (ref logic [3:0] r);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->ports.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kRef);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].name, "r");
+  EXPECT_EQ(r.cu->modules[0]->ports[1].direction, Direction::kOutput);
+  EXPECT_EQ(r.cu->modules[0]->ports[1].name, "y");
+  EXPECT_EQ(r.cu->modules[0]->ports[2].direction, Direction::kInout);
+  EXPECT_EQ(r.cu->modules[0]->ports[2].name, "data");
+  EXPECT_EQ(r.cu->modules[0]->ports[3].direction, Direction::kRef);
+  EXPECT_EQ(r.cu->modules[0]->ports[3].name, "r");
 }
 
 TEST(ParserSection3, AnsiPortMultipleDirections) {
@@ -837,9 +900,7 @@ TEST(ParserSection3, AnsiPortVariants) {
   EXPECT_TRUE(ParseOk("module m (input signed [7:0] s); endmodule\n"));
 }
 
-// --- Non-ANSI style ports ---
-
-TEST(ParserSection3, NonAnsiPortDeclaration) {
+TEST(ParserSection3, NonAnsiPortDeclarations) {
   // Non-ANSI style: port list + separate direction declarations
   auto r = Parse(
       "module m (a, b, y);\n"
@@ -850,9 +911,7 @@ TEST(ParserSection3, NonAnsiPortDeclaration) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
-TEST(ParserSection3, NonAnsiPortVariants) {
+  // Variants with packed types and inout
   EXPECT_TRUE(
       ParseOk("module m (a, d); input [15:0] a; inout [7:0] d; endmodule\n"));
   EXPECT_TRUE(
@@ -861,36 +920,24 @@ TEST(ParserSection3, NonAnsiPortVariants) {
 
 // --- Empty port list ---
 
-TEST(ParserSection3, EmptyPortListParens) {
-  auto r = Parse("module m (); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->ports.size(), 0u);
+TEST(ParserSection3, EmptyOrMissingPortList) {
+  // Empty parens and no port list at all
+  auto r1 = Parse("module m (); endmodule\n");
+  ASSERT_NE(r1.cu, nullptr);
+  EXPECT_FALSE(r1.has_errors);
+  EXPECT_EQ(r1.cu->modules[0]->ports.size(), 0u);
+  auto r2 = Parse("module m; endmodule\n");
+  ASSERT_NE(r2.cu, nullptr);
+  EXPECT_FALSE(r2.has_errors);
+  EXPECT_EQ(r2.cu->modules[0]->ports.size(), 0u);
 }
 
-TEST(ParserSection3, NoPortListAtAll) {
-  auto r = Parse("module m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->ports.size(), 0u);
-}
-
-// --- Dot-star port ---
-
-TEST(ParserSection3, DotStarPortImplicit) {
-  // LRM 23.2: module_keyword [lifetime] module_identifier (.*) ;
+TEST(ParserSection3, PortMiscVariants) {
+  // Dot-star implicit (LRM 23.2)
   EXPECT_TRUE(ParseOk("module m (.*); endmodule\n"));
+  // Port with default value
+  EXPECT_TRUE(ParseOk("module m (input int x = 10); endmodule\n"));
 }
-
-// --- Port with default values ---
-
-TEST(ParserSection3, AnsiPortWithDefaultValue) {
-  EXPECT_TRUE(
-      ParseOk("module m (input int x = 10);\n"
-              "endmodule\n"));
-}
-
-// --- Interface port in module ---
 
 TEST(ParserSection3, InterfacePortInModule) {
   // LRM 23.2.2: interface port declaration
@@ -922,45 +969,25 @@ TEST(ParserSection3, ModuleInstantiationHierarchy) {
 
 // --- Compilation unit scope items ---
 
-TEST(ParserSection3, TopLevelFunction) {
-  auto r = Parse(
+TEST(ParserSection3, TopLevelFunctionAndTask) {
+  auto rf = Parse(
       "function automatic int foo(int x);\n"
       "  return x + 1;\n"
       "endfunction\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->cu_items.size(), 1u);
-  EXPECT_EQ(r.cu->cu_items[0]->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_EQ(r.cu->cu_items[0]->name, "foo");
+  ASSERT_NE(rf.cu, nullptr);
+  EXPECT_FALSE(rf.has_errors);
+  ASSERT_GE(rf.cu->cu_items.size(), 1u);
+  EXPECT_EQ(rf.cu->cu_items[0]->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(rf.cu->cu_items[0]->name, "foo");
+  auto rt = Parse("task automatic my_task(input int x); endtask\n");
+  ASSERT_NE(rt.cu, nullptr);
+  EXPECT_FALSE(rt.has_errors);
+  ASSERT_GE(rt.cu->cu_items.size(), 1u);
+  EXPECT_EQ(rt.cu->cu_items[0]->kind, ModuleItemKind::kTaskDecl);
 }
-
-TEST(ParserSection3, TopLevelTask) {
-  auto r = Parse(
-      "task automatic my_task(input int x);\n"
-      "endtask\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->cu_items.size(), 1u);
-  EXPECT_EQ(r.cu->cu_items[0]->kind, ModuleItemKind::kTaskDecl);
-}
-
-TEST(ParserSection3, ModuleAndPackageInSameUnit) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  typedef int myint;\n"
-      "endpackage\n"
-      "module m;\n"
-      "  import pkg::*;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->packages.size(), 1u);
-  EXPECT_EQ(r.cu->modules.size(), 1u);
-}
-
-// --- Time units with different magnitudes (LRM Table 3-1) ---
 
 TEST(ParserSection3, TimeunitVariousMagnitudes) {
+  // LRM Table 3-1: various time unit magnitudes
   EXPECT_TRUE(
       ParseOk("module a; timeunit 100ns; timeprecision 10ps; endmodule\n"));
   EXPECT_TRUE(
