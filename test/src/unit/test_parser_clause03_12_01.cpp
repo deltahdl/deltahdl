@@ -65,12 +65,12 @@ static bool ElabOk(const std::string& src) {
 }
 
 // =============================================================================
-// LRM section 3.12.1 -- Compilation units
+// LRM §3.12.1 — Compilation units
 // =============================================================================
 
 // 1. Compilation unit definition: a collection of source files compiled
 // together.  A single Parse() call produces one CompilationUnit.
-TEST(ParserSection3, Sec3_12_1_CompilationUnitDefinition) {
+TEST(ParserClause03, Cl3_12_1_CompilationUnitDefinition) {
   auto r = Parse(
       "module a; endmodule\n"
       "module b; endmodule\n");
@@ -85,7 +85,7 @@ TEST(ParserSection3, Sec3_12_1_CompilationUnitDefinition) {
 // 2. Compilation-unit scope: declarations outside any other scope.
 // CU scope can contain anything valid in a package (§26.2) —
 // functions, tasks, typedefs, parameters, classes.
-TEST(ParserSection3, Sec3_12_1_CuScopeContainsPackageItems) {
+TEST(ParserClause03, Cl3_12_1_CuScopeContainsPackageItems) {
   auto r = Parse(
       "function int helper(int x); return x + 1; endfunction\n"
       "task auto_task; endtask\n"
@@ -101,7 +101,7 @@ TEST(ParserSection3, Sec3_12_1_CuScopeContainsPackageItems) {
 }
 
 // 3. Bind constructs at CU scope (§23.11) — CU scope can also hold bind.
-TEST(ParserSection3, Sec3_12_1_CuScopeBindDirective) {
+TEST(ParserClause03, Cl3_12_1_CuScopeBindDirective) {
   auto r = Parse(
       "module target; endmodule\n"
       "bind target target chk_inst();\n");
@@ -113,7 +113,7 @@ TEST(ParserSection3, Sec3_12_1_CuScopeBindDirective) {
 
 // 4. `include becomes part of the including file's CU.
 // The preprocessor inlines included content into the same CU.
-TEST(ParserSection3, Sec3_12_1_IncludeBecomesPartOfCU) {
+TEST(ParserClause03, Cl3_12_1_IncludeBecomesPartOfCU) {
   // We can't include real files in this unit test, but we verify that
   // the preprocessor produces a single text blob from `define/`ifdef
   // which are CU-scoped directives.  If an `include were processed,
@@ -132,7 +132,7 @@ TEST(ParserSection3, Sec3_12_1_IncludeBecomesPartOfCU) {
 
 // 5. Global visibility: modules, primitives, programs, interfaces, packages
 // are visible in all CUs.  Within a single CU, all are accessible.
-TEST(ParserSection3, Sec3_12_1_GloballyVisibleDesignElements) {
+TEST(ParserClause03, Cl3_12_1_GloballyVisibleDesignElements) {
   auto r = Parse(
       "package pkg; endpackage\n"
       "interface intf; endinterface\n"
@@ -156,7 +156,7 @@ TEST(ParserSection3, Sec3_12_1_GloballyVisibleDesignElements) {
 }
 
 // 6. CU scope can hold classes (valid in a package per §26.2).
-TEST(ParserSection3, Sec3_12_1_CuScopeClassDecl) {
+TEST(ParserClause03, Cl3_12_1_CuScopeClassDecl) {
   auto r = Parse(
       "class my_class;\n"
       "  int x;\n"
@@ -170,7 +170,7 @@ TEST(ParserSection3, Sec3_12_1_CuScopeClassDecl) {
 
 // 7. Compiler directives apply within a CU only.
 // A `define in one parse (CU) does not leak into a separate parse (CU).
-TEST(ParserSection3, Sec3_12_1_DirectivesLocalToCU) {
+TEST(ParserClause03, Cl3_12_1_DirectivesLocalToCU) {
   // First CU: define a macro and use it.
   auto r1 = Parse(
       "`define FOO 1\n"
@@ -190,7 +190,7 @@ TEST(ParserSection3, Sec3_12_1_DirectivesLocalToCU) {
 
 // 8. Name resolution: nested scope searched first, then CU scope.
 // A local declaration shadows a CU-scope declaration.
-TEST(ParserSection3, Sec3_12_1_NameResolutionOrder) {
+TEST(ParserClause03, Cl3_12_1_NameResolutionOrder) {
   // A function at CU scope and a module that also declares 'helper'.
   // The parser accepts both — resolution is elaboration's job.
   auto r = Parse(
@@ -216,7 +216,7 @@ TEST(ParserSection3, Sec3_12_1_NameResolutionOrder) {
 
 // 9. $unit:: scope resolution operator — used for disambiguation.
 // $unit is lexed as a system identifier; $unit::name is the syntax.
-TEST(ParserSection3, Sec3_12_1_DollarUnitScopeResolution) {
+TEST(ParserClause03, Cl3_12_1_DollarUnitScopeResolution) {
   // The LRM example: b = 5 + $unit::b;
   // $unit is a kSystemIdentifier token; :: is kColonColon.
   // This tests that the lexer correctly produces these tokens.
@@ -239,7 +239,7 @@ TEST(ParserSection3, Sec3_12_1_DollarUnitScopeResolution) {
 // The LRM says references shall only be made to names already defined.
 // This is a semantic rule; the parser accepts the code but elaboration
 // would reject it.  We test that parsing succeeds (syntax is valid).
-TEST(ParserSection3, Sec3_12_1_ForwardRefSyntaxValid) {
+TEST(ParserClause03, Cl3_12_1_ForwardRefSyntaxValid) {
   // This is valid syntax even though semantically 'b' is referenced
   // before its declaration at CU scope.
   EXPECT_TRUE(
@@ -251,7 +251,7 @@ TEST(ParserSection3, Sec3_12_1_ForwardRefSyntaxValid) {
 // 11. CU scope has no name — cannot be imported.
 // An import of $unit would be illegal.  Verify that valid import syntax
 // works and that CU items remain separate from packages.
-TEST(ParserSection3, Sec3_12_1_CuScopeCannotBeImported) {
+TEST(ParserClause03, Cl3_12_1_CuScopeCannotBeImported) {
   // Normal package import works fine.
   auto r = Parse(
       "package pkg;\n"
@@ -270,7 +270,7 @@ TEST(ParserSection3, Sec3_12_1_CuScopeCannotBeImported) {
 // 12. CU scope identifiers not accessible via hierarchical references.
 // Hierarchical names start from $root (§23.3.1), not from CU scope.
 // Verify that a hierarchical reference in a module parses correctly.
-TEST(ParserSection3, Sec3_12_1_HierRefFromCUScope) {
+TEST(ParserClause03, Cl3_12_1_HierRefFromCUScope) {
   auto r = Parse(
       "module top;\n"
       "  module_a u1();\n"
@@ -288,7 +288,7 @@ TEST(ParserSection3, Sec3_12_1_HierRefFromCUScope) {
 // Top-level typedef is parsed as a module item (discarded at top level
 // in current implementation) or could be a class.  Verify CU-scope
 // classes enable type sharing.
-TEST(ParserSection3, Sec3_12_1_TypeSharingViaCUScope) {
+TEST(ParserClause03, Cl3_12_1_TypeSharingViaCUScope) {
   auto r = Parse(
       "class shared_type;\n"
       "  int value;\n"
@@ -306,7 +306,7 @@ TEST(ParserSection3, Sec3_12_1_TypeSharingViaCUScope) {
 }
 
 // 14. Elaboration: CU-scope function at top level, module elaborates ok.
-TEST(ParserSection3, Sec3_12_1_ElabModuleWithCuFunction) {
+TEST(ParserClause03, Cl3_12_1_ElabModuleWithCuFunction) {
   // The CU has a top-level function and a module.
   // Elaboration of the module should succeed.
   EXPECT_TRUE(
@@ -317,7 +317,7 @@ TEST(ParserSection3, Sec3_12_1_ElabModuleWithCuFunction) {
 }
 
 // 15. Config declarations at top level (part of CU).
-TEST(ParserSection3, Sec3_12_1_ConfigAtCUScope) {
+TEST(ParserClause03, Cl3_12_1_ConfigAtCUScope) {
   auto r = Parse(
       "module lib_mod; endmodule\n"
       "config my_cfg;\n"
@@ -331,7 +331,7 @@ TEST(ParserSection3, Sec3_12_1_ConfigAtCUScope) {
 }
 
 // 16. Checker declarations at CU scope.
-TEST(ParserSection3, Sec3_12_1_CheckerAtCUScope) {
+TEST(ParserClause03, Cl3_12_1_CheckerAtCUScope) {
   auto r = Parse(
       "checker my_chk;\n"
       "endchecker\n"

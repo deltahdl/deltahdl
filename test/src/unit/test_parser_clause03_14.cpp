@@ -67,7 +67,7 @@ static bool ParseOk(const std::string& src) {
 // LRM §3.14 — Simulation time units and precision
 // =============================================================================
 
-TEST(ParserClause03, Sec3_14_TimeunitsAndTimescale) {
+TEST(ParserClause03, Cl3_14_TimeunitsAndTimescale) {
   auto r1 = Parse("module m; timeunit 1ns; endmodule\n");
   EXPECT_FALSE(r1.has_errors);
   EXPECT_TRUE(r1.cu->modules[0]->has_timeunit);
@@ -96,7 +96,7 @@ TEST(ParserClause03, Sec3_14_TimeunitsAndTimescale) {
 
 // 1. TimeUnit enum: six values with correct power-of-10 exponents
 // (s=0, ms=-3, us=-6, ns=-9, ps=-12, fs=-15).
-TEST(ParserClause03, Sec3_14_TimeUnitEnumValues) {
+TEST(ParserClause03, Cl3_14_TimeUnitEnumValues) {
   EXPECT_EQ(static_cast<int8_t>(TimeUnit::kS), 0);
   EXPECT_EQ(static_cast<int8_t>(TimeUnit::kMs), -3);
   EXPECT_EQ(static_cast<int8_t>(TimeUnit::kUs), -6);
@@ -106,7 +106,7 @@ TEST(ParserClause03, Sec3_14_TimeUnitEnumValues) {
 }
 
 // 2. Table 3-1: ParseTimeUnitStr maps all six character strings.
-TEST(ParserClause03, Sec3_14_Table3_1_AllUnitStrings) {
+TEST(ParserClause03, Cl3_14_Table3_1_AllUnitStrings) {
   TimeUnit u = TimeUnit::kNs;
   EXPECT_TRUE(ParseTimeUnitStr("s", u));
   EXPECT_EQ(u, TimeUnit::kS);
@@ -123,7 +123,7 @@ TEST(ParserClause03, Sec3_14_Table3_1_AllUnitStrings) {
 }
 
 // 3. Table 3-1: invalid unit strings are rejected.
-TEST(ParserClause03, Sec3_14_Table3_1_InvalidStrings) {
+TEST(ParserClause03, Cl3_14_Table3_1_InvalidStrings) {
   TimeUnit u = TimeUnit::kNs;
   EXPECT_FALSE(ParseTimeUnitStr("", u));
   EXPECT_FALSE(ParseTimeUnitStr("xs", u));
@@ -132,7 +132,7 @@ TEST(ParserClause03, Sec3_14_Table3_1_InvalidStrings) {
 }
 
 // 4. NOTE: "us" represents microseconds (the LRM substitutes for μs).
-TEST(ParserClause03, Sec3_14_UsForMicroseconds) {
+TEST(ParserClause03, Cl3_14_UsForMicroseconds) {
   TimeUnit u = TimeUnit::kNs;
   EXPECT_TRUE(ParseTimeUnitStr("us", u));
   EXPECT_EQ(u, TimeUnit::kUs);
@@ -140,7 +140,7 @@ TEST(ParserClause03, Sec3_14_UsForMicroseconds) {
 }
 
 // 5. TimeScale struct: time values have two components (unit + precision).
-TEST(ParserClause03, Sec3_14_TimeScaleTwoComponents) {
+TEST(ParserClause03, Cl3_14_TimeScaleTwoComponents) {
   TimeScale ts;
   ts.unit = TimeUnit::kNs;
   ts.magnitude = 1;
@@ -154,7 +154,7 @@ TEST(ParserClause03, Sec3_14_TimeScaleTwoComponents) {
 
 // 6. Three orders of magnitude: 1, 10, 100.
 // DelayToTicks produces proportionally different tick counts.
-TEST(ParserClause03, Sec3_14_ThreeMagnitudes) {
+TEST(ParserClause03, Cl3_14_ThreeMagnitudes) {
   TimeScale ts1{TimeUnit::kNs, 1, TimeUnit::kPs, 1};
   TimeScale ts10{TimeUnit::kNs, 10, TimeUnit::kPs, 1};
   TimeScale ts100{TimeUnit::kNs, 100, TimeUnit::kPs, 1};
@@ -164,7 +164,7 @@ TEST(ParserClause03, Sec3_14_ThreeMagnitudes) {
 }
 
 // 7. Lexer: all six time suffixes produce kTimeLiteral tokens.
-TEST(ParserClause03, Sec3_14_LexerAllTimeSuffixes) {
+TEST(ParserClause03, Cl3_14_LexerAllTimeSuffixes) {
   auto r_s = LexOne("1s");
   EXPECT_EQ(r_s.token.kind, TokenKind::kTimeLiteral);
   EXPECT_EQ(r_s.token.text, "1s");
@@ -186,7 +186,7 @@ TEST(ParserClause03, Sec3_14_LexerAllTimeSuffixes) {
 }
 
 // 8. Lexer: magnitudes 1, 10, 100 with time suffix.
-TEST(ParserClause03, Sec3_14_LexerTimeMagnitudes) {
+TEST(ParserClause03, Cl3_14_LexerTimeMagnitudes) {
   auto r1 = LexOne("1ns");
   EXPECT_EQ(r1.token.kind, TokenKind::kTimeLiteral);
   EXPECT_EQ(r1.token.text, "1ns");
@@ -200,7 +200,7 @@ TEST(ParserClause03, Sec3_14_LexerTimeMagnitudes) {
 
 // 9. SimTime: simulation time is maintained as ticks with comparison
 // and addition operators.
-TEST(ParserClause03, Sec3_14_SimTimeOperations) {
+TEST(ParserClause03, Cl3_14_SimTimeOperations) {
   SimTime t0{0};
   SimTime t1{1000};
   SimTime t2{1000};
@@ -216,13 +216,13 @@ TEST(ParserClause03, Sec3_14_SimTimeOperations) {
 }
 
 // 10. DelayToTicks: when unit == precision, delay maps 1:1 to ticks.
-TEST(ParserClause03, Sec3_14_DelayToTicksSameUnit) {
+TEST(ParserClause03, Cl3_14_DelayToTicksSameUnit) {
   TimeScale ts{TimeUnit::kNs, 1, TimeUnit::kNs, 1};
   EXPECT_EQ(DelayToTicks(42, ts, TimeUnit::kNs), 42u);
 }
 
 // 11. DelayToTicks covers the full range from seconds to femtoseconds.
-TEST(ParserClause03, Sec3_14_DelayToTicksFullRange) {
+TEST(ParserClause03, Cl3_14_DelayToTicksFullRange) {
   // 1 second at fs precision = 10^15 ticks.
   TimeScale ts_s{TimeUnit::kS, 1, TimeUnit::kFs, 1};
   EXPECT_EQ(DelayToTicks(1, ts_s, TimeUnit::kFs), 1000000000000000ULL);
@@ -234,7 +234,7 @@ TEST(ParserClause03, Sec3_14_DelayToTicksFullRange) {
 // 12. Precision constraint: precision exponent <= unit exponent.
 // "The time precision shall be at least as precise as the time unit."
 // Finer units have more-negative exponents (kFs < kPs < ... < kS).
-TEST(ParserClause03, Sec3_14_PrecisionAtLeastAsPreciseAsUnit) {
+TEST(ParserClause03, Cl3_14_PrecisionAtLeastAsPreciseAsUnit) {
   EXPECT_LE(static_cast<int8_t>(TimeUnit::kFs),
             static_cast<int8_t>(TimeUnit::kPs));
   EXPECT_LE(static_cast<int8_t>(TimeUnit::kPs),
@@ -249,7 +249,7 @@ TEST(ParserClause03, Sec3_14_PrecisionAtLeastAsPreciseAsUnit) {
 
 // 13. Time values stored in design element: module with timeunit and
 // timeprecision stores both components.
-TEST(ParserClause03, Sec3_14_TimeValuesInDesignElement) {
+TEST(ParserClause03, Cl3_14_TimeValuesInDesignElement) {
   auto r = Parse(
       "module m;\n"
       "  timeunit 1ns;\n"

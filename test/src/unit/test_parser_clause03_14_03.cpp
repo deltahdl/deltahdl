@@ -44,7 +44,7 @@ static ParseResult3_14_03 Parse(const std::string& src) {
 // =============================================================================
 
 // 19. Global precision is minimum of all timeprecision statements.
-TEST(ParserClause03e, Sec3_14_3_MinOfTimeprecisionStatements) {
+TEST(ParserClause03, Cl3_14_3_MinOfTimeprecisionStatements) {
   auto r = Parse(
       "module a;\n"
       "  timeprecision 1ns;\n"
@@ -62,7 +62,7 @@ TEST(ParserClause03e, Sec3_14_3_MinOfTimeprecisionStatements) {
 }
 
 // 20. Global precision considers timeunit precision argument (slash syntax).
-TEST(ParserClause03e, Sec3_14_3_ConsidersTimeunitPrecArg) {
+TEST(ParserClause03, Cl3_14_3_ConsidersTimeunitPrecArg) {
   auto r = Parse(
       "module a;\n"
       "  timeunit 1us / 1fs;\n"
@@ -77,7 +77,7 @@ TEST(ParserClause03e, Sec3_14_3_ConsidersTimeunitPrecArg) {
 }
 
 // 21. Global precision considers `timescale precision.
-TEST(ParserClause03e, Sec3_14_3_ConsidersTimescalePrec) {
+TEST(ParserClause03, Cl3_14_3_ConsidersTimescalePrec) {
   auto r = Parse(
       "`timescale 1ns / 1ps\n"
       "module a;\n"
@@ -91,7 +91,7 @@ TEST(ParserClause03e, Sec3_14_3_ConsidersTimescalePrec) {
 
 // 22. Global precision across all three sources: timeprecision, timeunit
 //     precision arg, and `timescale.
-TEST(ParserClause03e, Sec3_14_3_MinAcrossAllThreeSources) {
+TEST(ParserClause03, Cl3_14_3_MinAcrossAllThreeSources) {
   auto r = Parse(
       "`timescale 1us / 1ns\n"
       "module a;\n"
@@ -107,7 +107,7 @@ TEST(ParserClause03e, Sec3_14_3_MinAcrossAllThreeSources) {
 }
 
 // 23. With no time declarations, default is implementation-specific (kNs).
-TEST(ParserClause03e, Sec3_14_3_DefaultWhenNoneSpecified) {
+TEST(ParserClause03, Cl3_14_3_DefaultWhenNoneSpecified) {
   auto r = Parse(
       "module a;\n"
       "endmodule\n");
@@ -118,7 +118,7 @@ TEST(ParserClause03e, Sec3_14_3_DefaultWhenNoneSpecified) {
 }
 
 // 24. Step time unit equals global time precision.
-TEST(ParserClause03e, Sec3_14_3_StepEqualsGlobalPrecision) {
+TEST(ParserClause03, Cl3_14_3_StepEqualsGlobalPrecision) {
   auto r = Parse(
       "module a;\n"
       "  timeprecision 1fs;\n"
@@ -134,7 +134,7 @@ TEST(ParserClause03e, Sec3_14_3_StepEqualsGlobalPrecision) {
 }
 
 // 25. CU-scope timeprecision is included in global computation.
-TEST(ParserClause03e, Sec3_14_3_CUScopeTimeprecisionIncluded) {
+TEST(ParserClause03, Cl3_14_3_CUScopeTimeprecisionIncluded) {
   auto r = Parse(
       "timeprecision 1fs;\n"
       "module a;\n"
@@ -147,7 +147,7 @@ TEST(ParserClause03e, Sec3_14_3_CUScopeTimeprecisionIncluded) {
 }
 
 // 26. Interfaces and programs also contribute to global precision.
-TEST(ParserClause03e, Sec3_14_3_InterfacesAndProgramsContribute) {
+TEST(ParserClause03, Cl3_14_3_InterfacesAndProgramsContribute) {
   auto r = Parse(
       "interface i;\n"
       "  timeprecision 1ps;\n"
@@ -166,7 +166,7 @@ TEST(ParserClause03e, Sec3_14_3_InterfacesAndProgramsContribute) {
 
 // 27. 1step is parsed as a special delay in clocking blocks (§14.4).
 //     Verify parsing succeeds and the text is "1step".
-TEST(ParserClause03e, Sec3_14_3_1StepParsedInClockingBlock) {
+TEST(ParserClause03, Cl3_14_3_1StepParsedInClockingBlock) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -188,7 +188,7 @@ TEST(ParserClause03e, Sec3_14_3_1StepParsedInClockingBlock) {
 }
 
 // 28. Single module with timeunit slash — precision arg is used.
-TEST(ParserClause03e, Sec3_14_3_SingleModuleTimeunitSlash) {
+TEST(ParserClause03, Cl3_14_3_SingleModuleTimeunitSlash) {
   auto r = Parse(
       "module m;\n"
       "  timeunit 1us / 1ps;\n"
@@ -200,7 +200,7 @@ TEST(ParserClause03e, Sec3_14_3_SingleModuleTimeunitSlash) {
 }
 
 // 29. Multiple `timescale — preprocessor tracks min; function uses it.
-TEST(ParserClause03e, Sec3_14_3_MultipleTimescaleDirectives) {
+TEST(ParserClause03, Cl3_14_3_MultipleTimescaleDirectives) {
   auto r = Parse(
       "`timescale 1ns / 1ns\n"
       "module a; endmodule\n"
@@ -214,7 +214,7 @@ TEST(ParserClause03e, Sec3_14_3_MultipleTimescaleDirectives) {
 }
 
 // 30. Earlier `timescale with finer precision than later — global min is used.
-TEST(ParserClause03e, Sec3_14_3_EarlierTimescaleFinerPrecision) {
+TEST(ParserClause03, Cl3_14_3_EarlierTimescaleFinerPrecision) {
   auto r = Parse(
       "`timescale 1ns / 1fs\n"
       "module a; endmodule\n"

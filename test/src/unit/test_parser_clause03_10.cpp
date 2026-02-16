@@ -31,13 +31,13 @@ static ParseResult3_10 Parse(const std::string& src) {
 }
 
 // =============================================================================
-// LRM section 3.10 -- Configurations
+// LRM §3.10 — Configurations
 // =============================================================================
 
 // §3.10: "SystemVerilog provides the ability to specify design configurations,
 //         which specify the binding information of module instances to specific
 //         SystemVerilog source code. Configurations utilize libraries."
-TEST(ParserSection3, Sec3_10_ConfigBindingAndLibraries) {
+TEST(ParserClause03, Cl3_10_ConfigBindingAndLibraries) {
   auto r = Parse(
       "config cfg1;\n"
       "  design work.top;\n"

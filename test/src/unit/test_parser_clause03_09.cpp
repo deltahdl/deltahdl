@@ -31,12 +31,12 @@ static ParseResult3_09 Parse(const std::string& src) {
 }
 
 // =============================================================================
-// LRM section 3.9 -- Packages
+// LRM §3.9 — Packages
 // =============================================================================
 
 // §3.9: "Packages provide a declaration space, which can be shared by other
 //        building blocks." Package with typedef, functions, and end label.
-TEST(ParserSection3, Sec3_9_PackageDeclarationsAndEndLabel) {
+TEST(ParserClause03, Cl3_9_PackageDeclarationsAndEndLabel) {
   auto r = Parse(
       "package ComplexPkg;\n"
       "  typedef struct { shortreal i, r; } Complex;\n"
@@ -57,7 +57,7 @@ TEST(ParserSection3, Sec3_9_PackageDeclarationsAndEndLabel) {
 
 // §3.9: "Package declarations can be imported into other building blocks,
 //        including other packages."
-TEST(ParserSection3, Sec3_9_ImportIntoModuleAndPackage) {
+TEST(ParserClause03, Cl3_9_ImportIntoModuleAndPackage) {
   auto r = Parse(
       "package A; typedef int myint; endpackage\n"
       "package B; import A::*; endpackage\n"

@@ -52,12 +52,12 @@ static ModuleItem* FindItemByKind(ParseResult3_03& r, ModuleItemKind kind) {
 }
 
 // =============================================================================
-// LRM section 3.3 -- Modules
+// LRM §3.3 — Modules
 // =============================================================================
 
 // §3.3: "The basic building block in SystemVerilog is the module, enclosed
 //        between the keywords module and endmodule."
-TEST(ParserSection3, Sec3_3_ModuleEndLabel) {
+TEST(ParserClause03, Cl3_3_ModuleEndLabel) {
   auto r = Parse(
       "module m;\n"
       "endmodule : m\n");
@@ -68,7 +68,7 @@ TEST(ParserSection3, Sec3_3_ModuleEndLabel) {
 }
 
 // §3.3 LRM mux2to1 example (verbatim, with always_comb procedural block).
-TEST(ParserSection3, Sec3_3_Mux2to1LrmExample) {
+TEST(ParserClause03, Cl3_3_Mux2to1LrmExample) {
   auto r = Parse(
       "module mux2to1 (input wire a, b, sel,\n"
       "                output logic y);\n"
@@ -90,7 +90,7 @@ TEST(ParserSection3, Sec3_3_Mux2to1LrmExample) {
 }
 
 // §3.3: Data declarations, constants, user-defined types, class definitions
-TEST(ParserSection3, Sec3_3_ModuleDeclarations) {
+TEST(ParserClause03, Cl3_3_ModuleDeclarations) {
   auto r = Parse(
       "module m;\n"
       "  wire [7:0] w;\n"
@@ -117,7 +117,7 @@ TEST(ParserSection3, Sec3_3_ModuleDeclarations) {
 }
 
 // §3.3: "Subroutine definitions" and "Procedural blocks"
-TEST(ParserSection3, Sec3_3_SubroutinesAndProceduralBlocks) {
+TEST(ParserClause03, Cl3_3_SubroutinesAndProceduralBlocks) {
   auto r = Parse(
       "module m;\n"
       "  logic clk, a, b;\n"
@@ -152,7 +152,7 @@ TEST(ParserSection3, Sec3_3_SubroutinesAndProceduralBlocks) {
 }
 
 // §3.3: "Generate blocks"
-TEST(ParserSection3, Sec3_3_GenerateBlocks) {
+TEST(ParserClause03, Cl3_3_GenerateBlocks) {
   EXPECT_TRUE(
       ParseOk("module m #(parameter N = 4) ();\n"
               "  genvar i;\n"
@@ -165,7 +165,7 @@ TEST(ParserSection3, Sec3_3_GenerateBlocks) {
 }
 
 // §3.3: "Specify blocks"
-TEST(ParserSection3, Sec3_3_SpecifyBlock) {
+TEST(ParserClause03, Cl3_3_SpecifyBlock) {
   EXPECT_TRUE(
       ParseOk("module m (input a, output y);\n"
               "  assign y = a;\n"
@@ -176,7 +176,7 @@ TEST(ParserSection3, Sec3_3_SpecifyBlock) {
 }
 
 // §3.3: "Continuous assignments"
-TEST(ParserSection3, Sec3_3_ContinuousAssignment) {
+TEST(ParserClause03, Cl3_3_ContinuousAssignment) {
   auto r = Parse(
       "module m;\n"
       "  logic a, b, y;\n"
@@ -190,7 +190,7 @@ TEST(ParserSection3, Sec3_3_ContinuousAssignment) {
 
 // §3.3: "Instantiations of other modules, programs, interfaces, checkers,
 //        and primitives"
-TEST(ParserSection3, Sec3_3_DesignElementInstantiations) {
+TEST(ParserClause03, Cl3_3_DesignElementInstantiations) {
   auto r = Parse(
       "module child; endmodule\n"
       "module top;\n"

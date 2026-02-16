@@ -31,12 +31,12 @@ static ParseResult3_06 Parse(const std::string& src) {
 }
 
 // =============================================================================
-// LRM section 3.6 -- Checkers
+// LRM §3.6 — Checkers
 // =============================================================================
 
 // §3.6: Checker encapsulates assertions (assert property, cover property,
 //        property/sequence declarations) — the primary purpose of checkers.
-TEST(ParserSection3, Sec3_6_AssertionsInChecker) {
+TEST(ParserClause03, Cl3_6_AssertionsInChecker) {
   auto r = Parse(
       "checker req_ack_chk(logic clk, req, ack);\n"
       "  property req_followed_by_ack;\n"
@@ -63,7 +63,7 @@ TEST(ParserSection3, Sec3_6_AssertionsInChecker) {
 
 // §3.6: Checker also encapsulates "modeling code" — variables, initial blocks,
 //        always blocks used alongside assertions for auxiliary verification.
-TEST(ParserSection3, Sec3_6_ModelingCodeInChecker) {
+TEST(ParserClause03, Cl3_6_ModelingCodeInChecker) {
   auto r = Parse(
       "checker model_chk;\n"
       "  logic flag;\n"

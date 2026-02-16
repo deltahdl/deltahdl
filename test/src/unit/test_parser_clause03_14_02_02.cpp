@@ -38,7 +38,7 @@ static ParseResult3_14_02_02 Parse(const std::string& src) {
 // 45. timeunit keyword sets the time unit of a module to a time literal.
 // §3.14.2.2: "The time unit ... can be declared by the timeunit ...
 // keywords, respectively, and set to a time literal."
-TEST(ParserClause03, Sec3_14_2_2_TimeunitSetsUnit) {
+TEST(ParserClause03, Cl3_14_2_2_TimeunitSetsUnit) {
   auto r = Parse(
       "module m;\n"
       "  timeunit 1ns;\n"
@@ -53,7 +53,7 @@ TEST(ParserClause03, Sec3_14_2_2_TimeunitSetsUnit) {
 // 46. timeprecision keyword sets the time precision of a module.
 // §3.14.2.2: "The time ... precision can be declared by the ...
 // timeprecision keywords, respectively, and set to a time literal."
-TEST(ParserClause03, Sec3_14_2_2_TimeprecisionSetsPrecision) {
+TEST(ParserClause03, Cl3_14_2_2_TimeprecisionSetsPrecision) {
   auto r = Parse(
       "module m;\n"
       "  timeprecision 1ps;\n"
@@ -69,7 +69,7 @@ TEST(ParserClause03, Sec3_14_2_2_TimeprecisionSetsPrecision) {
 // precision.  §3.14.2.2: "The time precision may also be declared using
 // an optional second argument to the timeunit keyword using the slash
 // separator."
-TEST(ParserClause03, Sec3_14_2_2_TimeunitSlashSetsBoth) {
+TEST(ParserClause03, Cl3_14_2_2_TimeunitSlashSetsBoth) {
   auto r = Parse(
       "module m;\n"
       "  timeunit 100ps / 10fs;\n"
@@ -88,7 +88,7 @@ TEST(ParserClause03, Sec3_14_2_2_TimeunitSlashSetsBoth) {
 //   module D (...);
 //     timeunit 100ps;
 //     timeprecision 10fs;
-TEST(ParserClause03, Sec3_14_2_2_LrmExampleD) {
+TEST(ParserClause03, Cl3_14_2_2_LrmExampleD) {
   auto r = Parse(
       "module D;\n"
       "  timeunit 100ps;\n"
@@ -107,7 +107,7 @@ TEST(ParserClause03, Sec3_14_2_2_LrmExampleD) {
 // §3.14.2.2:
 //   module E (...);
 //     timeunit 100ps / 10fs;
-TEST(ParserClause03, Sec3_14_2_2_LrmExampleE) {
+TEST(ParserClause03, Cl3_14_2_2_LrmExampleE) {
   auto r = Parse(
       "module E;\n"
       "  timeunit 100ps / 10fs;\n"
@@ -126,7 +126,7 @@ TEST(ParserClause03, Sec3_14_2_2_LrmExampleE) {
 // §3.14.2.2: "Defining the timeunit and timeprecision constructs within
 // the design element removes the file order dependency problems with
 // compiler directives."
-TEST(ParserClause03, Sec3_14_2_2_RemovesFileOrderDependency) {
+TEST(ParserClause03, Cl3_14_2_2_RemovesFileOrderDependency) {
   // With different preceding timescales, keywords always win.
   auto r1 = Parse(
       "`timescale 1us / 1ns\n"
@@ -150,7 +150,7 @@ TEST(ParserClause03, Sec3_14_2_2_RemovesFileOrderDependency) {
 // defines a "time scope".
 // §3.14.2.2: "There shall be at most one time unit and one time
 // precision for any module, program, package, or interface definition."
-TEST(ParserClause03, Sec3_14_2_2_DefinesTimeScope) {
+TEST(ParserClause03, Cl3_14_2_2_DefinesTimeScope) {
   // One timeunit + one timeprecision: valid time scope.
   auto r = Parse(
       "module m;\n"
@@ -165,7 +165,7 @@ TEST(ParserClause03, Sec3_14_2_2_DefinesTimeScope) {
 // 52. timeunit and timeprecision work in interface declarations.
 // §3.14.2.2: "... for any module, program, package, or interface
 // definition ..."
-TEST(ParserClause03, Sec3_14_2_2_WorksInInterface) {
+TEST(ParserClause03, Cl3_14_2_2_WorksInInterface) {
   auto r = Parse(
       "interface ifc;\n"
       "  timeunit 1us;\n"
@@ -183,7 +183,7 @@ TEST(ParserClause03, Sec3_14_2_2_WorksInInterface) {
 
 // 53. timeunit and timeprecision work in program declarations.
 // §3.14.2.2: "... for any module, program, package, or interface ..."
-TEST(ParserClause03, Sec3_14_2_2_WorksInProgram) {
+TEST(ParserClause03, Cl3_14_2_2_WorksInProgram) {
   auto r = Parse(
       "program p;\n"
       "  timeunit 10ns;\n"
@@ -201,7 +201,7 @@ TEST(ParserClause03, Sec3_14_2_2_WorksInProgram) {
 
 // 54. All six time units are accepted as time literals for timeunit.
 // §3.14.2.2 / §5.8: time literals can use s, ms, us, ns, ps, fs.
-TEST(ParserClause03, Sec3_14_2_2_AllSixUnitsAccepted) {
+TEST(ParserClause03, Cl3_14_2_2_AllSixUnitsAccepted) {
   EXPECT_EQ(Parse("module m; timeunit 1s; endmodule").cu->modules[0]->time_unit,
             TimeUnit::kS);
   EXPECT_EQ(
@@ -223,7 +223,7 @@ TEST(ParserClause03, Sec3_14_2_2_AllSixUnitsAccepted) {
 
 // 55. All three magnitudes (1, 10, 100) are accepted in timeunit.
 // §3.14.2.2 / §5.8: time literals include magnitude.
-TEST(ParserClause03, Sec3_14_2_2_AllThreeMagnitudes) {
+TEST(ParserClause03, Cl3_14_2_2_AllThreeMagnitudes) {
   EXPECT_FALSE(Parse("module m; timeunit 1ns; endmodule").has_errors);
   EXPECT_FALSE(Parse("module m; timeunit 10ns; endmodule").has_errors);
   EXPECT_FALSE(Parse("module m; timeunit 100ns; endmodule").has_errors);
@@ -235,7 +235,7 @@ TEST(ParserClause03, Sec3_14_2_2_AllThreeMagnitudes) {
 
 // 56. timeunit keyword alone: only has_timeunit is set, not
 // has_timeprecision.
-TEST(ParserClause03, Sec3_14_2_2_TimeunitAloneNoPrec) {
+TEST(ParserClause03, Cl3_14_2_2_TimeunitAloneNoPrec) {
   auto r = Parse(
       "module m;\n"
       "  timeunit 1ns;\n"
@@ -247,7 +247,7 @@ TEST(ParserClause03, Sec3_14_2_2_TimeunitAloneNoPrec) {
 
 // 57. timeprecision keyword alone: only has_timeprecision is set, not
 // has_timeunit.
-TEST(ParserClause03, Sec3_14_2_2_TimeprecisionAloneNoUnit) {
+TEST(ParserClause03, Cl3_14_2_2_TimeprecisionAloneNoUnit) {
   auto r = Parse(
       "module m;\n"
       "  timeprecision 1ps;\n"
@@ -261,7 +261,7 @@ TEST(ParserClause03, Sec3_14_2_2_TimeprecisionAloneNoUnit) {
 // §3.14.2.2: "If specified, the timeunit and timeprecision declarations
 // shall precede any other items in the current time scope."
 // This test verifies timeunit before other items parses without error.
-TEST(ParserClause03, Sec3_14_2_2_PrecedeOtherItems) {
+TEST(ParserClause03, Cl3_14_2_2_PrecedeOtherItems) {
   auto r = Parse(
       "module m;\n"
       "  timeunit 1ns;\n"
@@ -277,7 +277,7 @@ TEST(ParserClause03, Sec3_14_2_2_PrecedeOtherItems) {
 // §3.14.2.2: "The timeunit and timeprecision declarations can be
 // repeated as later items, but shall match the previous declaration
 // within the current time scope."
-TEST(ParserClause03, Sec3_14_2_2_RepeatMatchingDeclaration) {
+TEST(ParserClause03, Cl3_14_2_2_RepeatMatchingDeclaration) {
   auto r = Parse(
       "module m;\n"
       "  timeunit 1ns;\n"
@@ -296,7 +296,7 @@ TEST(ParserClause03, Sec3_14_2_2_RepeatMatchingDeclaration) {
 // 60. Separate modules each define their own time scope independently.
 // §3.14.2.2: "There shall be at most one time unit and one time
 // precision for any module ... definition."
-TEST(ParserClause03, Sec3_14_2_2_SeparateModulesIndependentScope) {
+TEST(ParserClause03, Cl3_14_2_2_SeparateModulesIndependentScope) {
   auto r = Parse(
       "module a;\n"
       "  timeunit 1ns;\n"

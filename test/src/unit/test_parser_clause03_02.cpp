@@ -45,10 +45,10 @@ static bool ParseOk(const std::string& src) {
 }
 
 // =============================================================================
-// LRM section 3.2 -- Design elements
+// LRM §3.2 — Design elements
 // =============================================================================
 
-TEST(ParserSection3, AllSevenDesignElements) {
+TEST(ParserClause03, AllSevenDesignElements) {
   // §3.2: A design element is a module, program, interface, checker,
   //       package, primitive, or configuration.
   auto r = Parse(

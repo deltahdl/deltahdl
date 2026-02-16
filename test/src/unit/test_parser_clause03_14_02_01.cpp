@@ -62,7 +62,7 @@ static ParseResult3_14_02_01 Parse(const std::string& src) {
 // elements that follow it.  §3.14.2.1: "The `timescale compiler directive
 // specifies the default time unit and precision for all design elements
 // that follow this directive."
-TEST(ParserClause03, Sec3_14_2_1_DefaultForFollowingElements) {
+TEST(ParserClause03, Cl3_14_2_1_DefaultForFollowingElements) {
   auto r = Preprocess("`timescale 10us / 100ns\n");
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(r.has_timescale);
@@ -76,7 +76,7 @@ TEST(ParserClause03, Sec3_14_2_1_DefaultForFollowingElements) {
 // §3.14.2.1: "The `timescale directive remains in effect from when it is
 // encountered in the source code until another `timescale compiler
 // directive is read."
-TEST(ParserClause03, Sec3_14_2_1_PersistsUntilReplaced) {
+TEST(ParserClause03, Cl3_14_2_1_PersistsUntilReplaced) {
   // Two directives: second replaces first.
   auto r = Preprocess(
       "`timescale 1ns / 1ps\n"
@@ -92,7 +92,7 @@ TEST(ParserClause03, Sec3_14_2_1_PersistsUntilReplaced) {
 // 34. `timescale only affects the current compilation unit.
 // §3.14.2.1: "The `timescale directive only affects the current
 // compilation unit; it does not span multiple compilation units."
-TEST(ParserClause03, Sec3_14_2_1_CuScoped) {
+TEST(ParserClause03, Cl3_14_2_1_CuScoped) {
   // First CU: set timescale.
   auto r1 = Preprocess("`timescale 1ps / 1fs\n");
   EXPECT_TRUE(r1.has_timescale);
@@ -106,7 +106,7 @@ TEST(ParserClause03, Sec3_14_2_1_CuScoped) {
 // §3.14.2.1: "A second `timescale directive replaces the first directive."
 // `timescale 1ns / 10ps → modules A and B
 // `timescale 1ps / 1ps  → module C
-TEST(ParserClause03, Sec3_14_2_1_LrmExampleThreeModules) {
+TEST(ParserClause03, Cl3_14_2_1_LrmExampleThreeModules) {
   auto r = Parse(
       "`timescale 1ns / 10ps\n"
       "module A; endmodule\n"
@@ -126,7 +126,7 @@ TEST(ParserClause03, Sec3_14_2_1_LrmExampleThreeModules) {
 // settings depending on compilation order.
 // §3.14.2.1: "`timescale directive can result in file order dependency
 // problems."
-TEST(ParserClause03, Sec3_14_2_1_FileOrderDependency) {
+TEST(ParserClause03, Cl3_14_2_1_FileOrderDependency) {
   // Order 1: 1ns/10ps then module B then 1ps/1ps.
   auto r1 = Preprocess(
       "`timescale 1ns / 10ps\n"
@@ -146,7 +146,7 @@ TEST(ParserClause03, Sec3_14_2_1_FileOrderDependency) {
 // 37. Design elements with timeunit/timeprecision keywords are NOT
 // affected by `timescale.  §3.14.2.1: "that do not have timeunit and
 // timeprecision constructs specified within the design element."
-TEST(ParserClause03, Sec3_14_2_1_KeywordsOverrideTimescale) {
+TEST(ParserClause03, Cl3_14_2_1_KeywordsOverrideTimescale) {
   auto r = Parse(
       "`timescale 1ns / 1ps\n"
       "module m;\n"
@@ -165,7 +165,7 @@ TEST(ParserClause03, Sec3_14_2_1_KeywordsOverrideTimescale) {
 
 // 38. Global precision tracks the finest precision across all `timescale
 // directives.  This is necessary for delay conversion (§3.14.1).
-TEST(ParserClause03, Sec3_14_2_1_GlobalPrecisionTracking) {
+TEST(ParserClause03, Cl3_14_2_1_GlobalPrecisionTracking) {
   // Two directives: 1ns/1ps then 1us/1ns.
   // Global precision should be the finer one: 1ps.
   auto r = Preprocess(
@@ -179,7 +179,7 @@ TEST(ParserClause03, Sec3_14_2_1_GlobalPrecisionTracking) {
 }
 
 // 39. No `timescale: has_timescale is false; default timescale values.
-TEST(ParserClause03, Sec3_14_2_1_NoTimescaleDefault) {
+TEST(ParserClause03, Cl3_14_2_1_NoTimescaleDefault) {
   auto r = Preprocess("// no directives\n");
   EXPECT_FALSE(r.has_errors);
   EXPECT_FALSE(r.has_timescale);
@@ -189,26 +189,26 @@ TEST(ParserClause03, Sec3_14_2_1_NoTimescaleDefault) {
 }
 
 // 40. Error: missing slash in `timescale.
-TEST(ParserClause03, Sec3_14_2_1_ErrorMissingSlash) {
+TEST(ParserClause03, Cl3_14_2_1_ErrorMissingSlash) {
   auto r = Preprocess("`timescale 1ns 1ps\n");
   EXPECT_TRUE(r.has_errors);
 }
 
 // 41. Error: invalid magnitude (must be 1, 10, or 100).
-TEST(ParserClause03, Sec3_14_2_1_ErrorInvalidMagnitude) {
+TEST(ParserClause03, Cl3_14_2_1_ErrorInvalidMagnitude) {
   auto r = Preprocess("`timescale 5ns / 1ps\n");
   EXPECT_TRUE(r.has_errors);
 }
 
 // 42. Error: invalid time unit string.
-TEST(ParserClause03, Sec3_14_2_1_ErrorInvalidUnit) {
+TEST(ParserClause03, Cl3_14_2_1_ErrorInvalidUnit) {
   auto r = Preprocess("`timescale 1xx / 1ps\n");
   EXPECT_TRUE(r.has_errors);
 }
 
 // 43. Delay conversion uses `timescale values.  A delay of 1 under
 // `timescale 10ns/1ns converts to 10 ticks at ns global precision.
-TEST(ParserClause03, Sec3_14_2_1_DelayConversionWithTimescale) {
+TEST(ParserClause03, Cl3_14_2_1_DelayConversionWithTimescale) {
   auto r = Preprocess("`timescale 10ns / 1ns\n");
   EXPECT_FALSE(r.has_errors);
   // A delay of 3 in this timescale = 3 * 10ns = 30ns = 30 ticks at ns.
@@ -219,7 +219,7 @@ TEST(ParserClause03, Sec3_14_2_1_DelayConversionWithTimescale) {
 
 // 44. Syntax: whitespace around slash is optional.
 // §3.14.2.1 examples show both "1ns / 10ps" and "1ps/1ps".
-TEST(ParserClause03, Sec3_14_2_1_WhitespaceAroundSlash) {
+TEST(ParserClause03, Cl3_14_2_1_WhitespaceAroundSlash) {
   // No spaces around slash.
   auto r1 = Preprocess("`timescale 1ns/1ps\n");
   EXPECT_FALSE(r1.has_errors);

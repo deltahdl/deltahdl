@@ -60,7 +60,7 @@ static ParseResult3_14_02 Parse(const std::string& src) {
 
 // 24. Way 1: `timescale compiler directive specifies both time unit and
 // precision.  "Using the compiler directive `timescale"
-TEST(ParserClause03, Sec3_14_2_TimescaleDirectiveSetsUnitAndPrecision) {
+TEST(ParserClause03, Cl3_14_2_TimescaleDirectiveSetsUnitAndPrecision) {
   auto r = Preprocess("`timescale 1ns / 1ps\n");
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.timescale.unit, TimeUnit::kNs);
@@ -71,7 +71,7 @@ TEST(ParserClause03, Sec3_14_2_TimescaleDirectiveSetsUnitAndPrecision) {
 
 // 25. Way 2: timeunit and timeprecision keywords specify time unit and
 // precision independently.  "Using the keywords timeunit and timeprecision"
-TEST(ParserClause03, Sec3_14_2_KeywordsSetUnitAndPrecision) {
+TEST(ParserClause03, Cl3_14_2_KeywordsSetUnitAndPrecision) {
   auto r = Parse(
       "module m;\n"
       "  timeunit 1ns;\n"
@@ -87,7 +87,7 @@ TEST(ParserClause03, Sec3_14_2_KeywordsSetUnitAndPrecision) {
 }
 
 // 26. Way 2 alternate: timeunit with slash separator combines both.
-TEST(ParserClause03, Sec3_14_2_TimeunitSlashCombinesBoth) {
+TEST(ParserClause03, Cl3_14_2_TimeunitSlashCombinesBoth) {
   auto r = Parse(
       "module m;\n"
       "  timeunit 1ns / 1ps;\n"
@@ -102,7 +102,7 @@ TEST(ParserClause03, Sec3_14_2_TimeunitSlashCombinesBoth) {
 }
 
 // 27. `timescale handles all six time units from Table 3-1.
-TEST(ParserClause03, Sec3_14_2_TimescaleAllSixUnits) {
+TEST(ParserClause03, Cl3_14_2_TimescaleAllSixUnits) {
   auto r_s = Preprocess("`timescale 1s / 1s\n");
   EXPECT_EQ(r_s.timescale.unit, TimeUnit::kS);
   auto r_ms = Preprocess("`timescale 1ms / 1ms\n");
@@ -118,7 +118,7 @@ TEST(ParserClause03, Sec3_14_2_TimescaleAllSixUnits) {
 }
 
 // 28. timeunit keyword handles all six time units.
-TEST(ParserClause03, Sec3_14_2_TimeunitAllSixUnits) {
+TEST(ParserClause03, Cl3_14_2_TimeunitAllSixUnits) {
   auto r_s = Parse("module m; timeunit 1s; endmodule\n");
   EXPECT_EQ(r_s.cu->modules[0]->time_unit, TimeUnit::kS);
   auto r_ms = Parse("module m; timeunit 1ms; endmodule\n");
@@ -134,7 +134,7 @@ TEST(ParserClause03, Sec3_14_2_TimeunitAllSixUnits) {
 }
 
 // 29. Both mechanisms handle all three magnitudes (1, 10, 100).
-TEST(ParserClause03, Sec3_14_2_BothMechanismsMagnitudes) {
+TEST(ParserClause03, Cl3_14_2_BothMechanismsMagnitudes) {
   // `timescale with magnitudes.
   auto r1 = Preprocess("`timescale 1ns / 1ps\n");
   EXPECT_EQ(r1.timescale.magnitude, 1);
@@ -150,7 +150,7 @@ TEST(ParserClause03, Sec3_14_2_BothMechanismsMagnitudes) {
 
 // 30. Equivalent specifications: both mechanisms specify the same time values.
 // `timescale 1ns/1ps is equivalent to timeunit 1ns; timeprecision 1ps.
-TEST(ParserClause03, Sec3_14_2_EquivalentSpecifications) {
+TEST(ParserClause03, Cl3_14_2_EquivalentSpecifications) {
   // Way 1: `timescale directive.
   auto pp = Preprocess("`timescale 1ns / 1ps\n");
   EXPECT_FALSE(pp.has_errors);
@@ -169,7 +169,7 @@ TEST(ParserClause03, Sec3_14_2_EquivalentSpecifications) {
 // 31. Module with `timescale but no explicit timeunit/timeprecision:
 // has_timeunit=false (keywords were not used), but the preprocessor
 // carries the timescale state for this module.
-TEST(ParserClause03, Sec3_14_2_TimescaleWithoutKeywords) {
+TEST(ParserClause03, Cl3_14_2_TimescaleWithoutKeywords) {
   auto r = Parse(
       "`timescale 1ns / 1ps\n"
       "module m;\n"

@@ -38,13 +38,13 @@ static ModuleItem* FindItemByKind(ParseResult3_11& r, ModuleItemKind kind) {
 }
 
 // =============================================================================
-// LRM section 3.11 -- Overview of hierarchy
+// LRM §3.11 — Overview of hierarchy
 // =============================================================================
 
 // §3.11: "Hierarchy is created by one building block instantiating another."
 //        "Primitives cannot instantiate other building blocks; they are
 //        leaves." "SystemVerilog permits multiple top-level blocks."
-TEST(ParserSection3, Sec3_11_HierarchyAndInstantiation) {
+TEST(ParserClause03, Cl3_11_HierarchyAndInstantiation) {
   auto r = Parse(
       "module top;\n"
       "  logic in1, in2, sel;\n"

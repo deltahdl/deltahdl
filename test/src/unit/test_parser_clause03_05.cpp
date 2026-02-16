@@ -31,12 +31,12 @@ static ParseResult3_05 Parse(const std::string& src) {
 }
 
 // =============================================================================
-// LRM section 3.5 -- Interfaces
+// LRM §3.5 — Interfaces
 // =============================================================================
 
 // §3.5 LRM example: simple_bus interface definition.
 // Also covers end label (endinterface : simple_bus) and interface port.
-TEST(ParserSection3, Sec3_5_LrmExample) {
+TEST(ParserClause03, Cl3_5_LrmExample) {
   auto r = Parse(
       "interface simple_bus(input logic clk);\n"
       "  logic req, gnt;\n"
@@ -55,7 +55,7 @@ TEST(ParserSection3, Sec3_5_LrmExample) {
 }
 
 // §3.5: "An interface can have parameters, constants, variables"
-TEST(ParserSection3, Sec3_5_ParametersConstantsVariables) {
+TEST(ParserClause03, Cl3_5_ParametersConstantsVariables) {
   auto r = Parse(
       "interface ifc #(parameter WIDTH = 8);\n"
       "  localparam DEPTH = 16;\n"
@@ -69,7 +69,7 @@ TEST(ParserSection3, Sec3_5_ParametersConstantsVariables) {
 }
 
 // §3.5: "An interface can have ... functions, and tasks"
-TEST(ParserSection3, Sec3_5_FunctionsAndTasks) {
+TEST(ParserClause03, Cl3_5_FunctionsAndTasks) {
   auto r = Parse(
       "interface ifc;\n"
       "  function automatic int get_data;\n"
@@ -91,7 +91,7 @@ TEST(ParserSection3, Sec3_5_FunctionsAndTasks) {
 
 // §3.5: "an interface can also contain processes (i.e., initial or always
 //        procedures) and continuous assignments"
-TEST(ParserSection3, Sec3_5_ProcessesAndContinuousAssign) {
+TEST(ParserClause03, Cl3_5_ProcessesAndContinuousAssign) {
   auto r = Parse(
       "interface ifc;\n"
       "  logic sig_a, sig_b;\n"
@@ -113,7 +113,7 @@ TEST(ParserSection3, Sec3_5_ProcessesAndContinuousAssign) {
 }
 
 // §3.5: "the modport construct is provided"
-TEST(ParserSection3, Sec3_5_Modport) {
+TEST(ParserClause03, Cl3_5_Modport) {
   auto r = Parse(
       "interface myif;\n"
       "  logic [7:0] data;\n"

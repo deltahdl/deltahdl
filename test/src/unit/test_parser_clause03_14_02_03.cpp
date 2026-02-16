@@ -44,7 +44,7 @@ static ParseResult3_14_02_03 Parse(const std::string& src) {
 // =============================================================================
 
 // 1. Module with explicit timeunit — highest priority, no fallback needed.
-TEST(ParserClause03e, Sec3_14_2_3_ExplicitTimeunitTakesPriority) {
+TEST(ParserClause03, Cl3_14_2_3_ExplicitTimeunitTakesPriority) {
   auto r = Parse(
       "`timescale 1us / 1ns\n"
       "module m;\n"
@@ -59,7 +59,7 @@ TEST(ParserClause03e, Sec3_14_2_3_ExplicitTimeunitTakesPriority) {
 }
 
 // 2. Module with explicit timeprecision — highest priority.
-TEST(ParserClause03e, Sec3_14_2_3_ExplicitTimeprecisionTakesPriority) {
+TEST(ParserClause03, Cl3_14_2_3_ExplicitTimeprecisionTakesPriority) {
   auto r = Parse(
       "`timescale 1us / 1ns\n"
       "module m;\n"
@@ -74,7 +74,7 @@ TEST(ParserClause03e, Sec3_14_2_3_ExplicitTimeprecisionTakesPriority) {
 }
 
 // 3. Rule (a): Nested module inherits time unit from enclosing module.
-TEST(ParserClause03e, Sec3_14_2_3_RuleA_NestedInheritsUnit) {
+TEST(ParserClause03, Cl3_14_2_3_RuleA_NestedInheritsUnit) {
   auto r = Parse(
       "module outer;\n"
       "  timeunit 1ps;\n"
@@ -108,7 +108,7 @@ TEST(ParserClause03e, Sec3_14_2_3_RuleA_NestedInheritsUnit) {
 }
 
 // 4. Rule (a): Nested interface inherits from enclosing interface.
-TEST(ParserClause03e, Sec3_14_2_3_RuleA_NestedInterfaceInherits) {
+TEST(ParserClause03, Cl3_14_2_3_RuleA_NestedInterfaceInherits) {
   auto r = Parse(
       "interface outer_if;\n"
       "  timeunit 1us;\n"
@@ -135,7 +135,7 @@ TEST(ParserClause03e, Sec3_14_2_3_RuleA_NestedInterfaceInherits) {
 }
 
 // 5. Rule (b): Module without timeunit falls back to `timescale.
-TEST(ParserClause03e, Sec3_14_2_3_RuleB_FallbackToTimescale) {
+TEST(ParserClause03, Cl3_14_2_3_RuleB_FallbackToTimescale) {
   auto r = Parse(
       "`timescale 1us / 1ps\n"
       "module m;\n"
@@ -152,7 +152,7 @@ TEST(ParserClause03e, Sec3_14_2_3_RuleB_FallbackToTimescale) {
 }
 
 // 6. Rule (c): Module without timeunit or `timescale uses CU-scope timeunit.
-TEST(ParserClause03e, Sec3_14_2_3_RuleC_FallbackToCUTimeunit) {
+TEST(ParserClause03, Cl3_14_2_3_RuleC_FallbackToCUTimeunit) {
   auto r = Parse(
       "timeunit 1ps;\n"
       "timeprecision 1fs;\n"
@@ -173,7 +173,7 @@ TEST(ParserClause03e, Sec3_14_2_3_RuleC_FallbackToCUTimeunit) {
 }
 
 // 7. Rule (d): Default time unit when nothing is specified.
-TEST(ParserClause03e, Sec3_14_2_3_RuleD_DefaultTimeUnit) {
+TEST(ParserClause03, Cl3_14_2_3_RuleD_DefaultTimeUnit) {
   auto r = Parse(
       "module m;\n"
       "endmodule\n");
@@ -190,7 +190,7 @@ TEST(ParserClause03e, Sec3_14_2_3_RuleD_DefaultTimeUnit) {
 // 8. CU-scope timeunit can only be set by keyword, not `timescale.
 // §3.14.2.3: "The time unit of the compilation-unit scope can only be
 // set by a timeunit declaration, not a `timescale directive."
-TEST(ParserClause03e, Sec3_14_2_3_CUTimeunitOnlyByKeyword) {
+TEST(ParserClause03, Cl3_14_2_3_CUTimeunitOnlyByKeyword) {
   auto r = Parse(
       "`timescale 1us / 1ps\n"
       "module m;\n"
@@ -203,7 +203,7 @@ TEST(ParserClause03e, Sec3_14_2_3_CUTimeunitOnlyByKeyword) {
 
 // 9. Precedence: explicit timeunit > enclosing > `timescale > CU > default.
 // Module has timeunit, enclosing has different, `timescale is different.
-TEST(ParserClause03e, Sec3_14_2_3_FullPrecedenceChain) {
+TEST(ParserClause03, Cl3_14_2_3_FullPrecedenceChain) {
   auto r = Parse(
       "`timescale 1ms / 1us\n"
       "timeunit 1ns;\n"
@@ -241,7 +241,7 @@ TEST(ParserClause03e, Sec3_14_2_3_FullPrecedenceChain) {
 }
 
 // 10. Rule (b) takes precedence over rule (c).
-TEST(ParserClause03e, Sec3_14_2_3_TimescaleBeforeCUTimeunit) {
+TEST(ParserClause03, Cl3_14_2_3_TimescaleBeforeCUTimeunit) {
   auto r = Parse(
       "timeunit 1fs;\n"
       "`timescale 1us / 1ps\n"
@@ -257,7 +257,7 @@ TEST(ParserClause03e, Sec3_14_2_3_TimescaleBeforeCUTimeunit) {
 }
 
 // 11. CU-scope combined timeunit X / Y syntax.
-TEST(ParserClause03e, Sec3_14_2_3_CUTimeunitSlashSyntax) {
+TEST(ParserClause03, Cl3_14_2_3_CUTimeunitSlashSyntax) {
   auto r = Parse(
       "timeunit 100ps / 10fs;\n"
       "module m;\n"
@@ -270,7 +270,7 @@ TEST(ParserClause03e, Sec3_14_2_3_CUTimeunitSlashSyntax) {
 }
 
 // 12. Same precedence rules apply for timeprecision (§3.14.2.3).
-TEST(ParserClause03e, Sec3_14_2_3_SameRulesForPrecision) {
+TEST(ParserClause03, Cl3_14_2_3_SameRulesForPrecision) {
   // Module has no timeprecision, enclosing has it.
   auto r = Parse(
       "module outer;\n"
@@ -299,7 +299,7 @@ TEST(ParserClause03e, Sec3_14_2_3_SameRulesForPrecision) {
 }
 
 // 13. Default time unit is implementation-specific; ours is kNs.
-TEST(ParserClause03e, Sec3_14_2_3_DefaultIsImplementationSpecific) {
+TEST(ParserClause03, Cl3_14_2_3_DefaultIsImplementationSpecific) {
   auto r = Parse("module m; endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto resolved =
@@ -309,7 +309,7 @@ TEST(ParserClause03e, Sec3_14_2_3_DefaultIsImplementationSpecific) {
 }
 
 // 14. CU-scope timeunit applies to interface.
-TEST(ParserClause03e, Sec3_14_2_3_CUTimeunitAppliesToInterface) {
+TEST(ParserClause03, Cl3_14_2_3_CUTimeunitAppliesToInterface) {
   auto r = Parse(
       "timeunit 1ps;\n"
       "timeprecision 1fs;\n"
@@ -323,7 +323,7 @@ TEST(ParserClause03e, Sec3_14_2_3_CUTimeunitAppliesToInterface) {
 }
 
 // 15. CU-scope timeunit applies to program.
-TEST(ParserClause03e, Sec3_14_2_3_CUTimeunitAppliesToProgram) {
+TEST(ParserClause03, Cl3_14_2_3_CUTimeunitAppliesToProgram) {
   auto r = Parse(
       "timeunit 1us;\n"
       "timeprecision 1ns;\n"
@@ -338,7 +338,7 @@ TEST(ParserClause03e, Sec3_14_2_3_CUTimeunitAppliesToProgram) {
 
 // 16. Programs and packages cannot be nested (§3.14.2.3 rule a note).
 // Only modules and interfaces can inherit via nesting.
-TEST(ParserClause03e, Sec3_14_2_3_ProgramsCannotBeNested) {
+TEST(ParserClause03, Cl3_14_2_3_ProgramsCannotBeNested) {
   // A standalone program without timeunit uses CU scope or default.
   auto r = Parse(
       "program p;\n"
@@ -351,7 +351,7 @@ TEST(ParserClause03e, Sec3_14_2_3_ProgramsCannotBeNested) {
 }
 
 // 17. Multiple modules — each independently resolves time.
-TEST(ParserClause03e, Sec3_14_2_3_IndependentResolution) {
+TEST(ParserClause03, Cl3_14_2_3_IndependentResolution) {
   auto r = Parse(
       "`timescale 1us / 1ps\n"
       "module a;\n"
@@ -374,7 +374,7 @@ TEST(ParserClause03e, Sec3_14_2_3_IndependentResolution) {
 }
 
 // 18. Nested module with own timeunit overrides inheritance.
-TEST(ParserClause03e, Sec3_14_2_3_NestedOverridesInheritance) {
+TEST(ParserClause03, Cl3_14_2_3_NestedOverridesInheritance) {
   auto r = Parse(
       "module outer;\n"
       "  timeunit 1us;\n"

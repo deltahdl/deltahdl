@@ -31,14 +31,14 @@ static ParseResult3_12 Parse(const std::string& src) {
 }
 
 // =============================================================================
-// LRM section 3.12 -- Compilation and elaboration
+// LRM §3.12 — Compilation and elaboration
 // =============================================================================
 
 // §3.12: "Elaboration is the process of binding together the components that
 //        make up a design." It "involves expanding instantiations, computing
 //        parameter values, ... establishing net connectivity."
 //        "the compilation of a package is required to precede references to it"
-TEST(ParserSection3, Sec3_12_CompilationAndElaboration) {
+TEST(ParserClause03, Cl3_12_CompilationAndElaboration) {
   auto r = Parse(
       "package pkg; typedef logic [7:0] byte_t; endpackage\n"
       "module adder #(parameter W = 8) (\n"

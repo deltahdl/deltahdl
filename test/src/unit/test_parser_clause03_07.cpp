@@ -31,12 +31,12 @@ static ParseResult3_07 Parse(const std::string& src) {
 }
 
 // =============================================================================
-// LRM section 3.7 -- Primitives
+// LRM §3.7 — Primitives
 // =============================================================================
 
 // §3.7: "SystemVerilog includes a number of built-in primitive types"
 //       — logic gates and switches instantiated inside a module.
-TEST(ParserSection3, Sec3_7_BuiltInPrimitives) {
+TEST(ParserClause03, Cl3_7_BuiltInPrimitives) {
   auto r = Parse(
       "module gate_test(input a, b, c, output w, x, y, z);\n"
       "  and g1(w, a, b);\n"
@@ -69,7 +69,7 @@ TEST(ParserSection3, Sec3_7_BuiltInPrimitives) {
 //        primitives (UDPs). A UDP is enclosed between the keywords
 //        primitive...endprimitive."
 //        Combinational UDP with truth table for gate-level modeling.
-TEST(ParserSection3, Sec3_7_CombinationalUdp) {
+TEST(ParserClause03, Cl3_7_CombinationalUdp) {
   auto r = Parse(
       "primitive udp_or (output out, input a, b);\n"
       "  table\n"
@@ -96,7 +96,7 @@ TEST(ParserSection3, Sec3_7_CombinationalUdp) {
 
 // §3.7: Sequential UDP with initial statement — timing-accurate modeling
 //        for sequential gate-level circuits.
-TEST(ParserSection3, Sec3_7_SequentialUdp) {
+TEST(ParserClause03, Cl3_7_SequentialUdp) {
   auto r = Parse(
       "primitive udp_latch (output reg q, input d, en);\n"
       "  initial q = 0;\n"

@@ -38,13 +38,13 @@ static ModuleItem* FindItemByKind(ParseResult3_08& r, ModuleItemKind kind) {
 }
 
 // =============================================================================
-// LRM section 3.8 -- Subroutines
+// LRM §3.8 — Subroutines
 // =============================================================================
 
 // §3.8: "A task is called as a statement. A task can have any number of
 //        input, output, inout, and ref arguments, but does not return a
 //        value. Tasks can block simulation time during execution."
-TEST(ParserSection3, Sec3_8_TaskAllDirectionsAndBlocking) {
+TEST(ParserClause03, Cl3_8_TaskAllDirectionsAndBlocking) {
   auto r = Parse(
       "module m;\n"
       "  task my_task(input int a, output int b, inout int c, ref int d);\n"
@@ -68,7 +68,7 @@ TEST(ParserSection3, Sec3_8_TaskAllDirectionsAndBlocking) {
 }
 
 // §3.8: Function returning value, void function, all 4 argument directions.
-TEST(ParserSection3, Sec3_8_FunctionReturnAndVoidAndDirections) {
+TEST(ParserClause03, Cl3_8_FunctionReturnAndVoidAndDirections) {
   auto r = Parse(
       "module m;\n"
       "  function int compute(input int a, output int b,\n"

@@ -45,14 +45,14 @@ static bool ParseOk(const std::string& src) {
 }
 
 // =============================================================================
-// LRM section 3.4 -- Programs
+// LRM §3.4 — Programs
 // =============================================================================
 
 // §3.4 LRM example (verbatim) with end label:
 //   program test (input clk, input [16:1] addr, inout [7:0] data);
 //   initial begin ... end
 //   endprogram : test
-TEST(ParserSection3, Sec3_4_LrmExample) {
+TEST(ParserClause03, Cl3_4_LrmExample) {
   auto r = Parse(
       "program test (input clk, input [16:1] addr, inout [7:0] data);\n"
       "  initial begin\n"
@@ -75,7 +75,7 @@ TEST(ParserSection3, Sec3_4_LrmExample) {
 }
 
 // §3.4: "A program block can contain data declarations, class definitions"
-TEST(ParserSection3, Sec3_4_DataAndClassDeclarations) {
+TEST(ParserClause03, Cl3_4_DataAndClassDeclarations) {
   auto r = Parse(
       "program p;\n"
       "  logic [7:0] count;\n"
@@ -98,7 +98,7 @@ TEST(ParserSection3, Sec3_4_DataAndClassDeclarations) {
 
 // §3.4: "A program block can contain ... subroutine definitions ...
 //        initial ... final procedures"
-TEST(ParserSection3, Sec3_4_SubroutinesAndProcedures) {
+TEST(ParserClause03, Cl3_4_SubroutinesAndProcedures) {
   auto r = Parse(
       "program p;\n"
       "  function int get_val; return 42; endfunction\n"
@@ -123,7 +123,7 @@ TEST(ParserSection3, Sec3_4_SubroutinesAndProcedures) {
 }
 
 // §3.4: "It cannot contain always procedures ... module instances"
-TEST(ParserSection3, Sec3_4_RejectsDisallowedItems) {
+TEST(ParserClause03, Cl3_4_RejectsDisallowedItems) {
   EXPECT_TRUE(
       Parse("program p; always @(*) begin end endprogram\n").has_errors);
   EXPECT_TRUE(

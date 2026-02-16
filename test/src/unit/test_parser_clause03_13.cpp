@@ -65,11 +65,11 @@ static bool ElabOk(const std::string& src) {
 }
 
 // =============================================================================
-// LRM section 3.13 -- Name spaces
+// LRM §3.13 — Name spaces
 // =============================================================================
 
 // 1. Module and package in definition name space (can coexist without conflict)
-TEST(ParserSection3, Sec3_13_ModuleAndPackageInDefinitionNameSpace) {
+TEST(ParserClause03, Cl3_13_ModuleAndPackageInDefinitionNameSpace) {
   auto r = Parse(
       "package my_pkg;\n"
       "  typedef int myint;\n"
@@ -85,7 +85,7 @@ TEST(ParserSection3, Sec3_13_ModuleAndPackageInDefinitionNameSpace) {
 }
 
 // 2. Same-name variables in different modules (separate scopes)
-TEST(ParserSection3, Sec3_13_SameNameVarsInDifferentModules) {
+TEST(ParserClause03, Cl3_13_SameNameVarsInDifferentModules) {
   auto r = Parse(
       "module a;\n"
       "  logic [7:0] data;\n"
@@ -112,7 +112,7 @@ TEST(ParserSection3, Sec3_13_SameNameVarsInDifferentModules) {
 }
 
 // 3. Named begin-end block creating a subscope
-TEST(ParserSection3, Sec3_13_NamedBeginEndBlock) {
+TEST(ParserClause03, Cl3_13_NamedBeginEndBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : my_block\n"
@@ -132,7 +132,7 @@ TEST(ParserSection3, Sec3_13_NamedBeginEndBlock) {
 }
 
 // 4. Nested named begin-end blocks
-TEST(ParserSection3, Sec3_13_NestedNamedBlocks) {
+TEST(ParserClause03, Cl3_13_NestedNamedBlocks) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : outer\n"
@@ -152,7 +152,7 @@ TEST(ParserSection3, Sec3_13_NestedNamedBlocks) {
 }
 
 // 5. Fork-join block creating a subscope
-TEST(ParserSection3, Sec3_13_ForkJoinBlockSubscope) {
+TEST(ParserClause03, Cl3_13_ForkJoinBlockSubscope) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -165,7 +165,7 @@ TEST(ParserSection3, Sec3_13_ForkJoinBlockSubscope) {
 }
 
 // 6. Task and function names in same module scope
-TEST(ParserSection3, Sec3_13_TaskAndFunctionInSameModule) {
+TEST(ParserClause03, Cl3_13_TaskAndFunctionInSameModule) {
   auto r = Parse(
       "module m;\n"
       "  function int add(int a, int b);\n"
@@ -190,7 +190,7 @@ TEST(ParserSection3, Sec3_13_TaskAndFunctionInSameModule) {
 }
 
 // 7. Variable name same as module name (different name spaces)
-TEST(ParserSection3, Sec3_13_VarNameSameAsModuleName) {
+TEST(ParserClause03, Cl3_13_VarNameSameAsModuleName) {
   // A variable named 'top' inside module 'top' is legal because
   // the definition name space and the local scope are distinct.
   EXPECT_TRUE(
@@ -200,7 +200,7 @@ TEST(ParserSection3, Sec3_13_VarNameSameAsModuleName) {
 }
 
 // 8. Package with internal declarations (local scope)
-TEST(ParserSection3, Sec3_13_PackageWithInternalDeclarations) {
+TEST(ParserClause03, Cl3_13_PackageWithInternalDeclarations) {
   auto r = Parse(
       "package my_pkg;\n"
       "  typedef logic [7:0] byte_t;\n"
@@ -218,7 +218,7 @@ TEST(ParserSection3, Sec3_13_PackageWithInternalDeclarations) {
 }
 
 // 9. Package import with :: operator
-TEST(ParserSection3, Sec3_13_PackageImportExplicit) {
+TEST(ParserClause03, Cl3_13_PackageImportExplicit) {
   auto r = Parse(
       "package pkg;\n"
       "  typedef int myint;\n"
@@ -238,7 +238,7 @@ TEST(ParserSection3, Sec3_13_PackageImportExplicit) {
 }
 
 // 10. Package wildcard import (import pkg::*)
-TEST(ParserSection3, Sec3_13_PackageWildcardImport) {
+TEST(ParserClause03, Cl3_13_PackageWildcardImport) {
   auto r = Parse(
       "package pkg;\n"
       "  typedef int myint;\n"
@@ -257,7 +257,7 @@ TEST(ParserSection3, Sec3_13_PackageWildcardImport) {
 }
 
 // 11. Multiple packages imported into same module
-TEST(ParserSection3, Sec3_13_MultiplePackageImports) {
+TEST(ParserClause03, Cl3_13_MultiplePackageImports) {
   auto r = Parse(
       "package alpha;\n"
       "  typedef int alpha_t;\n"
@@ -281,7 +281,7 @@ TEST(ParserSection3, Sec3_13_MultiplePackageImports) {
 }
 
 // 12. Class scope -- members in class name space
-TEST(ParserSection3, Sec3_13_ClassScopeMembers) {
+TEST(ParserClause03, Cl3_13_ClassScopeMembers) {
   auto r = Parse(
       "class my_cls;\n"
       "  int data;\n"
@@ -300,7 +300,7 @@ TEST(ParserSection3, Sec3_13_ClassScopeMembers) {
 }
 
 // 13. Class with methods sharing scope with member variables
-TEST(ParserSection3, Sec3_13_ClassMethodsAndProperties) {
+TEST(ParserClause03, Cl3_13_ClassMethodsAndProperties) {
   auto r = Parse(
       "class my_cls;\n"
       "  int count;\n"
@@ -326,7 +326,7 @@ TEST(ParserSection3, Sec3_13_ClassMethodsAndProperties) {
 }
 
 // 14. Generate block scope (for-generate)
-TEST(ParserSection3, Sec3_13_GenerateForBlockScope) {
+TEST(ParserClause03, Cl3_13_GenerateForBlockScope) {
   auto r = Parse(
       "module m;\n"
       "  genvar i;\n"
@@ -348,7 +348,7 @@ TEST(ParserSection3, Sec3_13_GenerateForBlockScope) {
 }
 
 // 15. Labeled generate blocks (if-generate)
-TEST(ParserSection3, Sec3_13_LabeledIfGenerateBlock) {
+TEST(ParserClause03, Cl3_13_LabeledIfGenerateBlock) {
   auto r = Parse(
       "module m;\n"
       "  parameter USE_FAST = 1;\n"
@@ -372,7 +372,7 @@ TEST(ParserSection3, Sec3_13_LabeledIfGenerateBlock) {
 }
 
 // 16. Interface with modport declarations
-TEST(ParserSection3, Sec3_13_InterfaceWithModports) {
+TEST(ParserClause03, Cl3_13_InterfaceWithModports) {
   auto r = Parse(
       "interface bus_if;\n"
       "  logic [7:0] data;\n"
@@ -391,7 +391,7 @@ TEST(ParserSection3, Sec3_13_InterfaceWithModports) {
 }
 
 // 17. Program block with declarations
-TEST(ParserSection3, Sec3_13_ProgramBlockWithDeclarations) {
+TEST(ParserClause03, Cl3_13_ProgramBlockWithDeclarations) {
   auto r = Parse(
       "program test_prog;\n"
       "  int count;\n"
@@ -408,7 +408,7 @@ TEST(ParserSection3, Sec3_13_ProgramBlockWithDeclarations) {
 }
 
 // 18. $unit scope -- declarations outside any module/package
-TEST(ParserSection3, Sec3_13_UnitScopeDeclarations) {
+TEST(ParserClause03, Cl3_13_UnitScopeDeclarations) {
   auto r = Parse(
       "function automatic int helper(int x);\n"
       "  return x + 1;\n"
@@ -428,7 +428,7 @@ TEST(ParserSection3, Sec3_13_UnitScopeDeclarations) {
 }
 
 // 19. Hierarchical reference syntax (a.b.c)
-TEST(ParserSection3, Sec3_13_HierarchicalReferenceSyntax) {
+TEST(ParserClause03, Cl3_13_HierarchicalReferenceSyntax) {
   // Hierarchical names like top.sub.sig are member-access expressions.
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -439,7 +439,7 @@ TEST(ParserSection3, Sec3_13_HierarchicalReferenceSyntax) {
 }
 
 // 20. Package scope resolution (pkg::item)
-TEST(ParserSection3, Sec3_13_PackageScopeResolution) {
+TEST(ParserClause03, Cl3_13_PackageScopeResolution) {
   EXPECT_TRUE(
       ParseOk("package pkg;\n"
               "  parameter int WIDTH = 8;\n"
@@ -450,7 +450,7 @@ TEST(ParserSection3, Sec3_13_PackageScopeResolution) {
 }
 
 // 21. Class scope resolution (cls::member)
-TEST(ParserSection3, Sec3_13_ClassScopeResolution) {
+TEST(ParserClause03, Cl3_13_ClassScopeResolution) {
   EXPECT_TRUE(
       ParseOk("class base;\n"
               "  typedef int my_type;\n"
@@ -461,7 +461,7 @@ TEST(ParserSection3, Sec3_13_ClassScopeResolution) {
 }
 
 // 22. Typedef in package scope
-TEST(ParserSection3, Sec3_13_TypedefInPackageScope) {
+TEST(ParserClause03, Cl3_13_TypedefInPackageScope) {
   auto r = Parse(
       "package types_pkg;\n"
       "  typedef logic [7:0] byte_t;\n"
@@ -479,7 +479,7 @@ TEST(ParserSection3, Sec3_13_TypedefInPackageScope) {
 }
 
 // 23. Enum in module scope
-TEST(ParserSection3, Sec3_13_EnumInModuleScope) {
+TEST(ParserClause03, Cl3_13_EnumInModuleScope) {
   auto r = Parse(
       "module m;\n"
       "  typedef enum logic [1:0] {IDLE, RUN, DONE} state_t;\n"
@@ -499,7 +499,7 @@ TEST(ParserSection3, Sec3_13_EnumInModuleScope) {
 }
 
 // 24. Named fork-join blocks
-TEST(ParserSection3, Sec3_13_NamedForkJoinBlock) {
+TEST(ParserClause03, Cl3_13_NamedForkJoinBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -520,7 +520,7 @@ TEST(ParserSection3, Sec3_13_NamedForkJoinBlock) {
 }
 
 // 25. begin-end with no name (anonymous block)
-TEST(ParserSection3, Sec3_13_AnonymousBeginEndBlock) {
+TEST(ParserClause03, Cl3_13_AnonymousBeginEndBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -538,7 +538,7 @@ TEST(ParserSection3, Sec3_13_AnonymousBeginEndBlock) {
 }
 
 // 26. Multiple named blocks at same level
-TEST(ParserSection3, Sec3_13_MultipleNamedBlocksSameLevel) {
+TEST(ParserClause03, Cl3_13_MultipleNamedBlocksSameLevel) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -562,7 +562,7 @@ TEST(ParserSection3, Sec3_13_MultipleNamedBlocksSameLevel) {
 }
 
 // 27. Parameter and localparam in module scope
-TEST(ParserSection3, Sec3_13_ParameterAndLocalparamInModule) {
+TEST(ParserClause03, Cl3_13_ParameterAndLocalparamInModule) {
   auto r = Parse(
       "module m;\n"
       "  parameter int WIDTH = 8;\n"
@@ -584,7 +584,7 @@ TEST(ParserSection3, Sec3_13_ParameterAndLocalparamInModule) {
 }
 
 // 28. Port names as part of module scope
-TEST(ParserSection3, Sec3_13_PortNamesInModuleScope) {
+TEST(ParserClause03, Cl3_13_PortNamesInModuleScope) {
   auto r = Parse(
       "module m (input logic clk, input logic rst_n, output logic [7:0] q);\n"
       "endmodule\n");
@@ -600,7 +600,7 @@ TEST(ParserSection3, Sec3_13_PortNamesInModuleScope) {
 }
 
 // 29. Function with local variables creating subscope
-TEST(ParserSection3, Sec3_13_FunctionWithLocalVarsSubscope) {
+TEST(ParserClause03, Cl3_13_FunctionWithLocalVarsSubscope) {
   auto r = Parse(
       "module m;\n"
       "  function automatic int compute(int a, int b);\n"
@@ -621,7 +621,7 @@ TEST(ParserSection3, Sec3_13_FunctionWithLocalVarsSubscope) {
 }
 
 // 30. Nested class (class within a module -- class in module scope)
-TEST(ParserSection3, Sec3_13_NestedClassInModule) {
+TEST(ParserClause03, Cl3_13_NestedClassInModule) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  class inner_cls;\n"
@@ -637,7 +637,7 @@ TEST(ParserSection3, Sec3_13_NestedClassInModule) {
 //     "The text macro names are defined in the linear order of appearance in
 //     the
 //      set of input files that make up the compilation unit."
-TEST(ParserSection3, Sec3_13_TextMacroNameSpace) {
+TEST(ParserClause03, Cl3_13_TextMacroNameSpace) {
   // Macro defined and used; subsequent redefinition overrides previous
   auto r = Parse(
       "`define WIDTH 8\n"
@@ -658,7 +658,7 @@ TEST(ParserSection3, Sec3_13_TextMacroNameSpace) {
 // 32. Attribute name space (h) — enclosed by (* and *)
 //     "An attribute name can be defined and used only in the attribute name
 //      space. Any other type of name cannot be defined in this name space."
-TEST(ParserSection3, Sec3_13_AttributeNameSpace) {
+TEST(ParserClause03, Cl3_13_AttributeNameSpace) {
   auto r = Parse(
       "module m;\n"
       "  (* synthesis *) logic flag;\n"
@@ -679,7 +679,7 @@ TEST(ParserSection3, Sec3_13_AttributeNameSpace) {
 }
 
 // 33. All 8 name spaces coexist in a single compilation unit
-TEST(ParserSection3, Sec3_13_AllEightNameSpaces) {
+TEST(ParserClause03, Cl3_13_AllEightNameSpaces) {
   auto r = Parse(
       // (d) Text macro name space
       "`define VAL 1\n"
@@ -725,7 +725,7 @@ TEST(ParserSection3, Sec3_13_AllEightNameSpaces) {
 // =============================================================================
 
 // 34. Redeclaring a variable in the same module scope is an error.
-TEST(ParserSection3, Sec3_13_RedeclVarInModuleScope) {
+TEST(ParserClause03, Cl3_13_RedeclVarInModuleScope) {
   // Two logic declarations with the same name 'x' in the same module.
   EXPECT_FALSE(
       ElabOk("module m;\n"
@@ -735,7 +735,7 @@ TEST(ParserSection3, Sec3_13_RedeclVarInModuleScope) {
 }
 
 // 35. Redeclaring a net in the same module scope is an error.
-TEST(ParserSection3, Sec3_13_RedeclNetInModuleScope) {
+TEST(ParserClause03, Cl3_13_RedeclNetInModuleScope) {
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  wire w;\n"
@@ -744,7 +744,7 @@ TEST(ParserSection3, Sec3_13_RedeclNetInModuleScope) {
 }
 
 // 36. Distinct names in the same module scope are legal.
-TEST(ParserSection3, Sec3_13_DistinctNamesInModuleScope) {
+TEST(ParserClause03, Cl3_13_DistinctNamesInModuleScope) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  logic a;\n"
@@ -754,7 +754,7 @@ TEST(ParserSection3, Sec3_13_DistinctNamesInModuleScope) {
 }
 
 // 37. Same name in different modules is legal (separate name spaces).
-TEST(ParserSection3, Sec3_13_SameNameDifferentModulesElab) {
+TEST(ParserClause03, Cl3_13_SameNameDifferentModulesElab) {
   // Each module has its own module name space — 'data' in both is fine.
   SourceManager mgr;
   Arena arena;
