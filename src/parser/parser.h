@@ -53,7 +53,8 @@ class Parser {
   ModuleItem* ParseLetDecl();
   FunctionArg ParseLetArg();
   void ParseGenvarDecl(std::vector<ModuleItem*>& items);
-  void ParseTimeunitDecl(ModuleDecl* mod = nullptr);
+  void ParseTimeunitDecl(ModuleDecl* mod = nullptr,
+                         CompilationUnit* cu = nullptr);
   bool TryParseClockingOrVerification(std::vector<ModuleItem*>& items);
   void ParseParamPortDecl(
       std::vector<std::pair<std::string_view, Expr*>>& params);

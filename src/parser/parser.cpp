@@ -1,9 +1,7 @@
 #include "parser/parser.h"
 
-#include <cctype>
-#include <optional>
-
 #include "common/types.h"
+#include "parser/time_resolve.h"
 
 namespace delta {
 
@@ -340,6 +338,11 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
     return;
   }
   if (TryParseSecondaryTopLevel(unit)) return;
+  // CU-scope timeunit/timeprecision (§3.14.2.3 rule c)
+  if (Check(TokenKind::kKwTimeunit) || Check(TokenKind::kKwTimeprecision)) {
+    ParseTimeunitDecl(nullptr, unit);
+    return;
+  }
   // extern_constraint_declaration: static constraint ... (A.1.10)
   if (Check(TokenKind::kKwStatic)) {
     ParseOutOfBlockConstraint(unit);
@@ -472,21 +475,6 @@ PackageDecl* Parser::ParsePackageDecl() {
   return pkg;
 }
 
-static std::optional<AlwaysKind> TokenToAlwaysKind(TokenKind tk) {
-  switch (tk) {
-    case TokenKind::kKwAlways:
-      return AlwaysKind::kAlways;
-    case TokenKind::kKwAlwaysComb:
-      return AlwaysKind::kAlwaysComb;
-    case TokenKind::kKwAlwaysFF:
-      return AlwaysKind::kAlwaysFF;
-    case TokenKind::kKwAlwaysLatch:
-      return AlwaysKind::kAlwaysLatch;
-    default:
-      return std::nullopt;
-  }
-}
-
 // §11.12: Parse a single let port argument.
 FunctionArg Parser::ParseLetArg() {
   FunctionArg arg;
@@ -538,458 +526,44 @@ void Parser::ParseGenvarDecl(std::vector<ModuleItem*>& items) {
   Expect(TokenKind::kSemicolon);
 }
 
-static bool TryParseTimeUnit(std::string_view text, TimeUnit& out) {
-  // Extract the unit suffix from a time literal like "1ns", "100us".
-  size_t i = 0;
-  while (
-      i < text.size() &&
-      (std::isdigit(static_cast<unsigned char>(text[i])) || text[i] == '.')) {
-    ++i;
-  }
-  auto suffix = text.substr(i);
-  return ParseTimeUnitStr(suffix, out);
-}
-
-void Parser::ParseTimeunitDecl(ModuleDecl* mod) {
+void Parser::ParseTimeunitDecl(ModuleDecl* mod, CompilationUnit* cu) {
   bool is_unit = Check(TokenKind::kKwTimeunit);
-  Consume();             // timeunit or timeprecision keyword
-  auto tok = Consume();  // time literal (e.g. 1ns)
+  Consume();
+  auto tok = Consume();
+  TimeUnit tu = TimeUnit::kNs;
+  TryParseTimeUnit(tok.text, tu);
   if (mod != nullptr) {
-    TimeUnit unit = TimeUnit::kNs;
-    TryParseTimeUnit(tok.text, unit);
     if (is_unit) {
-      mod->time_unit = unit;
+      mod->time_unit = tu;
       mod->has_timeunit = true;
     } else {
-      mod->time_prec = unit;
+      mod->time_prec = tu;
       mod->has_timeprecision = true;
+    }
+  }
+  if (cu != nullptr) {
+    if (is_unit) {
+      cu->cu_time_unit = tu;
+      cu->has_cu_timeunit = true;
+    } else {
+      cu->cu_time_prec = tu;
+      cu->has_cu_timeprecision = true;
     }
   }
   if (Match(TokenKind::kSlash)) {
-    auto prec_tok = Consume();  // second time literal
+    auto prec_tok = Consume();
+    TimeUnit prec = TimeUnit::kNs;
+    TryParseTimeUnit(prec_tok.text, prec);
     if (mod != nullptr && is_unit) {
-      TimeUnit prec = TimeUnit::kNs;
-      TryParseTimeUnit(prec_tok.text, prec);
       mod->time_prec = prec;
       mod->has_timeprecision = true;
     }
+    if (cu != nullptr && is_unit) {
+      cu->cu_time_prec = prec;
+      cu->has_cu_timeprecision = true;
+    }
   }
   Expect(TokenKind::kSemicolon);
-}
-
-bool Parser::TryParseClockingOrVerification(std::vector<ModuleItem*>& items) {
-  if (Check(TokenKind::kKwSpecify)) {
-    items.push_back(ParseSpecifyBlock());
-    return true;
-  }
-  if (Check(TokenKind::kKwSpecparam)) {
-    items.push_back(ParseSpecparamDecl());
-    return true;
-  }
-  if (Check(TokenKind::kKwClocking)) {
-    items.push_back(ParseClockingDecl());
-    return true;
-  }
-  if (Check(TokenKind::kKwDefault) || Check(TokenKind::kKwGlobal)) {
-    auto saved = lexer_.SavePos();
-    Consume();
-    bool is_clocking = Check(TokenKind::kKwClocking);
-    bool is_disable = Check(TokenKind::kKwDisable);
-    lexer_.RestorePos(saved);
-    if (is_clocking) {
-      items.push_back(ParseClockingDecl());
-      return true;
-    }
-    if (is_disable) {
-      Consume();  // default
-      Consume();  // disable
-      Expect(TokenKind::kKwIff);
-      auto* item = arena_.Create<ModuleItem>();
-      item->kind = ModuleItemKind::kDefaultDisableIff;
-      item->loc = CurrentLoc();
-      item->init_expr = ParseExpr();
-      Expect(TokenKind::kSemicolon);
-      items.push_back(item);
-      return true;
-    }
-  }
-  return TryParseVerificationItem(items);
-}
-
-bool Parser::TryParseProcessBlock(std::vector<ModuleItem*>& items) {
-  if (Check(TokenKind::kKwInitial)) {
-    items.push_back(ParseInitialBlock());
-    return true;
-  }
-  if (Check(TokenKind::kKwFinal)) {
-    items.push_back(ParseFinalBlock());
-    return true;
-  }
-  auto ak = TokenToAlwaysKind(CurrentToken().kind);
-  if (ak) {
-    if (InProgramBlock())  // §3.4
-      diag_.Error(CurrentLoc(), "always procedures not allowed in programs");
-    items.push_back(ParseAlwaysBlock(*ak));
-    return true;
-  }
-  return false;
-}
-
-bool Parser::IsAtClassDecl() {
-  if (Check(TokenKind::kKwClass)) return true;
-  // 'virtual class' or 'interface class' — need lookahead to distinguish
-  // from 'virtual interface' or plain 'interface'.
-  if (!Check(TokenKind::kKwVirtual) && !Check(TokenKind::kKwInterface)) {
-    return false;
-  }
-  auto saved = lexer_.SavePos();
-  Consume();  // consume 'virtual' or 'interface'
-  bool result = Check(TokenKind::kKwClass);
-  lexer_.RestorePos(saved);
-  return result;
-}
-
-static bool IsElabSeverityTask(TokenKind kind, std::string_view text) {
-  return kind == TokenKind::kSystemIdentifier &&
-         (text == "$fatal" || text == "$error" || text == "$warning" ||
-          text == "$info");
-}
-
-bool Parser::TryParseDeclKeywordItem(std::vector<ModuleItem*>& items) {
-  if (Check(TokenKind::kKwTypedef)) {
-    items.push_back(ParseTypedef());
-    return true;
-  }
-  if (Check(TokenKind::kKwNettype)) {
-    items.push_back(ParseNettypeDecl());
-    return true;
-  }
-  if (Check(TokenKind::kKwFunction)) {
-    items.push_back(ParseFunctionDecl());
-    return true;
-  }
-  if (Check(TokenKind::kKwTask)) {
-    items.push_back(ParseTaskDecl());
-    return true;
-  }
-  // extern_tf_declaration (A.1.6): extern method_prototype ;
-  //                               | extern forkjoin task_prototype ;
-  if (Check(TokenKind::kKwExtern)) {
-    Consume();
-    bool forkjoin = Match(TokenKind::kKwForkjoin);
-    ModuleItem* item = nullptr;
-    if (forkjoin || Check(TokenKind::kKwTask)) {
-      item = ParseTaskDecl(/*prototype_only=*/true);
-    } else {
-      item = ParseFunctionDecl(/*prototype_only=*/true);
-    }
-    item->is_extern = true;
-    item->is_forkjoin = forkjoin;
-    items.push_back(item);
-    return true;
-  }
-  return false;
-}
-
-bool Parser::TryParseMiscKeywordItem(std::vector<ModuleItem*>& items) {
-  if (Check(TokenKind::kKwAssign)) {
-    items.push_back(ParseContinuousAssign());
-    return true;
-  }
-  if (TryParseProcessBlock(items)) return true;
-  if (Check(TokenKind::kKwAlias)) {
-    items.push_back(ParseAlias());
-    return true;
-  }
-  if (Check(TokenKind::kKwGenvar)) {
-    ParseGenvarDecl(items);
-    return true;
-  }
-  if (Check(TokenKind::kKwTimeunit) || Check(TokenKind::kKwTimeprecision)) {
-    ParseTimeunitDecl(current_module_);
-    return true;
-  }
-  if (Check(TokenKind::kKwLet)) {
-    items.push_back(ParseLetDecl());
-    return true;
-  }
-  if (Check(TokenKind::kKwInterconnect)) {
-    Consume();
-    DataType dtype;
-    dtype.kind = DataTypeKind::kWire;
-    dtype.is_net = true;
-    dtype.is_interconnect = true;
-    // A.2.2.1: interconnect implicit_data_type [signing] {packed_dimension}
-    if (Match(TokenKind::kKwSigned)) {
-      dtype.is_signed = true;
-    } else {
-      Match(TokenKind::kKwUnsigned);
-    }
-    ParsePackedDims(dtype);
-    ParseVarDeclList(items, dtype);
-    return true;
-  }
-  return false;
-}
-
-bool Parser::TryParseKeywordItem(std::vector<ModuleItem*>& items) {
-  if (TryParseDeclKeywordItem(items)) return true;
-  if (TryParseMiscKeywordItem(items)) return true;
-  return TryParseClassOrVerification(items);
-}
-
-bool Parser::TryParseClassOrVerification(std::vector<ModuleItem*>& items) {
-  if (IsAtClassDecl()) {
-    auto* item = arena_.Create<ModuleItem>();
-    item->kind = ModuleItemKind::kClassDecl;
-    item->loc = CurrentLoc();
-    item->class_decl = ParseClassDecl();
-    if (item->class_decl) item->name = item->class_decl->name;
-    items.push_back(item);
-    return true;
-  }
-  // Nested interface declaration (non_port_module_item) — IsAtClassDecl
-  // already ruled out 'interface class', so this is a nested interface.
-  if (Check(TokenKind::kKwInterface)) {
-    auto* item = arena_.Create<ModuleItem>();
-    item->kind = ModuleItemKind::kNestedModuleDecl;
-    item->loc = CurrentLoc();
-    item->nested_module_decl = ParseInterfaceDecl();
-    items.push_back(item);
-    return true;
-  }
-  return TryParseClockingOrVerification(items);
-}
-
-bool Parser::TryParseVerificationItem(std::vector<ModuleItem*>& items) {
-  if (Check(TokenKind::kKwAssert)) {
-    items.push_back(ParseAssertProperty());
-    return true;
-  }
-  if (Check(TokenKind::kKwAssume)) {
-    items.push_back(ParseAssumeProperty());
-    return true;
-  }
-  if (Check(TokenKind::kKwCover)) {
-    items.push_back(ParseCoverProperty());
-    return true;
-  }
-  if (Check(TokenKind::kKwProperty)) {
-    items.push_back(ParsePropertyDecl());
-    return true;
-  }
-  if (Check(TokenKind::kKwSequence)) {
-    items.push_back(ParseSequenceDecl());
-    return true;
-  }
-  if (Check(TokenKind::kKwCovergroup)) {
-    ParseCovergroupDecl(items);
-    return true;
-  }
-  return false;
-}
-
-// A.1.4 non_port_module_item additions: elaboration severity tasks,
-// nested module/program/interface declarations.
-bool Parser::TryParseNonPortItem(std::vector<ModuleItem*>& items) {
-  if (IsElabSeverityTask(CurrentToken().kind, CurrentToken().text)) {
-    auto* item = arena_.Create<ModuleItem>();
-    item->kind = ModuleItemKind::kElabSystemTask;
-    item->loc = CurrentLoc();
-    item->init_expr = ParseExpr();
-    Expect(TokenKind::kSemicolon);
-    items.push_back(item);
-    return true;
-  }
-  if (Check(TokenKind::kKwModule) || Check(TokenKind::kKwMacromodule)) {
-    auto* item = arena_.Create<ModuleItem>();
-    item->kind = ModuleItemKind::kNestedModuleDecl;
-    item->loc = CurrentLoc();
-    item->nested_module_decl = ParseModuleDecl();
-    items.push_back(item);
-    return true;
-  }
-  if (Check(TokenKind::kKwProgram)) {
-    auto* item = arena_.Create<ModuleItem>();
-    item->kind = ModuleItemKind::kNestedModuleDecl;
-    item->loc = CurrentLoc();
-    item->nested_module_decl = ParseProgramDecl();
-    items.push_back(item);
-    return true;
-  }
-  // checker_or_generate_item_declaration: nested checker_declaration (A.1.8)
-  if (Check(TokenKind::kKwChecker)) {
-    auto* item = arena_.Create<ModuleItem>();
-    item->kind = ModuleItemKind::kNestedModuleDecl;
-    item->loc = CurrentLoc();
-    item->nested_module_decl = ParseCheckerDecl();
-    items.push_back(item);
-    return true;
-  }
-  return false;
-}
-
-void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
-  auto attrs = ParseAttributes();
-  size_t before = items.size();
-
-  if (TryParseKeywordItem(items)) {
-    AttachAttrs(items, before, attrs);
-    return;
-  }
-  if (Check(TokenKind::kKwParameter) || Check(TokenKind::kKwLocalparam)) {
-    ParseParamDecl(items);
-    AttachAttrs(items, before, attrs);
-    return;
-  }
-  if (Check(TokenKind::kKwDefparam)) {
-    items.push_back(ParseDefparam());
-    AttachAttrs(items, before, attrs);
-    return;
-  }
-  if (Check(TokenKind::kKwImport)) {
-    ParseImportDecl(items);
-    AttachAttrs(items, before, attrs);
-    return;
-  }
-  if (Check(TokenKind::kKwExport)) {
-    ParseExportDecl(items);
-    AttachAttrs(items, before, attrs);
-    return;
-  }
-  if (Check(TokenKind::kKwGenerate)) {
-    ParseGenerateRegion(items);
-    AttachAttrs(items, before, attrs);
-    return;
-  }
-  if (Check(TokenKind::kKwFor)) {
-    items.push_back(ParseGenerateFor());
-    AttachAttrs(items, before, attrs);
-    return;
-  }
-  if (Check(TokenKind::kKwIf)) {
-    items.push_back(ParseGenerateIf());
-    AttachAttrs(items, before, attrs);
-    return;
-  }
-  if (TryParseNonPortItem(items)) {
-    AttachAttrs(items, before, attrs);
-    return;
-  }
-  ParseDataDeclItem(items, before, attrs);
-}
-
-void Parser::ParseDataDeclItem(std::vector<ModuleItem*>& items, size_t before,
-                               const std::vector<Attribute>& attrs) {
-  // A.2.1.3: data_declaration ::= [const] [var] [lifetime] ...
-  bool is_automatic = Match(TokenKind::kKwAutomatic);
-  bool is_static = !is_automatic && Match(TokenKind::kKwStatic);
-  // checker_or_generate_item_declaration: [rand] data_declaration (A.1.8)
-  bool is_rand = Match(TokenKind::kKwRand);
-  ParseTypedItemOrInst(items);
-  for (size_t i = before; i < items.size(); ++i) {
-    if (is_rand) items[i]->is_rand = true;
-    if (is_automatic) items[i]->is_automatic = true;
-    if (is_static) items[i]->is_static = true;
-  }
-  AttachAttrs(items, before, attrs);
-}
-
-// §6.8: Parse variable declaration after 'var' keyword.
-void Parser::ParseVarPrefixed(std::vector<ModuleItem*>& items) {
-  if (TryParseTypeRef(items)) return;
-  if (Check(TokenKind::kKwEnum)) {
-    auto dtype = ParseEnumType();
-    ParseVarDeclList(items, dtype);
-    return;
-  }
-  if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
-    auto dtype = ParseStructOrUnionType();
-    ParseVarDeclList(items, dtype);
-    return;
-  }
-  auto dtype = ParseDataType();
-  // §6.8: implicit_data_type — bare packed dims after 'var' (e.g. var [3:0] x)
-  if (dtype.kind == DataTypeKind::kImplicit && Check(TokenKind::kLBracket)) {
-    ParsePackedDims(dtype);
-  }
-  ParseVarDeclList(items, dtype);
-}
-
-void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items) {
-  // Handle 'var' prefix: var type(expr) name; or var data_type name; (§6.8)
-  if (Match(TokenKind::kKwVar)) {
-    ParseVarPrefixed(items);
-    return;
-  }
-  if (TryParseTypeRef(items)) return;
-  if (Check(TokenKind::kKwCase)) {
-    items.push_back(ParseGenerateCase());
-    return;
-  }
-  if (IsAtGateKeyword()) {
-    ParseGateInst(items);
-    return;
-  }
-  if (Check(TokenKind::kKwEnum)) {
-    auto dtype = ParseEnumType();
-    ParseVarDeclList(items, dtype);
-    return;
-  }
-  if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
-    auto dtype = ParseStructOrUnionType();
-    ParseVarDeclList(items, dtype);
-    return;
-  }
-  auto dtype = ParseDataType();
-  // A.2.2.1: implicit_data_type with signing/dims is a real type
-  if (dtype.kind != DataTypeKind::kImplicit || dtype.packed_dim_left ||
-      dtype.is_signed || dtype.is_const) {
-    ParseVarDeclList(items, dtype);
-    return;
-  }
-  if (!CheckIdentifier()) {
-    diag_.Error(CurrentLoc(), "unexpected token in module body");
-    Synchronize();
-    return;
-  }
-  ParseImplicitTypeOrInst(items);
-}
-
-void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
-  auto name_tok = Consume();
-  if (Check(TokenKind::kColonColon)) {
-    Consume();  // '::'
-    auto type_tok = ExpectIdentifier();
-    DataType dtype;
-    dtype.kind = DataTypeKind::kNamed;
-    dtype.scope_name = name_tok.text;
-    dtype.type_name = type_tok.text;
-    ParseVarDeclList(items, dtype);
-    return;
-  }
-  if (known_types_.count(name_tok.text) != 0) {
-    DataType dtype;
-    dtype.kind = DataTypeKind::kNamed;
-    dtype.type_name = name_tok.text;
-    ParseVarDeclList(items, dtype);
-    return;
-  }
-  if (CheckIdentifier() || Check(TokenKind::kHash)) {
-    if (InProgramBlock())  // §3.4
-      diag_.Error(name_tok.loc, "instantiations not allowed in programs");
-    items.push_back(ParseModuleInst(name_tok));
-    return;
-  }
-  auto* item = arena_.Create<ModuleItem>();
-  item->kind = ModuleItemKind::kVarDecl;
-  item->loc = name_tok.loc;
-  item->name = name_tok.text;
-  if (Match(TokenKind::kEq)) {
-    item->init_expr = ParseExpr();
-  }
-  Expect(TokenKind::kSemicolon);
-  items.push_back(item);
 }
 
 }  // namespace delta

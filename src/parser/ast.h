@@ -837,6 +837,20 @@ struct CompilationUnit {
   std::vector<BindDirective*> bind_directives;  // bind directives (§23.11)
   std::vector<ModuleItem*> cu_items;  // top-level functions/tasks (§3.12.1)
   NetType default_nettype = NetType::kWire;  // §6.10/§22.8
+
+  // CU-scope timeunit/timeprecision (§3.14.2.3 rule c)
+  TimeUnit cu_time_unit = TimeUnit::kNs;
+  TimeUnit cu_time_prec = TimeUnit::kNs;
+  bool has_cu_timeunit = false;
+  bool has_cu_timeprecision = false;
+};
+
+// §3.14.2.3 precedence resolution result.
+struct ResolvedTimescale {
+  TimeUnit unit = TimeUnit::kNs;
+  TimeUnit precision = TimeUnit::kNs;
+  bool has_unit = false;
+  bool has_precision = false;
 };
 
 }  // namespace delta
