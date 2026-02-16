@@ -480,15 +480,25 @@ bool Preprocessor::IsActive() const {
                      [](const CondState& s) { return s.active; });
 }
 
-// §22.3: Track design element nesting for resetall validation.
+// §3.2 + §22.3: Track design element nesting for resetall validation.
+// A design element is a module, program, interface, checker, package,
+// primitive, or configuration.
 void Preprocessor::TrackDesignElement(std::string_view trimmed) {
-  if (trimmed.starts_with("module ") || trimmed.starts_with("interface ") ||
-      trimmed.starts_with("program ") || trimmed.starts_with("package ")) {
+  if (trimmed.starts_with("module ") || trimmed.starts_with("program ") ||
+      trimmed.starts_with("interface ") || trimmed.starts_with("checker ") ||
+      trimmed.starts_with("package ") || trimmed.starts_with("primitive ") ||
+      trimmed.starts_with("config ") || trimmed.starts_with("macromodule ")) {
     ++design_element_depth_;
-  } else if (trimmed.starts_with("endmodule") ||
-             trimmed.starts_with("endinterface") ||
-             trimmed.starts_with("endprogram") ||
-             trimmed.starts_with("endpackage")) {
+  }
+  // Also check for end keywords anywhere in the line (handles single-line
+  // declarations like "module m; endmodule").
+  if (trimmed.find("endmodule") != std::string_view::npos ||
+      trimmed.find("endprogram") != std::string_view::npos ||
+      trimmed.find("endinterface") != std::string_view::npos ||
+      trimmed.find("endchecker") != std::string_view::npos ||
+      trimmed.find("endpackage") != std::string_view::npos ||
+      trimmed.find("endprimitive") != std::string_view::npos ||
+      trimmed.find("endconfig") != std::string_view::npos) {
     if (design_element_depth_ > 0) --design_element_depth_;
   }
 }

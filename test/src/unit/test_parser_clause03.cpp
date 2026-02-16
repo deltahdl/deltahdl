@@ -100,9 +100,7 @@ TEST(ParserSection3, DesignElementClass) {
 
 TEST(ParserSection3, DesignElementPrimitive) {
   auto r = Parse(
-      "primitive mux_prim (out, sel, a, b);\n"
-      "  output out;\n"
-      "  input sel, a, b;\n"
+      "primitive mux_prim (output out, input sel, a, b);\n"
       "  table\n"
       "    0 0 ? : 0;\n"
       "    0 1 ? : 1;\n"
@@ -112,6 +110,17 @@ TEST(ParserSection3, DesignElementPrimitive) {
       "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->udps.size(), 1u);
+  EXPECT_EQ(r.cu->udps[0]->name, "mux_prim");
+}
+
+TEST(ParserSection3, DesignElementCheckerBasic) {
+  auto r = Parse("checker chk; endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->name, "chk");
+  EXPECT_EQ(r.cu->checkers[0]->decl_kind, ModuleDeclKind::kChecker);
 }
 
 TEST(ParserSection3, DesignElementConfig) {
@@ -121,20 +130,32 @@ TEST(ParserSection3, DesignElementConfig) {
       "endconfig\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->configs.size(), 1u);
+  EXPECT_EQ(r.cu->configs[0]->name, "cfg1");
 }
 
-TEST(ParserSection3, MixedDesignElements) {
+TEST(ParserSection3, AllSevenDesignElements) {
+  // §3.2: A design element is a module, program, interface, checker,
+  //       package, primitive, or configuration.
   auto r = Parse(
-      "interface ifc; endinterface\n"
       "module m; endmodule\n"
       "program p; endprogram\n"
-      "package pkg; endpackage\n");
+      "interface ifc; endinterface\n"
+      "checker chk; endchecker\n"
+      "package pkg; endpackage\n"
+      "primitive udp_and (output out, input a, b);\n"
+      "  table 0 0 : 0; 0 1 : 0; 1 0 : 0; 1 1 : 1; endtable\n"
+      "endprimitive\n"
+      "config cfg; design m; endconfig\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->interfaces.size(), 1u);
   EXPECT_EQ(r.cu->modules.size(), 1u);
   EXPECT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_EQ(r.cu->checkers.size(), 1u);
   EXPECT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_EQ(r.cu->udps.size(), 1u);
+  EXPECT_EQ(r.cu->configs.size(), 1u);
 }
 
 TEST(ParserSection3, MultipleModulesInCompilationUnit) {
