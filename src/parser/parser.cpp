@@ -893,24 +893,6 @@ void Parser::ParseDataDeclItem(std::vector<ModuleItem*>& items, size_t before,
   AttachAttrs(items, before, attrs);
 }
 
-bool Parser::TryParseTypeRef(std::vector<ModuleItem*>& items) {
-  // §6.23 / A.2.2.1: type_reference used as data_type in declaration.
-  if (!Check(TokenKind::kKwType)) return false;
-  Consume();  // type
-  Expect(TokenKind::kLParen);
-  auto* type_expr = ParseExpr();
-  Expect(TokenKind::kRParen);
-  auto* item = arena_.Create<ModuleItem>();
-  item->kind = ModuleItemKind::kVarDecl;
-  item->loc = CurrentLoc();
-  item->data_type.type_ref_expr = type_expr;
-  item->name = ExpectIdentifier().text;
-  ParseUnpackedDims(item->unpacked_dims);
-  Expect(TokenKind::kSemicolon);
-  items.push_back(item);
-  return true;
-}
-
 // §6.8: Parse variable declaration after 'var' keyword.
 void Parser::ParseVarPrefixed(std::vector<ModuleItem*>& items) {
   if (TryParseTypeRef(items)) return;
