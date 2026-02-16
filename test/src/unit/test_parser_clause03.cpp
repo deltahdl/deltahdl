@@ -306,6 +306,45 @@ TEST(ParserSection3, Sec3_9_ImportIntoModuleAndPackage) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
+// ============================================================
+// LRM section 3.10 -- Configurations
+// ============================================================
+
+// §3.10: "SystemVerilog provides the ability to specify design configurations,
+//         which specify the binding information of module instances to specific
+//         SystemVerilog source code. Configurations utilize libraries."
+TEST(ParserSection3, Sec3_10_ConfigBindingAndLibraries) {
+  auto r = Parse(
+      "config cfg1;\n"
+      "  design work.top;\n"
+      "  default liblist work;\n"
+      "  instance top.u1 use lib2.fast_adder;\n"
+      "  cell adder liblist lib1 lib2;\n"
+      "endconfig : cfg1\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->configs.size(), 1u);
+  EXPECT_EQ(r.cu->configs[0]->name, "cfg1");
+  // Design statement: binding to specific source (lib.cell notation)
+  ASSERT_EQ(r.cu->configs[0]->design_cells.size(), 1u);
+  EXPECT_EQ(r.cu->configs[0]->design_cells[0].first, "work");
+  EXPECT_EQ(r.cu->configs[0]->design_cells[0].second, "top");
+  // Three rules: default, instance, cell — all configuration binding types
+  ASSERT_EQ(r.cu->configs[0]->rules.size(), 3u);
+  EXPECT_EQ(r.cu->configs[0]->rules[0]->kind, ConfigRuleKind::kDefault);
+  ASSERT_EQ(r.cu->configs[0]->rules[0]->liblist.size(), 1u);
+  EXPECT_EQ(r.cu->configs[0]->rules[0]->liblist[0], "work");
+  auto* r1 = r.cu->configs[0]->rules[1];
+  EXPECT_EQ(r1->kind, ConfigRuleKind::kInstance);
+  EXPECT_EQ(r1->inst_path, "top.u1");
+  EXPECT_EQ(r1->use_lib, "lib2");
+  EXPECT_EQ(r1->use_cell, "fast_adder");
+  auto* r2 = r.cu->configs[0]->rules[2];
+  EXPECT_EQ(r2->kind, ConfigRuleKind::kCell);
+  EXPECT_EQ(r2->cell_name, "adder");
+  ASSERT_EQ(r2->liblist.size(), 2u);
+}
+
 TEST(ParserSection3, AllSevenDesignElements) {
   // §3.2: A design element is a module, program, interface, checker,
   //       package, primitive, or configuration.
@@ -445,33 +484,13 @@ TEST(ParserSection3, Sec3_3_ModuleDeclarations) {
   EXPECT_GE(r.cu->modules[0]->items.size(), 7u);
 }
 
-// §3.3: "Subroutine definitions" (function + task)
-TEST(ParserSection3, Sec3_3_SubroutineDefinitions) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int add(int a, int b);\n"
-      "    return a + b;\n"
-      "  endfunction\n"
-      "  task display_val(input int x);\n"
-      "    $display(\"%d\", x);\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  bool has_func = false, has_task = false;
-  for (const auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kFunctionDecl) has_func = true;
-    if (item->kind == ModuleItemKind::kTaskDecl) has_task = true;
-  }
-  EXPECT_TRUE(has_func);
-  EXPECT_TRUE(has_task);
-}
-
-// §3.3: "Procedural blocks"
-TEST(ParserSection3, Sec3_3_ProceduralBlocks) {
+// §3.3: "Subroutine definitions" and "Procedural blocks"
+TEST(ParserSection3, Sec3_3_SubroutinesAndProceduralBlocks) {
   auto r = Parse(
       "module m;\n"
       "  logic clk, a, b;\n"
+      "  function int add(int a, int b); return a + b; endfunction\n"
+      "  task display_val(input int x); $display(\"%d\", x); endtask\n"
       "  initial a = 0;\n"
       "  final $display(\"done\");\n"
       "  always @(posedge clk) a <= b;\n"
@@ -479,9 +498,12 @@ TEST(ParserSection3, Sec3_3_ProceduralBlocks) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+  bool has_func = false, has_task = false;
   bool has_initial = false, has_final = false;
   bool has_always = false, has_always_comb = false;
   for (const auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kFunctionDecl) has_func = true;
+    if (item->kind == ModuleItemKind::kTaskDecl) has_task = true;
     if (item->kind == ModuleItemKind::kInitialBlock) has_initial = true;
     if (item->kind == ModuleItemKind::kFinalBlock) has_final = true;
     if (item->kind == ModuleItemKind::kAlwaysBlock) {
@@ -489,6 +511,8 @@ TEST(ParserSection3, Sec3_3_ProceduralBlocks) {
       if (item->always_kind == AlwaysKind::kAlwaysComb) has_always_comb = true;
     }
   }
+  EXPECT_TRUE(has_func);
+  EXPECT_TRUE(has_task);
   EXPECT_TRUE(has_initial);
   EXPECT_TRUE(has_final);
   EXPECT_TRUE(has_always);
@@ -556,28 +580,16 @@ TEST(ParserSection3, Sec3_3_DesignElementInstantiations) {
 // LRM section 3.4 -- Programs
 // =============================================================================
 
-// §3.4: "The program building block is enclosed between the keywords
-//        program...endprogram."
-TEST(ParserSection3, Sec3_4_ProgramEndLabel) {
-  auto r = Parse(
-      "program p;\n"
-      "endprogram : p\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_EQ(r.cu->programs[0]->name, "p");
-}
-
-// §3.4 LRM example (verbatim):
+// §3.4 LRM example (verbatim) with end label:
 //   program test (input clk, input [16:1] addr, inout [7:0] data);
 //   initial begin ... end
-//   endprogram
+//   endprogram : test
 TEST(ParserSection3, Sec3_4_LrmExample) {
   auto r = Parse(
       "program test (input clk, input [16:1] addr, inout [7:0] data);\n"
       "  initial begin\n"
       "  end\n"
-      "endprogram\n");
+      "endprogram : test\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->programs.size(), 1u);
@@ -612,42 +624,28 @@ TEST(ParserSection3, Sec3_4_DataAndClassDeclarations) {
   EXPECT_TRUE(has_class);
 }
 
-// §3.4: "A program block can contain ... subroutine definitions"
-TEST(ParserSection3, Sec3_4_SubroutineDefinitions) {
+// §3.4: "A program block can contain ... subroutine definitions ...
+//        initial ... final procedures"
+TEST(ParserSection3, Sec3_4_SubroutinesAndProcedures) {
   auto r = Parse(
       "program p;\n"
-      "  function int get_val;\n"
-      "    return 42;\n"
-      "  endfunction\n"
-      "  task run_test;\n"
-      "  endtask\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  bool has_func = false;
-  bool has_task = false;
-  for (const auto* item : r.cu->programs[0]->items) {
-    if (item->kind == ModuleItemKind::kFunctionDecl) has_func = true;
-    if (item->kind == ModuleItemKind::kTaskDecl) has_task = true;
-  }
-  EXPECT_TRUE(has_func);
-  EXPECT_TRUE(has_task);
-}
-
-// §3.4: "A program block can contain ... initial ... final procedures"
-TEST(ParserSection3, Sec3_4_InitialAndFinalProcedures) {
-  auto r = Parse(
-      "program p;\n"
+      "  function int get_val; return 42; endfunction\n"
+      "  task run_test; endtask\n"
       "  initial $display(\"test\");\n"
       "  final $display(\"done\");\n"
       "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+  bool has_func = false, has_task = false;
   bool has_initial = false, has_final = false;
   for (const auto* item : r.cu->programs[0]->items) {
+    if (item->kind == ModuleItemKind::kFunctionDecl) has_func = true;
+    if (item->kind == ModuleItemKind::kTaskDecl) has_task = true;
     if (item->kind == ModuleItemKind::kInitialBlock) has_initial = true;
     if (item->kind == ModuleItemKind::kFinalBlock) has_final = true;
   }
+  EXPECT_TRUE(has_func);
+  EXPECT_TRUE(has_task);
   EXPECT_TRUE(has_initial);
   EXPECT_TRUE(has_final);
 }
