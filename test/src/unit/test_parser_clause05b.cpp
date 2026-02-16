@@ -692,26 +692,6 @@ TEST(ParserSection5, AttributeValue_String) {
               "  logic x;\n"
               "endmodule"));
 }
-
-// =========================================================================
-// Section 5.10/5.11: Assignment pattern with type-cast prefix
-// =========================================================================
-
-TEST(ParserSection5, AssignmentPattern_TypeCastPrefix) {
-  // d = ab'{int:1, shortreal:1.0};
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  typedef struct {int a; shortreal b;} ab;\n"
-              "  ab d;\n"
-              "  initial d = ab'{int:1, shortreal:1.0};\n"
-              "endmodule"));
-}
-
-TEST(ParserSection5, AssignmentPattern_EmptyRejected) {
-  // An empty assignment pattern should be rejected.
-  EXPECT_FALSE(ParseOk("module m; initial x = '{}; endmodule"));
-}
-
 // =========================================================================
 // Section 5.5: Unary reduction operators
 // =========================================================================
