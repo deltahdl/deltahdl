@@ -205,6 +205,67 @@ TEST(ParserSection3, Sec3_7_SequentialUdp) {
   EXPECT_EQ(udp->table[2].output, '-');
 }
 
+// ============================================================
+// LRM section 3.8 -- Subroutines
+// ============================================================
+
+// §3.8: "A task is called as a statement. A task can have any number of
+//        input, output, inout, and ref arguments, but does not return a
+//        value. Tasks can block simulation time during execution."
+TEST(ParserSection3, Sec3_8_TaskAllDirectionsAndBlocking) {
+  auto r = Parse(
+      "module m;\n"
+      "  task my_task(input int a, output int b, inout int c, ref int d);\n"
+      "    #10;\n"
+      "    b = a + c;\n"
+      "    c = d;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* task = FindItemByKind(r, ModuleItemKind::kTaskDecl);
+  ASSERT_NE(task, nullptr);
+  EXPECT_EQ(task->name, "my_task");
+  ASSERT_EQ(task->func_args.size(), 4u);
+  EXPECT_EQ(task->func_args[0].direction, Direction::kInput);
+  EXPECT_EQ(task->func_args[1].direction, Direction::kOutput);
+  EXPECT_EQ(task->func_args[2].direction, Direction::kInout);
+  EXPECT_EQ(task->func_args[3].direction, Direction::kRef);
+  // Task has a body with delay (#10 blocks time) + assignments
+  EXPECT_GE(task->func_body_stmts.size(), 1u);
+}
+
+// §3.8: Function returning value, void function, all 4 argument directions.
+TEST(ParserSection3, Sec3_8_FunctionReturnAndVoidAndDirections) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int compute(input int a, output int b,\n"
+      "                       inout int c, ref int d);\n"
+      "    b = a;\n"
+      "    return a + c + d;\n"
+      "  endfunction\n"
+      "  function void show(input int val);\n"
+      "    $display(\"%d\", val);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  int func_count = 0;
+  for (const auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kFunctionDecl) {
+      ++func_count;
+      if (item->name == "compute") {
+        ASSERT_EQ(item->func_args.size(), 4u);
+        EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
+        EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
+        EXPECT_EQ(item->func_args[2].direction, Direction::kInout);
+        EXPECT_EQ(item->func_args[3].direction, Direction::kRef);
+      }
+    }
+  }
+  EXPECT_EQ(func_count, 2);
+}
+
 TEST(ParserSection3, AllSevenDesignElements) {
   // §3.2: A design element is a module, program, interface, checker,
   //       package, primitive, or configuration.
@@ -317,67 +378,31 @@ TEST(ParserSection3, Sec3_3_Mux2to1LrmExample) {
   EXPECT_EQ(blk->always_kind, AlwaysKind::kAlwaysComb);
 }
 
-// §3.3: "Data declarations, such as nets, variables, structures, and unions"
-TEST(ParserSection3, Sec3_3_DataDeclarations) {
+// §3.3: Data declarations, constants, user-defined types, class definitions
+TEST(ParserSection3, Sec3_3_ModuleDeclarations) {
   auto r = Parse(
       "module m;\n"
       "  wire [7:0] w;\n"
       "  logic [15:0] v;\n"
       "  struct packed { logic [3:0] a; logic [3:0] b; } s;\n"
       "  union packed { logic [7:0] x; logic [7:0] y; } u;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_GE(r.cu->modules[0]->items.size(), 4u);
-}
-
-// §3.3: "Constant declarations"
-TEST(ParserSection3, Sec3_3_ConstantDeclarations) {
-  auto r = Parse(
-      "module m;\n"
       "  parameter WIDTH = 8;\n"
       "  localparam DEPTH = 16;\n"
+      "  typedef logic [7:0] byte_t;\n"
+      "  class my_class; int val; endclass\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  bool has_param = false;
+  bool has_param = false, has_typedef = false, has_class = false;
   for (const auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kParamDecl) has_param = true;
-  }
-  EXPECT_TRUE(has_param);
-}
-
-// §3.3: "User-defined type definitions"
-TEST(ParserSection3, Sec3_3_UserDefinedTypes) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef logic [7:0] byte_t;\n"
-      "  byte_t data;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  bool has_typedef = false;
-  for (const auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kTypedef) has_typedef = true;
-  }
-  EXPECT_TRUE(has_typedef);
-}
-
-// §3.3: "Class definitions"
-TEST(ParserSection3, Sec3_3_ClassDefinition) {
-  auto r = Parse(
-      "module m;\n"
-      "  class my_class;\n"
-      "    int val;\n"
-      "  endclass\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  bool has_class = false;
-  for (const auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kClassDecl) has_class = true;
   }
+  EXPECT_TRUE(has_param);
+  EXPECT_TRUE(has_typedef);
   EXPECT_TRUE(has_class);
+  EXPECT_GE(r.cu->modules[0]->items.size(), 7u);
 }
 
 // §3.3: "Subroutine definitions" (function + task)
@@ -569,37 +594,21 @@ TEST(ParserSection3, Sec3_4_SubroutineDefinitions) {
   EXPECT_TRUE(has_task);
 }
 
-// §3.4: "A program block can contain ... one or more initial ... procedures"
-TEST(ParserSection3, Sec3_4_InitialProcedure) {
+// §3.4: "A program block can contain ... initial ... final procedures"
+TEST(ParserSection3, Sec3_4_InitialAndFinalProcedures) {
   auto r = Parse(
       "program p;\n"
-      "  initial begin\n"
-      "    $display(\"test\");\n"
-      "  end\n"
+      "  initial $display(\"test\");\n"
+      "  final $display(\"done\");\n"
       "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  bool has_initial = false;
+  bool has_initial = false, has_final = false;
   for (const auto* item : r.cu->programs[0]->items) {
     if (item->kind == ModuleItemKind::kInitialBlock) has_initial = true;
-  }
-  EXPECT_TRUE(has_initial);
-}
-
-// §3.4: "A program block can contain ... final procedures"
-TEST(ParserSection3, Sec3_4_FinalProcedure) {
-  auto r = Parse(
-      "program p;\n"
-      "  final begin\n"
-      "    $display(\"done\");\n"
-      "  end\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  bool has_final = false;
-  for (const auto* item : r.cu->programs[0]->items) {
     if (item->kind == ModuleItemKind::kFinalBlock) has_final = true;
   }
+  EXPECT_TRUE(has_initial);
   EXPECT_TRUE(has_final);
 }
 
@@ -743,39 +752,31 @@ TEST(ParserSection3, ModuleLifetimeAutomaticAndStatic) {
   EXPECT_TRUE(ParseOk("module static m; endmodule\n"));
 }
 
-TEST(ParserSection3, FunctionLifetime) {
-  // automatic
-  auto ra = Parse(
+TEST(ParserSection3, FunctionAndTaskLifetime) {
+  auto fa = Parse(
       "module m;\n"
       "  function automatic int add(int a, int b); return a+b; endfunction\n"
       "endmodule\n");
-  ASSERT_NE(ra.cu, nullptr);
-  EXPECT_FALSE(ra.has_errors);
-  EXPECT_EQ(ra.cu->modules[0]->items[0]->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_TRUE(ra.cu->modules[0]->items[0]->is_automatic);
-  // static
-  auto rs = Parse(
+  ASSERT_NE(fa.cu, nullptr);
+  EXPECT_FALSE(fa.has_errors);
+  EXPECT_EQ(fa.cu->modules[0]->items[0]->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_TRUE(fa.cu->modules[0]->items[0]->is_automatic);
+  auto fs = Parse(
       "module m;\n"
       "  function static int mul(int a, int b); return a*b; endfunction\n"
       "endmodule\n");
-  ASSERT_NE(rs.cu, nullptr);
-  EXPECT_FALSE(rs.has_errors);
-  EXPECT_EQ(rs.cu->modules[0]->items[0]->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_TRUE(rs.cu->modules[0]->items[0]->is_static);
-}
-
-TEST(ParserSection3, TaskLifetime) {
-  auto ra =
+  ASSERT_NE(fs.cu, nullptr);
+  EXPECT_FALSE(fs.has_errors);
+  EXPECT_TRUE(fs.cu->modules[0]->items[0]->is_static);
+  auto ta =
       Parse("module m; task automatic t(input int x); endtask endmodule\n");
-  ASSERT_NE(ra.cu, nullptr);
-  EXPECT_FALSE(ra.has_errors);
-  EXPECT_EQ(ra.cu->modules[0]->items[0]->kind, ModuleItemKind::kTaskDecl);
-  EXPECT_TRUE(ra.cu->modules[0]->items[0]->is_automatic);
-  auto rs = Parse("module m; task static t(input int x); endtask endmodule\n");
-  ASSERT_NE(rs.cu, nullptr);
-  EXPECT_FALSE(rs.has_errors);
-  EXPECT_EQ(rs.cu->modules[0]->items[0]->kind, ModuleItemKind::kTaskDecl);
-  EXPECT_TRUE(rs.cu->modules[0]->items[0]->is_static);
+  ASSERT_NE(ta.cu, nullptr);
+  EXPECT_FALSE(ta.has_errors);
+  EXPECT_TRUE(ta.cu->modules[0]->items[0]->is_automatic);
+  auto ts = Parse("module m; task static t(input int x); endtask endmodule\n");
+  ASSERT_NE(ts.cu, nullptr);
+  EXPECT_FALSE(ts.has_errors);
+  EXPECT_TRUE(ts.cu->modules[0]->items[0]->is_static);
 }
 
 TEST(ParserSection3, TopLevelFunctionAutomaticAndProgramLifetime) {
