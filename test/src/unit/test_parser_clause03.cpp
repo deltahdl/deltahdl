@@ -526,27 +526,27 @@ TEST(ParserSection3, Sec3_4_FinalProcedure) {
   EXPECT_TRUE(has_final);
 }
 
-// §3.4: "It cannot contain always procedures" — restriction noted.
-// The parser currently accepts this; semantic checking would reject it.
-TEST(ParserSection3, Sec3_4_NoAlwaysProceduresNote) {
-  auto r = Parse(
-      "program p;\n"
-      "  always @(*) begin end\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  // Parser accepts (no syntax error), but LRM §3.4 disallows always in program.
-  EXPECT_FALSE(r.has_errors);
+// §3.4: "It cannot contain always procedures ... module instances"
+TEST(ParserSection3, Sec3_4_RejectsDisallowedItems) {
+  EXPECT_TRUE(
+      Parse("program p; always @(*) begin end endprogram\n").has_errors);
+  EXPECT_TRUE(
+      Parse("program p; always_comb begin end endprogram\n").has_errors);
+  EXPECT_TRUE(
+      Parse("program p; always_ff @(posedge clk) begin end endprogram\n")
+          .has_errors);
+  EXPECT_TRUE(
+      Parse("program p; always_latch begin end endprogram\n").has_errors);
+  EXPECT_TRUE(Parse("module c; endmodule\n"
+                    "program p; c i(); endprogram\n")
+                  .has_errors);
 }
 
 // §3.4: "It creates a scope that encapsulates program-wide data"
 TEST(ParserSection3, Sec3_4_MultiplePrograms) {
   auto r = Parse(
-      "program p1;\n"
-      "  logic a;\n"
-      "endprogram\n"
-      "program p2;\n"
-      "  logic b;\n"
-      "endprogram\n");
+      "program p1; logic a; endprogram\n"
+      "program p2; logic b; endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->programs.size(), 2u);

@@ -299,6 +299,10 @@ class Parser {
   DiagEngine& diag_;
   std::unordered_set<std::string_view> known_types_;
   ModuleDecl* current_module_ = nullptr;  // Set during module body parsing
+  bool InProgramBlock() const {
+    return current_module_ &&
+           current_module_->decl_kind == ModuleDeclKind::kProgram;
+  }
 };
 
 inline bool IsPortDirection(TokenKind tk) {

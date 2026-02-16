@@ -627,6 +627,8 @@ bool Parser::TryParseProcessBlock(std::vector<ModuleItem*>& items) {
   }
   auto ak = TokenToAlwaysKind(CurrentToken().kind);
   if (ak) {
+    if (InProgramBlock())  // §3.4
+      diag_.Error(CurrentLoc(), "always procedures not allowed in programs");
     items.push_back(ParseAlwaysBlock(*ak));
     return true;
   }
@@ -974,6 +976,8 @@ void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
     return;
   }
   if (CheckIdentifier() || Check(TokenKind::kHash)) {
+    if (InProgramBlock())  // §3.4
+      diag_.Error(name_tok.loc, "instantiations not allowed in programs");
     items.push_back(ParseModuleInst(name_tok));
     return;
   }
