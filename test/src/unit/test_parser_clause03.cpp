@@ -548,6 +548,105 @@ TEST(ParserSection3, Sec3_4_MultiplePrograms) {
 }
 
 // =============================================================================
+// LRM section 3.5 -- Interfaces
+// =============================================================================
+
+// §3.5 LRM example: simple_bus interface definition.
+// Also covers end label (endinterface : simple_bus) and interface port.
+TEST(ParserSection3, Sec3_5_LrmExample) {
+  auto r = Parse(
+      "interface simple_bus(input logic clk);\n"
+      "  logic req, gnt;\n"
+      "  logic [7:0] addr, data;\n"
+      "  logic [1:0] mode;\n"
+      "  logic start, rdy;\n"
+      "endinterface : simple_bus\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->name, "simple_bus");
+  ASSERT_EQ(r.cu->interfaces[0]->ports.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->ports[0].name, "clk");
+  EXPECT_EQ(r.cu->interfaces[0]->ports[0].direction, Direction::kInput);
+  EXPECT_GE(r.cu->interfaces[0]->items.size(), 5u);
+}
+
+// §3.5: "An interface can have parameters, constants, variables"
+TEST(ParserSection3, Sec3_5_ParametersConstantsVariables) {
+  auto r = Parse(
+      "interface ifc #(parameter WIDTH = 8);\n"
+      "  localparam DEPTH = 16;\n"
+      "  logic [WIDTH-1:0] data;\n"
+      "  wire valid;\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_GE(r.cu->interfaces[0]->items.size(), 2u);
+}
+
+// §3.5: "An interface can have ... functions, and tasks"
+TEST(ParserSection3, Sec3_5_FunctionsAndTasks) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  function automatic int get_data;\n"
+      "    return 42;\n"
+      "  endfunction\n"
+      "  task automatic send(input int val);\n"
+      "  endtask\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  bool has_func = false, has_task = false;
+  for (const auto* item : r.cu->interfaces[0]->items) {
+    if (item->kind == ModuleItemKind::kFunctionDecl) has_func = true;
+    if (item->kind == ModuleItemKind::kTaskDecl) has_task = true;
+  }
+  EXPECT_TRUE(has_func);
+  EXPECT_TRUE(has_task);
+}
+
+// §3.5: "an interface can also contain processes (i.e., initial or always
+//        procedures) and continuous assignments"
+TEST(ParserSection3, Sec3_5_ProcessesAndContinuousAssign) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  logic sig_a, sig_b;\n"
+      "  initial sig_a = 0;\n"
+      "  always @(sig_a) sig_b = ~sig_a;\n"
+      "  assign sig_b = sig_a;\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  bool has_initial = false, has_always = false, has_assign = false;
+  for (const auto* item : r.cu->interfaces[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) has_initial = true;
+    if (item->kind == ModuleItemKind::kAlwaysBlock) has_always = true;
+    if (item->kind == ModuleItemKind::kContAssign) has_assign = true;
+  }
+  EXPECT_TRUE(has_initial);
+  EXPECT_TRUE(has_always);
+  EXPECT_TRUE(has_assign);
+}
+
+// §3.5: "the modport construct is provided"
+TEST(ParserSection3, Sec3_5_Modport) {
+  auto r = Parse(
+      "interface myif;\n"
+      "  logic [7:0] data;\n"
+      "  logic valid, ready;\n"
+      "  modport master (output data, output valid, input ready);\n"
+      "  modport slave (input data, input valid, output ready);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  ASSERT_EQ(r.cu->interfaces[0]->modports.size(), 2u);
+  EXPECT_EQ(r.cu->interfaces[0]->modports[0]->name, "master");
+  EXPECT_EQ(r.cu->interfaces[0]->modports[1]->name, "slave");
+}
+
+// =============================================================================
 // LRM section 6.21 -- Scope and lifetime (automatic/static)
 // =============================================================================
 
@@ -618,91 +717,36 @@ TEST(ParserSection3, ProgramAutomaticLifetime) {
 // LRM section 3.14 -- Simulation time units and precision (time values)
 // =============================================================================
 
-TEST(ParserSection3, TimeunitInsideModule) {
-  auto r = Parse(
-      "module m;\n"
-      "  timeunit 1ns;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
-}
-
-TEST(ParserSection3, TimeprecisionInsideModule) {
-  auto r = Parse(
-      "module m;\n"
-      "  timeprecision 1ps;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
-}
-
-TEST(ParserSection3, TimeunitWithSlashPrecision) {
-  // timeunit with combined precision (LRM 3.14.2.2)
-  auto r = Parse(
-      "module m;\n"
-      "  timeunit 100ps / 10fs;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
-}
-
-TEST(ParserSection3, TimeunitAndTimeprecisionBoth) {
-  // Both timeunit and timeprecision in one module
-  auto r = Parse(
-      "module m;\n"
-      "  timeunit 1ns;\n"
-      "  timeprecision 1ps;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
-  EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
+TEST(ParserSection3, TimeunitAndTimeprecision) {
+  auto r1 = Parse("module m; timeunit 1ns; endmodule\n");
+  EXPECT_FALSE(r1.has_errors);
+  EXPECT_TRUE(r1.cu->modules[0]->has_timeunit);
+  auto r2 = Parse("module m; timeprecision 1ps; endmodule\n");
+  EXPECT_FALSE(r2.has_errors);
+  EXPECT_TRUE(r2.cu->modules[0]->has_timeprecision);
+  auto r3 = Parse("module m; timeunit 1ns; timeprecision 1ps; endmodule\n");
+  EXPECT_FALSE(r3.has_errors);
+  EXPECT_TRUE(r3.cu->modules[0]->has_timeunit);
+  EXPECT_TRUE(r3.cu->modules[0]->has_timeprecision);
+  EXPECT_TRUE(ParseOk("module m; timeunit 100ps / 10fs; endmodule\n"));
 }
 
 TEST(ParserSection3, TimescaleDirective) {
-  auto r = Parse(
-      "`timescale 1ns/1ps\n"
-      "module m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
-TEST(ParserSection3, TimescaleMultipleModules) {
-  // LRM 3.14.2.1: timescale applies to all modules that follow
+  EXPECT_TRUE(ParseOk("`timescale 1ns/1ps\nmodule m; endmodule\n"));
   auto r = Parse(
       "`timescale 1ns/10ps\n"
       "module a; endmodule\n"
       "module b; endmodule\n"
       "`timescale 1ps/1ps\n"
       "module c; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 3u);
 }
 
-TEST(ParserSection3, TimeunitInProgram) {
-  auto r = Parse(
-      "program p;\n"
-      "  timeunit 10us;\n"
-      "  timeprecision 100ns;\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-}
-
-TEST(ParserSection3, TimeunitInInterface) {
-  auto r = Parse(
-      "interface ifc;\n"
-      "  timeunit 1ns;\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
+TEST(ParserSection3, TimeunitInProgramAndInterface) {
+  EXPECT_TRUE(
+      ParseOk("program p; timeunit 10us; timeprecision 100ns; endprogram\n"));
+  auto r = Parse("interface ifc; timeunit 1ns; endinterface\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->interfaces.size(), 1u);
 }
@@ -711,40 +755,17 @@ TEST(ParserSection3, TimeunitInInterface) {
 // LRM section 5.8 -- Time literals
 // =============================================================================
 
-TEST(ParserSection3, TimeLiteralInDelay) {
-  // Time literals: integer or fixed-point followed by a time unit (LRM 5.8)
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial #10ns $display(\"done\");\n"
-              "endmodule\n"));
-}
-
-TEST(ParserSection3, TimeLiteralPicoseconds) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial #40ps $display(\"done\");\n"
-              "endmodule\n"));
-}
-
-TEST(ParserSection3, TimeLiteralFractional) {
-  // Fractional time literal: 2.1ns
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial #2.1ns $display(\"done\");\n"
-              "endmodule\n"));
-}
-
-TEST(ParserSection3, TimeLiteralAllUnits) {
-  // All time unit suffixes: s, ms, us, ns, ps, fs
+TEST(ParserSection3, TimeLiterals) {
+  // Integer, fractional, and all unit suffixes (LRM 5.8)
+  EXPECT_TRUE(ParseOk("module m; initial #10ns $display(\"d\"); endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m; initial #40ps $display(\"d\"); endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m; initial #2.1ns $display(\"d\"); endmodule\n"));
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
-              "    #1s $display(\"s\");\n"
-              "    #1ms $display(\"ms\");\n"
-              "    #1us $display(\"us\");\n"
-              "    #1ns $display(\"ns\");\n"
-              "    #1ps $display(\"ps\");\n"
-              "    #1fs $display(\"fs\");\n"
+              "    #1s $display(\"s\"); #1ms $display(\"ms\");\n"
+              "    #1us $display(\"us\"); #1ns $display(\"ns\");\n"
+              "    #1ps $display(\"ps\"); #1fs $display(\"fs\");\n"
               "  end\n"
               "endmodule\n"));
 }
@@ -847,21 +868,6 @@ TEST(ParserSection3, NonAnsiPortVariants) {
       ParseOk("module m (a, b); inout [7:0] a; inout [7:0] b; endmodule\n"));
 }
 
-// --- Port declarations in interface ---
-
-TEST(ParserSection3, InterfaceWithPort) {
-  auto r = Parse(
-      "interface bus_if (input logic clk);\n"
-      "  logic req, gnt;\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces[0]->ports[0].name, "clk");
-  EXPECT_EQ(r.cu->interfaces[0]->ports[0].direction, Direction::kInput);
-}
-
 // --- Empty port list ---
 
 TEST(ParserSection3, EmptyPortListParens) {
@@ -959,24 +965,6 @@ TEST(ParserSection3, ModuleAndPackageInSameUnit) {
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->packages.size(), 1u);
   EXPECT_EQ(r.cu->modules.size(), 1u);
-}
-
-// --- Interface with modports ---
-
-TEST(ParserSection3, InterfaceWithModport) {
-  auto r = Parse(
-      "interface myif;\n"
-      "  logic [7:0] data;\n"
-      "  logic valid, ready;\n"
-      "  modport master (output data, output valid, input ready);\n"
-      "  modport slave (input data, input valid, output ready);\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  ASSERT_EQ(r.cu->interfaces[0]->modports.size(), 2u);
-  EXPECT_EQ(r.cu->interfaces[0]->modports[0]->name, "master");
-  EXPECT_EQ(r.cu->interfaces[0]->modports[1]->name, "slave");
 }
 
 // --- Time units with different magnitudes (LRM Table 3-1) ---
