@@ -692,4 +692,3 @@ TEST(ParserSection23, PortConnectionEmptyNamed) {
 // =============================================================================
 // LRM section 23.3.2 -- Module instantiation syntax (additional)
 // =============================================================================
-

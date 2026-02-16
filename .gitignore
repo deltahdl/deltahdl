@@ -1,6 +1,7 @@
 # Build
 build/
 cmake-build-*/
+Testing/
 
 # Python
 __pycache__/

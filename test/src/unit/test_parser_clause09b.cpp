@@ -190,7 +190,6 @@ TEST(ParserSection9b, AlwaysCombWithAssertion) {
 // §9.2.2.4 -- always_ff procedure
 // =============================================================================
 
-
 TEST(ParserSection9b, AlwaysLatchMultipleOutputs) {
   auto r = Parse(
       "module m;\n"
