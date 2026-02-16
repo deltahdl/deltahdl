@@ -571,12 +571,11 @@ bool Parser::ParseClassQualifiers(ClassMember* m) {
 
 // Parse keyword-introduced class members (methods, constraints, typedefs,
 // parameters, nested classes, covergroups). Returns true if handled.
-bool Parser::TryParseKeywordClassMember(std::vector<ClassMember*>& members,
+bool Parser::TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
                                         ClassMember* member, bool proto) {
   if (Check(TokenKind::kKwFunction)) {
     member->kind = ClassMemberKind::kMethod;
     member->method = ParseFunctionDecl(proto);
-    // §13.8: Propagate static qualifier to the method's ModuleItem.
     if (member->is_static) member->method->is_static = true;
     members.push_back(member);
     return true;
@@ -592,6 +591,12 @@ bool Parser::TryParseKeywordClassMember(std::vector<ClassMember*>& members,
     members.push_back(ParseConstraintStub(member));
     return true;
   }
+  return false;
+}
+
+bool Parser::TryParseKeywordClassMember(std::vector<ClassMember*>& members,
+                                        ClassMember* member, bool proto) {
+  if (TryParseMethodOrConstraint(members, member, proto)) return true;
   if (Check(TokenKind::kKwTypedef)) {
     member->kind = ClassMemberKind::kTypedef;
     member->typedef_item = ParseTypedef();
@@ -610,7 +615,6 @@ bool Parser::TryParseKeywordClassMember(std::vector<ClassMember*>& members,
     }
     return true;
   }
-  // class_item: class_declaration | interface_class_declaration (A.1.9)
   if (IsAtClassDecl()) {
     member->kind = ClassMemberKind::kClassDecl;
     member->nested_class = ParseClassDecl();
@@ -618,7 +622,6 @@ bool Parser::TryParseKeywordClassMember(std::vector<ClassMember*>& members,
     members.push_back(member);
     return true;
   }
-  // class_item: covergroup_declaration (A.1.9)
   if (Check(TokenKind::kKwCovergroup)) {
     member->kind = ClassMemberKind::kCovergroup;
     std::vector<ModuleItem*> temp;

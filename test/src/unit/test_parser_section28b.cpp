@@ -272,10 +272,12 @@ TEST(ParserSection28, Sec28_12_MultiplePathsInSpecifyBlock) {
   auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
   ASSERT_NE(spec, nullptr);
   ASSERT_EQ(spec->specify_items.size(), 3u);
-  for (auto* si : spec->specify_items) {
-    EXPECT_EQ(si->kind, SpecifyItemKind::kPathDecl);
-    EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
-  }
+  EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kPathDecl);
+  EXPECT_EQ(spec->specify_items[1]->kind, SpecifyItemKind::kPathDecl);
+  EXPECT_EQ(spec->specify_items[2]->kind, SpecifyItemKind::kPathDecl);
+  EXPECT_EQ(spec->specify_items[0]->path.path_kind, SpecifyPathKind::kParallel);
+  EXPECT_EQ(spec->specify_items[1]->path.path_kind, SpecifyPathKind::kParallel);
+  EXPECT_EQ(spec->specify_items[2]->path.path_kind, SpecifyPathKind::kParallel);
 }
 
 // --- Specparam with min:typ:max ---

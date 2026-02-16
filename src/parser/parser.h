@@ -76,6 +76,8 @@ class Parser {
   ClassDecl* ParseClassDecl();
   void ParseClassExtendsClause(ClassDecl* decl);
   void ParseClassMembers(std::vector<ClassMember*>& members);
+  bool TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
+                                  ClassMember* member, bool proto);
   bool TryParseKeywordClassMember(std::vector<ClassMember*>& members,
                                   ClassMember* member, bool proto);
   bool ParseClassQualifiers(ClassMember* member);
