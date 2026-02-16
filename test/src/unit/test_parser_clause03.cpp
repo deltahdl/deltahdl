@@ -55,83 +55,63 @@ static ModuleItem* FindItemByKind(ParseResult3& r, ModuleItemKind kind) {
 // LRM section 3.2 -- Design elements
 // =============================================================================
 
-TEST(ParserSection3, DesignElementModuleBasic) {
-  auto r = Parse("module top; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->name, "top");
-  EXPECT_EQ(r.cu->modules[0]->decl_kind, ModuleDeclKind::kModule);
-}
+// Individual design element types are tested in AllSevenDesignElements below
+// and in dedicated per-clause tests (§3.3–§3.10).
 
-TEST(ParserSection3, DesignElementProgramBasic) {
-  auto r = Parse("program p; endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_EQ(r.cu->programs[0]->name, "p");
-  EXPECT_EQ(r.cu->programs[0]->decl_kind, ModuleDeclKind::kProgram);
-}
+// =============================================================================
+// LRM section 3.6 -- Checkers
+// "The checker construct, enclosed by the keywords checker...endchecker,
+//  represents a verification block encapsulating assertions along with the
+//  modeling code."
+// =============================================================================
 
-TEST(ParserSection3, DesignElementInterfaceBasic) {
-  auto r = Parse("interface ifc; endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces[0]->name, "ifc");
-  EXPECT_EQ(r.cu->interfaces[0]->decl_kind, ModuleDeclKind::kInterface);
-}
-
-TEST(ParserSection3, DesignElementPackage) {
-  auto r = Parse("package pkg; endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-  EXPECT_EQ(r.cu->packages[0]->name, "pkg");
-}
-
-TEST(ParserSection3, DesignElementClass) {
-  auto r = Parse("class cls; endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->name, "cls");
-}
-
-TEST(ParserSection3, DesignElementPrimitive) {
+// §3.6: Checker encapsulates assertions (assert property, cover property,
+//        property/sequence declarations) — the primary purpose of checkers.
+TEST(ParserSection3, Sec3_6_AssertionsInChecker) {
   auto r = Parse(
-      "primitive mux_prim (output out, input sel, a, b);\n"
-      "  table\n"
-      "    0 0 ? : 0;\n"
-      "    0 1 ? : 1;\n"
-      "    1 ? 0 : 0;\n"
-      "    1 ? 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->udps.size(), 1u);
-  EXPECT_EQ(r.cu->udps[0]->name, "mux_prim");
-}
-
-TEST(ParserSection3, DesignElementCheckerBasic) {
-  auto r = Parse("checker chk; endchecker\n");
+      "checker req_ack_chk(logic clk, req, ack);\n"
+      "  property req_followed_by_ack;\n"
+      "    @(posedge clk) req |-> ##[1:3] ack;\n"
+      "  endproperty\n"
+      "  assert property (req_followed_by_ack);\n"
+      "  cover property (req_followed_by_ack);\n"
+      "endchecker : req_ack_chk\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->checkers.size(), 1u);
-  EXPECT_EQ(r.cu->checkers[0]->name, "chk");
-  EXPECT_EQ(r.cu->checkers[0]->decl_kind, ModuleDeclKind::kChecker);
+  EXPECT_EQ(r.cu->checkers[0]->name, "req_ack_chk");
+  ASSERT_GE(r.cu->checkers[0]->ports.size(), 3u);
+  bool has_prop = false, has_assert = false, has_cover = false;
+  for (const auto* item : r.cu->checkers[0]->items) {
+    if (item->kind == ModuleItemKind::kPropertyDecl) has_prop = true;
+    if (item->kind == ModuleItemKind::kAssertProperty) has_assert = true;
+    if (item->kind == ModuleItemKind::kCoverProperty) has_cover = true;
+  }
+  EXPECT_TRUE(has_prop);
+  EXPECT_TRUE(has_assert);
+  EXPECT_TRUE(has_cover);
 }
 
-TEST(ParserSection3, DesignElementConfig) {
+// §3.6: Checker also encapsulates "modeling code" — variables, initial blocks,
+//        always blocks used alongside assertions for auxiliary verification.
+TEST(ParserSection3, Sec3_6_ModelingCodeInChecker) {
   auto r = Parse(
-      "config cfg1;\n"
-      "  design top;\n"
-      "endconfig\n");
+      "checker model_chk;\n"
+      "  logic flag;\n"
+      "  initial flag = 0;\n"
+      "  always @(flag) flag <= ~flag;\n"
+      "endchecker\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->configs.size(), 1u);
-  EXPECT_EQ(r.cu->configs[0]->name, "cfg1");
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  bool has_initial = false, has_always = false;
+  for (const auto* item : r.cu->checkers[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) has_initial = true;
+    if (item->kind == ModuleItemKind::kAlwaysBlock) has_always = true;
+  }
+  EXPECT_TRUE(has_initial);
+  EXPECT_TRUE(has_always);
+  EXPECT_GE(r.cu->checkers[0]->items.size(), 3u);  // var + initial + always
 }
 
 TEST(ParserSection3, AllSevenDesignElements) {
@@ -149,13 +129,24 @@ TEST(ParserSection3, AllSevenDesignElements) {
       "config cfg; design m; endconfig\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_EQ(r.cu->checkers.size(), 1u);
-  EXPECT_EQ(r.cu->packages.size(), 1u);
-  EXPECT_EQ(r.cu->udps.size(), 1u);
-  EXPECT_EQ(r.cu->configs.size(), 1u);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->name, "m");
+  EXPECT_EQ(r.cu->modules[0]->decl_kind, ModuleDeclKind::kModule);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->name, "p");
+  EXPECT_EQ(r.cu->programs[0]->decl_kind, ModuleDeclKind::kProgram);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->name, "ifc");
+  EXPECT_EQ(r.cu->interfaces[0]->decl_kind, ModuleDeclKind::kInterface);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->name, "chk");
+  EXPECT_EQ(r.cu->checkers[0]->decl_kind, ModuleDeclKind::kChecker);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_EQ(r.cu->packages[0]->name, "pkg");
+  ASSERT_EQ(r.cu->udps.size(), 1u);
+  EXPECT_EQ(r.cu->udps[0]->name, "udp_and");
+  ASSERT_EQ(r.cu->configs.size(), 1u);
+  EXPECT_EQ(r.cu->configs[0]->name, "cfg");
 }
 
 TEST(ParserSection3, MultipleModulesInCompilationUnit) {
