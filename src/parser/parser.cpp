@@ -279,47 +279,57 @@ bool Parser::TryParseSecondaryTopLevel(CompilationUnit* unit) {
   return false;
 }
 
-void Parser::ParseTopLevel(CompilationUnit* unit) {
-  if (Match(TokenKind::kSemicolon)) return;  // null item
-  ParseAttributes();                         // consume optional (* ... *)
+// anonymous_program: program ; { ... } endprogram (A.1.11)
+bool Parser::TryParseAnonymousProgram() {
+  auto saved = lexer_.SavePos();
+  Consume();
+  if (!Check(TokenKind::kSemicolon)) {
+    lexer_.RestorePos(saved);
+    return false;
+  }
+  Consume();
+  while (!Check(TokenKind::kKwEndprogram) && !AtEnd()) {
+    if (Match(TokenKind::kSemicolon)) continue;
+    std::vector<ModuleItem*> discard;
+    ParseModuleItem(discard);
+  }
+  Expect(TokenKind::kKwEndprogram);
+  return true;
+}
+
+bool Parser::TryParsePrimaryTopLevel(CompilationUnit* unit) {
   if (Check(TokenKind::kKwExtern)) {
     ParseExternTopLevel(unit);
-    return;
+    return true;
   }
   if (Check(TokenKind::kKwModule) || Check(TokenKind::kKwMacromodule)) {
     unit->modules.push_back(ParseModuleDecl());
-    return;
+    return true;
   }
   if (Check(TokenKind::kKwPackage)) {
     unit->packages.push_back(ParsePackageDecl());
-    return;
+    return true;
   }
   if (IsAtClassDecl()) {
     unit->classes.push_back(ParseClassDecl());
-    return;
+    return true;
   }
   if (Check(TokenKind::kKwInterface)) {
     unit->interfaces.push_back(ParseInterfaceDecl());
-    return;
+    return true;
   }
   if (Check(TokenKind::kKwProgram)) {
-    // anonymous_program: program ; { ... } endprogram (A.1.11)
-    auto saved = lexer_.SavePos();
-    Consume();
-    if (Check(TokenKind::kSemicolon)) {
-      Consume();
-      while (!Check(TokenKind::kKwEndprogram) && !AtEnd()) {
-        if (Match(TokenKind::kSemicolon)) continue;
-        std::vector<ModuleItem*> discard;
-        ParseModuleItem(discard);
-      }
-      Expect(TokenKind::kKwEndprogram);
-      return;
-    }
-    lexer_.RestorePos(saved);
+    if (TryParseAnonymousProgram()) return true;
     unit->programs.push_back(ParseProgramDecl());
-    return;
+    return true;
   }
+  return false;
+}
+
+void Parser::ParseTopLevel(CompilationUnit* unit) {
+  if (Match(TokenKind::kSemicolon)) return;  // null item
+  ParseAttributes();                         // consume optional (* ... *)
+  if (TryParsePrimaryTopLevel(unit)) return;
   if (Check(TokenKind::kKwTypedef)) {
     std::vector<ModuleItem*> discard;
     ParseModuleItem(discard);
@@ -409,6 +419,37 @@ ModuleDecl* Parser::ParseModuleDecl() {
   return mod;
 }
 
+// Parse a single item inside a package body. Returns true if handled.
+bool Parser::TryParsePackageBodyItem(std::vector<ModuleItem*>& items) {
+  // anonymous_program: program ; { ... } endprogram (A.1.11)
+  if (Check(TokenKind::kKwProgram)) {
+    Consume();
+    Expect(TokenKind::kSemicolon);
+    while (!Check(TokenKind::kKwEndprogram) && !AtEnd()) {
+      if (Match(TokenKind::kSemicolon)) continue;
+      ParseModuleItem(items);
+    }
+    Expect(TokenKind::kKwEndprogram);
+    return true;
+  }
+  // extern_constraint_declaration in package (A.1.11)
+  if (Check(TokenKind::kKwConstraint)) {
+    ParseOutOfBlockConstraint(nullptr);
+    return true;
+  }
+  if (Check(TokenKind::kKwStatic)) {
+    auto saved = lexer_.SavePos();
+    Consume();
+    if (Check(TokenKind::kKwConstraint)) {
+      lexer_.RestorePos(saved);
+      ParseOutOfBlockConstraint(nullptr);
+      return true;
+    }
+    lexer_.RestorePos(saved);
+  }
+  return false;
+}
+
 PackageDecl* Parser::ParsePackageDecl() {
   auto* pkg = arena_.Create<PackageDecl>();
   pkg->range.start = CurrentLoc();
@@ -421,33 +462,9 @@ PackageDecl* Parser::ParsePackageDecl() {
   Expect(TokenKind::kSemicolon);
   while (!Check(TokenKind::kKwEndpackage) && !AtEnd()) {
     if (Match(TokenKind::kSemicolon)) continue;  // null item (A.1.11)
-    // anonymous_program: program ; { ... } endprogram (A.1.11)
-    if (Check(TokenKind::kKwProgram)) {
-      Consume();
-      Expect(TokenKind::kSemicolon);
-      while (!Check(TokenKind::kKwEndprogram) && !AtEnd()) {
-        if (Match(TokenKind::kSemicolon)) continue;
-        ParseModuleItem(pkg->items);
-      }
-      Expect(TokenKind::kKwEndprogram);
-      continue;
+    if (!TryParsePackageBodyItem(pkg->items)) {
+      ParseModuleItem(pkg->items);
     }
-    // extern_constraint_declaration in package (A.1.11)
-    if (Check(TokenKind::kKwConstraint)) {
-      ParseOutOfBlockConstraint(nullptr);
-      continue;
-    }
-    if (Check(TokenKind::kKwStatic)) {
-      auto saved = lexer_.SavePos();
-      Consume();
-      if (Check(TokenKind::kKwConstraint)) {
-        lexer_.RestorePos(saved);
-        ParseOutOfBlockConstraint(nullptr);
-        continue;
-      }
-      lexer_.RestorePos(saved);
-    }
-    ParseModuleItem(pkg->items);
   }
   Expect(TokenKind::kKwEndpackage);
   if (Match(TokenKind::kColon)) ExpectIdentifier();
@@ -636,7 +653,7 @@ static bool IsElabSeverityTask(TokenKind kind, std::string_view text) {
           text == "$info");
 }
 
-bool Parser::TryParseKeywordItem(std::vector<ModuleItem*>& items) {
+bool Parser::TryParseDeclKeywordItem(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kKwTypedef)) {
     items.push_back(ParseTypedef());
     return true;
@@ -658,7 +675,7 @@ bool Parser::TryParseKeywordItem(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kKwExtern)) {
     Consume();
     bool forkjoin = Match(TokenKind::kKwForkjoin);
-    ModuleItem* item;
+    ModuleItem* item = nullptr;
     if (forkjoin || Check(TokenKind::kKwTask)) {
       item = ParseTaskDecl(/*prototype_only=*/true);
     } else {
@@ -669,6 +686,10 @@ bool Parser::TryParseKeywordItem(std::vector<ModuleItem*>& items) {
     items.push_back(item);
     return true;
   }
+  return false;
+}
+
+bool Parser::TryParseMiscKeywordItem(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kKwAssign)) {
     items.push_back(ParseContinuousAssign());
     return true;
@@ -706,6 +727,12 @@ bool Parser::TryParseKeywordItem(std::vector<ModuleItem*>& items) {
     ParseVarDeclList(items, dtype);
     return true;
   }
+  return false;
+}
+
+bool Parser::TryParseKeywordItem(std::vector<ModuleItem*>& items) {
+  if (TryParseDeclKeywordItem(items)) return true;
+  if (TryParseMiscKeywordItem(items)) return true;
   return TryParseClassOrVerification(items);
 }
 

@@ -55,6 +55,20 @@ static Stmt* FirstInitialStmt(ParseResult9c& r) {
   return nullptr;
 }
 
+static bool HasItemKind(ParseResult9c& r, ModuleItemKind kind) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == kind) return true;
+  }
+  return false;
+}
+
+static ModuleItem* FindItemByKind(ParseResult9c& r, ModuleItemKind kind) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
+}
+
 // =============================================================================
 // LRM section 9.2 -- Structured procedures overview
 // Multiple initial/always procedures coexist within a module.
@@ -85,17 +99,9 @@ TEST(ParserSection9c, MixedProcedureTypes) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  bool has_initial = false;
-  bool has_always = false;
-  bool has_final = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) has_initial = true;
-    if (item->kind == ModuleItemKind::kAlwaysBlock) has_always = true;
-    if (item->kind == ModuleItemKind::kFinalBlock) has_final = true;
-  }
-  EXPECT_TRUE(has_initial);
-  EXPECT_TRUE(has_always);
-  EXPECT_TRUE(has_final);
+  EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kInitialBlock));
+  EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAlwaysBlock));
+  EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kFinalBlock));
 }
 
 // =============================================================================
@@ -215,16 +221,11 @@ TEST(ParserSection9c, FinalBlockWithBeginEnd) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  bool found = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kFinalBlock) {
-      found = true;
-      ASSERT_NE(item->body, nullptr);
-      EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-      EXPECT_GE(item->body->stmts.size(), 2u);
-    }
-  }
-  EXPECT_TRUE(found);
+  auto* final_item = FindItemByKind(r, ModuleItemKind::kFinalBlock);
+  ASSERT_NE(final_item, nullptr);
+  ASSERT_NE(final_item->body, nullptr);
+  EXPECT_EQ(final_item->body->kind, StmtKind::kBlock);
+  EXPECT_GE(final_item->body->stmts.size(), 2u);
 }
 
 TEST(ParserSection9c, MultipleFinalBlocks) {

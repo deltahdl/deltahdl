@@ -40,6 +40,13 @@ static bool ParseOk38(const std::string& src) {
   return !diag.HasErrors();
 }
 
+static ModuleItem* FindItemByKind(ParseResult38& r, ModuleItemKind kind) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
+}
+
 // =============================================================================
 // LRM section 38.36 -- vpi_register_cb: DPI-C imports for VPI callbacks
 // These tests verify that DPI-C import declarations with signatures typical
@@ -87,15 +94,10 @@ TEST(ParserSection38, DpiImportForVpiAccess) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  bool found_dpi = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kDpiImport) {
-      found_dpi = true;
-      EXPECT_EQ(item->name, "set_value");
-      EXPECT_TRUE(item->dpi_is_context);
-    }
-  }
-  EXPECT_TRUE(found_dpi);
+  auto* dpi = FindItemByKind(r, ModuleItemKind::kDpiImport);
+  ASSERT_NE(dpi, nullptr);
+  EXPECT_EQ(dpi->name, "set_value");
+  EXPECT_TRUE(dpi->dpi_is_context);
 }
 
 // LRM section 38.36 -- vpi_register_cb callback function signatures

@@ -65,6 +65,16 @@ static double RunAndGetReal(const std::string& src, const char* var_name) {
   return d;
 }
 
+// Helper: elaborate, lower, and run simulation. Returns true on success.
+static bool RunSim(SimCh5cFixture& f, const std::string& src) {
+  auto* design = ElaborateSrc(src, f);
+  if (!design) return false;
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  return true;
+}
+
 // ===========================================================================
 // §5.7 Numbers — simulation-level tests
 //
@@ -177,35 +187,22 @@ TEST(SimCh5c, NumberRealScientific) {
 TEST(SimCh5c, NumberAllIntegralBases) {
   // §5.7 + Syntax 5-2: decimal, hex, octal, binary all work as number.
   SimCh5cFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, c, d;\n"
-      "  initial begin\n"
-      "    a = 255;\n"
-      "    b = 8'hFF;\n"
-      "    c = 8'o377;\n"
-      "    d = 8'b1111_1111;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  EXPECT_NE(design, nullptr);
-  if (!design) return;
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  auto* vc = f.ctx.FindVariable("c");
-  auto* vd = f.ctx.FindVariable("d");
-  EXPECT_NE(va, nullptr);
-  EXPECT_NE(vb, nullptr);
-  EXPECT_NE(vc, nullptr);
-  EXPECT_NE(vd, nullptr);
-  if (!va || !vb || !vc || !vd) return;
-  EXPECT_EQ(va->value.ToUint64(), 255u);
-  EXPECT_EQ(vb->value.ToUint64(), 255u);
-  EXPECT_EQ(vc->value.ToUint64(), 255u);
-  EXPECT_EQ(vd->value.ToUint64(), 255u);
+  ASSERT_TRUE(RunSim(f,
+                     "module t;\n"
+                     "  logic [7:0] a, b, c, d;\n"
+                     "  initial begin\n"
+                     "    a = 255;\n"
+                     "    b = 8'hFF;\n"
+                     "    c = 8'o377;\n"
+                     "    d = 8'b1111_1111;\n"
+                     "  end\n"
+                     "endmodule\n"));
+  const char* const kNames[] = {"a", "b", "c", "d"};
+  for (const char* name : kNames) {
+    auto* v = f.ctx.FindVariable(name);
+    ASSERT_NE(v, nullptr) << name;
+    EXPECT_EQ(v->value.ToUint64(), 255u) << name;
+  }
 }
 
 // ---------------------------------------------------------------------------

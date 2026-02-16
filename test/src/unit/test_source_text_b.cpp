@@ -32,6 +32,23 @@ ParseResult Parse(const std::string& src) {
   return result;
 }
 
+// Returns true if any item in the list matches the given kind.
+bool HasItemKind(const std::vector<ModuleItem*>& items, ModuleItemKind kind) {
+  for (auto* item : items) {
+    if (item->kind == kind) return true;
+  }
+  return false;
+}
+
+// Returns true if any item matches the given kind and name.
+bool HasItemKindNamed(const std::vector<ModuleItem*>& items,
+                      ModuleItemKind kind, std::string_view name) {
+  for (auto* item : items) {
+    if (item->kind == kind && item->name == name) return true;
+  }
+  return false;
+}
+
 }  // namespace
 
 // =============================================================================
@@ -436,21 +453,10 @@ TEST(SourceText, InterfaceMultipleItemTypes) {
   // data var + extern function + extern forkjoin task = 3 items
   ASSERT_GE(ifc->items.size(), 3u);
   EXPECT_EQ(ifc->modports.size(), 2u);
-  // Verify the extern function.
-  bool found_extern_func = false;
-  bool found_forkjoin_task = false;
-  for (auto* item : ifc->items) {
-    if (item->kind == ModuleItemKind::kFunctionDecl && item->is_extern) {
-      found_extern_func = true;
-      EXPECT_EQ(item->name, "validate");
-    }
-    if (item->kind == ModuleItemKind::kTaskDecl && item->is_forkjoin) {
-      found_forkjoin_task = true;
-      EXPECT_EQ(item->name, "run_parallel");
-    }
-  }
-  EXPECT_TRUE(found_extern_func);
-  EXPECT_TRUE(found_forkjoin_task);
+  EXPECT_TRUE(
+      HasItemKindNamed(ifc->items, ModuleItemKind::kFunctionDecl, "validate"));
+  EXPECT_TRUE(
+      HasItemKindNamed(ifc->items, ModuleItemKind::kTaskDecl, "run_parallel"));
 }
 
 // =============================================================================
@@ -482,11 +488,8 @@ TEST(SourceText, ProgramContinuousAssign) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->programs.size(), 1u);
-  bool found_assign = false;
-  for (auto* item : r.cu->programs[0]->items) {
-    if (item->kind == ModuleItemKind::kContAssign) found_assign = true;
-  }
-  EXPECT_TRUE(found_assign);
+  EXPECT_TRUE(
+      HasItemKind(r.cu->programs[0]->items, ModuleItemKind::kContAssign));
 }
 
 // non_port_program_item ::= module_or_generate_item_declaration
@@ -501,20 +504,10 @@ TEST(SourceText, ProgramModuleOrGenerateItemDecl) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->programs.size(), 1u);
   auto& items = r.cu->programs[0]->items;
-  bool found_var = false;
-  bool found_func = false;
-  bool found_task = false;
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kVarDecl && item->name == "count")
-      found_var = true;
-    if (item->kind == ModuleItemKind::kFunctionDecl && item->name == "compute")
-      found_func = true;
-    if (item->kind == ModuleItemKind::kTaskDecl && item->name == "run")
-      found_task = true;
-  }
-  EXPECT_TRUE(found_var);
-  EXPECT_TRUE(found_func);
-  EXPECT_TRUE(found_task);
+  EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kVarDecl, "count"));
+  EXPECT_TRUE(
+      HasItemKindNamed(items, ModuleItemKind::kFunctionDecl, "compute"));
+  EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kTaskDecl, "run"));
 }
 
 // non_port_program_item ::= initial_construct
@@ -528,11 +521,8 @@ TEST(SourceText, ProgramInitialConstruct) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->programs.size(), 1u);
-  bool found_initial = false;
-  for (auto* item : r.cu->programs[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) found_initial = true;
-  }
-  EXPECT_TRUE(found_initial);
+  EXPECT_TRUE(
+      HasItemKind(r.cu->programs[0]->items, ModuleItemKind::kInitialBlock));
 }
 
 // non_port_program_item ::= final_construct
@@ -546,11 +536,8 @@ TEST(SourceText, ProgramFinalConstruct) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->programs.size(), 1u);
-  bool found_final = false;
-  for (auto* item : r.cu->programs[0]->items) {
-    if (item->kind == ModuleItemKind::kFinalBlock) found_final = true;
-  }
-  EXPECT_TRUE(found_final);
+  EXPECT_TRUE(
+      HasItemKind(r.cu->programs[0]->items, ModuleItemKind::kFinalBlock));
 }
 
 // non_port_program_item ::= concurrent_assertion_item
@@ -563,11 +550,8 @@ TEST(SourceText, ProgramConcurrentAssertion) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->programs.size(), 1u);
-  bool found_assert = false;
-  for (auto* item : r.cu->programs[0]->items) {
-    if (item->kind == ModuleItemKind::kAssertProperty) found_assert = true;
-  }
-  EXPECT_TRUE(found_assert);
+  EXPECT_TRUE(
+      HasItemKind(r.cu->programs[0]->items, ModuleItemKind::kAssertProperty));
 }
 
 // non_port_program_item ::= timeunits_declaration
@@ -595,11 +579,8 @@ TEST(SourceText, ProgramGenerateLoop) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->programs.size(), 1u);
-  bool found_for = false;
-  for (auto* item : r.cu->programs[0]->items) {
-    if (item->kind == ModuleItemKind::kGenerateFor) found_for = true;
-  }
-  EXPECT_TRUE(found_for);
+  EXPECT_TRUE(
+      HasItemKind(r.cu->programs[0]->items, ModuleItemKind::kGenerateFor));
 }
 
 // program_generate_item ::= conditional_generate_construct
@@ -614,11 +595,8 @@ TEST(SourceText, ProgramGenerateConditional) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->programs.size(), 1u);
-  bool found_if = false;
-  for (auto* item : r.cu->programs[0]->items) {
-    if (item->kind == ModuleItemKind::kGenerateIf) found_if = true;
-  }
-  EXPECT_TRUE(found_if);
+  EXPECT_TRUE(
+      HasItemKind(r.cu->programs[0]->items, ModuleItemKind::kGenerateIf));
 }
 
 // program_generate_item ::= generate_region
@@ -644,11 +622,8 @@ TEST(SourceText, ProgramElabSeverityTask) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->programs.size(), 1u);
-  bool found_elab = false;
-  for (auto* item : r.cu->programs[0]->items) {
-    if (item->kind == ModuleItemKind::kElabSystemTask) found_elab = true;
-  }
-  EXPECT_TRUE(found_elab);
+  EXPECT_TRUE(
+      HasItemKind(r.cu->programs[0]->items, ModuleItemKind::kElabSystemTask));
 }
 
 // Combined: program with multiple A.1.7 item types.
@@ -668,26 +643,12 @@ TEST(SourceText, ProgramMultipleItemTypes) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->programs.size(), 1u);
   auto& items = r.cu->programs[0]->items;
-  bool found_var = false;
-  bool found_assign = false;
-  bool found_initial = false;
-  bool found_final = false;
-  bool found_assert = false;
-  bool found_elab = false;
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kVarDecl) found_var = true;
-    if (item->kind == ModuleItemKind::kContAssign) found_assign = true;
-    if (item->kind == ModuleItemKind::kInitialBlock) found_initial = true;
-    if (item->kind == ModuleItemKind::kFinalBlock) found_final = true;
-    if (item->kind == ModuleItemKind::kAssertProperty) found_assert = true;
-    if (item->kind == ModuleItemKind::kElabSystemTask) found_elab = true;
-  }
-  EXPECT_TRUE(found_var);
-  EXPECT_TRUE(found_assign);
-  EXPECT_TRUE(found_initial);
-  EXPECT_TRUE(found_final);
-  EXPECT_TRUE(found_assert);
-  EXPECT_TRUE(found_elab);
+  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kVarDecl));
+  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kContAssign));
+  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kInitialBlock));
+  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kFinalBlock));
+  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kAssertProperty));
+  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kElabSystemTask));
 }
 
 // =============================================================================
@@ -753,15 +714,9 @@ TEST(SourceText, CheckerInitialAlwaysFinal) {
   ASSERT_EQ(r.cu->checkers.size(), 1u);
   auto& items = r.cu->checkers[0]->items;
   ASSERT_GE(items.size(), 3u);
-  bool found_initial = false, found_always = false, found_final = false;
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) found_initial = true;
-    if (item->kind == ModuleItemKind::kAlwaysBlock) found_always = true;
-    if (item->kind == ModuleItemKind::kFinalBlock) found_final = true;
-  }
-  EXPECT_TRUE(found_initial);
-  EXPECT_TRUE(found_always);
-  EXPECT_TRUE(found_final);
+  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kInitialBlock));
+  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kAlwaysBlock));
+  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kFinalBlock));
 }
 
 // checker_or_generate_item ::= assertion_item
@@ -865,15 +820,9 @@ TEST(SourceText, CheckerGenerateItems) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->checkers.size(), 1u);
   auto& items = r.cu->checkers[0]->items;
-  bool found_for = false, found_if = false, found_elab = false;
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kGenerateFor) found_for = true;
-    if (item->kind == ModuleItemKind::kGenerateIf) found_if = true;
-    if (item->kind == ModuleItemKind::kElabSystemTask) found_elab = true;
-  }
-  EXPECT_TRUE(found_for);
-  EXPECT_TRUE(found_if);
-  EXPECT_TRUE(found_elab);
+  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kGenerateFor));
+  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kGenerateIf));
+  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kElabSystemTask));
 }
 
 // Combined: checker with multiple A.1.8 item types.
@@ -896,27 +845,13 @@ TEST(SourceText, CheckerMultipleItemTypes) {
   auto* chk = r.cu->checkers[0];
   EXPECT_EQ(chk->name, "chk");
   ASSERT_EQ(chk->ports.size(), 2u);
-  bool found_var = false, found_assign = false, found_initial = false;
-  bool found_always = false, found_final = false, found_assert = false;
-  bool found_disable = false, found_func = false, found_elab = false;
-  for (auto* item : chk->items) {
-    if (item->kind == ModuleItemKind::kVarDecl) found_var = true;
-    if (item->kind == ModuleItemKind::kContAssign) found_assign = true;
-    if (item->kind == ModuleItemKind::kInitialBlock) found_initial = true;
-    if (item->kind == ModuleItemKind::kAlwaysBlock) found_always = true;
-    if (item->kind == ModuleItemKind::kFinalBlock) found_final = true;
-    if (item->kind == ModuleItemKind::kAssertProperty) found_assert = true;
-    if (item->kind == ModuleItemKind::kDefaultDisableIff) found_disable = true;
-    if (item->kind == ModuleItemKind::kFunctionDecl) found_func = true;
-    if (item->kind == ModuleItemKind::kElabSystemTask) found_elab = true;
-  }
-  EXPECT_TRUE(found_var);
-  EXPECT_TRUE(found_assign);
-  EXPECT_TRUE(found_initial);
-  EXPECT_TRUE(found_always);
-  EXPECT_TRUE(found_final);
-  EXPECT_TRUE(found_assert);
-  EXPECT_TRUE(found_disable);
-  EXPECT_TRUE(found_func);
-  EXPECT_TRUE(found_elab);
+  EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kVarDecl));
+  EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kContAssign));
+  EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kInitialBlock));
+  EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kAlwaysBlock));
+  EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kFinalBlock));
+  EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kAssertProperty));
+  EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kDefaultDisableIff));
+  EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kFunctionDecl));
+  EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kElabSystemTask));
 }

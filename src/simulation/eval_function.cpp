@@ -709,23 +709,25 @@ static Logic4Vec EvalLetExpansion(ModuleItem* decl, const Expr* call,
   return result;
 }
 
+// Try dispatching to method calls (builtin, class, parameterized scope)
+// or let expansion. Returns true if the call was handled.
+static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
+                                   Arena& arena, Logic4Vec& out) {
+  if (TryBuiltinMethodCall(expr, ctx, arena, out)) return true;
+  if (TryEvalClassMethodCall(expr, ctx, arena, out)) return true;
+  if (TryEvalParameterizedScopeCall(expr, ctx, arena, out)) return true;
+  auto* let_decl = ctx.FindLetDecl(expr->callee);
+  if (let_decl) {
+    out = EvalLetExpansion(let_decl, expr, ctx, arena);
+    return true;
+  }
+  return false;
+}
+
 // §13: Dispatch function calls with lifetime and void support.
 Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
-  Logic4Vec method_result;
-  if (TryBuiltinMethodCall(expr, ctx, arena, method_result)) {
-    return method_result;
-  }
-  if (TryEvalClassMethodCall(expr, ctx, arena, method_result)) {
-    return method_result;
-  }
-  // §13.8: Parameterized class scope call — C#(N)::method(args).
-  if (TryEvalParameterizedScopeCall(expr, ctx, arena, method_result)) {
-    return method_result;
-  }
-
-  // §11.12: Try let expansion before function lookup.
-  auto* let_decl = ctx.FindLetDecl(expr->callee);
-  if (let_decl) return EvalLetExpansion(let_decl, expr, ctx, arena);
+  Logic4Vec result;
+  if (TryDispatchMethodOrLet(expr, ctx, arena, result)) return result;
 
   auto* func = ctx.FindFunction(expr->callee);
   if (!func) return EvalDpiCall(expr, ctx, arena);
@@ -755,7 +757,7 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   ExecFunctionBody(func, ret_var, ctx, arena);
   WritebackOutputArgs(func, expr, ctx);
   WritebackQueueRefs(ctx);
-  auto result = is_void ? MakeLogic4VecVal(arena, 1, 0) : ret_var->value;
+  result = is_void ? MakeLogic4VecVal(arena, 1, 0) : ret_var->value;
 
   if (is_static) {
     ctx.PopStaticScope(func->name);

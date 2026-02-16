@@ -767,6 +767,45 @@ TEST(ParserSection28, GateArrayWithDelay) {
 }
 
 // =============================================================
+// Specify block and timing check helpers
+// =============================================================
+
+// Finds the first kSpecifyBlock item in a module's items.
+static ModuleItem* FindSpecifyBlock(const std::vector<ModuleItem*>& items) {
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
+  }
+  return nullptr;
+}
+
+// Finds the first timing check SpecifyItem inside a specify block.
+static SpecifyItem* FindTimingCheck(ModuleItem* spec_block) {
+  for (auto* si : spec_block->specify_items) {
+    if (si->kind == SpecifyItemKind::kTimingCheck) return si;
+  }
+  return nullptr;
+}
+
+// Returns true if any specify item matches the given kind.
+static bool HasSpecifyItemKind(ModuleItem* spec_block, SpecifyItemKind kind) {
+  for (auto* si : spec_block->specify_items) {
+    if (si->kind == kind) return true;
+  }
+  return false;
+}
+
+// Returns true if a full-path decl exists in the specify block.
+static bool HasFullPathDecl(ModuleItem* spec_block) {
+  for (auto* si : spec_block->specify_items) {
+    if (si->kind == SpecifyItemKind::kPathDecl &&
+        si->path.path_kind == SpecifyPathKind::kFull) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// =============================================================
 // Section 28.12: Specify blocks
 // =============================================================
 
@@ -778,18 +817,11 @@ TEST(ParserSection28, SpecifyBlockSimplePath) {
       "  endspecify\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  bool found_spec = false;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kSpecifyBlock) {
-      found_spec = true;
-      ASSERT_GE(item->specify_items.size(), 1u);
-      EXPECT_EQ(item->specify_items[0]->kind, SpecifyItemKind::kPathDecl);
-      EXPECT_EQ(item->specify_items[0]->path.path_kind,
-                SpecifyPathKind::kParallel);
-    }
-  }
-  EXPECT_TRUE(found_spec);
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  ASSERT_NE(spec, nullptr);
+  ASSERT_GE(spec->specify_items.size(), 1u);
+  EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kPathDecl);
+  EXPECT_EQ(spec->specify_items[0]->path.path_kind, SpecifyPathKind::kParallel);
 }
 
 TEST(ParserSection28, SpecifyBlockFullPath) {
@@ -800,19 +832,9 @@ TEST(ParserSection28, SpecifyBlockFullPath) {
       "  endspecify\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  bool found_full = false;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kSpecifyBlock) {
-      for (auto* si : item->specify_items) {
-        if (si->kind == SpecifyItemKind::kPathDecl &&
-            si->path.path_kind == SpecifyPathKind::kFull) {
-          found_full = true;
-        }
-      }
-    }
-  }
-  EXPECT_TRUE(found_full);
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  ASSERT_NE(spec, nullptr);
+  EXPECT_TRUE(HasFullPathDecl(spec));
 }
 
 TEST(ParserSection28, SpecifyBlockWithSpecparam) {
@@ -824,19 +846,10 @@ TEST(ParserSection28, SpecifyBlockWithSpecparam) {
       "  endspecify\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  bool found_specparam = false;
-  bool found_path = false;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kSpecifyBlock) {
-      for (auto* si : item->specify_items) {
-        if (si->kind == SpecifyItemKind::kSpecparam) found_specparam = true;
-        if (si->kind == SpecifyItemKind::kPathDecl) found_path = true;
-      }
-    }
-  }
-  EXPECT_TRUE(found_specparam);
-  EXPECT_TRUE(found_path);
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  ASSERT_NE(spec, nullptr);
+  EXPECT_TRUE(HasSpecifyItemKind(spec, SpecifyItemKind::kSpecparam));
+  EXPECT_TRUE(HasSpecifyItemKind(spec, SpecifyItemKind::kPathDecl));
 }
 
 // =============================================================
@@ -851,21 +864,14 @@ TEST(ParserSection28, TimingCheckSetup) {
       "  endspecify\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  bool found_tc = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kSpecifyBlock) {
-      for (auto* si : item->specify_items) {
-        if (si->kind == SpecifyItemKind::kTimingCheck) {
-          found_tc = true;
-          EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kSetup);
-          EXPECT_EQ(si->timing_check.ref_signal, "d");
-          EXPECT_EQ(si->timing_check.data_edge, SpecifyEdge::kPosedge);
-          EXPECT_EQ(si->timing_check.data_signal, "clk");
-        }
-      }
-    }
-  }
-  EXPECT_TRUE(found_tc);
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  ASSERT_NE(spec, nullptr);
+  auto* tc = FindTimingCheck(spec);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->timing_check.check_kind, TimingCheckKind::kSetup);
+  EXPECT_EQ(tc->timing_check.ref_signal, "d");
+  EXPECT_EQ(tc->timing_check.data_edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(tc->timing_check.data_signal, "clk");
 }
 
 TEST(ParserSection28, TimingCheckHold) {
@@ -876,20 +882,13 @@ TEST(ParserSection28, TimingCheckHold) {
       "  endspecify\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  bool found_tc = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kSpecifyBlock) {
-      for (auto* si : item->specify_items) {
-        if (si->kind == SpecifyItemKind::kTimingCheck) {
-          found_tc = true;
-          EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kHold);
-          EXPECT_EQ(si->timing_check.ref_edge, SpecifyEdge::kPosedge);
-          EXPECT_EQ(si->timing_check.ref_signal, "clk");
-        }
-      }
-    }
-  }
-  EXPECT_TRUE(found_tc);
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  ASSERT_NE(spec, nullptr);
+  auto* tc = FindTimingCheck(spec);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->timing_check.check_kind, TimingCheckKind::kHold);
+  EXPECT_EQ(tc->timing_check.ref_edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(tc->timing_check.ref_signal, "clk");
 }
 
 // =============================================================
@@ -905,19 +904,12 @@ TEST(ParserSection28, TimingCheckSetupWithNotifier) {
       "  endspecify\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  bool found_tc = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kSpecifyBlock) {
-      for (auto* si : item->specify_items) {
-        if (si->kind == SpecifyItemKind::kTimingCheck) {
-          found_tc = true;
-          EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kSetup);
-          EXPECT_EQ(si->timing_check.notifier, "notif");
-        }
-      }
-    }
-  }
-  EXPECT_TRUE(found_tc);
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  ASSERT_NE(spec, nullptr);
+  auto* tc = FindTimingCheck(spec);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->timing_check.check_kind, TimingCheckKind::kSetup);
+  EXPECT_EQ(tc->timing_check.notifier, "notif");
 }
 
 TEST(ParserSection28, TimingCheckWidth) {
@@ -928,20 +920,13 @@ TEST(ParserSection28, TimingCheckWidth) {
       "  endspecify\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  bool found_tc = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kSpecifyBlock) {
-      for (auto* si : item->specify_items) {
-        if (si->kind == SpecifyItemKind::kTimingCheck) {
-          found_tc = true;
-          EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kWidth);
-          EXPECT_EQ(si->timing_check.ref_edge, SpecifyEdge::kPosedge);
-          EXPECT_EQ(si->timing_check.ref_signal, "clk");
-        }
-      }
-    }
-  }
-  EXPECT_TRUE(found_tc);
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  ASSERT_NE(spec, nullptr);
+  auto* tc = FindTimingCheck(spec);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->timing_check.check_kind, TimingCheckKind::kWidth);
+  EXPECT_EQ(tc->timing_check.ref_edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(tc->timing_check.ref_signal, "clk");
 }
 
 // =============================================================

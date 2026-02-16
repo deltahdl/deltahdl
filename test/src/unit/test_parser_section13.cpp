@@ -48,6 +48,13 @@ static Stmt* FirstInitialStmt(ParseResult& r) {
   return nullptr;
 }
 
+static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
+}
+
 // =============================================================================
 // LRM section 13.5.3 -- Default argument values
 // =============================================================================
@@ -798,16 +805,10 @@ TEST(ParserSection13, FunctionCallInContAssign) {
       "  assign result = add(x, y);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  bool found_assign = false;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kContAssign) {
-      found_assign = true;
-      ASSERT_NE(item->assign_rhs, nullptr);
-      EXPECT_EQ(item->assign_rhs->kind, ExprKind::kCall);
-    }
-  }
-  EXPECT_TRUE(found_assign);
+  auto* assign = FindItemByKind(r, ModuleItemKind::kContAssign);
+  ASSERT_NE(assign, nullptr);
+  ASSERT_NE(assign->assign_rhs, nullptr);
+  EXPECT_EQ(assign->assign_rhs->kind, ExprKind::kCall);
 }
 
 // Function call as part of a binary expression.

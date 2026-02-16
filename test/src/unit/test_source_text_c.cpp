@@ -116,9 +116,10 @@ TEST(SourceText, ClassPureVirtualAndExtern) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
   auto& members = r.cu->classes[0]->members;
   ASSERT_EQ(members.size(), 4u);
-  for (auto* m : members) {
-    EXPECT_EQ(m->kind, ClassMemberKind::kMethod);
-  }
+  EXPECT_EQ(members[0]->kind, ClassMemberKind::kMethod);
+  EXPECT_EQ(members[1]->kind, ClassMemberKind::kMethod);
+  EXPECT_EQ(members[2]->kind, ClassMemberKind::kMethod);
+  EXPECT_EQ(members[3]->kind, ClassMemberKind::kMethod);
   EXPECT_TRUE(members[0]->is_virtual);
   EXPECT_TRUE(members[1]->is_virtual);
   EXPECT_EQ(members[2]->method->name, "ext_fn");

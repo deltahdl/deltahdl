@@ -37,6 +37,13 @@ static bool ParseOk(const std::string& src) {
   return !diag.HasErrors();
 }
 
+static ModuleItem* FindItemByKind(ParseResult3& r, ModuleItemKind kind) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
+}
+
 // =============================================================================
 // LRM section 3.2 -- Design elements
 // =============================================================================
@@ -610,16 +617,10 @@ TEST(ParserSection3, ModuleInstantiationHierarchy) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto* mod = r.cu->modules[0];
-  bool found_inst = false;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kModuleInst) {
-      found_inst = true;
-      EXPECT_EQ(item->inst_module, "mux2to1");
-      EXPECT_EQ(item->inst_name, "m1");
-    }
-  }
-  EXPECT_TRUE(found_inst);
+  auto* inst = FindItemByKind(r, ModuleItemKind::kModuleInst);
+  ASSERT_NE(inst, nullptr);
+  EXPECT_EQ(inst->inst_module, "mux2to1");
+  EXPECT_EQ(inst->inst_name, "m1");
 }
 
 // --- Compilation unit scope items ---

@@ -569,36 +569,35 @@ bool Parser::ParseClassQualifiers(ClassMember* m) {
   return proto;
 }
 
-void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
-  auto* member = arena_.Create<ClassMember>();
-  member->loc = CurrentLoc();
-  bool proto = ParseClassQualifiers(member);
-
+// Parse keyword-introduced class members (methods, constraints, typedefs,
+// parameters, nested classes, covergroups). Returns true if handled.
+bool Parser::TryParseKeywordClassMember(std::vector<ClassMember*>& members,
+                                        ClassMember* member, bool proto) {
   if (Check(TokenKind::kKwFunction)) {
     member->kind = ClassMemberKind::kMethod;
     member->method = ParseFunctionDecl(proto);
     // §13.8: Propagate static qualifier to the method's ModuleItem.
     if (member->is_static) member->method->is_static = true;
     members.push_back(member);
-    return;
+    return true;
   }
   if (Check(TokenKind::kKwTask)) {
     member->kind = ClassMemberKind::kMethod;
     member->method = ParseTaskDecl(proto);
     if (member->is_static) member->method->is_static = true;
     members.push_back(member);
-    return;
+    return true;
   }
   if (Check(TokenKind::kKwConstraint)) {
     members.push_back(ParseConstraintStub(member));
-    return;
+    return true;
   }
   if (Check(TokenKind::kKwTypedef)) {
     member->kind = ClassMemberKind::kTypedef;
     member->typedef_item = ParseTypedef();
     member->name = member->typedef_item->name;
     members.push_back(member);
-    return;
+    return true;
   }
   if (Check(TokenKind::kKwParameter) || Check(TokenKind::kKwLocalparam)) {
     std::vector<ModuleItem*> param_items;
@@ -609,7 +608,7 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
       m->name = param_items[i]->name;
       members.push_back(m);
     }
-    return;
+    return true;
   }
   // class_item: class_declaration | interface_class_declaration (A.1.9)
   if (IsAtClassDecl()) {
@@ -617,7 +616,7 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
     member->nested_class = ParseClassDecl();
     member->name = member->nested_class->name;
     members.push_back(member);
-    return;
+    return true;
   }
   // class_item: covergroup_declaration (A.1.9)
   if (Check(TokenKind::kKwCovergroup)) {
@@ -626,8 +625,17 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
     ParseCovergroupDecl(temp);
     if (!temp.empty()) member->name = temp[0]->name;
     members.push_back(member);
-    return;
+    return true;
   }
+  return false;
+}
+
+void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
+  auto* member = arena_.Create<ClassMember>();
+  member->loc = CurrentLoc();
+  bool proto = ParseClassQualifiers(member);
+
+  if (TryParseKeywordClassMember(members, member, proto)) return;
 
   // Property: type name [= expr] {, name [= expr]} ;
   DataType dtype = ParseDataType();

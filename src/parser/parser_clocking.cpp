@@ -58,6 +58,13 @@ ModuleItem* Parser::ParseClockingDecl() {
     item->name = Consume().text;
   }
 
+  // §14.3: "default clocking clocking_identifier ;" reference form.
+  if (item->is_default_clocking && !item->name.empty() &&
+      Check(TokenKind::kSemicolon)) {
+    Consume();  // ;
+    return item;
+  }
+
   // clocking_event: @identifier or @(event_expression).
   Expect(TokenKind::kAt);
   if (Check(TokenKind::kLParen)) {

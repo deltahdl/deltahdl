@@ -422,7 +422,7 @@ TEST(ParserSection27, GenerateForPreDecrement) {
 // =============================================================================
 
 // §27.1: Generate-for with module instantiation (structural repetition).
-TEST(ParserSection27, GenerateForWithModuleInst) {
+TEST(ParserSection27, GenerateForWithModuleInst2) {
   auto r = Parse(
       "module m;\n"
       "  for (genvar i = 0; i < 4; i++) begin : gen_inst\n"

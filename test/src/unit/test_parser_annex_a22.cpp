@@ -791,13 +791,13 @@ TEST(ParserA222, Strength0AllKeywords) {
   const struct {
     const char* keyword;
     uint8_t expected;
-  } cases[] = {
+  } kCases[] = {
       {"supply0", 5},
       {"strong0", 4},
       {"pull0", 3},
       {"weak0", 2},
   };
-  for (const auto& c : cases) {
+  for (const auto& c : kCases) {
     auto src = std::string("module m;\n  wire (") + c.keyword +
                ", strong1) w;\nendmodule";
     auto r = Parse(src);
@@ -816,13 +816,13 @@ TEST(ParserA222, Strength1AllKeywords) {
   const struct {
     const char* keyword;
     uint8_t expected;
-  } cases[] = {
+  } kCases[] = {
       {"supply1", 5},
       {"strong1", 4},
       {"pull1", 3},
       {"weak1", 2},
   };
-  for (const auto& c : cases) {
+  for (const auto& c : kCases) {
     auto src = std::string("module m;\n  wire (strong0, ") + c.keyword +
                ") w;\nendmodule";
     auto r = Parse(src);

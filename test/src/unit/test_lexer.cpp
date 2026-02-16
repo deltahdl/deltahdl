@@ -73,26 +73,23 @@ TEST(Lexer, LexicalToken_FreeFormatTokenText) {
   EXPECT_EQ(ct, st);
 }
 
+static bool HasTokenKind(const std::vector<Token>& tokens, TokenKind kind) {
+  for (const auto& t : tokens) {
+    if (t.kind == kind) return true;
+  }
+  return false;
+}
+
 TEST(Lexer, LexicalToken_AllSevenCategories) {
   // §5.2: Token types — White space, Comment, Operator, Number, String
   // literal, Identifier, Keyword. White space and comments are consumed by the
   // lexer (not emitted as tokens). Verify the remaining 5 emitted categories.
   auto tokens = Lex("module /* comment */ x ; x = 42 + \"hello\" ; endmodule");
-  bool has_keyword = false, has_id = false, has_op = false;
-  bool has_number = false, has_string = false;
-  for (auto& t : tokens) {
-    if (t.kind == TokenKind::kKwModule || t.kind == TokenKind::kKwEndmodule)
-      has_keyword = true;
-    if (t.kind == TokenKind::kIdentifier) has_id = true;
-    if (t.kind == TokenKind::kPlus || t.kind == TokenKind::kEq) has_op = true;
-    if (t.kind == TokenKind::kIntLiteral) has_number = true;
-    if (t.kind == TokenKind::kStringLiteral) has_string = true;
-  }
-  EXPECT_TRUE(has_keyword);
-  EXPECT_TRUE(has_id);
-  EXPECT_TRUE(has_op);
-  EXPECT_TRUE(has_number);
-  EXPECT_TRUE(has_string);
+  EXPECT_TRUE(HasTokenKind(tokens, TokenKind::kKwModule));
+  EXPECT_TRUE(HasTokenKind(tokens, TokenKind::kIdentifier));
+  EXPECT_TRUE(HasTokenKind(tokens, TokenKind::kPlus));
+  EXPECT_TRUE(HasTokenKind(tokens, TokenKind::kIntLiteral));
+  EXPECT_TRUE(HasTokenKind(tokens, TokenKind::kStringLiteral));
 }
 
 TEST(Lexer, LexicalToken_EscapedIdentifierException) {

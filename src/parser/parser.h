@@ -18,6 +18,8 @@ class Parser {
 
  private:
   void ParseTopLevel(CompilationUnit* unit);
+  bool TryParsePrimaryTopLevel(CompilationUnit* unit);
+  bool TryParseAnonymousProgram();
   void ParseExternTopLevel(CompilationUnit* unit);
   bool TryParseSecondaryTopLevel(CompilationUnit* unit);
   void ParseOutOfBlockConstraint(CompilationUnit* unit);
@@ -26,6 +28,7 @@ class Parser {
   ModuleDecl* ParseModuleDecl();
   ModuleDecl* ParseExternModuleDecl();
   PackageDecl* ParsePackageDecl();
+  bool TryParsePackageBodyItem(std::vector<ModuleItem*>& items);
   void ParseImportDecl(std::vector<ModuleItem*>& items);
   ModuleItem* ParseImportItem();
   void ParseExportDecl(std::vector<ModuleItem*>& items);
@@ -42,6 +45,8 @@ class Parser {
   bool TryParseTypeRef(std::vector<ModuleItem*>& items);
   bool TryParseProcessBlock(std::vector<ModuleItem*>& items);
   bool TryParseKeywordItem(std::vector<ModuleItem*>& items);
+  bool TryParseDeclKeywordItem(std::vector<ModuleItem*>& items);
+  bool TryParseMiscKeywordItem(std::vector<ModuleItem*>& items);
   bool TryParseNonPortItem(std::vector<ModuleItem*>& items);
   bool TryParseClassOrVerification(std::vector<ModuleItem*>& items);
   bool TryParseVerificationItem(std::vector<ModuleItem*>& items);
@@ -71,6 +76,8 @@ class Parser {
   ClassDecl* ParseClassDecl();
   void ParseClassExtendsClause(ClassDecl* decl);
   void ParseClassMembers(std::vector<ClassMember*>& members);
+  bool TryParseKeywordClassMember(std::vector<ClassMember*>& members,
+                                  ClassMember* member, bool proto);
   bool ParseClassQualifiers(ClassMember* member);
   void ParseExtraPropertyDecls(std::vector<ClassMember*>& members,
                                const ClassMember* first, const DataType& dtype);

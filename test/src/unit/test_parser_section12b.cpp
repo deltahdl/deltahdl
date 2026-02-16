@@ -35,6 +35,14 @@ static bool ParseOk(const std::string& src) {
   return !diag.HasErrors();
 }
 
+static ModuleItem* FindFunc12b(ParseResult12b& r, std::string_view name) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kFunctionDecl && item->name == name)
+      return item;
+  }
+  return nullptr;
+}
+
 static Stmt* FirstInitialStmt(ParseResult12b& r) {
   for (auto* item : r.cu->modules[0]->items) {
     if (item->kind != ModuleItemKind::kInitialBlock) continue;
@@ -476,6 +484,16 @@ TEST(ParserSection12, ForWithBlockBody) {
 // LRM section 12.8 -- Jump statements (additional cases)
 // =============================================================================
 
+static Stmt* FindReturnStmt(ParseResult12b& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kFunctionDecl) continue;
+    for (auto* s : item->func_body_stmts) {
+      if (s->kind == StmtKind::kReturn) return s;
+    }
+  }
+  return nullptr;
+}
+
 // Return with complex expression.
 TEST(ParserSection12, ReturnWithComplexExpr) {
   auto r = Parse(
@@ -485,14 +503,7 @@ TEST(ParserSection12, ReturnWithComplexExpr) {
       "  endfunction\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  Stmt* ret = nullptr;
-  for (auto* item : mod->items) {
-    if (item->kind != ModuleItemKind::kFunctionDecl) continue;
-    for (auto* s : item->func_body_stmts) {
-      if (s->kind == StmtKind::kReturn) ret = s;
-    }
-  }
+  auto* ret = FindReturnStmt(r);
   ASSERT_NE(ret, nullptr);
   EXPECT_EQ(ret->kind, StmtKind::kReturn);
   ASSERT_NE(ret->expr, nullptr);
@@ -601,13 +612,7 @@ TEST(ParserSection12, ReturnFromVoidFunctionEarly) {
       "  endfunction\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ModuleItem* fn = nullptr;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kFunctionDecl && item->name == "check") {
-      fn = item;
-    }
-  }
+  auto* fn = FindFunc12b(r, "check");
   ASSERT_NE(fn, nullptr);
   ASSERT_GE(fn->func_body_stmts.size(), 1u);
   // First statement is an if whose then_branch is a return.

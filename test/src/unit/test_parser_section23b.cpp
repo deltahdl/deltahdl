@@ -35,6 +35,13 @@ static bool ParseOk(const std::string& src) {
   return !diag.HasErrors();
 }
 
+static ModuleItem* FindItemByKind(ParseResult23b& r, ModuleItemKind kind) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
+}
+
 // =========================================================================
 // LRM section 23.1: Module definitions
 // =========================================================================
@@ -533,10 +540,7 @@ TEST(ParserSection23, LoopGenerateForStructure) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  ModuleItem* gen = nullptr;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kGenerateFor) gen = item;
-  }
+  auto* gen = FindItemByKind(r, ModuleItemKind::kGenerateFor);
   ASSERT_NE(gen, nullptr);
   EXPECT_NE(gen->gen_init, nullptr);
   EXPECT_NE(gen->gen_cond, nullptr);
@@ -552,14 +556,9 @@ TEST(ParserSection23, LoopGenerateInlineGenvar) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  bool found = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kGenerateFor) {
-      found = true;
-      EXPECT_NE(item->gen_init, nullptr);
-    }
-  }
-  EXPECT_TRUE(found);
+  auto* gen = FindItemByKind(r, ModuleItemKind::kGenerateFor);
+  ASSERT_NE(gen, nullptr);
+  EXPECT_NE(gen->gen_init, nullptr);
 }
 
 TEST(ParserSection23, LoopGenerateWithModuleInst) {
@@ -571,10 +570,7 @@ TEST(ParserSection23, LoopGenerateWithModuleInst) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  ModuleItem* gen = nullptr;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kGenerateFor) gen = item;
-  }
+  auto* gen = FindItemByKind(r, ModuleItemKind::kGenerateFor);
   ASSERT_NE(gen, nullptr);
   ASSERT_EQ(gen->gen_body.size(), 1);
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kModuleInst);
