@@ -44,6 +44,7 @@ void Parser::ParseParenList(std::vector<Expr*>& out) {
 }
 
 void Parser::ParsePortConnection(ModuleItem* item) {
+  ParseAttributes();  // §5.12: attribute on port connection
   if (Check(TokenKind::kDotStar)) {
     // .* wildcard port connection (§23.3.2.4)
     Consume();
