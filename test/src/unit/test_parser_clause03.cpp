@@ -400,94 +400,202 @@ TEST(ParserSection3, Sec3_3_DesignElementInstantiations) {
 }
 
 // =============================================================================
+// LRM section 3.4 -- Programs
+// =============================================================================
+
+// §3.4: "The program building block is enclosed between the keywords
+//        program...endprogram."
+TEST(ParserSection3, Sec3_4_ProgramEndLabel) {
+  auto r = Parse(
+      "program p;\n"
+      "endprogram : p\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->name, "p");
+}
+
+// §3.4 LRM example (verbatim):
+//   program test (input clk, input [16:1] addr, inout [7:0] data);
+//   initial begin ... end
+//   endprogram
+TEST(ParserSection3, Sec3_4_LrmExample) {
+  auto r = Parse(
+      "program test (input clk, input [16:1] addr, inout [7:0] data);\n"
+      "  initial begin\n"
+      "  end\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->name, "test");
+  ASSERT_EQ(r.cu->programs[0]->ports.size(), 3u);
+  EXPECT_EQ(r.cu->programs[0]->ports[0].name, "clk");
+  EXPECT_EQ(r.cu->programs[0]->ports[1].name, "addr");
+  EXPECT_EQ(r.cu->programs[0]->ports[2].name, "data");
+  EXPECT_EQ(r.cu->programs[0]->ports[2].direction, Direction::kInout);
+  bool has_initial = false;
+  for (const auto* item : r.cu->programs[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) has_initial = true;
+  }
+  EXPECT_TRUE(has_initial);
+}
+
+// §3.4: "A program block can contain data declarations"
+TEST(ParserSection3, Sec3_4_DataDeclarations) {
+  auto r = Parse(
+      "program p;\n"
+      "  logic [7:0] count;\n"
+      "  int status;\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_GE(r.cu->programs[0]->items.size(), 2u);
+}
+
+// §3.4: "A program block can contain ... class definitions"
+TEST(ParserSection3, Sec3_4_ClassDefinition) {
+  auto r = Parse(
+      "program p;\n"
+      "  class my_trans;\n"
+      "    int data;\n"
+      "  endclass\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  bool has_class = false;
+  for (const auto* item : r.cu->programs[0]->items) {
+    if (item->kind == ModuleItemKind::kClassDecl) has_class = true;
+  }
+  EXPECT_TRUE(has_class);
+}
+
+// §3.4: "A program block can contain ... subroutine definitions"
+TEST(ParserSection3, Sec3_4_SubroutineDefinitions) {
+  auto r = Parse(
+      "program p;\n"
+      "  function int get_val;\n"
+      "    return 42;\n"
+      "  endfunction\n"
+      "  task run_test;\n"
+      "  endtask\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  bool has_func = false;
+  bool has_task = false;
+  for (const auto* item : r.cu->programs[0]->items) {
+    if (item->kind == ModuleItemKind::kFunctionDecl) has_func = true;
+    if (item->kind == ModuleItemKind::kTaskDecl) has_task = true;
+  }
+  EXPECT_TRUE(has_func);
+  EXPECT_TRUE(has_task);
+}
+
+// §3.4: "A program block can contain ... one or more initial ... procedures"
+TEST(ParserSection3, Sec3_4_InitialProcedure) {
+  auto r = Parse(
+      "program p;\n"
+      "  initial begin\n"
+      "    $display(\"test\");\n"
+      "  end\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  bool has_initial = false;
+  for (const auto* item : r.cu->programs[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) has_initial = true;
+  }
+  EXPECT_TRUE(has_initial);
+}
+
+// §3.4: "A program block can contain ... final procedures"
+TEST(ParserSection3, Sec3_4_FinalProcedure) {
+  auto r = Parse(
+      "program p;\n"
+      "  final begin\n"
+      "    $display(\"done\");\n"
+      "  end\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  bool has_final = false;
+  for (const auto* item : r.cu->programs[0]->items) {
+    if (item->kind == ModuleItemKind::kFinalBlock) has_final = true;
+  }
+  EXPECT_TRUE(has_final);
+}
+
+// §3.4: "It cannot contain always procedures" — restriction noted.
+// The parser currently accepts this; semantic checking would reject it.
+TEST(ParserSection3, Sec3_4_NoAlwaysProceduresNote) {
+  auto r = Parse(
+      "program p;\n"
+      "  always @(*) begin end\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  // Parser accepts (no syntax error), but LRM §3.4 disallows always in program.
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §3.4: "It creates a scope that encapsulates program-wide data"
+TEST(ParserSection3, Sec3_4_MultiplePrograms) {
+  auto r = Parse(
+      "program p1;\n"
+      "  logic a;\n"
+      "endprogram\n"
+      "program p2;\n"
+      "  logic b;\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 2u);
+  EXPECT_EQ(r.cu->programs[0]->name, "p1");
+  EXPECT_EQ(r.cu->programs[1]->name, "p2");
+}
+
+// =============================================================================
 // LRM section 6.21 -- Scope and lifetime (automatic/static)
 // =============================================================================
 
-TEST(ParserSection3, ModuleLifetimeAutomatic) {
-  // module with automatic lifetime (LRM 23.2.1)
-  auto r = Parse(
-      "module automatic m;\n"
-      "  function int foo(int x);\n"
-      "    return x + 1;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
+TEST(ParserSection3, ModuleLifetimeAutomaticAndStatic) {
+  EXPECT_TRUE(ParseOk("module automatic m; endmodule\n"));
+  EXPECT_TRUE(ParseOk("module static m; endmodule\n"));
 }
 
-TEST(ParserSection3, ModuleLifetimeStatic) {
-  // module with static lifetime
-  auto r = Parse(
-      "module static m;\n"
-      "  function int bar(int x);\n"
-      "    return x * 2;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
-TEST(ParserSection3, FunctionAutomaticLifetime) {
-  // function declared with automatic lifetime (LRM 6.21)
-  auto r = Parse(
+TEST(ParserSection3, FunctionLifetime) {
+  // automatic
+  auto ra = Parse(
       "module m;\n"
-      "  function automatic int add(int a, int b);\n"
-      "    return a + b;\n"
-      "  endfunction\n"
+      "  function automatic int add(int a, int b); return a+b; endfunction\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_TRUE(item->is_automatic);
+  ASSERT_NE(ra.cu, nullptr);
+  EXPECT_FALSE(ra.has_errors);
+  EXPECT_EQ(ra.cu->modules[0]->items[0]->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_TRUE(ra.cu->modules[0]->items[0]->is_automatic);
+  // static
+  auto rs = Parse(
+      "module m;\n"
+      "  function static int mul(int a, int b); return a*b; endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(rs.cu, nullptr);
+  EXPECT_FALSE(rs.has_errors);
+  EXPECT_EQ(rs.cu->modules[0]->items[0]->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_TRUE(rs.cu->modules[0]->items[0]->is_static);
 }
 
-TEST(ParserSection3, FunctionStaticLifetime) {
-  // function declared with static lifetime
-  auto r = Parse(
-      "module m;\n"
-      "  function static int mul(int a, int b);\n"
-      "    return a * b;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_TRUE(item->is_static);
-}
-
-TEST(ParserSection3, TaskAutomaticLifetime) {
-  // task declared with automatic lifetime
-  auto r = Parse(
-      "module m;\n"
-      "  task automatic my_task(input int x);\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
-  EXPECT_TRUE(item->is_automatic);
-}
-
-TEST(ParserSection3, TaskStaticLifetime) {
-  auto r = Parse(
-      "module m;\n"
-      "  task static my_task(input int x);\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
-  EXPECT_TRUE(item->is_static);
+TEST(ParserSection3, TaskLifetime) {
+  auto ra =
+      Parse("module m; task automatic t(input int x); endtask endmodule\n");
+  ASSERT_NE(ra.cu, nullptr);
+  EXPECT_FALSE(ra.has_errors);
+  EXPECT_EQ(ra.cu->modules[0]->items[0]->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_TRUE(ra.cu->modules[0]->items[0]->is_automatic);
+  auto rs = Parse("module m; task static t(input int x); endtask endmodule\n");
+  ASSERT_NE(rs.cu, nullptr);
+  EXPECT_FALSE(rs.has_errors);
+  EXPECT_EQ(rs.cu->modules[0]->items[0]->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_TRUE(rs.cu->modules[0]->items[0]->is_static);
 }
 
 TEST(ParserSection3, TopLevelFunctionAutomatic) {
@@ -718,25 +826,10 @@ TEST(ParserSection3, AnsiPortMultipleDirections) {
   EXPECT_EQ(r.cu->modules[0]->ports[3].name, "bus");
 }
 
-TEST(ParserSection3, AnsiPortInputVar) {
-  // input var int -- variable port type (LRM 23.2.2.3)
-  EXPECT_TRUE(
-      ParseOk("module m (input var int in1, input var shortreal in2);\n"
-              "endmodule\n"));
-}
-
-TEST(ParserSection3, AnsiPortOutputRegister) {
-  // output reg (ANSI style)
-  EXPECT_TRUE(
-      ParseOk("module m (output reg [7:0] q);\n"
-              "endmodule\n"));
-}
-
-TEST(ParserSection3, AnsiPortSigned) {
-  // Signed port declaration
-  EXPECT_TRUE(
-      ParseOk("module m (input signed [7:0] s_data);\n"
-              "endmodule\n"));
+TEST(ParserSection3, AnsiPortVariants) {
+  EXPECT_TRUE(ParseOk("module m (input var int in1); endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m (output reg [7:0] q); endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m (input signed [7:0] s); endmodule\n"));
 }
 
 // --- Non-ANSI style ports ---
@@ -754,36 +847,14 @@ TEST(ParserSection3, NonAnsiPortDeclaration) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserSection3, NonAnsiPortWithWidth) {
-  // Non-ANSI ports with vector width
+TEST(ParserSection3, NonAnsiPortVariants) {
   EXPECT_TRUE(
-      ParseOk("module m (addr, data);\n"
-              "  input [15:0] addr;\n"
-              "  inout [7:0] data;\n"
-              "endmodule\n"));
-}
-
-TEST(ParserSection3, NonAnsiPortInoutBidirectional) {
+      ParseOk("module m (a, d); input [15:0] a; inout [7:0] d; endmodule\n"));
   EXPECT_TRUE(
-      ParseOk("module m (a, b);\n"
-              "  inout [7:0] a;\n"
-              "  inout [7:0] b;\n"
-              "endmodule\n"));
+      ParseOk("module m (a, b); inout [7:0] a; inout [7:0] b; endmodule\n"));
 }
 
-// --- Port declarations in program and interface ---
-
-TEST(ParserSection3, ProgramWithPorts) {
-  auto r = Parse(
-      "program test (input clk, input [15:0] addr, inout [7:0] data);\n"
-      "  initial begin\n"
-      "  end\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_EQ(r.cu->programs[0]->ports.size(), 3u);
-}
+// --- Port declarations in interface ---
 
 TEST(ParserSection3, InterfaceWithPort) {
   auto r = Parse(
@@ -915,37 +986,15 @@ TEST(ParserSection3, InterfaceWithModport) {
   EXPECT_EQ(r.cu->interfaces[0]->modports[1]->name, "slave");
 }
 
-// --- Time units with different magnitudes ---
+// --- Time units with different magnitudes (LRM Table 3-1) ---
 
-TEST(ParserSection3, TimeunitAllMagnitudes) {
-  // LRM Table 3-1: 1, 10, or 100 with s, ms, us, ns, ps, fs
+TEST(ParserSection3, TimeunitVariousMagnitudes) {
   EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  timeunit 100ns;\n"
-              "  timeprecision 10ps;\n"
-              "endmodule\n"));
-}
-
-TEST(ParserSection3, TimeunitMicroseconds) {
+      ParseOk("module a; timeunit 100ns; timeprecision 10ps; endmodule\n"));
   EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  timeunit 1us;\n"
-              "  timeprecision 1ns;\n"
-              "endmodule\n"));
-}
-
-TEST(ParserSection3, TimeunitFemtoseconds) {
+      ParseOk("module b; timeunit 1us; timeprecision 1ns; endmodule\n"));
   EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  timeunit 1ps;\n"
-              "  timeprecision 1fs;\n"
-              "endmodule\n"));
-}
-
-TEST(ParserSection3, TimeunitMilliseconds) {
+      ParseOk("module c; timeunit 1ps; timeprecision 1fs; endmodule\n"));
   EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  timeunit 10ms;\n"
-              "  timeprecision 100us;\n"
-              "endmodule\n"));
+      ParseOk("module d; timeunit 10ms; timeprecision 100us; endmodule\n"));
 }
