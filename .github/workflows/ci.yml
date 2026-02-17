@@ -155,26 +155,27 @@ jobs:
           --cov-fail-under=100
   # ── Trigger ──
   trigger-deltahdl-ci:
+    env:
+      GH_TOKEN: ${{ secrets.GH_PAT }}
     if: "!failure() && !cancelled()"
     needs:
+      - detect
+      - static-analysis
       - test-run-sim-tests
       - test-run-sv-tests
       - test-test-common
       - yamllint
     runs-on: ubuntu-24.04
     steps:
-      - if: >-
-          needs.test-run-sim-tests.result == 'skipped'
-          && needs.test-run-sv-tests.result == 'skipped'
-          && needs.test-test-common.result == 'skipped'
-          && needs.yamllint.result == 'skipped'
-        run: echo "No script or workflow changes detected"
-      - if: >-
-          needs.test-run-sim-tests.result != 'skipped'
-          || needs.test-run-sv-tests.result != 'skipped'
-          || needs.test-test-common.result != 'skipped'
-          || needs.yamllint.result != 'skipped'
-        run: echo "All CI checks passed"
+      - name: Trigger DeltaHDL workflow
+        run: >-
+          gh workflow run deltahdl.yml
+          --repo "${{ github.repository }}"
+          -f branch="${{ github.event.pull_request.head.ref
+          || github.ref_name }}"
+          -f event="${{ github.event_name }}"
+          -f sha="${{ github.event.pull_request.head.sha
+          || github.sha }}"
   # ── Gate: yamllint for workflow-only changes ──
   yamllint:
     if: >-
