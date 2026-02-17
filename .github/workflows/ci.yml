@@ -44,7 +44,9 @@ jobs:
           fi
   # ── Gate: static analysis for all scripts ──
   static-analysis:
-    if: needs.detect.outputs.scripts-changed == 'true'
+    if: >-
+      needs.detect.outputs.scripts-changed == 'true'
+      || inputs.force-static-analysis
     needs: detect
     runs-on: ubuntu-24.04
     steps:
@@ -208,6 +210,10 @@ on:
     paths-ignore: ["docs/**", "*.md", LICENSE]
   workflow_dispatch:
     inputs:
+      force-static-analysis:
+        default: false
+        description: Run static analysis only
+        type: boolean
       force-yamllint:
         default: false
         description: Run yamllint only
