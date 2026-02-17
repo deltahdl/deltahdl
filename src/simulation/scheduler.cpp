@@ -91,42 +91,41 @@ void Scheduler::Run() {
 // --- Scheduler: time slot execution (IEEE 1800-2023 section 4.5) ---
 
 void Scheduler::ExecuteTimeSlot(TimeSlot& slot) {
-  // Preponed region: read-only sampling
+  // Preponed region: read-only sampling (§4.4.2.1)
   ExecuteRegion(slot.regions[static_cast<size_t>(Region::kPreponed)]);
 
-  // Iterate Active region set until stable
-  while (IterateActiveSet(slot)) {
-    // Keep iterating while events exist in active regions
+  // Pre-Active region: PLI callback (§4.4.3.2)
+  ExecuteRegion(slot.regions[static_cast<size_t>(Region::kPreActive)]);
+
+  // Iterative loop: [Active ... Pre-Postponed] (§4.5)
+  while (slot.AnyNonemptyIn(Region::kActive, Region::kPrePostponed)) {
+    while (IterateActiveSet(slot)) {
+    }
+    while (IterateReactiveSet(slot)) {
+    }
+    // Pre-Postponed only when [Active...Post-Re-NBA] are all empty
+    if (!slot.AnyNonemptyIn(Region::kActive, Region::kPostReNBA)) {
+      ExecuteRegion(slot.regions[static_cast<size_t>(Region::kPrePostponed)]);
+    }
   }
 
-  // Iterate Reactive region set until stable
-  while (IterateReactiveSet(slot)) {
-    // Keep iterating while events exist in reactive regions
-  }
-
-  // Postponed region
+  // Postponed region: read-only (§4.4.3.10)
   ExecuteRegion(slot.regions[static_cast<size_t>(Region::kPostponed)]);
 
   if (post_timestep_cb_) post_timestep_cb_();
 }
 
 // --- Scheduler: Active region set iteration ---
-// Regions: PreActive, Active, Inactive, PreNBA, NBA, PostNBA
+// Regions: Active, Inactive, PreNBA, NBA, PostNBA
 
 bool Scheduler::IterateActiveSet(TimeSlot& slot) {
-  bool did_work = false;
-
-  ExecuteActiveRegions(slot);
-  if (slot.AnyNonemptyIn(Region::kPreActive, Region::kPostNBA)) {
-    did_work = true;
+  if (!slot.AnyNonemptyIn(Region::kActive, Region::kPostNBA)) {
+    return false;
   }
-
-  // Drain all active-side regions in priority order
-  while (slot.AnyNonemptyIn(Region::kPreActive, Region::kPostNBA)) {
+  while (slot.AnyNonemptyIn(Region::kActive, Region::kPostNBA)) {
     ExecuteActiveRegions(slot);
   }
-
-  return did_work;
+  return true;
 }
 
 void Scheduler::ExecuteActiveRegions(TimeSlot& slot) {
@@ -134,7 +133,6 @@ void Scheduler::ExecuteActiveRegions(TimeSlot& slot) {
     ExecuteRegion(slot.regions[static_cast<size_t>(r)]);
   };
 
-  exec(Region::kPreActive);
   exec(Region::kActive);
   exec(Region::kInactive);
   exec(Region::kPreNBA);
@@ -147,10 +145,10 @@ void Scheduler::ExecuteActiveRegions(TimeSlot& slot) {
 //          ReInactive, PreReNBA, ReNBA, PostReNBA, PrePostponed
 
 bool Scheduler::IterateReactiveSet(TimeSlot& slot) {
-  if (!slot.AnyNonemptyIn(Region::kPreObserved, Region::kPrePostponed)) {
+  if (!slot.AnyNonemptyIn(Region::kPreObserved, Region::kPostReNBA)) {
     return false;
   }
-  while (slot.AnyNonemptyIn(Region::kPreObserved, Region::kPrePostponed)) {
+  while (slot.AnyNonemptyIn(Region::kPreObserved, Region::kPostReNBA)) {
     ExecuteReactiveRegions(slot);
     RestartActiveSet(slot);
   }
@@ -158,7 +156,7 @@ bool Scheduler::IterateReactiveSet(TimeSlot& slot) {
 }
 
 void Scheduler::RestartActiveSet(TimeSlot& slot) {
-  if (!slot.AnyNonemptyIn(Region::kPreActive, Region::kPostNBA)) return;
+  if (!slot.AnyNonemptyIn(Region::kActive, Region::kPostNBA)) return;
   while (IterateActiveSet(slot)) {
   }
 }
@@ -176,7 +174,6 @@ void Scheduler::ExecuteReactiveRegions(TimeSlot& slot) {
   exec(Region::kPreReNBA);
   exec(Region::kReNBA);
   exec(Region::kPostReNBA);
-  exec(Region::kPrePostponed);
 }
 
 // --- Scheduler: single region drain ---
