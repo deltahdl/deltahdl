@@ -430,6 +430,22 @@ class TestBuildResult:
             result, _ = run_sv_tests.build_result(str(sv))
         assert result["name"] == "bare.sv"
 
+    def test_exception_returns_fail_with_stderr(self, tmp_path, capsys):
+        """build_result() should catch exceptions and return fail status."""
+        sv = tmp_path / "chapter-5" / "bad.sv"
+        sv.parent.mkdir(parents=True)
+        sv.write_text("/*\n:name: bad\n*/\nmodule m; endmodule\n")
+        with patch(
+            "run_sv_tests.parse_metadata",
+            side_effect=OSError("read error"),
+        ):
+            result, ok = run_sv_tests.build_result(str(sv))
+        assert ok == 0
+        assert result["status"] == "fail"
+        assert "OSError" in result["stderr"]
+        assert "read error" in result["stderr"]
+        assert "read error" in capsys.readouterr().err
+
 
 class TestPrintStatus:
     """Tests for the print_status() function."""
