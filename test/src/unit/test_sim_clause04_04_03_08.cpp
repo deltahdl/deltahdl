@@ -103,9 +103,7 @@ TEST(SimCh4438, PostReNBACanCreateEvents) {
     order.push_back("post_re_nba");
     // Create an event in the Pre-Postponed region from Post-Re-NBA.
     auto* new_ev = sched.GetEventPool().Acquire();
-    new_ev->callback = [&order]() {
-      order.push_back("created_pre_postponed");
-    };
+    new_ev->callback = [&order]() { order.push_back("created_pre_postponed"); };
     sched.ScheduleEvent({0}, Region::kPrePostponed, new_ev);
   };
   sched.ScheduleEvent({0}, Region::kPostReNBA, post_re_nba);

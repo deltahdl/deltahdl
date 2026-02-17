@@ -103,9 +103,7 @@ TEST(SimCh4439, PrePostponedCanCreateEvents) {
     order.push_back("pre_postponed");
     // Create an event in the Postponed region from Pre-Postponed.
     auto* new_ev = sched.GetEventPool().Acquire();
-    new_ev->callback = [&order]() {
-      order.push_back("created_postponed");
-    };
+    new_ev->callback = [&order]() { order.push_back("created_postponed"); };
     sched.ScheduleEvent({0}, Region::kPostponed, new_ev);
   };
   sched.ScheduleEvent({0}, Region::kPrePostponed, pre_postponed);

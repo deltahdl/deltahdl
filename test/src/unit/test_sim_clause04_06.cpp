@@ -213,9 +213,7 @@ TEST(SimCh46, SequentialStatementsProduceOrderedNBAs) {
     stmt->callback = [&, i]() {
       log.push_back("stmt" + std::to_string(i));
       auto* nba = sched.GetEventPool().Acquire();
-      nba->callback = [&, i]() {
-        log.push_back("nba" + std::to_string(i));
-      };
+      nba->callback = [&, i]() { log.push_back("nba" + std::to_string(i)); };
       sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
     };
     sched.ScheduleEvent({0}, Region::kActive, stmt);
