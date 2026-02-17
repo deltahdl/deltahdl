@@ -80,21 +80,37 @@ jobs:
         name: Publish to GitHub Pages
         uses: actions/deploy-pages@v4
   build-asan-ubsan:
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 200M
     needs: [clang-tidy-src, clang-tidy-test]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
-      - name: Install Clang
+      - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-18
+          sudo apt-get install -y ccache clang-18
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            ccache-build-asan-ubsan-${{
+            hashFiles('**/CMakeLists.txt') }}-${{
+            inputs.sha }}
+          path: .ccache
+          restore-keys: |
+            ccache-build-asan-ubsan-${{ hashFiles('**/CMakeLists.txt') }}-
+            ccache-build-asan-ubsan-
       - name: Build
         run: |
           cmake -B build \
             -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_C_COMPILER=clang-18 \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Debug \
             -DDELTAHDL_SANITIZERS=ON
           cmake --build build --parallel --target deltahdl
@@ -105,21 +121,37 @@ jobs:
           path: build/
           retention-days: 1
   build-coverage:
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 200M
     needs: [clang-tidy-src, clang-tidy-test]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
-      - name: Install Clang
+      - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-18
+          sudo apt-get install -y ccache clang-18
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            ccache-build-coverage-${{
+            hashFiles('**/CMakeLists.txt') }}-${{
+            inputs.sha }}
+          path: .ccache
+          restore-keys: |
+            ccache-build-coverage-${{ hashFiles('**/CMakeLists.txt') }}-
+            ccache-build-coverage-
       - name: Build
         run: |
           cmake -B build \
             -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_C_COMPILER=clang-18 \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Debug \
             -DDELTAHDL_COVERAGE=ON
           cmake --build build --parallel --target deltahdl
@@ -130,17 +162,35 @@ jobs:
           path: build/
           retention-days: 1
   build-macos-26-arm64-clang:
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 200M
     needs: [clang-tidy-src, clang-tidy-test]
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
+      - name: Install tools
+        run: brew install ccache
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            ccache-build-macos-arm64-${{
+            hashFiles('**/CMakeLists.txt') }}-${{
+            inputs.sha }}
+          path: .ccache
+          restore-keys: |
+            ccache-build-macos-arm64-${{ hashFiles('**/CMakeLists.txt') }}-
+            ccache-build-macos-arm64-
       - name: Build
         run: |
           cmake -B build \
             -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build --parallel --target deltahdl
       - name: Upload build
@@ -150,21 +200,37 @@ jobs:
           path: build/
           retention-days: 1
   build-tsan:
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 200M
     needs: [clang-tidy-src, clang-tidy-test]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
-      - name: Install Clang
+      - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-18
+          sudo apt-get install -y ccache clang-18
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            ccache-build-tsan-${{
+            hashFiles('**/CMakeLists.txt') }}-${{
+            inputs.sha }}
+          path: .ccache
+          restore-keys: |
+            ccache-build-tsan-${{ hashFiles('**/CMakeLists.txt') }}-
+            ccache-build-tsan-
       - name: Build
         run: |
           cmake -B build \
             -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_C_COMPILER=clang-18 \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Debug \
             -DDELTAHDL_TSAN=ON
           cmake --build build --parallel --target deltahdl
@@ -175,21 +241,37 @@ jobs:
           path: build/
           retention-days: 1
   build-ubuntu-24-04-x86-64-clang:
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 200M
     needs: [clang-tidy-src, clang-tidy-test]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
-      - name: Install compiler
+      - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-18
+          sudo apt-get install -y ccache clang-18
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            ccache-build-clang-release-${{
+            hashFiles('**/CMakeLists.txt') }}-${{
+            inputs.sha }}
+          path: .ccache
+          restore-keys: |
+            ccache-build-clang-release-${{ hashFiles('**/CMakeLists.txt') }}-
+            ccache-build-clang-release-
       - name: Build
         run: |
           cmake -B build \
             -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_C_COMPILER=clang-18 \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build --parallel --target deltahdl
       - name: Upload build
@@ -199,21 +281,37 @@ jobs:
           path: build/
           retention-days: 1
   build-ubuntu-24-04-x86-64-gcc:
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 200M
     needs: [clang-tidy-src, clang-tidy-test]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
-      - name: Install compiler
+      - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y g++-14
+          sudo apt-get install -y ccache g++-14
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            ccache-build-gcc-release-${{
+            hashFiles('**/CMakeLists.txt') }}-${{
+            inputs.sha }}
+          path: .ccache
+          restore-keys: |
+            ccache-build-gcc-release-${{ hashFiles('**/CMakeLists.txt') }}-
+            ccache-build-gcc-release-
       - name: Build
         run: |
           cmake -B build \
             -DCMAKE_CXX_COMPILER=g++-14 \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_C_COMPILER=gcc-14 \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build --parallel --target deltahdl
       - name: Upload build
@@ -735,6 +833,8 @@ jobs:
   unit-test-asan-ubsan:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 200M
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
     needs: build-asan-ubsan
     runs-on: ubuntu-24.04
@@ -747,16 +847,29 @@ jobs:
         with:
           name: build-asan-ubsan
           path: build/
-      - name: Install Clang
+      - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-18
+          sudo apt-get install -y ccache clang-18
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            ccache-test-asan-ubsan-${{
+            hashFiles('**/CMakeLists.txt') }}-${{
+            inputs.sha }}
+          path: .ccache
+          restore-keys: |
+            ccache-test-asan-ubsan-${{ hashFiles('**/CMakeLists.txt') }}-
+            ccache-test-asan-ubsan-
       - name: Build tests
         run: cmake --build build --parallel 2
       - name: Unit tests
         run: ctest --test-dir build --output-on-failure --label-exclude e2e
   unit-test-coverage:
     env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 200M
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
     needs: build-coverage
     runs-on: ubuntu-24.04
@@ -769,10 +882,21 @@ jobs:
         with:
           name: build-coverage
           path: build/
-      - name: Install Clang
+      - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-18
+          sudo apt-get install -y ccache clang-18
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            ccache-test-coverage-${{
+            hashFiles('**/CMakeLists.txt') }}-${{
+            inputs.sha }}
+          path: .ccache
+          restore-keys: |
+            ccache-test-coverage-${{ hashFiles('**/CMakeLists.txt') }}-
+            ccache-test-coverage-
       - name: Build tests
         run: cmake --build build --parallel 2
       - name: Unit tests
@@ -784,6 +908,9 @@ jobs:
           path: profraw/
           retention-days: 1
   unit-test-macos-26-arm64-clang:
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 200M
     needs: build-macos-26-arm64-clang
     runs-on: macos-26
     steps:
@@ -795,12 +922,27 @@ jobs:
         with:
           name: build-macos-26-arm64-clang
           path: build/
+      - name: Install tools
+        run: brew install ccache
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            ccache-test-macos-arm64-${{
+            hashFiles('**/CMakeLists.txt') }}-${{
+            inputs.sha }}
+          path: .ccache
+          restore-keys: |
+            ccache-test-macos-arm64-${{ hashFiles('**/CMakeLists.txt') }}-
+            ccache-test-macos-arm64-
       - name: Build tests
         run: cmake --build build --parallel 2
       - name: Unit tests
         run: ctest --test-dir build --output-on-failure --label-exclude e2e
   unit-test-tsan:
     env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 200M
       TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
     needs: build-tsan
     runs-on: ubuntu-24.04
@@ -813,15 +955,29 @@ jobs:
         with:
           name: build-tsan
           path: build/
-      - name: Install Clang
+      - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-18
+          sudo apt-get install -y ccache clang-18
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            ccache-test-tsan-${{
+            hashFiles('**/CMakeLists.txt') }}-${{
+            inputs.sha }}
+          path: .ccache
+          restore-keys: |
+            ccache-test-tsan-${{ hashFiles('**/CMakeLists.txt') }}-
+            ccache-test-tsan-
       - name: Build tests
         run: cmake --build build --parallel 2
       - name: Unit tests
         run: ctest --test-dir build --output-on-failure --label-exclude e2e
   unit-test-ubuntu-24-04-x86-64-clang:
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 200M
     needs: build-ubuntu-24-04-x86-64-clang
     runs-on: ubuntu-24.04
     steps:
@@ -833,15 +989,29 @@ jobs:
         with:
           name: build-ubuntu-24-04-x86-64-clang
           path: build/
-      - name: Install compiler
+      - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-18
+          sudo apt-get install -y ccache clang-18
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            ccache-test-clang-release-${{
+            hashFiles('**/CMakeLists.txt') }}-${{
+            inputs.sha }}
+          path: .ccache
+          restore-keys: |
+            ccache-test-clang-release-${{ hashFiles('**/CMakeLists.txt') }}-
+            ccache-test-clang-release-
       - name: Build tests
         run: cmake --build build --parallel 2
       - name: Unit tests
         run: ctest --test-dir build --output-on-failure --label-exclude e2e
   unit-test-ubuntu-24-04-x86-64-gcc:
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 200M
     needs: build-ubuntu-24-04-x86-64-gcc
     runs-on: ubuntu-24.04
     steps:
@@ -853,10 +1023,21 @@ jobs:
         with:
           name: build-ubuntu-24-04-x86-64-gcc
           path: build/
-      - name: Install compiler
+      - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y g++-14
+          sudo apt-get install -y ccache g++-14
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            ccache-test-gcc-release-${{
+            hashFiles('**/CMakeLists.txt') }}-${{
+            inputs.sha }}
+          path: .ccache
+          restore-keys: |
+            ccache-test-gcc-release-${{ hashFiles('**/CMakeLists.txt') }}-
+            ccache-test-gcc-release-
       - name: Build tests
         run: cmake --build build --parallel 2
       - name: Unit tests
