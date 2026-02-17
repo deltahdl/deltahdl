@@ -261,27 +261,37 @@ def build_result(path):
         name = str(Path(path).relative_to(TEST_DIR / chapter))
     except ValueError:
         name = Path(path).name
-    metadata = parse_metadata(path)
-    tags = metadata.get("tags", "").split()
-    if tags and not re.match(r"^\d+\.", name):
-        name = f"{tags[0]}--{name}"
-    simulate = "simulation" in metadata.get("type", "").split()
-    should_fail = bool(metadata.get("should_fail_because"))
-    defines = metadata.get("defines", "").split()
 
-    t0 = time.monotonic()
-    stderr = ""
     try:
-        ok, stderr = run_test(path, simulate=simulate, defines=defines)
-        dt = time.monotonic() - t0
-        if should_fail:
-            ok = not ok
-        status = "pass" if ok else "fail"
-        ok_int = int(ok)
-    except subprocess.TimeoutExpired:
-        dt = time.monotonic() - t0
-        status = "timeout"
-        ok_int = 0
+        metadata = parse_metadata(path)
+        tags = metadata.get("tags", "").split()
+        if tags and not re.match(r"^\d+\.", name):
+            name = f"{tags[0]}--{name}"
+        simulate = "simulation" in metadata.get("type", "").split()
+        should_fail = bool(metadata.get("should_fail_because"))
+        defines = metadata.get("defines", "").split()
+
+        t0 = time.monotonic()
+        stderr = ""
+        try:
+            ok, stderr = run_test(path, simulate=simulate, defines=defines)
+            dt = time.monotonic() - t0
+            if should_fail:
+                ok = not ok
+            status = "pass" if ok else "fail"
+            ok_int = int(ok)
+        except subprocess.TimeoutExpired:
+            dt = time.monotonic() - t0
+            status = "timeout"
+            ok_int = 0
+    except (OSError, subprocess.SubprocessError, ValueError) as exc:
+        return {
+            "name": name,
+            "chapter": chapter,
+            "status": "fail",
+            "time": 0.0,
+            "stderr": f"{type(exc).__name__}: {exc}",
+        }, 0
 
     return {
         "name": name,
