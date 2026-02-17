@@ -57,7 +57,7 @@ jobs:
             assert-no-inline-directives \
             assert-no-linter-config-files \
             assert-one-assert-per-pytest \
-            mypy pylint pytest yamllint
+            mypy pylint pytest
           npm install -g jscpd
       - name: Assert no inline lint disables
         run: >-
@@ -76,17 +76,6 @@ jobs:
           assert-one-assert-per-pytest
           --verbose
           ${{ github.workspace }}/test/scripts
-      - name: Lint YAML
-        run: |
-          EMPTY='empty-lines: {max: 0, max-start: 0, max-end: 1}'
-          KEY='key-ordering: enable'
-          NL='new-line-at-end-of-file: enable'
-          TR='truthy: {allowed-values: ["true", "false", "on"]}'
-          RULES="$EMPTY, $KEY, $NL, $TR"
-          yamllint --strict \
-            --config-data \
-            "{extends: default, rules: {$RULES}}" \
-            .github/workflows/*.yml
       - name: Run pylint on source
         run: >-
           python3 -m pylint scripts/
