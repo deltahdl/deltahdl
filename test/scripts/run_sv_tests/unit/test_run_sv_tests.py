@@ -430,8 +430,9 @@ class TestBuildResult:
             result, _ = run_sv_tests.build_result(str(sv))
         assert result["name"] == "bare.sv"
 
-    def test_exception_returns_fail_with_stderr(self, tmp_path, capsys):
-        """build_result() should catch exceptions and return fail status."""
+    @staticmethod
+    def _build_result_with_oserror(tmp_path):
+        """Run build_result with parse_metadata raising OSError."""
         sv = tmp_path / "chapter-5" / "bad.sv"
         sv.parent.mkdir(parents=True)
         sv.write_text("/*\n:name: bad\n*/\nmodule m; endmodule\n")
@@ -439,11 +440,26 @@ class TestBuildResult:
             "run_sv_tests.parse_metadata",
             side_effect=OSError("read error"),
         ):
-            result, ok = run_sv_tests.build_result(str(sv))
+            return run_sv_tests.build_result(str(sv))
+
+    def test_exception_returns_ok_zero(self, tmp_path):
+        """build_result() should return ok=0 when an exception is caught."""
+        _, ok = self._build_result_with_oserror(tmp_path)
         assert ok == 0
+
+    def test_exception_returns_fail_status(self, tmp_path):
+        """build_result() should return fail status when an exception is caught."""
+        result, _ = self._build_result_with_oserror(tmp_path)
         assert result["status"] == "fail"
-        assert "OSError" in result["stderr"]
-        assert "read error" in result["stderr"]
+
+    def test_exception_captures_stderr(self, tmp_path):
+        """build_result() should capture exception details in stderr field."""
+        result, _ = self._build_result_with_oserror(tmp_path)
+        assert "OSError: read error" in result["stderr"]
+
+    def test_exception_logs_to_stderr(self, tmp_path, capsys):
+        """build_result() should log caught exceptions to stderr."""
+        self._build_result_with_oserror(tmp_path)
         assert "read error" in capsys.readouterr().err
 
 
