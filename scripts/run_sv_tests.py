@@ -285,6 +285,11 @@ def build_result(path):
             status = "timeout"
             ok_int = 0
     except (OSError, subprocess.SubprocessError, ValueError) as exc:
+        print(
+            f"error: {name}: {type(exc).__name__}: {exc}",
+            file=sys.stderr,
+            flush=True,
+        )
         return {
             "name": name,
             "chapter": chapter,
