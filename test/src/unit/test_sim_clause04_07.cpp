@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -324,10 +325,12 @@ TEST(SimCh47, NondeterminismAcrossTimeSlots) {
   ASSERT_EQ(order.size(), 4u);
   // Time 0 events both execute before time 5 (deterministic time ordering).
   // Within each time slot, both events execute (order is nondeterministic).
-  EXPECT_TRUE(order[0] == "t0_a" || order[0] == "t0_b");
-  EXPECT_TRUE(order[1] == "t0_a" || order[1] == "t0_b");
-  EXPECT_NE(order[0], order[1]);
-  EXPECT_TRUE(order[2] == "t5_a" || order[2] == "t5_b");
-  EXPECT_TRUE(order[3] == "t5_a" || order[3] == "t5_b");
-  EXPECT_NE(order[2], order[3]);
+  // Verify both t0 events are present.
+  std::vector<std::string> t0(order.begin(), order.begin() + 2);
+  std::sort(t0.begin(), t0.end());
+  EXPECT_EQ(t0, (std::vector<std::string>{"t0_a", "t0_b"}));
+  // Verify both t5 events are present.
+  std::vector<std::string> t5(order.begin() + 2, order.end());
+  std::sort(t5.begin(), t5.end());
+  EXPECT_EQ(t5, (std::vector<std::string>{"t5_a", "t5_b"}));
 }

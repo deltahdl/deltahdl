@@ -367,24 +367,13 @@ TEST(SimCh443, FullPLIRegionOrderingPerFigure41) {
   schedule(Region::kPreponed, "preponed");
 
   sched.Run();
-  ASSERT_EQ(order.size(), 17u);
-  EXPECT_EQ(order[0], "preponed");
-  EXPECT_EQ(order[1], "pre_active");
-  EXPECT_EQ(order[2], "active");
-  EXPECT_EQ(order[3], "inactive");
-  EXPECT_EQ(order[4], "pre_nba");
-  EXPECT_EQ(order[5], "nba");
-  EXPECT_EQ(order[6], "post_nba");
-  EXPECT_EQ(order[7], "pre_observed");
-  EXPECT_EQ(order[8], "observed");
-  EXPECT_EQ(order[9], "post_observed");
-  EXPECT_EQ(order[10], "reactive");
-  EXPECT_EQ(order[11], "reinactive");
-  EXPECT_EQ(order[12], "pre_renba");
-  EXPECT_EQ(order[13], "renba");
-  EXPECT_EQ(order[14], "post_renba");
-  EXPECT_EQ(order[15], "pre_postponed");
-  EXPECT_EQ(order[16], "postponed");
+  std::vector<std::string> expected = {
+      "preponed",  "pre_active",    "active",     "inactive",
+      "pre_nba",   "nba",           "post_nba",   "pre_observed",
+      "observed",  "post_observed", "reactive",   "reinactive",
+      "pre_renba", "renba",         "post_renba", "pre_postponed",
+      "postponed"};
+  EXPECT_EQ(order, expected);
 }
 
 // ---------------------------------------------------------------------------

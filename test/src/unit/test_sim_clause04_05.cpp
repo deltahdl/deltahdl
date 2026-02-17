@@ -126,24 +126,13 @@ TEST(SimCh45, ExecuteTimeSlotFullRegionOrdering) {
   schedule(Region::kPreponed, "preponed");
 
   sched.Run();
-  ASSERT_EQ(order.size(), 17u);
-  EXPECT_EQ(order[0], "preponed");
-  EXPECT_EQ(order[1], "pre_active");
-  EXPECT_EQ(order[2], "active");
-  EXPECT_EQ(order[3], "inactive");
-  EXPECT_EQ(order[4], "pre_nba");
-  EXPECT_EQ(order[5], "nba");
-  EXPECT_EQ(order[6], "post_nba");
-  EXPECT_EQ(order[7], "pre_observed");
-  EXPECT_EQ(order[8], "observed");
-  EXPECT_EQ(order[9], "post_observed");
-  EXPECT_EQ(order[10], "reactive");
-  EXPECT_EQ(order[11], "re_inactive");
-  EXPECT_EQ(order[12], "pre_re_nba");
-  EXPECT_EQ(order[13], "re_nba");
-  EXPECT_EQ(order[14], "post_re_nba");
-  EXPECT_EQ(order[15], "pre_postponed");
-  EXPECT_EQ(order[16], "postponed");
+  std::vector<std::string> expected = {
+      "preponed",   "pre_active",    "active",      "inactive",
+      "pre_nba",    "nba",           "post_nba",    "pre_observed",
+      "observed",   "post_observed", "reactive",    "re_inactive",
+      "pre_re_nba", "re_nba",        "post_re_nba", "pre_postponed",
+      "postponed"};
+  EXPECT_EQ(order, expected);
 }
 
 // ---------------------------------------------------------------------------

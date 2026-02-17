@@ -220,15 +220,10 @@ TEST(SimCh46, SequentialStatementsProduceOrderedNBAs) {
   }
 
   sched.Run();
-  ASSERT_EQ(log.size(), 6u);
-  // Statements execute in order.
-  EXPECT_EQ(log[0], "stmt0");
-  EXPECT_EQ(log[1], "stmt1");
-  EXPECT_EQ(log[2], "stmt2");
-  // NBAs execute in execution order (same as statement order).
-  EXPECT_EQ(log[3], "nba0");
-  EXPECT_EQ(log[4], "nba1");
-  EXPECT_EQ(log[5], "nba2");
+  // Statements execute in order, then NBAs in execution order.
+  std::vector<std::string> expected = {"stmt0", "stmt1", "stmt2",
+                                       "nba0",  "nba1",  "nba2"};
+  EXPECT_EQ(log, expected);
 }
 
 // ---------------------------------------------------------------------------

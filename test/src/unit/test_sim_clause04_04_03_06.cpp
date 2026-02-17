@@ -267,11 +267,8 @@ TEST(SimCh4436, PostObservedInfrastructureWorksEvenIfCurrentlyUnused) {
   schedule(Region::kActive, "active");
 
   sched.Run();
-  ASSERT_EQ(order.size(), 6u);
-  EXPECT_EQ(order[0], "active");
-  EXPECT_EQ(order[1], "post_nba");
-  EXPECT_EQ(order[2], "pre_observed");
-  EXPECT_EQ(order[3], "observed");
-  EXPECT_EQ(order[4], "post_observed");
-  EXPECT_EQ(order[5], "reactive");
+  std::vector<std::string> expected = {"active",        "post_nba",
+                                       "pre_observed",  "observed",
+                                       "post_observed", "reactive"};
+  EXPECT_EQ(order, expected);
 }

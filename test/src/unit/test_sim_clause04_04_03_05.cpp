@@ -253,16 +253,19 @@ TEST(SimCh4435, PreObservedReadsFullyStabilizedActiveSetState) {
   // Active sets value = 1, then schedules an Inactive event that
   // re-enters Active with value = 99. After active set stabilizes,
   // Pre-Observed should see 99.
+  auto set_final = [&]() { value = 99; };
+  auto schedule_reentry = [&]() {
+    auto* active2 = sched.GetEventPool().Acquire();
+    active2->callback = set_final;
+    sched.ScheduleEvent({0}, Region::kActive, active2);
+  };
+
   auto* active = sched.GetEventPool().Acquire();
   active->callback = [&]() {
     if (value == 0) {
       value = 1;
       auto* inactive = sched.GetEventPool().Acquire();
-      inactive->callback = [&]() {
-        auto* active2 = sched.GetEventPool().Acquire();
-        active2->callback = [&]() { value = 99; };
-        sched.ScheduleEvent({0}, Region::kActive, active2);
-      };
+      inactive->callback = schedule_reentry;
       sched.ScheduleEvent({0}, Region::kInactive, inactive);
     }
   };

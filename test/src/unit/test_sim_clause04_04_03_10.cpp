@@ -268,14 +268,8 @@ TEST(SimCh44310, PostponedInfrastructureWithFullRegionChain) {
   schedule(Region::kPreponed, "preponed");
 
   sched.Run();
-  ASSERT_EQ(order.size(), 9u);
-  EXPECT_EQ(order[0], "preponed");
-  EXPECT_EQ(order[1], "active");
-  EXPECT_EQ(order[2], "post_nba");
-  EXPECT_EQ(order[3], "observed");
-  EXPECT_EQ(order[4], "post_observed");
-  EXPECT_EQ(order[5], "reactive");
-  EXPECT_EQ(order[6], "post_re_nba");
-  EXPECT_EQ(order[7], "pre_postponed");
-  EXPECT_EQ(order[8], "postponed");
+  std::vector<std::string> expected = {
+      "preponed", "active",      "post_nba",      "observed", "post_observed",
+      "reactive", "post_re_nba", "pre_postponed", "postponed"};
+  EXPECT_EQ(order, expected);
 }

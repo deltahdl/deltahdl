@@ -167,31 +167,35 @@ TEST(SimCh4423, ChainedZeroDelayIteration) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
+  // Inner chain: active2 -> inactive2.
+  auto log_inactive2 = [&order]() { order.push_back("inactive2"); };
+  auto do_active2 = [&]() {
+    order.push_back("active2");
+    auto* inact2 = sched.GetEventPool().Acquire();
+    inact2->callback = log_inactive2;
+    sched.ScheduleEvent({0}, Region::kInactive, inact2);
+  };
+  // Outer chain: active1 -> inactive1 -> (inner chain).
+  auto do_inactive1 = [&]() {
+    order.push_back("inactive1");
+    auto* act2 = sched.GetEventPool().Acquire();
+    act2->callback = do_active2;
+    sched.ScheduleEvent({0}, Region::kActive, act2);
+  };
+
   auto* act1 = sched.GetEventPool().Acquire();
   act1->callback = [&]() {
     order.push_back("active1");
     auto* inact1 = sched.GetEventPool().Acquire();
-    inact1->callback = [&]() {
-      order.push_back("inactive1");
-      auto* act2 = sched.GetEventPool().Acquire();
-      act2->callback = [&]() {
-        order.push_back("active2");
-        auto* inact2 = sched.GetEventPool().Acquire();
-        inact2->callback = [&order]() { order.push_back("inactive2"); };
-        sched.ScheduleEvent({0}, Region::kInactive, inact2);
-      };
-      sched.ScheduleEvent({0}, Region::kActive, act2);
-    };
+    inact1->callback = do_inactive1;
     sched.ScheduleEvent({0}, Region::kInactive, inact1);
   };
   sched.ScheduleEvent({0}, Region::kActive, act1);
 
   sched.Run();
-  ASSERT_EQ(order.size(), 4u);
-  EXPECT_EQ(order[0], "active1");
-  EXPECT_EQ(order[1], "inactive1");
-  EXPECT_EQ(order[2], "active2");
-  EXPECT_EQ(order[3], "inactive2");
+  std::vector<std::string> expected = {"active1", "inactive1", "active2",
+                                       "inactive2"};
+  EXPECT_EQ(order, expected);
 }
 
 // ---------------------------------------------------------------------------
