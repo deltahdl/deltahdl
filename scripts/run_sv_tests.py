@@ -327,7 +327,7 @@ def main():
             for result, ok in pool.map(build_result, tests):
                 results.append(result)
                 ok_flags.append(ok)
-    except Exception as exc:
+    except (OSError, subprocess.SubprocessError, RuntimeError) as exc:
         print(
             f"\nerror: pool.map failed after {len(results)}/{len(tests)} "
             f"results: {type(exc).__name__}: {exc}",
