@@ -58,6 +58,13 @@ static Stmt* FirstBodyStmt(ModuleItem* item) {
   return item->func_body_stmts[0];
 }
 
+static Stmt* FindStmtByKind(ModuleItem* item, StmtKind kind) {
+  for (auto* stmt : item->func_body_stmts) {
+    if (stmt->kind == kind) return stmt;
+  }
+  return nullptr;
+}
+
 // =============================================================================
 // 1. Automatic function declaration parses (function automatic ...)
 // =============================================================================
@@ -366,15 +373,10 @@ TEST(ParserSection4, Sec4_9_3_AutomaticFuncWithForLoop) {
   auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->is_automatic);
-  bool found_for = false;
-  for (auto* stmt : item->func_body_stmts) {
-    if (stmt->kind == StmtKind::kFor) {
-      found_for = true;
-      EXPECT_NE(stmt->for_cond, nullptr);
-      EXPECT_NE(stmt->for_body, nullptr);
-    }
-  }
-  EXPECT_TRUE(found_for);
+  auto* for_stmt = FindStmtByKind(item, StmtKind::kFor);
+  ASSERT_NE(for_stmt, nullptr);
+  EXPECT_NE(for_stmt->for_cond, nullptr);
+  EXPECT_NE(for_stmt->for_body, nullptr);
 }
 
 // =============================================================================

@@ -78,6 +78,21 @@ static Stmt* InitialBody(ParseResult4e& r) {
   return nullptr;
 }
 
+static Stmt* FindStmtByKind(ModuleItem* item, StmtKind kind) {
+  for (auto* stmt : item->func_body_stmts) {
+    if (stmt->kind == kind) return stmt;
+  }
+  return nullptr;
+}
+
+static ClassMember* FindClassMethod(ParseResult4e& r) {
+  if (r.cu->classes.empty()) return nullptr;
+  for (auto* m : r.cu->classes[0]->members) {
+    if (m->kind == ClassMemberKind::kMethod) return m;
+  }
+  return nullptr;
+}
+
 // =============================================================================
 // 1. Static function — variables are static by default
 // =============================================================================
@@ -381,10 +396,12 @@ TEST(ParserSection4, Sec4_9_4_MultipleStaticVarsInFunc) {
   EXPECT_TRUE(fn->is_automatic);
   // First three statements should be static variable declarations.
   ASSERT_GE(fn->func_body_stmts.size(), 3u);
-  for (int i = 0; i < 3; ++i) {
-    EXPECT_EQ(fn->func_body_stmts[i]->kind, StmtKind::kVarDecl);
-    EXPECT_TRUE(fn->func_body_stmts[i]->var_is_static);
-  }
+  EXPECT_EQ(fn->func_body_stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(fn->func_body_stmts[1]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(fn->func_body_stmts[2]->kind, StmtKind::kVarDecl);
+  EXPECT_TRUE(fn->func_body_stmts[0]->var_is_static);
+  EXPECT_TRUE(fn->func_body_stmts[1]->var_is_static);
+  EXPECT_TRUE(fn->func_body_stmts[2]->var_is_static);
   EXPECT_EQ(fn->func_body_stmts[0]->var_name, "a");
   EXPECT_EQ(fn->func_body_stmts[1]->var_name, "b");
   EXPECT_EQ(fn->func_body_stmts[2]->var_name, "c");
@@ -611,14 +628,7 @@ TEST(ParserSection4, Sec4_9_4_ForLoopInitInStaticFunc) {
   auto* fn = FirstFuncOrTask(r);
   ASSERT_NE(fn, nullptr);
   EXPECT_TRUE(fn->is_static);
-  // Find the for-loop statement in the function body.
-  Stmt* for_stmt = nullptr;
-  for (auto* s : fn->func_body_stmts) {
-    if (s->kind == StmtKind::kFor) {
-      for_stmt = s;
-      break;
-    }
-  }
+  auto* for_stmt = FindStmtByKind(fn, StmtKind::kFor);
   ASSERT_NE(for_stmt, nullptr);
   EXPECT_EQ(for_stmt->for_init_type.kind, DataTypeKind::kInt);
 }
@@ -642,13 +652,7 @@ TEST(ParserSection4, Sec4_9_4_ForLoopInitInAutoFunc) {
   auto* fn = FirstFuncOrTask(r);
   ASSERT_NE(fn, nullptr);
   EXPECT_TRUE(fn->is_automatic);
-  Stmt* for_stmt = nullptr;
-  for (auto* s : fn->func_body_stmts) {
-    if (s->kind == StmtKind::kFor) {
-      for_stmt = s;
-      break;
-    }
-  }
+  auto* for_stmt = FindStmtByKind(fn, StmtKind::kFor);
   ASSERT_NE(for_stmt, nullptr);
   EXPECT_EQ(for_stmt->for_init_type.kind, DataTypeKind::kInt);
 }
@@ -669,16 +673,8 @@ TEST(ParserSection4, Sec4_9_4_StaticVarInClassMethod) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto* cls = r.cu->classes[0];
-  EXPECT_EQ(cls->name, "Counter");
-  // Find the method member.
-  ClassMember* method_member = nullptr;
-  for (auto* m : cls->members) {
-    if (m->kind == ClassMemberKind::kMethod) {
-      method_member = m;
-      break;
-    }
-  }
+  EXPECT_EQ(r.cu->classes[0]->name, "Counter");
+  auto* method_member = FindClassMethod(r);
   ASSERT_NE(method_member, nullptr);
   ASSERT_NE(method_member->method, nullptr);
   ASSERT_GE(method_member->method->func_body_stmts.size(), 1u);
@@ -702,13 +698,7 @@ TEST(ParserSection4, Sec4_9_4_AutoVarInClassMethod) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
-  ClassMember* method_member = nullptr;
-  for (auto* m : r.cu->classes[0]->members) {
-    if (m->kind == ClassMemberKind::kMethod) {
-      method_member = m;
-      break;
-    }
-  }
+  auto* method_member = FindClassMethod(r);
   ASSERT_NE(method_member, nullptr);
   ASSERT_NE(method_member->method, nullptr);
   ASSERT_GE(method_member->method->func_body_stmts.size(), 1u);

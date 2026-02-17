@@ -55,6 +55,21 @@ static ModuleItem* FirstAlwaysItem(ParseResult4b& r) {
   return nullptr;
 }
 
+static ModuleItem* FindItemByKind(ParseResult4b& r, ModuleItemKind kind) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
+}
+
+static ModuleItem* FindContAssign(ParseResult4b& r) {
+  return FindItemByKind(r, ModuleItemKind::kContAssign);
+}
+
+static ModuleItem* FindInitialBlock(ParseResult4b& r) {
+  return FindItemByKind(r, ModuleItemKind::kInitialBlock);
+}
+
 // =============================================================================
 // LRM section 4.5 -- Simulation scheduling semantics
 //
@@ -117,15 +132,10 @@ TEST(ParserSection4, Sec4_5_ContinuousAssign) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  bool found = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kContAssign) {
-      found = true;
-      EXPECT_NE(item->assign_lhs, nullptr);
-      EXPECT_NE(item->assign_rhs, nullptr);
-    }
-  }
-  EXPECT_TRUE(found);
+  auto* ca = FindContAssign(r);
+  ASSERT_NE(ca, nullptr);
+  EXPECT_NE(ca->assign_lhs, nullptr);
+  EXPECT_NE(ca->assign_rhs, nullptr);
 }
 
 // ---------------------------------------------------------------------------
@@ -185,14 +195,7 @@ TEST(ParserSection4, Sec4_5_MultipleNonblockingAssigns) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  // Find the initial block (skip past variable declarations).
-  ModuleItem* init_item = nullptr;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) {
-      init_item = item;
-      break;
-    }
-  }
+  auto* init_item = FindInitialBlock(r);
   ASSERT_NE(init_item, nullptr);
   auto* body = init_item->body;
   ASSERT_NE(body, nullptr);
@@ -216,14 +219,7 @@ TEST(ParserSection4, Sec4_5_MixBlockingNonblocking) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  // Find the initial block (skip past variable declarations).
-  ModuleItem* init_item = nullptr;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) {
-      init_item = item;
-      break;
-    }
-  }
+  auto* init_item = FindInitialBlock(r);
   ASSERT_NE(init_item, nullptr);
   auto* body = init_item->body;
   ASSERT_NE(body, nullptr);
@@ -488,7 +484,7 @@ TEST(ParserSection4, Sec4_5_AlwaysComb) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
   ASSERT_NE(item->body, nullptr);
 }
@@ -507,7 +503,7 @@ TEST(ParserSection4, Sec4_5_AlwaysFF) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysFFBlock);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysFF);
   ASSERT_FALSE(item->sensitivity.empty());
   EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
@@ -528,7 +524,7 @@ TEST(ParserSection4, Sec4_5_AlwaysLatch) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysLatchBlock);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysLatch);
   ASSERT_NE(item->body, nullptr);
 }
@@ -548,14 +544,7 @@ TEST(ParserSection4, Sec4_5_InitialBlockWithDelays) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  // Find the initial block (skip past variable declarations).
-  ModuleItem* init_item = nullptr;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) {
-      init_item = item;
-      break;
-    }
-  }
+  auto* init_item = FindInitialBlock(r);
   ASSERT_NE(init_item, nullptr);
   ASSERT_NE(init_item->body, nullptr);
   EXPECT_EQ(init_item->body->kind, StmtKind::kBlock);
@@ -636,18 +625,13 @@ TEST(ParserSection4, Sec4_5_ContinuousAssignWithDelay) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  bool found = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kContAssign) {
-      found = true;
-      ASSERT_NE(item->assign_delay, nullptr);
-      EXPECT_EQ(item->assign_delay->kind, ExprKind::kIntegerLiteral);
-      EXPECT_EQ(item->assign_delay->int_val, 5u);
-      EXPECT_NE(item->assign_lhs, nullptr);
-      EXPECT_NE(item->assign_rhs, nullptr);
-    }
-  }
-  EXPECT_TRUE(found);
+  auto* ca = FindContAssign(r);
+  ASSERT_NE(ca, nullptr);
+  ASSERT_NE(ca->assign_delay, nullptr);
+  EXPECT_EQ(ca->assign_delay->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(ca->assign_delay->int_val, 5u);
+  EXPECT_NE(ca->assign_lhs, nullptr);
+  EXPECT_NE(ca->assign_rhs, nullptr);
 }
 
 // ---------------------------------------------------------------------------

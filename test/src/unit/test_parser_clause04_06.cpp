@@ -85,6 +85,13 @@ static Stmt* InitialBody(ParseResult4c& r) {
   return nullptr;
 }
 
+static bool HasDefaultCaseItem(const Stmt* case_stmt) {
+  for (const auto& ci : case_stmt->case_items) {
+    if (ci.is_default) return true;
+  }
+  return false;
+}
+
 // =============================================================================
 // §4.6: always_comb guarantees combinational semantics
 // =============================================================================
@@ -101,7 +108,7 @@ TEST(ParserSection4, Sec4_6_AlwaysCombCombinational) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
   ASSERT_NE(item->body, nullptr);
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
@@ -123,7 +130,7 @@ TEST(ParserSection4, Sec4_6_AlwaysFfFlipFlop) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysFFBlock);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysFF);
   ASSERT_NE(item->body, nullptr);
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
@@ -145,7 +152,7 @@ TEST(ParserSection4, Sec4_6_AlwaysLatchLatch) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysLatchBlock);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysLatch);
   ASSERT_NE(item->body, nullptr);
 }
@@ -414,10 +421,12 @@ TEST(ParserSection4, Sec4_6_OrderedPortConnections) {
   EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
   ASSERT_EQ(item->inst_ports.size(), 3u);
   // Positional ports have empty name (first element of pair).
-  for (size_t i = 0; i < 3; ++i) {
-    EXPECT_TRUE(item->inst_ports[i].first.empty());
-    EXPECT_NE(item->inst_ports[i].second, nullptr);
-  }
+  EXPECT_TRUE(item->inst_ports[0].first.empty());
+  EXPECT_TRUE(item->inst_ports[1].first.empty());
+  EXPECT_TRUE(item->inst_ports[2].first.empty());
+  EXPECT_NE(item->inst_ports[0].second, nullptr);
+  EXPECT_NE(item->inst_ports[1].second, nullptr);
+  EXPECT_NE(item->inst_ports[2].second, nullptr);
 }
 
 // =============================================================================
@@ -633,12 +642,7 @@ TEST(ParserSection4, Sec4_6_PriorityCaseWithDefault) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
-  // Verify that a default item exists.
-  bool found_default = false;
-  for (const auto& ci : stmt->case_items) {
-    if (ci.is_default) found_default = true;
-  }
-  EXPECT_TRUE(found_default);
+  EXPECT_TRUE(HasDefaultCaseItem(stmt));
 }
 
 // =============================================================================
