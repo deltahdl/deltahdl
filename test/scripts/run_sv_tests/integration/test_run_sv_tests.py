@@ -145,6 +145,28 @@ class TestMain:
 
         assert get_exit_code(run) == 1
 
+    def test_pool_map_exception_prints_error_and_continues(
+        self, capsys, get_exit_code
+    ):
+        """main() prints diagnostic and still exits when pool.map raises."""
+        fake_paths = ["/tests/chapter-5/a.sv"]
+
+        def run():
+            with patch("sys.argv", ["run_sv_tests.py"]), \
+                 patch("run_sv_tests.check_binary"), \
+                 patch("run_sv_tests.glob.glob", return_value=fake_paths), \
+                 patch(
+                     "run_sv_tests.ThreadPoolExecutor"
+                 ) as mock_pool_cls:
+                mock_pool_cls.return_value.__enter__.return_value \
+                    .map.side_effect = OSError("too many open files")
+                run_sv_tests.main()
+
+        assert (
+            get_exit_code(run) == 0
+            and "pool.map failed after 0/1" in capsys.readouterr().err
+        )
+
     def test_writes_junit_xml(self, tmp_path, get_exit_code):
         """main() writes JUnit XML when --junit-xml is given."""
         xml_path = str(tmp_path / "report.xml")

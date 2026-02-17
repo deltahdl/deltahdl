@@ -343,7 +343,7 @@ def main():
         passed += ok
 
     failed = len(results) - passed
-    pct = 100.0 * passed / len(results)
+    pct = 100.0 * passed / len(results) if results else 0.0
     print(
         f"\nsv-tests summary: {passed}/{len(results)} passed ({pct:.1f}%), "
         f"{failed} failed",
