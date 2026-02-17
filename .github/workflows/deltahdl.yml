@@ -602,7 +602,7 @@ jobs:
           path: build/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
-      - name: Integration tests
+      - name: Run sv-tests
         run: python3 scripts/run_sv_tests.py
   integration-test-coverage:
     env:
@@ -626,7 +626,7 @@ jobs:
           path: build/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
-      - name: Integration tests
+      - name: Run sv-tests
         run: python3 scripts/run_sv_tests.py
       - name: Upload profraw
         uses: actions/upload-artifact@v4
@@ -654,7 +654,7 @@ jobs:
           path: build/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
-      - name: Integration tests
+      - name: Run sv-tests
         run: python3 -u scripts/run_sv_tests.py
   integration-test-tsan:
     env:
@@ -678,7 +678,7 @@ jobs:
           path: build/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
-      - name: Integration tests
+      - name: Run sv-tests
         run: python3 scripts/run_sv_tests.py
   integration-test-ubuntu-24-04-x86-64-clang:
     needs: cache-sv-tests
@@ -700,7 +700,7 @@ jobs:
           path: build/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
-      - name: Integration tests
+      - name: Run sv-tests
         run: python3 scripts/run_sv_tests.py
   integration-test-ubuntu-24-04-x86-64-gcc:
     needs: cache-sv-tests
@@ -722,7 +722,7 @@ jobs:
           path: build/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
-      - name: Integration tests
+      - name: Run sv-tests
         run: python3 scripts/run_sv_tests.py
   release:
     if: >-
