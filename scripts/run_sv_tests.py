@@ -322,10 +322,18 @@ def main():
     ok_flags = []
     suite_start = time.monotonic()
 
-    with ThreadPoolExecutor(max_workers=os.cpu_count()) as pool:
-        for result, ok in pool.map(build_result, tests):
-            results.append(result)
-            ok_flags.append(ok)
+    try:
+        with ThreadPoolExecutor(max_workers=os.cpu_count()) as pool:
+            for result, ok in pool.map(build_result, tests):
+                results.append(result)
+                ok_flags.append(ok)
+    except Exception as exc:
+        print(
+            f"\nerror: pool.map failed after {len(results)}/{len(tests)} "
+            f"results: {type(exc).__name__}: {exc}",
+            file=sys.stderr,
+            flush=True,
+        )
 
     # Sort results by clause-number prefix for hierarchical display.
     pairs = sorted(zip(results, ok_flags), key=lambda p: _natural_sort_key(p[0]["name"]))
@@ -336,14 +344,19 @@ def main():
 
     failed = len(results) - passed
     pct = 100.0 * passed / len(results)
-    print(f"\nsv-tests summary: {passed}/{len(results)} passed ({pct:.1f}%), {failed} failed")
+    print(
+        f"\nsv-tests summary: {passed}/{len(results)} passed ({pct:.1f}%), "
+        f"{failed} failed",
+        flush=True,
+    )
 
     print_chapter_breakdown(results)
+    sys.stdout.flush()
 
     if args.junit_xml:
         elapsed = time.monotonic() - suite_start
         write_junit_xml(results, elapsed, args.junit_xml)
-        print(f"\nJUnit XML written to {args.junit_xml}")
+        print(f"\nJUnit XML written to {args.junit_xml}", flush=True)
 
     sys.exit(min(failed, 1))
 
