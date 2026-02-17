@@ -296,9 +296,13 @@ jobs:
       - name: Restore ctcache
         uses: actions/cache@v4
         with:
-          key: ctcache-src-${{ hashFiles('.clang-tidy') }}
+          key: >-
+            ctcache-src-${{ hashFiles('.clang-tidy') }}-${{
+            github.event.workflow_run.head_sha }}
           path: .ctcache
-          restore-keys: ctcache-src-
+          restore-keys: |
+            ctcache-src-${{ hashFiles('.clang-tidy') }}-
+            ctcache-src-
       - name: Generate compile_commands.json
         run: |
           cmake -B build \
@@ -338,9 +342,14 @@ jobs:
       - name: Restore ctcache
         uses: actions/cache@v4
         with:
-          key: ctcache-test-${{ hashFiles('test/src/unit/.clang-tidy') }}
+          key: >-
+            ctcache-test-${{
+            hashFiles('test/src/unit/.clang-tidy') }}-${{
+            github.event.workflow_run.head_sha }}
           path: .ctcache
-          restore-keys: ctcache-test-
+          restore-keys: |
+            ctcache-test-${{ hashFiles('test/src/unit/.clang-tidy') }}-
+            ctcache-test-
       - name: Generate compile_commands.json
         run: |
           cmake -B build \
