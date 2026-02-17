@@ -223,12 +223,12 @@ class TestCheckAssertions:
         assert ok is False and "Assertion parse error" in detail
 
     def test_string_equality_pass(self):
-        """_try_string_equality() should return True for matching strings."""
-        assert run_sv_tests._try_string_equality("('hello' == 'hello')") is True
+        """try_string_equality() should return True for matching strings."""
+        assert run_sv_tests.try_string_equality("('hello' == 'hello')") is True
 
     def test_string_equality_fail(self):
-        """_try_string_equality() should return False for mismatched strings."""
-        assert run_sv_tests._try_string_equality("('hello' == 'world')") is False
+        """try_string_equality() should return False for mismatched strings."""
+        assert run_sv_tests.try_string_equality("('hello' == 'world')") is False
 
     @patch("ast.parse", side_effect=SyntaxError)
     def test_string_equality_fallback_pass(self, _mock_parse):
