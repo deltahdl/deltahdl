@@ -168,11 +168,11 @@ TEST(ParserCh501, Sec5_1_BlockCommentBetweenTokens) {
 
 TEST(ParserCh501, Sec5_1_BlockCommentInsideExpression) {
   // Block comment between operands in a continuous assignment expression.
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  logic a, b, c;\n"
-      "  assign a = b /* comment */ + c;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic a, b, c;\n"
+              "  assign a = b /* comment */ + c;\n"
+              "endmodule\n"));
 }
 
 // =========================================================================
