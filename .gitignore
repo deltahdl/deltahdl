@@ -1,22 +1,15 @@
-# Build
+*~
+*.pyc
+*.swo
+*.swp
+.cache/
+.coverage
+.DS_Store
+.idea/
+.vscode/
+__pycache__/
 build/
 cmake-build-*/
-Testing/
-
-# Python
-__pycache__/
-*.pyc
-
-# IDE / tooling
-.cache/
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
 compile_commands.json
-
-# OS
-.DS_Store
+Testing/
 Thumbs.db
-.coverage
