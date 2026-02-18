@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -183,7 +184,7 @@ TEST(SimCh4095, TransistorSourceElements) {
 
   // Enumerate all six transistor types as distinct source elements.
   // Each is represented as a named type with bidirectional connectivity.
-  enum class TranType {
+  enum class TranType : std::uint8_t {
     kTran,
     kTranif0,
     kTranif1,
@@ -272,8 +273,8 @@ TEST(SimCh4095, RelaxationTechnique) {
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
     // Relaxation: iterate until all nodes converge.
-    int prev_n1;
-    int prev_n2;
+    int prev_n1 = 0;
+    int prev_n2 = 0;
     do {
       prev_n1 = n1;
       prev_n2 = n2;

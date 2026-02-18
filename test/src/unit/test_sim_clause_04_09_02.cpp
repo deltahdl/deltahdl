@@ -443,7 +443,6 @@ TEST(SimCh4092, ReEvaluatesOnEachSourceChange) {
   int src = 0;
   int dst = 0;
   int update_count = 0;
-  bool assign_active = true;
 
   // Model: assign dst = src;
   // Source changes at time 0, 1, and 2.
@@ -456,10 +455,8 @@ TEST(SimCh4092, ReEvaluatesOnEachSourceChange) {
       auto* update = sched.GetEventPool().Acquire();
       update->kind = EventKind::kUpdate;
       update->callback = [&, val]() {
-        if (assign_active) {
-          dst = val;
-          ++update_count;
-        }
+        dst = val;
+        ++update_count;
       };
       sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
     };
