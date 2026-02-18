@@ -150,6 +150,9 @@ class Parser {
   DataType ParseStructOrUnionBody(TokenKind kw);
   void ParseStructMembers(DataType& dtype);
   DataType ParseFunctionReturnType();
+  void ParseDynamicOverrideSpecifiers();
+  void ParseFuncName(ModuleItem* item);
+  void ParseFuncBody(ModuleItem* item);
   ModuleItem* ParseFunctionDecl(bool prototype_only = false);
   ModuleItem* ParseTaskDecl(bool prototype_only = false);
   std::vector<FunctionArg> ParseFunctionArgs();

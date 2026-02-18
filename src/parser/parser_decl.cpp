@@ -291,39 +291,40 @@ DataType Parser::ParseFunctionReturnType() {
 
 // --- Function declaration ---
 
-ModuleItem* Parser::ParseFunctionDecl(bool prototype_only) {
-  auto* item = arena_.Create<ModuleItem>();
-  item->kind = ModuleItemKind::kFunctionDecl;
-  item->loc = CurrentLoc();
-  Expect(TokenKind::kKwFunction);
+// A.2.6: dynamic_override_specifiers
+void Parser::ParseDynamicOverrideSpecifiers() {
+  if (Match(TokenKind::kColon)) {
+    Match(TokenKind::kKwInitial) || Match(TokenKind::kKwExtends) ||
+        Match(TokenKind::kKwFinal);
+  }
+  if (Match(TokenKind::kColon)) Match(TokenKind::kKwFinal);
+}
 
-  // Optional lifetime: automatic or static.
-  item->is_automatic = Match(TokenKind::kKwAutomatic);
-  if (!item->is_automatic) item->is_static = Match(TokenKind::kKwStatic);
-
+// Parse function/task name with optional class_scope and 'new' for ctors.
+void Parser::ParseFuncName(ModuleItem* item) {
   item->return_type = ParseFunctionReturnType();
-
-  // §8.7 constructors use 'new' as function name
-  item->name =
-      Match(TokenKind::kKwNew) ? "new" : Expect(TokenKind::kIdentifier).text;
+  // A.1.11: function [class_scope] new — if the return type was parsed as a
+  // named type but :: follows, the "type" was actually a class scope prefix.
+  if (item->return_type.kind == DataTypeKind::kNamed &&
+      Check(TokenKind::kColonColon)) {
+    item->return_type = DataType{};
+    Consume();  // ::
+    item->name =
+        Match(TokenKind::kKwNew) ? "new" : Expect(TokenKind::kIdentifier).text;
+  } else {
+    item->name =
+        Match(TokenKind::kKwNew) ? "new" : Expect(TokenKind::kIdentifier).text;
+  }
   // §8.24 out-of-block methods: class_name::method_name
-  // class_constructor_declaration: function class_scope new (A.1.11)
   while (Match(TokenKind::kColonColon)) {
     item->name =
         Match(TokenKind::kKwNew) ? "new" : Expect(TokenKind::kIdentifier).text;
   }
+}
 
-  if (Check(TokenKind::kLParen)) {
-    item->func_args = ParseFunctionArgs();
-  }
-  Expect(TokenKind::kSemicolon);
-
-  // Pure virtual / extern prototypes have no body (§8.21, §8.24)
-  if (prototype_only) return item;
-
-  // Old-style port declarations (§13.3)
+// Parse function body: old-style ports, statements, endfunction label.
+void Parser::ParseFuncBody(ModuleItem* item) {
   ParseOldStylePortDecls(item, TokenKind::kKwEndfunction);
-
   while (!Check(TokenKind::kKwEndfunction) && !AtEnd()) {
     if (IsBlockVarDeclStart()) {
       ParseBlockVarDecls(item->func_body_stmts);
@@ -332,10 +333,30 @@ ModuleItem* Parser::ParseFunctionDecl(bool prototype_only) {
     }
   }
   Expect(TokenKind::kKwEndfunction);
-  // Optional end label: ": name" (may be 'new' for constructors)
   if (Match(TokenKind::kColon)) {
     if (!Match(TokenKind::kKwNew)) ExpectIdentifier();
   }
+}
+
+ModuleItem* Parser::ParseFunctionDecl(bool prototype_only) {
+  auto* item = arena_.Create<ModuleItem>();
+  item->kind = ModuleItemKind::kFunctionDecl;
+  item->loc = CurrentLoc();
+  Expect(TokenKind::kKwFunction);
+
+  ParseDynamicOverrideSpecifiers();
+
+  item->is_automatic = Match(TokenKind::kKwAutomatic);
+  if (!item->is_automatic) item->is_static = Match(TokenKind::kKwStatic);
+
+  ParseFuncName(item);
+
+  if (Check(TokenKind::kLParen)) {
+    item->func_args = ParseFunctionArgs();
+  }
+  Expect(TokenKind::kSemicolon);
+
+  if (!prototype_only) ParseFuncBody(item);
   return item;
 }
 
@@ -677,9 +698,15 @@ DataType Parser::ParseNamedType() {
     dtype.type_params = ParseTypeParamList();
   }
   // §8.26.3 scope-resolved types: class_name::type_name
-  while (Match(TokenKind::kColonColon)) {
+  while (Check(TokenKind::kColonColon)) {
+    auto saved = lexer_.SavePos();
+    Consume();  // ::
+    if (!CheckIdentifier()) {
+      lexer_.RestorePos(saved);
+      break;
+    }
     dtype.scope_name = dtype.type_name;
-    dtype.type_name = ExpectIdentifier().text;
+    dtype.type_name = Consume().text;
     if (Check(TokenKind::kHash)) {
       Consume();
       dtype.type_params = ParseTypeParamList();
