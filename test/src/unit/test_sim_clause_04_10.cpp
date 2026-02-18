@@ -351,12 +351,8 @@ TEST(SimCh410, FullPliCallbackRegionOrdering) {
   ScheduleOrderEvent(sched, SimTime{0}, Region::kPostponed, order, "postponed");
 
   sched.Run();
-  ASSERT_EQ(order.size(), 7u);
-  EXPECT_EQ(order[0], "pre_active");
-  EXPECT_EQ(order[1], "active");
-  EXPECT_EQ(order[2], "pre_nba");
-  EXPECT_EQ(order[3], "nba");
-  EXPECT_EQ(order[4], "post_nba");
-  EXPECT_EQ(order[5], "pre_postponed");
-  EXPECT_EQ(order[6], "postponed");
+  const std::vector<std::string> kExpected = {
+      "pre_active", "active",        "pre_nba",  "nba",
+      "post_nba",   "pre_postponed", "postponed"};
+  EXPECT_EQ(order, kExpected);
 }
