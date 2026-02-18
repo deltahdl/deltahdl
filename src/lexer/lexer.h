@@ -28,6 +28,7 @@ class Lexer {
     uint32_t line;
     uint32_t column;
     bool has_peeked;
+    bool in_attribute;
     Token peeked;
     KeywordVersion keyword_version;
   };

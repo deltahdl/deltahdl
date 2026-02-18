@@ -226,6 +226,7 @@ enum class StmtKind : uint8_t {
   kWaitOrder,        // wait_order(ev1, ev2, ...) (§15.5.4)
   kRandcase,         // randcase ... endcase (§18.16)
   kVarDecl,          // Block-level variable declaration (§9.3.1)
+  kBlockItemDecl,    // Block-level typedef/import/let (§A.2.8)
 };
 
 enum class Edge : uint8_t {
@@ -323,6 +324,10 @@ struct Stmt {
   Expr* var_init = nullptr;
   bool var_is_automatic = false;  // §6.21 explicit automatic lifetime
   bool var_is_static = false;     // §6.21 explicit static lifetime
+  bool var_is_const = false;      // §A.2.8 [const] data_declaration
+
+  // Block-level declaration item (kBlockItemDecl) — §A.2.8
+  ModuleItem* decl_item = nullptr;
 };
 
 // --- Declarations and module items ---

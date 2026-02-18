@@ -906,7 +906,8 @@ std::vector<Token> Lexer::LexAll() {
 }
 
 Lexer::SavedPos Lexer::SavePos() const {
-  return {pos_, line_, column_, has_peeked_, peeked_, keyword_version_};
+  return {pos_,          line_,   column_,         has_peeked_,
+          in_attribute_, peeked_, keyword_version_};
 }
 
 void Lexer::RestorePos(const SavedPos& saved) {
@@ -914,6 +915,7 @@ void Lexer::RestorePos(const SavedPos& saved) {
   line_ = saved.line;
   column_ = saved.column;
   has_peeked_ = saved.has_peeked;
+  in_attribute_ = saved.in_attribute;
   peeked_ = saved.peeked;
   keyword_version_ = saved.keyword_version;
 }

@@ -169,14 +169,41 @@ Stmt* Parser::ParseNbEventTriggerStmt() {
   return s;
 }
 
-// LRM section 9.3.1 -- block_item_declaration detection
+// §A.2.8 block_item_declaration detection (skips attribute instances)
 bool Parser::IsBlockVarDeclStart() {
+  auto saved = lexer_.SavePos();
+  while (Check(TokenKind::kAttrStart)) {
+    Consume();
+    int depth = 1;
+    while (depth > 0 && !AtEnd()) {
+      if (Check(TokenKind::kAttrEnd)) depth--;
+      Consume();
+    }
+  }
+  bool result = IsBlockVarDeclStartCore();
+  lexer_.RestorePos(saved);
+  return result;
+}
+
+bool Parser::IsBlockVarDeclStartCore() {
   auto tk = CurrentToken().kind;
   if (tk == TokenKind::kKwAutomatic || tk == TokenKind::kKwStatic) {
     return true;  // §6.21 explicit lifetime qualifier
   }
   if (tk == TokenKind::kKwParameter || tk == TokenKind::kKwLocalparam) {
     return true;  // §6.20.1 block-level parameter declarations
+  }
+  if (tk == TokenKind::kKwConst) {
+    return true;  // §A.2.8: [const] [var] [lifetime] data_type_or_implicit
+  }
+  if (tk == TokenKind::kKwTypedef) {
+    return true;  // §A.2.8: data_declaration → type_declaration
+  }
+  if (tk == TokenKind::kKwImport) {
+    return true;  // §A.2.8: data_declaration → package_import_declaration
+  }
+  if (tk == TokenKind::kKwLet) {
+    return true;  // §A.2.8: let_declaration
   }
   if (tk == TokenKind::kKwStruct || tk == TokenKind::kKwUnion ||
       tk == TokenKind::kKwEnum || tk == TokenKind::kKwVar) {
@@ -194,8 +221,78 @@ bool Parser::IsBlockVarDeclStart() {
          known_types_.count(CurrentToken().text) != 0;
 }
 
-// LRM section 9.3.1 -- block-level variable declarations
+// §A.2.8: data_declaration — [const] [var] [lifetime] data_type_or_implicit
+void Parser::ParseBlockDataDecl(std::vector<Stmt*>& stmts,
+                                std::vector<Attribute> attrs) {
+  bool is_const = Match(TokenKind::kKwConst);
+  bool is_automatic = Match(TokenKind::kKwAutomatic);             // §6.21
+  bool is_static = !is_automatic && Match(TokenKind::kKwStatic);  // §6.21
+  bool saw_var = Match(TokenKind::kKwVar);  // optional 'var' prefix (§6.8)
+  if (!is_automatic && !is_static && saw_var) {
+    is_automatic = Match(TokenKind::kKwAutomatic);
+    is_static = !is_automatic && Match(TokenKind::kKwStatic);
+  }
+  DataType dtype = ParseDataType();
+  if (saw_var && dtype.kind == DataTypeKind::kImplicit &&
+      Check(TokenKind::kLBracket)) {
+    ParsePackedDims(dtype);
+  }
+  do {
+    auto* s = arena_.Create<Stmt>();
+    s->kind = StmtKind::kVarDecl;
+    s->range.start = CurrentLoc();
+    s->var_decl_type = dtype;
+    s->var_is_const = is_const;
+    s->var_is_automatic = is_automatic;
+    s->var_is_static = is_static;
+    s->var_name = ExpectIdentifier().text;
+    s->attrs = attrs;
+    ParseUnpackedDims(s->var_unpacked_dims);
+    if (Match(TokenKind::kEq)) {
+      s->var_init = ParseExpr();
+    }
+    stmts.push_back(s);
+  } while (Match(TokenKind::kComma));
+  Expect(TokenKind::kSemicolon);
+}
+
+// §A.2.8 block_item_declaration
 void Parser::ParseBlockVarDecls(std::vector<Stmt*>& stmts) {
+  auto attrs = ParseAttributes();
+  // §A.2.8: let_declaration
+  if (Check(TokenKind::kKwLet)) {
+    auto* s = arena_.Create<Stmt>();
+    s->kind = StmtKind::kBlockItemDecl;
+    s->range.start = CurrentLoc();
+    s->decl_item = ParseLetDecl();
+    s->attrs = std::move(attrs);
+    stmts.push_back(s);
+    return;
+  }
+  // §A.2.8: data_declaration → type_declaration
+  if (Check(TokenKind::kKwTypedef)) {
+    auto* s = arena_.Create<Stmt>();
+    s->kind = StmtKind::kBlockItemDecl;
+    s->range.start = CurrentLoc();
+    s->decl_item = ParseTypedef();
+    s->attrs = std::move(attrs);
+    stmts.push_back(s);
+    return;
+  }
+  // §A.2.8: data_declaration → package_import_declaration
+  if (Check(TokenKind::kKwImport)) {
+    std::vector<ModuleItem*> import_items;
+    ParseImportDecl(import_items);
+    for (auto* imp : import_items) {
+      auto* s = arena_.Create<Stmt>();
+      s->kind = StmtKind::kBlockItemDecl;
+      s->range.start = imp->loc;
+      s->decl_item = imp;
+      s->attrs = attrs;
+      stmts.push_back(s);
+    }
+    return;
+  }
   // §6.20.1: parameter/localparam as block-level declarations
   if (Check(TokenKind::kKwParameter) || Check(TokenKind::kKwLocalparam)) {
     std::vector<ModuleItem*> param_items;
@@ -207,34 +304,12 @@ void Parser::ParseBlockVarDecls(std::vector<Stmt*>& stmts) {
       s->var_decl_type = param->data_type;
       s->var_name = param->name;
       s->var_init = param->init_expr;
+      s->attrs = attrs;
       stmts.push_back(s);
     }
     return;
   }
-  bool is_automatic = Match(TokenKind::kKwAutomatic);             // §6.21
-  bool is_static = !is_automatic && Match(TokenKind::kKwStatic);  // §6.21
-  bool saw_var = Match(TokenKind::kKwVar);  // optional 'var' prefix (§6.8)
-  DataType dtype = ParseDataType();
-  // §6.8: implicit_data_type — bare packed dims after 'var' (e.g. var [3:0] x)
-  if (saw_var && dtype.kind == DataTypeKind::kImplicit &&
-      Check(TokenKind::kLBracket)) {
-    ParsePackedDims(dtype);
-  }
-  do {
-    auto* s = arena_.Create<Stmt>();
-    s->kind = StmtKind::kVarDecl;
-    s->range.start = CurrentLoc();
-    s->var_decl_type = dtype;
-    s->var_is_automatic = is_automatic;
-    s->var_is_static = is_static;
-    s->var_name = ExpectIdentifier().text;
-    ParseUnpackedDims(s->var_unpacked_dims);
-    if (Match(TokenKind::kEq)) {
-      s->var_init = ParseExpr();
-    }
-    stmts.push_back(s);
-  } while (Match(TokenKind::kComma));
-  Expect(TokenKind::kSemicolon);
+  ParseBlockDataDecl(stmts, std::move(attrs));
 }
 
 // LRM section 12.6 / section 9.3.4 -- named blocks
