@@ -194,8 +194,6 @@ ModuleItem* Parser::ParseTypedef() {
   return item;
 }
 
-// --- Nettype declaration (§6.6.7 stub) ---
-
 ModuleItem* Parser::ParseNettypeDecl() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kNettypeDecl;
@@ -219,8 +217,6 @@ ModuleItem* Parser::ParseNettypeDecl() {
   return item;
 }
 
-// --- Function argument list ---
-
 std::vector<FunctionArg> Parser::ParseFunctionArgs() {
   std::vector<FunctionArg> args;
   Expect(TokenKind::kLParen);
@@ -231,7 +227,7 @@ std::vector<FunctionArg> Parser::ParseFunctionArgs() {
   Direction sticky_dir = Direction::kNone;
   do {
     FunctionArg arg;
-    // const ref (§13.5.2)
+    // A.2.7 tf_port_direction: [const] ref [static]
     if (Match(TokenKind::kKwConst)) {
       arg.is_const = true;
     }
@@ -251,11 +247,16 @@ std::vector<FunctionArg> Parser::ParseFunctionArgs() {
       arg.direction = Direction::kRef;
       sticky_dir = Direction::kRef;
       Consume();
+      Match(TokenKind::kKwStatic);  // A.2.7: ref [static]
     } else {
       arg.direction = sticky_dir;
     }
+    Match(TokenKind::kKwVar);  // A.2.7 tf_port_item: [var]
     arg.data_type = ParseDataType();
-    arg.name = Expect(TokenKind::kIdentifier).text;
+    // A.2.7 clarification 28: name optional in prototypes
+    if (CheckIdentifier()) {
+      arg.name = Consume().text;
+    }
     // Unpacked dimensions on argument (§13.4)
     ParseUnpackedDims(arg.unpacked_dims);
     // Default value (§13.5.3)
@@ -267,8 +268,6 @@ std::vector<FunctionArg> Parser::ParseFunctionArgs() {
   Expect(TokenKind::kRParen);
   return args;
 }
-
-// --- Function return type ---
 
 DataType Parser::ParseFunctionReturnType() {
   if (Check(TokenKind::kKwVoid)) {
@@ -288,8 +287,6 @@ DataType Parser::ParseFunctionReturnType() {
   }
   return ParseDataType();
 }
-
-// --- Function declaration ---
 
 // A.2.6: dynamic_override_specifiers
 void Parser::ParseDynamicOverrideSpecifiers() {
@@ -360,13 +357,13 @@ ModuleItem* Parser::ParseFunctionDecl(bool prototype_only) {
   return item;
 }
 
-// --- Task declaration ---
-
 ModuleItem* Parser::ParseTaskDecl(bool prototype_only) {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kTaskDecl;
   item->loc = CurrentLoc();
   Expect(TokenKind::kKwTask);
+
+  ParseDynamicOverrideSpecifiers();
 
   if (Match(TokenKind::kKwAutomatic)) {
     item->is_automatic = true;
@@ -375,6 +372,10 @@ ModuleItem* Parser::ParseTaskDecl(bool prototype_only) {
   }
 
   item->name = Expect(TokenKind::kIdentifier).text;
+  // A.2.7: interface_identifier . task_identifier
+  if (Match(TokenKind::kDot)) {
+    item->name = Expect(TokenKind::kIdentifier).text;
+  }
   // §8.24 out-of-block methods: class_name::method_name
   while (Match(TokenKind::kColonColon)) {
     item->name = Expect(TokenKind::kIdentifier).text;
@@ -406,8 +407,6 @@ ModuleItem* Parser::ParseTaskDecl(bool prototype_only) {
   return item;
 }
 
-// --- Event lists ---
-
 std::vector<EventExpr> Parser::ParseEventList() {
   std::vector<EventExpr> events;
   events.push_back(ParseSingleEvent());
@@ -434,18 +433,14 @@ EventExpr Parser::ParseSingleEvent() {
   return ev;
 }
 
-// --- Old-style port declarations (§13.3) ---
+// --- Old-style port declarations (§13.3 / A.2.7) ---
 
 void Parser::ParseOldStylePortDecls(ModuleItem* item, TokenKind end_kw) {
-  // Parse port direction declarations before the function/task body.
-  // tf_port_declaration ::= tf_port_direction [var] data_type_or_implicit
-  //     list_of_tf_variable_identifiers
-  // list_of_tf_variable_identifiers ::=
-  //     port_identifier { variable_dimension } [ = expression ]
-  //     { , port_identifier { variable_dimension } [ = expression ] }
   while (Check(TokenKind::kKwInput) || Check(TokenKind::kKwOutput) ||
-         Check(TokenKind::kKwInout) || Check(TokenKind::kKwRef)) {
+         Check(TokenKind::kKwInout) || Check(TokenKind::kKwRef) ||
+         Check(TokenKind::kKwConst)) {
     Direction dir = Direction::kNone;
+    bool is_const = Match(TokenKind::kKwConst);  // A.2.7: [const] ref
     if (Check(TokenKind::kKwInput)) {
       dir = Direction::kInput;
     } else if (Check(TokenKind::kKwOutput)) {
@@ -456,10 +451,12 @@ void Parser::ParseOldStylePortDecls(ModuleItem* item, TokenKind end_kw) {
       dir = Direction::kRef;
     }
     Consume();
+    Match(TokenKind::kKwVar);  // A.2.7 tf_port_declaration: [var]
     DataType dt = ParseDataType();
     // list_of_tf_variable_identifiers: comma-separated port names
     do {
       FunctionArg arg;
+      arg.is_const = is_const;
       arg.direction = dir;
       arg.data_type = dt;
       arg.name = Expect(TokenKind::kIdentifier).text;
