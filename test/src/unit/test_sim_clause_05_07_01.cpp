@@ -16,7 +16,7 @@
 
 using namespace delta;
 
-struct SimCh5bFixture {
+struct SimCh50701Fixture {
   SourceManager mgr;
   Arena arena;
   Scheduler scheduler{arena};
@@ -24,7 +24,7 @@ struct SimCh5bFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign* ElaborateSrc(const std::string& src, SimCh5bFixture& f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimCh50701Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
@@ -34,7 +34,7 @@ static RtlirDesign* ElaborateSrc(const std::string& src, SimCh5bFixture& f) {
 }
 
 static uint64_t RunAndGet(const std::string& src, const char* var_name) {
-  SimCh5bFixture f;
+  SimCh50701Fixture f;
   auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0;
@@ -48,159 +48,13 @@ static uint64_t RunAndGet(const std::string& src, const char* var_name) {
 }
 
 // ===========================================================================
-// §5.6 Identifiers, keywords, and system names — simulation-level tests
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// 1. Simple identifier with dollar sign ($) in name
-// ---------------------------------------------------------------------------
-TEST(SimCh5b, IdentifierWithDollarSign) {
-  // §5.6: Simple identifiers may contain letters, digits, $, and _.
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] n$657;\n"
-      "  initial n$657 = 8'd42;\n"
-      "endmodule\n",
-      "n$657");
-  EXPECT_EQ(result, 42u);
-}
-
-// ---------------------------------------------------------------------------
-// 2. Identifier starting with underscore
-// ---------------------------------------------------------------------------
-TEST(SimCh5b, IdentifierStartingWithUnderscore) {
-  // §5.6: First character must be a letter or underscore (not digit or $).
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] _bus3;\n"
-      "  initial _bus3 = 8'd55;\n"
-      "endmodule\n",
-      "_bus3");
-  EXPECT_EQ(result, 55u);
-}
-
-// ---------------------------------------------------------------------------
-// 3. Identifiers are case sensitive
-// ---------------------------------------------------------------------------
-TEST(SimCh5b, IdentifiersCaseSensitive) {
-  // §5.6: Identifiers are case sensitive.
-  SimCh5bFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] data, Data, DATA;\n"
-      "  initial begin\n"
-      "    data = 8'd10;\n"
-      "    Data = 8'd20;\n"
-      "    DATA = 8'd30;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v1 = f.ctx.FindVariable("data");
-  auto* v2 = f.ctx.FindVariable("Data");
-  auto* v3 = f.ctx.FindVariable("DATA");
-  ASSERT_NE(v1, nullptr);
-  ASSERT_NE(v2, nullptr);
-  ASSERT_NE(v3, nullptr);
-  EXPECT_EQ(v1->value.ToUint64(), 10u);
-  EXPECT_EQ(v2->value.ToUint64(), 20u);
-  EXPECT_EQ(v3->value.ToUint64(), 30u);
-}
-
-// ---------------------------------------------------------------------------
-// 4. Long identifier (1024 characters — the minimum required maximum)
-// ---------------------------------------------------------------------------
-TEST(SimCh5b, LongIdentifier1024Chars) {
-  // §5.6: Maximum identifier length is at least 1024 characters.
-  std::string long_id(1024, 'a');
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] " +
-          long_id +
-          ";\n"
-          "  initial " +
-          long_id +
-          " = 8'd77;\n"
-          "endmodule\n",
-      long_id.c_str());
-  EXPECT_EQ(result, 77u);
-}
-
-// ---------------------------------------------------------------------------
-// 5. Identifier with digits (not as first character)
-// ---------------------------------------------------------------------------
-TEST(SimCh5b, IdentifierWithDigits) {
-  // §5.6: Simple identifiers can contain digits (not as first character).
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] abc123;\n"
-      "  initial abc123 = 8'd88;\n"
-      "endmodule\n",
-      "abc123");
-  EXPECT_EQ(result, 88u);
-}
-
-// ---------------------------------------------------------------------------
-// 6. Identifier references an object by name
-// ---------------------------------------------------------------------------
-TEST(SimCh5b, IdentifierReferencesObject) {
-  // §5.6: An identifier gives an object a unique name for referencing.
-  SimCh5bFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] source, sink;\n"
-      "  initial begin\n"
-      "    source = 8'd66;\n"
-      "    sink = source;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("sink");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 66u);
-}
-
-// ---------------------------------------------------------------------------
-// 7. Multiple identifiers with mixed character classes
-// ---------------------------------------------------------------------------
-TEST(SimCh5b, IdentifierMixedCharClasses) {
-  // §5.6: Identifiers use letters, digits, $, _ in combination.
-  SimCh5bFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] _start, mid$dle, end_99, result;\n"
-      "  initial begin\n"
-      "    _start = 8'd1;\n"
-      "    mid$dle = 8'd2;\n"
-      "    end_99 = 8'd3;\n"
-      "    result = _start + mid$dle + end_99;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 6u);
-}
-
-// ===========================================================================
-// §5.7.1 Integer literal constants — simulation-level tests
+// §5.7.1 Integer literal constants
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
 // 8. Simple decimal number
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, SimpleDecimalNumber) {
+TEST(SimCh50701, SimpleDecimalNumber) {
   // §5.7.1: Simple decimal number — sequence of digits 0-9.
   auto result = RunAndGet(
       "module t;\n"
@@ -214,7 +68,7 @@ TEST(SimCh5b, SimpleDecimalNumber) {
 // ---------------------------------------------------------------------------
 // 9. Sized binary literal constant
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, SizedBinaryLiteral) {
+TEST(SimCh50701, SizedBinaryLiteral) {
   // §5.7.1: Sized binary literal — 4-bit binary number.
   auto result = RunAndGet(
       "module t;\n"
@@ -228,7 +82,7 @@ TEST(SimCh5b, SizedBinaryLiteral) {
 // ---------------------------------------------------------------------------
 // 10. Sized octal literal constant
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, SizedOctalLiteral) {
+TEST(SimCh50701, SizedOctalLiteral) {
   // §5.7.1: based literal with octal base
   auto result = RunAndGet(
       "module t;\n"
@@ -242,7 +96,7 @@ TEST(SimCh5b, SizedOctalLiteral) {
 // ---------------------------------------------------------------------------
 // 11. Sized hexadecimal literal constant
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, SizedHexLiteral) {
+TEST(SimCh50701, SizedHexLiteral) {
   // §5.7.1: based literal with hex base
   auto result = RunAndGet(
       "module t;\n"
@@ -256,7 +110,7 @@ TEST(SimCh5b, SizedHexLiteral) {
 // ---------------------------------------------------------------------------
 // 12. Sized decimal literal constant
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, SizedDecimalLiteral) {
+TEST(SimCh50701, SizedDecimalLiteral) {
   // §5.7.1: Sized decimal literal — 5-bit decimal number.
   auto result = RunAndGet(
       "module t;\n"
@@ -270,7 +124,7 @@ TEST(SimCh5b, SizedDecimalLiteral) {
 // ---------------------------------------------------------------------------
 // 13. Unsized hex literal (at least 32 bits)
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, UnsizedHexLiteral) {
+TEST(SimCh50701, UnsizedHexLiteral) {
   // §5.7.1: Unsized hex literal (at least 32 bits).
   auto result = RunAndGet(
       "module t;\n"
@@ -284,7 +138,7 @@ TEST(SimCh5b, UnsizedHexLiteral) {
 // ---------------------------------------------------------------------------
 // 14. Unsized octal literal
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, UnsizedOctalLiteral) {
+TEST(SimCh50701, UnsizedOctalLiteral) {
   // §5.7.1: Unsized octal literal.
   auto result = RunAndGet(
       "module t;\n"
@@ -298,7 +152,7 @@ TEST(SimCh5b, UnsizedOctalLiteral) {
 // ---------------------------------------------------------------------------
 // 15. Unary minus before size (two's complement)
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, UnaryMinusBeforeSize) {
+TEST(SimCh50701, UnaryMinusBeforeSize) {
   // §5.7.1: Unary minus before size — two's complement of 6, held in 8 bits.
   // equivalent to -(8'd 6) = 250 in unsigned 8-bit
   auto result = RunAndGet(
@@ -313,7 +167,7 @@ TEST(SimCh5b, UnaryMinusBeforeSize) {
 // ---------------------------------------------------------------------------
 // 16. Negative numbers in two's complement
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, NegativeTwosComplement) {
+TEST(SimCh50701, NegativeTwosComplement) {
   // §5.7.1: Negative numbers use two's-complement representation.
   auto result = RunAndGet(
       "module t;\n"
@@ -327,9 +181,9 @@ TEST(SimCh5b, NegativeTwosComplement) {
 // ---------------------------------------------------------------------------
 // 17. Hex digits case insensitive
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, HexDigitsCaseInsensitive) {
+TEST(SimCh50701, HexDigitsCaseInsensitive) {
   // §5.7.1: Hex digits a-f are case insensitive.
-  SimCh5bFixture f;
+  SimCh50701Fixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] a, b;\n"
@@ -354,9 +208,9 @@ TEST(SimCh5b, HexDigitsCaseInsensitive) {
 // ---------------------------------------------------------------------------
 // 18. Underscore in numbers
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, UnderscoreInNumber) {
+TEST(SimCh50701, UnderscoreInNumber) {
   // §5.7.1: Underscores are legal anywhere in a number except as first char.
-  SimCh5bFixture f;
+  SimCh50701Fixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] a, b, c;\n"
@@ -385,7 +239,7 @@ TEST(SimCh5b, UnderscoreInNumber) {
 // ---------------------------------------------------------------------------
 // 19. Left padding with zeros (value smaller than size)
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, LeftPadWithZeros) {
+TEST(SimCh50701, LeftPadWithZeros) {
   // §5.7.1: Value smaller than size — left-padded with zeros.
   auto result = RunAndGet(
       "module t;\n"
@@ -399,7 +253,7 @@ TEST(SimCh5b, LeftPadWithZeros) {
 // ---------------------------------------------------------------------------
 // 20. Truncation from left (value larger than size)
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, TruncationFromLeft) {
+TEST(SimCh50701, TruncationFromLeft) {
   // §5.7.1: Value larger than size — truncated from the left.
   auto result = RunAndGet(
       "module t;\n"
@@ -413,9 +267,9 @@ TEST(SimCh5b, TruncationFromLeft) {
 // ---------------------------------------------------------------------------
 // 21. X value in hex literal
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, XValueInHexLiteral) {
+TEST(SimCh50701, XValueInHexLiteral) {
   // §5.7.1: x sets 4 bits to unknown in hex base.
-  SimCh5bFixture f;
+  SimCh50701Fixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [11:0] x;\n"
@@ -434,9 +288,9 @@ TEST(SimCh5b, XValueInHexLiteral) {
 // ---------------------------------------------------------------------------
 // 22. Z value in hex literal
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, ZValueInHexLiteral) {
+TEST(SimCh50701, ZValueInHexLiteral) {
   // §5.7.1: z sets 4 bits to high-impedance in hex base.
-  SimCh5bFixture f;
+  SimCh50701Fixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] x;\n"
@@ -458,9 +312,9 @@ TEST(SimCh5b, ZValueInHexLiteral) {
 // ---------------------------------------------------------------------------
 // 23. X in binary literal (1 bit)
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, XInBinaryLiteral) {
+TEST(SimCh50701, XInBinaryLiteral) {
   // §5.7.1: x sets 1 bit to unknown in binary base.
-  SimCh5bFixture f;
+  SimCh50701Fixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [2:0] x;\n"
@@ -481,9 +335,9 @@ TEST(SimCh5b, XInBinaryLiteral) {
 // ---------------------------------------------------------------------------
 // 24. Question mark as z alternative
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, QuestionMarkAsZ) {
+TEST(SimCh50701, QuestionMarkAsZ) {
   // §5.7.1: ? is an alternative for the z character.
-  SimCh5bFixture f;
+  SimCh50701Fixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] a, b;\n"
@@ -508,9 +362,9 @@ TEST(SimCh5b, QuestionMarkAsZ) {
 // ---------------------------------------------------------------------------
 // 25. Unbased unsized literal '0 and '1
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, UnbasedUnsizedLiteral01) {
+TEST(SimCh50701, UnbasedUnsizedLiteral01) {
   // §5.7.1: Unbased unsized literals — all bits set to specified value.
-  SimCh5bFixture f;
+  SimCh50701Fixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] a, b;\n"
@@ -535,9 +389,9 @@ TEST(SimCh5b, UnbasedUnsizedLiteral01) {
 // ---------------------------------------------------------------------------
 // 26. Unbased unsized literal 'x and 'z
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, UnbasedUnsizedLiteralXZ) {
+TEST(SimCh50701, UnbasedUnsizedLiteralXZ) {
   // §5.7.1: Unbased unsized x and z set all bits to x or z.
-  SimCh5bFixture f;
+  SimCh50701Fixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] a, b;\n"
@@ -566,9 +420,9 @@ TEST(SimCh5b, UnbasedUnsizedLiteralXZ) {
 // ---------------------------------------------------------------------------
 // 27. Left padding with x when leftmost bit is x
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, LeftPadWithX) {
+TEST(SimCh50701, LeftPadWithX) {
   // §5.7.1: Leftmost x causes x-padding to the left.
-  SimCh5bFixture f;
+  SimCh50701Fixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [11:0] x;\n"
@@ -590,9 +444,9 @@ TEST(SimCh5b, LeftPadWithX) {
 // ---------------------------------------------------------------------------
 // 28. Left padding with z when leftmost bit is z
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, LeftPadWithZ) {
+TEST(SimCh50701, LeftPadWithZ) {
   // §5.7.1: Leftmost z causes z-padding to the left.
-  SimCh5bFixture f;
+  SimCh50701Fixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [11:0] x;\n"
@@ -614,7 +468,7 @@ TEST(SimCh5b, LeftPadWithZ) {
 // ---------------------------------------------------------------------------
 // 29. Signed based literal with 's' designator
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, SignedBasedLiteral) {
+TEST(SimCh50701, SignedBasedLiteral) {
   // §5.7.1: Signed based literal — 4'shf is 4'b1111, signed = -1.
   auto result = RunAndGet(
       "module t;\n"
@@ -629,9 +483,9 @@ TEST(SimCh5b, SignedBasedLiteral) {
 // ---------------------------------------------------------------------------
 // 30. Signed designator does not affect bit pattern
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, SignedDesignatorBitPattern) {
+TEST(SimCh50701, SignedDesignatorBitPattern) {
   // §5.7.1: The s designator affects interpretation, not the bit pattern.
-  SimCh5bFixture f;
+  SimCh50701Fixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] a, b;\n"
@@ -657,9 +511,9 @@ TEST(SimCh5b, SignedDesignatorBitPattern) {
 // ---------------------------------------------------------------------------
 // 31. X and z case insensitive in values
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, XZCaseInsensitive) {
+TEST(SimCh50701, XZCaseInsensitive) {
   // §5.7.1: x and z are case insensitive in number values.
-  SimCh5bFixture f;
+  SimCh50701Fixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] a, b;\n"
@@ -684,9 +538,9 @@ TEST(SimCh5b, XZCaseInsensitive) {
 // ---------------------------------------------------------------------------
 // 32. X in octal literal (sets 3 bits)
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, XInOctalLiteral) {
+TEST(SimCh50701, XInOctalLiteral) {
   // §5.7.1: x sets 3 bits to unknown in octal base.
-  SimCh5bFixture f;
+  SimCh50701Fixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [5:0] x;\n"
@@ -706,9 +560,9 @@ TEST(SimCh5b, XInOctalLiteral) {
 // ---------------------------------------------------------------------------
 // 33. Base format case insensitive
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, BaseFormatCaseInsensitive) {
+TEST(SimCh50701, BaseFormatCaseInsensitive) {
   // §5.7.1: Base format letter is case insensitive.
-  SimCh5bFixture f;
+  SimCh50701Fixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, c, d;\n"
@@ -741,7 +595,7 @@ TEST(SimCh5b, BaseFormatCaseInsensitive) {
 // ---------------------------------------------------------------------------
 // 34. White space between size and base format
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, WhiteSpaceSizeAndBase) {
+TEST(SimCh50701, WhiteSpaceSizeAndBase) {
   // §5.7.1: White space allowed between size, base, and value tokens.
   auto result = RunAndGet(
       "module t;\n"
@@ -753,11 +607,11 @@ TEST(SimCh5b, WhiteSpaceSizeAndBase) {
 }
 
 // ---------------------------------------------------------------------------
-// 35. Left padding: known value (0x3x → yields 03x)
+// 35. Left padding: known value (0x3x -> yields 03x)
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, LeftPadKnownHex) {
+TEST(SimCh50701, LeftPadKnownHex) {
   // §5.7.1: Known value with x in low nibble — yields 03x.
-  SimCh5bFixture f;
+  SimCh50701Fixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [11:0] x;\n"
@@ -779,9 +633,9 @@ TEST(SimCh5b, LeftPadKnownHex) {
 // ---------------------------------------------------------------------------
 // 36. Decimal single-digit x
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, DecimalSingleDigitX) {
+TEST(SimCh50701, DecimalSingleDigitX) {
   // §5.7.1: Decimal literal allows single x/z/? digit only.
-  SimCh5bFixture f;
+  SimCh50701Fixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -801,7 +655,7 @@ TEST(SimCh5b, DecimalSingleDigitX) {
 // ---------------------------------------------------------------------------
 // 37. Size constant must be nonzero
 // ---------------------------------------------------------------------------
-TEST(SimCh5b, SizeConstantNonzero) {
+TEST(SimCh50701, SizeConstantNonzero) {
   // §5.7.1: Size constant must be nonzero.
   // Using size=1 (the smallest legal size) verifies nonzero is accepted.
   auto result = RunAndGet(
