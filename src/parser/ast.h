@@ -589,9 +589,11 @@ enum class ModuleDeclKind : uint8_t {
 struct ModportPort {
   Direction direction = Direction::kNone;
   std::string_view name;
-  Expr* expr = nullptr;    // Port expression: .name(expr) (§25.5.4)
-  bool is_import = false;  // import task/function (§25.7)
-  bool is_export = false;  // export task/function (§25.7)
+  Expr* expr = nullptr;             // Port expression: .name(expr) (§25.5.4)
+  bool is_import = false;           // import task/function (§25.7)
+  bool is_export = false;           // export task/function (§25.7)
+  bool is_clocking = false;         // clocking identifier (§A.2.9)
+  ModuleItem* prototype = nullptr;  // method_prototype (§A.2.9)
 };
 
 struct ModportDecl {

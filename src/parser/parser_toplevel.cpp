@@ -376,47 +376,98 @@ ModuleDecl* Parser::ParseInterfaceDecl() {
 
 // --- Modport declaration ---
 
-ModportPort Parser::ParseModportPort(Direction& cur_dir) {
+// §A.2.9 modport_tf_port ::= method_prototype | tf_identifier
+ModportPort Parser::ParseModportTfPort(bool is_import) {
   ModportPort port;
-  // import/export task/function names (§25.7)
-  if (Check(TokenKind::kKwImport)) {
+  port.is_import = is_import;
+  port.is_export = !is_import;
+  if (Check(TokenKind::kKwTask)) {
+    auto* item = arena_.Create<ModuleItem>();
+    item->kind = ModuleItemKind::kTaskDecl;
+    item->loc = CurrentLoc();
     Consume();
-    port.is_import = true;
+    item->name = Expect(TokenKind::kIdentifier).text;
+    if (Check(TokenKind::kLParen)) item->func_args = ParseFunctionArgs();
+    port.prototype = item;
+    port.name = item->name;
+  } else if (Check(TokenKind::kKwFunction)) {
+    auto* item = arena_.Create<ModuleItem>();
+    item->kind = ModuleItemKind::kFunctionDecl;
+    item->loc = CurrentLoc();
+    Consume();
+    item->data_type = ParseFunctionReturnType();
+    item->name = Expect(TokenKind::kIdentifier).text;
+    if (Check(TokenKind::kLParen)) item->func_args = ParseFunctionArgs();
+    port.prototype = item;
+    port.name = item->name;
+  } else {
     port.name = Expect(TokenKind::kIdentifier).text;
-    return port;
   }
-  if (Check(TokenKind::kKwExport)) {
-    Consume();
-    port.is_export = true;
-    port.name = Expect(TokenKind::kIdentifier).text;
-    return port;
-  }
-  // Direction keywords
-  if (Check(TokenKind::kKwInput)) {
-    cur_dir = Direction::kInput;
-    Consume();
-  } else if (Check(TokenKind::kKwOutput)) {
-    cur_dir = Direction::kOutput;
-    Consume();
-  } else if (Check(TokenKind::kKwInout)) {
-    cur_dir = Direction::kInout;
-    Consume();
-  } else if (Check(TokenKind::kKwRef)) {
-    cur_dir = Direction::kRef;
-    Consume();
-  }
+  return port;
+}
 
-  // Port expression syntax: .name(expr) (§25.5.4)
+// §A.2.9 modport_simple_port ::=
+//   port_identifier | . port_identifier ( [ expression ] )
+ModportPort Parser::ParseModportSimplePort(Direction dir) {
+  ModportPort port;
+  port.direction = dir;
   if (Match(TokenKind::kDot)) {
     port.name = Expect(TokenKind::kIdentifier).text;
     Expect(TokenKind::kLParen);
-    port.expr = ParseExpr();
+    if (!Check(TokenKind::kRParen)) port.expr = ParseExpr();
     Expect(TokenKind::kRParen);
-    return port;
+  } else {
+    port.name = Expect(TokenKind::kIdentifier).text;
   }
-  port.direction = cur_dir;
-  port.name = Expect(TokenKind::kIdentifier).text;
   return port;
+}
+
+static Direction TokenToDirection(TokenKind tk) {
+  switch (tk) {
+    case TokenKind::kKwInput:
+      return Direction::kInput;
+    case TokenKind::kKwOutput:
+      return Direction::kOutput;
+    case TokenKind::kKwInout:
+      return Direction::kInout;
+    case TokenKind::kKwRef:
+      return Direction::kRef;
+    default:
+      return Direction::kNone;
+  }
+}
+
+// §A.2.9 modport_item ::=
+//   modport_identifier ( modport_ports_declaration { , ... } )
+void Parser::ParseModportItem(ModportDecl* mp) {
+  Direction cur_dir = Direction::kNone;
+  // 0=simple, 1=import, 2=export — tracks current tf group
+  int tf_mode = 0;
+  while (!Check(TokenKind::kRParen) && !AtEnd()) {
+    ParseAttributes();
+    if (Check(TokenKind::kKwClocking)) {
+      tf_mode = 0;
+      Consume();
+      ModportPort port;
+      port.is_clocking = true;
+      port.name = Expect(TokenKind::kIdentifier).text;
+      mp->ports.push_back(port);
+    } else if (Check(TokenKind::kKwImport) || Check(TokenKind::kKwExport)) {
+      tf_mode = Check(TokenKind::kKwImport) ? 1 : 2;
+      Consume();
+      mp->ports.push_back(ParseModportTfPort(tf_mode == 1));
+    } else if (IsPortDirection(CurrentToken().kind)) {
+      tf_mode = 0;
+      cur_dir = TokenToDirection(CurrentToken().kind);
+      Consume();
+      mp->ports.push_back(ParseModportSimplePort(cur_dir));
+    } else if (tf_mode != 0) {
+      mp->ports.push_back(ParseModportTfPort(tf_mode == 1));
+    } else {
+      mp->ports.push_back(ParseModportSimplePort(cur_dir));
+    }
+    if (!Check(TokenKind::kRParen)) Expect(TokenKind::kComma);
+  }
 }
 
 void Parser::ParseModportDecl(std::vector<ModportDecl*>& out) {
@@ -426,10 +477,7 @@ void Parser::ParseModportDecl(std::vector<ModportDecl*>& out) {
     mp->loc = CurrentLoc();
     mp->name = Expect(TokenKind::kIdentifier).text;
     Expect(TokenKind::kLParen);
-    Direction cur_dir = Direction::kNone;
-    do {
-      mp->ports.push_back(ParseModportPort(cur_dir));
-    } while (Match(TokenKind::kComma));
+    ParseModportItem(mp);
     Expect(TokenKind::kRParen);
     out.push_back(mp);
   } while (Match(TokenKind::kComma));

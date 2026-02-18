@@ -72,7 +72,9 @@ class Parser {
   ModuleDecl* ParseInterfaceDecl();
   ModuleDecl* ParseProgramDecl();
   void ParseModportDecl(std::vector<ModportDecl*>& out);
-  ModportPort ParseModportPort(Direction& cur_dir);
+  void ParseModportItem(ModportDecl* mp);
+  ModportPort ParseModportTfPort(bool is_import);
+  ModportPort ParseModportSimplePort(Direction dir);
   bool IsAtClassDecl();
   ClassDecl* ParseClassDecl();
   void ParseClassExtendsClause(ClassDecl* decl);
