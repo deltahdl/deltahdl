@@ -12,52 +12,10 @@ using namespace delta;
 
 // ===========================================================================
 // §4.9.5 Switch (transistor) processing
-//
-// LRM §4.9.5:
-//   "The event-driven simulation algorithm described in 4.5 depends on
-//    unidirectional signal flow and can process each event independently.
-//    The inputs are read, the result is computed, and the update is
-//    scheduled. SystemVerilog provides switch-level modeling in addition to
-//    behavioral and gate-level modeling. Switches provide bidirectional
-//    signal flow of wires of both built-in and user-defined net types
-//    (see 6.6) and require coordinated processing of nodes connected by
-//    switches.
-//
-//    The source elements that model switches are various forms of
-//    transistors, called tran, tranif0, tranif1, rtran, rtranif0, and
-//    rtranif1 (see 28.8).
-//
-//    Switch processing shall consider all the devices in a bidirectional
-//    switch-connected net before it can determine the appropriate value for
-//    any node on the net because the inputs and outputs interact. A
-//    simulator can do this using a relaxation technique. The simulator can
-//    process bidirectional switches at any time. It can process a subset of
-//    bidirectional switch-connected events at a particular time,
-//    intermingled with the execution of other active events.
-//
-//    For bidirectional switches connecting built-in net types, further
-//    refinement is required when some transistors have gate value x. A
-//    conceptually simple technique is to solve the network repeatedly with
-//    these transistors set to all possible combinations of fully conducting
-//    and nonconducting transistors. Any node that has a unique logic level
-//    in all cases has steady-state response equal to this level. All other
-//    nodes have steady-state response x.
-//
-//    When connecting user-defined net types, propagation of the signal from
-//    one terminal to the other follows the same rules as in the propagation
-//    of built-in net types. If the control input is off, each net is
-//    resolved separately; otherwise, they are resolved as if a single net.
-//    The bidirectional switch shall be treated as off for an x or z control
-//    input value. This is different from the behavior of a bidirectional
-//    switch connecting built-in net types, which is described in the
-//    preceding paragraph."
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.9.5 "The event-driven simulation algorithm...depends on unidirectional
-//          signal flow and can process each event independently. The inputs
-//          are read, the result is computed, and the update is scheduled."
-// Standard unidirectional event processing: read inputs, compute, schedule.
+// §4.9.5 — Standard unidirectional event processing
 // ---------------------------------------------------------------------------
 TEST(SimCh4095, UnidirectionalEventProcessing) {
   Arena arena;
@@ -83,10 +41,7 @@ TEST(SimCh4095, UnidirectionalEventProcessing) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.5 "Switches provide bidirectional signal flow of wires of both
-//          built-in and user-defined net types"
-// Bidirectional switches allow signal to flow in both directions between
-// two connected nets, unlike unidirectional gates.
+// §4.9.5 — Bidirectional signal flow between connected nets
 // ---------------------------------------------------------------------------
 TEST(SimCh4095, BidirectionalSignalFlow) {
   Arena arena;
@@ -132,9 +87,7 @@ TEST(SimCh4095, BidirectionalSignalFlow) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.5 "require coordinated processing of nodes connected by switches"
-// All devices on a bidirectional switch-connected net must be considered
-// together before any node value can be determined.
+// §4.9.5 — Coordinated processing of switch-connected nodes
 // ---------------------------------------------------------------------------
 TEST(SimCh4095, CoordinatedProcessingOfConnectedNodes) {
   Arena arena;
@@ -173,10 +126,7 @@ TEST(SimCh4095, CoordinatedProcessingOfConnectedNodes) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.5 "The source elements that model switches are various forms of
-//          transistors, called tran, tranif0, tranif1, rtran, rtranif0,
-//          and rtranif1"
-// Each transistor type is a distinct source element for switch processing.
+// §4.9.5 — Six transistor source element types
 // ---------------------------------------------------------------------------
 TEST(SimCh4095, TransistorSourceElements) {
   Arena arena;
@@ -218,12 +168,7 @@ TEST(SimCh4095, TransistorSourceElements) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.5 "Switch processing shall consider all the devices in a
-//          bidirectional switch-connected net before it can determine the
-//          appropriate value for any node on the net because the inputs
-//          and outputs interact"
-// Inputs and outputs interact: changing a downstream node affects an
-// upstream node through the bidirectional switch.
+// §4.9.5 — Inputs and outputs interact through bidirectional switches
 // ---------------------------------------------------------------------------
 TEST(SimCh4095, InputsAndOutputsInteract) {
   Arena arena;
@@ -256,8 +201,7 @@ TEST(SimCh4095, InputsAndOutputsInteract) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.5 "A simulator can do this using a relaxation technique"
-// The relaxation technique iteratively processes the network until stable.
+// §4.9.5 — Relaxation technique iterates until stable
 // ---------------------------------------------------------------------------
 TEST(SimCh4095, RelaxationTechnique) {
   Arena arena;
@@ -298,11 +242,7 @@ TEST(SimCh4095, RelaxationTechnique) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.5 "The simulator can process bidirectional switches at any time.
-//          It can process a subset of bidirectional switch-connected events
-//          at a particular time, intermingled with the execution of other
-//          active events."
-// Switch processing can be interleaved with other active events.
+// §4.9.5 — Switch processing intermingled with other active events
 // ---------------------------------------------------------------------------
 TEST(SimCh4095, IntermingledWithOtherActiveEvents) {
   Arena arena;
@@ -344,10 +284,7 @@ TEST(SimCh4095, IntermingledWithOtherActiveEvents) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.5 "Any node that has a unique logic level in all cases has
-//          steady-state response equal to this level."
-// When gate=x, solve all combinations. If a node always resolves to the
-// same value, that is its steady-state response.
+// §4.9.5 — Unique logic level across all combinations gives steady-state
 // ---------------------------------------------------------------------------
 TEST(SimCh4095, SteadyStateUniqueLevel) {
   Arena arena;
@@ -385,9 +322,7 @@ TEST(SimCh4095, SteadyStateUniqueLevel) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.5 "All other nodes have steady-state response x."
-// When gate=x and a node resolves to different values in different
-// combinations, its steady-state response is x.
+// §4.9.5 — Ambiguous node across combinations has steady-state x
 // ---------------------------------------------------------------------------
 TEST(SimCh4095, SteadyStateAmbiguousX) {
   Arena arena;
@@ -423,12 +358,7 @@ TEST(SimCh4095, SteadyStateAmbiguousX) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.5 "The bidirectional switch shall be treated as off for an x or z
-//          control input value. This is different from the behavior of a
-//          bidirectional switch connecting built-in net types."
-// For user-defined net types, x or z control input → switch off, nets
-// resolved separately. This differs from built-in net types which attempt
-// combinatorial solving.
+// §4.9.5 — User-defined net type: x/z control input treats switch as off
 // ---------------------------------------------------------------------------
 TEST(SimCh4095, UserDefinedNetTypeSwitchOffForXZ) {
   Arena arena;

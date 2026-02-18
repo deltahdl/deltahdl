@@ -12,29 +12,16 @@ using namespace delta;
 // ===========================================================================
 // §4.4.2.7 Re-Inactive events region
 //
-// LRM §4.4.2.7:
-//   "The Re-Inactive region holds the events to be evaluated after all the
-//    Reactive events are processed."
-//
-//   "If events are being executed in the reactive region set, an explicit
-//    #0 delay control requires the process to be suspended and an event
-//    to be scheduled into the Re-Inactive region of the current time slot
-//    so that the process can be resumed in the next Re-Inactive to Reactive
-//    iteration."
-//
-//   "The Re-Inactive region is the reactive region set dual of the Inactive
-//    region (see 4.4.2.3)."
-//
 // Figure 4-1 shows:
 //   region_Reactive    -> region_ReInactive    (forward from Reactive)
-//   region_ReInactive  -> region_Reactive      (feedback — iteration)
+//   region_ReInactive  -> region_Reactive      (feedback -- iteration)
 //   region_ReInactive  -> pli_region_PreReNBA  (forward to PreReNBA PLI)
 //
 // The Re-Inactive region is part of the reactive region set (§4.4.1).
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.4.2.7 "The Re-Inactive region holds the events to be evaluated"
+// §4.4.2.7 Re-Inactive region event execution
 // Basic: events scheduled in the Re-Inactive region are executed.
 // ---------------------------------------------------------------------------
 TEST(SimCh4427, ReInactiveRegionExecutesEvents) {
@@ -51,8 +38,7 @@ TEST(SimCh4427, ReInactiveRegionExecutesEvents) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.7 "holds the events to be evaluated after all the Reactive events
-// are processed."
+// §4.4.2.7 Re-Inactive executes after Reactive
 // Re-Inactive events execute only after Reactive events have drained.
 // ---------------------------------------------------------------------------
 TEST(SimCh4427, ReInactiveExecutesAfterReactive) {
@@ -75,7 +61,7 @@ TEST(SimCh4427, ReInactiveExecutesAfterReactive) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.7 "after all the Reactive events are processed"
+// §4.4.2.7 All Reactive events complete before Re-Inactive
 // Multiple Reactive events all complete before any Re-Inactive event starts.
 // ---------------------------------------------------------------------------
 TEST(SimCh4427, AllReactiveEventsCompleteBeforeReInactive) {
@@ -102,8 +88,7 @@ TEST(SimCh4427, AllReactiveEventsCompleteBeforeReInactive) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.7 "#0 delay control requires the process to be suspended and an
-// event to be scheduled into the Re-Inactive region"
+// §4.4.2.7 #0 delay schedules into Re-Inactive
 // Simulating #0: a Reactive callback schedules into Re-Inactive at the
 // same time.
 // ---------------------------------------------------------------------------
@@ -129,7 +114,7 @@ TEST(SimCh4427, ZeroDelaySchedulesIntoReInactive) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.7 "resumed in the next Re-Inactive to Reactive iteration"
+// §4.4.2.7 Re-Inactive-to-Reactive iteration
 // Figure 4-1: region_ReInactive -> region_Reactive (feedback edge).
 // A Re-Inactive callback that schedules a new Reactive event triggers
 // re-iteration of the reactive region set.

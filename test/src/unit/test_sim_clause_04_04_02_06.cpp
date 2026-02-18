@@ -13,20 +13,9 @@ using namespace delta;
 // ===========================================================================
 // §4.4.2.6 Reactive events region
 //
-// LRM §4.4.2.6:
-//   "The Reactive region holds the current reactive region set events being
-//    evaluated and can be processed in any order."
-//
-//   "The code specified by blocking assignments in checkers, program blocks
-//    and the code in action blocks of concurrent assertions are scheduled
-//    in the Reactive region."
-//
-//   "The Reactive region is the reactive region set dual of the Active
-//    region (see 4.4.2.2)."
-//
 // Figure 4-1 shows:
 //   pli_region_PostObserved -> region_Reactive  (forward from PostObserved)
-//   region_Reactive -> region_Reactive          (self-loop — any order)
+//   region_Reactive -> region_Reactive          (self-loop -- any order)
 //   region_Reactive -> region_ReInactive        (forward to Re-Inactive)
 //   pli_region_PostReNBA -> region_Reactive     (feedback from PostReNBA)
 //   pli_region_PreReNBA -> region_Reactive      (feedback from PreReNBA)
@@ -36,7 +25,7 @@ using namespace delta;
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.4.2.6 "The Reactive region holds ... events being evaluated"
+// §4.4.2.6 Reactive region event execution
 // Basic: events scheduled in the Reactive region are executed.
 // ---------------------------------------------------------------------------
 TEST(SimCh4426, ReactiveRegionExecutesEvents) {
@@ -53,7 +42,7 @@ TEST(SimCh4426, ReactiveRegionExecutesEvents) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.6 "holds the current reactive region set events"
+// §4.4.2.6 Reactive region holds multiple events
 // Multiple events coexist in the Reactive region and all execute.
 // ---------------------------------------------------------------------------
 TEST(SimCh4426, ReactiveRegionHoldsMultipleEvents) {
@@ -72,11 +61,10 @@ TEST(SimCh4426, ReactiveRegionHoldsMultipleEvents) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.6 "can be processed in any order"
-// The LRM explicitly permits any ordering of Reactive events.  Our FIFO
-// implementation is one valid ordering.  This test verifies that all
-// events execute regardless of insertion order, confirming the "any
-// order" contract is satisfied.
+// §4.4.2.6 Reactive events processed in any valid order
+// Any ordering of Reactive events is permitted.  Our FIFO implementation
+// is one valid ordering.  This test verifies that all events execute
+// regardless of insertion order.
 // ---------------------------------------------------------------------------
 TEST(SimCh4426, ReactiveEventsProcessedInAnyValidOrder) {
   Arena arena;
@@ -148,9 +136,8 @@ TEST(SimCh4426, ReactiveExecutesBeforeReInactive) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.6 "The Reactive region is the reactive region set dual of the
-// Active region (see 4.4.2.2)."
-// Its ordinal lies between PostObserved and PrePostponed — within the
+// §4.4.2.6 Reactive is dual of Active (within reactive region set)
+// Its ordinal lies between PostObserved and PrePostponed -- within the
 // reactive region set.
 // ---------------------------------------------------------------------------
 TEST(SimCh4426, ReactiveIsWithinReactiveRegionSet) {
@@ -246,10 +233,9 @@ TEST(SimCh4426, ReactiveParticipatesInReNBAIteration) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.6 "The Reactive region is the reactive region set dual of the
-// Active region"
-// Reactive-to-Active restart: when a Reactive callback schedules an
-// Active event, the active set restarts (per Figure 4-1 feedback).
+// §4.4.2.6 Reactive-to-Active restart
+// When a Reactive callback schedules an Active event, the active set
+// restarts (per Figure 4-1 feedback).
 // ---------------------------------------------------------------------------
 TEST(SimCh4426, ReactiveSchedulesActiveRestart) {
   Arena arena;

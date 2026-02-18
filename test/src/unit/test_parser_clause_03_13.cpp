@@ -640,10 +640,7 @@ TEST(ParserClause03, Cl3_13_NestedClassInModule) {
               "endmodule\n"));
 }
 
-// 31. Text macro name space (d) — `define introduces names with leading '
-//     "The text macro names are defined in the linear order of appearance in
-//     the
-//      set of input files that make up the compilation unit."
+// 31. Text macro name space (d) — `define introduces names with leading `
 TEST(ParserClause03, Cl3_13_TextMacroNameSpace) {
   // Macro defined and used; subsequent redefinition overrides previous
   auto r = Parse(
@@ -663,8 +660,6 @@ TEST(ParserClause03, Cl3_13_TextMacroNameSpace) {
 }
 
 // 32. Attribute name space (h) — enclosed by (* and *)
-//     "An attribute name can be defined and used only in the attribute name
-//      space. Any other type of name cannot be defined in this name space."
 TEST(ParserClause03, Cl3_13_AttributeNameSpace) {
   auto r = Parse(
       "module m;\n"
@@ -716,8 +711,7 @@ TEST(ParserClause03, Cl3_13_AllEightNameSpaces) {
 }
 
 // =============================================================================
-// §3.13: "Within a name space, it shall be illegal to redeclare a name
-//         already declared by a prior declaration."
+// §3.13 Redeclaration rules
 // =============================================================================
 
 // 34. Redeclaring a variable in the same module scope is an error.

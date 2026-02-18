@@ -12,12 +12,6 @@ using namespace delta;
 // ===========================================================================
 // §4.4.3.10 Postponed PLI region
 //
-// LRM §4.4.3.10:
-//   "The Postponed region provides a PLI callback control point that allows
-//    PLI application routines to create read-only events after processing all
-//    other regions. PLI cbReadOnlySynch and other similar events are scheduled
-//    in the Postponed region."
-//
 // Figure 4-1 shows:
 //   pli_region_PrePostponed -> region_Postponed
 //
@@ -26,7 +20,7 @@ using namespace delta;
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.4.3.10 "provides a PLI callback control point"
+// §4.4.3.10 Postponed PLI callback control point
 // Basic: events scheduled in the Postponed region are executed.
 // ---------------------------------------------------------------------------
 TEST(SimCh44310, PostponedRegionExecutesPLICallbacks) {
@@ -43,7 +37,7 @@ TEST(SimCh44310, PostponedRegionExecutesPLICallbacks) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.10 "allows PLI application routines to create read-only events"
+// §4.4.3.10 Postponed read-only event creation
 // A Postponed callback can read state set by all preceding regions.
 // ---------------------------------------------------------------------------
 TEST(SimCh44310, PostponedCanReadValues) {
@@ -67,7 +61,7 @@ TEST(SimCh44310, PostponedCanReadValues) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.10 "read-only events"
+// §4.4.3.10 Postponed reads cumulative state
 // Postponed sees the cumulative state from the entire active + reactive chain.
 // ---------------------------------------------------------------------------
 TEST(SimCh44310, PostponedReadsStateFromActiveAndReactiveRegions) {
@@ -96,7 +90,7 @@ TEST(SimCh44310, PostponedReadsStateFromActiveAndReactiveRegions) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.10 "after processing all other regions"
+// §4.4.3.10 Postponed executes after all other regions
 // Postponed executes after Pre-Postponed in the same time slot.
 // ---------------------------------------------------------------------------
 TEST(SimCh44310, PostponedExecutesAfterPrePostponed) {
@@ -163,7 +157,7 @@ TEST(SimCh44310, PostponedIsLastRegionOrdinal) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.10 "PLI callback control point"
+// §4.4.3.10 Multiple Postponed callbacks
 // Multiple PLI callbacks coexist in the Postponed region and all execute.
 // ---------------------------------------------------------------------------
 TEST(SimCh44310, PostponedRegionHoldsMultiplePLICallbacks) {
@@ -206,7 +200,7 @@ TEST(SimCh44310, PostponedEventsAcrossMultipleTimeSlots) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.10 "after processing all other regions"
+// §4.4.3.10 Postponed provides read-only snapshot
 // Postponed is read-only. A Postponed callback reads the final state produced
 // by the full region chain (Preponed through Pre-Postponed). This verifies
 // that Postponed provides a consistent snapshot of completed simulation state.
@@ -241,8 +235,7 @@ TEST(SimCh44310, PostponedProvidesReadOnlySnapshotAfterAllRegions) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.10 "PLI cbReadOnlySynch and other similar events are scheduled in
-// the Postponed region."
+// §4.4.3.10 Postponed infrastructure with full region chain
 // Postponed region correctly processes all events in the time slot, including
 // alongside a full set of surrounding regions from all region sets.
 // ---------------------------------------------------------------------------

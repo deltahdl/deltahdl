@@ -12,16 +12,6 @@ using namespace delta;
 // ===========================================================================
 // §4.4.3 PLI regions
 //
-// LRM §4.4.3:
-//   "In addition to the simulation regions, where PLI callbacks can be
-//    scheduled, there are additional PLI-specific regions."
-//
-//   "The PLI regions of a time slot are the Preponed, Pre-Active, Pre-NBA,
-//    Post-NBA, Pre-Observed, Post-Observed, Pre-Re-NBA, Post-Re-NBA and
-//    Pre-Postponed regions."
-//
-//   "The flow of execution of the PLI regions is specified in Figure 4-1."
-//
 // Figure 4-1 PLI region edges (DOT GraphViz at ~/Figure_4_1.gv):
 //   region_Preponed    -> pli_region_PreActive        (line 53)
 //   pli_region_PreActive -> region_Active              (line 36)
@@ -49,7 +39,7 @@ using namespace delta;
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.4.3 "there are additional PLI-specific regions"
+// §4.4.3 PLI-specific regions
 // All 9 PLI region enum values exist and are distinct from each other.
 // ---------------------------------------------------------------------------
 TEST(SimCh443, PLIRegionEnumsExist) {
@@ -75,9 +65,7 @@ TEST(SimCh443, PLIRegionEnumsExist) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3 "The PLI regions of a time slot are the Preponed, Pre-Active,
-// Pre-NBA, Post-NBA, Pre-Observed, Post-Observed, Pre-Re-NBA, Post-Re-NBA
-// and Pre-Postponed regions."
+// §4.4.3 PLI regions of a time slot
 // There are exactly 9 PLI regions.  They are a subset of the full region
 // enum (which also includes simulation regions).
 // ---------------------------------------------------------------------------
@@ -96,7 +84,7 @@ TEST(SimCh443, ExactlyNinePLIRegionsExist) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3 "In addition to the simulation regions"
+// §4.4.3 PLI regions interleaved with simulation regions
 // PLI regions are interleaved with simulation regions: each PLI region's
 // ordinal sits between its neighboring simulation regions.
 // ---------------------------------------------------------------------------
@@ -121,8 +109,7 @@ TEST(SimCh443, PLIRegionsAreInterleavedWithSimulationRegions) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3 "The flow of execution of the PLI regions is specified in
-// Figure 4-1."
+// §4.4.3 PLI region execution flow per Figure 4-1
 // Figure 4-1: region_Preponed -> pli_region_PreActive -> region_Active.
 // Pre-Active PLI region executes between Preponed and Active.
 // ---------------------------------------------------------------------------
@@ -331,8 +318,7 @@ TEST(SimCh443, PrePostponedExecutesBeforePostponed) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3 "The flow of execution of the PLI regions is specified in
-// Figure 4-1."
+// §4.4.3 Full PLI region ordering per Figure 4-1
 // Full PLI region ordering: all 9 PLI regions execute in their specified
 // positions relative to each other and the simulation regions.
 // ---------------------------------------------------------------------------
@@ -408,8 +394,8 @@ TEST(SimCh443, PLIRegionsExecuteAcrossMultipleTimeSlots) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3 "In addition to the simulation regions"
-// PLI regions can schedule events — a PLI callback (Pre-Active) schedules
+// §4.4.3 PLI callbacks scheduling into simulation regions
+// PLI regions can schedule events -- a PLI callback (Pre-Active) schedules
 // into the Active simulation region, as Figure 4-1 shows:
 // pli_region_PreActive -> region_Active.
 // ---------------------------------------------------------------------------

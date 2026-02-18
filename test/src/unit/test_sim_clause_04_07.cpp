@@ -12,24 +12,10 @@ using namespace delta;
 
 // ===========================================================================
 // §4.7 Nondeterminism
-//
-// LRM §4.7:
-//   "One source of nondeterminism is the fact that active events can be taken
-//    off the Active or Reactive event region and processed in any order."
-//
-//   "Another source of nondeterminism is that statements without time-control
-//    constructs in procedural blocks do not have to be executed as one event.
-//    Time control statements are the # expression and @ expression constructs
-//    (see 9.4). At any time while evaluating a procedural statement, the
-//    simulator may suspend execution and place the partially completed event
-//    as a pending event in the event region. The effect of this is to allow
-//    the interleaving of process execution, although the order of interleaved
-//    execution is nondeterministic and not under control of the user."
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.7 "active events can be taken off the Active ... region and processed
-// in any order"
+// §4.7 Active region events processed in any order.
 // Multiple independent events in the Active region all execute within the
 // same time slot — the scheduler must process them all.
 // ---------------------------------------------------------------------------
@@ -49,8 +35,7 @@ TEST(SimCh47, ActiveRegionProcessesAllEvents) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.7 "active events can be taken off the ... Reactive event region and
-// processed in any order"
+// §4.7 Reactive region events processed in any order.
 // Multiple independent events in the Reactive region all execute within the
 // same time slot.
 // ---------------------------------------------------------------------------
@@ -70,7 +55,7 @@ TEST(SimCh47, ReactiveRegionProcessesAllEvents) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.7 "processed in any order" — independent Active processes can interleave.
+// §4.7 Independent Active processes can interleave.
 // Two independent processes each schedule events in Active; both see each
 // other's results regardless of execution order.
 // ---------------------------------------------------------------------------
@@ -97,7 +82,7 @@ TEST(SimCh47, IndependentActiveProcessesInterleave) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.7 "processed in any order" — independent Reactive processes interleave.
+// §4.7 Independent Reactive processes interleave.
 // Two independent processes in Reactive region; both execute.
 // ---------------------------------------------------------------------------
 TEST(SimCh47, IndependentReactiveProcessesInterleave) {
@@ -120,8 +105,7 @@ TEST(SimCh47, IndependentReactiveProcessesInterleave) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.7 "the simulator may suspend execution and place the partially completed
-// event as a pending event in the event region"
+// §4.7 Process suspension and pending event placement.
 // A process suspends via #0 (Inactive region) and resumes later. This models
 // process suspension without time-control — the scheduler places the
 // continuation as a pending event.
@@ -155,7 +139,7 @@ TEST(SimCh47, ProcessSuspensionViaPendingEvent) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.7 "the effect of this is to allow the interleaving of process execution"
+// §4.7 Process execution interleaving.
 // Multiple processes interleave through suspension. Process A and C both
 // suspend, allowing B to run in between.
 // ---------------------------------------------------------------------------
@@ -201,8 +185,7 @@ TEST(SimCh47, MultipleProcessInterleaving) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.7 "the order of interleaved execution is nondeterministic and not under
-// control of the user"
+// §4.7 Nondeterministic interleaved execution order.
 // The scheduler processes events from a region but the result (cumulative
 // side effects) reflects all events having executed. With conflicting writes,
 // the last-executed wins — the user cannot control which wins.
@@ -229,8 +212,7 @@ TEST(SimCh47, ConflictingWritesInActiveRegion) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.7 "active events can be taken off the Active ... region and processed in
-// any order"
+// §4.7 Dynamically generated Active events execute in same time slot.
 // An Active callback that generates new Active events — the dynamically
 // generated events also execute within the same time slot iteration.
 // ---------------------------------------------------------------------------
@@ -261,7 +243,7 @@ TEST(SimCh47, DynamicallyGeneratedActiveEventsExecute) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.7 "the simulator may suspend execution" — Reactive region suspension.
+// §4.7 Reactive region suspension via Re-Inactive.
 // A Reactive process suspends via Re-Inactive and resumes, allowing other
 // Reactive processes to interleave.
 // ---------------------------------------------------------------------------
@@ -294,7 +276,7 @@ TEST(SimCh47, ReactiveProcessSuspensionViaReInactive) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.7 "processed in any order" — nondeterminism across multiple time slots.
+// §4.7 Nondeterminism across multiple time slots.
 // Each time slot independently has nondeterministic ordering among its events.
 // Both time slots execute all their events.
 // ---------------------------------------------------------------------------

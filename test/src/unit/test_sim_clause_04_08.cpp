@@ -11,28 +11,10 @@ using namespace delta;
 
 // ===========================================================================
 // §4.8 Race conditions
-//
-// LRM §4.8:
-//   "Because the execution of expression evaluation and net update events may
-//    be intermingled, race conditions are possible."
-//
-//   Example:
-//     assign p = q;
-//     initial begin
-//       q = 1;
-//       #1 q = 0;
-//       $display(p);
-//     end
-//
-//   "The simulator is correct in displaying either a 1 or a 0. The assignment
-//    of 0 to q enables an update event for p. The simulator may either
-//    continue and execute the $display task or execute the update for p,
-//    followed by the $display task."
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.8 "the execution of expression evaluation and net update events may be
-// intermingled"
+// §4.8 Expression evaluation and net update events intermingled.
 // Both kEvaluation and kUpdate events in the Active region execute — the
 // scheduler interleaves them.
 // ---------------------------------------------------------------------------
@@ -61,7 +43,7 @@ TEST(SimCh48, EvalAndUpdateEventsIntermingleInActive) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.8 "The assignment of 0 to q enables an update event for p"
+// §4.8 Blocking assignment triggers continuous assignment update event.
 // A blocking assignment that modifies a variable triggers an update event
 // (continuous assignment). Both the process continuation and the update event
 // are in the Active region.
@@ -92,8 +74,7 @@ TEST(SimCh48, BlockingAssignmentTriggersUpdateEvent) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.8 "The simulator may either continue and execute the $display task or
-// execute the update for p"
+// §4.8 Update event races with process continuation.
 // The update event and the process continuation (next statement) are both
 // Active events — they race.
 // ---------------------------------------------------------------------------
@@ -129,9 +110,9 @@ TEST(SimCh48, UpdateEventRacesWithProcessContinuation) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.8 "The simulator is correct in displaying either a 1 or a 0"
-// Both race outcomes are valid. In our FIFO implementation, the update
-// executes first (it was scheduled first), so display sees the updated value.
+// §4.8 Both race outcomes are valid.
+// In our FIFO implementation, the update executes first (it was scheduled
+// first), so display sees the updated value.
 // ---------------------------------------------------------------------------
 TEST(SimCh48, BothRaceOutcomesAreValid) {
   Arena arena;
@@ -157,9 +138,8 @@ TEST(SimCh48, BothRaceOutcomesAreValid) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.8 LRM example: "assign p = q; initial begin q = 1; #1 q = 0;
-// $display(p); end"
-// Full simulation of the LRM example across two time slots.
+// §4.8 Full simulation of the assign/display race example.
+// Full simulation of the race condition across two time slots.
 // ---------------------------------------------------------------------------
 TEST(SimCh48, LRMExampleAssignPEqualsQ) {
   Arena arena;
@@ -207,7 +187,7 @@ TEST(SimCh48, LRMExampleAssignPEqualsQ) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.8 "expression evaluation and net update events may be intermingled"
+// §4.8 Multiple update events race with each other.
 // Multiple update events from different continuous assignments all race
 // with each other and with evaluation events.
 // ---------------------------------------------------------------------------
@@ -242,7 +222,7 @@ TEST(SimCh48, MultipleUpdateEventsRaceWithEachOther) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.8 "expression evaluation and net update events may be intermingled"
+// §4.8 Race condition across multiple nets.
 // A process writes to multiple variables with continuous assignments,
 // generating multiple racing update events.
 // ---------------------------------------------------------------------------
@@ -294,7 +274,7 @@ TEST(SimCh48, RaceConditionAcrossMultipleNets) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.8 "expression evaluation and net update events may be intermingled"
+// §4.8 Evaluation and update event kinds are distinct.
 // Both kEvaluation and kUpdate EventKind tags are distinct, and both
 // execute in the Active region — the scheduler dispatches both.
 // ---------------------------------------------------------------------------
@@ -349,9 +329,9 @@ TEST(SimCh48, NoRaceBetweenDifferentRegions) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.8 "expression evaluation and net update events may be intermingled"
-// NBAs avoid the race: using nonblocking assignments (NBA region) ensures
-// updates happen in a separate phase, eliminating the Active-region race.
+// §4.8 NBAs eliminate Active-region races.
+// Using nonblocking assignments (NBA region) ensures updates happen in a
+// separate phase, eliminating the Active-region race.
 // ---------------------------------------------------------------------------
 TEST(SimCh48, NBAEliminatesActiveRegionRace) {
   Arena arena;

@@ -11,27 +11,10 @@ using namespace delta;
 
 // ===========================================================================
 // §4.10 PLI callback control points
-//
-// LRM §4.10:
-//   "There are two kinds of PLI callbacks: those that are executed immediately
-//    when some specific activity occurs, and those that are explicitly
-//    registered as a one-shot evaluation event."
-//
-//   Table 4-1 provides the mapping from the various PLI callbacks:
-//     cbAfterDelay       → Pre-Active
-//     cbNextSimTime      → Pre-Active
-//     cbReadWriteSynch   → Pre-NBA or Post-NBA
-//     cbAtStartOfSimTime → Pre-Active
-//     cbNBASynch         → Pre-NBA
-//     cbAtEndOfSimTime   → Pre-Postponed
-//     cbReadOnlySynch    → Postponed
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.10 "There are two kinds of PLI callbacks: those that are executed
-//         immediately when some specific activity occurs"
-// Immediate-execution callbacks fire synchronously when their triggering
-// activity happens, without being scheduled through the event regions.
+// §4.10 — Immediate-execution PLI callback
 // ---------------------------------------------------------------------------
 TEST(SimCh410, ImmediateExecutionCallback) {
   Arena arena;
@@ -59,10 +42,7 @@ TEST(SimCh410, ImmediateExecutionCallback) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.10 "and those that are explicitly registered as a one-shot evaluation
-//         event"
-// One-shot callbacks are registered in a specific event region and execute
-// exactly once when the scheduler processes that region.
+// §4.10 — One-shot evaluation event callback
 // ---------------------------------------------------------------------------
 TEST(SimCh410, OneShotEvaluationEvent) {
   Arena arena;

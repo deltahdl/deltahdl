@@ -12,13 +12,8 @@ using namespace delta;
 // ===========================================================================
 // §4.9 Scheduling implication of assignments
 //
-// LRM §4.9:
-//   "Assignments are translated into processes and events as detailed in
-//    4.9.1 through 4.9.7."
-//
-// This section establishes the core principle: every assignment type in
-// SystemVerilog is implemented through the scheduler's process/event model.
-// The seven assignment types are:
+// Every assignment type in SystemVerilog is implemented through the
+// scheduler's process/event model. The seven assignment types are:
 //   4.9.1 Continuous assignment
 //   4.9.2 Procedural continuous assignment
 //   4.9.3 Blocking assignment
@@ -29,9 +24,9 @@ using namespace delta;
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.9 "Assignments are translated into processes and events"
-// Continuous assignment (4.9.1): a process sensitive to source elements that
-// schedules an active update event when the expression changes.
+// §4.9 Continuous assignment (4.9.1) as process and event.
+// A process sensitive to source elements schedules an active update event
+// when the expression changes.
 // ---------------------------------------------------------------------------
 TEST(SimCh49, ContinuousAssignmentAsProcessAndEvent) {
   Arena arena;
@@ -58,9 +53,9 @@ TEST(SimCh49, ContinuousAssignmentAsProcessAndEvent) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9 "Assignments are translated into processes and events"
-// Procedural continuous assignment (4.9.2): assign/force creates a process
-// sensitive to the expression; deassign/release deactivates it.
+// §4.9 Procedural continuous assignment (4.9.2) as process and event.
+// assign/force creates a process sensitive to the expression;
+// deassign/release deactivates it.
 // ---------------------------------------------------------------------------
 TEST(SimCh49, ProceduralContinuousAssignmentAsProcessAndEvent) {
   Arena arena;
@@ -94,9 +89,9 @@ TEST(SimCh49, ProceduralContinuousAssignmentAsProcessAndEvent) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9 "Assignments are translated into processes and events"
-// Blocking assignment (4.9.3): with intra-assignment delay, the process
-// suspends and is scheduled as a future event.
+// §4.9 Blocking assignment (4.9.3) as process and event.
+// With intra-assignment delay, the process suspends and is scheduled as
+// a future event.
 // ---------------------------------------------------------------------------
 TEST(SimCh49, BlockingAssignmentAsProcessAndEvent) {
   Arena arena;
@@ -127,9 +122,8 @@ TEST(SimCh49, BlockingAssignmentAsProcessAndEvent) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9 "Assignments are translated into processes and events"
-// Blocking assignment with zero delay (4.9.3): process is scheduled as an
-// Inactive event for the current time.
+// §4.9 Blocking assignment with zero delay (4.9.3).
+// Process is scheduled as an Inactive event for the current time.
 // ---------------------------------------------------------------------------
 TEST(SimCh49, BlockingAssignmentZeroDelaySchedulesInactive) {
   Arena arena;
@@ -162,9 +156,9 @@ TEST(SimCh49, BlockingAssignmentZeroDelaySchedulesInactive) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9 "Assignments are translated into processes and events"
-// Nonblocking assignment (4.9.4): always computes the updated value and
-// schedules the update as an NBA update event.
+// §4.9 Nonblocking assignment (4.9.4) as NBA event.
+// Always computes the updated value and schedules the update as an NBA
+// update event.
 // ---------------------------------------------------------------------------
 TEST(SimCh49, NonblockingAssignmentAsNBAEvent) {
   Arena arena;
@@ -196,9 +190,9 @@ TEST(SimCh49, NonblockingAssignmentAsNBAEvent) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9 "Assignments are translated into processes and events"
-// Switch processing (4.9.5): bidirectional switch events are scheduled as
-// active update events, intermingled with other active events.
+// §4.9 Switch processing (4.9.5) as active events.
+// Bidirectional switch events are scheduled as active update events,
+// intermingled with other active events.
 // ---------------------------------------------------------------------------
 TEST(SimCh49, SwitchProcessingAsActiveEvents) {
   Arena arena;
@@ -224,9 +218,8 @@ TEST(SimCh49, SwitchProcessingAsActiveEvents) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9 "Assignments are translated into processes and events"
-// Port connections (4.9.6): ports connect processes through implicit
-// continuous assignment statements.
+// §4.9 Port connections (4.9.6) as implicit continuous assignments.
+// Ports connect processes through implicit continuous assignment statements.
 // ---------------------------------------------------------------------------
 TEST(SimCh49, PortConnectionAsImplicitContinuousAssignment) {
   Arena arena;
@@ -252,9 +245,9 @@ TEST(SimCh49, PortConnectionAsImplicitContinuousAssignment) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9 "Assignments are translated into processes and events"
-// Subroutines (4.9.7): copy-in on invocation and copy-out on return behave
-// as blocking assignments, modeled as evaluation events.
+// §4.9 Subroutines (4.9.7) as blocking assignment events.
+// Copy-in on invocation and copy-out on return behave as blocking
+// assignments, modeled as evaluation events.
 // ---------------------------------------------------------------------------
 TEST(SimCh49, SubroutineArgumentPassingAsBlockingAssignment) {
   Arena arena;
@@ -281,9 +274,8 @@ TEST(SimCh49, SubroutineArgumentPassingAsBlockingAssignment) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9 "Assignments are translated into processes and events"
-// All seven assignment types use the same process/event scheduler
-// infrastructure — they all go through ScheduleEvent.
+// §4.9 All seven assignment types use the same scheduler infrastructure.
+// They all go through ScheduleEvent.
 // ---------------------------------------------------------------------------
 TEST(SimCh49, AllAssignmentTypesUseSchedulerInfrastructure) {
   Arena arena;
@@ -312,9 +304,8 @@ TEST(SimCh49, AllAssignmentTypesUseSchedulerInfrastructure) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9 "Assignments are translated into processes and events"
-// The translation into processes/events means assignment ordering follows
-// region ordering (§4.5): Active → Inactive → NBA.
+// §4.9 Assignment ordering follows region ordering (§4.5).
+// Active → Inactive → NBA.
 // ---------------------------------------------------------------------------
 TEST(SimCh49, AssignmentOrderingFollowsRegionOrdering) {
   Arena arena;

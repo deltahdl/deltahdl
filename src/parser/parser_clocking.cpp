@@ -6,7 +6,7 @@ namespace delta {
 // §14 — Clocking block declaration
 // =============================================================================
 
-// clocking_skew ::= edge_identifier [delay_control] | delay_control
+// §14.3: Parse clocking skew (edge and/or delay control).
 void Parser::ParseClockingSkew(Edge& edge, Expr*& delay) {
   edge = Edge::kNone;
   delay = nullptr;
@@ -58,7 +58,7 @@ ModuleItem* Parser::ParseClockingDecl() {
     item->name = Consume().text;
   }
 
-  // §14.3: "default clocking clocking_identifier ;" reference form.
+  // §14.3: default clocking reference form (name only, no body).
   if (item->is_default_clocking && !item->name.empty() &&
       Check(TokenKind::kSemicolon)) {
     Consume();  // ;
@@ -112,11 +112,9 @@ Direction Parser::ParseClockingDirection(Edge& in_edge, Expr*& in_delay,
   return Direction::kNone;
 }
 
-// Parse one clocking_item:
-//   default default_skew ;
-//   | clocking_direction list_of_clocking_decl_assign ;
+// §14.3: Parse a single clocking item (default skew or signal declarations).
 void Parser::ParseClockingItem(ModuleItem* item) {
-  // Skip "default default_skew ;" for now (not stored).
+  // Skip default skew declaration for now (not stored).
   if (Check(TokenKind::kKwDefault)) {
     Consume();
     // Consume tokens until semicolon.
@@ -136,7 +134,7 @@ void Parser::ParseClockingItem(ModuleItem* item) {
       ParseClockingDirection(in_edge, in_delay, out_edge, out_delay);
   if (dir == Direction::kNone) return;
 
-  // list_of_clocking_decl_assign: signal [= expr] {, signal [= expr]}
+  // Parse comma-separated signal declarations with optional assignments.
   do {
     ClockingSignalDecl sig;
     sig.direction = dir;
@@ -173,7 +171,7 @@ Stmt* Parser::ParseWaitOrderStmt() {
   }
   Expect(TokenKind::kRParen);
 
-  // action_block: statement_or_null | [statement] else statement_or_null
+  // §15.5.4: Parse optional action block (pass/else statements).
   if (Check(TokenKind::kKwElse)) {
     Consume();
     stmt->else_branch = ParseStmt();

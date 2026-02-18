@@ -49,9 +49,7 @@ static int CountItemsByKind(const std::vector<ModuleItem*>& items,
 // LRM §3.11 — Overview of hierarchy
 // =============================================================================
 
-// §3.11: "Hierarchy is created by one building block instantiating another."
-//        "Primitives cannot instantiate other building blocks; they are
-//        leaves." "SystemVerilog permits multiple top-level blocks."
+// §3.11 Hierarchy through instantiation, primitives as leaves, multiple tops
 TEST(ParserClause03, Cl3_11_HierarchyAndInstantiation) {
   auto r = Parse(
       "module top;\n"

@@ -11,19 +11,10 @@ using namespace delta;
 
 // ===========================================================================
 // §4.9.2 Procedural continuous assignment
-//
-// LRM §4.9.2:
-//   "A procedural continuous assignment (which is the assign or force
-//    statement; see 10.6) corresponds to a process that is sensitive to
-//    the source elements in the expression. When the value of the
-//    expression changes, it causes an active update event to be added to
-//    the event region, using current values to determine the target.
-//    A deassign or a release statement deactivates any corresponding
-//    assign or force statement(s)."
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.9.2 "A procedural continuous assignment ... corresponds to a process"
+// §4.9.2 Procedural continuous assignment corresponds to a process.
 // The assign/force statement is modeled as a scheduler process (Event with
 // callback), not as a one-shot operation.
 // ---------------------------------------------------------------------------
@@ -66,7 +57,7 @@ TEST(SimCh4092, ProceduralContinuousAssignmentCorrespondsToProcess) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.2 "which is the assign ... statement"
+// §4.9.2 The assign statement overrides procedural assignment.
 // The procedural 'assign' statement overrides the normal procedural
 // assignment to a variable, creating a continuous driver.
 // ---------------------------------------------------------------------------
@@ -104,7 +95,7 @@ TEST(SimCh4092, AssignStatementOverridesProceduralAssignment) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.2 "which is the ... force statement"
+// §4.9.2 The force statement overrides all drivers.
 // The procedural 'force' statement overrides all other drivers on a net
 // or variable, creating a forced continuous driver.
 // ---------------------------------------------------------------------------
@@ -147,7 +138,7 @@ TEST(SimCh4092, ForceStatementOverridesAllDrivers) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.2 "sensitive to the source elements in the expression"
+// §4.9.2 Sensitive to source elements in the expression.
 // The procedural continuous assignment process only triggers when a source
 // element in its RHS expression changes.
 // ---------------------------------------------------------------------------
@@ -192,7 +183,7 @@ TEST(SimCh4092, SensitiveToSourceElements) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.2 "it causes an active update event to be added to the event region"
+// §4.9.2 Schedules an active update event.
 // The update event from a procedural continuous assignment is scheduled in
 // the Active region.
 // ---------------------------------------------------------------------------
@@ -225,7 +216,7 @@ TEST(SimCh4092, SchedulesActiveUpdateEvent) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.2 "using current values to determine the target"
+// §4.9.2 Uses current values to determine the target.
 // The target of the procedural continuous assignment is determined using
 // values at the time the update executes.
 // ---------------------------------------------------------------------------
@@ -277,8 +268,7 @@ TEST(SimCh4092, UsesCurrentValuesToDetermineTarget) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.2 "A deassign ... statement deactivates any corresponding assign ...
-//          statement(s)"
+// §4.9.2 Deassign deactivates the corresponding assign.
 // After deassign, the procedural continuous assignment process is
 // deactivated: further source changes no longer drive the target.
 // ---------------------------------------------------------------------------
@@ -331,8 +321,7 @@ TEST(SimCh4092, DeassignDeactivatesAssign) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.2 "a release statement deactivates any corresponding ... force
-//          statement(s)"
+// §4.9.2 Release deactivates the corresponding force.
 // After release, the force process is deactivated and the underlying
 // drivers resume control.
 // ---------------------------------------------------------------------------
@@ -390,7 +379,7 @@ TEST(SimCh4092, ReleaseDeactivatesForce) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.2 "A deassign ... statement deactivates any corresponding assign"
+// §4.9.2 Deassign allows subsequent procedural assignment.
 // After deassign, a subsequent procedural assignment can take effect,
 // proving the assign override is removed.
 // ---------------------------------------------------------------------------
@@ -432,8 +421,7 @@ TEST(SimCh4092, DeassignAllowsSubsequentProceduralAssignment) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.2 "When the value of the expression changes, it causes an active
-//          update event"
+// §4.9.2 Re-evaluates on each source change.
 // The procedural continuous assignment process re-evaluates on each
 // source change, scheduling a new active update event each time.
 // ---------------------------------------------------------------------------

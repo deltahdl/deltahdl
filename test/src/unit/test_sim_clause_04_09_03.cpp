@@ -11,26 +11,10 @@ using namespace delta;
 
 // ===========================================================================
 // §4.9.3 Blocking assignment
-//
-// LRM §4.9.3:
-//   "A blocking assignment statement (see 10.4.1) with an intra-assignment
-//    delay computes the right-hand side value using the current values, then
-//    causes the executing process to be suspended and scheduled as a future
-//    event. If the delay is 0, the process is scheduled as an Inactive event
-//    for the current time. If a blocking assignment with zero delay is
-//    executed from a Reactive region, the process is scheduled as a
-//    Re-Inactive event.
-//
-//    When the process is returned (or if it returns immediately if no delay
-//    is specified), the process performs the assignment to the left-hand side
-//    and enables any events based upon the update of the left-hand side. The
-//    values at the time the process resumes are used to determine the
-//    target(s). Execution may then continue with the next sequential
-//    statement or with other Active or Reactive events."
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.9.3 "computes the right-hand side value using the current values"
+// §4.9.3 RHS computed using current values at execution time.
 // The RHS of a blocking assignment is evaluated using the values at the time
 // the statement executes, not at the time the assignment completes.
 // ---------------------------------------------------------------------------
@@ -70,8 +54,7 @@ TEST(SimCh4093, ComputesRhsUsingCurrentValues) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.3 "causes the executing process to be suspended and scheduled as a
-//          future event"
+// §4.9.3 Process suspended and scheduled as future event.
 // An intra-assignment delay suspends the process until the specified future
 // time, when the assignment completes.
 // ---------------------------------------------------------------------------
@@ -108,8 +91,7 @@ TEST(SimCh4093, SuspendsProcessAndSchedulesFutureEvent) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.3 "If the delay is 0, the process is scheduled as an Inactive event
-//          for the current time"
+// §4.9.3 Zero delay schedules an Inactive event for current time.
 // A blocking assignment with #0 delay schedules the process in the Inactive
 // region of the current time step, not the Active region.
 // ---------------------------------------------------------------------------
@@ -146,8 +128,7 @@ TEST(SimCh4093, ZeroDelaySchedulesInactiveEvent) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.3 "If a blocking assignment with zero delay is executed from a
-//          Reactive region, the process is scheduled as a Re-Inactive event"
+// §4.9.3 Zero delay from Reactive region schedules Re-Inactive event.
 // When the blocking assignment with #0 originates in the Reactive region,
 // the process goes to Re-Inactive instead of Inactive.
 // ---------------------------------------------------------------------------
@@ -176,7 +157,7 @@ TEST(SimCh4093, ZeroDelayFromReactiveSchedulesReInactive) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.3 "if it returns immediately if no delay is specified"
+// §4.9.3 No delay means immediate assignment without suspension.
 // A blocking assignment without an intra-assignment delay performs the
 // assignment immediately — the process is not suspended.
 // ---------------------------------------------------------------------------
@@ -204,7 +185,7 @@ TEST(SimCh4093, NoDelayAssignsImmediately) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.3 "the process performs the assignment to the left-hand side"
+// §4.9.3 Assignment to LHS after delay completes.
 // After the delay, the captured RHS value is assigned to the LHS.
 // ---------------------------------------------------------------------------
 TEST(SimCh4093, PerformsAssignmentToLhs) {
@@ -230,7 +211,7 @@ TEST(SimCh4093, PerformsAssignmentToLhs) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.3 "enables any events based upon the update of the left-hand side"
+// §4.9.3 LHS update enables dependent events.
 // When the blocking assignment completes and updates the LHS, any processes
 // sensitive to the LHS are triggered.
 // ---------------------------------------------------------------------------
@@ -265,8 +246,7 @@ TEST(SimCh4093, EnablesEventsOnLhsUpdate) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.3 "The values at the time the process resumes are used to determine
-//          the target(s)"
+// §4.9.3 Target determined at resume time, not schedule time.
 // For a blocking assignment with delay where the LHS target depends on
 // some variable, the target is determined at resume time, not schedule time.
 // ---------------------------------------------------------------------------
@@ -310,7 +290,7 @@ TEST(SimCh4093, TargetDeterminedAtResumeTime) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.3 "Execution may then continue with the next sequential statement"
+// §4.9.3 Execution continues with next sequential statement.
 // After the blocking assignment completes (with or without delay), the next
 // sequential statement in the process executes.
 // ---------------------------------------------------------------------------
@@ -344,7 +324,7 @@ TEST(SimCh4093, ContinuesWithNextSequentialStatement) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.3 "or with other Active or Reactive events"
+// §4.9.3 Continues with other Active or Reactive events.
 // After a blocking assignment completes, other events in the same region
 // may execute (the scheduler continues processing the region).
 // ---------------------------------------------------------------------------

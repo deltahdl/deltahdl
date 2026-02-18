@@ -70,8 +70,7 @@ static bool HasAlwaysOfKind(const std::vector<ModuleItem*>& items,
 // LRM §3.3 — Modules
 // =============================================================================
 
-// §3.3: "The basic building block in SystemVerilog is the module, enclosed
-//        between the keywords module and endmodule."
+// §3.3 Module with end label
 TEST(ParserClause03, Cl3_3_ModuleEndLabel) {
   auto r = Parse(
       "module m;\n"
@@ -104,7 +103,7 @@ TEST(ParserClause03, Cl3_3_Mux2to1LrmExample) {
   EXPECT_EQ(blk->always_kind, AlwaysKind::kAlwaysComb);
 }
 
-// §3.3: Data declarations, constants, user-defined types, class definitions
+// §3.3 Data declarations, constants, user-defined types, class definitions
 TEST(ParserClause03, Cl3_3_ModuleDeclarations) {
   auto r = Parse(
       "module m;\n"
@@ -127,7 +126,7 @@ TEST(ParserClause03, Cl3_3_ModuleDeclarations) {
   EXPECT_GE(r.cu->modules[0]->items.size(), 7u);
 }
 
-// §3.3: "Subroutine definitions" and "Procedural blocks"
+// §3.3 Subroutine definitions and procedural blocks
 TEST(ParserClause03, Cl3_3_SubroutinesAndProceduralBlocks) {
   auto r = Parse(
       "module m;\n"
@@ -154,7 +153,7 @@ TEST(ParserClause03, Cl3_3_SubroutinesAndProceduralBlocks) {
       HasAlwaysOfKind(r.cu->modules[0]->items, AlwaysKind::kAlwaysComb));
 }
 
-// §3.3: "Generate blocks"
+// §3.3 Generate blocks
 TEST(ParserClause03, Cl3_3_GenerateBlocks) {
   EXPECT_TRUE(
       ParseOk("module m #(parameter N = 4) ();\n"
@@ -167,7 +166,7 @@ TEST(ParserClause03, Cl3_3_GenerateBlocks) {
               "endmodule\n"));
 }
 
-// §3.3: "Specify blocks"
+// §3.3 Specify blocks
 TEST(ParserClause03, Cl3_3_SpecifyBlock) {
   EXPECT_TRUE(
       ParseOk("module m (input a, output y);\n"
@@ -178,7 +177,7 @@ TEST(ParserClause03, Cl3_3_SpecifyBlock) {
               "endmodule\n"));
 }
 
-// §3.3: "Continuous assignments"
+// §3.3 Continuous assignments
 TEST(ParserClause03, Cl3_3_ContinuousAssignment) {
   auto r = Parse(
       "module m;\n"
@@ -191,8 +190,7 @@ TEST(ParserClause03, Cl3_3_ContinuousAssignment) {
   ASSERT_NE(ca, nullptr);
 }
 
-// §3.3: "Instantiations of other modules, programs, interfaces, checkers,
-//        and primitives"
+// §3.3 Design element instantiations
 TEST(ParserClause03, Cl3_3_DesignElementInstantiations) {
   auto r = Parse(
       "module child; endmodule\n"

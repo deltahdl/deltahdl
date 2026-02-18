@@ -12,11 +12,6 @@ using namespace delta;
 // ===========================================================================
 // §4.4.3.7 Pre-Re-NBA PLI region
 //
-// LRM §4.4.3.7:
-//   "The Pre-Re-NBA region provides for a PLI callback control point that
-//    allows PLI application routines to read and write values and create
-//    events before the events in the Re-NBA region are evaluated (see 4.5)."
-//
 // Figure 4-1 shows:
 //   region_ReInactive -> pli_region_PreReNBA -> region_ReNBA
 //
@@ -25,7 +20,7 @@ using namespace delta;
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.4.3.7 "provides for a PLI callback control point"
+// §4.4.3.7 Pre-Re-NBA PLI callback control point
 // Basic: events scheduled in the Pre-Re-NBA region are executed.
 // ---------------------------------------------------------------------------
 TEST(SimCh4437, PreReNBARegionExecutesPLICallbacks) {
@@ -42,7 +37,7 @@ TEST(SimCh4437, PreReNBARegionExecutesPLICallbacks) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.7 "allows PLI application routines to read ... values"
+// §4.4.3.7 Pre-Re-NBA can read values
 // A Pre-Re-NBA callback can read state set by an earlier region.
 // ---------------------------------------------------------------------------
 TEST(SimCh4437, PreReNBACanReadValues) {
@@ -66,7 +61,7 @@ TEST(SimCh4437, PreReNBACanReadValues) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.7 "allows PLI application routines to ... write values"
+// §4.4.3.7 Pre-Re-NBA can write values
 // A Pre-Re-NBA callback can modify state that Re-NBA will later observe.
 // ---------------------------------------------------------------------------
 TEST(SimCh4437, PreReNBACanWriteValues) {
@@ -90,7 +85,7 @@ TEST(SimCh4437, PreReNBACanWriteValues) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.7 "allows PLI application routines to ... create events"
+// §4.4.3.7 Pre-Re-NBA can create events
 // A Pre-Re-NBA callback can schedule new events (e.g., into Re-NBA).
 // ---------------------------------------------------------------------------
 TEST(SimCh4437, PreReNBACanCreateEvents) {
@@ -115,7 +110,7 @@ TEST(SimCh4437, PreReNBACanCreateEvents) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.7 "before the events in the Re-NBA region are evaluated"
+// §4.4.3.7 Pre-Re-NBA executes before Re-NBA
 // Pre-Re-NBA executes before Re-NBA in the same time slot.
 // ---------------------------------------------------------------------------
 TEST(SimCh4437, PreReNBAExecutesBeforeReNBA) {
@@ -178,7 +173,7 @@ TEST(SimCh4437, PreReNBAIsWithinReactiveRegionSet) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.7 "PLI callback control point"
+// §4.4.3.7 Multiple Pre-Re-NBA callbacks
 // Multiple PLI callbacks coexist in the Pre-Re-NBA region and all execute.
 // ---------------------------------------------------------------------------
 TEST(SimCh4437, PreReNBARegionHoldsMultiplePLICallbacks) {
@@ -221,7 +216,7 @@ TEST(SimCh4437, PreReNBAEventsAcrossMultipleTimeSlots) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.7 "read and write values and create events"
+// §4.4.3.7 Pre-Re-NBA read-write capability
 // Pre-Re-NBA is read-write. A Pre-Re-NBA callback reads state that Reactive
 // set earlier and overwrites it; a later Re-NBA callback sees the Pre-Re-NBA
 // modification. This verifies read-write capability in context.

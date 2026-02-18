@@ -12,13 +12,6 @@ using namespace delta;
 // ===========================================================================
 // §4.4.3.5 Pre-Observed PLI region
 //
-// LRM §4.4.3.5:
-//   "The Pre-Observed region provides for a PLI callback control point that
-//    allows PLI application routines to read values after the active region
-//    set has stabilized. Within this region, it is illegal to write values
-//    to any net or variable or to schedule an event within the current time
-//    slot."
-//
 // Figure 4-1 shows:
 //   pli_region_PostNBA -> pli_region_PreObserved -> region_Observed
 //
@@ -27,7 +20,7 @@ using namespace delta;
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.4.3.5 "provides for a PLI callback control point"
+// §4.4.3.5 Pre-Observed PLI callback control point
 // Basic: events scheduled in the Pre-Observed region are executed.
 // ---------------------------------------------------------------------------
 TEST(SimCh4435, PreObservedRegionExecutesPLICallbacks) {
@@ -44,7 +37,7 @@ TEST(SimCh4435, PreObservedRegionExecutesPLICallbacks) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.5 "allows PLI application routines to read values"
+// §4.4.3.5 Pre-Observed can read values
 // A Pre-Observed callback can read state set by the active region set.
 // ---------------------------------------------------------------------------
 TEST(SimCh4435, PreObservedCanReadValues) {
@@ -68,7 +61,7 @@ TEST(SimCh4435, PreObservedCanReadValues) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.5 "read values after the active region set has stabilized"
+// §4.4.3.5 Read after active region set stabilization
 // Pre-Observed sees final state from the entire active region set
 // (PreActive, Active, Inactive, PreNBA, NBA, PostNBA), not just Active.
 // ---------------------------------------------------------------------------
@@ -125,7 +118,7 @@ TEST(SimCh4435, PreObservedExecutesAfterPostNBABeforeObserved) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.5 "after the active region set has stabilized"
+// §4.4.3.5 Pre-Observed after entire active region set
 // Pre-Observed executes after the entire active region set, not just Active.
 // Full chain: Active -> Inactive -> PreNBA -> NBA -> PostNBA -> PreObserved.
 // ---------------------------------------------------------------------------
@@ -166,7 +159,7 @@ TEST(SimCh4435, PreObservedIsAfterPostNBABeforeObserved) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.5 "PLI callback control point"
+// §4.4.3.5 Multiple Pre-Observed callbacks
 // Multiple PLI callbacks coexist in the Pre-Observed region and all execute.
 // ---------------------------------------------------------------------------
 TEST(SimCh4435, PreObservedRegionHoldsMultiplePLICallbacks) {
@@ -209,7 +202,7 @@ TEST(SimCh4435, PreObservedEventsAcrossMultipleTimeSlots) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.5 "it is illegal to write values to any net or variable"
+// §4.4.3.5 Pre-Observed is read-only
 // Pre-Observed is read-only. This test confirms that Pre-Observed executes
 // in isolation after the active set, so a PLI callback sampling state sees
 // the stable snapshot produced by the active region set.
@@ -239,7 +232,7 @@ TEST(SimCh4435, PreObservedProvidesReadOnlySnapshotAfterActiveSet) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.5 "read values after the active region set has stabilized"
+// §4.4.3.5 Pre-Observed reads fully-stabilized active set state
 // Pre-Observed reads the fully-stabilized state, even when multiple active
 // region set iterations occur due to feedback (Active -> Inactive -> Active).
 // The final value after all active-set iterations is what Pre-Observed sees.

@@ -43,10 +43,7 @@ static const ModuleItem* FindInstByModule(const std::vector<ModuleItem*>& items,
 // LRM §3.12 — Compilation and elaboration
 // =============================================================================
 
-// §3.12: "Elaboration is the process of binding together the components that
-//        make up a design." It "involves expanding instantiations, computing
-//        parameter values, ... establishing net connectivity."
-//        "the compilation of a package is required to precede references to it"
+// §3.12 Compilation and elaboration with parameterized instantiation
 TEST(ParserClause03, Cl3_12_CompilationAndElaboration) {
   auto r = Parse(
       "package pkg; typedef logic [7:0] byte_t; endpackage\n"

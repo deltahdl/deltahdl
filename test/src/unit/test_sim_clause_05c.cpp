@@ -77,10 +77,6 @@ static bool RunSim(SimCh5cFixture& f, const std::string& src) {
 
 // ===========================================================================
 // §5.7 Numbers — simulation-level tests
-//
-// LRM §5.7: "Constant numbers can be specified as integer constants
-// (see 5.7.1) or real constants (see 5.7.2)."
-// Syntax 5-2: number ::= integral_number | real_number
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
@@ -269,7 +265,7 @@ TEST(SimCh5c, NumberSizedDecimalBase) {
 // ---------------------------------------------------------------------------
 TEST(SimCh5c, NumberUnderscoreInIntegral) {
   // Syntax 5-2: unsigned_number ::= decimal_digit { _ | decimal_digit }
-  // "Embedded spaces are illegal" (note 38), but underscores are legal.
+  // Embedded spaces are illegal (note 38), but underscores are legal.
   auto v = RunAndGet(
       "module t;\n  logic [31:0] x;\n  initial x = 1_000_000;\nendmodule\n",
       "x");
@@ -278,19 +274,13 @@ TEST(SimCh5c, NumberUnderscoreInIntegral) {
 
 // ===========================================================================
 // §5.8 Time literals — simulation-level tests
-//
-// LRM §5.8: "Time is written in integer or fixed-point format, followed
-// without a space by a time unit (fs ps ns us ms s)."
-// "The time literal is interpreted as a realtime value scaled to the
-// current time unit."
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
 // 1. Integer format with ns unit (default time unit)
 // ---------------------------------------------------------------------------
 TEST(SimCh5c, TimeLitIntegerNs) {
-  // §5.8: "Time is written in integer ... format, followed without a space
-  // by a time unit"  Example: 40ps.  Here we use ns (default unit).
+  // §5.8: Integer time literal with ns unit (default).
   auto v = RunAndGetReal(
       "module t;\n  realtime r;\n  initial r = 10ns;\nendmodule\n", "r");
   EXPECT_DOUBLE_EQ(v, 10.0);
@@ -300,8 +290,7 @@ TEST(SimCh5c, TimeLitIntegerNs) {
 // 2. Fixed-point format with ns unit
 // ---------------------------------------------------------------------------
 TEST(SimCh5c, TimeLitFixedPointNs) {
-  // §5.8: "Time is written in ... fixed-point format, followed without a
-  // space by a time unit"  Example from LRM: 2.1ns.
+  // §5.8: Fixed-point time literal with ns unit.
   auto v = RunAndGetReal(
       "module t;\n  realtime r;\n  initial r = 2.1ns;\nendmodule\n", "r");
   EXPECT_DOUBLE_EQ(v, 2.1);
@@ -389,10 +378,6 @@ TEST(SimCh5c, TimeLitLrmExample40ps) {
 
 // ===========================================================================
 // §5.9.1 Special characters in strings — simulation-level tests
-//
-// LRM §5.9.1: Table 5-1 lists escape sequences for special characters in
-// string literals.  An escaped character not in Table 5-1 "is treated the
-// same as if the character was not escaped."
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
@@ -511,8 +496,7 @@ TEST(SimCh5c, StrEscHexOneDigit) {
 // 12. Unrecognized escape — treated as literal character
 // ---------------------------------------------------------------------------
 TEST(SimCh5c, StrEscUnrecognized) {
-  // §5.9.1: "An escaped character not appearing in Table 5-1 is treated
-  // the same as if the character was not escaped."  \b → 'b' (0x62).
+  // §5.9.1: Unrecognized escape treated as literal character. \b -> 'b' (0x62).
   auto v = RunAndGet(
       "module t;\n  byte c;\n  initial c = \"\\b\";\nendmodule\n", "c");
   EXPECT_EQ(v, 0x62u);
@@ -531,12 +515,6 @@ TEST(SimCh5c, StrEscMultiple) {
 
 // ===========================================================================
 // §5.9 String literals — simulation-level tests
-//
-// LRM §5.9: "A string literal is a sequence of characters enclosed by a
-// single pair of double quotes ... or a triple pair of double quotes."
-// "String literals used as operands in expressions and assignments shall
-// be treated as unsigned integer constants represented by a sequence of
-// 8-bit ASCII values."
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
@@ -553,7 +531,7 @@ TEST(SimCh5c, StrLitSingleChar) {
 // 2. Multi-character string — 8-bit-per-character packing
 // ---------------------------------------------------------------------------
 TEST(SimCh5c, StrLitMultiChar) {
-  // §5.9: "a sequence of 8-bit ASCII values"
+  // §5.9: String packs as a sequence of 8-bit ASCII values.
   auto v = RunAndGet(
       "module t;\n  bit [23:0] s;\n  initial s = \"ABC\";\nendmodule\n", "s");
   EXPECT_EQ(v, 0x414243u);
@@ -563,8 +541,7 @@ TEST(SimCh5c, StrLitMultiChar) {
 // 3. Larger destination — right-justified, zero-padded
 // ---------------------------------------------------------------------------
 TEST(SimCh5c, StrLitZeroPad) {
-  // §5.9: "the value is right-justified, and the leftmost bits are padded
-  // with zeros"
+  // §5.9: Larger destination — right-justified, zero-padded on the left.
   auto v = RunAndGet(
       "module t;\n  bit [15:0] s;\n  initial s = \"A\";\nendmodule\n", "s");
   EXPECT_EQ(v, 0x0041u);
@@ -574,8 +551,7 @@ TEST(SimCh5c, StrLitZeroPad) {
 // 4. Smaller destination — right-justified, leftmost truncated
 // ---------------------------------------------------------------------------
 TEST(SimCh5c, StrLitTruncateLeft) {
-  // §5.9: "the string is right-justified, and the leftmost characters are
-  // truncated."
+  // §5.9: Smaller destination — right-justified, leftmost chars truncated.
   auto v = RunAndGet(
       "module t;\n  byte s;\n  initial s = \"ABCD\";\nendmodule\n", "s");
   EXPECT_EQ(v, 0x44u);
@@ -585,7 +561,7 @@ TEST(SimCh5c, StrLitTruncateLeft) {
 // 5. Triple-quoted string — basic
 // ---------------------------------------------------------------------------
 TEST(SimCh5c, StrLitTripleBasic) {
-  // §5.9: "a triple pair of double quotes"
+  // §5.9: Triple-quoted string literal.
   auto v = RunAndGet(
       "module t;\n  bit [15:0] s;\n"
       "  initial s = \"\"\"AB\"\"\";\nendmodule\n",
@@ -597,7 +573,7 @@ TEST(SimCh5c, StrLitTripleBasic) {
 // 6. Triple-quoted string — embedded newline (no escape needed)
 // ---------------------------------------------------------------------------
 TEST(SimCh5c, StrLitTripleNewline) {
-  // §5.9: "allow for a newline character to be inserted directly"
+  // §5.9: Triple-quoted string allows direct newline characters.
   auto v = RunAndGet(
       "module t;\n  bit [23:0] s;\n"
       "  initial s = \"\"\"A\nB\"\"\";\nendmodule\n",
@@ -609,7 +585,7 @@ TEST(SimCh5c, StrLitTripleNewline) {
 // 7. Triple-quoted string — embedded double-quote (no escape needed)
 // ---------------------------------------------------------------------------
 TEST(SimCh5c, StrLitTripleQuote) {
-  // §5.9: "allow for a \" character to be inserted directly"
+  // §5.9: Triple-quoted string allows embedded double-quote without escape.
   auto v = RunAndGet(
       "module t;\n  bit [23:0] s;\n"
       "  initial s = \"\"\"A\"B\"\"\";\nendmodule\n",
@@ -621,7 +597,7 @@ TEST(SimCh5c, StrLitTripleQuote) {
 // 8. Line continuation — backslash-newline stripped in quoted string
 // ---------------------------------------------------------------------------
 TEST(SimCh5c, StrLitLineContinuation) {
-  // §5.9: "the backslash and the newline character are ignored"
+  // §5.9: Line continuation — backslash-newline stripped from string.
   auto v = RunAndGet(
       "module t;\n  bit [31:0] s;\n"
       "  initial s = \"AB\\\nCD\";\nendmodule\n",
@@ -646,8 +622,7 @@ TEST(SimCh5c, StrLitDoubleBackslashNewline) {
 // 10. Triple-quoted line continuation — same behavior as quoted
 // ---------------------------------------------------------------------------
 TEST(SimCh5c, StrLitTripleContinuation) {
-  // §5.9: "an escaped newline in a triple-quoted string literal is treated
-  // exactly like an escaped newline in a single-quoted string literal."
+  // §5.9: Triple-quoted line continuation behaves like single-quoted.
   auto v = RunAndGet(
       "module t;\n  bit [31:0] s;\n"
       "  initial s = \"\"\"AB\\\nCD\"\"\";\nendmodule\n",
@@ -657,12 +632,6 @@ TEST(SimCh5c, StrLitTripleContinuation) {
 
 // ===========================================================================
 // §5.10 Structure literals — simulation-level tests
-//
-// LRM §5.10: "Structure literals are structure assignment patterns or
-// pattern expressions with constant member expressions (see 10.9.2)."
-// "A structure literal shall have a type, which may be either explicitly
-// indicated with a prefix or implicitly indicated by an assignment-like
-// context (see 10.8)."
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
@@ -835,18 +804,13 @@ TEST(SimCh5c, StructLitPositionalInit) {
 
 // ===========================================================================
 // §5.7.2 Real literal constants — simulation-level tests
-//
-// LRM §5.7.2: "The real literal constant numbers shall be represented as
-// described by IEEE Std 754, an IEEE standard for double-precision
-// floating-point numbers."
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
 // 1. Fixed-point decimal notation
 // ---------------------------------------------------------------------------
 TEST(SimCh5c, RealFixedPointDecimal) {
-  // §5.7.2: "Real numbers can be specified in … decimal notation
-  // (for example, 14.72)"
+  // §5.7.2: Fixed-point decimal notation.
   auto v = RunAndGetReal(
       "module t;\n  real x;\n  initial x = 1.2;\nendmodule\n", "x");
   EXPECT_DOUBLE_EQ(v, 1.2);
@@ -876,7 +840,7 @@ TEST(SimCh5c, RealLargeFixedPoint) {
 // 4. Scientific notation with uppercase E
 // ---------------------------------------------------------------------------
 TEST(SimCh5c, RealScientificUpperE) {
-  // §5.7.2: "1.2E12 (the exponent symbol can be e or E)"
+  // §5.7.2: Scientific notation with uppercase E.
   auto v = RunAndGetReal(
       "module t;\n  real x;\n  initial x = 1.2E12;\nendmodule\n", "x");
   EXPECT_DOUBLE_EQ(v, 1.2e12);
@@ -926,7 +890,7 @@ TEST(SimCh5c, RealIntegerNegativeExponent) {
 // 9. Underscores are ignored in real literals
 // ---------------------------------------------------------------------------
 TEST(SimCh5c, RealUnderscoreIgnored) {
-  // §5.7.2: "236.123_763_e-12 (underscores are ignored)"
+  // §5.7.2: Underscores in real literals are ignored.
   auto v = RunAndGetReal(
       "module t;\n  real x;\n  initial x = 236.123_763_e-12;\nendmodule\n",
       "x");
@@ -957,7 +921,7 @@ TEST(SimCh5c, RealExponentPositiveSign) {
 // 12. IEEE 754 double-precision bit-exact storage
 // ---------------------------------------------------------------------------
 TEST(SimCh5c, RealIEEE754BitExact) {
-  // §5.7.2: "represented as described by IEEE Std 754"
+  // §5.7.2: IEEE 754 double-precision bit-exact storage.
   // Verify the 64-bit pattern matches IEEE 754 double for 1.0.
   auto bits =
       RunAndGet("module t;\n  real x;\n  initial x = 1.0;\nendmodule\n", "x");

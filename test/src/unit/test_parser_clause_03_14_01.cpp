@@ -9,8 +9,6 @@ using namespace delta;
 // =============================================================================
 
 // 14. Same precision as unit: delay values rounded to whole numbers.
-// "If the precision is the same as the time units, then delay values are
-// rounded off to whole numbers (integers)."
 TEST(ParserClause03, Cl3_14_1_SamePrecisionRoundsToInteger) {
   TimeScale ts{TimeUnit::kNs, 1, TimeUnit::kNs, 1};
   // 2.75ns with 1ns precision rounds to 3ns = 3 ticks at ns.
@@ -22,8 +20,6 @@ TEST(ParserClause03, Cl3_14_1_SamePrecisionRoundsToInteger) {
 }
 
 // 15. One order of magnitude smaller: rounds to one decimal place.
-// "If the precision is one order of magnitude smaller than the time units,
-// then delay values are rounded off to one decimal place."
 TEST(ParserClause03, Cl3_14_1_OneOrderSmallerRoundsToOneDecimal) {
   // 1ns unit, 100ps precision → 1 decimal place in ns.
   TimeScale ts{TimeUnit::kNs, 1, TimeUnit::kPs, 100};
@@ -33,8 +29,7 @@ TEST(ParserClause03, Cl3_14_1_OneOrderSmallerRoundsToOneDecimal) {
   EXPECT_EQ(RealDelayToTicks(2.73, ts, TimeUnit::kPs), 2700u);
 }
 
-// 16. LRM example: "if the time unit specified is 1ns and the precision
-// is 100ps, then ... a delay of 2.75ns would be rounded off to 2.8ns."
+// 16. Rounding example: 1ns unit, 100ps precision, 2.75ns rounds to 2.8ns.
 TEST(ParserClause03, Cl3_14_1_LrmExample_2_75ns) {
   TimeScale ts{TimeUnit::kNs, 1, TimeUnit::kPs, 100};
   // 2.75ns rounded to nearest 100ps = 2.8ns = 2800 ticks at ps.
@@ -77,10 +72,8 @@ TEST(ParserClause03, Cl3_14_1_ExactIntegerPassThrough) {
   EXPECT_EQ(RealDelayToTicks(3.0, ts, TimeUnit::kPs), 3000u);
 }
 
-// 21. Per-element accuracy: "The time values in a design element are
-// accurate to within the unit of time precision specified for that
-// design element, even if there is a smaller time precision specified
-// elsewhere in the design."
+// 21. Per-element accuracy: each design element rounds to its own precision,
+// independent of finer precision specified elsewhere in the design.
 TEST(ParserClause03, Cl3_14_1_PerElementAccuracy) {
   // Element A: 1ns / 100ps — rounds to 0.1ns steps.
   TimeScale ts_a{TimeUnit::kNs, 1, TimeUnit::kPs, 100};

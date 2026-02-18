@@ -12,15 +12,6 @@ using namespace delta;
 // ===========================================================================
 // §4.4.3.1 Preponed PLI region
 //
-// LRM §4.4.3.1:
-//   "The Preponed region provides for a PLI callback control point that
-//    allows PLI application routines to access data at the current time
-//    slot before any net or variable has changed state."
-//
-//   "Within this region, it is illegal to write values to any net or
-//    variable or to schedule an event in any other region within the
-//    current time slot."
-//
 // Figure 4-1 shows:
 //   region_Preponed -> pli_region_PreActive  (first region in time slot)
 //
@@ -29,7 +20,7 @@ using namespace delta;
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.4.3.1 "The Preponed region provides for a PLI callback control point"
+// §4.4.3.1 Preponed PLI callback control point
 // Basic: events scheduled in the Preponed region are executed.
 // ---------------------------------------------------------------------------
 TEST(SimCh4431, PreponedRegionExecutesPLICallbacks) {
@@ -46,8 +37,7 @@ TEST(SimCh4431, PreponedRegionExecutesPLICallbacks) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.1 "allows PLI application routines to access data at the current
-// time slot before any net or variable has changed state"
+// §4.4.3.1 Read-only access before state changes
 // Preponed executes before Active, so it sees state from the previous time
 // slot (or initial state).
 // ---------------------------------------------------------------------------
@@ -72,7 +62,7 @@ TEST(SimCh4431, PreponedAccessesDataBeforeAnyStateChange) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.1 "before any net or variable has changed state"
+// §4.4.3.1 Preponed sees pre-change state
 // Preponed sees the state BEFORE all simulation regions (Active, Inactive,
 // NBA, Observed, Reactive, Re-Inactive, Re-NBA) modify it.
 // ---------------------------------------------------------------------------
@@ -137,7 +127,7 @@ TEST(SimCh4431, PreponedIsFirstRegionOrdinal) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.1 "PLI callback control point"
+// §4.4.3.1 Multiple Preponed callbacks
 // Multiple PLI callbacks coexist in the Preponed region and all execute.
 // ---------------------------------------------------------------------------
 TEST(SimCh4431, PreponedRegionHoldsMultiplePLICallbacks) {
@@ -156,7 +146,7 @@ TEST(SimCh4431, PreponedRegionHoldsMultiplePLICallbacks) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.1 "access data at the current time slot"
+// §4.4.3.1 Preponed data access across time slots
 // Preponed at time T sees state left by Postponed at time T-1 (the final
 // state of the previous time slot).
 // ---------------------------------------------------------------------------
@@ -232,7 +222,7 @@ TEST(SimCh4431, PreponedEventsAcrossMultipleTimeSlots) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.1 "it is illegal to write values to any net or variable"
+// §4.4.3.1 Preponed is read-only
 // The Preponed region is read-only. This test confirms that Preponed
 // executes in isolation before any state-modifying region, so a PLI
 // callback sampling state sees a consistent snapshot.

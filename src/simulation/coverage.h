@@ -33,7 +33,7 @@ struct CoverBin {
   std::vector<int64_t> values;
   std::vector<std::vector<int64_t>> transitions;
   uint64_t hit_count = 0;
-  uint32_t at_least = 1;  // §19.7: minimum hit count for "covered"
+  uint32_t at_least = 1;  // §19.7: minimum hit count for covered status
 };
 
 // =============================================================================

@@ -12,23 +12,14 @@ using namespace delta;
 // ===========================================================================
 // §4.4.2.1 Preponed events region
 //
-// LRM §4.4.2.1:
-//   "The #1step sampling delay provides the ability to sample data
-//    immediately before entering the current time slot. #1step sampling
-//    is identical to taking the data samples in the Preponed region of
-//    the current time slot. Sampling in the Preponed region is equivalent
-//    to sampling in the previous Postponed region. Preponed region PLI
-//    events are also scheduled in this region (see 4.4.3.1)."
-//
-// Figure 4-1 shows: PrevSlot → Preponed → PreActive → Active → ...
+// Figure 4-1 shows: PrevSlot -> Preponed -> PreActive -> Active -> ...
 // Preponed is the very first region in every time slot and has no
-// feedback edges into it — it executes exactly once per time slot.
+// feedback edges into it -- it executes exactly once per time slot.
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
 // §4.4.2.1 Preponed executes before all other regions in the time slot.
-// This verifies "sample data immediately before entering the current
-// time slot" — Preponed runs before Active.
+// Verifies that Preponed runs before Active.
 // ---------------------------------------------------------------------------
 TEST(SimCh4421, PreponedExecutesBeforeAllOtherRegions) {
   Arena arena;
@@ -55,9 +46,7 @@ TEST(SimCh4421, PreponedExecutesBeforeAllOtherRegions) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.1 "#1step sampling is identical to taking the data samples in
-// the Preponed region of the current time slot."
-//
+// §4.4.2.1 #1step sampling via Preponed region
 // A Preponed callback at time T samples a value before any Active
 // modifications at time T.  The sampled value reflects the state from
 // before the current time slot.
@@ -88,11 +77,9 @@ TEST(SimCh4421, PreponedSamplesBeforeActiveModifications) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.1 "Sampling in the Preponed region is equivalent to sampling in
-// the previous Postponed region."
-//
+// §4.4.2.1 Preponed equivalent to previous Postponed
 // A Postponed callback at time T-1 and a Preponed callback at time T
-// observe the same shared state — nothing changes between them.
+// observe the same shared state -- nothing changes between them.
 // ---------------------------------------------------------------------------
 TEST(SimCh4421, PreponedEquivalentToPreviousPostponed) {
   Arena arena;
@@ -155,9 +142,9 @@ TEST(SimCh4421, PreponedDoesNotReExecuteDuringIteration) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.1 "Preponed region PLI events are also scheduled in this region
-// (see 4.4.3.1)."  PLI events and simulation events both execute in the
-// Preponed queue — the scheduler makes no distinction.
+// §4.4.2.1 Preponed PLI events
+// PLI events and simulation events both execute in the Preponed queue --
+// the scheduler makes no distinction.
 // ---------------------------------------------------------------------------
 TEST(SimCh4421, PreponedPLIEventsExecuteInRegion) {
   Arena arena;

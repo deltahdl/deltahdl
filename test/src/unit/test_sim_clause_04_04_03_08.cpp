@@ -12,11 +12,6 @@ using namespace delta;
 // ===========================================================================
 // §4.4.3.8 Post-Re-NBA PLI region
 //
-// LRM §4.4.3.8:
-//   "The Post-Re-NBA region provides for a PLI callback control point that
-//    allows PLI application routines to read and write values and create
-//    events after the events in the Re-NBA region are evaluated (see 4.5)."
-//
 // Figure 4-1 shows:
 //   region_ReNBA -> pli_region_PostReNBA -> pli_region_PrePostponed
 //
@@ -25,7 +20,7 @@ using namespace delta;
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.4.3.8 "provides for a PLI callback control point"
+// §4.4.3.8 Post-Re-NBA PLI callback control point
 // Basic: events scheduled in the Post-Re-NBA region are executed.
 // ---------------------------------------------------------------------------
 TEST(SimCh4438, PostReNBARegionExecutesPLICallbacks) {
@@ -42,7 +37,7 @@ TEST(SimCh4438, PostReNBARegionExecutesPLICallbacks) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.8 "allows PLI application routines to read ... values"
+// §4.4.3.8 Post-Re-NBA can read values
 // A Post-Re-NBA callback can read state set by an earlier region.
 // ---------------------------------------------------------------------------
 TEST(SimCh4438, PostReNBACanReadValues) {
@@ -66,7 +61,7 @@ TEST(SimCh4438, PostReNBACanReadValues) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.8 "allows PLI application routines to ... write values"
+// §4.4.3.8 Post-Re-NBA can write values
 // A Post-Re-NBA callback can modify state that later regions will observe.
 // ---------------------------------------------------------------------------
 TEST(SimCh4438, PostReNBACanWriteValues) {
@@ -90,7 +85,7 @@ TEST(SimCh4438, PostReNBACanWriteValues) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.8 "allows PLI application routines to ... create events"
+// §4.4.3.8 Post-Re-NBA can create events
 // A Post-Re-NBA callback can schedule new events (e.g., into Pre-Postponed).
 // ---------------------------------------------------------------------------
 TEST(SimCh4438, PostReNBACanCreateEvents) {
@@ -115,7 +110,7 @@ TEST(SimCh4438, PostReNBACanCreateEvents) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.8 "after the events in the Re-NBA region are evaluated"
+// §4.4.3.8 Post-Re-NBA executes after Re-NBA
 // Post-Re-NBA executes after Re-NBA in the same time slot.
 // ---------------------------------------------------------------------------
 TEST(SimCh4438, PostReNBAExecutesAfterReNBA) {
@@ -178,7 +173,7 @@ TEST(SimCh4438, PostReNBAIsWithinReactiveRegionSet) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.8 "PLI callback control point"
+// §4.4.3.8 Multiple Post-Re-NBA callbacks
 // Multiple PLI callbacks coexist in the Post-Re-NBA region and all execute.
 // ---------------------------------------------------------------------------
 TEST(SimCh4438, PostReNBARegionHoldsMultiplePLICallbacks) {
@@ -221,7 +216,7 @@ TEST(SimCh4438, PostReNBAEventsAcrossMultipleTimeSlots) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.8 "read and write values and create events"
+// §4.4.3.8 Post-Re-NBA read-write capability
 // Post-Re-NBA is read-write. A Post-Re-NBA callback reads state that Re-NBA
 // set earlier and overwrites it; a later Pre-Postponed callback sees the
 // Post-Re-NBA modification. This verifies read-write capability in context.

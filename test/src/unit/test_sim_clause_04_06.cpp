@@ -11,36 +11,10 @@ using namespace delta;
 
 // ===========================================================================
 // §4.6 Determinism
-//
-// LRM §4.6:
-//   "This standard guarantees a certain scheduling order:
-//    a) Statements within a begin-end block shall be executed in the order
-//       in which they appear in that begin-end block. Execution of statements
-//       in a particular begin-end block can be suspended in favor of other
-//       processes in the model; however, in no case shall the statements in
-//       a begin-end block be executed in any order other than that in which
-//       they appear in the source.
-//    b) NBAs shall be performed in the order the statements were executed
-//       (see 10.4.2)."
-//
-// The LRM example:
-//   module test;
-//   logic a;
-//   initial begin
-//     a <= 0;
-//     a <= 1;
-//   end
-//   endmodule
-//
-// "When this block is executed, there will be two events added to the NBA
-// region. ... This rule requires that they be taken from the NBA region and
-// performed in execution order as well. Hence, at the end of simulation
-// time 0, the variable a will be assigned 0 and then 1."
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.6(a) "Statements within a begin-end block shall be executed in the
-// order in which they appear"
+// §4.6(a) Begin-end block statement ordering.
 // Sequential events scheduled in the Active region execute in FIFO order.
 // ---------------------------------------------------------------------------
 TEST(SimCh46, SequentialStatementsExecuteInSourceOrder) {
@@ -63,8 +37,7 @@ TEST(SimCh46, SequentialStatementsExecuteInSourceOrder) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.6(a) "Execution of statements in a particular begin-end block can be
-// suspended in favor of other processes"
+// §4.6(a) Process suspension and resumption ordering.
 // A suspended process resumes in order — events from different processes
 // interleave but each individual process's events remain in source order.
 // ---------------------------------------------------------------------------
@@ -98,8 +71,7 @@ TEST(SimCh46, SuspendedProcessResumesInOrder) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.6(a) "in no case shall the statements in a begin-end block be executed
-// in any order other than that in which they appear in the source"
+// §4.6(a) Source-order preservation in begin-end blocks.
 // Even with many events, source order (FIFO) is preserved within a region.
 // ---------------------------------------------------------------------------
 TEST(SimCh46, LargeSequentialBlockPreservesOrder) {
@@ -121,8 +93,7 @@ TEST(SimCh46, LargeSequentialBlockPreservesOrder) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.6(b) "NBAs shall be performed in the order the statements were
-// executed"
+// §4.6(b) NBA execution order matches statement execution order.
 // Multiple NBA events scheduled in execution order execute in that order.
 // ---------------------------------------------------------------------------
 TEST(SimCh46, NBAExecutionOrder) {
@@ -145,9 +116,7 @@ TEST(SimCh46, NBAExecutionOrder) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.6(b) LRM example: "a <= 0; a <= 1;"
-// "Hence, at the end of simulation time 0, the variable a will be assigned
-// 0 and then 1."
+// §4.6(b) Last NBA wins for multiple assignments to the same variable.
 // The last NBA wins — variable ends up with value 1.
 // ---------------------------------------------------------------------------
 TEST(SimCh46, NBALastAssignmentWins) {
@@ -170,8 +139,7 @@ TEST(SimCh46, NBALastAssignmentWins) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.6(b) "two events added to the NBA region ... entered in the event
-// region in execution order"
+// §4.6(b) Active-generated NBAs execute in creation order.
 // Active region generates NBAs; they execute in the order they were created.
 // ---------------------------------------------------------------------------
 TEST(SimCh46, ActiveGeneratedNBAsExecuteInOrder) {
@@ -305,8 +273,7 @@ TEST(SimCh46, NBAOrderingAcrossTimeSlots) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.6(b) "performed in execution order" — Reactive region NBAs (Re-NBA)
-// also maintain FIFO execution order.
+// §4.6(b) Reactive region NBAs (Re-NBA) maintain FIFO execution order.
 // ---------------------------------------------------------------------------
 TEST(SimCh46, ReactiveNBAExecutionOrder) {
   Arena arena;

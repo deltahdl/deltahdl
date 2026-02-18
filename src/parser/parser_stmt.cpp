@@ -243,7 +243,7 @@ Stmt* Parser::ParseBlockStmt() {
   stmt->kind = StmtKind::kBlock;
   stmt->range.start = CurrentLoc();
   Expect(TokenKind::kKwBegin);
-  // Optional block label: ": label_name"
+  // Optional block label.
   if (Match(TokenKind::kColon)) {
     stmt->label = ExpectIdentifier().text;
   }
@@ -258,7 +258,7 @@ Stmt* Parser::ParseBlockStmt() {
     }
   }
   Expect(TokenKind::kKwEnd);
-  // Optional end label: ": label_name"
+  // Optional end label.
   if (Match(TokenKind::kColon)) {
     ExpectIdentifier();
   }
@@ -291,11 +291,11 @@ Stmt* Parser::ParseCaseStmt(TokenKind case_kind) {
   Expect(TokenKind::kLParen);
   stmt->condition = ParseExpr();
   Expect(TokenKind::kRParen);
-  // LRM section 12.5.4 -- "case (expr) inside"
+  // §12.5.4: case-inside variant.
   if (Match(TokenKind::kKwInside)) {
     stmt->case_inside = true;
   }
-  // §12.6: "case (expr) matches"
+  // §12.6: case-matches variant.
   Match(TokenKind::kKwMatches);
   while (!Check(TokenKind::kKwEndcase) && !AtEnd()) {
     stmt->case_items.push_back(ParseCaseItem(stmt->case_inside));
@@ -382,7 +382,7 @@ Stmt* Parser::ParseForkStmt() {
   stmt->kind = StmtKind::kFork;
   stmt->range.start = CurrentLoc();
   Expect(TokenKind::kKwFork);
-  // Optional fork label: ": label_name"
+  // Optional fork label.
   if (Match(TokenKind::kColon)) {
     stmt->label = ExpectIdentifier().text;
   }
@@ -398,7 +398,7 @@ Stmt* Parser::ParseForkStmt() {
   }
   stmt->join_kind = CurrentToken().kind;
   Consume();  // join / join_any / join_none
-  // Optional end label: ": label_name"
+  // Optional end label.
   if (Match(TokenKind::kColon)) {
     ExpectIdentifier();
   }
@@ -445,8 +445,7 @@ Expr* Parser::ParseForeachArrayId() {
   return expr;
 }
 
-// LRM section 12.7.3 -- foreach loop
-// Syntax: foreach ( ps_or_hierarchical_array_identifier [ loop_vars ] ) stmt
+// §12.7.3: foreach loop.
 // The array id may be hierarchical (a.b.c); loop vars are comma-separated
 // identifiers where some slots may be empty.
 Stmt* Parser::ParseForeachStmt() {

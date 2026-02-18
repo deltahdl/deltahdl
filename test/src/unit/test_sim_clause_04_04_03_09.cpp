@@ -12,11 +12,6 @@ using namespace delta;
 // ===========================================================================
 // §4.4.3.9 Pre-Postponed PLI region
 //
-// LRM §4.4.3.9:
-//   "The Pre-Postponed region provides a PLI callback control point that
-//    allows PLI application routines to read and write values and create
-//    events after processing all other regions except the Postponed region."
-//
 // Figure 4-1 shows:
 //   pli_region_PostReNBA -> pli_region_PrePostponed -> region_Postponed
 //
@@ -25,7 +20,7 @@ using namespace delta;
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.4.3.9 "provides a PLI callback control point"
+// §4.4.3.9 Pre-Postponed PLI callback control point
 // Basic: events scheduled in the Pre-Postponed region are executed.
 // ---------------------------------------------------------------------------
 TEST(SimCh4439, PrePostponedRegionExecutesPLICallbacks) {
@@ -42,7 +37,7 @@ TEST(SimCh4439, PrePostponedRegionExecutesPLICallbacks) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.9 "allows PLI application routines to read ... values"
+// §4.4.3.9 Pre-Postponed can read values
 // A Pre-Postponed callback can read state set by an earlier region.
 // ---------------------------------------------------------------------------
 TEST(SimCh4439, PrePostponedCanReadValues) {
@@ -66,7 +61,7 @@ TEST(SimCh4439, PrePostponedCanReadValues) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.9 "allows PLI application routines to ... write values"
+// §4.4.3.9 Pre-Postponed can write values
 // A Pre-Postponed callback can modify state that Postponed will observe.
 // ---------------------------------------------------------------------------
 TEST(SimCh4439, PrePostponedCanWriteValues) {
@@ -90,7 +85,7 @@ TEST(SimCh4439, PrePostponedCanWriteValues) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.9 "allows PLI application routines to ... create events"
+// §4.4.3.9 Pre-Postponed can create events
 // A Pre-Postponed callback can schedule new events (e.g., into Postponed).
 // ---------------------------------------------------------------------------
 TEST(SimCh4439, PrePostponedCanCreateEvents) {
@@ -115,7 +110,7 @@ TEST(SimCh4439, PrePostponedCanCreateEvents) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.9 "after processing all other regions except the Postponed region"
+// §4.4.3.9 Pre-Postponed executes after all regions except Postponed
 // Pre-Postponed executes after Post-Re-NBA in the same time slot.
 // ---------------------------------------------------------------------------
 TEST(SimCh4439, PrePostponedExecutesAfterPostReNBA) {
@@ -178,7 +173,7 @@ TEST(SimCh4439, PrePostponedIsWithinReactiveRegionSet) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.9 "PLI callback control point"
+// §4.4.3.9 Multiple Pre-Postponed callbacks
 // Multiple PLI callbacks coexist in the Pre-Postponed region and all execute.
 // ---------------------------------------------------------------------------
 TEST(SimCh4439, PrePostponedRegionHoldsMultiplePLICallbacks) {
@@ -221,7 +216,7 @@ TEST(SimCh4439, PrePostponedEventsAcrossMultipleTimeSlots) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.9 "read and write values and create events"
+// §4.4.3.9 Pre-Postponed read-write capability
 // Pre-Postponed is read-write. A Pre-Postponed callback reads state that
 // Post-Re-NBA set earlier and overwrites it; a later Postponed callback sees
 // the Pre-Postponed modification. This verifies read-write capability.

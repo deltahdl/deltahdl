@@ -11,20 +11,10 @@ using namespace delta;
 
 // ===========================================================================
 // §4.9.4 Nonblocking assignment
-//
-// LRM §4.9.4:
-//   "A nonblocking assignment statement (see 10.4.2) always computes the
-//    updated value and schedules the update as an NBA update event, either
-//    in the current time step if the delay is zero or as a future event if
-//    the delay is nonzero. The values in effect when the update is placed
-//    in the event region are used to compute both the right-hand value and
-//    the left-hand target."
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.9.4 "always computes the updated value"
-// The RHS of a nonblocking assignment is always evaluated to produce the
-// updated value before the NBA event is scheduled.
+// §4.9.4 — RHS always evaluated before NBA is scheduled
 // ---------------------------------------------------------------------------
 TEST(SimCh4094, AlwaysComputesUpdatedValue) {
   Arena arena;
@@ -49,9 +39,7 @@ TEST(SimCh4094, AlwaysComputesUpdatedValue) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.4 "schedules the update as an NBA update event"
-// The update from a nonblocking assignment is scheduled in the NBA region,
-// not the Active or Inactive region.
+// §4.9.4 — Update scheduled in NBA region, not Active or Inactive
 // ---------------------------------------------------------------------------
 TEST(SimCh4094, SchedulesUpdateAsNbaEvent) {
   Arena arena;
@@ -84,9 +72,7 @@ TEST(SimCh4094, SchedulesUpdateAsNbaEvent) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.4 "either in the current time step if the delay is zero"
-// A nonblocking assignment with zero delay schedules the NBA event in the
-// current time step's NBA region.
+// §4.9.4 — Zero delay schedules NBA in current time step
 // ---------------------------------------------------------------------------
 TEST(SimCh4094, ZeroDelaySchedulesNbaInCurrentTimestep) {
   Arena arena;
@@ -115,9 +101,7 @@ TEST(SimCh4094, ZeroDelaySchedulesNbaInCurrentTimestep) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.4 "or as a future event if the delay is nonzero"
-// A nonblocking assignment with a nonzero delay schedules the NBA event at
-// the future time.
+// §4.9.4 — Nonzero delay schedules NBA as future event
 // ---------------------------------------------------------------------------
 TEST(SimCh4094, NonzeroDelaySchedulesNbaAsFutureEvent) {
   Arena arena;
@@ -146,11 +130,7 @@ TEST(SimCh4094, NonzeroDelaySchedulesNbaAsFutureEvent) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.4 "The values in effect when the update is placed in the event region
-//          are used to compute...the right-hand value"
-// The RHS is computed using values at the time the NBA is scheduled, not at
-// the time the NBA executes. If the source changes after scheduling, the
-// original captured value is used.
+// §4.9.4 — RHS computed using values at schedule time, not execution time
 // ---------------------------------------------------------------------------
 TEST(SimCh4094, RhsComputedAtScheduleTime) {
   Arena arena;
@@ -179,9 +159,7 @@ TEST(SimCh4094, RhsComputedAtScheduleTime) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.4 "and the left-hand target"
-// The LHS target is also determined using values at the time the NBA is
-// scheduled, not at the time it executes.
+// §4.9.4 — LHS target determined at schedule time, not execution time
 // ---------------------------------------------------------------------------
 TEST(SimCh4094, LhsTargetDeterminedAtScheduleTime) {
   Arena arena;
@@ -219,9 +197,7 @@ TEST(SimCh4094, LhsTargetDeterminedAtScheduleTime) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.4 "schedules the update as an NBA update event"
-// Multiple nonblocking assignments from the same process all schedule their
-// updates in the NBA region. All NBA updates execute after Active completes.
+// §4.9.4 — Multiple NBAs all schedule in NBA region
 // ---------------------------------------------------------------------------
 TEST(SimCh4094, MultipleNbasAllScheduleInNbaRegion) {
   Arena arena;
@@ -259,9 +235,7 @@ TEST(SimCh4094, MultipleNbasAllScheduleInNbaRegion) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.4 "always computes the updated value and schedules the update"
-// The nonblocking assignment does NOT block the executing process. The process
-// continues immediately after scheduling the NBA event.
+// §4.9.4 — NBA does not block the executing process
 // ---------------------------------------------------------------------------
 TEST(SimCh4094, NbaDoesNotBlockProcess) {
   Arena arena;
@@ -292,9 +266,7 @@ TEST(SimCh4094, NbaDoesNotBlockProcess) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.4 "schedules the update as an NBA update event"
-// NBA events execute after all Active and Inactive events in the same time
-// step, demonstrating the stratified region ordering.
+// §4.9.4 — NBA executes after Active and Inactive in the same time step
 // ---------------------------------------------------------------------------
 TEST(SimCh4094, NbaExecutesAfterActiveAndInactive) {
   Arena arena;
@@ -328,10 +300,7 @@ TEST(SimCh4094, NbaExecutesAfterActiveAndInactive) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.4 "always computes the updated value and schedules the update as an
-//          NBA update event"
-// Classic swap pattern: two nonblocking assignments to swap values. Both RHS
-// values are computed before either NBA update executes.
+// §4.9.4 — Swap pattern: both RHS values computed before either NBA executes
 // ---------------------------------------------------------------------------
 TEST(SimCh4094, SwapPatternBothRhsComputedBeforeUpdate) {
   Arena arena;

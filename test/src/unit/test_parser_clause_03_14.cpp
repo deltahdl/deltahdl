@@ -131,7 +131,7 @@ TEST(ParserClause03, Cl3_14_Table3_1_InvalidStrings) {
   EXPECT_FALSE(ParseTimeUnitStr("NS", u));  // case-sensitive
 }
 
-// 4. NOTE: "us" represents microseconds (the LRM substitutes for μs).
+// 4. "us" represents microseconds (substitution for the mu-s symbol).
 TEST(ParserClause03, Cl3_14_UsForMicroseconds) {
   TimeUnit u = TimeUnit::kNs;
   EXPECT_TRUE(ParseTimeUnitStr("us", u));
@@ -232,7 +232,6 @@ TEST(ParserClause03, Cl3_14_DelayToTicksFullRange) {
 }
 
 // 12. Precision constraint: precision exponent <= unit exponent.
-// "The time precision shall be at least as precise as the time unit."
 // Finer units have more-negative exponents (kFs < kPs < ... < kS).
 TEST(ParserClause03, Cl3_14_PrecisionAtLeastAsPreciseAsUnit) {
   EXPECT_LE(static_cast<int8_t>(TimeUnit::kFs),

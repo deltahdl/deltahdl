@@ -11,18 +11,10 @@ using namespace delta;
 
 // ===========================================================================
 // §4.9.7 Subroutines
-//
-// LRM §4.9.7:
-//   "Subroutine argument passing is by value, and it copies in on invocation
-//    and copies out on return. The copyout-on-the-return function behaves in
-//    the same manner as does any blocking assignment."
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.9.7 "Subroutine argument passing is by value"
-// Arguments are passed by value — the subroutine receives a copy, not a
-// reference to the caller's variable. Modifications inside the subroutine
-// do not directly affect the caller's copy.
+// §4.9.7 — Argument passing is by value
 // ---------------------------------------------------------------------------
 TEST(SimCh4097, ArgumentPassedByValue) {
   Arena arena;
@@ -50,10 +42,7 @@ TEST(SimCh4097, ArgumentPassedByValue) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.7 "it copies in on invocation"
-// The argument value is captured (copied in) at the time the subroutine is
-// invoked. If the source changes after invocation, the subroutine still uses
-// the value from invocation time.
+// §4.9.7 — Copy-in happens at invocation time
 // ---------------------------------------------------------------------------
 TEST(SimCh4097, CopyInOnInvocation) {
   Arena arena;
@@ -87,9 +76,7 @@ TEST(SimCh4097, CopyInOnInvocation) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.7 "copies out on return"
-// Output arguments are copied out (written back to the caller's variable)
-// when the subroutine returns, not during execution.
+// §4.9.7 — Copy-out happens on return
 // ---------------------------------------------------------------------------
 TEST(SimCh4097, CopyOutOnReturn) {
   Arena arena;
@@ -117,9 +104,7 @@ TEST(SimCh4097, CopyOutOnReturn) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.7 "it copies in on invocation and copies out on return"
-// A subroutine with an inout argument copies the value in at invocation and
-// copies the (possibly modified) value out on return.
+// §4.9.7 — Inout argument: copy-in at invocation, copy-out on return
 // ---------------------------------------------------------------------------
 TEST(SimCh4097, InoutArgCopiedInAndOut) {
   Arena arena;
@@ -146,9 +131,7 @@ TEST(SimCh4097, InoutArgCopiedInAndOut) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.7 "copies out on return"
-// Multiple output arguments are all copied out when the subroutine returns.
-// All copy-outs happen at the same point (return time).
+// §4.9.7 — Multiple output arguments all copied out on return
 // ---------------------------------------------------------------------------
 TEST(SimCh4097, MultipleCopyOutArgsOnReturn) {
   Arena arena;
@@ -182,10 +165,7 @@ TEST(SimCh4097, MultipleCopyOutArgsOnReturn) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.7 "The copyout-on-the-return function behaves in the same manner as
-//          does any blocking assignment"
-// The copy-out is immediate (like a blocking assignment), so the next
-// statement after the subroutine call sees the updated value.
+// §4.9.7 — Copy-out behaves as a blocking assignment (immediate)
 // ---------------------------------------------------------------------------
 TEST(SimCh4097, CopyOutBehavesAsBlockingAssignment) {
   Arena arena;
@@ -213,10 +193,7 @@ TEST(SimCh4097, CopyOutBehavesAsBlockingAssignment) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.7 "The copyout-on-the-return function behaves in the same manner as
-//          does any blocking assignment"
-// Like a blocking assignment, the copy-out enables events based on the
-// update of the left-hand side (the caller's variable).
+// §4.9.7 — Copy-out enables events on the updated variable
 // ---------------------------------------------------------------------------
 TEST(SimCh4097, CopyOutEnablesEventsOnUpdate) {
   Arena arena;
@@ -249,11 +226,7 @@ TEST(SimCh4097, CopyOutEnablesEventsOnUpdate) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.7 "The copyout-on-the-return function behaves in the same manner as
-//          does any blocking assignment"
-// Like a blocking assignment without intra-assignment delay, the copy-out
-// does not suspend the calling process. Execution continues with the next
-// sequential statement after the subroutine returns.
+// §4.9.7 — Copy-out does not suspend the calling process
 // ---------------------------------------------------------------------------
 TEST(SimCh4097, CopyOutDoesNotSuspendProcess) {
   Arena arena;
@@ -285,10 +258,7 @@ TEST(SimCh4097, CopyOutDoesNotSuspendProcess) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.7 "The copyout-on-the-return function behaves in the same manner as
-//          does any blocking assignment"
-// Like a blocking assignment, the copy-out occurs in the Active region (not
-// NBA or any deferred region). This contrasts with nonblocking assignments.
+// §4.9.7 — Copy-out occurs in the Active region
 // ---------------------------------------------------------------------------
 TEST(SimCh4097, CopyOutOccursInActiveRegion) {
   Arena arena;
@@ -318,12 +288,7 @@ TEST(SimCh4097, CopyOutOccursInActiveRegion) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.7 "Subroutine argument passing is by value, and it copies in on
-//          invocation and copies out on return"
-// The copy-in captures values at invocation and the copy-out writes values
-// at return. This means if the caller's source variable changes during
-// subroutine execution, the subroutine uses the invocation-time value, and
-// the copy-out writes back the subroutine's computed result regardless.
+// §4.9.7 — Copy-in and copy-out are independent operations
 // ---------------------------------------------------------------------------
 TEST(SimCh4097, CopyInAndCopyOutAreIndependent) {
   Arena arena;

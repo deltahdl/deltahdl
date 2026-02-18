@@ -509,7 +509,7 @@ Expr* Parser::ParseIdentifierExpr() {
   }
 
   // Postfix chain: calls, selects, member access, and attributes
-  // §5.12 Example 7: add (* mode = "cla" *) (b, c)
+  // §5.12: attributes may appear before argument list.
   while (Check(TokenKind::kLParen) || Check(TokenKind::kLBracket) ||
          Check(TokenKind::kAttrStart)) {
     if (Check(TokenKind::kAttrStart)) {

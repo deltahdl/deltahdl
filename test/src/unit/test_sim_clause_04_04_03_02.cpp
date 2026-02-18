@@ -12,11 +12,6 @@ using namespace delta;
 // ===========================================================================
 // §4.4.3.2 Pre-Active PLI region
 //
-// LRM §4.4.3.2:
-//   "The Pre-Active region provides for a PLI callback control point that
-//    allows PLI application routines to read and write values and create
-//    events before events in the Active region are evaluated (see 4.5)."
-//
 // Figure 4-1 shows:
 //   region_Preponed -> pli_region_PreActive -> region_Active
 //
@@ -27,7 +22,7 @@ using namespace delta;
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.4.3.2 "provides for a PLI callback control point"
+// §4.4.3.2 Pre-Active PLI callback control point
 // Basic: events scheduled in the Pre-Active region are executed.
 // ---------------------------------------------------------------------------
 TEST(SimCh4432, PreActiveRegionExecutesPLICallbacks) {
@@ -44,7 +39,7 @@ TEST(SimCh4432, PreActiveRegionExecutesPLICallbacks) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.2 "allows PLI application routines to read ... values"
+// §4.4.3.2 Pre-Active can read values
 // A Pre-Active callback can read state set during initialization.
 // ---------------------------------------------------------------------------
 TEST(SimCh4432, PreActiveCanReadValues) {
@@ -62,7 +57,7 @@ TEST(SimCh4432, PreActiveCanReadValues) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.2 "allows PLI application routines to ... write values"
+// §4.4.3.2 Pre-Active can write values
 // A Pre-Active callback can modify state that Active will later observe.
 // ---------------------------------------------------------------------------
 TEST(SimCh4432, PreActiveCanWriteValues) {
@@ -86,7 +81,7 @@ TEST(SimCh4432, PreActiveCanWriteValues) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.2 "allows PLI application routines to ... create events"
+// §4.4.3.2 Pre-Active can create events
 // A Pre-Active callback can schedule new events (e.g., into Active).
 // ---------------------------------------------------------------------------
 TEST(SimCh4432, PreActiveCanCreateEvents) {
@@ -111,7 +106,7 @@ TEST(SimCh4432, PreActiveCanCreateEvents) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.2 "before events in the Active region are evaluated"
+// §4.4.3.2 Pre-Active executes before Active
 // Pre-Active executes before Active in the same time slot.
 // ---------------------------------------------------------------------------
 TEST(SimCh4432, PreActiveExecutesBeforeActive) {
@@ -174,7 +169,7 @@ TEST(SimCh4432, PreActiveIsWithinActiveRegionSet) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.2 "PLI callback control point"
+// §4.4.3.2 Multiple Pre-Active callbacks
 // Multiple PLI callbacks coexist in the Pre-Active region and all execute.
 // ---------------------------------------------------------------------------
 TEST(SimCh4432, PreActiveRegionHoldsMultiplePLICallbacks) {
@@ -217,7 +212,7 @@ TEST(SimCh4432, PreActiveEventsAcrossMultipleTimeSlots) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.2 "read and write values and create events"
+// §4.4.3.2 Pre-Active read-write vs Preponed read-only
 // Contrast with §4.4.3.1: Pre-Active is read-write, whereas Preponed is
 // read-only. A Pre-Active callback writes state that is visible to a
 // later Active callback in the same time slot.

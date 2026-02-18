@@ -23,8 +23,7 @@ TEST(Lexer, EmptyInput) {
 // --- §5.2: Lexical tokens ---
 
 TEST(Lexer, LexicalToken_SourceIsTokenStream) {
-  // §5.2: "SystemVerilog source text files shall be a stream of lexical
-  // tokens."
+  // §5.2: Source text is a stream of lexical tokens.
   auto tokens = Lex("module m; endmodule");
   ASSERT_GE(tokens.size(), 4);
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwModule);
@@ -35,7 +34,7 @@ TEST(Lexer, LexicalToken_SourceIsTokenStream) {
 }
 
 TEST(Lexer, LexicalToken_EachTokenHasOneOrMoreChars) {
-  // §5.2: "A lexical token shall consist of one or more characters."
+  // §5.2: Each lexical token has one or more characters.
   auto tokens = Lex("module m; logic [7:0] x = 8'hFF + 1; endmodule");
   for (size_t i = 0; i + 1 < tokens.size(); ++i) {
     EXPECT_GE(tokens[i].text.size(), 1u)
@@ -44,9 +43,7 @@ TEST(Lexer, LexicalToken_EachTokenHasOneOrMoreChars) {
 }
 
 TEST(Lexer, LexicalToken_FreeFormatLayout) {
-  // §5.2: "The layout of tokens in a source file shall be free format; that
-  // is, spaces and newline characters shall not be syntactically significant
-  // other than being token separators."
+  // §5.2: Free format layout — spaces and newlines are only token separators.
   auto compact = Lex("module m;logic [7:0] x;endmodule");
   auto spread =
       Lex("module\n  m\n  ;\nlogic\n  [\n  7\n  :\n  0\n  ]\n  x\n  "
@@ -93,8 +90,7 @@ TEST(Lexer, LexicalToken_AllSevenCategories) {
 }
 
 TEST(Lexer, LexicalToken_EscapedIdentifierException) {
-  // §5.2: "except for escaped identifiers (see 5.6.1)" — whitespace IS
-  // syntactically significant for escaped identifiers: it terminates them.
+  // §5.2: Escaped identifiers are the exception — whitespace terminates them.
   auto with_space = Lex("\\abc+def ");
   ASSERT_GE(with_space.size(), 2);
   EXPECT_EQ(with_space[0].kind, TokenKind::kEscapedIdentifier);
@@ -713,8 +709,8 @@ TEST(Lexer, Comment_EmptyBlockComment) {
 }
 
 TEST(Lexer, Comment_BlockNotNested) {
-  // §5.4: "Block comments shall not be nested."
-  // /* outer /* inner */ ends at first */ — "still_here" is a token.
+  // §5.4: Block comments are not nested.
+  // /* outer /* inner */ ends at first */ — still_here is a token.
   auto tokens = Lex("a /* outer /* inner */ still_here");
   ASSERT_GE(tokens.size(), 3);
   EXPECT_EQ(tokens[0].text, "a");
@@ -748,8 +744,7 @@ TEST(Lexer, Comment_SlashesInsideBlock) {
 }
 
 TEST(Lexer, Comment_LineCommentEndsAtNewline) {
-  // §5.4: "A one-line comment shall start with // and end with a newline
-  // character." — code on the next line is not part of the comment.
+  // §5.4: One-line comment ends at newline — code on the next line is active.
   auto tokens = Lex("a // comment text\nb // more\nc");
   ASSERT_EQ(tokens.size(), 4);
   EXPECT_EQ(tokens[0].text, "a");

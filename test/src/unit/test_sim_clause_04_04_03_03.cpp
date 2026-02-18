@@ -12,11 +12,6 @@ using namespace delta;
 // ===========================================================================
 // §4.4.3.3 Pre-NBA PLI region
 //
-// LRM §4.4.3.3:
-//   "The Pre-NBA region provides for a PLI callback control point that
-//    allows PLI application routines to read and write values and create
-//    events before the events in the NBA region are evaluated (see 4.5)."
-//
 // Figure 4-1 shows:
 //   region_Inactive -> pli_region_PreNBA -> region_NBA
 //
@@ -25,7 +20,7 @@ using namespace delta;
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.4.3.3 "provides for a PLI callback control point"
+// §4.4.3.3 Pre-NBA PLI callback control point
 // Basic: events scheduled in the Pre-NBA region are executed.
 // ---------------------------------------------------------------------------
 TEST(SimCh4433, PreNBARegionExecutesPLICallbacks) {
@@ -42,7 +37,7 @@ TEST(SimCh4433, PreNBARegionExecutesPLICallbacks) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.3 "allows PLI application routines to read ... values"
+// §4.4.3.3 Pre-NBA can read values
 // A Pre-NBA callback can read state set during initialization.
 // ---------------------------------------------------------------------------
 TEST(SimCh4433, PreNBACanReadValues) {
@@ -60,7 +55,7 @@ TEST(SimCh4433, PreNBACanReadValues) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.3 "allows PLI application routines to ... write values"
+// §4.4.3.3 Pre-NBA can write values
 // A Pre-NBA callback can modify state that NBA will later observe.
 // ---------------------------------------------------------------------------
 TEST(SimCh4433, PreNBACanWriteValues) {
@@ -84,7 +79,7 @@ TEST(SimCh4433, PreNBACanWriteValues) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.3 "allows PLI application routines to ... create events"
+// §4.4.3.3 Pre-NBA can create events
 // A Pre-NBA callback can schedule new events (e.g., into NBA).
 // ---------------------------------------------------------------------------
 TEST(SimCh4433, PreNBACanCreateEvents) {
@@ -109,7 +104,7 @@ TEST(SimCh4433, PreNBACanCreateEvents) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.3 "before the events in the NBA region are evaluated"
+// §4.4.3.3 Pre-NBA executes before NBA
 // Pre-NBA executes before NBA in the same time slot.
 // ---------------------------------------------------------------------------
 TEST(SimCh4433, PreNBAExecutesBeforeNBA) {
@@ -172,7 +167,7 @@ TEST(SimCh4433, PreNBAIsWithinActiveRegionSet) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.3 "PLI callback control point"
+// §4.4.3.3 Multiple Pre-NBA callbacks
 // Multiple PLI callbacks coexist in the Pre-NBA region and all execute.
 // ---------------------------------------------------------------------------
 TEST(SimCh4433, PreNBARegionHoldsMultiplePLICallbacks) {
@@ -215,7 +210,7 @@ TEST(SimCh4433, PreNBAEventsAcrossMultipleTimeSlots) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.3 "read and write values and create events"
+// §4.4.3.3 Pre-NBA read-write capability
 // Pre-NBA is read-write. A Pre-NBA callback writes state that Active set
 // earlier; NBA then sees the Pre-NBA modification. This verifies read-write
 // capability in the context of the full active region set ordering.

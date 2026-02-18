@@ -48,12 +48,6 @@ static uint64_t RunAndGet(const std::string& src, const char* var_name) {
 
 // ===========================================================================
 // §5.3 White space — simulation-level tests
-//
-// LRM §5.3: "White space shall contain the characters for spaces, tabs,
-// newlines, formfeeds, and end of file. These characters shall be ignored
-// except when they serve to separate other lexical tokens. However, blanks
-// and tabs shall be considered significant characters in string literals
-// (see 5.9)."
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
@@ -314,12 +308,6 @@ TEST(SimCh5, WhitespaceMultipleStatements) {
 
 // ===========================================================================
 // §5.2 Lexical tokens — simulation-level tests
-//
-// LRM §5.2: "SystemVerilog source text files shall be a stream of lexical
-// tokens. A lexical token shall consist of one or more characters. The layout
-// of tokens in a source file shall be free format; that is, spaces and
-// newline characters shall not be syntactically significant other than being
-// token separators, except for escaped identifiers (see 5.6.1)."
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
@@ -458,13 +446,6 @@ TEST(SimCh5, LexicalTokenFreeFormatAlwaysComb) {
 
 // ===========================================================================
 // §5.4 Comments — simulation-level tests
-//
-// LRM §5.4: "SystemVerilog has two forms to introduce comments. A one-line
-// comment shall start with the two characters // and end with a newline
-// character. A block comment shall start with /* and end with */. Block
-// comments shall not be nested. The one-line comment token // shall not have
-// any special meaning inside a block comment, and the block comment tokens
-// /* and */ shall not have any special meaning inside a one-line comment."
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
@@ -499,7 +480,7 @@ TEST(SimCh5, CommentBlockCommentStripped) {
 // 3. Block comments not nested — first */ ends the comment
 // ---------------------------------------------------------------------------
 TEST(SimCh5, CommentBlockNotNested) {
-  // §5.4: "Block comments shall not be nested."
+  // §5.4: Block comments are not nested.
   // "/* outer /* inner */" ends at first */ — remaining code is active.
   auto result = RunAndGet(
       "module t;\n"
@@ -514,8 +495,7 @@ TEST(SimCh5, CommentBlockNotNested) {
 // 4. // inside block comment has no special meaning
 // ---------------------------------------------------------------------------
 TEST(SimCh5, CommentLineInsideBlockNoEffect) {
-  // §5.4: "The one-line comment token // shall not have any special meaning
-  // inside a block comment."
+  // §5.4: // has no special meaning inside a block comment.
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -531,8 +511,7 @@ TEST(SimCh5, CommentLineInsideBlockNoEffect) {
 // 5. /* and */ inside line comment have no special meaning
 // ---------------------------------------------------------------------------
 TEST(SimCh5, CommentBlockInsideLineNoEffect) {
-  // §5.4: "The block comment tokens /* and */ shall not have any special
-  // meaning inside a one-line comment."
+  // §5.4: /* and */ have no special meaning inside a one-line comment.
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -643,7 +622,7 @@ TEST(SimCh5, OperatorTripleCharInExpr) {
 // 4. Unary operator to the left of operand
 // ---------------------------------------------------------------------------
 TEST(SimCh5, OperatorUnaryLeftOfOperand) {
-  // §5.5: "Unary operators shall appear to the left of their operand."
+  // §5.5: Unary operators appear to the left of their operand.
   // Unary minus (-) appears to the left of its operand.
   auto result = RunAndGet(
       "module t;\n"
@@ -658,7 +637,7 @@ TEST(SimCh5, OperatorUnaryLeftOfOperand) {
 // 5. Binary operator between operands
 // ---------------------------------------------------------------------------
 TEST(SimCh5, OperatorBinaryBetweenOperands) {
-  // §5.5: "Binary operators shall appear between their operands."
+  // §5.5: Binary operators appear between their operands.
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -672,8 +651,8 @@ TEST(SimCh5, OperatorBinaryBetweenOperands) {
 // 6. Conditional operator (two operator characters, three operands)
 // ---------------------------------------------------------------------------
 TEST(SimCh5, OperatorConditionalThreeOperands) {
-  // §5.5: "A conditional operator shall have two operator characters
-  //        that separate three operands."
+  // §5.5: Conditional operator has two operator chars separating three
+  // operands.
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -983,7 +962,7 @@ TEST(SimCh5, DirectivePersistsInCompilationUnit) {
 }
 
 TEST(SimCh5, DirectiveCanBeOverridden) {
-  // §5.6.4: "unless a different compiler directive specifies otherwise."
+  // §5.6.4: A directive can be overridden by a later directive.
   auto result = PreprocessAndGet(
       "`define X 8'd10\n"
       "`define X 8'd20\n"

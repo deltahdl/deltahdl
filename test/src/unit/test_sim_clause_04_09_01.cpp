@@ -11,19 +11,10 @@ using namespace delta;
 
 // ===========================================================================
 // §4.9.1 Continuous assignment
-//
-// LRM §4.9.1:
-//   "A continuous assignment statement (see 10.3) corresponds to a process,
-//    sensitive to the source elements in the expression. When the value of
-//    the expression changes, it causes an active update event to be added to
-//    the event region, using current values to determine the target. A
-//    continuous assignment process is also evaluated at time zero in order
-//    to propagate constant values. This includes implicit continuous
-//    assignments inferred from port connections (see 4.9.6)."
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.9.1 "A continuous assignment statement corresponds to a process"
+// §4.9.1 Continuous assignment corresponds to a process.
 // A continuous assignment is modeled as a scheduler process (Event with
 // callback), not as a one-shot operation.
 // ---------------------------------------------------------------------------
@@ -67,7 +58,7 @@ TEST(SimCh4091, ContinuousAssignmentCorrespondsToProcess) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.1 "sensitive to the source elements in the expression"
+// §4.9.1 Sensitive to source elements in the expression.
 // The continuous assignment process is only triggered when a source element
 // in its RHS expression changes — not by unrelated signals.
 // ---------------------------------------------------------------------------
@@ -108,7 +99,7 @@ TEST(SimCh4091, SensitiveToSourceElements) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.1 "it causes an active update event to be added to the event region"
+// §4.9.1 Schedules an active update event.
 // The update event from a continuous assignment is scheduled in the Active
 // region (not Inactive, NBA, or any other region).
 // ---------------------------------------------------------------------------
@@ -141,7 +132,7 @@ TEST(SimCh4091, SchedulesActiveUpdateEvent) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.1 "using current values to determine the target"
+// §4.9.1 Uses current values to determine the target.
 // The target (LHS) of the continuous assignment is determined using values
 // at the time the update executes, not at the time it was scheduled.
 // ---------------------------------------------------------------------------
@@ -177,8 +168,7 @@ TEST(SimCh4091, UsesCurrentValuesToDetermineTarget) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.1 "A continuous assignment process is also evaluated at time zero
-//          in order to propagate constant values"
+// §4.9.1 Evaluated at time zero for constant propagation.
 // Even when the RHS is a constant (never changes), the continuous assignment
 // process still executes at time 0 to propagate the constant to the LHS.
 // ---------------------------------------------------------------------------
@@ -204,7 +194,7 @@ TEST(SimCh4091, EvaluatedAtTimeZeroForConstantPropagation) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.1 "A continuous assignment process is also evaluated at time zero"
+// §4.9.1 Time-zero evaluation before procedural reads.
 // The time-zero evaluation ensures that signals driven by continuous
 // assignments have defined values before any procedural code reads them.
 // ---------------------------------------------------------------------------
@@ -237,8 +227,7 @@ TEST(SimCh4091, TimeZeroEvalBeforeProceduralReads) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.1 "This includes implicit continuous assignments inferred from
-//          port connections (see 4.9.6)"
+// §4.9.1 Implicit continuous assignment from input port (see §4.9.6).
 // Input ports behave like implicit continuous assignments from outside to
 // local — they follow the same scheduling rules as explicit assigns.
 // ---------------------------------------------------------------------------
@@ -267,8 +256,7 @@ TEST(SimCh4091, ImplicitContinuousAssignmentFromInputPort) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.1 "This includes implicit continuous assignments inferred from
-//          port connections (see 4.9.6)"
+// §4.9.1 Implicit continuous assignment from output port (see §4.9.6).
 // Output ports also behave as implicit continuous assignments from a local
 // expression to an outside net.
 // ---------------------------------------------------------------------------
@@ -297,8 +285,7 @@ TEST(SimCh4091, ImplicitContinuousAssignmentFromOutputPort) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.1 "When the value of the expression changes, it causes an active
-//          update event"
+// §4.9.1 Multiple continuous assignments to the same net.
 // Multiple continuous assignments to the same net each independently
 // schedule active update events when their respective sources change.
 // ---------------------------------------------------------------------------
@@ -340,7 +327,7 @@ TEST(SimCh4091, MultipleContinuousAssignmentsToSameNet) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.1 "When the value of the expression changes"
+// §4.9.1 No update when expression value is unchanged.
 // If the RHS expression does not change value, no update event is scheduled.
 // This models the sensitivity behavior of continuous assignments.
 // ---------------------------------------------------------------------------

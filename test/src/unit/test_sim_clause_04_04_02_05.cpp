@@ -12,27 +12,17 @@ using namespace delta;
 // ===========================================================================
 // §4.4.2.5 Observed events region
 //
-// LRM §4.4.2.5:
-//   "The Observed region is for evaluation of property expressions when
-//    they are triggered."
-//
-//   "During property evaluation, pass/fail code shall be scheduled in
-//    the Reactive region of the current time slot."
-//
-//   "PLI callbacks are not allowed in the Observed region."
-//
 // Figure 4-1 shows:
 //   pli_region_PreObserved -> region_Observed  (forward from PreObserved PLI)
 //   region_Observed -> pli_region_PostObserved (forward to PostObserved PLI)
-//   region_Observed -> region_Active           (feedback — re-iteration)
+//   region_Observed -> region_Active           (feedback -- re-iteration)
 //
 // The Observed region is the first region of the reactive region set
 // (§4.4.1) and bridges the active and reactive region sets.
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.4.2.5 "The Observed region is for evaluation of property expressions
-// when they are triggered."
+// §4.4.2.5 Observed region event execution
 // Basic: events scheduled in the Observed region are executed.
 // ---------------------------------------------------------------------------
 TEST(SimCh4425, ObservedRegionExecutesEvents) {
@@ -49,7 +39,7 @@ TEST(SimCh4425, ObservedRegionExecutesEvents) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.5 "The Observed region is for evaluation of property expressions"
+// §4.4.2.5 Observed region holds multiple events
 // Multiple property evaluation events coexist and all execute.
 // ---------------------------------------------------------------------------
 TEST(SimCh4425, ObservedRegionHoldsMultipleEvents) {
@@ -68,8 +58,7 @@ TEST(SimCh4425, ObservedRegionHoldsMultipleEvents) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.5 "During property evaluation, pass/fail code shall be scheduled
-// in the Reactive region of the current time slot."
+// §4.4.2.5 Pass/fail code scheduled into Reactive
 // An Observed callback schedules into Reactive at the same time slot.
 // ---------------------------------------------------------------------------
 TEST(SimCh4425, ObservedSchedulesPassFailIntoReactive) {
@@ -94,8 +83,7 @@ TEST(SimCh4425, ObservedSchedulesPassFailIntoReactive) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.5 "pass/fail code shall be scheduled in the Reactive region of
-// the current time slot"
+// §4.4.2.5 Multiple pass/fail actions scheduled in Reactive
 // Multiple pass/fail actions from a single Observed event all land in
 // Reactive at the current time slot.
 // ---------------------------------------------------------------------------

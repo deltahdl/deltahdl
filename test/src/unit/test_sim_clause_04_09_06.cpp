@@ -11,41 +11,10 @@ using namespace delta;
 
 // ===========================================================================
 // §4.9.6 Port connections
-//
-// LRM §4.9.6:
-//   "Ports connect processes through implicit continuous assignment statements
-//    or implicit bidirectional connections. Bidirectional connections are
-//    analogous to an always-enabled tran connection between the two nets, but
-//    without any strength reduction (A tran connection does not affect signal
-//    strength across the bidirectional terminals, except that a supply
-//    strength is reduced to strong. See 28.13).
-//
-//    Ports can always be represented as declared objects connected as follows:
-//    — If an input port, then a continuous assignment from an outside
-//      expression to a local (input) net or variable
-//    — If an output port, then a continuous assignment from a local output
-//      expression to an outside net or variable
-//    — If an inout port, then a non-strength-reducing transistor connecting
-//      the local net to an outside net
-//
-//    Primitive terminals, including UDP terminals, are different from module
-//    ports. Primitive output and inout terminals shall be connected directly
-//    to 1-bit nets or 1-bit structural net expressions (see 23.3.3), with no
-//    intervening process that could alter the strength. Changes from primitive
-//    evaluations are scheduled as active update events in the connected nets.
-//    Input terminals connected to 1-bit nets or 1-bit structural net
-//    expressions are also connected directly, with no intervening process
-//    that could affect the strength. Input terminals connected to other kinds
-//    of expressions are represented as implicit continuous assignments from
-//    the expression to an implicit net that is connected to the input
-//    terminal."
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.9.6 "Ports connect processes through implicit continuous assignment
-//          statements"
-// An input or output port acts as an implicit continuous assignment: when the
-// source changes, an update event propagates the new value to the destination.
+// §4.9.6 — Ports connect via implicit continuous assignment
 // ---------------------------------------------------------------------------
 TEST(SimCh4096, PortsConnectViaImplicitContinuousAssignment) {
   Arena arena;
@@ -73,9 +42,7 @@ TEST(SimCh4096, PortsConnectViaImplicitContinuousAssignment) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.6 "or implicit bidirectional connections"
-// An inout port creates a bidirectional connection: a change on either side
-// propagates to the other.
+// §4.9.6 — Implicit bidirectional connection (inout port)
 // ---------------------------------------------------------------------------
 TEST(SimCh4096, ImplicitBidirectionalConnection) {
   Arena arena;
@@ -116,11 +83,7 @@ TEST(SimCh4096, ImplicitBidirectionalConnection) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.6 "Bidirectional connections are analogous to an always-enabled tran
-//          connection between the two nets, but without any strength
-//          reduction"
-// Unlike a real tran gate (which reduces supply→strong), a bidirectional
-// port connection preserves full signal strength across the connection.
+// §4.9.6 — Bidirectional port preserves signal strength (no reduction)
 // ---------------------------------------------------------------------------
 TEST(SimCh4096, BidirectionalNoStrengthReduction) {
   Arena arena;
@@ -157,10 +120,7 @@ TEST(SimCh4096, BidirectionalNoStrengthReduction) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.6 "If an input port, then a continuous assignment from an outside
-//          expression to a local (input) net or variable"
-// An input port is modeled as a continuous assignment: outside → local.
-// When the outside expression changes at a later time, the local net updates.
+// §4.9.6 — Input port: continuous assignment from outside to local
 // ---------------------------------------------------------------------------
 TEST(SimCh4096, InputPortContinuousAssignmentOutsideToLocal) {
   Arena arena;
@@ -202,9 +162,7 @@ TEST(SimCh4096, InputPortContinuousAssignmentOutsideToLocal) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.6 "If an output port, then a continuous assignment from a local
-//          output expression to an outside net or variable"
-// An output port is modeled as a continuous assignment: local → outside.
+// §4.9.6 — Output port: continuous assignment from local to outside
 // ---------------------------------------------------------------------------
 TEST(SimCh4096, OutputPortContinuousAssignmentLocalToOutside) {
   Arena arena;
@@ -232,10 +190,7 @@ TEST(SimCh4096, OutputPortContinuousAssignmentLocalToOutside) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.6 "If an inout port, then a non-strength-reducing transistor
-//          connecting the local net to an outside net"
-// An inout port behaves like a non-strength-reducing tran: signals flow both
-// ways, and a later change on one side propagates to the other.
+// §4.9.6 — Inout port: non-strength-reducing bidirectional connection
 // ---------------------------------------------------------------------------
 TEST(SimCh4096, InoutPortNonStrengthReducingTransistor) {
   Arena arena;
@@ -285,11 +240,7 @@ TEST(SimCh4096, InoutPortNonStrengthReducingTransistor) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.6 "Primitive terminals, including UDP terminals, are different from
-//          module ports"
-// Primitive output/inout terminals connect directly to 1-bit nets without any
-// intervening process. This test verifies a primitive output terminal drives
-// a 1-bit net directly, with no additional process in between.
+// §4.9.6 — Primitive terminals connect directly to 1-bit nets
 // ---------------------------------------------------------------------------
 TEST(SimCh4096, PrimitiveTerminalsDirectConnection) {
   Arena arena;
@@ -319,11 +270,7 @@ TEST(SimCh4096, PrimitiveTerminalsDirectConnection) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.6 "Primitive output and inout terminals shall be connected directly
-//          to 1-bit nets...with no intervening process that could alter the
-//          strength"
-// The strength from the primitive's output terminal flows directly to the
-// connected net without any alteration.
+// §4.9.6 — Primitive output: no strength alteration
 // ---------------------------------------------------------------------------
 TEST(SimCh4096, PrimitiveOutputNoStrengthAlteration) {
   Arena arena;
@@ -356,10 +303,7 @@ TEST(SimCh4096, PrimitiveOutputNoStrengthAlteration) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.6 "Changes from primitive evaluations are scheduled as active update
-//          events in the connected nets"
-// When a primitive evaluates and produces a change, the update is scheduled
-// in the Active region — not Inactive, NBA, or any other region.
+// §4.9.6 — Primitive changes scheduled as active update events
 // ---------------------------------------------------------------------------
 TEST(SimCh4096, PrimitiveChangesScheduledAsActiveUpdateEvents) {
   Arena arena;
@@ -393,12 +337,7 @@ TEST(SimCh4096, PrimitiveChangesScheduledAsActiveUpdateEvents) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.9.6 "Input terminals connected to other kinds of expressions are
-//          represented as implicit continuous assignments from the expression
-//          to an implicit net that is connected to the input terminal"
-// When a primitive input is connected to an expression (not a simple 1-bit
-// net), an implicit continuous assignment is created from the expression to
-// an implicit net, which then connects to the terminal.
+// §4.9.6 — Primitive input expression via implicit continuous assignment
 // ---------------------------------------------------------------------------
 TEST(SimCh4096, PrimitiveInputExprImplicitContinuousAssignment) {
   Arena arena;

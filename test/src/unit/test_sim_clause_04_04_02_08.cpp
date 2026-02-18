@@ -12,27 +12,16 @@ using namespace delta;
 // ===========================================================================
 // §4.4.2.8 Re-NBA events region
 //
-// LRM §4.4.2.8:
-//   "The Re-NBA region holds the events to be evaluated after all the
-//    Re-Inactive events are processed."
-//
-//   "If events are being executed in the reactive region set, a nonblocking
-//    assignment creates an event in the Re-NBA update region scheduled for
-//    the current or a later simulation time."
-//
-//   "The Re-NBA region is the reactive region set dual of the NBA region
-//    (see 4.4.2.4)."
-//
 // Figure 4-1 shows:
 //   pli_region_PreReNBA -> region_ReNBA    (forward from PreReNBA PLI)
 //   region_ReNBA -> pli_region_PostReNBA   (forward to PostReNBA PLI)
-//   region_ReNBA -> region_Reactive        (feedback — re-iteration)
+//   region_ReNBA -> region_Reactive        (feedback -- re-iteration)
 //
 // The Re-NBA region is part of the reactive region set (§4.4.1).
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.4.2.8 "The Re-NBA ... region holds the events to be evaluated"
+// §4.4.2.8 Re-NBA region event execution
 // Basic: events scheduled in the Re-NBA region are executed.
 // ---------------------------------------------------------------------------
 TEST(SimCh4428, ReNBARegionExecutesEvents) {
@@ -49,8 +38,7 @@ TEST(SimCh4428, ReNBARegionExecutesEvents) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.8 "holds the events to be evaluated after all the Re-Inactive
-// events are processed."
+// §4.4.2.8 Re-NBA executes after Re-Inactive
 // Re-NBA events execute only after Re-Inactive events have drained.
 // ---------------------------------------------------------------------------
 TEST(SimCh4428, ReNBAExecutesAfterReInactive) {
@@ -73,7 +61,7 @@ TEST(SimCh4428, ReNBAExecutesAfterReInactive) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.8 "after all the Re-Inactive events are processed"
+// §4.4.2.8 All Re-Inactive events complete before Re-NBA
 // Multiple Re-Inactive events all complete before any Re-NBA event starts.
 // ---------------------------------------------------------------------------
 TEST(SimCh4428, AllReInactiveEventsCompleteBeforeReNBA) {
@@ -100,8 +88,7 @@ TEST(SimCh4428, AllReInactiveEventsCompleteBeforeReNBA) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.8 "a nonblocking assignment creates an event in the Re-NBA
-// update region scheduled for the current ... simulation time"
+// §4.4.2.8 Nonblocking assignment schedules Re-NBA at current time
 // A Reactive callback schedules into Re-NBA at the same time (current time).
 // ---------------------------------------------------------------------------
 TEST(SimCh4428, NonblockingAssignmentSchedulesReNBACurrentTime) {
@@ -126,8 +113,7 @@ TEST(SimCh4428, NonblockingAssignmentSchedulesReNBACurrentTime) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.8 "a nonblocking assignment creates an event in the Re-NBA
-// update region scheduled for ... a later simulation time"
+// §4.4.2.8 Nonblocking assignment schedules Re-NBA at later time
 // A Reactive callback at time 0 schedules a Re-NBA event at time 5.
 // ---------------------------------------------------------------------------
 TEST(SimCh4428, NonblockingAssignmentSchedulesReNBALaterTime) {

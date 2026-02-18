@@ -12,26 +12,16 @@ using namespace delta;
 // ===========================================================================
 // §4.4.2.3 Inactive events region
 //
-// LRM §4.4.2.3:
-//   "The Inactive region holds the events to be evaluated after all the
-//    Active events are processed."
-//
-//   "If events are being executed in the active region set, an explicit
-//    #0 delay control requires the process to be suspended and an event
-//    to be scheduled into the Inactive region of the current time slot
-//    so that the process can be resumed in the next Inactive to Active
-//    iteration."
-//
 // Figure 4-1 shows:
 //   region_Active   -> region_Inactive   (forward edge)
-//   region_Inactive -> region_Active     (feedback — iteration)
+//   region_Inactive -> region_Active     (feedback -- iteration)
 //   region_Inactive -> pli_region_PreNBA (forward to PreNBA PLI)
 //
 // The Inactive region is part of the active region set (§4.4.1).
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.4.2.3 "The Inactive region holds the events to be evaluated"
+// §4.4.2.3 Inactive region event execution
 // Basic: events scheduled in the Inactive region are executed.
 // ---------------------------------------------------------------------------
 TEST(SimCh4423, InactiveRegionExecutesEvents) {
@@ -48,8 +38,7 @@ TEST(SimCh4423, InactiveRegionExecutesEvents) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.3 "holds the events to be evaluated after all the Active events
-// are processed."
+// §4.4.2.3 Inactive executes after Active
 // Inactive events execute only after Active events have drained.
 // ---------------------------------------------------------------------------
 TEST(SimCh4423, InactiveExecutesAfterActive) {
@@ -72,7 +61,7 @@ TEST(SimCh4423, InactiveExecutesAfterActive) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.3 "after all the Active events are processed"
+// §4.4.2.3 All Active events complete before Inactive
 // Multiple Active events all complete before any Inactive event starts.
 // ---------------------------------------------------------------------------
 TEST(SimCh4423, AllActiveEventsCompleteBeforeInactive) {
@@ -99,8 +88,7 @@ TEST(SimCh4423, AllActiveEventsCompleteBeforeInactive) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.3 "#0 delay control requires the process to be suspended and an
-// event to be scheduled into the Inactive region"
+// §4.4.2.3 #0 delay schedules into Inactive
 // Simulating #0: an Active callback schedules into Inactive at the same time.
 // ---------------------------------------------------------------------------
 TEST(SimCh4423, ZeroDelaySchedulesIntoInactive) {
@@ -125,7 +113,7 @@ TEST(SimCh4423, ZeroDelaySchedulesIntoInactive) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.3 "resumed in the next Inactive to Active iteration"
+// §4.4.2.3 Inactive-to-Active iteration
 // Figure 4-1: region_Inactive -> region_Active (feedback edge).
 // An Inactive callback that schedules a new Active event triggers
 // re-iteration of the active region set.

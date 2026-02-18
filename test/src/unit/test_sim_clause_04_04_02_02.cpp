@@ -13,10 +13,6 @@ using namespace delta;
 // ===========================================================================
 // §4.4.2.2 Active events region
 //
-// LRM §4.4.2.2:
-//   "The Active region holds the current active region set events being
-//    evaluated and can be processed in any order."
-//
 // Figure 4-1 shows:
 //   region_Active -> region_Active   (self-loop)
 //   region_Active -> region_Inactive (forward edge)
@@ -27,7 +23,7 @@ using namespace delta;
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.4.2.2 "The Active region holds ... events being evaluated"
+// §4.4.2.2 Active region event execution
 // Basic: events scheduled in the Active region are executed.
 // ---------------------------------------------------------------------------
 TEST(SimCh4422, ActiveRegionExecutesEvents) {
@@ -44,7 +40,7 @@ TEST(SimCh4422, ActiveRegionExecutesEvents) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.2 "holds the current active region set events"
+// §4.4.2.2 Active region holds multiple events
 // Multiple events coexist in the Active region and all execute.
 // ---------------------------------------------------------------------------
 TEST(SimCh4422, ActiveRegionHoldsMultipleEvents) {
@@ -63,11 +59,10 @@ TEST(SimCh4422, ActiveRegionHoldsMultipleEvents) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.2 "can be processed in any order"
-// The LRM explicitly permits any ordering of Active events.  Our FIFO
-// implementation is one valid ordering.  This test verifies that all
-// events execute regardless of insertion order, confirming the "any
-// order" contract is satisfied.
+// §4.4.2.2 Active events processed in any valid order
+// Any ordering of Active events is permitted.  Our FIFO implementation
+// is one valid ordering.  This test verifies that all events execute
+// regardless of insertion order.
 // ---------------------------------------------------------------------------
 TEST(SimCh4422, ActiveEventsProcessedInAnyValidOrder) {
   Arena arena;

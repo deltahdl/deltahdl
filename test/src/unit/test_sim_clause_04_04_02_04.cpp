@@ -12,24 +12,16 @@ using namespace delta;
 // ===========================================================================
 // §4.4.2.4 NBA events region
 //
-// LRM §4.4.2.4:
-//   "The NBA (nonblocking assignment update) region holds the events to be
-//    evaluated after all the Inactive events are processed."
-//
-//   "If events are being executed in the active region set, a nonblocking
-//    assignment creates an event in the NBA region scheduled for the current
-//    or a later simulation time."
-//
 // Figure 4-1 shows:
 //   pli_region_PreNBA -> region_NBA    (forward from PreNBA PLI)
 //   region_NBA -> pli_region_PostNBA   (forward to PostNBA PLI)
-//   region_NBA -> region_Active        (feedback — re-iteration)
+//   region_NBA -> region_Active        (feedback -- re-iteration)
 //
 // The NBA region is part of the active region set (§4.4.1).
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.4.2.4 "The NBA ... region holds the events to be evaluated"
+// §4.4.2.4 NBA region event execution
 // Basic: events scheduled in the NBA region are executed.
 // ---------------------------------------------------------------------------
 TEST(SimCh4424, NBARegionExecutesEvents) {
@@ -46,8 +38,7 @@ TEST(SimCh4424, NBARegionExecutesEvents) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.4 "holds the events to be evaluated after all the Inactive events
-// are processed."
+// §4.4.2.4 NBA executes after Inactive
 // NBA events execute only after Inactive events have drained.
 // ---------------------------------------------------------------------------
 TEST(SimCh4424, NBAExecutesAfterInactive) {
@@ -70,7 +61,7 @@ TEST(SimCh4424, NBAExecutesAfterInactive) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.4 "after all the Inactive events are processed"
+// §4.4.2.4 All Inactive events complete before NBA
 // Multiple Inactive events all complete before any NBA event starts.
 // ---------------------------------------------------------------------------
 TEST(SimCh4424, AllInactiveEventsCompleteBeforeNBA) {
@@ -97,8 +88,7 @@ TEST(SimCh4424, AllInactiveEventsCompleteBeforeNBA) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.4 "a nonblocking assignment creates an event in the NBA region
-// scheduled for the current ... simulation time"
+// §4.4.2.4 Nonblocking assignment schedules NBA at current time
 // An Active callback schedules into NBA at the same time (current time).
 // ---------------------------------------------------------------------------
 TEST(SimCh4424, NonblockingAssignmentSchedulesNBACurrentTime) {
@@ -123,8 +113,7 @@ TEST(SimCh4424, NonblockingAssignmentSchedulesNBACurrentTime) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.4 "a nonblocking assignment creates an event in the NBA region
-// scheduled for ... a later simulation time"
+// §4.4.2.4 Nonblocking assignment schedules NBA at later time
 // An Active callback at time 0 schedules an NBA event at time 5.
 // ---------------------------------------------------------------------------
 TEST(SimCh4424, NonblockingAssignmentSchedulesNBALaterTime) {

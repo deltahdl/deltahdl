@@ -12,14 +12,6 @@ using namespace delta;
 // ===========================================================================
 // §4.4.3.6 Post-Observed PLI region
 //
-// LRM §4.4.3.6:
-//   "The Post-Observed region provides for a PLI callback control point that
-//    allows PLI application routines to read values after properties are
-//    evaluated (in the Observed or an earlier region)."
-//
-//   "NOTE—The PLI currently does not schedule callbacks in the
-//    Post-Observed region."
-//
 // Figure 4-1 shows:
 //   region_Observed -> pli_region_PostObserved -> region_Reactive
 //
@@ -28,7 +20,7 @@ using namespace delta;
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.4.3.6 "provides for a PLI callback control point"
+// §4.4.3.6 Post-Observed PLI callback control point
 // Basic: events scheduled in the Post-Observed region are executed.
 // ---------------------------------------------------------------------------
 TEST(SimCh4436, PostObservedRegionExecutesPLICallbacks) {
@@ -45,7 +37,7 @@ TEST(SimCh4436, PostObservedRegionExecutesPLICallbacks) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.6 "allows PLI application routines to read values"
+// §4.4.3.6 Post-Observed can read values
 // A Post-Observed callback can read state set by the active region set.
 // ---------------------------------------------------------------------------
 TEST(SimCh4436, PostObservedCanReadValues) {
@@ -69,8 +61,7 @@ TEST(SimCh4436, PostObservedCanReadValues) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.6 "after properties are evaluated (in the Observed or an earlier
-// region)"
+// §4.4.3.6 Post-Observed reads after property evaluation
 // Post-Observed sees state set by the Observed region.
 // ---------------------------------------------------------------------------
 TEST(SimCh4436, PostObservedReadsAfterObservedRegion) {
@@ -121,8 +112,7 @@ TEST(SimCh4436, PostObservedExecutesAfterObservedBeforeReactive) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.6 "after properties are evaluated (in the Observed or an earlier
-// region)"
+// §4.4.3.6 Post-Observed after full chain through Observed
 // Post-Observed sees state from the entire chain: Active set -> Observed.
 // Full chain: Active -> NBA -> PostNBA -> PreObserved -> Observed ->
 // PostObserved.
@@ -164,7 +154,7 @@ TEST(SimCh4436, PostObservedIsAfterObservedBeforeReactive) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.6 "PLI callback control point"
+// §4.4.3.6 Multiple Post-Observed callbacks
 // Multiple PLI callbacks coexist in the Post-Observed region and all execute.
 // ---------------------------------------------------------------------------
 TEST(SimCh4436, PostObservedRegionHoldsMultiplePLICallbacks) {
@@ -207,7 +197,7 @@ TEST(SimCh4436, PostObservedEventsAcrossMultipleTimeSlots) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.6 "read values after properties are evaluated"
+// §4.4.3.6 Post-Observed is read-only
 // Post-Observed is read-only. This test confirms that Post-Observed executes
 // after Observed, so a PLI callback sampling state sees the snapshot produced
 // by property evaluation in the Observed region.
@@ -241,8 +231,7 @@ TEST(SimCh4436, PostObservedProvidesReadOnlySnapshotAfterObserved) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.3.6 "NOTE—The PLI currently does not schedule callbacks in the
-// Post-Observed region."
+// §4.4.3.6 Post-Observed infrastructure with full region chain
 // Even though no PLI currently uses this region, the infrastructure must
 // still correctly process events placed here. This test schedules a
 // Post-Observed event alongside a full set of surrounding regions and

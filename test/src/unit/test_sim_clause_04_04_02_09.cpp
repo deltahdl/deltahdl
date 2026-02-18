@@ -12,31 +12,16 @@ using namespace delta;
 // ===========================================================================
 // §4.4.2.9 Postponed events region
 //
-// LRM §4.4.2.9:
-//   "$monitor, $strobe, and other similar events are scheduled in the
-//    Postponed region."
-//
-//   "No new value changes are allowed to happen in the current time slot
-//    once the Postponed region is reached."
-//
-//   "Within this region, it is illegal to write values to any net or
-//    variable or to schedule an event in any previous region within the
-//    current time slot."
-//
-//   "Postponed region PLI events are also scheduled in this region
-//    (see 4.4.3.10)."
-//
 // Figure 4-1 shows:
 //   pli_region_PrePostponed -> region_Postponed  (forward from PrePostponed)
-//   region_Postponed -> NextSlot                  (terminal — next time slot)
+//   region_Postponed -> NextSlot                  (terminal -- next time slot)
 //
 // The Postponed region is the last simulation region in a time slot.
 // It is NOT part of the iterative region set (§4.4.1).
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// §4.4.2.9 "$monitor, $strobe, and other similar events are scheduled in
-// the Postponed region."
+// §4.4.2.9 Postponed region event execution
 // Basic: events scheduled in the Postponed region are executed.
 // ---------------------------------------------------------------------------
 TEST(SimCh4429, PostponedRegionExecutesEvents) {
@@ -53,8 +38,7 @@ TEST(SimCh4429, PostponedRegionExecutesEvents) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.9 "$monitor, $strobe, and other similar events are scheduled in
-// the Postponed region."
+// §4.4.2.9 Postponed region holds multiple events
 // Multiple monitor/strobe-like events coexist and all execute.
 // ---------------------------------------------------------------------------
 TEST(SimCh4429, PostponedRegionHoldsMultipleEvents) {
@@ -73,9 +57,8 @@ TEST(SimCh4429, PostponedRegionHoldsMultipleEvents) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.9 "No new value changes are allowed ... once the Postponed region
-// is reached."
-// Postponed callbacks observe the final state of all prior regions —
+// §4.4.2.9 Postponed observes final state
+// Postponed callbacks observe the final state of all prior regions --
 // values set in Active, NBA, Reactive, and Re-NBA are all visible.
 // ---------------------------------------------------------------------------
 TEST(SimCh4429, PostponedObservesFinalState) {
@@ -215,9 +198,8 @@ TEST(SimCh4429, PostponedAdvancesToNextTimeSlot) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.9 "Postponed region PLI events are also scheduled in this region
-// (see 4.4.3.10)."
-// PLI events and simulation events both execute in the Postponed queue —
+// §4.4.2.9 Postponed PLI events
+// PLI events and simulation events both execute in the Postponed queue --
 // the scheduler makes no distinction.
 // ---------------------------------------------------------------------------
 TEST(SimCh4429, PostponedPLIEventsExecuteInRegion) {
@@ -265,8 +247,7 @@ TEST(SimCh4429, PostponedEventsAcrossMultipleTimeSlots) {
 }
 
 // ---------------------------------------------------------------------------
-// §4.4.2.9 "Sampling in the Preponed region is equivalent to sampling in
-// the previous Postponed region." (from §4.4.2.1)
+// §4.4.2.9 Postponed state persists to next Preponed (cross-ref §4.4.2.1)
 // This cross-reference test verifies that Postponed at time T and Preponed
 // at time T+1 observe the same shared state.
 // ---------------------------------------------------------------------------
