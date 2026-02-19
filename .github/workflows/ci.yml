@@ -113,7 +113,7 @@ jobs:
   test-run-sim-tests:
     needs:
       - static-analysis
-      - test-run-tests-common
+      - test-lib
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -139,7 +139,7 @@ jobs:
   test-run-sv-tests:
     needs:
       - static-analysis
-      - test-run-tests-common
+      - test-lib
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -161,8 +161,8 @@ jobs:
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
-  # ── Lane: run_tests_common ──
-  test-run-tests-common:
+  # ── Lane: lib ──
+  test-lib:
     needs: static-analysis
     runs-on: ubuntu-24.04
     steps:
@@ -195,7 +195,7 @@ jobs:
       - static-analysis
       - test-run-sim-tests
       - test-run-sv-tests
-      - test-run-tests-common
+      - test-lib
       - yamllint
     runs-on: ubuntu-24.04
     steps:
