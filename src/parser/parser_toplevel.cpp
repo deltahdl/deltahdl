@@ -234,14 +234,14 @@ void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
       return;
     }
     // Parse strength spec.
+    // Two-strength form: (strength0, strength1) or (strength1, strength0)
+    // Single-strength form (pull gates): (strength0) or (strength1)
     if (IsStrength0Token(tk)) {
       str0 = ParseStrength0();
-      Expect(TokenKind::kComma);
-      str1 = ParseStrength1();
+      if (Match(TokenKind::kComma)) str1 = ParseStrength1();
     } else {
       str1 = ParseStrength1();
-      Expect(TokenKind::kComma);
-      str0 = ParseStrength0();
+      if (Match(TokenKind::kComma)) str0 = ParseStrength0();
     }
     Expect(TokenKind::kRParen);
   }
