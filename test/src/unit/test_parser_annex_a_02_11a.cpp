@@ -944,5 +944,4 @@ TEST(ParserA211, BinsSelection_WithIff) {
               "endmodule\n"));
 }
 
-
 }  // namespace
