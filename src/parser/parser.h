@@ -217,7 +217,7 @@ class Parser {
   bool IsBlockVarDeclStartCore();
   void ParseBlockVarDecls(std::vector<Stmt*>& stmts);
   void ParseBlockDataDecl(std::vector<Stmt*>& stmts,
-                          std::vector<Attribute> attrs);
+                          const std::vector<Attribute>& attrs);
 
   // Clocking blocks and interprocess sync (parser_clocking.cpp — §14, §15)
   ModuleItem* ParseClockingDecl();

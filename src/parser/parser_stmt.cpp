@@ -223,7 +223,7 @@ bool Parser::IsBlockVarDeclStartCore() {
 
 // §A.2.8: data_declaration — [const] [var] [lifetime] data_type_or_implicit
 void Parser::ParseBlockDataDecl(std::vector<Stmt*>& stmts,
-                                std::vector<Attribute> attrs) {
+                                const std::vector<Attribute>& attrs) {
   bool is_const = Match(TokenKind::kKwConst);
   bool is_automatic = Match(TokenKind::kKwAutomatic);             // §6.21
   bool is_static = !is_automatic && Match(TokenKind::kKwStatic);  // §6.21
@@ -309,7 +309,7 @@ void Parser::ParseBlockVarDecls(std::vector<Stmt*>& stmts) {
     }
     return;
   }
-  ParseBlockDataDecl(stmts, std::move(attrs));
+  ParseBlockDataDecl(stmts, attrs);
 }
 
 // LRM section 12.6 / section 9.3.4 -- named blocks
