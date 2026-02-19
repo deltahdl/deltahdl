@@ -7,6 +7,7 @@ import glob
 import operator
 import os
 import re
+import signal
 import subprocess
 import sys
 import time
@@ -324,6 +325,9 @@ def execute_single_test(path):
 
 def main():
     """Run all sv-tests and print a summary."""
+    if hasattr(signal, "SIGPIPE"):
+        signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+
     args = parse_args()
 
     check_binary()

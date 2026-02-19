@@ -2,6 +2,7 @@
 
 import ast
 import re
+import signal
 import subprocess
 from unittest.mock import MagicMock, patch
 from xml.etree import ElementTree as ET
@@ -538,3 +539,44 @@ class TestWriteJunitXml:
             and "c.sv" in errors[0].attrib["message"]
             and "30s timeout" in errors[0].text
         )
+
+
+class TestMainSigpipe:
+    """Tests for SIGPIPE handling in main()."""
+
+    def test_main_resets_sigpipe_to_default(self, get_exit_code):
+        """main() should set SIGPIPE to SIG_DFL on Unix."""
+        observed = {}
+        original = signal.getsignal(signal.SIGPIPE)
+        original_signal = signal.signal
+
+        def spy_signal(signum, handler):
+            if signum == signal.SIGPIPE:
+                observed["handler"] = handler
+            return original_signal(signum, handler)
+
+        def run():
+            with patch("sys.argv", ["run_sv_tests.py"]), \
+                 patch("run_sv_tests.check_binary"), \
+                 patch("run_sv_tests.glob.glob", return_value=[]), \
+                 patch("run_sv_tests.signal.signal", side_effect=spy_signal):
+                run_sv_tests.main()
+
+        try:
+            get_exit_code(run)
+            assert observed.get("handler") == signal.SIG_DFL
+        finally:
+            signal.signal(signal.SIGPIPE, original)
+
+    def test_main_skips_sigpipe_when_unavailable(self, get_exit_code):
+        """main() should skip SIGPIPE setup when the attribute is absent."""
+
+        def run():
+            with patch("sys.argv", ["run_sv_tests.py"]), \
+                 patch("run_sv_tests.check_binary"), \
+                 patch("run_sv_tests.glob.glob", return_value=[]), \
+                 patch.object(run_sv_tests.signal, "SIGPIPE", create=False):
+                delattr(run_sv_tests.signal, "SIGPIPE")
+                run_sv_tests.main()
+
+        assert get_exit_code(run) == 1
