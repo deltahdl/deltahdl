@@ -1,22 +1,22 @@
-"""End-to-end tests for test_common module."""
+"""End-to-end tests for run_tests_common module."""
 
 import subprocess
 import sys
 
-from lib import test_common
+from lib import run_tests_common
 
-REPO_ROOT = test_common.REPO_ROOT
+REPO_ROOT = run_tests_common.REPO_ROOT
 
 
 def test_import_succeeds_in_subprocess():
-    """Importing test_common in a fresh Python process should succeed."""
+    """Importing run_tests_common in a fresh Python process should succeed."""
     repo_root = str(REPO_ROOT)
     result = subprocess.run(
         [
             sys.executable,
             "-c",
             f"import sys; sys.path.insert(0, {repo_root!r}); "
-            "from lib import test_common",
+            "from lib import run_tests_common",
         ],
         capture_output=True,
         text=True,
@@ -38,4 +38,4 @@ def test_public_names_are_accessible():
         "check_binary",
         "print_result",
     ]
-    assert all(hasattr(test_common, n) for n in expected)
+    assert all(hasattr(run_tests_common, n) for n in expected)

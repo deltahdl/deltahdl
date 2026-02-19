@@ -8,9 +8,9 @@ import textwrap
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-from lib import test_common
+from lib import run_tests_common
 
-REPO_ROOT = test_common.REPO_ROOT
+REPO_ROOT = run_tests_common.REPO_ROOT
 SCRIPTS_DIR = REPO_ROOT / "scripts"
 
 
@@ -56,11 +56,11 @@ def _run_sv_tests(tmp_path, exit_code=0, extra_args=None):
         sys.path.insert(0, {str(SCRIPTS_DIR)!r})
 
         import run_sv_tests
-        from lib import test_common
+        from lib import run_tests_common
         from pathlib import Path
 
-        test_common.BINARY = Path({str(binary)!r})
-        run_sv_tests.BINARY = test_common.BINARY
+        run_tests_common.BINARY = Path({str(binary)!r})
+        run_sv_tests.BINARY = run_tests_common.BINARY
         run_sv_tests.TEST_DIR = Path({str(test_dir)!r})
 
         sys.argv = ["run_sv_tests.py"{args_str}]

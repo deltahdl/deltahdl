@@ -47,7 +47,7 @@ def stub_binary(tmp_path):
 
 @pytest.fixture()
 def patch_binary(request):
-    """Patch lib.test_common.BINARY to point at a stub binary.
+    """Patch lib.run_tests_common.BINARY to point at a stub binary.
 
     Returns a factory: call it with (exit_code, stdout, stderr) and the
     patch is applied for the duration of the test.
@@ -57,7 +57,7 @@ def patch_binary(request):
 
     def _make(exit_code=0, stdout="", stderr=""):
         binary = make_stub(exit_code, stdout, stderr)
-        p = patch("lib.test_common.BINARY", binary)
+        p = patch("lib.run_tests_common.BINARY", binary)
         p.start()
         patches.append(p)
         return binary

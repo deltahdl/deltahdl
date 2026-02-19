@@ -1,18 +1,18 @@
-"""Integration tests for test_common module."""
+"""Integration tests for run_tests_common module."""
 
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from lib import test_common
+from lib import run_tests_common
 
 
 def test_startup_then_print(capsys):
     """Simulates a runner: check binary exists, then print results."""
     mock_binary = MagicMock(spec=Path)
     mock_binary.exists.return_value = True
-    with patch("lib.test_common.BINARY", mock_binary):
-        test_common.check_binary()
-    test_common.print_result(True, "startup_check")
+    with patch("lib.run_tests_common.BINARY", mock_binary):
+        run_tests_common.check_binary()
+    run_tests_common.print_result(True, "startup_check")
     out = capsys.readouterr().out
     assert all(s in out for s in ("PASS", "startup_check"))
 
@@ -33,4 +33,4 @@ class TestColorConsistency:
 
 def test_binary_is_under_repo_root():
     """BINARY path should start with REPO_ROOT."""
-    assert str(test_common.BINARY).startswith(str(test_common.REPO_ROOT))
+    assert str(run_tests_common.BINARY).startswith(str(run_tests_common.REPO_ROOT))

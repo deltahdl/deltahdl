@@ -32,7 +32,7 @@ jobs:
             exit 0
           fi
           CHANGED=$(git diff --name-only "$BASE" "${{ github.sha }}")
-          if echo "$CHANGED" | grep -qE '^(lib/|scripts/|test/scripts/)'; then
+          if echo "$CHANGED" | grep -qE '^(lib/|scripts/|test/lib/|test/scripts/)'; then
             echo "scripts_changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "scripts_changed=false" >> "$GITHUB_OUTPUT"
@@ -84,6 +84,7 @@ jobs:
         run: >-
           assert-one-assert-per-pytest
           --verbose
+          ${{ github.workspace }}/test/lib
           ${{ github.workspace }}/test/scripts
       - name: Run pylint on source
         run: >-
@@ -92,12 +93,12 @@ jobs:
       - name: Run pylint on tests
         run: >-
           PYTHONPATH=.:scripts python3 -m pylint
-          test/scripts/
+          test/lib/ test/scripts/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run mypy on source
         run: python3 -m mypy lib/ scripts/
       - name: Run mypy on tests
-        run: MYPYPATH=.:scripts python3 -m mypy test/scripts/
+        run: MYPYPATH=.:scripts python3 -m mypy test/lib/ test/scripts/
       - name: Detect copy-paste in source
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
@@ -105,14 +106,14 @@ jobs:
       - name: Detect copy-paste in tests
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
-          --reporters console test/scripts/
+          --reporters console test/lib/ test/scripts/
   # ── Lane: run_sim_tests ──
   # DO NOT lower coverage thresholds. Uncovered code is untested code —
   # lowering it hides bugs and lets regressions slip through silently.
   test-run-sim-tests:
     needs:
       - static-analysis
-      - test-test-common
+      - test-run-tests-common
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -138,7 +139,7 @@ jobs:
   test-run-sv-tests:
     needs:
       - static-analysis
-      - test-test-common
+      - test-run-tests-common
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -160,8 +161,8 @@ jobs:
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
-  # ── Lane: test_common ──
-  test-test-common:
+  # ── Lane: run_tests_common ──
+  test-run-tests-common:
     needs: static-analysis
     runs-on: ubuntu-24.04
     steps:
@@ -179,8 +180,8 @@ jobs:
         run: pip install pytest pytest-cov
       - name: Run tests with 100% coverage gate
         run: >-
-          python3 -m pytest test/scripts/test_common/ -v
-          --cov=lib.test_common
+          python3 -m pytest test/lib/run_tests_common/ -v
+          --cov=lib.run_tests_common
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
@@ -194,7 +195,7 @@ jobs:
       - static-analysis
       - test-run-sim-tests
       - test-run-sv-tests
-      - test-test-common
+      - test-run-tests-common
       - yamllint
     runs-on: ubuntu-24.04
     steps:
