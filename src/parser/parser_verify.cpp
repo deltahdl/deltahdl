@@ -68,6 +68,17 @@ Stmt* Parser::ParseRandsequenceStmt() {
 
 // --- §19 Covergroup declaration ---
 
+// Skip balanced parentheses. Opening '(' must already be consumed.
+static void SkipParenContents(Lexer& lexer) {
+  int depth = 1;
+  while (depth > 0 && !lexer.Peek().Is(TokenKind::kEof)) {
+    if (lexer.Peek().Is(TokenKind::kLParen)) ++depth;
+    if (lexer.Peek().Is(TokenKind::kRParen)) --depth;
+    if (depth > 0) lexer.Next();
+  }
+  if (lexer.Peek().Is(TokenKind::kRParen)) lexer.Next();
+}
+
 // Skip a coverpoint or cross definition including optional bin block.
 static void SkipCoverpointBody(Lexer& lexer) {
   // Skip until ';' or '{'.
@@ -90,15 +101,35 @@ void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
   Expect(TokenKind::kKwCovergroup);
   item->name = Expect(TokenKind::kIdentifier).text;
 
-  // Optional sampling event: @(event) or @@(event).
-  if (Match(TokenKind::kAt) || Match(TokenKind::kAtAt)) {
+  // Optional extends (§19.3).
+  if (Match(TokenKind::kKwExtends)) {
+    ExpectIdentifier();
+  }
+
+  // Optional port list: ( [tf_port_list] ).
+  if (Check(TokenKind::kLParen)) {
+    Consume();
+    SkipParenContents(lexer_);
+  }
+
+  // Optional coverage event.
+  if (Match(TokenKind::kAt)) {
     Expect(TokenKind::kLParen);
     ParseEventList();
     Expect(TokenKind::kRParen);
+  } else if (Check(TokenKind::kAtAt)) {
+    Consume();
+    Expect(TokenKind::kLParen);
+    SkipParenContents(lexer_);
+  } else if (Match(TokenKind::kKwWith)) {
+    Expect(TokenKind::kKwFunction);
+    ExpectIdentifier();
+    Expect(TokenKind::kLParen);
+    SkipParenContents(lexer_);
   }
   Expect(TokenKind::kSemicolon);
 
-  // Covergroup body — skip for now (just consume to endgroup).
+  // Covergroup body — skip (consume to endgroup).
   while (!Check(TokenKind::kKwEndgroup) && !AtEnd()) {
     SkipCovergroupItem();
   }
