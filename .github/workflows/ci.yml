@@ -38,7 +38,8 @@ jobs:
             exit 0
           fi
           CHANGED=$(git diff --name-only "$BASE" "${{ github.sha }}")
-          if echo "$CHANGED" | grep -qE '^(lib/|scripts/|test/lib/|test/scripts/)'; then
+          PAT='^(lib/|scripts/|test/lib/|test/scripts/)'
+          if echo "$CHANGED" | grep -qE "$PAT"; then
             echo "scripts_changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "scripts_changed=false" >> "$GITHUB_OUTPUT"
@@ -49,7 +50,8 @@ jobs:
             echo "workflows_changed=false" >> "$GITHUB_OUTPUT"
           fi
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            MSG=$(git log -1 --format=%B "${{ github.event.pull_request.head.sha }}")
+            SHA="${{ github.event.pull_request.head.sha }}"
+            MSG=$(git log -1 --format=%B "$SHA")
           else
             MSG=$(git log -1 --format=%B "${{ github.sha }}")
           fi
@@ -129,9 +131,33 @@ jobs:
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
           --reporters console test/lib/ test/scripts/
-  # ── Lane: run_sim_tests ──
+  # ── Lane: lib ──
   # DO NOT lower coverage thresholds. Uncovered code is untested code —
   # lowering it hides bugs and lets regressions slip through silently.
+  test-lib:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-${{ github.job }}-${{
+            hashFiles('.github/workflows/ci.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-${{ github.job }}-
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run tests with 100% coverage gate
+        run: >-
+          python3 -m pytest test/lib/run_tests_common/ -v
+          --cov=lib.run_tests_common
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
+  # ── Lane: run_sim_tests ──
   test-run-sim-tests:
     needs:
       - static-analysis
@@ -180,30 +206,6 @@ jobs:
         run: >-
           python3 -m pytest test/scripts/run_sv_tests/ -v
           --cov=run_sv_tests
-          --cov-branch
-          --cov-report=term-missing
-          --cov-fail-under=100
-  # ── Lane: lib ──
-  test-lib:
-    needs: static-analysis
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Restore pip cache
-        uses: actions/cache@v4
-        with:
-          key: >-
-            pip-${{ github.job }}-${{
-            hashFiles('.github/workflows/ci.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-${{ github.job }}-
-      - name: Install tools
-        run: pip install pytest pytest-cov
-      - name: Run tests with 100% coverage gate
-        run: >-
-          python3 -m pytest test/lib/run_tests_common/ -v
-          --cov=lib.run_tests_common
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
