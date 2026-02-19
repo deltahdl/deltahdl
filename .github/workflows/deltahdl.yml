@@ -655,7 +655,7 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: Run sv-tests
-        run: python3 -u scripts/run_sv_tests.py
+        run: python3 scripts/run_sv_tests.py
   integration-test-tsan:
     env:
       TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
