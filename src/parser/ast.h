@@ -506,7 +506,7 @@ struct ModuleItem {
   // Module instantiation
   std::string_view inst_module;
   std::string_view inst_name;
-  std::vector<Expr*> inst_params;
+  std::vector<std::pair<std::string_view, Expr*>> inst_params;
   std::vector<std::pair<std::string_view, Expr*>> inst_ports;
   bool inst_wildcard = false;        // .* port connection (§23.3.2.4)
   Expr* inst_range_left = nullptr;   // Instance array left bound (§23.3.2)

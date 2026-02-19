@@ -409,7 +409,7 @@ void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
   if (CheckIdentifier() || Check(TokenKind::kHash)) {
     if (InProgramBlock())
       diag_.Error(name_tok.loc, "instantiations not allowed in programs");
-    items.push_back(ParseModuleInst(name_tok));
+    ParseModuleInstList(name_tok, &items);
     return;
   }
   auto* item = arena_.Create<ModuleItem>();

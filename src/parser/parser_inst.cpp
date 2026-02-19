@@ -3,33 +3,53 @@
 namespace delta {
 
 ModuleItem* Parser::ParseModuleInst(const Token& module_tok) {
-  auto* item = arena_.Create<ModuleItem>();
-  item->kind = ModuleItemKind::kModuleInst;
-  item->loc = module_tok.loc;
-  item->inst_module = module_tok.text;
+  return ParseModuleInstList(module_tok, nullptr);
+}
+
+ModuleItem* Parser::ParseModuleInstList(
+    const Token& module_tok, std::vector<ModuleItem*>* extra_items) {
+  // A.4.1.1: parameter_value_assignment shared by all instances
+  std::vector<std::pair<std::string_view, Expr*>> params;
   if (Match(TokenKind::kHash)) {
-    ParseParenList(item->inst_params);
+    ParseParamValueAssignment(params);
   }
-  item->inst_name = Expect(TokenKind::kIdentifier).text;
-  // Instance array range: inst_name [left:right] or [size] (§23.3.2)
-  if (Check(TokenKind::kLBracket)) {
-    Consume();
-    item->inst_range_left = ParseExpr();
-    if (Match(TokenKind::kColon)) {
-      item->inst_range_right = ParseExpr();
+
+  auto parse_one_instance = [&]() -> ModuleItem* {
+    auto* item = arena_.Create<ModuleItem>();
+    item->kind = ModuleItemKind::kModuleInst;
+    item->loc = module_tok.loc;
+    item->inst_module = module_tok.text;
+    item->inst_params = params;
+    item->inst_name = Expect(TokenKind::kIdentifier).text;
+    // Instance array range: inst_name [left:right] or [size] (§23.3.2)
+    if (Check(TokenKind::kLBracket)) {
+      Consume();
+      item->inst_range_left = ParseExpr();
+      if (Match(TokenKind::kColon)) {
+        item->inst_range_right = ParseExpr();
+      }
+      Expect(TokenKind::kRBracket);
     }
-    Expect(TokenKind::kRBracket);
-  }
-  Expect(TokenKind::kLParen);
-  if (!Check(TokenKind::kRParen)) {
-    ParsePortConnection(item);
-    while (Match(TokenKind::kComma)) {
+    Expect(TokenKind::kLParen);
+    if (!Check(TokenKind::kRParen)) {
       ParsePortConnection(item);
+      while (Match(TokenKind::kComma)) {
+        ParsePortConnection(item);
+      }
     }
+    Expect(TokenKind::kRParen);
+    return item;
+  };
+
+  auto* first = parse_one_instance();
+  if (extra_items) extra_items->push_back(first);
+  // A.4.1.1: { , hierarchical_instance }
+  while (Match(TokenKind::kComma)) {
+    auto* next = parse_one_instance();
+    if (extra_items) extra_items->push_back(next);
   }
-  Expect(TokenKind::kRParen);
   Expect(TokenKind::kSemicolon);
-  return item;
+  return first;
 }
 
 void Parser::ParseParenList(std::vector<Expr*>& out) {
@@ -38,6 +58,36 @@ void Parser::ParseParenList(std::vector<Expr*>& out) {
     out.push_back(ParseExpr());
     while (Match(TokenKind::kComma)) {
       out.push_back(ParseExpr());
+    }
+  }
+  Expect(TokenKind::kRParen);
+}
+
+// A.4.1.1: Parse parameter_value_assignment contents inside #( ... )
+// Handles both ordered and named parameter assignments.
+void Parser::ParseParamValueAssignment(
+    std::vector<std::pair<std::string_view, Expr*>>& out) {
+  Expect(TokenKind::kLParen);
+  if (!Check(TokenKind::kRParen)) {
+    if (Check(TokenKind::kDot)) {
+      // Named parameter assignments: .name(expr) { , .name(expr) }
+      do {
+        Expect(TokenKind::kDot);
+        auto name = Expect(TokenKind::kIdentifier);
+        Expect(TokenKind::kLParen);
+        Expr* expr = nullptr;
+        if (!Check(TokenKind::kRParen)) {
+          expr = ParseExpr();
+        }
+        Expect(TokenKind::kRParen);
+        out.push_back({name.text, expr});
+      } while (Match(TokenKind::kComma));
+    } else {
+      // Ordered parameter assignments: expr { , expr }
+      out.push_back({{}, ParseExpr()});
+      while (Match(TokenKind::kComma)) {
+        out.push_back({{}, ParseExpr()});
+      }
     }
   }
   Expect(TokenKind::kRParen);
@@ -53,15 +103,25 @@ void Parser::ParsePortConnection(ModuleItem* item) {
   }
   if (Match(TokenKind::kDot)) {
     auto name = Expect(TokenKind::kIdentifier);
-    Expect(TokenKind::kLParen);
-    Expr* expr = nullptr;
-    if (!Check(TokenKind::kRParen)) {
-      expr = ParseExpr();
+    // A.4.1.1: [ ( [ expression ] ) ] — parentheses are optional
+    if (Match(TokenKind::kLParen)) {
+      Expr* expr = nullptr;
+      if (!Check(TokenKind::kRParen)) {
+        expr = ParseExpr();
+      }
+      Expect(TokenKind::kRParen);
+      item->inst_ports.push_back({name.text, expr});
+    } else {
+      // .name shorthand — implicit connection (§23.3.2.3)
+      item->inst_ports.push_back({name.text, nullptr});
     }
-    Expect(TokenKind::kRParen);
-    item->inst_ports.push_back({name.text, expr});
   } else {
-    item->inst_ports.push_back({{}, ParseExpr()});
+    // Ordered port: blank position (empty expression) or expression
+    if (Check(TokenKind::kComma) || Check(TokenKind::kRParen)) {
+      item->inst_ports.push_back({{}, nullptr});
+    } else {
+      item->inst_ports.push_back({{}, ParseExpr()});
+    }
   }
 }
 

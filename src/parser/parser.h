@@ -176,6 +176,10 @@ class Parser {
   void ParseTypedItemOrInst(std::vector<ModuleItem*>& items);
   void ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items);
   ModuleItem* ParseModuleInst(const Token& module_tok);
+  ModuleItem* ParseModuleInstList(const Token& module_tok,
+                                  std::vector<ModuleItem*>* extra_items);
+  void ParseParamValueAssignment(
+      std::vector<std::pair<std::string_view, Expr*>>& out);
   void ParsePortConnection(ModuleItem* item);
   void ParseUnpackedDims(std::vector<Expr*>& dims);
   void ParseParenList(std::vector<Expr*>& out);
