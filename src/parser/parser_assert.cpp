@@ -175,7 +175,8 @@ ModuleItem* Parser::ParseAssumeProperty() {
 }
 
 // Parse: cover property ( property_spec ) [pass_stmt] ;
-//        cover sequence ( [clocking_event] [disable iff (...)] seq ) stmt_or_null
+//        cover sequence ( [clocking_event] [disable iff (...)] seq )
+//        stmt_or_null
 // Or: cover #0 ( expr ) [pass_stmt] ; / cover final ( expr ) [pass_stmt] ;
 ModuleItem* Parser::ParseCoverProperty() {
   auto* item = arena_.Create<ModuleItem>();

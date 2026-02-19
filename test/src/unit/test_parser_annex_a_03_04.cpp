@@ -258,7 +258,8 @@ TEST(ParserA304, NOutputGatetype_Not) {
 }
 
 // =============================================================================
-// A.3.4 Production #6: pass_en_switchtype ::= tranif0 | tranif1 | rtranif1 | rtranif0
+// A.3.4 Production #6: pass_en_switchtype ::= tranif0 | tranif1 | rtranif1 |
+// rtranif0
 // =============================================================================
 
 TEST(ParserA304, PassEnSwitchtype_Tranif0) {
@@ -375,10 +376,14 @@ TEST(ParserA304, AllGateAndSwitchTypes) {
   // Verify all 24 gate kinds are present
   EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kCmos), nullptr);
   EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kRcmos), nullptr);
-  EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kBufif0), nullptr);
-  EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kBufif1), nullptr);
-  EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kNotif0), nullptr);
-  EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kNotif1), nullptr);
+  EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kBufif0),
+            nullptr);
+  EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kBufif1),
+            nullptr);
+  EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kNotif0),
+            nullptr);
+  EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kNotif1),
+            nullptr);
   EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kNmos), nullptr);
   EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kPmos), nullptr);
   EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kRnmos), nullptr);
@@ -391,10 +396,14 @@ TEST(ParserA304, AllGateAndSwitchTypes) {
   EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kXnor), nullptr);
   EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kBuf), nullptr);
   EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kNot), nullptr);
-  EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kTranif0), nullptr);
-  EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kTranif1), nullptr);
-  EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kRtranif0), nullptr);
-  EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kRtranif1), nullptr);
+  EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kTranif0),
+            nullptr);
+  EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kTranif1),
+            nullptr);
+  EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kRtranif0),
+            nullptr);
+  EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kRtranif1),
+            nullptr);
   EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kTran), nullptr);
   EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kRtran), nullptr);
 }

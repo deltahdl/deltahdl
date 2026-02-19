@@ -79,31 +79,31 @@ TEST(ParserA303, EnableTerminal_SimpleIdent) {
 
 TEST(ParserA303, EnableTerminal_ComplexExpr) {
   // enable_terminal accepts any expression
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  bufif1 (out, in, a & b);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  bufif1 (out, in, a & b);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA303, EnableTerminal_BitwiseExpr) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  notif0 (out, in, a | b | c);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  notif0 (out, in, a | b | c);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA303, EnableTerminal_TernaryExpr) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  notif1 (out, in, sel ? en1 : en2);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  notif1 (out, in, sel ? en1 : en2);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA303, EnableTerminal_BitSelect) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  bufif0 (out, in, ctrl[2]);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  bufif0 (out, in, ctrl[2]);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA303, EnableTerminal_PassEnableSwitch) {
@@ -119,10 +119,10 @@ TEST(ParserA303, EnableTerminal_PassEnableSwitch) {
 }
 
 TEST(ParserA303, EnableTerminal_PassEnableExpr) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  rtranif0 (a, b, x ^ y);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  rtranif0 (a, b, x ^ y);\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -143,24 +143,24 @@ TEST(ParserA303, InoutTerminal_SimpleIdent) {
 }
 
 TEST(ParserA303, InoutTerminal_BitSelect) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  tran (a[0], b[1]);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  tran (a[0], b[1]);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA303, InoutTerminal_PartSelect) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  rtran (bus[3:0], net[7:4]);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  rtran (bus[3:0], net[7:4]);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA303, InoutTerminal_Concatenation) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  tran ({a, b}, {c, d});\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  tran ({a, b}, {c, d});\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA303, InoutTerminal_PassEnableSwitch) {
@@ -205,24 +205,24 @@ TEST(ParserA303, InputTerminal_SimpleIdent) {
 
 TEST(ParserA303, InputTerminal_ComplexExpr) {
   // input_terminal accepts any expression
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  or (out, a & b, c | d);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  or (out, a & b, c | d);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA303, InputTerminal_TernaryExpr) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  xor (out, sel ? a : b, c);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  xor (out, sel ? a : b, c);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA303, InputTerminal_BitSelect) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  nand (out, data[0], data[1], data[2]);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  nand (out, data[0], data[1], data[2]);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA303, InputTerminal_NOutputGate) {
@@ -239,10 +239,10 @@ TEST(ParserA303, InputTerminal_NOutputGate) {
 
 TEST(ParserA303, InputTerminal_NOutputExpr) {
   // Expression as input_terminal in not gate
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  not (out, a ^ b);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  not (out, a ^ b);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA303, InputTerminal_MultipleInputs) {
@@ -259,10 +259,10 @@ TEST(ParserA303, InputTerminal_MultipleInputs) {
 
 TEST(ParserA303, InputTerminal_CmosSwitch) {
   // input_terminal as second terminal of cmos switch
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  cmos (out, data[3:0], nctrl, pctrl);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  cmos (out, data[3:0], nctrl, pctrl);\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -283,24 +283,24 @@ TEST(ParserA303, NcontrolTerminal_SimpleIdent) {
 }
 
 TEST(ParserA303, NcontrolTerminal_ComplexExpr) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  cmos (out, in, a & b, pctrl);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  cmos (out, in, a & b, pctrl);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA303, NcontrolTerminal_BitSelect) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  rcmos (out, in, ctrl[0], ctrl[1]);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  rcmos (out, in, ctrl[0], ctrl[1]);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA303, NcontrolTerminal_TernaryExpr) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  cmos (out, in, sel ? n1 : n2, pctrl);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  cmos (out, in, sel ? n1 : n2, pctrl);\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -321,24 +321,24 @@ TEST(ParserA303, OutputTerminal_SimpleIdent) {
 }
 
 TEST(ParserA303, OutputTerminal_BitSelect) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  and (out[0], a, b);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  and (out[0], a, b);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA303, OutputTerminal_PartSelect) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  buf (out[3:0], in);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  buf (out[3:0], in);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA303, OutputTerminal_Concatenation) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  buf ({o1, o2}, in);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  buf ({o1, o2}, in);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA303, OutputTerminal_MultipleOutputs) {
@@ -366,18 +366,18 @@ TEST(ParserA303, OutputTerminal_PullGate) {
 }
 
 TEST(ParserA303, OutputTerminal_PullGateBitSelect) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  pulldown (bus[2]);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  pulldown (bus[2]);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA303, OutputTerminal_EnableGate) {
   // output_terminal as first terminal of enable gate
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  bufif0 (out[7:0], in, en);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  bufif0 (out[7:0], in, en);\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -398,24 +398,24 @@ TEST(ParserA303, PcontrolTerminal_SimpleIdent) {
 }
 
 TEST(ParserA303, PcontrolTerminal_ComplexExpr) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  rcmos (out, in, nctrl, x | y);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  rcmos (out, in, nctrl, x | y);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA303, PcontrolTerminal_BitSelect) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  cmos (out, in, nctrl, ctrl[1]);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  cmos (out, in, nctrl, ctrl[1]);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA303, PcontrolTerminal_TernaryExpr) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  rcmos (out, in, nctrl, sel ? p1 : p2);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  rcmos (out, in, nctrl, sel ? p1 : p2);\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -431,7 +431,8 @@ TEST(ParserA303, AllTerminalTypes) {
       "  buf (o1, o2, in);\n"
       "  // output_terminal + input_terminal + enable_terminal\n"
       "  bufif0 (out, data, en);\n"
-      "  // output_terminal + input_terminal + ncontrol_terminal + pcontrol_terminal\n"
+      "  // output_terminal + input_terminal + ncontrol_terminal + "
+      "pcontrol_terminal\n"
       "  cmos (out2, data2, nc, pc);\n"
       "  // inout_terminal + inout_terminal\n"
       "  tran (p, q);\n"
