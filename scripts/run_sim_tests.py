@@ -4,7 +4,7 @@
 import subprocess
 import sys
 
-from test_common import BINARY, REPO_ROOT, check_binary, print_result
+from lib.test_common import BINARY, REPO_ROOT, check_binary, print_result
 
 TEST_DIR = REPO_ROOT / "test" / "src" / "e2e"
 

@@ -110,7 +110,9 @@ jobs:
   # DO NOT lower coverage thresholds. Uncovered code is untested code —
   # lowering it hides bugs and lets regressions slip through silently.
   test-run-sim-tests:
-    needs: static-analysis
+    needs:
+      - static-analysis
+      - test-test-common
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -134,7 +136,9 @@ jobs:
           --cov-fail-under=100
   # ── Lane: run_sv_tests ──
   test-run-sv-tests:
-    needs: static-analysis
+    needs:
+      - static-analysis
+      - test-test-common
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -176,7 +180,7 @@ jobs:
       - name: Run tests with 100% coverage gate
         run: >-
           python3 -m pytest test/scripts/test_common/ -v
-          --cov=test_common
+          --cov=lib.test_common
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100

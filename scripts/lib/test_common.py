@@ -4,7 +4,7 @@ import os
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 BINARY = REPO_ROOT / "build" / "src" / "deltahdl"
 
 _NO_COLOR = (

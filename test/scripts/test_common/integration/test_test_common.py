@@ -3,14 +3,14 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import test_common
+from lib import test_common
 
 
 def test_startup_then_print(capsys):
     """Simulates a runner: check binary exists, then print results."""
     mock_binary = MagicMock(spec=Path)
     mock_binary.exists.return_value = True
-    with patch("test_common.BINARY", mock_binary):
+    with patch("lib.test_common.BINARY", mock_binary):
         test_common.check_binary()
     test_common.print_result(True, "startup_check")
     out = capsys.readouterr().out
