@@ -2,7 +2,6 @@
 
 import ast
 import re
-import signal
 import subprocess
 from unittest.mock import MagicMock, patch
 from xml.etree import ElementTree as ET
@@ -541,42 +540,41 @@ class TestWriteJunitXml:
         )
 
 
-class TestMainSigpipe:
-    """Tests for SIGPIPE handling in main()."""
+class TestMainBrokenPipe:
+    """Tests for BrokenPipeError resilience in main()."""
 
-    def test_main_resets_sigpipe_to_default(self, get_exit_code):
-        """main() should set SIGPIPE to SIG_DFL on Unix."""
-        observed = {}
-        original = signal.getsignal(signal.SIGPIPE)
-        original_signal = signal.signal
+    _FAKE_RESULT = (
+        {"name": "a.sv", "chapter": "chapter-5", "status": "pass",
+         "time": 0.1, "stderr": ""},
+        1,
+    )
 
-        def spy_signal(signum, handler):
-            if signum == signal.SIGPIPE:
-                observed["handler"] = handler
-            return original_signal(signum, handler)
+    def _run_with_broken_pipe(self, argv):
+        """Run main() with print_status raising BrokenPipeError."""
+        with patch("sys.argv", argv), \
+             patch("run_sv_tests.check_binary"), \
+             patch("run_sv_tests.glob.glob", return_value=["/x/a.sv"]), \
+             patch("run_sv_tests.build_result", return_value=self._FAKE_RESULT), \
+             patch("run_sv_tests.print_status", side_effect=BrokenPipeError), \
+             patch("run_sv_tests.os.open", return_value=99), \
+             patch("run_sv_tests.os.dup2"), \
+             patch("run_sv_tests.os.close"):
+            run_sv_tests.main()
 
-        def run():
-            with patch("sys.argv", ["run_sv_tests.py"]), \
-                 patch("run_sv_tests.check_binary"), \
-                 patch("run_sv_tests.glob.glob", return_value=[]), \
-                 patch("run_sv_tests.signal.signal", side_effect=spy_signal):
-                run_sv_tests.main()
+    def test_main_exits_correctly_on_broken_pipe(self, get_exit_code):
+        """main() should exit 0 when all tests pass despite BrokenPipeError."""
+        assert get_exit_code(
+            lambda: self._run_with_broken_pipe(["run_sv_tests.py"])
+        ) == 0
 
-        try:
-            get_exit_code(run)
-            assert observed.get("handler") == signal.SIG_DFL
-        finally:
-            signal.signal(signal.SIGPIPE, original)
-
-    def test_main_skips_sigpipe_when_unavailable(self, get_exit_code):
-        """main() should skip SIGPIPE setup when the attribute is absent."""
-
-        def run():
-            with patch("sys.argv", ["run_sv_tests.py"]), \
-                 patch("run_sv_tests.check_binary"), \
-                 patch("run_sv_tests.glob.glob", return_value=[]), \
-                 patch.object(run_sv_tests.signal, "SIGPIPE", create=False):
-                delattr(run_sv_tests.signal, "SIGPIPE")
-                run_sv_tests.main()
-
-        assert get_exit_code(run) == 1
+    def test_main_writes_junit_xml_despite_broken_pipe(
+        self, tmp_path, get_exit_code
+    ):
+        """main() should write JUnit XML even when stdout pipe breaks."""
+        xml_path = str(tmp_path / "pipe-report.xml")
+        get_exit_code(
+            lambda: self._run_with_broken_pipe(
+                ["run_sv_tests.py", "--junit-xml", xml_path]
+            )
+        )
+        assert tmp_path.joinpath("pipe-report.xml").exists()

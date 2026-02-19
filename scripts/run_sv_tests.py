@@ -7,7 +7,6 @@ import glob
 import operator
 import os
 import re
-import signal
 import subprocess
 import sys
 import time
@@ -325,9 +324,6 @@ def execute_single_test(path):
 
 def main():
     """Run all sv-tests and print a summary."""
-    if hasattr(signal, "SIGPIPE"):
-        signal.signal(signal.SIGPIPE, signal.SIG_DFL)
-
     args = parse_args()
 
     check_binary()
@@ -356,21 +352,26 @@ def main():
 
     # Sort results by clause-number prefix for hierarchical display.
     pairs = sorted(zip(results, ok_flags), key=lambda p: _natural_sort_key(p[0]["name"]))
-    passed = 0
-    for result, ok in pairs:
-        print_status(result, ok)
-        passed += ok
-
+    passed = sum(ok for _, ok in pairs)
     failed = len(results) - passed
-    pct = 100.0 * passed / len(results) if results else 0.0
-    print(
-        f"\nsv-tests summary: {passed}/{len(results)} passed ({pct:.1f}%), "
-        f"{failed} failed",
-        flush=True,
-    )
 
-    print_chapter_breakdown(results)
-    sys.stdout.flush()
+    try:
+        for result, ok in pairs:
+            print_status(result, ok)
+
+        pct = 100.0 * passed / len(results) if results else 0.0
+        print(
+            f"\nsv-tests summary: {passed}/{len(results)} passed ({pct:.1f}%), "
+            f"{failed} failed",
+            flush=True,
+        )
+
+        print_chapter_breakdown(results)
+        sys.stdout.flush()
+    except BrokenPipeError:
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull, sys.stdout.fileno())
+        os.close(devnull)
 
     if args.junit_xml:
         elapsed = time.monotonic() - suite_start
