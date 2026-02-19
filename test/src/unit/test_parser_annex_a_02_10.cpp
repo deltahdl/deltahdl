@@ -1472,4 +1472,90 @@ TEST(ParserA210, SequenceActualArg_EventExpr) {
       "endmodule\n"));
 }
 
+// assume_property_statement with no action block
+TEST(ParserA210, AssumeProperty_NoActionBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  assume property (@(posedge clk) req |-> ack);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssumeProperty);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->assert_pass_stmt, nullptr);
+  EXPECT_EQ(item->assert_fail_stmt, nullptr);
+}
+
+// property_port_list — empty port list
+TEST(ParserA210, PropertyPortList_Empty) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  property p();\n"
+      "    a |-> b;\n"
+      "  endproperty\n"
+      "endmodule\n"));
+}
+
+// sequence_port_item with default value
+TEST(ParserA210, SequencePortItem_DefaultValue) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  sequence s(a, b = 1'b1);\n"
+      "    a ##1 b;\n"
+      "  endsequence\n"
+      "endmodule\n"));
+}
+
+// sequence_instance with sequence_abbrev
+TEST(ParserA210, SequenceExpr_SequenceInstanceWithAbbrev) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  sequence s; a ##1 b; endsequence\n"
+      "  assert property (@(posedge clk) s [*3] |-> c);\n"
+      "endmodule\n"));
+}
+
+// sequence_list_of_arguments — mixed positional + named
+TEST(ParserA210, SequenceListOfArguments_Mixed) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  sequence s(a, b, c); a ##1 b ##1 c; endsequence\n"
+      "  assert property (@(posedge clk) s(x, .b(y), .c(z)));\n"
+      "endmodule\n"));
+}
+
+// assertion_variable_declaration — multiple vars and complex type
+TEST(ParserA210, AssertionVariableDecl_MultipleVars) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  property p;\n"
+      "    int x;\n"
+      "    logic [7:0] y;\n"
+      "    (a, x = b) |-> (c == x);\n"
+      "  endproperty\n"
+      "endmodule\n"));
+}
+
+// property_case_item — default without colon
+TEST(ParserA210, PropertyCaseItem_DefaultNoColon) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  assert property (@(posedge clk)\n"
+      "    case (sel)\n"
+      "      2'b00: a |-> b;\n"
+      "      default a;\n"
+      "    endcase);\n"
+      "endmodule\n"));
+}
+
+// property_formal_type — implicit (no type)
+TEST(ParserA210, PropertyFormalType_Implicit) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  property p(x);\n"
+      "    x;\n"
+      "  endproperty\n"
+      "endmodule\n"));
+}
+
 }  // namespace
