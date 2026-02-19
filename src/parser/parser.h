@@ -238,6 +238,7 @@ class Parser {
   ModuleItem* ParseAssumeProperty();
   ModuleItem* ParsePropertyAssertLike(ModuleItemKind kind, TokenKind keyword);
   ModuleItem* ParseCoverProperty();
+  ModuleItem* ParseRestrictProperty();
   ModuleItem* ParsePropertyDecl();
   ModuleItem* ParseSequenceDecl();
 

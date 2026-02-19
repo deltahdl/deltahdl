@@ -369,6 +369,8 @@ enum class ModuleItemKind : uint8_t {
   kAssertProperty,     // assert property (§16.5)
   kAssumeProperty,     // assume property (§16.5)
   kCoverProperty,      // cover property (§16.5)
+  kCoverSequence,      // cover sequence (§16.5)
+  kRestrictProperty,   // restrict property (§16.5)
   kClockingBlock,      // Clocking block (§14)
   kCovergroupDecl,     // covergroup ... endgroup (§19)
   kSpecifyBlock,       // specify ... endspecify (§30)

@@ -210,6 +210,10 @@ bool Parser::TryParseVerificationItem(std::vector<ModuleItem*>& items) {
     items.push_back(ParseCoverProperty());
     return true;
   }
+  if (Check(TokenKind::kKwRestrict)) {
+    items.push_back(ParseRestrictProperty());
+    return true;
+  }
   if (Check(TokenKind::kKwProperty)) {
     items.push_back(ParsePropertyDecl());
     return true;

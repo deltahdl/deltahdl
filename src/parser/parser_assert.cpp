@@ -175,6 +175,7 @@ ModuleItem* Parser::ParseAssumeProperty() {
 }
 
 // Parse: cover property ( property_spec ) [pass_stmt] ;
+//        cover sequence ( [clocking_event] [disable iff (...)] seq ) stmt_or_null
 // Or: cover #0 ( expr ) [pass_stmt] ; / cover final ( expr ) [pass_stmt] ;
 ModuleItem* Parser::ParseCoverProperty() {
   auto* item = arena_.Create<ModuleItem>();
@@ -201,7 +202,14 @@ ModuleItem* Parser::ParseCoverProperty() {
     return WrapStmtAsItem(arena_, stmt, item->loc);
   }
 
-  Expect(TokenKind::kKwProperty);
+  // Distinguish cover property vs cover sequence.
+  if (Check(TokenKind::kKwSequence)) {
+    item->kind = ModuleItemKind::kCoverSequence;
+    Expect(TokenKind::kKwSequence);
+  } else {
+    Expect(TokenKind::kKwProperty);
+  }
+
   Expect(TokenKind::kLParen);
   item->assert_expr = SkipPropertySpec(arena_, lexer_, CurrentLoc());
   Expect(TokenKind::kRParen);
@@ -211,6 +219,20 @@ ModuleItem* Parser::ParseCoverProperty() {
   } else {
     Expect(TokenKind::kSemicolon);
   }
+  return item;
+}
+
+// Parse: restrict property ( property_spec ) ;
+ModuleItem* Parser::ParseRestrictProperty() {
+  auto* item = arena_.Create<ModuleItem>();
+  item->kind = ModuleItemKind::kRestrictProperty;
+  item->loc = CurrentLoc();
+  Expect(TokenKind::kKwRestrict);
+  Expect(TokenKind::kKwProperty);
+  Expect(TokenKind::kLParen);
+  item->assert_expr = SkipPropertySpec(arena_, lexer_, CurrentLoc());
+  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kSemicolon);
   return item;
 }
 

@@ -686,6 +686,8 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kAssertProperty:
     case ModuleItemKind::kAssumeProperty:
     case ModuleItemKind::kCoverProperty:
+    case ModuleItemKind::kCoverSequence:
+    case ModuleItemKind::kRestrictProperty:
     case ModuleItemKind::kClockingBlock:
     case ModuleItemKind::kCovergroupDecl:
     case ModuleItemKind::kSpecifyBlock:
