@@ -476,8 +476,11 @@ PackageDecl* Parser::ParsePackageDecl() {
 }
 
 // §11.12: Parse a single let port argument.
+// A.2.12: let_port_item ::= {attribute_instance} let_formal_type
+//         formal_port_identifier {variable_dimension} [= expression]
 FunctionArg Parser::ParseLetArg() {
   FunctionArg arg;
+  ParseAttributes();  // A.2.12: {attribute_instance}
   if (!Match(TokenKind::kKwUntyped)) {
     arg.data_type = ParseDataType();
   }
