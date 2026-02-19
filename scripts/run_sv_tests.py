@@ -372,6 +372,23 @@ def main():
         devnull = os.open(os.devnull, os.O_WRONLY)
         os.dup2(devnull, sys.stdout.fileno())
         os.close(devnull)
+        print(
+            "\nerror: stdout pipe broke — the GitHub Actions runner likely"
+            " killed the reader before output was fully drained."
+            "\nThis is a known runner bug: the .NET runtime sets"
+            " SIGPIPE=SIG_IGN (inherited by all child processes), and"
+            "\nProcessInvoker.cs has a 5-second hard timeout that kills"
+            " the process tree if stdout is not drained in time."
+            "\nOn macOS with 16 KB pipe buffers this deadline is"
+            " regularly missed."
+            "\nSee: https://github.com/actions/runner/issues/2684"
+            "\nSee: https://github.com/actions/runner/blob/main/src/"
+            "Runner.Worker/Handlers/NodeScriptActionHandler.cs"
+            " (ProcessInvoker)",
+            file=sys.stderr,
+            flush=True,
+        )
+        sys.exit(1)
 
     if args.junit_xml:
         elapsed = time.monotonic() - suite_start

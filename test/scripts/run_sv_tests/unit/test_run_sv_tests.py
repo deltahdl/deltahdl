@@ -1,6 +1,7 @@
 """Unit tests for run_sv_tests module."""
 
 import ast
+import io
 import re
 import subprocess
 from unittest.mock import MagicMock, patch
@@ -561,20 +562,29 @@ class TestMainBrokenPipe:
              patch("run_sv_tests.os.close"):
             run_sv_tests.main()
 
-    def test_main_exits_correctly_on_broken_pipe(self, get_exit_code):
-        """main() should exit 0 when all tests pass despite BrokenPipeError."""
+    def test_main_exits_one_on_broken_pipe(self, get_exit_code):
+        """main() should exit 1 when stdout pipe breaks."""
         assert get_exit_code(
             lambda: self._run_with_broken_pipe(["run_sv_tests.py"])
-        ) == 0
+        ) == 1
 
-    def test_main_writes_junit_xml_despite_broken_pipe(
+    def test_main_prints_diagnostic_on_broken_pipe(self, get_exit_code):
+        """main() should print runner bug diagnostic to stderr."""
+        stderr = io.StringIO()
+        with patch("sys.stderr", stderr):
+            get_exit_code(
+                lambda: self._run_with_broken_pipe(["run_sv_tests.py"])
+            )
+        assert "actions/runner/issues/2684" in stderr.getvalue()
+
+    def test_main_skips_junit_xml_on_broken_pipe(
         self, tmp_path, get_exit_code
     ):
-        """main() should write JUnit XML even when stdout pipe breaks."""
+        """main() should not write JUnit XML when stdout pipe breaks."""
         xml_path = str(tmp_path / "pipe-report.xml")
         get_exit_code(
             lambda: self._run_with_broken_pipe(
                 ["run_sv_tests.py", "--junit-xml", xml_path]
             )
         )
-        assert tmp_path.joinpath("pipe-report.xml").exists()
+        assert not tmp_path.joinpath("pipe-report.xml").exists()
