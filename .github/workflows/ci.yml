@@ -32,7 +32,7 @@ jobs:
             exit 0
           fi
           CHANGED=$(git diff --name-only "$BASE" "${{ github.sha }}")
-          if echo "$CHANGED" | grep -qE '^(scripts/|test/scripts/)'; then
+          if echo "$CHANGED" | grep -qE '^(lib/|scripts/|test/scripts/)'; then
             echo "scripts_changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "scripts_changed=false" >> "$GITHUB_OUTPUT"
@@ -87,21 +87,21 @@ jobs:
           ${{ github.workspace }}/test/scripts
       - name: Run pylint on source
         run: >-
-          python3 -m pylint scripts/
+          python3 -m pylint lib/ scripts/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run pylint on tests
         run: >-
-          PYTHONPATH=scripts python3 -m pylint
+          PYTHONPATH=.:scripts python3 -m pylint
           test/scripts/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run mypy on source
-        run: python3 -m mypy scripts/
+        run: python3 -m mypy lib/ scripts/
       - name: Run mypy on tests
-        run: MYPYPATH=scripts python3 -m mypy test/scripts/
+        run: MYPYPATH=.:scripts python3 -m mypy test/scripts/
       - name: Detect copy-paste in source
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
-          --reporters console scripts/
+          --reporters console lib/ scripts/
       - name: Detect copy-paste in tests
         run: >-
           jscpd --pattern "**/*.py" --threshold 0

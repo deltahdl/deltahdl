@@ -10,7 +10,8 @@ from xml.etree import ElementTree as ET
 
 from lib import test_common
 
-SCRIPTS_DIR = test_common.REPO_ROOT / "scripts"
+REPO_ROOT = test_common.REPO_ROOT
+SCRIPTS_DIR = REPO_ROOT / "scripts"
 
 
 def _make_stub_binary(tmp_path, exit_code=0, stderr=""):
@@ -51,6 +52,7 @@ def _run_sv_tests(tmp_path, exit_code=0, extra_args=None):
 
     code = textwrap.dedent(f"""\
         import sys
+        sys.path.insert(0, {str(REPO_ROOT)!r})
         sys.path.insert(0, {str(SCRIPTS_DIR)!r})
 
         import run_sv_tests

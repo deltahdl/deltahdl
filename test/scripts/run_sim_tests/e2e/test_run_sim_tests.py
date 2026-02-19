@@ -6,7 +6,8 @@ import textwrap
 
 from lib import test_common
 
-SCRIPTS_DIR = test_common.REPO_ROOT / "scripts"
+REPO_ROOT = test_common.REPO_ROOT
+SCRIPTS_DIR = REPO_ROOT / "scripts"
 
 
 def _run_sim_script(test_dir, binary_path):
@@ -21,6 +22,7 @@ def _run_sim_script(test_dir, binary_path):
     """
     code = textwrap.dedent(f"""\
         import sys
+        sys.path.insert(0, {str(REPO_ROOT)!r})
         sys.path.insert(0, {str(SCRIPTS_DIR)!r})
         from pathlib import Path
         import run_sim_tests

@@ -7,8 +7,12 @@ from unittest.mock import patch
 
 import pytest
 
-# Add scripts/ to sys.path so we can import the modules under test.
-SCRIPTS_DIR = Path(__file__).resolve().parent.parent.parent / "scripts"
+# Add repo root (for lib/) and scripts/ to sys.path so we can import
+# the modules under test.
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+SCRIPTS_DIR = REPO_ROOT / "scripts"
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 

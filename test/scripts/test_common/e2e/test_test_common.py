@@ -10,12 +10,12 @@ REPO_ROOT = test_common.REPO_ROOT
 
 def test_import_succeeds_in_subprocess():
     """Importing test_common in a fresh Python process should succeed."""
-    scripts_dir = str(REPO_ROOT / "scripts")
+    repo_root = str(REPO_ROOT)
     result = subprocess.run(
         [
             sys.executable,
             "-c",
-            f"import sys; sys.path.insert(0, {scripts_dir!r}); "
+            f"import sys; sys.path.insert(0, {repo_root!r}); "
             "from lib import test_common",
         ],
         capture_output=True,
