@@ -15,8 +15,6 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from lib.run_tests_common import BINARY, GREEN, RED, REPO_ROOT, RESET, check_binary, print_result
 
 TEST_DIR = REPO_ROOT / "third_party" / "sv-tests" / "tests"

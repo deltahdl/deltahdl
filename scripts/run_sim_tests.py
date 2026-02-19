@@ -3,9 +3,6 @@
 
 import subprocess
 import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from lib.run_tests_common import BINARY, REPO_ROOT, check_binary, print_result
 
