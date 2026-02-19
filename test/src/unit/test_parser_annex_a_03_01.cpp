@@ -152,17 +152,17 @@ TEST(ParserA301, GateInst_PmosBasic) {
 }
 
 TEST(ParserA301, GateInst_RnmosBasic) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  rnmos (out, in, ctrl);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  rnmos (out, in, ctrl);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA301, GateInst_RpmosBasic) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  rpmos (out, in, ctrl);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  rpmos (out, in, ctrl);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA301, GateInst_MosWithDelay) {
@@ -206,24 +206,24 @@ TEST(ParserA301, GateInst_Bufif0Basic) {
 }
 
 TEST(ParserA301, GateInst_Bufif1Basic) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  bufif1 (out, in, ctrl);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  bufif1 (out, in, ctrl);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA301, GateInst_Notif0Basic) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  notif0 (out, in, ctrl);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  notif0 (out, in, ctrl);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA301, GateInst_Notif1Basic) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  notif1 (out, in, ctrl);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  notif1 (out, in, ctrl);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA301, GateInst_EnableWithStrength) {
@@ -293,38 +293,38 @@ TEST(ParserA301, GateInst_AndBasic) {
 }
 
 TEST(ParserA301, GateInst_NandBasic) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  nand (out, a, b);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  nand (out, a, b);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA301, GateInst_OrBasic) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  or (out, a, b);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  or (out, a, b);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA301, GateInst_NorBasic) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  nor (out, a, b);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  nor (out, a, b);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA301, GateInst_XorBasic) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  xor (out, a, b);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  xor (out, a, b);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA301, GateInst_XnorBasic) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  xnor (out, a, b);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  xnor (out, a, b);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA301, GateInst_NInputWithStrength) {
@@ -467,24 +467,24 @@ TEST(ParserA301, GateInst_Tranif0Basic) {
 }
 
 TEST(ParserA301, GateInst_Tranif1Basic) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  tranif1 (io1, io2, ctrl);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  tranif1 (io1, io2, ctrl);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA301, GateInst_Rtranif0Basic) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  rtranif0 (io1, io2, ctrl);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  rtranif0 (io1, io2, ctrl);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA301, GateInst_Rtranif1Basic) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  rtranif1 (io1, io2, ctrl);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  rtranif1 (io1, io2, ctrl);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA301, GateInst_PassEnWithDelay) {
@@ -526,10 +526,10 @@ TEST(ParserA301, GateInst_TranBasic) {
 }
 
 TEST(ParserA301, GateInst_RtranBasic) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  rtran (io1, io2);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  rtran (io1, io2);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA301, GateInst_PassSwitchMultipleInstances) {
@@ -621,7 +621,8 @@ TEST(ParserA301, GateInst_PullupMultipleInstances) {
 // =============================================================================
 // A.3.1 Production #2: cmos_switch_instance
 // cmos_switch_instance ::= [name_of_instance]
-//   ( output_terminal , input_terminal , ncontrol_terminal , pcontrol_terminal )
+//   ( output_terminal , input_terminal , ncontrol_terminal , pcontrol_terminal
+//   )
 // =============================================================================
 
 TEST(ParserA301, CmosSwitchInst_Unnamed) {
@@ -810,7 +811,8 @@ TEST(ParserA301, NOutputGateInst_Unnamed) {
 
 // =============================================================================
 // A.3.1 Production #7: pass_switch_instance
-// pass_switch_instance ::= [name_of_instance] ( inout_terminal , inout_terminal )
+// pass_switch_instance ::= [name_of_instance] ( inout_terminal , inout_terminal
+// )
 // =============================================================================
 
 TEST(ParserA301, PassSwitchInst_TranNamed) {
@@ -954,61 +956,61 @@ TEST(ParserA301, PullGateInst_PullupUnnamed) {
 // =============================================================================
 
 TEST(ParserA301, GateInst_AllNInputGateTypes) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  and  a1(o, i1, i2);\n"
-      "  nand n1(o, i1, i2);\n"
-      "  or   o1(o, i1, i2);\n"
-      "  nor  r1(o, i1, i2);\n"
-      "  xor  x1(o, i1, i2);\n"
-      "  xnor z1(o, i1, i2);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  and  a1(o, i1, i2);\n"
+              "  nand n1(o, i1, i2);\n"
+              "  or   o1(o, i1, i2);\n"
+              "  nor  r1(o, i1, i2);\n"
+              "  xor  x1(o, i1, i2);\n"
+              "  xnor z1(o, i1, i2);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA301, GateInst_AllEnableGateTypes) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  bufif0 b0(o, i, c);\n"
-      "  bufif1 b1(o, i, c);\n"
-      "  notif0 n0(o, i, c);\n"
-      "  notif1 n1(o, i, c);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  bufif0 b0(o, i, c);\n"
+              "  bufif1 b1(o, i, c);\n"
+              "  notif0 n0(o, i, c);\n"
+              "  notif1 n1(o, i, c);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA301, GateInst_AllMosSwitchTypes) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  nmos  n1(o, i, g);\n"
-      "  pmos  p1(o, i, g);\n"
-      "  rnmos rn1(o, i, g);\n"
-      "  rpmos rp1(o, i, g);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  nmos  n1(o, i, g);\n"
+              "  pmos  p1(o, i, g);\n"
+              "  rnmos rn1(o, i, g);\n"
+              "  rpmos rp1(o, i, g);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA301, GateInst_AllCmosSwitchTypes) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  cmos  c1(o, i, n, p);\n"
-      "  rcmos rc1(o, i, n, p);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  cmos  c1(o, i, n, p);\n"
+              "  rcmos rc1(o, i, n, p);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA301, GateInst_AllPassSwitchTypes) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  tran  t1(a, b);\n"
-      "  rtran rt1(a, b);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  tran  t1(a, b);\n"
+              "  rtran rt1(a, b);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA301, GateInst_AllPassEnSwitchTypes) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  tranif0  t0(a, b, c);\n"
-      "  tranif1  t1(a, b, c);\n"
-      "  rtranif0 rt0(a, b, c);\n"
-      "  rtranif1 rt1(a, b, c);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  tranif0  t0(a, b, c);\n"
+              "  tranif1  t1(a, b, c);\n"
+              "  rtranif0 rt0(a, b, c);\n"
+              "  rtranif1 rt1(a, b, c);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA301, GateInst_StrengthOrder_Strength1First) {
@@ -1024,17 +1026,17 @@ TEST(ParserA301, GateInst_StrengthOrder_Strength1First) {
 }
 
 TEST(ParserA301, GateInst_DelayWithMinTypMax) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  and #(1:2:3, 4:5:6) a1(out, in1, in2);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  and #(1:2:3, 4:5:6) a1(out, in1, in2);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA301, GateInst_ComplexTerminalExpressions) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  and a1(out[0], in1[3:0], in2[7:4]);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  and a1(out[0], in1[3:0], in2[7:4]);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA301, GateInst_NamedUnnamedMixedInMulti) {
