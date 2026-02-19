@@ -37,30 +37,11 @@ ParseResult Parse(const std::string& src) {
 }  // namespace
 
 // =============================================================================
-// Annex E -- Optional compiler directives
+// Annex E.7 -- `delay_mode_zero
 // =============================================================================
-
-TEST(ParserAnnexE, AnnexEDefaultDecayTime) {
-  auto r = Parse("`default_decay_time 10\nmodule m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  if (r.cu->modules.size() >= 1u) {
-    EXPECT_EQ(r.cu->modules[0]->name, "m");
-  }
-}
 
 TEST(ParserAnnexE, AnnexEDelayModeZero) {
   auto r = Parse("`delay_mode_zero\nmodule m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  if (r.cu->modules.size() >= 1u) {
-    EXPECT_EQ(r.cu->modules[0]->name, "m");
-  }
-}
-
-TEST(ParserAnnexE, AnnexEMultipleDirectives) {
-  auto r = Parse(
-      "`default_decay_time 100\n"
-      "`delay_mode_distributed\n"
-      "module m; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   if (r.cu->modules.size() >= 1u) {
     EXPECT_EQ(r.cu->modules[0]->name, "m");
