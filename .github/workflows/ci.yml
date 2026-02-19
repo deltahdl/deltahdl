@@ -211,8 +211,7 @@ jobs:
   # ── Gate: yamllint for workflow-only changes ──
   yamllint:
     if: >-
-      (needs.detect.outputs.workflows-changed == 'true'
-      && needs.detect.outputs.scripts-changed != 'true')
+      needs.detect.outputs.workflows-changed == 'true'
       || inputs.force-yamllint
     needs: detect
     runs-on: ubuntu-24.04
