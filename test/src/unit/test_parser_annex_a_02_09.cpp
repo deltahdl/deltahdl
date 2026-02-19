@@ -464,4 +464,107 @@ TEST(ParserA29, FullPrototypeMixed) {
               "endinterface\n"));
 }
 
+// Additional AST verification for clocking port details
+
+TEST(ParserA29, ClockingPort_NotImportExport) {
+  auto r = Parse(
+      "interface A_Bus(input logic clk);\n"
+      "  clocking sb @(posedge clk);\n"
+      "  endclocking\n"
+      "  modport STB(clocking sb);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 1u);
+  EXPECT_TRUE(mp->ports[0].is_clocking);
+  EXPECT_FALSE(mp->ports[0].is_import);
+  EXPECT_FALSE(mp->ports[0].is_export);
+  EXPECT_EQ(mp->ports[0].direction, Direction::kNone);
+}
+
+// Verify import/export flags are mutually exclusive in AST
+
+TEST(ParserA29, ImportFlag_NotExport) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  modport target(import Read);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  EXPECT_TRUE(mp->ports[0].is_import);
+  EXPECT_FALSE(mp->ports[0].is_export);
+}
+
+TEST(ParserA29, ExportFlag_NotImport) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  modport target(export Write);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  EXPECT_FALSE(mp->ports[0].is_import);
+  EXPECT_TRUE(mp->ports[0].is_export);
+}
+
+// Verify source location is captured on ModportDecl
+
+TEST(ParserA29, ModportDeclHasSourceLoc) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  logic a;\n"
+      "  modport target(input a);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  EXPECT_TRUE(mp->loc.IsValid());
+}
+
+// Verify function prototype return type stored
+
+TEST(ParserA29, FunctionPrototype_ReturnType) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  modport init(import function int compute(input int a));\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 1u);
+  ASSERT_NE(mp->ports[0].prototype, nullptr);
+  EXPECT_EQ(mp->ports[0].prototype->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(mp->ports[0].prototype->data_type.kind, DataTypeKind::kInt);
+}
+
+// Verify task prototype with arguments stores them
+
+TEST(ParserA29, TaskPrototype_HasArgs) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  modport init(import task Read(input logic [7:0] raddr));\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_NE(mp->ports[0].prototype, nullptr);
+  EXPECT_FALSE(mp->ports[0].prototype->func_args.empty());
+}
+
+// Empty modport (no ports) should parse
+
+TEST(ParserA29, EmptyModport) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  modport empty();\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  EXPECT_EQ(mp->ports.size(), 0u);
+  EXPECT_EQ(mp->name, "empty");
+}
+
 }  // namespace
