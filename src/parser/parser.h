@@ -100,6 +100,7 @@ class Parser {
 
   // User-defined primitives (parser_toplevel.cpp)
   UdpDecl* ParseUdpDecl();
+  UdpDecl* ParseExternUdpDecl();
 
   // Verification constructs (parser_verify.cpp — §17/§18/§19)
   ModuleDecl* ParseCheckerDecl();

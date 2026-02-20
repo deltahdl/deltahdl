@@ -382,6 +382,10 @@ void Parser::ParseExternTopLevel(CompilationUnit* unit) {
     unit->programs.push_back(decl);
     return;
   }
+  if (Check(TokenKind::kKwPrimitive)) {
+    unit->udps.push_back(ParseExternUdpDecl());
+    return;
+  }
   SkipToSemicolon(lexer_);
 }
 
