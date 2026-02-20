@@ -11,7 +11,7 @@ UdpEvalState::UdpEvalState(const UdpDecl& decl) : decl_(decl) {
 
 static bool IsEdgeSymbol(char symbol) {
   return symbol == 'r' || symbol == 'f' || symbol == 'p' || symbol == 'n' ||
-         symbol == '*';
+         symbol == '*' || symbol == '\x01';
 }
 
 static bool MatchLevel(char symbol, char value) {
@@ -93,7 +93,19 @@ static bool MatchRowWithEdge(const UdpTableRow& row,
     }
     has_edge = true;
     if (i != changed_idx) return false;
-    if (!MatchEdge(sym, prev_value, new_inputs[i])) return false;
+    if (sym == '\x01') {
+      // Parenthesized edge indicator: match from/to pair.
+      if (i < row.paren_edges.size()) {
+        auto [from, to] = row.paren_edges[i];
+        if (!MatchLevel(from, prev_value) ||
+            !MatchLevel(to, new_inputs[i]))
+          return false;
+      } else {
+        return false;
+      }
+    } else if (!MatchEdge(sym, prev_value, new_inputs[i])) {
+      return false;
+    }
   }
   return true;
 }

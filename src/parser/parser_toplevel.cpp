@@ -401,9 +401,32 @@ UdpDecl* Parser::ParseUdpDecl() {
   Expect(TokenKind::kKwTable);
   while (!Check(TokenKind::kKwEndtable) && !AtEnd()) {
     UdpTableRow row;
-    // Read input entries until ':'
+    // Read input entries until ':'.
+    // Handle parenthesized edge indicators: ( level_symbol level_symbol )
     while (!Check(TokenKind::kColon) && !AtEnd()) {
-      row.inputs.push_back(UdpCharFromToken(Consume()));
+      if (Check(TokenKind::kLParen)) {
+        Consume();  // eat '('
+        // The two level symbols may be in one token (e.g. "01", "x1")
+        // or in two separate tokens (e.g. "0" "x").
+        Token tok = Consume();
+        char from = 0, to = 0;
+        if (tok.text.size() >= 2) {
+          from = tok.text[0];
+          to = tok.text[1];
+        } else {
+          from = UdpCharFromToken(tok);
+          to = UdpCharFromToken(Consume());
+        }
+        Expect(TokenKind::kRParen);
+        // Pad paren_edges to match inputs size so far.
+        while (row.paren_edges.size() < row.inputs.size()) {
+          row.paren_edges.push_back({0, 0});
+        }
+        row.inputs.push_back('\x01');
+        row.paren_edges.push_back({from, to});
+      } else {
+        row.inputs.push_back(UdpCharFromToken(Consume()));
+      }
     }
     Expect(TokenKind::kColon);
     if (udp->is_sequential) {

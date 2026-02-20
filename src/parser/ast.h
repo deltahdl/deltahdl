@@ -765,7 +765,11 @@ struct SpecifyItem {
 // --- User-Defined Primitives (§29) ---
 
 struct UdpTableRow {
-  std::vector<char> inputs;  // '0','1','x','?','b','r','f','p','n','*'
+  std::vector<char> inputs;  // '0','1','x','?','b','r','f','p','n','*','\x01'
+  // Parallel vector for parenthesized edge indicators (A.5.3 edge_indicator).
+  // Same size as inputs when any paren edges exist; empty otherwise.
+  // paren_edges[i] = {from, to} for '\x01' entries; {0, 0} otherwise.
+  std::vector<std::pair<char, char>> paren_edges;
   char current_state = 0;    // For sequential UDPs (0 if combinational)
   char output = '0';         // '0','1','x','-'
 };
