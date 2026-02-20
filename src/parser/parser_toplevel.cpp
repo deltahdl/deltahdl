@@ -275,7 +275,7 @@ void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
 // --- UDP instantiation (§A.5.4) ---
 
 void Parser::ParseUdpInstList(const Token& udp_tok,
-                               std::vector<ModuleItem*>& items) {
+                              std::vector<ModuleItem*>& items) {
   auto loc = udp_tok.loc;
 
   // Optional drive_strength: (strength0, strength1) or (strength1, strength0)
