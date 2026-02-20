@@ -467,7 +467,7 @@ jobs:
         with:
           key: >-
             ctcache-src-${{ matrix.shard }}-${{
-            hashFiles('.clang-tidy') }}-${{
+            hashFiles('etc/clang_tidy/src.yml') }}-${{
             inputs.sha }}
           path: .ctcache
           restore-keys: |
@@ -491,7 +491,7 @@ jobs:
           run-clang-tidy-18 -p build \
             -j "$(nproc)" \
             -clang-tidy-binary /usr/local/bin/clang-tidy-cached \
-            -config-file=.clang-tidy \
+            -config-file=etc/clang_tidy/src.yml \
             -extra-arg=-ferror-limit=0 \
             -extra-arg=-w \
             -warnings-as-errors='*' \
@@ -527,7 +527,7 @@ jobs:
         with:
           key: >-
             ctcache-test-${{ matrix.shard }}-${{
-            hashFiles('test/src/unit/.clang-tidy') }}-${{
+            hashFiles('etc/clang_tidy/test_src_unit.yml') }}-${{
             inputs.sha }}
           path: .ctcache
           restore-keys: |
@@ -550,7 +550,7 @@ jobs:
           run-clang-tidy-18 -p build \
             -j "$(nproc)" \
             -clang-tidy-binary /usr/local/bin/clang-tidy-cached \
-            -config-file=test/src/unit/.clang-tidy \
+            -config-file=etc/clang_tidy/test_src_unit.yml \
             -extra-arg=-ferror-limit=0 \
             -extra-arg=-w \
             -warnings-as-errors='*' \

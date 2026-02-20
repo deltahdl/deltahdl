@@ -1,0 +1,91 @@
+# ============================================================
+# GOOGLE C++ STYLE GUIDE - ENFORCED BY CLANG-TIDY
+#
+# This codebase is written by an AI coding assistant (Claude).
+# There is no human code review. These rules are the ONLY
+# guardrails ensuring code quality and consistency. If a rule
+# is disabled or weakened, there is NOTHING ELSE stopping bad
+# code from landing in main.
+#
+# RULES FOR THE AI:
+# 1. NEVER disable a check to fix a build.
+#    Fix the CODE, not the config.
+# 2. NEVER add a function/class/variable to an IgnoredRegexp
+#    to bypass naming rules. Rename the code instead.
+# 3. NEVER weaken a threshold (raise limits, remove prefixes,
+#    change Case rules).
+# 4. The ONLY valid exceptions are names mandated by the C++
+#    standard (listed explicitly below with section refs).
+# 5. If you think a rule is wrong, you are wrong. Research
+#    the Google C++ Style Guide before touching this file.
+# ============================================================
+---
+CheckOptions:
+  readability-function-cognitive-complexity.Threshold: 15
+  readability-function-size.LineThreshold: 200
+  readability-function-size.NestingThreshold: 4
+  readability-function-size.ParameterThreshold: 5
+  readability-function-size.StatementThreshold: 50
+  readability-identifier-naming.ClassCase: CamelCase
+  readability-identifier-naming.ClassConstantCase: CamelCase
+  readability-identifier-naming.ClassConstantPrefix: k
+  readability-identifier-naming.ConstantCase: CamelCase
+  readability-identifier-naming.ConstantPrefix: k
+  readability-identifier-naming.ConstexprVariableCase: CamelCase
+  readability-identifier-naming.ConstexprVariablePrefix: k
+  readability-identifier-naming.EnumCase: CamelCase
+  readability-identifier-naming.EnumConstantCase: CamelCase
+  readability-identifier-naming.EnumConstantPrefix: k
+  readability-identifier-naming.FunctionCase: CamelCase
+  # C++ standard: main, coroutine promise/awaitable methods
+  # IEEE 1800-2023 VPI (§36) + DPI (Annex I) C-API functions
+  readability-identifier-naming.FunctionIgnoredRegexp: 'main|get_return_object|initial_suspend|final_suspend|return_void|return_value|unhandled_exception|await_ready|await_suspend|await_resume|vpi_register_systf|vpi_handle_by_name|vpi_iterate|vpi_scan|vpi_get_value|vpi_put_value|vpi_register_cb|vpi_get|vpi_get_str|vpi_free_object|vpi_get_vlog_info|vpi_register_assertion_cb|sv[A-Z].*'
+  readability-identifier-naming.GlobalConstantCase: CamelCase
+  readability-identifier-naming.GlobalConstantPrefix: k
+  readability-identifier-naming.LocalConstantCase: CamelCase
+  readability-identifier-naming.LocalConstantPrefix: k
+  readability-identifier-naming.MethodCase: CamelCase
+  # C++ standard: coroutine promise/awaitable + container concept methods
+  readability-identifier-naming.MethodIgnoredRegexp: 'get_return_object|initial_suspend|final_suspend|return_void|return_value|unhandled_exception|await_ready|await_suspend|await_resume|push_back|begin|end|size|empty|data'
+  readability-identifier-naming.NamespaceCase: lower_case
+  readability-identifier-naming.ParameterCase: lower_case
+  readability-identifier-naming.PrivateMemberCase: lower_case
+  readability-identifier-naming.PrivateMemberSuffix: '_'
+  readability-identifier-naming.ProtectedMemberCase: lower_case
+  readability-identifier-naming.ProtectedMemberSuffix: '_'
+  readability-identifier-naming.PublicMemberCase: lower_case
+  readability-identifier-naming.ScopedEnumConstantCase: CamelCase
+  readability-identifier-naming.ScopedEnumConstantPrefix: k
+  readability-identifier-naming.StaticConstantCase: CamelCase
+  readability-identifier-naming.StaticConstantPrefix: k
+  # C++23 coroutine promise_type [coroutine.handle]
+  # IEEE 1800-2023 Annex I/K/L/M C struct tags (t_vpi_*, s_vpi_*)
+  readability-identifier-naming.StructCase: CamelCase
+  readability-identifier-naming.StructIgnoredRegexp: 'promise_type|t_vpi_.*|s_vpi_.*'
+  readability-identifier-naming.TemplateParameterCase: CamelCase
+  readability-identifier-naming.TypeAliasCase: CamelCase
+  # IEEE 1800-2023 §36 + Annex I/K/L/M: VPI/DPI C-API type aliases
+  readability-identifier-naming.TypeAliasIgnoredRegexp: 'vpiHandle|s_vpi_.*|s_cb_data|SVpi.*|PLI_.*'
+  readability-identifier-naming.TypedefCase: CamelCase
+  # IEEE 1800-2023 Annex I/K/L/M: VPI/DPI C-API typedefs and struct tags
+  readability-identifier-naming.TypedefIgnoredRegexp: 's_vpi_.*|s_cb_data|sv[A-Z].*|t_vpi_.*|p_vpi_.*|vpi_assertion_callback_func'
+  readability-identifier-naming.VariableCase: lower_case
+Checks: >-
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  cppcoreguidelines-avoid-goto,
+  cppcoreguidelines-init-variables,
+  cppcoreguidelines-slicing,
+  misc-redundant-expression,
+  misc-unused-parameters,
+  modernize-use-auto,
+  modernize-use-nullptr,
+  modernize-use-override,
+  performance-*,
+  readability-function-cognitive-complexity,
+  readability-function-size,
+  readability-identifier-naming,
+  readability-redundant-smartptr-get,
+  readability-simplify-boolean-expr
+HeaderFilterRegex: '(src|test)/.*\.h$'
