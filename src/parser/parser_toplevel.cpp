@@ -297,11 +297,25 @@ UdpDecl* Parser::ParseUdpDecl() {
   auto parse_port_decls = [&]() {
     while (!Check(TokenKind::kKwTable) && !Check(TokenKind::kKwInitial) &&
            !AtEnd()) {
+      ParseAttributes();  // consume optional { attribute_instance }
       if (Match(TokenKind::kKwOutput)) {
         if (Match(TokenKind::kKwReg)) {
           udp->is_sequential = true;
         }
         udp->output_name = Expect(TokenKind::kIdentifier).text;
+        // Optional: = constant_expression (port-level initialization)
+        if (Match(TokenKind::kEq)) {
+          udp->has_initial = true;
+          while (!Check(TokenKind::kSemicolon) && !AtEnd()) {
+            auto tok = Consume();
+            if (!tok.text.empty()) {
+              char last = tok.text.back();
+              if (last == '0' || last == '1' || last == 'x' || last == 'X') {
+                udp->initial_value = (last == 'X') ? 'x' : last;
+              }
+            }
+          }
+        }
         Expect(TokenKind::kSemicolon);
       } else if (Match(TokenKind::kKwInput)) {
         udp->input_names.push_back(Expect(TokenKind::kIdentifier).text);
@@ -310,6 +324,7 @@ UdpDecl* Parser::ParseUdpDecl() {
         }
         Expect(TokenKind::kSemicolon);
       } else if (Match(TokenKind::kKwReg)) {
+        udp->is_sequential = true;
         Expect(TokenKind::kIdentifier);
         Expect(TokenKind::kSemicolon);
       } else {
@@ -325,12 +340,26 @@ UdpDecl* Parser::ParseUdpDecl() {
     Expect(TokenKind::kSemicolon);
     parse_port_decls();
   } else if (Check(TokenKind::kKwOutput)) {
-    // ANSI form: (output [reg] name, input in1, ...)
+    // ANSI form: (output [reg] name [= constant_expression], input in1, ...)
     Consume();
     if (Match(TokenKind::kKwReg)) {
       udp->is_sequential = true;
     }
     udp->output_name = Expect(TokenKind::kIdentifier).text;
+    // Optional: = constant_expression (port-level initialization)
+    if (Match(TokenKind::kEq)) {
+      udp->has_initial = true;
+      while (!Check(TokenKind::kComma) && !Check(TokenKind::kRParen) &&
+             !AtEnd()) {
+        auto tok = Consume();
+        if (!tok.text.empty()) {
+          char last = tok.text.back();
+          if (last == '0' || last == '1' || last == 'x' || last == 'X') {
+            udp->initial_value = (last == 'X') ? 'x' : last;
+          }
+        }
+      }
+    }
     while (Match(TokenKind::kComma)) {
       Match(TokenKind::kKwInput);
       udp->input_names.push_back(Expect(TokenKind::kIdentifier).text);
