@@ -63,8 +63,7 @@ void Parser::ParseParenList(std::vector<Expr*>& out) {
   Expect(TokenKind::kRParen);
 }
 
-// A.4.1.1: Parse parameter_value_assignment contents inside #( ... )
-// Handles both ordered and named parameter assignments.
+// NOLINTNEXTLINE(readability-function-size)
 void Parser::ParseParamValueAssignment(
     std::vector<std::pair<std::string_view, Expr*>>& out) {
   Expect(TokenKind::kLParen);

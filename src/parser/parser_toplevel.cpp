@@ -282,7 +282,7 @@ static char UdpCharFromToken(const Token& tok) {
   return '?';
 }
 
-// NOLINTNEXTLINE(readability-function-cognitive-complexity)
+// NOLINTNEXTLINE(readability-function-cognitive-complexity,readability-function-size)
 UdpDecl* Parser::ParseUdpDecl() {
   auto* udp = arena_.Create<UdpDecl>();
   udp->range.start = CurrentLoc();
