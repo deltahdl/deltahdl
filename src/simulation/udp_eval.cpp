@@ -79,6 +79,7 @@ char UdpEvalState::Evaluate(const std::vector<char>& inputs) {
 
 // Match a single row with edge detection. Returns true if matched,
 // and sets has_edge to indicate whether the row had an edge specifier.
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 static bool MatchRowWithEdge(const UdpTableRow& row,
                              const std::vector<char>& new_inputs,
                              uint32_t changed_idx, char prev_value,

@@ -282,6 +282,7 @@ static char UdpCharFromToken(const Token& tok) {
   return '?';
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 UdpDecl* Parser::ParseUdpDecl() {
   auto* udp = arena_.Create<UdpDecl>();
   udp->range.start = CurrentLoc();
@@ -293,7 +294,7 @@ UdpDecl* Parser::ParseUdpDecl() {
   //   Non-ANSI: (id1, id2, ...)  followed by udp_port_declaration entries
   //   Wildcard: (.*)             followed by udp_port_declaration entries
   Expect(TokenKind::kLParen);
-  // Helper lambda: parse udp_port_declaration entries before the table.
+  // NOLINTNEXTLINE(readability-function-cognitive-complexity)
   auto parse_port_decls = [&]() {
     while (!Check(TokenKind::kKwTable) && !Check(TokenKind::kKwInitial) &&
            !AtEnd()) {

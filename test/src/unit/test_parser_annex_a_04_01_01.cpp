@@ -327,6 +327,7 @@ TEST(ParserAnnexA0411, FullCombination) {
 // Elaboration: module instantiation creates hierarchy and binds ports
 // =============================================================================
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 TEST(ParserAnnexA0411, ElaborationModuleInstPortBinding) {
   // Verify that instantiation creates proper child modules in elaboration
   auto r = Parse(
@@ -353,6 +354,7 @@ TEST(ParserAnnexA0411, ElaborationModuleInstPortBinding) {
   EXPECT_TRUE(found_inst);
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 TEST(ParserAnnexA0411, ElaborationParamOverrideOrdered) {
   // Verify ordered parameter overrides are stored correctly
   auto r = Parse(
@@ -375,6 +377,7 @@ TEST(ParserAnnexA0411, ElaborationParamOverrideOrdered) {
   EXPECT_TRUE(found);
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 TEST(ParserAnnexA0411, ElaborationParamOverrideNamed) {
   // Verify named parameter overrides carry the parameter name
   auto r = Parse(
@@ -397,6 +400,7 @@ TEST(ParserAnnexA0411, ElaborationParamOverrideNamed) {
   EXPECT_TRUE(found);
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 TEST(ParserAnnexA0411, ElaborationInstanceArray) {
   // Verify instance array range is preserved in AST
   auto r = Parse(
@@ -421,6 +425,7 @@ TEST(ParserAnnexA0411, ElaborationInstanceArray) {
   EXPECT_TRUE(found);
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 TEST(ParserAnnexA0411, ElaborationWildcardPortConnection) {
   // Verify .* wildcard flag is set in AST
   auto r = Parse(
@@ -444,6 +449,7 @@ TEST(ParserAnnexA0411, ElaborationWildcardPortConnection) {
   EXPECT_TRUE(found);
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 TEST(ParserAnnexA0411, MultipleInstancesSharedParams) {
   // All instances in a multi-instance statement share the same params
   auto r = Parse(

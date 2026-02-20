@@ -416,6 +416,7 @@ jobs:
             | awk "NR % 3 == ${{ matrix.shard }}" \
             | xargs -n1 basename \
             | sed 's/\./\\./g' \
+            | sed 's|^|/|' \
             | paste -sd'|')
           run-clang-tidy-18 -p build \
             -j "$(nproc)" \
@@ -474,6 +475,7 @@ jobs:
             | awk "NR % 13 == ${{ matrix.shard }}" \
             | xargs -n1 basename \
             | sed 's/\./\\./g' \
+            | sed 's|^|/|' \
             | paste -sd'|')
           run-clang-tidy-18 -p build \
             -j "$(nproc)" \

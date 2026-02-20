@@ -517,6 +517,7 @@ TEST(ParserAnnexA042, NestedForInsideFor) {
 
 // --- generate_region with mixed constructs ---
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 TEST(ParserAnnexA042, GenerateRegionMixedConstructs) {
   auto r = Parse(
       "module m;\n"
