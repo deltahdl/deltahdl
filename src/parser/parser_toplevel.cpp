@@ -282,84 +282,119 @@ static char UdpCharFromToken(const Token& tok) {
   return '?';
 }
 
-// NOLINTNEXTLINE(readability-function-cognitive-complexity,readability-function-size)
+char Parser::ParseUdpInitialValue(TokenKind stop1, TokenKind stop2) {
+  char result = '0';
+  while (!Check(stop1) && !Check(stop2) && !AtEnd()) {
+    auto tok = Consume();
+    if (!tok.text.empty()) {
+      char last = tok.text.back();
+      if (last == '0' || last == '1' || last == 'x' || last == 'X') {
+        result = (last == 'X') ? 'x' : last;
+      }
+    }
+  }
+  return result;
+}
+
+void Parser::ParseUdpOutputDecl(UdpDecl* udp) {
+  if (Match(TokenKind::kKwReg)) {
+    udp->is_sequential = true;
+  }
+  udp->output_name = Expect(TokenKind::kIdentifier).text;
+  if (Match(TokenKind::kEq)) {
+    udp->has_initial = true;
+    udp->initial_value =
+        ParseUdpInitialValue(TokenKind::kSemicolon, TokenKind::kSemicolon);
+  }
+  Expect(TokenKind::kSemicolon);
+}
+
+void Parser::ParseUdpPortDecls(UdpDecl* udp) {
+  while (!Check(TokenKind::kKwTable) && !Check(TokenKind::kKwInitial) &&
+         !AtEnd()) {
+    ParseAttributes();
+    if (Match(TokenKind::kKwOutput)) {
+      ParseUdpOutputDecl(udp);
+    } else if (Match(TokenKind::kKwInput)) {
+      udp->input_names.push_back(Expect(TokenKind::kIdentifier).text);
+      while (Match(TokenKind::kComma)) {
+        udp->input_names.push_back(Expect(TokenKind::kIdentifier).text);
+      }
+      Expect(TokenKind::kSemicolon);
+    } else if (Match(TokenKind::kKwReg)) {
+      udp->is_sequential = true;
+      Expect(TokenKind::kIdentifier);
+      Expect(TokenKind::kSemicolon);
+    } else {
+      break;
+    }
+  }
+}
+
+void Parser::ParseUdpTableRow(UdpDecl* udp) {
+  UdpTableRow row;
+  while (!Check(TokenKind::kColon) && !AtEnd()) {
+    if (Check(TokenKind::kLParen)) {
+      Consume();
+      Token tok = Consume();
+      char from = 0, to = 0;
+      if (tok.text.size() >= 2) {
+        from = tok.text[0];
+        to = tok.text[1];
+      } else {
+        from = UdpCharFromToken(tok);
+        to = UdpCharFromToken(Consume());
+      }
+      Expect(TokenKind::kRParen);
+      while (row.paren_edges.size() < row.inputs.size()) {
+        row.paren_edges.push_back({0, 0});
+      }
+      row.inputs.push_back('\x01');
+      row.paren_edges.push_back({from, to});
+    } else {
+      row.inputs.push_back(UdpCharFromToken(Consume()));
+    }
+  }
+  Expect(TokenKind::kColon);
+  if (udp->is_sequential) {
+    row.current_state = UdpCharFromToken(Consume());
+    Expect(TokenKind::kColon);
+  }
+  row.output = UdpCharFromToken(Consume());
+  Expect(TokenKind::kSemicolon);
+  udp->table.push_back(row);
+}
+
+void Parser::ParseUdpTable(UdpDecl* udp) {
+  Expect(TokenKind::kKwTable);
+  while (!Check(TokenKind::kKwEndtable) && !AtEnd()) {
+    ParseUdpTableRow(udp);
+  }
+  Expect(TokenKind::kKwEndtable);
+}
+
 UdpDecl* Parser::ParseUdpDecl() {
   auto* udp = arena_.Create<UdpDecl>();
   udp->range.start = CurrentLoc();
   Expect(TokenKind::kKwPrimitive);
   udp->name = Expect(TokenKind::kIdentifier).text;
 
-  // Port list — three forms:
-  //   ANSI:     (output [reg] name, input in1, ...)
-  //   Non-ANSI: (id1, id2, ...)  followed by udp_port_declaration entries
-  //   Wildcard: (.*)             followed by udp_port_declaration entries
   Expect(TokenKind::kLParen);
-  // NOLINTNEXTLINE(readability-function-cognitive-complexity)
-  auto parse_port_decls = [&]() {
-    while (!Check(TokenKind::kKwTable) && !Check(TokenKind::kKwInitial) &&
-           !AtEnd()) {
-      ParseAttributes();  // consume optional { attribute_instance }
-      if (Match(TokenKind::kKwOutput)) {
-        if (Match(TokenKind::kKwReg)) {
-          udp->is_sequential = true;
-        }
-        udp->output_name = Expect(TokenKind::kIdentifier).text;
-        // Optional: = constant_expression (port-level initialization)
-        if (Match(TokenKind::kEq)) {
-          udp->has_initial = true;
-          while (!Check(TokenKind::kSemicolon) && !AtEnd()) {
-            auto tok = Consume();
-            if (!tok.text.empty()) {
-              char last = tok.text.back();
-              if (last == '0' || last == '1' || last == 'x' || last == 'X') {
-                udp->initial_value = (last == 'X') ? 'x' : last;
-              }
-            }
-          }
-        }
-        Expect(TokenKind::kSemicolon);
-      } else if (Match(TokenKind::kKwInput)) {
-        udp->input_names.push_back(Expect(TokenKind::kIdentifier).text);
-        while (Match(TokenKind::kComma)) {
-          udp->input_names.push_back(Expect(TokenKind::kIdentifier).text);
-        }
-        Expect(TokenKind::kSemicolon);
-      } else if (Match(TokenKind::kKwReg)) {
-        udp->is_sequential = true;
-        Expect(TokenKind::kIdentifier);
-        Expect(TokenKind::kSemicolon);
-      } else {
-        break;
-      }
-    }
-  };
-
   if (Check(TokenKind::kDotStar)) {
-    // Wildcard port form: ( .* )
     Consume();
     Expect(TokenKind::kRParen);
     Expect(TokenKind::kSemicolon);
-    parse_port_decls();
+    ParseUdpPortDecls(udp);
   } else if (Check(TokenKind::kKwOutput)) {
-    // ANSI form: (output [reg] name [= constant_expression], input in1, ...)
     Consume();
     if (Match(TokenKind::kKwReg)) {
       udp->is_sequential = true;
     }
     udp->output_name = Expect(TokenKind::kIdentifier).text;
-    // Optional: = constant_expression (port-level initialization)
     if (Match(TokenKind::kEq)) {
       udp->has_initial = true;
-      while (!Check(TokenKind::kComma) && !Check(TokenKind::kRParen) &&
-             !AtEnd()) {
-        auto tok = Consume();
-        if (!tok.text.empty()) {
-          char last = tok.text.back();
-          if (last == '0' || last == '1' || last == 'x' || last == 'X') {
-            udp->initial_value = (last == 'X') ? 'x' : last;
-          }
-        }
-      }
+      udp->initial_value =
+          ParseUdpInitialValue(TokenKind::kComma, TokenKind::kRParen);
     }
     while (Match(TokenKind::kComma)) {
       Match(TokenKind::kKwInput);
@@ -368,80 +403,26 @@ UdpDecl* Parser::ParseUdpDecl() {
     Expect(TokenKind::kRParen);
     Expect(TokenKind::kSemicolon);
   } else {
-    // Non-ANSI form: (id1, id2, ...) followed by port declarations
-    Expect(TokenKind::kIdentifier);  // first port (ignored — resolved by decls)
+    Expect(TokenKind::kIdentifier);
     while (Match(TokenKind::kComma)) {
       Expect(TokenKind::kIdentifier);
     }
     Expect(TokenKind::kRParen);
     Expect(TokenKind::kSemicolon);
-    parse_port_decls();
+    ParseUdpPortDecls(udp);
   }
 
-  // Optional initial statement for sequential UDPs (§29.7).
-  // init_val ::= 1'b0 | 1'b1 | 1'bx | 1'bX | 1'B0 | 1'B1 | 1'Bx | 1'BX | 1 | 0
   if (Match(TokenKind::kKwInitial)) {
     udp->has_initial = true;
-    Expect(TokenKind::kIdentifier);  // output reg name
+    Expect(TokenKind::kIdentifier);
     Expect(TokenKind::kEq);
-    // Consume all tokens until semicolon; use last character of the final
-    // token as the init value (handles both bare 0/1 and sized 1'b0 forms).
-    while (!Check(TokenKind::kSemicolon) && !AtEnd()) {
-      auto tok = Consume();
-      if (!tok.text.empty()) {
-        char last = tok.text.back();
-        if (last == '0' || last == '1' || last == 'x' || last == 'X') {
-          udp->initial_value = (last == 'X') ? 'x' : last;
-        }
-      }
-    }
+    udp->initial_value =
+        ParseUdpInitialValue(TokenKind::kSemicolon, TokenKind::kSemicolon);
     Expect(TokenKind::kSemicolon);
   }
 
-  // Table block.
-  Expect(TokenKind::kKwTable);
-  while (!Check(TokenKind::kKwEndtable) && !AtEnd()) {
-    UdpTableRow row;
-    // Read input entries until ':'.
-    // Handle parenthesized edge indicators: ( level_symbol level_symbol )
-    while (!Check(TokenKind::kColon) && !AtEnd()) {
-      if (Check(TokenKind::kLParen)) {
-        Consume();  // eat '('
-        // The two level symbols may be in one token (e.g. "01", "x1")
-        // or in two separate tokens (e.g. "0" "x").
-        Token tok = Consume();
-        char from = 0, to = 0;
-        if (tok.text.size() >= 2) {
-          from = tok.text[0];
-          to = tok.text[1];
-        } else {
-          from = UdpCharFromToken(tok);
-          to = UdpCharFromToken(Consume());
-        }
-        Expect(TokenKind::kRParen);
-        // Pad paren_edges to match inputs size so far.
-        while (row.paren_edges.size() < row.inputs.size()) {
-          row.paren_edges.push_back({0, 0});
-        }
-        row.inputs.push_back('\x01');
-        row.paren_edges.push_back({from, to});
-      } else {
-        row.inputs.push_back(UdpCharFromToken(Consume()));
-      }
-    }
-    Expect(TokenKind::kColon);
-    if (udp->is_sequential) {
-      // Sequential: inputs : current_state : output
-      row.current_state = UdpCharFromToken(Consume());
-      Expect(TokenKind::kColon);
-    }
-    row.output = UdpCharFromToken(Consume());
-    Expect(TokenKind::kSemicolon);
-    udp->table.push_back(row);
-  }
-  Expect(TokenKind::kKwEndtable);
+  ParseUdpTable(udp);
   Expect(TokenKind::kKwEndprimitive);
-  // Optional end label: endprimitive : udp_identifier
   if (Match(TokenKind::kColon)) {
     Expect(TokenKind::kIdentifier);
   }

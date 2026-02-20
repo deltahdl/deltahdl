@@ -63,30 +63,37 @@ void Parser::ParseParenList(std::vector<Expr*>& out) {
   Expect(TokenKind::kRParen);
 }
 
-// NOLINTNEXTLINE(readability-function-size)
+void Parser::ParseNamedParamValues(
+    std::vector<std::pair<std::string_view, Expr*>>& out) {
+  do {
+    Expect(TokenKind::kDot);
+    auto name = Expect(TokenKind::kIdentifier);
+    Expect(TokenKind::kLParen);
+    Expr* expr = nullptr;
+    if (!Check(TokenKind::kRParen)) {
+      expr = ParseExpr();
+    }
+    Expect(TokenKind::kRParen);
+    out.push_back({name.text, expr});
+  } while (Match(TokenKind::kComma));
+}
+
+void Parser::ParseOrderedParamValues(
+    std::vector<std::pair<std::string_view, Expr*>>& out) {
+  out.push_back({{}, ParseExpr()});
+  while (Match(TokenKind::kComma)) {
+    out.push_back({{}, ParseExpr()});
+  }
+}
+
 void Parser::ParseParamValueAssignment(
     std::vector<std::pair<std::string_view, Expr*>>& out) {
   Expect(TokenKind::kLParen);
   if (!Check(TokenKind::kRParen)) {
     if (Check(TokenKind::kDot)) {
-      // Named parameter assignments: .name(expr) { , .name(expr) }
-      do {
-        Expect(TokenKind::kDot);
-        auto name = Expect(TokenKind::kIdentifier);
-        Expect(TokenKind::kLParen);
-        Expr* expr = nullptr;
-        if (!Check(TokenKind::kRParen)) {
-          expr = ParseExpr();
-        }
-        Expect(TokenKind::kRParen);
-        out.push_back({name.text, expr});
-      } while (Match(TokenKind::kComma));
+      ParseNamedParamValues(out);
     } else {
-      // Ordered parameter assignments: expr { , expr }
-      out.push_back({{}, ParseExpr()});
-      while (Match(TokenKind::kComma)) {
-        out.push_back({{}, ParseExpr()});
-      }
+      ParseOrderedParamValues(out);
     }
   }
   Expect(TokenKind::kRParen);

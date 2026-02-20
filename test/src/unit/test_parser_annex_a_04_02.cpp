@@ -49,6 +49,14 @@ RtlirDesign* Elaborate(const std::string& src, ElabFixture& f,
   return elab.Elaborate(name);
 }
 
+bool HasItemOfKind(const std::vector<ModuleItem*>& items,
+                   ModuleItemKind kind) {
+  for (auto* item : items) {
+    if (item->kind == kind) return true;
+  }
+  return false;
+}
+
 }  // namespace
 
 // =============================================================================
@@ -517,7 +525,6 @@ TEST(ParserAnnexA042, NestedForInsideFor) {
 
 // --- generate_region with mixed constructs ---
 
-// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 TEST(ParserAnnexA042, GenerateRegionMixedConstructs) {
   auto r = Parse(
       "module m;\n"
@@ -536,15 +543,9 @@ TEST(ParserAnnexA042, GenerateRegionMixedConstructs) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* mod = r.cu->modules[0];
-  bool found_for = false, found_if = false, found_case = false;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kGenerateFor) found_for = true;
-    if (item->kind == ModuleItemKind::kGenerateIf) found_if = true;
-    if (item->kind == ModuleItemKind::kGenerateCase) found_case = true;
-  }
-  EXPECT_TRUE(found_for);
-  EXPECT_TRUE(found_if);
-  EXPECT_TRUE(found_case);
+  EXPECT_TRUE(HasItemOfKind(mod->items, ModuleItemKind::kGenerateFor));
+  EXPECT_TRUE(HasItemOfKind(mod->items, ModuleItemKind::kGenerateIf));
+  EXPECT_TRUE(HasItemOfKind(mod->items, ModuleItemKind::kGenerateCase));
 }
 
 // =============================================================================

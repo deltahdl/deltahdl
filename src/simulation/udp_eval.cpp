@@ -77,9 +77,13 @@ char UdpEvalState::Evaluate(const std::vector<char>& inputs) {
   return output_;
 }
 
-// Match a single row with edge detection. Returns true if matched,
-// and sets has_edge to indicate whether the row had an edge specifier.
-// NOLINTNEXTLINE(readability-function-cognitive-complexity)
+static bool MatchParenEdge(const UdpTableRow& row, size_t i,
+                           char prev_value, char new_value) {
+  if (i >= row.paren_edges.size()) return false;
+  auto [from, to] = row.paren_edges[i];
+  return MatchLevel(from, prev_value) && MatchLevel(to, new_value);
+}
+
 static bool MatchRowWithEdge(const UdpTableRow& row,
                              const std::vector<char>& new_inputs,
                              uint32_t changed_idx, char prev_value,
@@ -95,14 +99,7 @@ static bool MatchRowWithEdge(const UdpTableRow& row,
     has_edge = true;
     if (i != changed_idx) return false;
     if (sym == '\x01') {
-      // Parenthesized edge indicator: match from/to pair.
-      if (i < row.paren_edges.size()) {
-        auto [from, to] = row.paren_edges[i];
-        if (!MatchLevel(from, prev_value) || !MatchLevel(to, new_inputs[i]))
-          return false;
-      } else {
-        return false;
-      }
+      if (!MatchParenEdge(row, i, prev_value, new_inputs[i])) return false;
     } else if (!MatchEdge(sym, prev_value, new_inputs[i])) {
       return false;
     }

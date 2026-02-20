@@ -30,6 +30,13 @@ ParseResult Parse(const std::string& src) {
   return result;
 }
 
+ModuleItem* FindModuleInst(const std::vector<ModuleItem*>& items) {
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kModuleInst) return item;
+  }
+  return nullptr;
+}
+
 }  // namespace
 
 // =============================================================================
@@ -327,9 +334,7 @@ TEST(ParserAnnexA0411, FullCombination) {
 // Elaboration: module instantiation creates hierarchy and binds ports
 // =============================================================================
 
-// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 TEST(ParserAnnexA0411, ElaborationModuleInstPortBinding) {
-  // Verify that instantiation creates proper child modules in elaboration
   auto r = Parse(
       "module child(input a, output b);\n"
       "  assign b = a;\n"
@@ -340,23 +345,15 @@ TEST(ParserAnnexA0411, ElaborationModuleInstPortBinding) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  // Verify AST structure
   ASSERT_GE(r.cu->modules.size(), 2u);
-  bool found_inst = false;
-  for (auto* item : r.cu->modules[1]->items) {
-    if (item->kind == ModuleItemKind::kModuleInst) {
-      found_inst = true;
-      EXPECT_EQ(item->inst_module, "child");
-      EXPECT_EQ(item->inst_name, "u0");
-      EXPECT_EQ(item->inst_ports.size(), 2u);
-    }
-  }
-  EXPECT_TRUE(found_inst);
+  auto* inst = FindModuleInst(r.cu->modules[1]->items);
+  ASSERT_NE(inst, nullptr);
+  EXPECT_EQ(inst->inst_module, "child");
+  EXPECT_EQ(inst->inst_name, "u0");
+  EXPECT_EQ(inst->inst_ports.size(), 2u);
 }
 
-// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 TEST(ParserAnnexA0411, ElaborationParamOverrideOrdered) {
-  // Verify ordered parameter overrides are stored correctly
   auto r = Parse(
       "module sub #(parameter W = 1)(input [W-1:0] d);\n"
       "endmodule\n"
@@ -365,21 +362,14 @@ TEST(ParserAnnexA0411, ElaborationParamOverrideOrdered) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  bool found = false;
-  for (auto* item : r.cu->modules[1]->items) {
-    if (item->kind == ModuleItemKind::kModuleInst) {
-      found = true;
-      EXPECT_EQ(item->inst_params.size(), 1u);
-      EXPECT_EQ(item->inst_params[0].first, "");
-      EXPECT_NE(item->inst_params[0].second, nullptr);
-    }
-  }
-  EXPECT_TRUE(found);
+  auto* inst = FindModuleInst(r.cu->modules[1]->items);
+  ASSERT_NE(inst, nullptr);
+  EXPECT_EQ(inst->inst_params.size(), 1u);
+  EXPECT_EQ(inst->inst_params[0].first, "");
+  EXPECT_NE(inst->inst_params[0].second, nullptr);
 }
 
-// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 TEST(ParserAnnexA0411, ElaborationParamOverrideNamed) {
-  // Verify named parameter overrides carry the parameter name
   auto r = Parse(
       "module sub #(parameter W = 1)(input [W-1:0] d);\n"
       "endmodule\n"
@@ -388,21 +378,14 @@ TEST(ParserAnnexA0411, ElaborationParamOverrideNamed) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  bool found = false;
-  for (auto* item : r.cu->modules[1]->items) {
-    if (item->kind == ModuleItemKind::kModuleInst) {
-      found = true;
-      EXPECT_EQ(item->inst_params.size(), 1u);
-      EXPECT_EQ(item->inst_params[0].first, "W");
-      EXPECT_NE(item->inst_params[0].second, nullptr);
-    }
-  }
-  EXPECT_TRUE(found);
+  auto* inst = FindModuleInst(r.cu->modules[1]->items);
+  ASSERT_NE(inst, nullptr);
+  EXPECT_EQ(inst->inst_params.size(), 1u);
+  EXPECT_EQ(inst->inst_params[0].first, "W");
+  EXPECT_NE(inst->inst_params[0].second, nullptr);
 }
 
-// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 TEST(ParserAnnexA0411, ElaborationInstanceArray) {
-  // Verify instance array range is preserved in AST
   auto r = Parse(
       "module sub(input a, output b);\n"
       "  assign b = a;\n"
@@ -413,21 +396,14 @@ TEST(ParserAnnexA0411, ElaborationInstanceArray) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  bool found = false;
-  for (auto* item : r.cu->modules[1]->items) {
-    if (item->kind == ModuleItemKind::kModuleInst) {
-      found = true;
-      EXPECT_EQ(item->inst_name, "u0");
-      EXPECT_NE(item->inst_range_left, nullptr);
-      EXPECT_NE(item->inst_range_right, nullptr);
-    }
-  }
-  EXPECT_TRUE(found);
+  auto* inst = FindModuleInst(r.cu->modules[1]->items);
+  ASSERT_NE(inst, nullptr);
+  EXPECT_EQ(inst->inst_name, "u0");
+  EXPECT_NE(inst->inst_range_left, nullptr);
+  EXPECT_NE(inst->inst_range_right, nullptr);
 }
 
-// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 TEST(ParserAnnexA0411, ElaborationWildcardPortConnection) {
-  // Verify .* wildcard flag is set in AST
   auto r = Parse(
       "module sub(input a, output b);\n"
       "  assign b = a;\n"
@@ -438,20 +414,13 @@ TEST(ParserAnnexA0411, ElaborationWildcardPortConnection) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  bool found = false;
-  for (auto* item : r.cu->modules[1]->items) {
-    if (item->kind == ModuleItemKind::kModuleInst) {
-      found = true;
-      EXPECT_TRUE(item->inst_wildcard);
-      EXPECT_EQ(item->inst_ports.size(), 0u);
-    }
-  }
-  EXPECT_TRUE(found);
+  auto* inst = FindModuleInst(r.cu->modules[1]->items);
+  ASSERT_NE(inst, nullptr);
+  EXPECT_TRUE(inst->inst_wildcard);
+  EXPECT_EQ(inst->inst_ports.size(), 0u);
 }
 
-// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 TEST(ParserAnnexA0411, MultipleInstancesSharedParams) {
-  // All instances in a multi-instance statement share the same params
   auto r = Parse(
       "module sub #(parameter W = 1)(input [W-1:0] d);\n"
       "endmodule\n"
@@ -460,14 +429,13 @@ TEST(ParserAnnexA0411, MultipleInstancesSharedParams) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  int inst_count = 0;
-  for (auto* item : r.cu->modules[1]->items) {
-    if (item->kind == ModuleItemKind::kModuleInst) {
-      inst_count++;
-      EXPECT_EQ(item->inst_module, "sub");
-      EXPECT_EQ(item->inst_params.size(), 1u);
-      EXPECT_EQ(item->inst_params[0].first, "W");
-    }
-  }
-  EXPECT_EQ(inst_count, 2);
+  ASSERT_GE(r.cu->modules[1]->items.size(), 2u);
+  auto* i0 = r.cu->modules[1]->items[0];
+  auto* i1 = r.cu->modules[1]->items[1];
+  EXPECT_EQ(i0->inst_module, "sub");
+  EXPECT_EQ(i0->inst_params.size(), 1u);
+  EXPECT_EQ(i0->inst_params[0].first, "W");
+  EXPECT_EQ(i1->inst_module, "sub");
+  EXPECT_EQ(i1->inst_params.size(), 1u);
+  EXPECT_EQ(i1->inst_params[0].first, "W");
 }

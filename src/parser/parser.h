@@ -101,6 +101,11 @@ class Parser {
   // User-defined primitives (parser_toplevel.cpp)
   UdpDecl* ParseUdpDecl();
   UdpDecl* ParseExternUdpDecl();
+  char ParseUdpInitialValue(TokenKind stop1, TokenKind stop2);
+  void ParseUdpOutputDecl(UdpDecl* udp);
+  void ParseUdpPortDecls(UdpDecl* udp);
+  void ParseUdpTable(UdpDecl* udp);
+  void ParseUdpTableRow(UdpDecl* udp);
 
   // Verification constructs (parser_verify.cpp — §17/§18/§19)
   ModuleDecl* ParseCheckerDecl();
@@ -180,6 +185,10 @@ class Parser {
   ModuleItem* ParseModuleInstList(const Token& module_tok,
                                   std::vector<ModuleItem*>* extra_items);
   void ParseParamValueAssignment(
+      std::vector<std::pair<std::string_view, Expr*>>& out);
+  void ParseNamedParamValues(
+      std::vector<std::pair<std::string_view, Expr*>>& out);
+  void ParseOrderedParamValues(
       std::vector<std::pair<std::string_view, Expr*>>& out);
   void ParsePortConnection(ModuleItem* item);
   void ParseUnpackedDims(std::vector<Expr*>& dims);
