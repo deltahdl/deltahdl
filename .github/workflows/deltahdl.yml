@@ -375,9 +375,6 @@ jobs:
       CTCACHE_DIR: ${{ github.workspace }}/.ctcache
     needs: static-analysis
     runs-on: ubuntu-24.04
-    strategy:
-      matrix:
-        shard: [0, 1, 2]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -403,7 +400,6 @@ jobs:
             inputs.sha }}
           path: .ctcache
           restore-keys: |
-            ctcache-src-${{ matrix.shard }}-${{ hashFiles('.clang-tidy') }}-
             ctcache-src-${{ matrix.shard }}-
       - name: Generate compile_commands.json
         run: |
@@ -428,14 +424,14 @@ jobs:
             -extra-arg=-w \
             -warnings-as-errors='*' \
             "($regex)"
+    strategy:
+      matrix:
+        shard: [0, 1, 2]
   clang-tidy-test:
     env:
       CTCACHE_DIR: ${{ github.workspace }}/.ctcache
     needs: static-analysis
     runs-on: ubuntu-24.04
-    strategy:
-      matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -461,7 +457,6 @@ jobs:
             inputs.sha }}
           path: .ctcache
           restore-keys: |
-            ctcache-test-${{ matrix.shard }}-${{ hashFiles('test/src/unit/.clang-tidy') }}-
             ctcache-test-${{ matrix.shard }}-
       - name: Generate compile_commands.json
         run: |
@@ -485,6 +480,9 @@ jobs:
             -extra-arg=-w \
             -warnings-as-errors='*' \
             "($regex)"
+    strategy:
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
   e2e-test-asan-ubsan:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
