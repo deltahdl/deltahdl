@@ -770,8 +770,8 @@ struct UdpTableRow {
   // Same size as inputs when any paren edges exist; empty otherwise.
   // paren_edges[i] = {from, to} for '\x01' entries; {0, 0} otherwise.
   std::vector<std::pair<char, char>> paren_edges;
-  char current_state = 0;    // For sequential UDPs (0 if combinational)
-  char output = '0';         // '0','1','x','-'
+  char current_state = 0;  // For sequential UDPs (0 if combinational)
+  char output = '0';       // '0','1','x','-'
 };
 
 struct UdpDecl {

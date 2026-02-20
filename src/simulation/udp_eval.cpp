@@ -97,8 +97,7 @@ static bool MatchRowWithEdge(const UdpTableRow& row,
       // Parenthesized edge indicator: match from/to pair.
       if (i < row.paren_edges.size()) {
         auto [from, to] = row.paren_edges[i];
-        if (!MatchLevel(from, prev_value) ||
-            !MatchLevel(to, new_inputs[i]))
+        if (!MatchLevel(from, prev_value) || !MatchLevel(to, new_inputs[i]))
           return false;
       } else {
         return false;
