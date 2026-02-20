@@ -484,8 +484,9 @@ jobs:
             "($regex)"
     strategy:
       matrix:
-        shard: ['00', '01', '02', '03', '04', '05', '06',
-          '07', '08', '09', '10', '11', '12']
+        shard: ['00', '01', '02', '03', '04', '05',
+                '06', '07', '08', '09', '10', '11',
+                '12']
   e2e-test-asan-ubsan:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
