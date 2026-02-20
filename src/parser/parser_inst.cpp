@@ -178,42 +178,54 @@ static bool IsDriveStrengthToken(TokenKind k) {
   }
 }
 
-ModuleItem* Parser::ParseContinuousAssign() {
-  auto* item = arena_.Create<ModuleItem>();
-  item->kind = ModuleItemKind::kContAssign;
-  item->loc = CurrentLoc();
+void Parser::ParseContinuousAssign(std::vector<ModuleItem*>& items) {
+  auto loc = CurrentLoc();
   Expect(TokenKind::kKwAssign);
   // §10.3.4: Optional drive strength: assign (strong0, weak1) ...
+  uint8_t ds0 = 0, ds1 = 0;
   if (Check(TokenKind::kLParen)) {
     auto saved = lexer_.SavePos();
     Consume();  // '('
     if (IsDriveStrengthToken(CurrentToken().kind)) {
-      ParseDriveStrength(item->drive_strength0, item->drive_strength1);
+      ParseDriveStrength(ds0, ds1);
       Expect(TokenKind::kRParen);
     } else {
       lexer_.RestorePos(saved);
     }
   }
   // Optional delay3: assign #(rise, fall, decay) or assign #delay (§10.3.3)
+  Expr* delay = nullptr;
+  Expr* delay_fall = nullptr;
+  Expr* delay_decay = nullptr;
   if (Check(TokenKind::kHash)) {
     Consume();
     if (Match(TokenKind::kLParen)) {
-      item->assign_delay = ParseMinTypMaxExpr();
+      delay = ParseMinTypMaxExpr();
       if (Match(TokenKind::kComma)) {
-        item->assign_delay_fall = ParseMinTypMaxExpr();
-        if (Match(TokenKind::kComma))
-          item->assign_delay_decay = ParseMinTypMaxExpr();
+        delay_fall = ParseMinTypMaxExpr();
+        if (Match(TokenKind::kComma)) delay_decay = ParseMinTypMaxExpr();
       }
       Expect(TokenKind::kRParen);
     } else {
-      item->assign_delay = ParsePrimaryExpr();
+      delay = ParsePrimaryExpr();
     }
   }
-  item->assign_lhs = ParseExpr();
-  Expect(TokenKind::kEq);
-  item->assign_rhs = ParseExpr();
+  // A.6.1: list_of_net_assignments ::= net_assignment { , net_assignment }
+  do {
+    auto* item = arena_.Create<ModuleItem>();
+    item->kind = ModuleItemKind::kContAssign;
+    item->loc = loc;
+    item->drive_strength0 = ds0;
+    item->drive_strength1 = ds1;
+    item->assign_delay = delay;
+    item->assign_delay_fall = delay_fall;
+    item->assign_delay_decay = delay_decay;
+    item->assign_lhs = ParseExpr();
+    Expect(TokenKind::kEq);
+    item->assign_rhs = ParseExpr();
+    items.push_back(item);
+  } while (Match(TokenKind::kComma));
   Expect(TokenKind::kSemicolon);
-  return item;
 }
 
 ModuleItem* Parser::ParseAlias() {

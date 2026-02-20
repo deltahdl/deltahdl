@@ -89,6 +89,15 @@ struct RtlirContAssign {
   uint32_t width = 0;
   uint8_t drive_strength0 = 0;  // §10.3.4: 0=none,1=highz,...,5=supply
   uint8_t drive_strength1 = 0;
+  Expr* delay = nullptr;        // §10.3.3: rise delay (or single delay)
+  Expr* delay_fall = nullptr;   // §10.3.3: fall delay
+  Expr* delay_decay = nullptr;  // §10.3.3: turn-off delay
+};
+
+// --- Net alias (§10.11) ---
+
+struct RtlirAlias {
+  std::vector<Expr*> nets;
 };
 
 // --- Process block ---
@@ -143,6 +152,7 @@ struct RtlirModule {
   std::vector<RtlirNet> nets;
   std::vector<RtlirVariable> variables;
   std::vector<RtlirContAssign> assigns;
+  std::vector<RtlirAlias> aliases;
   std::vector<RtlirProcess> processes;
   std::vector<RtlirModuleInst> children;
   std::vector<RtlirParamDecl> params;

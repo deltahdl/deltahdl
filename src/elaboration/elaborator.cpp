@@ -592,6 +592,9 @@ void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
   ca.width = LookupLhsWidth(ca.lhs, mod);
   ca.drive_strength0 = item->drive_strength0;
   ca.drive_strength1 = item->drive_strength1;
+  ca.delay = item->assign_delay;
+  ca.delay_fall = item->assign_delay_fall;
+  ca.delay_decay = item->assign_delay_decay;
   mod->assigns.push_back(ca);
 }
 
@@ -679,10 +682,15 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       specparam_names_.insert(item->name);
       ElaborateSpecparam(item, mod);
       break;
+    case ModuleItemKind::kAlias: {
+      RtlirAlias alias;
+      alias.nets = item->alias_nets;
+      mod->aliases.push_back(alias);
+      break;
+    }
     case ModuleItemKind::kDefparam:
     case ModuleItemKind::kImportDecl:
     case ModuleItemKind::kExportDecl:
-    case ModuleItemKind::kAlias:
     case ModuleItemKind::kPropertyDecl:
     case ModuleItemKind::kSequenceDecl:
     case ModuleItemKind::kAssertProperty:

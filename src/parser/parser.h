@@ -172,7 +172,7 @@ class Parser {
   void ParseDriveStrength(uint8_t& s0, uint8_t& s1);
   void ParseNetStrength(DataType& dtype);
   void ParseVarDeclList(std::vector<ModuleItem*>& items, const DataType& dtype);
-  ModuleItem* ParseContinuousAssign();
+  void ParseContinuousAssign(std::vector<ModuleItem*>& items);
   ModuleItem* ParseAlias();
   void ParseParamDecl(std::vector<ModuleItem*>& items);
   void ParseTypeParamDecl(std::vector<ModuleItem*>& items, SourceLoc loc);

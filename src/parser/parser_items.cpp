@@ -132,7 +132,7 @@ bool Parser::TryParseDeclKeywordItem(std::vector<ModuleItem*>& items) {
 
 bool Parser::TryParseMiscKeywordItem(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kKwAssign)) {
-    items.push_back(ParseContinuousAssign());
+    ParseContinuousAssign(items);
     return true;
   }
   if (TryParseProcessBlock(items)) return true;
