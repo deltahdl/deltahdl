@@ -39,7 +39,7 @@ struct ElabFixture {
 };
 
 RtlirDesign* Elaborate(const std::string& src, ElabFixture& f,
-                        std::string_view top = "") {
+                       std::string_view top = "") {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);

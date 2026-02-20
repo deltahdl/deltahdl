@@ -142,8 +142,7 @@ TEST(ParserAnnexA051, EndLabel) {
 // --- udp_declaration: extern udp_ansi_declaration ---
 
 TEST(ParserAnnexA051, ExternAnsi) {
-  auto r = Parse(
-      "extern primitive inv(output out, input in);\n");
+  auto r = Parse("extern primitive inv(output out, input in);\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);
@@ -158,8 +157,7 @@ TEST(ParserAnnexA051, ExternAnsi) {
 // --- udp_declaration: extern udp_nonansi_declaration ---
 
 TEST(ParserAnnexA051, ExternNonAnsi) {
-  auto r = Parse(
-      "extern primitive inv(out, in);\n");
+  auto r = Parse("extern primitive inv(out, in);\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);
@@ -174,8 +172,7 @@ TEST(ParserAnnexA051, ExternNonAnsi) {
 // --- udp_declaration: extern with sequential ANSI ports ---
 
 TEST(ParserAnnexA051, ExternAnsiSequential) {
-  auto r = Parse(
-      "extern primitive dff(output reg q, input d, input clk);\n");
+  auto r = Parse("extern primitive dff(output reg q, input d, input clk);\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);

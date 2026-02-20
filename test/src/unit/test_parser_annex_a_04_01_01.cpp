@@ -93,7 +93,8 @@ TEST(ParserAnnexA0411, MultipleInstancesWithParams) {
 //   ordered_parameter_assignment { , ordered_parameter_assignment }
 //   | named_parameter_assignment { , named_parameter_assignment }
 // ordered_parameter_assignment ::= param_expression
-// named_parameter_assignment ::= . parameter_identifier ( [ param_expression ] )
+// named_parameter_assignment ::= . parameter_identifier ( [ param_expression ]
+// )
 // =============================================================================
 
 TEST(ParserAnnexA0411, EmptyParameterValueAssignment) {
@@ -119,8 +120,7 @@ TEST(ParserAnnexA0411, OrderedParameterAssignment) {
 
 TEST(ParserAnnexA0411, NamedParameterAssignment) {
   // . parameter_identifier ( [ param_expression ] )
-  auto r =
-      Parse("module m; sub #(.WIDTH(8), .DEPTH(4)) u0(a); endmodule\n");
+  auto r = Parse("module m; sub #(.WIDTH(8), .DEPTH(4)) u0(a); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* item = r.cu->modules[0]->items[0];
@@ -219,7 +219,7 @@ TEST(ParserAnnexA0411, OrderedPortBlankPosition) {
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->inst_ports.size(), 3u);
   EXPECT_NE(item->inst_ports[0].second, nullptr);  // a
-  EXPECT_EQ(item->inst_ports[1].second, nullptr);   // blank
+  EXPECT_EQ(item->inst_ports[1].second, nullptr);  // blank
   EXPECT_NE(item->inst_ports[2].second, nullptr);  // c
 }
 

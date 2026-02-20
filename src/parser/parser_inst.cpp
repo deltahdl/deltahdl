@@ -6,8 +6,8 @@ ModuleItem* Parser::ParseModuleInst(const Token& module_tok) {
   return ParseModuleInstList(module_tok, nullptr);
 }
 
-ModuleItem* Parser::ParseModuleInstList(
-    const Token& module_tok, std::vector<ModuleItem*>* extra_items) {
+ModuleItem* Parser::ParseModuleInstList(const Token& module_tok,
+                                        std::vector<ModuleItem*>* extra_items) {
   // A.4.1.1: parameter_value_assignment shared by all instances
   std::vector<std::pair<std::string_view, Expr*>> params;
   if (Match(TokenKind::kHash)) {
