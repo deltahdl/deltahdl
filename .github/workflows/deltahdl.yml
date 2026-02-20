@@ -192,7 +192,7 @@ jobs:
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Release
-          cmake --build build --parallel
+          cmake --build build --parallel 2
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
