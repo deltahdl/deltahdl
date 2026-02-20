@@ -106,6 +106,7 @@ class Parser {
   void ParseUdpPortDecls(UdpDecl* udp);
   void ParseUdpTable(UdpDecl* udp);
   void ParseUdpTableRow(UdpDecl* udp);
+  void ParseUdpInstList(const Token& udp_tok, std::vector<ModuleItem*>& items);
 
   // Verification constructs (parser_verify.cpp — §17/§18/§19)
   ModuleDecl* ParseCheckerDecl();
@@ -322,6 +323,7 @@ class Parser {
   Arena& arena_;
   DiagEngine& diag_;
   std::unordered_set<std::string_view> known_types_;
+  std::unordered_set<std::string_view> known_udps_;
   ModuleDecl* current_module_ = nullptr;  // Set during module body parsing
   bool InProgramBlock() const {
     return current_module_ &&

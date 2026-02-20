@@ -362,6 +362,7 @@ enum class ModuleItemKind : uint8_t {
   kImportDecl,
   kExportDecl,
   kGateInst,
+  kUdpInst,            // UDP instantiation (§A.5.4)
   kDefparam,
   kAlias,              // Net alias (§10.11)
   kPropertyDecl,       // property ... endproperty (§16.12)

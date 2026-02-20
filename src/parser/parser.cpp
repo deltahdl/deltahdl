@@ -251,7 +251,9 @@ void Parser::ParseOutOfBlockConstraint(CompilationUnit* unit) {
 // Parse secondary top-level items (primitives, checkers, configs, etc.)
 bool Parser::TryParseSecondaryTopLevel(CompilationUnit* unit) {
   if (Check(TokenKind::kKwPrimitive)) {
-    unit->udps.push_back(ParseUdpDecl());
+    auto* udp = ParseUdpDecl();
+    unit->udps.push_back(udp);
+    known_udps_.insert(udp->name);
     return true;
   }
   if (Check(TokenKind::kKwChecker)) {
@@ -383,7 +385,9 @@ void Parser::ParseExternTopLevel(CompilationUnit* unit) {
     return;
   }
   if (Check(TokenKind::kKwPrimitive)) {
-    unit->udps.push_back(ParseExternUdpDecl());
+    auto* udp = ParseExternUdpDecl();
+    unit->udps.push_back(udp);
+    known_udps_.insert(udp->name);
     return;
   }
   SkipToSemicolon(lexer_);

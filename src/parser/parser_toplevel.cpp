@@ -272,6 +272,91 @@ void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
   Expect(TokenKind::kSemicolon);
 }
 
+// --- UDP instantiation (§A.5.4) ---
+
+void Parser::ParseUdpInstList(const Token& udp_tok,
+                               std::vector<ModuleItem*>& items) {
+  auto loc = udp_tok.loc;
+
+  // Optional drive_strength: (strength0, strength1) or (strength1, strength0)
+  uint8_t str0 = 0;
+  uint8_t str1 = 0;
+  if (Check(TokenKind::kLParen)) {
+    auto saved = lexer_.SavePos();
+    Consume();  // '('
+    auto tk = CurrentToken().kind;
+    if (IsStrength0Token(tk) || IsStrength1Token(tk)) {
+      if (IsStrength0Token(tk)) {
+        str0 = ParseStrength0();
+        if (Match(TokenKind::kComma)) str1 = ParseStrength1();
+      } else {
+        str1 = ParseStrength1();
+        if (Match(TokenKind::kComma)) str0 = ParseStrength0();
+      }
+      Expect(TokenKind::kRParen);
+    } else {
+      // Not strength — restore and parse as unnamed instance.
+      lexer_.RestorePos(saved);
+    }
+  }
+
+  // Optional delay2: #delay or #(rise, fall)
+  Expr* delay = nullptr;
+  Expr* delay_fall = nullptr;
+  if (Check(TokenKind::kHash)) {
+    Consume();
+    if (Match(TokenKind::kLParen)) {
+      delay = ParseMinTypMaxExpr();
+      if (Match(TokenKind::kComma)) {
+        delay_fall = ParseMinTypMaxExpr();
+      }
+      Expect(TokenKind::kRParen);
+    } else {
+      delay = ParsePrimaryExpr();
+    }
+  }
+
+  // Parse comma-separated udp_instance entries.
+  auto parse_one = [&]() -> ModuleItem* {
+    auto* item = arena_.Create<ModuleItem>();
+    item->kind = ModuleItemKind::kUdpInst;
+    item->loc = loc;
+    item->inst_module = udp_tok.text;
+    item->drive_strength0 = str0;
+    item->drive_strength1 = str1;
+    item->gate_delay = delay;
+    item->gate_delay_fall = delay_fall;
+
+    // Optional name_of_instance: identifier [ unpacked_dimension ]
+    if (CheckIdentifier() && !Check(TokenKind::kLParen)) {
+      item->gate_inst_name = Consume().text;
+      if (Check(TokenKind::kLBracket)) {
+        Consume();
+        item->inst_range_left = ParseExpr();
+        if (Match(TokenKind::kColon)) {
+          item->inst_range_right = ParseExpr();
+        }
+        Expect(TokenKind::kRBracket);
+      }
+    }
+
+    // Terminal list: ( output_terminal , input_terminal { , input_terminal } )
+    Expect(TokenKind::kLParen);
+    item->gate_terminals.push_back(ParseExpr());
+    while (Match(TokenKind::kComma)) {
+      item->gate_terminals.push_back(ParseExpr());
+    }
+    Expect(TokenKind::kRParen);
+    return item;
+  };
+
+  items.push_back(parse_one());
+  while (Match(TokenKind::kComma)) {
+    items.push_back(parse_one());
+  }
+  Expect(TokenKind::kSemicolon);
+}
+
 // --- UDP declaration (§29) ---
 
 static char UdpCharFromToken(const Token& tok) {

@@ -673,6 +673,8 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kGateInst:
       ElaborateGateInst(item, mod, arena_);
       break;
+    case ModuleItemKind::kUdpInst:
+      break;
     case ModuleItemKind::kSpecparam:
       specparam_names_.insert(item->name);
       ElaborateSpecparam(item, mod);

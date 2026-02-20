@@ -406,6 +406,10 @@ void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
     ParseVarDeclList(items, dtype);
     return;
   }
+  if (known_udps_.count(name_tok.text) != 0) {
+    ParseUdpInstList(name_tok, items);
+    return;
+  }
   if (CheckIdentifier() || Check(TokenKind::kHash)) {
     if (InProgramBlock())
       diag_.Error(name_tok.loc, "instantiations not allowed in programs");
