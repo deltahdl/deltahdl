@@ -18,10 +18,20 @@ jobs:
         with:
           name: build-coverage-shard-0
           path: build/
-      - name: Download unit profraw
+      - name: Download unit profraw shard 0
         uses: actions/download-artifact@v4
         with:
-          name: profraw-unit
+          name: profraw-unit-shard-0
+          path: profraw/unit/
+      - name: Download unit profraw shard 1
+        uses: actions/download-artifact@v4
+        with:
+          name: profraw-unit-shard-1
+          path: profraw/unit/
+      - name: Download unit profraw shard 2
+        uses: actions/download-artifact@v4
+        with:
+          name: profraw-unit-shard-2
           path: profraw/unit/
       - name: Download e2e profraw
         uses: actions/download-artifact@v4
@@ -933,69 +943,65 @@ jobs:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+    name: unit-test-asan-ubsan-shard-${{ matrix.shard }}
     needs: build-asan-ubsan
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
-      - name: Download build shard 0
+      - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-asan-ubsan-shard-0
-          path: build/
-      - name: Download build shard 1
-        uses: actions/download-artifact@v4
-        with:
-          name: build-asan-ubsan-shard-1
-          path: build/
-      - name: Download build shard 2
-        uses: actions/download-artifact@v4
-        with:
-          name: build-asan-ubsan-shard-2
+          name: build-asan-ubsan-shard-${{ matrix.shard }}
           path: build/
       - name: Fix permissions
         run: >-
           find build/test -maxdepth 1 -type f -name 'test_*'
           -exec chmod +x {} +
       - name: Unit tests
-        run: ctest --test-dir build --output-on-failure --label-exclude e2e
+        run: >-
+          ctest --test-dir build --output-on-failure
+          --label-exclude e2e
+          --exclude-regex '_NOT_BUILT'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2]
   unit-test-coverage:
     env:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
+    name: unit-test-coverage-shard-${{ matrix.shard }}
     needs: build-coverage
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
-      - name: Download build shard 0
+      - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-coverage-shard-0
-          path: build/
-      - name: Download build shard 1
-        uses: actions/download-artifact@v4
-        with:
-          name: build-coverage-shard-1
-          path: build/
-      - name: Download build shard 2
-        uses: actions/download-artifact@v4
-        with:
-          name: build-coverage-shard-2
+          name: build-coverage-shard-${{ matrix.shard }}
           path: build/
       - name: Fix permissions
         run: >-
           find build/test -maxdepth 1 -type f -name 'test_*'
           -exec chmod +x {} +
       - name: Unit tests
-        run: ctest --test-dir build --output-on-failure --label-exclude e2e
+        run: >-
+          ctest --test-dir build --output-on-failure
+          --label-exclude e2e
+          --exclude-regex '_NOT_BUILT'
       - name: Upload profraw
         uses: actions/upload-artifact@v4
         with:
-          name: profraw-unit
+          name: profraw-unit-shard-${{ matrix.shard }}
           path: profraw/
           retention-days: 1
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2]
   unit-test-macos-26-arm64-clang:
     needs: build-macos-26-arm64-clang
     runs-on: macos-26
@@ -1017,33 +1023,31 @@ jobs:
   unit-test-tsan:
     env:
       TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
+    name: unit-test-tsan-shard-${{ matrix.shard }}
     needs: build-tsan
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
-      - name: Download build shard 0
+      - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-tsan-shard-0
-          path: build/
-      - name: Download build shard 1
-        uses: actions/download-artifact@v4
-        with:
-          name: build-tsan-shard-1
-          path: build/
-      - name: Download build shard 2
-        uses: actions/download-artifact@v4
-        with:
-          name: build-tsan-shard-2
+          name: build-tsan-shard-${{ matrix.shard }}
           path: build/
       - name: Fix permissions
         run: >-
           find build/test -maxdepth 1 -type f -name 'test_*'
           -exec chmod +x {} +
       - name: Unit tests
-        run: ctest --test-dir build --output-on-failure --label-exclude e2e
+        run: >-
+          ctest --test-dir build --output-on-failure
+          --label-exclude e2e
+          --exclude-regex '_NOT_BUILT'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2]
   unit-test-ubuntu-24-04-x86-64-clang:
     needs: build-ubuntu-24-04-x86-64-clang
     runs-on: ubuntu-24.04
