@@ -509,7 +509,7 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: E2E tests
-        run: python3 scripts/run_sim_tests.py
+        run: PYTHONPATH=. python3 scripts/run_sim_tests.py
   e2e-test-coverage:
     env:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
@@ -527,7 +527,7 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: E2E tests
-        run: python3 scripts/run_sim_tests.py
+        run: PYTHONPATH=. python3 scripts/run_sim_tests.py
       - name: Upload profraw
         uses: actions/upload-artifact@v4
         with:
@@ -549,7 +549,7 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: E2E tests
-        run: python3 scripts/run_sim_tests.py
+        run: PYTHONPATH=. python3 scripts/run_sim_tests.py
   e2e-test-tsan:
     env:
       TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
@@ -567,7 +567,7 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: E2E tests
-        run: python3 scripts/run_sim_tests.py
+        run: PYTHONPATH=. python3 scripts/run_sim_tests.py
   e2e-test-ubuntu-24-04-x86-64-clang:
     needs: integration-test-ubuntu-24-04-x86-64-clang
     runs-on: ubuntu-24.04
@@ -583,7 +583,7 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: E2E tests
-        run: python3 scripts/run_sim_tests.py
+        run: PYTHONPATH=. python3 scripts/run_sim_tests.py
   e2e-test-ubuntu-24-04-x86-64-gcc:
     needs: integration-test-ubuntu-24-04-x86-64-gcc
     runs-on: ubuntu-24.04
@@ -599,7 +599,7 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: E2E tests
-        run: python3 scripts/run_sim_tests.py
+        run: PYTHONPATH=. python3 scripts/run_sim_tests.py
   # DO NOT lower the sv-tests pass threshold. Every failing test
   # represents a real LRM conformance gap — lowering it hides parser
   # and elaboration bugs instead of fixing them.
@@ -631,7 +631,7 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: Run sv-tests
-        run: python3 scripts/run_sv_tests.py
+        run: PYTHONPATH=. python3 scripts/run_sv_tests.py
   integration-test-coverage:
     env:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
@@ -655,7 +655,7 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: Run sv-tests
-        run: python3 scripts/run_sv_tests.py
+        run: PYTHONPATH=. python3 scripts/run_sv_tests.py
       - name: Upload profraw
         uses: actions/upload-artifact@v4
         with:
@@ -683,7 +683,7 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: Run sv-tests
-        run: python3 scripts/run_sv_tests.py
+        run: PYTHONPATH=. python3 scripts/run_sv_tests.py
   integration-test-tsan:
     env:
       TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
@@ -707,7 +707,7 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: Run sv-tests
-        run: python3 scripts/run_sv_tests.py
+        run: PYTHONPATH=. python3 scripts/run_sv_tests.py
   integration-test-ubuntu-24-04-x86-64-clang:
     needs: cache-sv-tests
     runs-on: ubuntu-24.04
@@ -729,7 +729,7 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: Run sv-tests
-        run: python3 scripts/run_sv_tests.py
+        run: PYTHONPATH=. python3 scripts/run_sv_tests.py
   integration-test-ubuntu-24-04-x86-64-gcc:
     needs: cache-sv-tests
     runs-on: ubuntu-24.04
@@ -751,7 +751,7 @@ jobs:
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: Run sv-tests
-        run: python3 scripts/run_sv_tests.py
+        run: PYTHONPATH=. python3 scripts/run_sv_tests.py
   release:
     if: >-
       inputs.branch == 'main'
