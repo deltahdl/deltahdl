@@ -113,7 +113,7 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Debug \
             -DDELTAHDL_SANITIZERS=ON
-          cmake --build build --parallel
+          cmake --build build --parallel 2
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
@@ -154,7 +154,7 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Debug \
             -DDELTAHDL_COVERAGE=ON
-          cmake --build build --parallel
+          cmake --build build --parallel 2
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
@@ -233,7 +233,7 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Debug \
             -DDELTAHDL_TSAN=ON
-          cmake --build build --parallel
+          cmake --build build --parallel 2
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
@@ -273,7 +273,7 @@ jobs:
             -DCMAKE_C_COMPILER=clang-18 \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Release
-          cmake --build build --parallel
+          cmake --build build --parallel 2
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
@@ -313,7 +313,7 @@ jobs:
             -DCMAKE_C_COMPILER=gcc-14 \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Release
-          cmake --build build --parallel
+          cmake --build build --parallel 2
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
