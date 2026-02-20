@@ -77,8 +77,8 @@ char UdpEvalState::Evaluate(const std::vector<char>& inputs) {
   return output_;
 }
 
-static bool MatchParenEdge(const UdpTableRow& row, size_t i,
-                           char prev_value, char new_value) {
+static bool MatchParenEdge(const UdpTableRow& row, size_t i, char prev_value,
+                           char new_value) {
   if (i >= row.paren_edges.size()) return false;
   auto [from, to] = row.paren_edges[i];
   return MatchLevel(from, prev_value) && MatchLevel(to, new_value);

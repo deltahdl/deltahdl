@@ -49,8 +49,7 @@ RtlirDesign* Elaborate(const std::string& src, ElabFixture& f,
   return elab.Elaborate(name);
 }
 
-bool HasItemOfKind(const std::vector<ModuleItem*>& items,
-                   ModuleItemKind kind) {
+bool HasItemOfKind(const std::vector<ModuleItem*>& items, ModuleItemKind kind) {
   for (auto* item : items) {
     if (item->kind == kind) return true;
   }
