@@ -396,23 +396,34 @@ CaseItem Parser::ParseCaseItem(bool inside) {
   return item;
 }
 
-// LRM section 12.7.1 -- for with optional variable declaration in init
+// §A.6.8: for ( [for_initialization] ; [expression] ; [for_step] ) stmt_or_null
 Stmt* Parser::ParseForStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kFor;
   stmt->range.start = CurrentLoc();
   Expect(TokenKind::kKwFor);
   Expect(TokenKind::kLParen);
-  // Check for variable declaration: "for (int i = 0; ...)"
-  if (IsDataTypeKeyword(CurrentToken().kind)) {
+  // §A.6.8: for_initialization is optional.
+  if (Check(TokenKind::kSemicolon)) {
+    // Empty init — just consume the ';'.
+    Consume();
+  } else if (Check(TokenKind::kKwVar) || IsDataTypeKeyword(CurrentToken().kind)) {
+    // §A.6.8: for_variable_declaration: [var] data_type id = expr
+    Match(TokenKind::kKwVar);
     stmt->for_init_type = ParseDataType();
     stmt->for_init = ParseAssignmentOrExprStmt();
   } else {
     stmt->for_init = ParseAssignmentOrExprStmt();
   }
-  stmt->for_cond = ParseExpr();
+  // §A.6.8: condition expression is optional.
+  if (!Check(TokenKind::kSemicolon)) {
+    stmt->for_cond = ParseExpr();
+  }
   Expect(TokenKind::kSemicolon);
-  stmt->for_step = ParseAssignmentOrExprNoSemi();
+  // §A.6.8: for_step is optional.
+  if (!Check(TokenKind::kRParen)) {
+    stmt->for_step = ParseAssignmentOrExprNoSemi();
+  }
   Expect(TokenKind::kRParen);
   stmt->for_body = ParseStmt();
   return stmt;

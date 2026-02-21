@@ -240,6 +240,8 @@ static ExecTask ExecDoWhile(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 static uint32_t GetArraySize(const Stmt* stmt, SimContext& ctx) {
   if (!stmt->expr) return 0;
   if (stmt->expr->kind != ExprKind::kIdentifier) return 0;
+  auto* info = ctx.FindArrayInfo(stmt->expr->text);
+  if (info) return info->size;
   auto* var = ctx.FindVariable(stmt->expr->text);
   if (!var) return 0;
   return var->value.width;
