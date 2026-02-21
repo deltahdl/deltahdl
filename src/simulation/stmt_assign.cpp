@@ -525,7 +525,8 @@ static bool TryClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   return true;
 }
 
-// §A.6.7.1: Unwrap typed assignment pattern expression (kCast wrapping pattern).
+// §A.6.7.1: Unwrap typed assignment pattern expression (kCast wrapping
+// pattern).
 static const Expr* UnwrapTypedPattern(const Expr* expr) {
   if (expr->kind == ExprKind::kCast && expr->lhs &&
       expr->lhs->kind == ExprKind::kAssignmentPattern)

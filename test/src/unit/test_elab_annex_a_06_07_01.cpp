@@ -26,12 +26,11 @@ struct ElabA60701Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src,
-                                 ElabA60701Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, ElabA60701Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -45,7 +44,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src,
 // §10.9: positional assignment pattern elaborates for struct init
 TEST(ElabA60701, StructPositionalPatternElaborates) {
   ElabA60701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
       "  pair_t p;\n"
@@ -60,7 +59,7 @@ TEST(ElabA60701, StructPositionalPatternElaborates) {
 // §10.9: named assignment pattern elaborates for struct init
 TEST(ElabA60701, StructNamedPatternElaborates) {
   ElabA60701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
       "  pair_t p;\n"
@@ -75,7 +74,7 @@ TEST(ElabA60701, StructNamedPatternElaborates) {
 // §10.9: assignment pattern with default key elaborates
 TEST(ElabA60701, PatternDefaultKeyElaborates) {
   ElabA60701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] arr [0:3];\n"
       "  initial begin\n"
@@ -89,7 +88,7 @@ TEST(ElabA60701, PatternDefaultKeyElaborates) {
 // §10.9: typed assignment pattern expression elaborates
 TEST(ElabA60701, TypedPatternExpressionElaborates) {
   ElabA60701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  typedef struct packed { logic [7:0] x; logic [7:0] y; } coord_t;\n"
       "  coord_t c;\n"
@@ -104,7 +103,7 @@ TEST(ElabA60701, TypedPatternExpressionElaborates) {
 // §12.6: case-matches statement elaborates
 TEST(ElabA60701, CaseMatchesElaborates) {
   ElabA60701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x, y;\n"
       "  initial begin\n"
@@ -122,7 +121,7 @@ TEST(ElabA60701, CaseMatchesElaborates) {
 // §12.6.2: matches operator in if-condition elaborates
 TEST(ElabA60701, MatchesInIfElaborates) {
   ElabA60701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x, y;\n"
       "  initial begin\n"

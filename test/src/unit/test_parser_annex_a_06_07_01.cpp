@@ -21,11 +21,11 @@ namespace {
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-ParseResult Parse(const std::string &src) {
+ParseResult Parse(const std::string& src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -36,8 +36,8 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-static Stmt *FirstInitialStmt(ParseResult &r) {
-  for (auto *item : r.cu->modules[0]->items) {
+static Stmt* FirstInitialStmt(ParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
@@ -168,7 +168,7 @@ TEST(ParserA60701, PatternTaggedVoidMember) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
 }
@@ -191,7 +191,8 @@ TEST(ParserA60701, PatternParenthesized) {
 
 // ---------------------------------------------------------------------------
 // pattern ::= '{ pattern { , pattern } }
-// pattern ::= '{ member_identifier : pattern { , member_identifier : pattern } }
+// pattern ::= '{ member_identifier : pattern { , member_identifier : pattern }
+// }
 // ---------------------------------------------------------------------------
 
 // §12.6: positional assignment pattern in expression context
@@ -234,7 +235,8 @@ TEST(ParserA60701, PatternAssignmentWithDotBindings) {
 }
 
 // ---------------------------------------------------------------------------
-// assignment_pattern ::= '{ constant_expression { expression { , expression } } }
+// assignment_pattern ::= '{ constant_expression { expression { , expression } }
+// }
 // ---------------------------------------------------------------------------
 
 // §10.9.1: replication form of assignment pattern
@@ -264,7 +266,8 @@ TEST(ParserA60701, AssignmentPatternReplicationMultiElem) {
 // ---------------------------------------------------------------------------
 // assignment_pattern_expression ::= [ type ] assignment_pattern
 // assignment_pattern_expression_type ::=
-//   ps_type_identifier | ps_parameter_identifier | integer_atom_type | type_reference
+//   ps_type_identifier | ps_parameter_identifier | integer_atom_type |
+//   type_reference
 // ---------------------------------------------------------------------------
 
 // §10.9: typed assignment pattern expression with user-defined type
@@ -338,7 +341,8 @@ TEST(ParserA60701, ArrayPatternKeyConstExpr) {
 
 // ---------------------------------------------------------------------------
 // assignment_pattern_net_lvalue ::= '{ net_lvalue { , net_lvalue } }
-// assignment_pattern_variable_lvalue ::= '{ variable_lvalue { , variable_lvalue } }
+// assignment_pattern_variable_lvalue ::= '{ variable_lvalue { , variable_lvalue
+// } }
 // ---------------------------------------------------------------------------
 
 // §10.9: assignment pattern as LHS (variable lvalue)
@@ -400,7 +404,7 @@ TEST(ParserA60701, CaseMatchesDefault) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
   ASSERT_EQ(stmt->case_items.size(), 2u);
@@ -422,7 +426,7 @@ TEST(ParserA60701, CaseMatchesMultipleItems) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_EQ(stmt->case_items.size(), 4u);
 }
@@ -441,7 +445,7 @@ TEST(ParserA60701, MatchesExprInIfCondition) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   ASSERT_NE(stmt->condition, nullptr);
@@ -475,10 +479,10 @@ TEST(ParserA60701, AssignmentPatternElementsCount) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  auto *rhs = stmt->rhs;
+  auto* rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
   EXPECT_EQ(rhs->elements.size(), 4u);
@@ -494,9 +498,9 @@ TEST(ParserA60701, AssignmentPatternKeysPopulated) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto *rhs = stmt->rhs;
+  auto* rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
   ASSERT_EQ(rhs->pattern_keys.size(), 2u);
@@ -515,14 +519,14 @@ TEST(ParserA60701, ReplicationPatternRepeatCount) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto *rhs = stmt->rhs;
+  auto* rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
   ASSERT_EQ(rhs->elements.size(), 1u);
   // The replication element is a kReplicate expression
-  auto *rep = rhs->elements[0];
+  auto* rep = rhs->elements[0];
   EXPECT_EQ(rep->kind, ExprKind::kReplicate);
   EXPECT_NE(rep->repeat_count, nullptr);
 }
@@ -537,9 +541,9 @@ TEST(ParserA60701, TaggedExprAstKind) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto *rhs = stmt->rhs;
+  auto* rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTagged);
   // member identifier stored in rhs->rhs
@@ -557,9 +561,9 @@ TEST(ParserA60701, EmptyAssignmentPattern) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto *rhs = stmt->rhs;
+  auto* rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
   EXPECT_EQ(rhs->elements.size(), 0u);

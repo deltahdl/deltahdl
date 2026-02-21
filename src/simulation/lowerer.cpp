@@ -327,13 +327,14 @@ void Lowerer::LowerVar(const RtlirVariable& var) {
 void Lowerer::LowerVarInit(const RtlirVariable& var, Variable* v,
                            uint32_t width) {
   auto* sinfo = ctx_.GetVariableStructType(var.name);
-  // §A.6.7.1: Unwrap typed assignment pattern expression (kCast wrapping pattern).
+  // §A.6.7.1: Unwrap typed assignment pattern expression (kCast wrapping
+  // pattern).
   auto* init = var.init_expr;
   if (init->kind == ExprKind::kCast && init->lhs &&
       init->lhs->kind == ExprKind::kAssignmentPattern)
     init = init->lhs;
-  bool named = init->kind == ExprKind::kAssignmentPattern &&
-               !init->pattern_keys.empty();
+  bool named =
+      init->kind == ExprKind::kAssignmentPattern && !init->pattern_keys.empty();
   if (named && sinfo) {
     v->value = EvalStructPattern(init, sinfo, ctx_, arena_);
     return;

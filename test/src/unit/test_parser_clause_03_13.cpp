@@ -689,4 +689,3 @@ TEST(ParserClause03, Cl3_13_AllEightNameSpaces) {
   // (h) Attribute name space
   EXPECT_TRUE(HasAttrNamed(r.cu->modules[0]->items, "keep"));
 }
-
