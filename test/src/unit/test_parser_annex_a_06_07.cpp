@@ -5,8 +5,14 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "elaboration/elaborator.h"
+#include "elaboration/rtlir.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
+#include "simulation/lowerer.h"
+#include "simulation/scheduler.h"
+#include "simulation/sim_context.h"
+#include "simulation/variable.h"
 
 using namespace delta;
 
@@ -41,12 +47,36 @@ static Stmt *FirstInitialStmt(ParseResult &r) {
   return nullptr;
 }
 
+struct SimA607Fixture {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag};
+};
+
+static RtlirDesign *ElaborateSrc(const std::string &src, SimA607Fixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  return elab.Elaborate(cu->modules.back()->name);
+}
+
 }  // namespace
 
 // =============================================================================
 // A.6.7 Case statements
 // =============================================================================
 
+// ---------------------------------------------------------------------------
+// case_statement ::=
+//   [ unique_priority ] case_keyword ( case_expression )
+//     case_item { case_item } endcase
+// ---------------------------------------------------------------------------
+
+// §12.5: basic case statement with single items
 TEST(ParserA607, CaseStmtParse) {
   auto r = Parse(
       "module m;\n"
@@ -59,8 +89,10 @@ TEST(ParserA607, CaseStmtParse) {
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCase);
 }
 
+// §12.5: case statement items count and default detection
 TEST(ParserA607, CaseStmtItems) {
   auto r = Parse(
       "module m;\n"
@@ -74,4 +106,758 @@ TEST(ParserA607, CaseStmtItems) {
   ASSERT_EQ(stmt->case_items.size(), 2u);
   EXPECT_FALSE(stmt->case_items[0].is_default);
   EXPECT_TRUE(stmt->case_items[1].is_default);
+}
+
+// §12.5: multiple case_item_expressions per case item (comma-separated)
+TEST(ParserA607, CaseMultipleItemExprs) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(sel)\n"
+      "      0, 1: x = 8'd10;\n"
+      "      2, 3, 4: x = 8'd20;\n"
+      "      default: x = 8'd30;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->case_items.size(), 3u);
+  EXPECT_EQ(stmt->case_items[0].patterns.size(), 2u);
+  EXPECT_EQ(stmt->case_items[1].patterns.size(), 3u);
+  EXPECT_TRUE(stmt->case_items[2].is_default);
+}
+
+// §12.5: default without colon
+TEST(ParserA607, CaseDefaultNoColon) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x) 0: y = 1; default y = 0; endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->case_items.size(), 2u);
+  EXPECT_TRUE(stmt->case_items[1].is_default);
+}
+
+// §12.5: case with no default
+TEST(ParserA607, CaseNoDefault) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x) 0: y = 1; 1: y = 2; endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->case_items.size(), 2u);
+  EXPECT_FALSE(stmt->case_items[0].is_default);
+  EXPECT_FALSE(stmt->case_items[1].is_default);
+}
+
+// §12.5: case with block statement in item body
+TEST(ParserA607, CaseItemWithBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x)\n"
+      "      0: begin y = 1; z = 2; end\n"
+      "      default: begin y = 0; z = 0; end\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->case_items[0].body->kind, StmtKind::kBlock);
+}
+
+// ---------------------------------------------------------------------------
+// case_keyword ::= case | casez | casex
+// ---------------------------------------------------------------------------
+
+// §12.5.1: casez keyword
+TEST(ParserA607, CasezKeyword) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    casez(sel) 3'b1??: x = 1; default: x = 0; endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasez);
+}
+
+// §12.5.1: casex keyword
+TEST(ParserA607, CasexKeyword) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    casex(sel) 3'b1??: x = 1; default: x = 0; endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasex);
+}
+
+// ---------------------------------------------------------------------------
+// case_statement ::=
+//   [ unique_priority ] case ( case_expression ) inside
+//     case_inside_item { case_inside_item } endcase
+// ---------------------------------------------------------------------------
+
+// §12.5.4: case-inside variant
+TEST(ParserA607, CaseInsideParse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x) inside\n"
+      "      1, 3: y = 8'd10;\n"
+      "      [4:7]: y = 8'd20;\n"
+      "      default: y = 8'd30;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCase);
+  EXPECT_TRUE(stmt->case_inside);
+}
+
+// ---------------------------------------------------------------------------
+// case_statement ::=
+//   [ unique_priority ] case_keyword ( case_expression ) matches
+//     case_pattern_item { case_pattern_item } endcase
+// ---------------------------------------------------------------------------
+
+// §12.6.1: case-matches variant
+TEST(ParserA607, CaseMatchesParse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(v) matches\n"
+      "      5: y = 8'd10;\n"
+      "      default: y = 8'd20;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+}
+
+// ---------------------------------------------------------------------------
+// unique_priority with case
+// ---------------------------------------------------------------------------
+
+// §12.5.3: unique case
+TEST(ParserA607, UniqueCaseParse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique case(x)\n"
+      "      0: y = 1;\n"
+      "      1: y = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
+}
+
+// §12.5.3: unique0 case
+TEST(ParserA607, Unique0CaseParse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique0 case(x)\n"
+      "      0: y = 1;\n"
+      "      1: y = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
+}
+
+// §12.5.3: priority case
+TEST(ParserA607, PriorityCaseParse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    priority case(x)\n"
+      "      0: y = 1;\n"
+      "      1: y = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
+}
+
+// §12.5.3: priority casez
+TEST(ParserA607, PriorityCasezParse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    priority casez(a)\n"
+      "      3'b00?: y = 1;\n"
+      "      3'b0??: y = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
+  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasez);
+}
+
+// §12.5.2: constant expression as case_expression
+TEST(ParserA607, ConstExprCaseExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(1)\n"
+      "      a: y = 1;\n"
+      "      b: y = 2;\n"
+      "      default: y = 3;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_NE(stmt->condition, nullptr);
+}
+
+// §12.5: nested case statements
+TEST(ParserA607, NestedCaseStmt) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(a)\n"
+      "      0: case(b)\n"
+      "           0: x = 1;\n"
+      "           1: x = 2;\n"
+      "         endcase\n"
+      "      1: x = 3;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->case_items[0].body->kind, StmtKind::kCase);
+}
+
+// ---------------------------------------------------------------------------
+// case_inside_item ::=
+//   range_list : statement_or_null
+// range_list ::= value_range { , value_range }
+// ---------------------------------------------------------------------------
+
+// §12.5.4: case inside with range [lo:hi]
+TEST(ParserA607, CaseInsideRange) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x) inside\n"
+      "      [0:3]: y = 1;\n"
+      "      [4:7]: y = 2;\n"
+      "      default: y = 3;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_TRUE(stmt->case_inside);
+  ASSERT_GE(stmt->case_items.size(), 2u);
+}
+
+// §12.5.4: case inside with multiple value_ranges (comma-separated)
+TEST(ParserA607, CaseInsideMultipleRanges) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x) inside\n"
+      "      1, 3, [5:7]: y = 1;\n"
+      "      default: y = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_TRUE(stmt->case_inside);
+  EXPECT_EQ(stmt->case_items[0].patterns.size(), 3u);
+}
+
+// ---------------------------------------------------------------------------
+// randcase_statement ::= randcase randcase_item { randcase_item } endcase
+// randcase_item ::= expression : statement_or_null
+// ---------------------------------------------------------------------------
+
+// §18.16: randcase statement
+TEST(ParserA607, RandcaseParse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    randcase\n"
+      "      50: x = 1;\n"
+      "      30: x = 2;\n"
+      "      20: x = 3;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kRandcase);
+  EXPECT_EQ(stmt->randcase_items.size(), 3u);
+}
+
+// §18.16: randcase with block bodies
+TEST(ParserA607, RandcaseWithBlocks) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    randcase\n"
+      "      50: begin x = 1; y = 2; end\n"
+      "      50: begin x = 3; y = 4; end\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kRandcase);
+  EXPECT_EQ(stmt->randcase_items.size(), 2u);
+}
+
+// ---------------------------------------------------------------------------
+// value_range ::= expression
+// value_range ::= [ expression : expression ]
+// ---------------------------------------------------------------------------
+
+// §11.4.13: value_range as simple expression in case-inside
+TEST(ParserA607, ValueRangeExpression) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x) inside\n"
+      "      5: y = 1;\n"
+      "      10: y = 2;\n"
+      "      default: y = 3;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §11.4.13: value_range with bracket range [lo:hi]
+TEST(ParserA607, ValueRangeBracket) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x) inside\n"
+      "      [0:15]: y = 1;\n"
+      "      default: y = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §12.5: case with null statement body (;)
+TEST(ParserA607, CaseItemNullBody) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x)\n"
+      "      0: ;\n"
+      "      1: y = 1;\n"
+      "      default: ;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->case_items.size(), 3u);
+}
+
+// §12.5: case with expression as case_expression (not just identifier)
+TEST(ParserA607, CaseComplexExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(a + b)\n"
+      "      0: y = 1;\n"
+      "      1: y = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_NE(stmt->condition, nullptr);
+  EXPECT_EQ(stmt->condition->kind, ExprKind::kBinary);
+}
+
+// =============================================================================
+// Simulation tests — A.6.7 Case statements
+// =============================================================================
+
+// §12.5: case statement — first matching item
+TEST(SimA607, CaseFirstMatch) {
+  SimA607Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel, x;\n"
+      "  initial begin\n"
+      "    sel = 8'd1;\n"
+      "    case(sel)\n"
+      "      8'd0: x = 8'd10;\n"
+      "      8'd1: x = 8'd20;\n"
+      "      8'd2: x = 8'd30;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 20u);
+}
+
+// §12.5: case falls to default when no item matches
+TEST(SimA607, CaseDefaultFallthrough) {
+  SimA607Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel, x;\n"
+      "  initial begin\n"
+      "    sel = 8'd5;\n"
+      "    case(sel)\n"
+      "      8'd0: x = 8'd10;\n"
+      "      8'd1: x = 8'd20;\n"
+      "      default: x = 8'd99;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 99u);
+}
+
+// §12.5: no default, no match — no change
+TEST(SimA607, CaseNoDefaultNoMatch) {
+  SimA607Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel, x;\n"
+      "  initial begin\n"
+      "    x = 8'd42;\n"
+      "    sel = 8'd5;\n"
+      "    case(sel)\n"
+      "      8'd0: x = 8'd10;\n"
+      "      8'd1: x = 8'd20;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
+// §12.5: case with multiple case_item_expressions per item
+TEST(SimA607, CaseMultipleExprsPerItem) {
+  SimA607Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel, x;\n"
+      "  initial begin\n"
+      "    sel = 8'd3;\n"
+      "    case(sel)\n"
+      "      8'd0, 8'd1: x = 8'd10;\n"
+      "      8'd2, 8'd3: x = 8'd20;\n"
+      "      default: x = 8'd30;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 20u);
+}
+
+// §12.5.2: constant expression as case_expression
+TEST(SimA607, ConstExprAsCaseExpr) {
+  SimA607Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, x;\n"
+      "  initial begin\n"
+      "    a = 8'd1;\n"
+      "    case(1)\n"
+      "      a: x = 8'd10;\n"
+      "      default: x = 8'd20;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 10u);
+}
+
+// §12.5.3: unique case qualifier stored
+TEST(SimA607, UniqueCaseQualifier) {
+  SimA607Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel, x;\n"
+      "  initial begin\n"
+      "    sel = 8'd1;\n"
+      "    unique case(sel)\n"
+      "      8'd0: x = 8'd10;\n"
+      "      8'd1: x = 8'd20;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 20u);
+}
+
+// §12.5.3: priority case — selects first match
+TEST(SimA607, PriorityCaseFirstMatch) {
+  SimA607Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel, x;\n"
+      "  initial begin\n"
+      "    sel = 8'd1;\n"
+      "    priority case(sel)\n"
+      "      8'd0: x = 8'd10;\n"
+      "      8'd1: x = 8'd20;\n"
+      "      8'd1: x = 8'd30;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 20u);
+}
+
+// §12.5.4: case-inside set membership match
+TEST(SimA607, CaseInsideMatch) {
+  SimA607Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel, x;\n"
+      "  initial begin\n"
+      "    sel = 8'd5;\n"
+      "    case(sel) inside\n"
+      "      8'd1, 8'd3: x = 8'd10;\n"
+      "      8'd5: x = 8'd20;\n"
+      "      default: x = 8'd30;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 20u);
+}
+
+// §12.5: case inside for loop
+TEST(SimA607, CaseInsideForLoop) {
+  SimA607Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] total;\n"
+      "  initial begin\n"
+      "    total = 8'd0;\n"
+      "    for (int i = 0; i < 3; i = i + 1) begin\n"
+      "      case(i)\n"
+      "        0: total = total + 8'd1;\n"
+      "        1: total = total + 8'd10;\n"
+      "        2: total = total + 8'd100;\n"
+      "      endcase\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("total");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 111u);
+}
+
+// §12.5: nested case statements
+TEST(SimA607, NestedCaseExecution) {
+  SimA607Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, x;\n"
+      "  initial begin\n"
+      "    a = 8'd0;\n"
+      "    b = 8'd1;\n"
+      "    case(a)\n"
+      "      8'd0: case(b)\n"
+      "              8'd0: x = 8'd10;\n"
+      "              8'd1: x = 8'd20;\n"
+      "              default: x = 8'd30;\n"
+      "            endcase\n"
+      "      default: x = 8'd40;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 20u);
+}
+
+// §12.5: sequential case statements (both execute)
+TEST(SimA607, SequentialCaseStatements) {
+  SimA607Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x, y;\n"
+      "  initial begin\n"
+      "    case(1)\n"
+      "      1: x = 8'd11;\n"
+      "      default: x = 8'd0;\n"
+      "    endcase\n"
+      "    case(0)\n"
+      "      0: y = 8'd22;\n"
+      "      default: y = 8'd0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *x = f.ctx.FindVariable("x");
+  auto *y = f.ctx.FindVariable("y");
+  ASSERT_NE(x, nullptr);
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(x->value.ToUint64(), 11u);
+  EXPECT_EQ(y->value.ToUint64(), 22u);
+}
+
+// §12.5: case with block body in item
+TEST(SimA607, CaseWithBlockBody) {
+  SimA607Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x, y;\n"
+      "  initial begin\n"
+      "    case(1)\n"
+      "      1: begin x = 8'd5; y = 8'd6; end\n"
+      "      default: begin x = 8'd0; y = 8'd0; end\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *x = f.ctx.FindVariable("x");
+  auto *y = f.ctx.FindVariable("y");
+  ASSERT_NE(x, nullptr);
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(x->value.ToUint64(), 5u);
+  EXPECT_EQ(y->value.ToUint64(), 6u);
 }
