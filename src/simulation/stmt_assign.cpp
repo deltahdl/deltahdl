@@ -525,6 +525,14 @@ static bool TryClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   return true;
 }
 
+// §A.6.7.1: Unwrap typed assignment pattern expression (kCast wrapping pattern).
+static const Expr* UnwrapTypedPattern(const Expr* expr) {
+  if (expr->kind == ExprKind::kCast && expr->lhs &&
+      expr->lhs->kind == ExprKind::kAssignmentPattern)
+    return expr->lhs;
+  return expr;
+}
+
 // Execute a blocking assignment with full LHS support.
 // §10.9.2: Evaluate RHS as named struct pattern if applicable.
 static Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
@@ -532,12 +540,13 @@ static Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
   if (!stmt->rhs || stmt->lhs->kind != ExprKind::kIdentifier) {
     return EvalExpr(stmt->rhs, ctx, arena);
   }
-  bool named = stmt->rhs->kind == ExprKind::kAssignmentPattern &&
-               !stmt->rhs->pattern_keys.empty();
+  auto* inner = UnwrapTypedPattern(stmt->rhs);
+  bool named = inner->kind == ExprKind::kAssignmentPattern &&
+               !inner->pattern_keys.empty();
   if (!named) return EvalExpr(stmt->rhs, ctx, arena);
   auto* sinfo = ctx.GetVariableStructType(stmt->lhs->text);
   if (!sinfo) return EvalExpr(stmt->rhs, ctx, arena);
-  return EvalStructPattern(stmt->rhs, sinfo, ctx, arena);
+  return EvalStructPattern(inner, sinfo, ctx, arena);
 }
 
 // §7.4.3: Compute (lo, count) for an unpacked array slice expression.

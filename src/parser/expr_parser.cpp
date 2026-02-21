@@ -344,9 +344,13 @@ Expr* Parser::ParseTaggedExpr() {
     Expect(TokenKind::kRParen);
   } else if (Check(TokenKind::kApostropheLBrace)) {
     expr->lhs = ParseAssignmentPattern();
+  } else if (Check(TokenKind::kDot)) {
+    // §A.6.7.1: tagged member_identifier .variable_identifier pattern
+    expr->lhs = ParsePrimaryExpr();  // handles .name and .*
   } else if (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kComma) &&
              !Check(TokenKind::kRParen) && !Check(TokenKind::kRBrace) &&
-             !Check(TokenKind::kColon) && !Check(TokenKind::kEof)) {
+             !Check(TokenKind::kColon) && !Check(TokenKind::kEof) &&
+             !Check(TokenKind::kAmpAmpAmp)) {
     expr->lhs = ParseExpr();
   }
   return expr;
@@ -393,15 +397,44 @@ Expr* Parser::ParsePrimaryExpr() {
       return ParseTaggedExpr();
     case TokenKind::kKwNew:  // §8.7
       return ParseNewExpr();
+    // §A.6.7.1: pattern ::= .* (wildcard)
+    case TokenKind::kDotStar: {
+      auto* pat = arena_.Create<Expr>();
+      pat->kind = ExprKind::kIdentifier;
+      pat->text = ".*";
+      pat->range.start = Consume().loc;
+      return pat;
+    }
+    // §A.6.7.1: pattern ::= . variable_identifier (binding)
+    case TokenKind::kDot: {
+      auto loc = Consume().loc;
+      auto name = ExpectIdentifier();
+      auto* pat = arena_.Create<Expr>();
+      pat->kind = ExprKind::kIdentifier;
+      pat->text = name.text;
+      pat->range.start = loc;
+      return pat;
+    }
     default:
       break;
   }
 
   // §6.24 type cast: type'(expr) — only if followed by apostrophe.
+  // §A.6.7.1: integer_atom_type'{...} — typed assignment pattern expression.
   // Bare type keywords (e.g., $typename(logic)) are valid identifiers.
   if (IsCastTypeToken(tok.kind)) {
     auto saved = lexer_.SavePos();
     auto type_tok = Consume();
+    // §A.6.7.1: integer_atom_type'{...} typed assignment pattern
+    if (Check(TokenKind::kApostropheLBrace)) {
+      auto* pat = ParseAssignmentPattern();
+      auto* typed = arena_.Create<Expr>();
+      typed->kind = ExprKind::kCast;
+      typed->text = type_tok.text;
+      typed->range.start = type_tok.loc;
+      typed->lhs = pat;
+      return typed;
+    }
     if (Check(TokenKind::kApostrophe)) {
       lexer_.RestorePos(saved);
       return ParseCastExpr();
@@ -488,9 +521,20 @@ Expr* Parser::ParseParameterizedScope(Expr* base) {
 }
 
 // §6.19.4, §6.24: try to parse type_name'(expr) cast.
-// Returns the cast Expr on success, or nullptr if not a cast.
+// §A.6.7.1: also handles type_name'{...} typed assignment pattern expression.
+// Returns the cast/pattern Expr on success, or nullptr if not a cast/pattern.
 Expr* Parser::TryParseUserTypeCast(const Token& tok) {
   if (known_types_.count(tok.text) == 0) return nullptr;
+  // §A.6.7.1: type_name'{...} — typed assignment pattern expression
+  if (Check(TokenKind::kApostropheLBrace)) {
+    auto* pat = ParseAssignmentPattern();
+    auto* typed = arena_.Create<Expr>();
+    typed->kind = ExprKind::kCast;
+    typed->text = tok.text;
+    typed->range.start = tok.loc;
+    typed->lhs = pat;
+    return typed;
+  }
   if (!Check(TokenKind::kApostrophe)) return nullptr;
   auto saved = lexer_.SavePos();
   Consume();  // '
