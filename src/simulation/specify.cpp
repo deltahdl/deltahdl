@@ -28,7 +28,7 @@ uint64_t SpecifyManager::GetPathDelay(std::string_view src,
                                       std::string_view dst) const {
   auto it = path_index_.find({std::string(src), std::string(dst)});
   if (it == path_index_.end()) return 0;
-  return path_delays_[it->second].rise_delay;
+  return path_delays_[it->second].delays[0];
 }
 
 bool SpecifyManager::HasPathDelay(std::string_view src,

@@ -427,9 +427,10 @@ void AnnotateSdfToManager(const SdfFile& file, SpecifyManager& mgr,
       PathDelay pd;
       pd.src_port = io.src_port;
       pd.dst_port = io.dst_port;
-      pd.rise_delay = SelectMtm(io.rise, mtm);
-      pd.fall_delay = SelectMtm(io.fall, mtm);
-      pd.z_delay = SelectMtm(io.turnoff, mtm);
+      pd.delay_count = 3;
+      pd.delays[0] = SelectMtm(io.rise, mtm);
+      pd.delays[1] = SelectMtm(io.fall, mtm);
+      pd.delays[2] = SelectMtm(io.turnoff, mtm);
       mgr.AddPathDelay(pd);
     }
     for (const auto& tc : cell.timing_checks) {

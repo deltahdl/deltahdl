@@ -567,8 +567,8 @@ TEST_F(SpecifyTest, RuntimePathDelay) {
   PathDelay pd;
   pd.src_port = "a";
   pd.dst_port = "b";
-  pd.rise_delay = 10;
-  pd.fall_delay = 12;
+  pd.delays[0] = 10;
+  pd.delays[1] = 12;
   mgr.AddPathDelay(pd);
 
   EXPECT_TRUE(mgr.HasPathDelay("a", "b"));
@@ -613,13 +613,13 @@ TEST_F(SpecifyTest, RuntimeMultiplePathDelays) {
   PathDelay pd1;
   pd1.src_port = "in1";
   pd1.dst_port = "out1";
-  pd1.rise_delay = 5;
+  pd1.delays[0] = 5;
   mgr.AddPathDelay(pd1);
 
   PathDelay pd2;
   pd2.src_port = "in2";
   pd2.dst_port = "out2";
-  pd2.rise_delay = 8;
+  pd2.delays[0] = 8;
   pd2.path_kind = SpecifyPathKind::kFull;
   mgr.AddPathDelay(pd2);
 

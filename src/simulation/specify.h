@@ -20,9 +20,11 @@ struct PathDelay {
   std::string dst_port;
   SpecifyPathKind path_kind = SpecifyPathKind::kParallel;
   SpecifyEdge edge = SpecifyEdge::kNone;
-  uint64_t rise_delay = 0;
-  uint64_t fall_delay = 0;
-  uint64_t z_delay = 0;  // Transition to Z (tri-state)
+  uint8_t delay_count = 1;   // 1, 2, 3, 6, or 12
+  uint64_t delays[12] = {};  // A.7.4 transition delays:
+  // [0]=rise/t01, [1]=fall/t10, [2]=z/t0z,
+  // [3]=tz1, [4]=t1z, [5]=tz0,
+  // [6]=t0x, [7]=tx1, [8]=t1x, [9]=tx0, [10]=txz, [11]=tzx
 };
 
 // =============================================================================

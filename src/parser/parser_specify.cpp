@@ -175,16 +175,23 @@ void Parser::ParsePathPorts(std::vector<SpecifyTerminal>& ports) {
   }
 }
 
-// Parse delay values: expr or (expr, expr, ...) after '='
+// Parse delay values: mintypmax_expr or (mintypmax_expr, ...) after '='
+// A.7.4: path_delay_value uses constant_mintypmax_expression
 void Parser::ParsePathDelays(std::vector<Expr*>& delays) {
+  auto loc = CurrentLoc();
   if (Match(TokenKind::kLParen)) {
-    delays.push_back(ParseExpr());
+    delays.push_back(ParseMinTypMaxExpr());
     while (Match(TokenKind::kComma)) {
-      delays.push_back(ParseExpr());
+      delays.push_back(ParseMinTypMaxExpr());
     }
     Expect(TokenKind::kRParen);
   } else {
-    delays.push_back(ParseExpr());
+    delays.push_back(ParseMinTypMaxExpr());
+  }
+  // A.7.4: list_of_path_delay_expressions allows exactly 1, 2, 3, 6, or 12
+  auto n = delays.size();
+  if (n != 1 && n != 2 && n != 3 && n != 6 && n != 12) {
+    diag_.Error(loc, "path delay must have 1, 2, 3, 6, or 12 values");
   }
 }
 
