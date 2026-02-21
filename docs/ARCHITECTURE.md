@@ -4,7 +4,7 @@ DeltaHDL compiles SystemVerilog source files through a staged pipeline. Each
 stage transforms the design into a progressively lower-level representation
 until it reaches either a running simulation or a mapped netlist.
 
-```
+```text
 Source Files (.sv)
        |
        v
@@ -44,9 +44,10 @@ Source Files (.sv)
 ### Preprocessor
 
 The preprocessor handles macro definitions (`+define+`), file inclusion
-(`\`include`), and conditional compilation (`\`ifdef`/`\`ifndef`). It operates
-on raw source text before tokenization and produces a single concatenated
-string for the lexer. Include directories are specified with `+incdir+`.
+(`` `include ``), and conditional compilation (`` `ifdef ``/`` `ifndef ``). It
+operates on raw source text before tokenization and produces a single
+concatenated string for the lexer. Include directories are specified with
+`+incdir+`.
 
 ### Lexer
 
@@ -80,7 +81,7 @@ After elaboration the pipeline branches into either simulation or synthesis.
 
 ## Simulation
 
-```
+```text
 RtlirDesign
      |
      v
@@ -120,7 +121,7 @@ name and scope management for function calls.
 The scheduler implements the IEEE 1800-2023 section 4.5 stratified event
 algorithm. Each simulation timestep is divided into 17 ordered regions:
 
-```
+```text
   Preponed
   PreActive
   Active           <--+
@@ -159,7 +160,7 @@ are compiled into plain `std::function` lambdas for lower overhead.
 
 All simulation values use dual-rail aval/bval encoding per the VPI convention:
 
-```
+```text
   Value   aval  bval
   -----   ----  ----
     0       0     0
@@ -231,7 +232,7 @@ checked each cycle.
 
 ## Synthesis
 
-```
+```text
 RtlirDesign
      |
      v
@@ -287,7 +288,7 @@ formats: BLIF, structural Verilog, JSON, or EDIF.
 
 ## Source Layout
 
-```
+```text
 src/
   common/          types, diagnostics, arena allocator, source manager
   lexer/           tokenizer, keyword table

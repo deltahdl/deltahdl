@@ -1,17 +1,18 @@
 # DeltaHDL
 
-DeltaHDL is an open-source event-driven SystemVerilog IEEE 1800-2023 simulator and synthesizer written in C++23.
+DeltaHDL is an open-source event-driven SystemVerilog IEEE 1800-2023
+simulator and synthesizer written in C++23.
 
 ## Usage
 
-```
+```sh
 deltahdl [options] <source-files...>
 ```
 
 ### General Options
 
 | Option | Description |
-|---|---|
+| --- | --- |
 | `-o <name>` | Set output name |
 | `--top <module>` | Top-level module |
 | `-f <file>` | Read options from file |
@@ -27,7 +28,7 @@ deltahdl [options] <source-files...>
 ### Simulation Options
 
 | Option | Description |
-|---|---|
+| --- | --- |
 | `--vcd <file>` | Dump VCD waveforms |
 | `--fst <file>` | Dump FST waveforms |
 | `--max-time <time>` | Maximum simulation time |
@@ -40,7 +41,7 @@ deltahdl [options] <source-files...>
 ### Synthesis Options
 
 | Option | Description |
-|---|---|
+| --- | --- |
 | `--synth` | Enable synthesis mode |
 | `--target <name>` | Target technology |
 | `--lut-size <n>` | LUT input count (default 4) |
@@ -80,7 +81,7 @@ deltahdl -f project.args
 
 Where `project.args` contains one option per line (lines starting with `#` are comments):
 
-```
+```text
 # Project options
 +incdir+src/include
 +define+DEBUG=1
