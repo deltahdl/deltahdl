@@ -746,16 +746,26 @@ enum class SpecifyEdge : uint8_t {
   kNone,
   kPosedge,
   kNegedge,
+  kEdge,
+};
+
+enum class SpecifyPolarity : uint8_t {
+  kNone,
+  kPositive,   // +
+  kNegative,   // -
 };
 
 struct SpecifyPathDecl {
   SpecifyPathKind path_kind = SpecifyPathKind::kParallel;
   SpecifyEdge edge = SpecifyEdge::kNone;
+  SpecifyPolarity polarity = SpecifyPolarity::kNone;
+  SpecifyPolarity dst_polarity = SpecifyPolarity::kNone;
   std::vector<std::string_view> src_ports;
   std::vector<std::string_view> dst_ports;
   std::vector<Expr*> delays;  // 1, 2, 3, 6, or 12 delay values
-  Expr* condition = nullptr;  // if (cond) path or ifnone path
-  bool is_ifnone = false;     // ifnone conditional path
+  Expr* condition = nullptr;    // if (cond) path or ifnone path
+  Expr* data_source = nullptr;  // edge-sensitive data_source_expression
+  bool is_ifnone = false;       // ifnone conditional path
   SourceLoc loc;
 };
 

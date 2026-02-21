@@ -118,7 +118,7 @@ void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
   Consume();
 }
 
-// Parse edge qualifier: posedge | negedge | (nothing)
+// Parse edge qualifier: posedge | negedge | edge | (nothing)
 SpecifyEdge Parser::ParseSpecifyEdge() {
   if (Check(TokenKind::kKwPosedge)) {
     Consume();
@@ -127,6 +127,10 @@ SpecifyEdge Parser::ParseSpecifyEdge() {
   if (Check(TokenKind::kKwNegedge)) {
     Consume();
     return SpecifyEdge::kNegedge;
+  }
+  if (Check(TokenKind::kKwEdge)) {
+    Consume();
+    return SpecifyEdge::kEdge;
   }
   return SpecifyEdge::kNone;
 }
@@ -152,7 +156,21 @@ void Parser::ParsePathDelays(std::vector<Expr*>& delays) {
   }
 }
 
-// Parse: ( [edge] src_ports =>|*> dst_ports ) = delay ;
+// Parse optional polarity operator: + | -
+SpecifyPolarity Parser::ParseSpecifyPolarity() {
+  if (Check(TokenKind::kPlus)) {
+    Consume();
+    return SpecifyPolarity::kPositive;
+  }
+  if (Check(TokenKind::kMinus)) {
+    Consume();
+    return SpecifyPolarity::kNegative;
+  }
+  return SpecifyPolarity::kNone;
+}
+
+// Parse: ( [edge] src_ports [polarity] =>|*> dst_ports ) = delay ;
+// Also handles edge-sensitive form: ( [edge] src [polarity] => ( dst [polarity] : data_source ) )
 SpecifyItem* Parser::ParseSpecifyPathDecl() {
   auto* item = arena_.Create<SpecifyItem>();
   item->kind = SpecifyItemKind::kPathDecl;
@@ -162,17 +180,35 @@ SpecifyItem* Parser::ParseSpecifyPathDecl() {
   item->path.edge = ParseSpecifyEdge();
   ParsePathPorts(item->path.src_ports);
 
+  // Optional polarity operator before => or *>
+  item->path.polarity = ParseSpecifyPolarity();
+
   // => (parallel) or *> (full)
+  // Handle +=> lexed as += then > (kPlusEq kGt)
   if (Match(TokenKind::kEqGt)) {
     item->path.path_kind = SpecifyPathKind::kParallel;
   } else if (Match(TokenKind::kStarGt)) {
     item->path.path_kind = SpecifyPathKind::kFull;
+  } else if (item->path.polarity != SpecifyPolarity::kNone &&
+             Match(TokenKind::kGt)) {
+    // Polarity consumed a combined +=|-> token; kGt completes =>
+    item->path.path_kind = SpecifyPathKind::kParallel;
   } else {
     // Try to recover
     Consume();
   }
 
-  ParsePathPorts(item->path.dst_ports);
+  // Check for edge-sensitive data_source form: ( dst [polarity] : data_source )
+  if (Match(TokenKind::kLParen)) {
+    ParsePathPorts(item->path.dst_ports);
+    item->path.dst_polarity = ParseSpecifyPolarity();
+    Expect(TokenKind::kColon);
+    item->path.data_source = ParseExpr();
+    Expect(TokenKind::kRParen);
+  } else {
+    ParsePathPorts(item->path.dst_ports);
+  }
+
   Expect(TokenKind::kRParen);
   Expect(TokenKind::kEq);
   ParsePathDelays(item->path.delays);
