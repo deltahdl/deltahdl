@@ -24,6 +24,7 @@ add_library(deltahdl_lib STATIC
     parser/parser_items.cpp
     parser/time_resolve.cpp
     elaboration/elaborator.cpp
+    elaboration/elaborator_defparam.cpp
     elaboration/elaborator_validate.cpp
     elaboration/type_eval.cpp
     elaboration/const_eval.cpp
