@@ -13,8 +13,11 @@ Stmt* Parser::ParseImmediateAssertLike(StmtKind kind, TokenKind keyword) {
   stmt->range.start = CurrentLoc();
   Expect(keyword);
 
+  // §A.6.10: deferred_immediate — assert #0 (...) or assert final (...)
   if (Match(TokenKind::kHash)) {
     Expect(TokenKind::kIntLiteral);
+    stmt->is_deferred = true;
+  } else if (Match(TokenKind::kKwFinal)) {
     stmt->is_deferred = true;
   }
 
@@ -45,7 +48,7 @@ Stmt* Parser::ParseImmediateAssume() {
                                   TokenKind::kKwAssume);
 }
 
-// Parse: cover [#0] (expr) [pass_stmt] ;
+// Parse: cover [#0 | final] (expr) [pass_stmt] ;
 // Note: cover has no else branch per the LRM.
 Stmt* Parser::ParseImmediateCover() {
   auto* stmt = arena_.Create<Stmt>();
@@ -53,8 +56,11 @@ Stmt* Parser::ParseImmediateCover() {
   stmt->range.start = CurrentLoc();
   Expect(TokenKind::kKwCover);
 
+  // §A.6.10: deferred_immediate — cover #0 (...) or cover final (...)
   if (Match(TokenKind::kHash)) {
     Expect(TokenKind::kIntLiteral);
+    stmt->is_deferred = true;
+  } else if (Match(TokenKind::kKwFinal)) {
     stmt->is_deferred = true;
   }
 
