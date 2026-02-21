@@ -207,6 +207,18 @@ Expr* Parser::ParseInfixBp(Expr* lhs, int min_bp) {
       continue;
     }
 
+    // §A.6.6: &&& in cond_predicate — lowest precedence binary operator
+    if (tok.kind == TokenKind::kAmpAmpAmp && min_bp <= 0) {
+      Consume();
+      auto* bin = arena_.Create<Expr>();
+      bin->kind = ExprKind::kBinary;
+      bin->op = TokenKind::kAmpAmpAmp;
+      bin->lhs = lhs;
+      bin->rhs = ParseExprBp(1);
+      lhs = bin;
+      continue;
+    }
+
     // inside expression: expr inside { range_list }
     if (tok.kind == TokenKind::kKwInside && min_bp <= 1) {
       lhs = ParseInsideExpr(lhs);
