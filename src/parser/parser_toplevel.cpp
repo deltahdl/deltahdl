@@ -274,85 +274,89 @@ void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
 
 // --- UDP instantiation (§A.5.4) ---
 
+// Speculatively parse optional drive strength: (strength0, strength1) or
+// (strength1, strength0).  Restores lexer position if '(' is not followed by
+// a strength keyword.
+bool Parser::TryParseStrengthSpec(uint8_t& str0, uint8_t& str1) {
+  if (!Check(TokenKind::kLParen)) return false;
+  auto saved = lexer_.SavePos();
+  Consume();  // '('
+  auto tk = CurrentToken().kind;
+  if (!IsStrength0Token(tk) && !IsStrength1Token(tk)) {
+    lexer_.RestorePos(saved);
+    return false;
+  }
+  if (IsStrength0Token(tk)) {
+    str0 = ParseStrength0();
+    if (Match(TokenKind::kComma)) str1 = ParseStrength1();
+  } else {
+    str1 = ParseStrength1();
+    if (Match(TokenKind::kComma)) str0 = ParseStrength0();
+  }
+  Expect(TokenKind::kRParen);
+  return true;
+}
+
+// Parse a single UDP instance: optional name [ dimension ], then terminal list.
+ModuleItem* Parser::ParseOneUdpInstance(const Token& udp_tok, SourceLoc loc) {
+  auto* item = arena_.Create<ModuleItem>();
+  item->kind = ModuleItemKind::kUdpInst;
+  item->loc = loc;
+  item->inst_module = udp_tok.text;
+
+  // Optional name_of_instance: identifier [ unpacked_dimension ]
+  if (CheckIdentifier() && !Check(TokenKind::kLParen)) {
+    item->gate_inst_name = Consume().text;
+    if (Check(TokenKind::kLBracket)) {
+      Consume();
+      item->inst_range_left = ParseExpr();
+      if (Match(TokenKind::kColon)) {
+        item->inst_range_right = ParseExpr();
+      }
+      Expect(TokenKind::kRBracket);
+    }
+  }
+
+  // Terminal list: ( output_terminal , input_terminal { , input_terminal } )
+  Expect(TokenKind::kLParen);
+  item->gate_terminals.push_back(ParseExpr());
+  while (Match(TokenKind::kComma)) {
+    item->gate_terminals.push_back(ParseExpr());
+  }
+  Expect(TokenKind::kRParen);
+  return item;
+}
+
 void Parser::ParseUdpInstList(const Token& udp_tok,
                               std::vector<ModuleItem*>& items) {
   auto loc = udp_tok.loc;
 
-  // Optional drive_strength: (strength0, strength1) or (strength1, strength0)
+  // Optional drive_strength.
   uint8_t str0 = 0;
   uint8_t str1 = 0;
-  if (Check(TokenKind::kLParen)) {
-    auto saved = lexer_.SavePos();
-    Consume();  // '('
-    auto tk = CurrentToken().kind;
-    if (IsStrength0Token(tk) || IsStrength1Token(tk)) {
-      if (IsStrength0Token(tk)) {
-        str0 = ParseStrength0();
-        if (Match(TokenKind::kComma)) str1 = ParseStrength1();
-      } else {
-        str1 = ParseStrength1();
-        if (Match(TokenKind::kComma)) str0 = ParseStrength0();
-      }
-      Expect(TokenKind::kRParen);
-    } else {
-      // Not strength — restore and parse as unnamed instance.
-      lexer_.RestorePos(saved);
-    }
-  }
+  TryParseStrengthSpec(str0, str1);
 
   // Optional delay2: #delay or #(rise, fall)
   Expr* delay = nullptr;
   Expr* delay_fall = nullptr;
-  if (Check(TokenKind::kHash)) {
-    Consume();
-    if (Match(TokenKind::kLParen)) {
-      delay = ParseMinTypMaxExpr();
-      if (Match(TokenKind::kComma)) {
-        delay_fall = ParseMinTypMaxExpr();
-      }
-      Expect(TokenKind::kRParen);
-    } else {
-      delay = ParsePrimaryExpr();
-    }
-  }
+  Expr* unused_decay = nullptr;
+  ParseGateDelay(delay, delay_fall, unused_decay);
 
   // Parse comma-separated udp_instance entries.
-  auto parse_one = [&]() -> ModuleItem* {
-    auto* item = arena_.Create<ModuleItem>();
-    item->kind = ModuleItemKind::kUdpInst;
-    item->loc = loc;
-    item->inst_module = udp_tok.text;
+  auto apply_common = [&](ModuleItem* item) {
     item->drive_strength0 = str0;
     item->drive_strength1 = str1;
     item->gate_delay = delay;
     item->gate_delay_fall = delay_fall;
-
-    // Optional name_of_instance: identifier [ unpacked_dimension ]
-    if (CheckIdentifier() && !Check(TokenKind::kLParen)) {
-      item->gate_inst_name = Consume().text;
-      if (Check(TokenKind::kLBracket)) {
-        Consume();
-        item->inst_range_left = ParseExpr();
-        if (Match(TokenKind::kColon)) {
-          item->inst_range_right = ParseExpr();
-        }
-        Expect(TokenKind::kRBracket);
-      }
-    }
-
-    // Terminal list: ( output_terminal , input_terminal { , input_terminal } )
-    Expect(TokenKind::kLParen);
-    item->gate_terminals.push_back(ParseExpr());
-    while (Match(TokenKind::kComma)) {
-      item->gate_terminals.push_back(ParseExpr());
-    }
-    Expect(TokenKind::kRParen);
-    return item;
   };
 
-  items.push_back(parse_one());
+  auto* first = ParseOneUdpInstance(udp_tok, loc);
+  apply_common(first);
+  items.push_back(first);
   while (Match(TokenKind::kComma)) {
-    items.push_back(parse_one());
+    auto* next = ParseOneUdpInstance(udp_tok, loc);
+    apply_common(next);
+    items.push_back(next);
   }
   Expect(TokenKind::kSemicolon);
 }

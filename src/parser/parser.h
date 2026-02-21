@@ -106,6 +106,8 @@ class Parser {
   void ParseUdpPortDecls(UdpDecl* udp);
   void ParseUdpTable(UdpDecl* udp);
   void ParseUdpTableRow(UdpDecl* udp);
+  bool TryParseStrengthSpec(uint8_t& str0, uint8_t& str1);
+  ModuleItem* ParseOneUdpInstance(const Token& udp_tok, SourceLoc loc);
   void ParseUdpInstList(const Token& udp_tok, std::vector<ModuleItem*>& items);
 
   // Verification constructs (parser_verify.cpp — §17/§18/§19)

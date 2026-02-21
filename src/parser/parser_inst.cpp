@@ -197,19 +197,7 @@ void Parser::ParseContinuousAssign(std::vector<ModuleItem*>& items) {
   Expr* delay = nullptr;
   Expr* delay_fall = nullptr;
   Expr* delay_decay = nullptr;
-  if (Check(TokenKind::kHash)) {
-    Consume();
-    if (Match(TokenKind::kLParen)) {
-      delay = ParseMinTypMaxExpr();
-      if (Match(TokenKind::kComma)) {
-        delay_fall = ParseMinTypMaxExpr();
-        if (Match(TokenKind::kComma)) delay_decay = ParseMinTypMaxExpr();
-      }
-      Expect(TokenKind::kRParen);
-    } else {
-      delay = ParsePrimaryExpr();
-    }
-  }
+  ParseGateDelay(delay, delay_fall, delay_decay);
   // A.6.1: list_of_net_assignments ::= net_assignment { , net_assignment }
   do {
     auto* item = arena_.Create<ModuleItem>();
