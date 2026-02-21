@@ -330,9 +330,25 @@ void Parser::ParseTimingCheckTrailingArgs(TimingCheckDecl& tc) {
   }
 }
 
-// §31.9: Parse extended args after notifier: timestamp_cond, timecheck_cond,
-// delayed_reference, delayed_data.
+// Parse extended args after notifier, dispatching by check kind.
 void Parser::ParseExtendedTimingCheckArgs(TimingCheckDecl& tc) {
+  // §31.8: $timeskew/$fullskew: event_based_flag, remain_active_flag.
+  if (tc.check_kind == TimingCheckKind::kTimeskew ||
+      tc.check_kind == TimingCheckKind::kFullskew) {
+    // event_based_flag (expression or empty)
+    if (!Match(TokenKind::kComma) || Check(TokenKind::kRParen)) return;
+    if (!Check(TokenKind::kComma) && !Check(TokenKind::kRParen)) {
+      tc.event_based_flag = ParseExpr();
+    }
+    // remain_active_flag (expression or empty)
+    if (!Match(TokenKind::kComma) || Check(TokenKind::kRParen)) return;
+    if (!Check(TokenKind::kComma) && !Check(TokenKind::kRParen)) {
+      tc.remain_active_flag = ParseExpr();
+    }
+    return;
+  }
+  // §31.9: $setuphold/$recrem: timestamp_cond, timecheck_cond,
+  // delayed_reference, delayed_data.
   // timestamp_condition (expression or empty)
   if (!Match(TokenKind::kComma) || Check(TokenKind::kRParen)) return;
   if (!Check(TokenKind::kComma) && !Check(TokenKind::kRParen)) {

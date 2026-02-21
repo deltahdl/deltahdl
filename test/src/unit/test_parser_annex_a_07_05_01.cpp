@@ -258,7 +258,8 @@ TEST(ParserA70501, TimeskewWithFlags) {
   ASSERT_NE(tc, nullptr);
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kTimeskew);
   EXPECT_EQ(tc->notifier, "ntfr");
-  // event_based_flag and remain_active_flag to be checked after AST extension
+  ASSERT_NE(tc->event_based_flag, nullptr);
+  ASSERT_NE(tc->remain_active_flag, nullptr);
 }
 
 // =============================================================================
@@ -279,7 +280,8 @@ TEST(ParserA70501, FullskewWithFlags) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kFullskew);
   ASSERT_GE(tc->limits.size(), 2u);
   EXPECT_EQ(tc->notifier, "ntfr");
-  // event_based_flag and remain_active_flag to be checked after AST extension
+  ASSERT_NE(tc->event_based_flag, nullptr);
+  ASSERT_NE(tc->remain_active_flag, nullptr);
 }
 
 // =============================================================================
