@@ -67,9 +67,9 @@ TEST(ParserA70501, SetupTimingCheck) {
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kSetup);
-  EXPECT_EQ(tc->ref_signal, "data");
+  EXPECT_EQ(tc->ref_terminal.name, "data");
   EXPECT_EQ(tc->data_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(tc->data_signal, "clk");
+  EXPECT_EQ(tc->data_terminal.name, "clk");
   ASSERT_EQ(tc->limits.size(), 1u);
 }
 
@@ -104,8 +104,8 @@ TEST(ParserA70501, HoldTimingCheck) {
   ASSERT_NE(tc, nullptr);
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kHold);
   EXPECT_EQ(tc->ref_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(tc->ref_signal, "clk");
-  EXPECT_EQ(tc->data_signal, "data");
+  EXPECT_EQ(tc->ref_terminal.name, "clk");
+  EXPECT_EQ(tc->data_terminal.name, "data");
 }
 
 // =============================================================================
@@ -218,9 +218,9 @@ TEST(ParserA70501, SkewTimingCheck) {
   ASSERT_NE(tc, nullptr);
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kSkew);
   EXPECT_EQ(tc->ref_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(tc->ref_signal, "clk1");
+  EXPECT_EQ(tc->ref_terminal.name, "clk1");
   EXPECT_EQ(tc->data_edge, SpecifyEdge::kNegedge);
-  EXPECT_EQ(tc->data_signal, "clk2");
+  EXPECT_EQ(tc->data_terminal.name, "clk2");
   EXPECT_EQ(tc->notifier, "ntfr");
 }
 
@@ -284,7 +284,7 @@ TEST(ParserA70501, PeriodTimingCheck) {
   ASSERT_NE(tc, nullptr);
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kPeriod);
   EXPECT_EQ(tc->ref_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(tc->ref_signal, "clk");
+  EXPECT_EQ(tc->ref_terminal.name, "clk");
   EXPECT_EQ(tc->notifier, "ntfr");
 }
 

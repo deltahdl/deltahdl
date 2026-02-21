@@ -71,7 +71,7 @@ TEST(ParserSection28, Sec28_12_TimingCheckWidth) {
   auto* si = sp.sole_item;
   EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kWidth);
   EXPECT_EQ(si->timing_check.ref_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(si->timing_check.ref_signal, "clk");
+  EXPECT_EQ(si->timing_check.ref_terminal.name, "clk");
   ASSERT_EQ(si->timing_check.limits.size(), 1u);
 }
 
@@ -88,7 +88,7 @@ TEST(ParserSection28, Sec28_12_TimingCheckPeriod) {
   auto* si = sp.sole_item;
   EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kPeriod);
   EXPECT_EQ(si->timing_check.ref_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(si->timing_check.ref_signal, "clk");
+  EXPECT_EQ(si->timing_check.ref_terminal.name, "clk");
 }
 
 TEST(ParserSection28, Sec28_12_TimingCheckSkew) {
@@ -104,7 +104,7 @@ TEST(ParserSection28, Sec28_12_TimingCheckSkew) {
   auto* si = sp.sole_item;
   EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kSkew);
   EXPECT_EQ(si->timing_check.ref_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(si->timing_check.ref_signal, "clk1");
+  EXPECT_EQ(si->timing_check.ref_terminal.name, "clk1");
   EXPECT_EQ(si->timing_check.data_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(si->timing_check.data_signal, "clk2");
+  EXPECT_EQ(si->timing_check.data_terminal.name, "clk2");
 }

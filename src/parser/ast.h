@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/source_loc.h"
@@ -803,11 +804,13 @@ enum class TimingCheckKind : uint8_t {
 struct TimingCheckDecl {
   TimingCheckKind check_kind = TimingCheckKind::kSetup;
   SpecifyEdge ref_edge = SpecifyEdge::kNone;
-  std::string_view ref_signal;
+  SpecifyTerminal ref_terminal;
   Expr* ref_condition = nullptr;  // §31.7: &&& condition on ref signal
+  std::vector<std::pair<char,char>> ref_edge_descriptors;  // A.7.5.3: edge [01,10,...]
   SpecifyEdge data_edge = SpecifyEdge::kNone;
-  std::string_view data_signal;
+  SpecifyTerminal data_terminal;
   Expr* data_condition = nullptr;  // §31.7: &&& condition on data signal
+  std::vector<std::pair<char,char>> data_edge_descriptors;  // A.7.5.3: edge [01,10,...]
   std::vector<Expr*> limits;       // Timing limit expressions
   std::string_view notifier;       // Optional notifier variable
   // §31.9: Extended arguments for $setuphold / $recrem.

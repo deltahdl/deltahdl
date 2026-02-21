@@ -118,8 +118,18 @@ void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
   Consume();
 }
 
-// Parse edge qualifier: posedge | negedge | edge | (nothing)
-SpecifyEdge Parser::ParseSpecifyEdge() {
+// A.7.5.3: Parse a single edge_descriptor inside edge [ ... ].
+// edge_descriptor ::= 01 | 10 | z_or_x zero_or_one | zero_or_one z_or_x
+static bool IsZorX(char c) {
+  return c == 'x' || c == 'X' || c == 'z' || c == 'Z';
+}
+
+static bool IsZeroOrOne(char c) { return c == '0' || c == '1'; }
+
+// Parse edge qualifier: posedge | negedge | edge [ [...] ] | (nothing)
+// A.7.5.3: edge_control_specifier ::= edge [ edge_descriptor { , edge_descriptor } ]
+SpecifyEdge Parser::ParseSpecifyEdge(
+    std::vector<std::pair<char,char>>* edge_descriptors) {
   if (Check(TokenKind::kKwPosedge)) {
     Consume();
     return SpecifyEdge::kPosedge;
@@ -130,6 +140,39 @@ SpecifyEdge Parser::ParseSpecifyEdge() {
   }
   if (Check(TokenKind::kKwEdge)) {
     Consume();
+    // A.7.5.3: Optional edge_control_specifier bracket list.
+    if (edge_descriptors && Match(TokenKind::kLBracket)) {
+      // Parse edge_descriptor { , edge_descriptor }
+      do {
+        auto text = CurrentToken().text;
+        if (Check(TokenKind::kIntLiteral) && text.size() == 2 &&
+            IsZeroOrOne(text[0]) && IsZeroOrOne(text[1])) {
+          // 01 | 10 (or 00, 11 though unusual)
+          edge_descriptors->push_back({text[0], text[1]});
+          Consume();
+        } else if (Check(TokenKind::kIdentifier) && text.size() == 2 &&
+                   IsZorX(text[0]) && IsZeroOrOne(text[1])) {
+          // z_or_x zero_or_one: x0, x1, z0, z1, X0, X1, Z0, Z1
+          edge_descriptors->push_back({text[0], text[1]});
+          Consume();
+        } else if ((Check(TokenKind::kIntLiteral) && text.size() == 1 &&
+                    IsZeroOrOne(text[0]))) {
+          // zero_or_one z_or_x: 0x, 0z, 1x, 1z (two tokens)
+          char first = text[0];
+          Consume();
+          auto next_text = CurrentToken().text;
+          if (Check(TokenKind::kIdentifier) && next_text.size() == 1 &&
+              IsZorX(next_text[0])) {
+            edge_descriptors->push_back({first, next_text[0]});
+            Consume();
+          }
+        } else {
+          // Unknown token — skip to avoid infinite loop.
+          Consume();
+        }
+      } while (Match(TokenKind::kComma));
+      Expect(TokenKind::kRBracket);
+    }
     return SpecifyEdge::kEdge;
   }
   return SpecifyEdge::kNone;
@@ -382,6 +425,7 @@ void Parser::ParseExtendedTimingCheckArgs(TimingCheckDecl& tc) {
 }
 
 // Parse: $setup(data [&&& cond], posedge clk [&&& cond], limit ...) ;
+// A.7.5.3: timing_check_event uses specify_terminal_descriptor, not bare identifier.
 SpecifyItem* Parser::ParseTimingCheck() {
   auto* item = arena_.Create<SpecifyItem>();
   item->kind = SpecifyItemKind::kTimingCheck;
@@ -394,8 +438,12 @@ SpecifyItem* Parser::ParseTimingCheck() {
   Expect(TokenKind::kLParen);
 
   // First signal argument (with optional edge and §31.7 condition).
-  item->timing_check.ref_edge = ParseSpecifyEdge();
-  item->timing_check.ref_signal = Expect(TokenKind::kIdentifier).text;
+  // A.7.5.3: timing_check_event ::=
+  //   [ timing_check_event_control ] specify_terminal_descriptor
+  //   [ &&& timing_check_condition ]
+  item->timing_check.ref_edge =
+      ParseSpecifyEdge(&item->timing_check.ref_edge_descriptors);
+  item->timing_check.ref_terminal = ParseSpecifyTerminal();
   if (Match(TokenKind::kAmpAmpAmp)) {
     item->timing_check.ref_condition = ParseExpr();
   }
@@ -404,8 +452,9 @@ SpecifyItem* Parser::ParseTimingCheck() {
   // Second signal argument (with optional edge/condition) or limit.
   bool has_data_signal = NeedsDataSignal(item->timing_check.check_kind);
   if (has_data_signal) {
-    item->timing_check.data_edge = ParseSpecifyEdge();
-    item->timing_check.data_signal = Expect(TokenKind::kIdentifier).text;
+    item->timing_check.data_edge =
+        ParseSpecifyEdge(&item->timing_check.data_edge_descriptors);
+    item->timing_check.data_terminal = ParseSpecifyTerminal();
     if (Match(TokenKind::kAmpAmpAmp)) {
       item->timing_check.data_condition = ParseExpr();
     }

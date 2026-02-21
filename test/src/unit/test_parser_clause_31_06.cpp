@@ -86,7 +86,7 @@ TEST(ParserSection28, Sec28_12_TimingCheckWithEdges) {
   auto* si = sp.sole_item;
   EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kSetup);
   EXPECT_EQ(si->timing_check.ref_edge, SpecifyEdge::kNegedge);
-  EXPECT_EQ(si->timing_check.ref_signal, "d");
+  EXPECT_EQ(si->timing_check.ref_terminal.name, "d");
   EXPECT_EQ(si->timing_check.data_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(si->timing_check.data_signal, "clk");
+  EXPECT_EQ(si->timing_check.data_terminal.name, "clk");
 }

@@ -210,9 +210,9 @@ TEST_F(SpecifyTest, SetupTimingCheck) {
   ASSERT_EQ(spec->specify_items.size(), 1u);
   auto& tc = spec->specify_items[0]->timing_check;
   EXPECT_EQ(tc.check_kind, TimingCheckKind::kSetup);
-  EXPECT_EQ(tc.ref_signal, "data");
+  EXPECT_EQ(tc.ref_terminal.name, "data");
   EXPECT_EQ(tc.data_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(tc.data_signal, "clk");
+  EXPECT_EQ(tc.data_terminal.name, "clk");
   ASSERT_EQ(tc.limits.size(), 1u);
 }
 
@@ -228,8 +228,8 @@ TEST_F(SpecifyTest, HoldTimingCheck) {
   auto& tc = spec->specify_items[0]->timing_check;
   EXPECT_EQ(tc.check_kind, TimingCheckKind::kHold);
   EXPECT_EQ(tc.ref_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(tc.ref_signal, "clk");
-  EXPECT_EQ(tc.data_signal, "data");
+  EXPECT_EQ(tc.ref_terminal.name, "clk");
+  EXPECT_EQ(tc.data_terminal.name, "data");
 }
 
 TEST_F(SpecifyTest, SetupholdTimingCheck) {
@@ -298,7 +298,7 @@ TEST_F(SpecifyTest, WidthTimingCheck) {
   auto& tc = spec->specify_items[0]->timing_check;
   EXPECT_EQ(tc.check_kind, TimingCheckKind::kWidth);
   EXPECT_EQ(tc.ref_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(tc.ref_signal, "clk");
+  EXPECT_EQ(tc.ref_terminal.name, "clk");
   ASSERT_GE(tc.limits.size(), 1u);
 }
 
@@ -339,9 +339,9 @@ TEST_F(SpecifyTest, SkewTimingCheck) {
   auto& tc = spec->specify_items[0]->timing_check;
   EXPECT_EQ(tc.check_kind, TimingCheckKind::kSkew);
   EXPECT_EQ(tc.ref_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(tc.ref_signal, "clk1");
+  EXPECT_EQ(tc.ref_terminal.name, "clk1");
   EXPECT_EQ(tc.data_edge, SpecifyEdge::kNegedge);
-  EXPECT_EQ(tc.data_signal, "clk2");
+  EXPECT_EQ(tc.data_terminal.name, "clk2");
 }
 
 TEST_F(SpecifyTest, NochangeTimingCheck) {
@@ -370,9 +370,9 @@ TEST_F(SpecifyTest, TimeskewTimingCheck) {
   auto& tc = spec->specify_items[0]->timing_check;
   EXPECT_EQ(tc.check_kind, TimingCheckKind::kTimeskew);
   EXPECT_EQ(tc.ref_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(tc.ref_signal, "clk1");
+  EXPECT_EQ(tc.ref_terminal.name, "clk1");
   EXPECT_EQ(tc.data_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(tc.data_signal, "clk2");
+  EXPECT_EQ(tc.data_terminal.name, "clk2");
   ASSERT_EQ(tc.limits.size(), 1u);
 }
 
@@ -421,7 +421,7 @@ TEST_F(SpecifyTest, ConditionedSetup) {
   ASSERT_NE(spec, nullptr);
   auto& tc = spec->specify_items[0]->timing_check;
   EXPECT_EQ(tc.check_kind, TimingCheckKind::kSetup);
-  EXPECT_EQ(tc.ref_signal, "data");
+  EXPECT_EQ(tc.ref_terminal.name, "data");
   EXPECT_NE(tc.ref_condition, nullptr);
 }
 

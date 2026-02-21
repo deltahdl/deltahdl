@@ -72,9 +72,9 @@ TEST(ParserSection28, Sec28_12_TimingCheckSetup) {
   EXPECT_EQ(si->kind, SpecifyItemKind::kTimingCheck);
   EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kSetup);
   EXPECT_EQ(si->timing_check.ref_edge, SpecifyEdge::kNone);
-  EXPECT_EQ(si->timing_check.ref_signal, "d");
+  EXPECT_EQ(si->timing_check.ref_terminal.name, "d");
   EXPECT_EQ(si->timing_check.data_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(si->timing_check.data_signal, "clk");
+  EXPECT_EQ(si->timing_check.data_terminal.name, "clk");
   ASSERT_EQ(si->timing_check.limits.size(), 1u);
 }
 
@@ -92,9 +92,9 @@ TEST(ParserSection28, Sec28_12_TimingCheckHold) {
   EXPECT_EQ(si->kind, SpecifyItemKind::kTimingCheck);
   EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kHold);
   EXPECT_EQ(si->timing_check.ref_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(si->timing_check.ref_signal, "clk");
+  EXPECT_EQ(si->timing_check.ref_terminal.name, "clk");
   EXPECT_EQ(si->timing_check.data_edge, SpecifyEdge::kNone);
-  EXPECT_EQ(si->timing_check.data_signal, "d");
+  EXPECT_EQ(si->timing_check.data_terminal.name, "d");
   ASSERT_EQ(si->timing_check.limits.size(), 1u);
 }
 
@@ -112,8 +112,8 @@ TEST(ParserSection28, Sec28_12_TimingCheckSetuphold) {
   EXPECT_EQ(si->kind, SpecifyItemKind::kTimingCheck);
   EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kSetuphold);
   EXPECT_EQ(si->timing_check.ref_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(si->timing_check.ref_signal, "clk");
-  EXPECT_EQ(si->timing_check.data_signal, "d");
+  EXPECT_EQ(si->timing_check.ref_terminal.name, "clk");
+  EXPECT_EQ(si->timing_check.data_terminal.name, "d");
   ASSERT_EQ(si->timing_check.limits.size(), 2u);
 }
 
@@ -130,8 +130,8 @@ TEST(ParserSection28, Sec28_12_TimingCheckRecovery) {
   auto* si = sp.sole_item;
   EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kRecovery);
   EXPECT_EQ(si->timing_check.ref_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(si->timing_check.ref_signal, "clk");
-  EXPECT_EQ(si->timing_check.data_signal, "rst");
+  EXPECT_EQ(si->timing_check.ref_terminal.name, "clk");
+  EXPECT_EQ(si->timing_check.data_terminal.name, "rst");
 }
 
 TEST(ParserSection28, Sec28_12_TimingCheckRemoval) {
@@ -147,9 +147,9 @@ TEST(ParserSection28, Sec28_12_TimingCheckRemoval) {
   auto* si = sp.sole_item;
   EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kRemoval);
   EXPECT_EQ(si->timing_check.ref_edge, SpecifyEdge::kNegedge);
-  EXPECT_EQ(si->timing_check.ref_signal, "rst");
+  EXPECT_EQ(si->timing_check.ref_terminal.name, "rst");
   EXPECT_EQ(si->timing_check.data_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(si->timing_check.data_signal, "clk");
+  EXPECT_EQ(si->timing_check.data_terminal.name, "clk");
 }
 
 TEST(ParserSection28, Sec28_12_TimingCheckRecrem) {
@@ -164,8 +164,8 @@ TEST(ParserSection28, Sec28_12_TimingCheckRecrem) {
   ASSERT_NE(sp.sole_item, nullptr);
   auto* si = sp.sole_item;
   EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kRecrem);
-  EXPECT_EQ(si->timing_check.ref_signal, "clk");
-  EXPECT_EQ(si->timing_check.data_signal, "rst");
+  EXPECT_EQ(si->timing_check.ref_terminal.name, "clk");
+  EXPECT_EQ(si->timing_check.data_terminal.name, "rst");
   ASSERT_EQ(si->timing_check.limits.size(), 2u);
 }
 
