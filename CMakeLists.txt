@@ -34,8 +34,9 @@ if(BUILD_TESTING)
     add_subdirectory(test)
     add_test(
         NAME sim_tests
-        COMMAND ${CMAKE_COMMAND} -E env python3
-            ${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_sim_tests.py
+        COMMAND ${CMAKE_COMMAND} -E env
+            PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}
+            python3 ${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_sim_tests.py
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
     set_tests_properties(sim_tests PROPERTIES LABELS "e2e")
