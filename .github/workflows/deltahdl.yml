@@ -469,13 +469,13 @@ jobs:
           cmake -B build \
             -DCMAKE_CXX_COMPILER=clang++-18 \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-      - name: Run clang-tidy (src, shard ${{ matrix.shard }}/4)
+      - name: Run clang-tidy (src, shard ${{ matrix.shard }}/3)
         run: |
           regex=$(jq -r '.[].file' build/compile_commands.json \
             | grep -v '/test/' \
             | grep '\.cpp$' \
             | sort \
-            | awk "NR % 4 == ${{ matrix.shard }}" \
+            | awk "NR % 3 == ${{ matrix.shard }}" \
             | xargs -n1 basename \
             | sed 's/\./\\./g' \
             | sed 's|^|/|' \
@@ -491,7 +491,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: ['00', '01', '02', '03']
+        shard: ['00', '01', '02']
   clang-tidy-test:
     env:
       CTCACHE_DIR: ${{ github.workspace }}/.ctcache
@@ -529,12 +529,12 @@ jobs:
           cmake -B build \
             -DCMAKE_CXX_COMPILER=clang++-18 \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-      - name: Run clang-tidy (test, shard ${{ matrix.shard }}/15)
+      - name: Run clang-tidy (test, shard ${{ matrix.shard }}/17)
         run: |
           regex=$(jq -r '.[].file' build/compile_commands.json \
             | grep '/test/src/unit/.*\.cpp$' \
             | sort \
-            | awk "NR % 15 == ${{ matrix.shard }}" \
+            | awk "NR % 17 == ${{ matrix.shard }}" \
             | xargs -n1 basename \
             | sed 's/\./\\./g' \
             | sed 's|^|/|' \
@@ -552,7 +552,7 @@ jobs:
       matrix:
         shard: ['00', '01', '02', '03', '04', '05',
                 '06', '07', '08', '09', '10', '11',
-                '12', '13', '14']
+                '12', '13', '14', '15', '16']
   e2e-test-asan-ubsan:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
