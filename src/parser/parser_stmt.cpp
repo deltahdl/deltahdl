@@ -407,7 +407,8 @@ Stmt* Parser::ParseForStmt() {
   if (Check(TokenKind::kSemicolon)) {
     // Empty init — just consume the ';'.
     Consume();
-  } else if (Check(TokenKind::kKwVar) || IsDataTypeKeyword(CurrentToken().kind)) {
+  } else if (Check(TokenKind::kKwVar) ||
+             IsDataTypeKeyword(CurrentToken().kind)) {
     // §A.6.8: for_variable_declaration: [var] data_type id = expr
     Match(TokenKind::kKwVar);
     stmt->for_init_type = ParseDataType();

@@ -23,14 +23,13 @@ struct ElabA701Fixture {
   bool has_errors = false;
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src,
-                                 ElabA701Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, ElabA701Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
-  auto *design = elab.Elaborate(cu->modules.back()->name);
+  auto* design = elab.Elaborate(cu->modules.back()->name);
   f.has_errors = f.diag.HasErrors();
   return design;
 }
@@ -44,7 +43,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src,
 // Empty specify block elaborates without errors
 TEST(ElabA701, EmptySpecifyBlockElaborates) {
   ElabA701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
       "  endspecify\n"
@@ -57,7 +56,7 @@ TEST(ElabA701, EmptySpecifyBlockElaborates) {
 // Specify block with path declaration elaborates
 TEST(ElabA701, SpecifyBlockWithPathElaborates) {
   ElabA701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
       "    (a => b) = 5;\n"
@@ -71,7 +70,7 @@ TEST(ElabA701, SpecifyBlockWithPathElaborates) {
 // Specify block with pulsestyle declaration elaborates
 TEST(ElabA701, SpecifyBlockWithPulsestyleElaborates) {
   ElabA701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
       "    pulsestyle_onevent out1;\n"
@@ -86,7 +85,7 @@ TEST(ElabA701, SpecifyBlockWithPulsestyleElaborates) {
 // Specify block with showcancelled declaration elaborates
 TEST(ElabA701, SpecifyBlockWithShowcancelledElaborates) {
   ElabA701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
       "    showcancelled out1;\n"
@@ -101,7 +100,7 @@ TEST(ElabA701, SpecifyBlockWithShowcancelledElaborates) {
 // Specify block with all five item kinds elaborates
 TEST(ElabA701, SpecifyBlockWithAllItemKindsElaborates) {
   ElabA701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
       "    specparam tPD = 5;\n"

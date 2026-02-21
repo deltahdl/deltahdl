@@ -54,7 +54,8 @@ static const RsProduction* FindProduction(const Stmt* stmt,
   return nullptr;
 }
 
-// Execute a single rs_prod item (code block, if, repeat, case, or sub-production).
+// Execute a single rs_prod item (code block, if, repeat, case, or
+// sub-production).
 static ExecTask ExecRsProd(const Stmt* stmt, const RsProd& prod,
                            SimContext& ctx, Arena& arena) {
   switch (prod.kind) {
@@ -99,8 +100,7 @@ static ExecTask ExecRsProd(const Stmt* stmt, const RsProd& prod,
         }
         for (auto* pat : ci.patterns) {
           if (EvalExpr(pat, ctx, arena).ToUint64() == val) {
-            co_return co_await ExecRsProduction(stmt, ci.item.name, ctx,
-                                                arena);
+            co_return co_await ExecRsProduction(stmt, ci.item.name, ctx, arena);
           }
         }
       }
@@ -121,16 +121,15 @@ static ExecTask ExecRsProduction(const Stmt* stmt, std::string_view name,
   if (production->rules.size() > 1) {
     uint64_t total_weight = 0;
     for (const auto& rule : production->rules) {
-      total_weight += rule.weight ? EvalExpr(rule.weight, ctx, arena).ToUint64()
-                                  : 1;
+      total_weight +=
+          rule.weight ? EvalExpr(rule.weight, ctx, arena).ToUint64() : 1;
     }
     if (total_weight > 0) {
       uint64_t pick = ctx.Urandom32() % total_weight;
       uint64_t cumulative = 0;
       for (const auto& rule : production->rules) {
-        cumulative += rule.weight
-                          ? EvalExpr(rule.weight, ctx, arena).ToUint64()
-                          : 1;
+        cumulative +=
+            rule.weight ? EvalExpr(rule.weight, ctx, arena).ToUint64() : 1;
         if (pick < cumulative) {
           selected = &rule;
           break;

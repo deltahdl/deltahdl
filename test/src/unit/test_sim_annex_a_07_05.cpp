@@ -29,12 +29,11 @@ struct SimA705Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src,
-                                 SimA705Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA705Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -73,12 +72,12 @@ TEST(SimA705, RuntimeTimingCheckEntryHold) {
 TEST(SimA705, RuntimeAllTwelveKinds) {
   SpecifyManager mgr;
   TimingCheckKind kinds[] = {
-      TimingCheckKind::kSetup,    TimingCheckKind::kHold,
+      TimingCheckKind::kSetup,     TimingCheckKind::kHold,
       TimingCheckKind::kSetuphold, TimingCheckKind::kRecovery,
-      TimingCheckKind::kRemoval,  TimingCheckKind::kRecrem,
-      TimingCheckKind::kSkew,     TimingCheckKind::kTimeskew,
-      TimingCheckKind::kFullskew, TimingCheckKind::kPeriod,
-      TimingCheckKind::kWidth,    TimingCheckKind::kNochange,
+      TimingCheckKind::kRemoval,   TimingCheckKind::kRecrem,
+      TimingCheckKind::kSkew,      TimingCheckKind::kTimeskew,
+      TimingCheckKind::kFullskew,  TimingCheckKind::kPeriod,
+      TimingCheckKind::kWidth,     TimingCheckKind::kNochange,
   };
   for (auto kind : kinds) {
     TimingCheckEntry tc;
@@ -101,7 +100,7 @@ TEST(SimA705, RuntimeAllTwelveKinds) {
 // Module with $setup timing check simulates correctly
 TEST(SimA705, SetupTimingCheckSimulates) {
   SimA705Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
@@ -114,7 +113,7 @@ TEST(SimA705, SetupTimingCheckSimulates) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -122,7 +121,7 @@ TEST(SimA705, SetupTimingCheckSimulates) {
 // Module with multiple timing checks simulates correctly
 TEST(SimA705, MultipleTimingChecksSimulate) {
   SimA705Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
@@ -137,7 +136,7 @@ TEST(SimA705, MultipleTimingChecksSimulate) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
@@ -145,7 +144,7 @@ TEST(SimA705, MultipleTimingChecksSimulate) {
 // Module with timing checks and path delays simulates correctly
 TEST(SimA705, TimingChecksWithPathsSimulate) {
   SimA705Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
@@ -159,7 +158,7 @@ TEST(SimA705, TimingChecksWithPathsSimulate) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }

@@ -29,12 +29,11 @@ struct SimA704Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src,
-                                 SimA704Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA704Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -48,7 +47,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src,
 // Module with 6-delay path simulates correctly
 TEST(SimA704, SixDelayPathSimulates) {
   SimA704Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
@@ -61,7 +60,7 @@ TEST(SimA704, SixDelayPathSimulates) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -69,7 +68,7 @@ TEST(SimA704, SixDelayPathSimulates) {
 // Module with 12-delay path simulates correctly
 TEST(SimA704, TwelveDelayPathSimulates) {
   SimA704Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
@@ -82,7 +81,7 @@ TEST(SimA704, TwelveDelayPathSimulates) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
@@ -90,7 +89,7 @@ TEST(SimA704, TwelveDelayPathSimulates) {
 // Module with min:typ:max delay simulates correctly
 TEST(SimA704, MinTypMaxDelaySimulates) {
   SimA704Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
@@ -103,7 +102,7 @@ TEST(SimA704, MinTypMaxDelaySimulates) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
@@ -119,12 +118,12 @@ TEST(SimA704, RuntimePathDelaySixDelays) {
   pd.src_port = "a";
   pd.dst_port = "b";
   pd.delay_count = 6;
-  pd.delays[0] = 1;   // t01
-  pd.delays[1] = 2;   // t10
-  pd.delays[2] = 3;   // t0z
-  pd.delays[3] = 4;   // tz1
-  pd.delays[4] = 5;   // t1z
-  pd.delays[5] = 6;   // tz0
+  pd.delays[0] = 1;  // t01
+  pd.delays[1] = 2;  // t10
+  pd.delays[2] = 3;  // t0z
+  pd.delays[3] = 4;  // tz1
+  pd.delays[4] = 5;  // t1z
+  pd.delays[5] = 6;  // tz0
   mgr.AddPathDelay(pd);
 
   EXPECT_TRUE(mgr.HasPathDelay("a", "b"));

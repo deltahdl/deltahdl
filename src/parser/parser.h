@@ -137,7 +137,7 @@ class Parser {
   SpecifyTerminal ParseSpecifyTerminal();
   void ParsePathDelays(std::vector<Expr*>& delays);
   SpecifyEdge ParseSpecifyEdge(
-      std::vector<std::pair<char,char>>* edge_descriptors = nullptr);
+      std::vector<std::pair<char, char>>* edge_descriptors = nullptr);
   SpecifyPolarity ParseSpecifyPolarity();
   TimingCheckKind ParseTimingCheckKind(std::string_view name);
   bool CheckNextIsCommaOrRParen();

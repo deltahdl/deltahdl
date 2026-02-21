@@ -15,11 +15,11 @@ namespace {
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-ParseResult Parse(const std::string &src) {
+ParseResult Parse(const std::string& src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -30,8 +30,8 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-static Stmt *FirstInitialStmt(ParseResult &r) {
-  for (auto *item : r.cu->modules[0]->items) {
+static Stmt* FirstInitialStmt(ParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
@@ -41,9 +41,8 @@ static Stmt *FirstInitialStmt(ParseResult &r) {
   return nullptr;
 }
 
-static ModuleItem *FirstModuleItemOfKind(ParseResult &r,
-                                         ModuleItemKind kind) {
-  for (auto *item : r.cu->modules[0]->items) {
+static ModuleItem* FirstModuleItemOfKind(ParseResult& r, ModuleItemKind kind) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == kind) return item;
   }
   return nullptr;
@@ -63,7 +62,7 @@ TEST(ParserA610, SimpleAssertSemicolon) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
   ASSERT_NE(stmt->assert_expr, nullptr);
@@ -80,7 +79,7 @@ TEST(ParserA610, SimpleAssertPassAction) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
   ASSERT_NE(stmt->assert_pass_stmt, nullptr);
@@ -95,7 +94,7 @@ TEST(ParserA610, SimpleAssertPassElseFail) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
   ASSERT_NE(stmt->assert_pass_stmt, nullptr);
@@ -110,7 +109,7 @@ TEST(ParserA610, SimpleAssertElseOnly) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
   EXPECT_EQ(stmt->assert_pass_stmt, nullptr);
@@ -129,7 +128,7 @@ TEST(ParserA610, SimpleAssumeSemicolon) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kAssumeImmediate);
   EXPECT_EQ(stmt->assert_pass_stmt, nullptr);
@@ -144,7 +143,7 @@ TEST(ParserA610, SimpleAssumePassElseFail) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kAssumeImmediate);
   ASSERT_NE(stmt->assert_pass_stmt, nullptr);
@@ -163,7 +162,7 @@ TEST(ParserA610, SimpleCoverSemicolon) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kCoverImmediate);
   EXPECT_EQ(stmt->assert_pass_stmt, nullptr);
@@ -178,7 +177,7 @@ TEST(ParserA610, SimpleCoverPassAction) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kCoverImmediate);
   ASSERT_NE(stmt->assert_pass_stmt, nullptr);
@@ -197,7 +196,7 @@ TEST(ParserA610, DeferredAssertHash0) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
   EXPECT_TRUE(stmt->is_deferred);
@@ -211,7 +210,7 @@ TEST(ParserA610, DeferredAssertFinal) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
   EXPECT_TRUE(stmt->is_deferred);
@@ -225,7 +224,7 @@ TEST(ParserA610, DeferredAssertHash0ActionBlock) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
   EXPECT_TRUE(stmt->is_deferred);
@@ -245,7 +244,7 @@ TEST(ParserA610, DeferredAssumeHash0) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kAssumeImmediate);
   EXPECT_TRUE(stmt->is_deferred);
@@ -259,7 +258,7 @@ TEST(ParserA610, DeferredAssumeFinal) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kAssumeImmediate);
   EXPECT_TRUE(stmt->is_deferred);
@@ -277,7 +276,7 @@ TEST(ParserA610, DeferredCoverHash0) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kCoverImmediate);
   EXPECT_TRUE(stmt->is_deferred);
@@ -291,7 +290,7 @@ TEST(ParserA610, DeferredCoverFinal) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kCoverImmediate);
   EXPECT_TRUE(stmt->is_deferred);
@@ -309,7 +308,7 @@ TEST(ParserA610, ActionBlockBeginEnd) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
   ASSERT_NE(stmt->assert_pass_stmt, nullptr);
@@ -324,7 +323,7 @@ TEST(ParserA610, ActionBlockPassFailBlocks) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->assert_pass_stmt, nullptr);
   ASSERT_NE(stmt->assert_fail_stmt, nullptr);
@@ -342,7 +341,7 @@ TEST(ParserA610, AssertPropertyModule) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstModuleItemOfKind(r, ModuleItemKind::kAssertProperty);
+  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kAssertProperty);
   ASSERT_NE(item, nullptr);
 }
 
@@ -354,7 +353,7 @@ TEST(ParserA610, AssumePropertyModule) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstModuleItemOfKind(r, ModuleItemKind::kAssumeProperty);
+  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kAssumeProperty);
   ASSERT_NE(item, nullptr);
 }
 
@@ -366,7 +365,7 @@ TEST(ParserA610, CoverPropertyModule) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstModuleItemOfKind(r, ModuleItemKind::kCoverProperty);
+  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kCoverProperty);
   ASSERT_NE(item, nullptr);
 }
 
@@ -378,7 +377,7 @@ TEST(ParserA610, CoverSequenceModule) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstModuleItemOfKind(r, ModuleItemKind::kCoverSequence);
+  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kCoverSequence);
   ASSERT_NE(item, nullptr);
 }
 
@@ -390,7 +389,7 @@ TEST(ParserA610, RestrictPropertyModule) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstModuleItemOfKind(r, ModuleItemKind::kRestrictProperty);
+  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kRestrictProperty);
   ASSERT_NE(item, nullptr);
 }
 
@@ -432,7 +431,7 @@ TEST(ParserA610, AssertPropertyActionBlock) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstModuleItemOfKind(r, ModuleItemKind::kAssertProperty);
+  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kAssertProperty);
   ASSERT_NE(item, nullptr);
   ASSERT_NE(item->assert_pass_stmt, nullptr);
   ASSERT_NE(item->assert_fail_stmt, nullptr);
@@ -446,7 +445,7 @@ TEST(ParserA610, CoverPropertyPassAction) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstModuleItemOfKind(r, ModuleItemKind::kCoverProperty);
+  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kCoverProperty);
   ASSERT_NE(item, nullptr);
   ASSERT_NE(item->assert_pass_stmt, nullptr);
 }

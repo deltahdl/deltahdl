@@ -55,7 +55,8 @@ TimingCheckDecl* GetSoleTimingCheck(ParseResult& r) {
 // A.7.5.1 $setup_timing_check
 // =============================================================================
 
-// $setup ( data_event , reference_event , timing_check_limit [ , [ notifier ] ] )
+// $setup ( data_event , reference_event , timing_check_limit [ , [ notifier ] ]
+// )
 TEST(ParserA70501, SetupTimingCheck) {
   auto r = Parse(
       "module m;\n"
@@ -91,7 +92,8 @@ TEST(ParserA70501, SetupWithNotifier) {
 // A.7.5.1 $hold_timing_check
 // =============================================================================
 
-// $hold ( reference_event , data_event , timing_check_limit [ , [ notifier ] ] )
+// $hold ( reference_event , data_event , timing_check_limit [ , [ notifier ] ]
+// )
 TEST(ParserA70501, HoldTimingCheck) {
   auto r = Parse(
       "module m;\n"
@@ -271,7 +273,8 @@ TEST(ParserA70501, FullskewWithFlags) {
 // A.7.5.1 $period_timing_check
 // =============================================================================
 
-// $period ( controlled_reference_event , timing_check_limit [ , [ notifier ] ] )
+// $period ( controlled_reference_event , timing_check_limit [ , [ notifier ] ]
+// )
 TEST(ParserA70501, PeriodTimingCheck) {
   auto r = Parse(
       "module m;\n"
@@ -292,7 +295,8 @@ TEST(ParserA70501, PeriodTimingCheck) {
 // A.7.5.1 $width_timing_check
 // =============================================================================
 
-// $width ( controlled_reference_event , timing_check_limit , threshold [ , [ notifier ] ] )
+// $width ( controlled_reference_event , timing_check_limit , threshold [ , [
+// notifier ] ] )
 TEST(ParserA70501, WidthWithThreshold) {
   auto r = Parse(
       "module m;\n"
@@ -340,4 +344,3 @@ TEST(ParserA70501, NochangeWithNotifier) {
   ASSERT_NE(tc, nullptr);
   EXPECT_EQ(tc->notifier, "ntfr");
 }
-

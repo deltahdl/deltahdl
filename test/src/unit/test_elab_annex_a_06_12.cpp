@@ -21,14 +21,13 @@ struct ElabA612Fixture {
   bool has_errors = false;
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src,
-                                 ElabA612Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, ElabA612Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
-  auto *design = elab.Elaborate(cu->modules.back()->name);
+  auto* design = elab.Elaborate(cu->modules.back()->name);
   f.has_errors = f.diag.HasErrors();
   return design;
 }
@@ -42,7 +41,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src,
 // Basic randsequence elaborates without errors
 TEST(ElabA612, BasicRandsequenceElaborates) {
   ElabA612Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  initial begin\n"
       "    randsequence(main)\n"
@@ -60,7 +59,7 @@ TEST(ElabA612, BasicRandsequenceElaborates) {
 // Randsequence with weighted alternatives elaborates
 TEST(ElabA612, WeightedAlternativesElaborate) {
   ElabA612Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  initial begin\n"
       "    randsequence(main)\n"
@@ -78,7 +77,7 @@ TEST(ElabA612, WeightedAlternativesElaborate) {
 // Randsequence with if-else, repeat, case elaborates
 TEST(ElabA612, ControlFlowProdsElaborate) {
   ElabA612Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  initial begin\n"
       "    randsequence(main)\n"
@@ -97,7 +96,7 @@ TEST(ElabA612, ControlFlowProdsElaborate) {
 // Randsequence with rand join elaborates
 TEST(ElabA612, RandJoinElaborates) {
   ElabA612Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  initial begin\n"
       "    randsequence(main)\n"
@@ -115,7 +114,7 @@ TEST(ElabA612, RandJoinElaborates) {
 // Randsequence with production ports and return types elaborates
 TEST(ElabA612, ProductionPortsElaborate) {
   ElabA612Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  initial begin\n"
       "    randsequence(main)\n"

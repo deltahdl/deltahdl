@@ -28,12 +28,11 @@ struct SimA703Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src,
-                                 SimA703Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA703Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -47,7 +46,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src,
 // Terminal with bit-select in specify does not interfere with simulation
 TEST(SimA703, TerminalBitSelectSimulates) {
   SimA703Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
@@ -60,7 +59,7 @@ TEST(SimA703, TerminalBitSelectSimulates) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -68,7 +67,7 @@ TEST(SimA703, TerminalBitSelectSimulates) {
 // Terminal with part-select in specify does not interfere with simulation
 TEST(SimA703, TerminalPartSelectSimulates) {
   SimA703Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
@@ -81,7 +80,7 @@ TEST(SimA703, TerminalPartSelectSimulates) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
@@ -89,7 +88,7 @@ TEST(SimA703, TerminalPartSelectSimulates) {
 // Dotted terminals in specify do not interfere with simulation
 TEST(SimA703, DottedTerminalSimulates) {
   SimA703Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
@@ -102,7 +101,7 @@ TEST(SimA703, DottedTerminalSimulates) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
@@ -110,7 +109,7 @@ TEST(SimA703, DottedTerminalSimulates) {
 // Mixed terminal forms do not interfere with behavioral simulation
 TEST(SimA703, MixedTerminalFormsDoNotInterfere) {
   SimA703Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  specify\n"
@@ -127,8 +126,8 @@ TEST(SimA703, MixedTerminalFormsDoNotInterfere) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *va = f.ctx.FindVariable("a");
-  auto *vb = f.ctx.FindVariable("b");
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
   ASSERT_NE(va, nullptr);
   ASSERT_NE(vb, nullptr);
   EXPECT_EQ(va->value.ToUint64(), 11u);

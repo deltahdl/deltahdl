@@ -23,14 +23,13 @@ struct ElabA705Fixture {
   bool has_errors = false;
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src,
-                                 ElabA705Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, ElabA705Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
-  auto *design = elab.Elaborate(cu->modules.back()->name);
+  auto* design = elab.Elaborate(cu->modules.back()->name);
   f.has_errors = f.diag.HasErrors();
   return design;
 }
@@ -44,7 +43,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src,
 // $setup timing check elaborates
 TEST(ElabA705, SetupTimingCheckElaborates) {
   ElabA705Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
       "    $setup(data, posedge clk, 10);\n"
@@ -58,7 +57,7 @@ TEST(ElabA705, SetupTimingCheckElaborates) {
 // $hold timing check elaborates
 TEST(ElabA705, HoldTimingCheckElaborates) {
   ElabA705Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
       "    $hold(posedge clk, data, 5);\n"
@@ -72,7 +71,7 @@ TEST(ElabA705, HoldTimingCheckElaborates) {
 // All 12 system_timing_check alternatives in one specify block
 TEST(ElabA705, AllTwelveCheckTypesElaborate) {
   ElabA705Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
       "    $setup(d, posedge clk, 10);\n"
@@ -97,7 +96,7 @@ TEST(ElabA705, AllTwelveCheckTypesElaborate) {
 // Timing checks mixed with path declarations elaborate
 TEST(ElabA705, TimingChecksMixedWithPathsElaborate) {
   ElabA705Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
       "    (a => b) = 5;\n"
@@ -114,7 +113,7 @@ TEST(ElabA705, TimingChecksMixedWithPathsElaborate) {
 // Timing checks with specparam declarations elaborate
 TEST(ElabA705, TimingChecksWithSpecparamsElaborate) {
   ElabA705Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
       "    specparam tSetup = 10;\n"
@@ -129,7 +128,7 @@ TEST(ElabA705, TimingChecksWithSpecparamsElaborate) {
 // Multiple specify blocks with timing checks elaborate
 TEST(ElabA705, MultipleSpecifyBlocksElaborate) {
   ElabA705Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
       "    $setup(d, posedge clk, 10);\n"

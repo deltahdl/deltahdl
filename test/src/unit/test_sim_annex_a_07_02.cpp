@@ -28,12 +28,11 @@ struct SimA702Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src,
-                                 SimA702Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA702Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -47,7 +46,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src,
 // Module with simple parallel path simulates correctly
 TEST(SimA702, SimpleParallelPathSimulates) {
   SimA702Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
@@ -60,7 +59,7 @@ TEST(SimA702, SimpleParallelPathSimulates) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -68,7 +67,7 @@ TEST(SimA702, SimpleParallelPathSimulates) {
 // Module with full path simulates correctly
 TEST(SimA702, SimpleFullPathSimulates) {
   SimA702Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
@@ -81,7 +80,7 @@ TEST(SimA702, SimpleFullPathSimulates) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
@@ -89,7 +88,7 @@ TEST(SimA702, SimpleFullPathSimulates) {
 // Module with edge-sensitive path simulates correctly
 TEST(SimA702, EdgeSensitivePathSimulates) {
   SimA702Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
@@ -102,7 +101,7 @@ TEST(SimA702, EdgeSensitivePathSimulates) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
@@ -110,7 +109,7 @@ TEST(SimA702, EdgeSensitivePathSimulates) {
 // Module with state-dependent path simulates correctly
 TEST(SimA702, StateDependentPathSimulates) {
   SimA702Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
@@ -124,7 +123,7 @@ TEST(SimA702, StateDependentPathSimulates) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
@@ -132,7 +131,7 @@ TEST(SimA702, StateDependentPathSimulates) {
 // Module with polarity path simulates correctly
 TEST(SimA702, PolarityPathSimulates) {
   SimA702Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
@@ -146,7 +145,7 @@ TEST(SimA702, PolarityPathSimulates) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
@@ -154,7 +153,7 @@ TEST(SimA702, PolarityPathSimulates) {
 // Path declarations do not interfere with behavioral initial block
 TEST(SimA702, PathDeclsDoNotInterfereBehavioral) {
   SimA702Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  specify\n"
@@ -173,8 +172,8 @@ TEST(SimA702, PathDeclsDoNotInterfereBehavioral) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *va = f.ctx.FindVariable("a");
-  auto *vb = f.ctx.FindVariable("b");
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
   ASSERT_NE(va, nullptr);
   ASSERT_NE(vb, nullptr);
   EXPECT_EQ(va->value.ToUint64(), 11u);

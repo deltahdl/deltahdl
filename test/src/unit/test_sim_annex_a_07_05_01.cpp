@@ -29,12 +29,11 @@ struct SimA70501Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src,
-                                 SimA70501Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA70501Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -56,7 +55,7 @@ TEST(SimA70501, SetupholdDualLimitsStored) {
   tc.notifier = "ntfr";
   mgr.AddTimingCheck(tc);
   ASSERT_EQ(mgr.TimingCheckCount(), 1u);
-  auto &stored = mgr.GetTimingChecks()[0];
+  auto& stored = mgr.GetTimingChecks()[0];
   EXPECT_EQ(stored.kind, TimingCheckKind::kSetuphold);
   EXPECT_EQ(stored.limit, 10u);
   EXPECT_EQ(stored.limit2, 5u);
@@ -76,7 +75,7 @@ TEST(SimA70501, RecremDualLimitsStored) {
   tc.limit = 8;
   tc.limit2 = 3;
   mgr.AddTimingCheck(tc);
-  auto &stored = mgr.GetTimingChecks()[0];
+  auto& stored = mgr.GetTimingChecks()[0];
   EXPECT_EQ(stored.kind, TimingCheckKind::kRecrem);
   EXPECT_EQ(stored.limit, 8u);
   EXPECT_EQ(stored.limit2, 3u);
@@ -97,7 +96,7 @@ TEST(SimA70501, FullskewDualLimitsStored) {
   tc.limit = 4;
   tc.limit2 = 6;
   mgr.AddTimingCheck(tc);
-  auto &stored = mgr.GetTimingChecks()[0];
+  auto& stored = mgr.GetTimingChecks()[0];
   EXPECT_EQ(stored.kind, TimingCheckKind::kFullskew);
   EXPECT_EQ(stored.limit, 4u);
   EXPECT_EQ(stored.limit2, 6u);
@@ -116,7 +115,7 @@ TEST(SimA70501, WidthThresholdAsLimit2) {
   tc.limit = 20;
   tc.limit2 = 1;  // threshold
   mgr.AddTimingCheck(tc);
-  auto &stored = mgr.GetTimingChecks()[0];
+  auto& stored = mgr.GetTimingChecks()[0];
   EXPECT_EQ(stored.kind, TimingCheckKind::kWidth);
   EXPECT_EQ(stored.limit, 20u);
   EXPECT_EQ(stored.limit2, 1u);
@@ -136,7 +135,7 @@ TEST(SimA70501, NochangeOffsetsStored) {
   tc.limit = 0;   // start_edge_offset
   tc.limit2 = 0;  // end_edge_offset
   mgr.AddTimingCheck(tc);
-  auto &stored = mgr.GetTimingChecks()[0];
+  auto& stored = mgr.GetTimingChecks()[0];
   EXPECT_EQ(stored.kind, TimingCheckKind::kNochange);
 }
 
@@ -146,7 +145,7 @@ TEST(SimA70501, NochangeOffsetsStored) {
 
 TEST(SimA70501, SetupholdFullArgsSimulates) {
   SimA70501Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
@@ -159,7 +158,7 @@ TEST(SimA70501, SetupholdFullArgsSimulates) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -170,7 +169,7 @@ TEST(SimA70501, SetupholdFullArgsSimulates) {
 
 TEST(SimA70501, TimeskewWithFlagsSimulates) {
   SimA70501Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
@@ -183,7 +182,7 @@ TEST(SimA70501, TimeskewWithFlagsSimulates) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }

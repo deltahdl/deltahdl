@@ -127,9 +127,10 @@ static bool IsZorX(char c) {
 static bool IsZeroOrOne(char c) { return c == '0' || c == '1'; }
 
 // Parse edge qualifier: posedge | negedge | edge [ [...] ] | (nothing)
-// A.7.5.3: edge_control_specifier ::= edge [ edge_descriptor { , edge_descriptor } ]
+// A.7.5.3: edge_control_specifier ::= edge [ edge_descriptor { ,
+// edge_descriptor } ]
 SpecifyEdge Parser::ParseSpecifyEdge(
-    std::vector<std::pair<char,char>>* edge_descriptors) {
+    std::vector<std::pair<char, char>>* edge_descriptors) {
   if (Check(TokenKind::kKwPosedge)) {
     Consume();
     return SpecifyEdge::kPosedge;
@@ -252,7 +253,8 @@ SpecifyPolarity Parser::ParseSpecifyPolarity() {
 }
 
 // Parse: ( [edge] src_ports [polarity] =>|*> dst_ports ) = delay ;
-// Also handles edge-sensitive form: ( [edge] src [polarity] => ( dst [polarity] : data_source ) )
+// Also handles edge-sensitive form: ( [edge] src [polarity] => ( dst [polarity]
+// : data_source ) )
 SpecifyItem* Parser::ParseSpecifyPathDecl() {
   auto* item = arena_.Create<SpecifyItem>();
   item->kind = SpecifyItemKind::kPathDecl;
@@ -425,7 +427,8 @@ void Parser::ParseExtendedTimingCheckArgs(TimingCheckDecl& tc) {
 }
 
 // Parse: $setup(data [&&& cond], posedge clk [&&& cond], limit ...) ;
-// A.7.5.3: timing_check_event uses specify_terminal_descriptor, not bare identifier.
+// A.7.5.3: timing_check_event uses specify_terminal_descriptor, not bare
+// identifier.
 SpecifyItem* Parser::ParseTimingCheck() {
   auto* item = arena_.Create<SpecifyItem>();
   item->kind = SpecifyItemKind::kTimingCheck;

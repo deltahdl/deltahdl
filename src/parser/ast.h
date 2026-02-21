@@ -280,16 +280,16 @@ struct RsCaseItem {
 
 struct RsProd {
   RsProdKind kind = RsProdKind::kItem;
-  RsProductionItem item;                // kItem
-  std::vector<Stmt*> code_stmts;        // kCodeBlock
-  Expr* condition = nullptr;            // kIf / kRepeat
-  RsProductionItem if_true;             // kIf
-  RsProductionItem if_false;            // kIf (else branch)
-  bool has_else = false;                // kIf
-  Expr* repeat_count = nullptr;         // kRepeat
-  RsProductionItem repeat_item;         // kRepeat
-  Expr* case_expr = nullptr;            // kCase
-  std::vector<RsCaseItem> case_items;   // kCase
+  RsProductionItem item;               // kItem
+  std::vector<Stmt*> code_stmts;       // kCodeBlock
+  Expr* condition = nullptr;           // kIf / kRepeat
+  RsProductionItem if_true;            // kIf
+  RsProductionItem if_false;           // kIf (else branch)
+  bool has_else = false;               // kIf
+  Expr* repeat_count = nullptr;        // kRepeat
+  RsProductionItem repeat_item;        // kRepeat
+  Expr* case_expr = nullptr;           // kCase
+  std::vector<RsCaseItem> case_items;  // kCase
 };
 
 struct RsRule {
@@ -297,8 +297,8 @@ struct RsRule {
   bool is_rand_join = false;
   Expr* rand_join_expr = nullptr;  // Optional bias expression
   std::vector<RsProductionItem> rand_join_items;
-  Expr* weight = nullptr;              // := weight_specification
-  std::vector<Stmt*> weight_code;      // Optional code block after weight
+  Expr* weight = nullptr;          // := weight_specification
+  std::vector<Stmt*> weight_code;  // Optional code block after weight
 };
 
 struct RsProduction {
@@ -372,7 +372,7 @@ struct Stmt {
   std::vector<std::pair<Expr*, Stmt*>> randcase_items;  // weight : stmt
 
   // randsequence (§18.17)
-  std::string_view rs_top_production;       // Optional top production name
+  std::string_view rs_top_production;  // Optional top production name
   std::vector<RsProduction> rs_productions;
 
   // Variable declaration (kVarDecl) — block-level data declaration (§9.3.1)
@@ -752,8 +752,8 @@ enum class SpecifyEdge : uint8_t {
 
 enum class SpecifyPolarity : uint8_t {
   kNone,
-  kPositive,   // +
-  kNegative,   // -
+  kPositive,  // +
+  kNegative,  // -
 };
 
 enum class SpecifyRangeKind : uint8_t {
@@ -765,10 +765,10 @@ enum class SpecifyRangeKind : uint8_t {
 };
 
 struct SpecifyTerminal {
-  std::string_view name;           // port_identifier
-  std::string_view interface_name; // interface_identifier (empty if simple)
-  Expr* range_left = nullptr;      // first expr in range
-  Expr* range_right = nullptr;     // second expr (null for bit-select)
+  std::string_view name;            // port_identifier
+  std::string_view interface_name;  // interface_identifier (empty if simple)
+  Expr* range_left = nullptr;       // first expr in range
+  Expr* range_right = nullptr;      // second expr (null for bit-select)
   SpecifyRangeKind range_kind = SpecifyRangeKind::kNone;
 };
 
@@ -779,7 +779,7 @@ struct SpecifyPathDecl {
   SpecifyPolarity dst_polarity = SpecifyPolarity::kNone;
   std::vector<SpecifyTerminal> src_ports;
   std::vector<SpecifyTerminal> dst_ports;
-  std::vector<Expr*> delays;  // 1, 2, 3, 6, or 12 delay values
+  std::vector<Expr*> delays;    // 1, 2, 3, 6, or 12 delay values
   Expr* condition = nullptr;    // if (cond) path or ifnone path
   Expr* data_source = nullptr;  // edge-sensitive data_source_expression
   bool is_ifnone = false;       // ifnone conditional path
@@ -806,20 +806,24 @@ struct TimingCheckDecl {
   SpecifyEdge ref_edge = SpecifyEdge::kNone;
   SpecifyTerminal ref_terminal;
   Expr* ref_condition = nullptr;  // §31.7: &&& condition on ref signal
-  std::vector<std::pair<char,char>> ref_edge_descriptors;  // A.7.5.3: edge [01,10,...]
+  std::vector<std::pair<char, char>>
+      ref_edge_descriptors;  // A.7.5.3: edge [01,10,...]
   SpecifyEdge data_edge = SpecifyEdge::kNone;
   SpecifyTerminal data_terminal;
   Expr* data_condition = nullptr;  // §31.7: &&& condition on data signal
-  std::vector<std::pair<char,char>> data_edge_descriptors;  // A.7.5.3: edge [01,10,...]
-  std::vector<Expr*> limits;       // Timing limit expressions
-  std::string_view notifier;       // Optional notifier variable
+  std::vector<std::pair<char, char>>
+      data_edge_descriptors;  // A.7.5.3: edge [01,10,...]
+  std::vector<Expr*> limits;  // Timing limit expressions
+  std::string_view notifier;  // Optional notifier variable
   // §31.9: Extended arguments for $setuphold / $recrem.
   Expr* timestamp_cond = nullptr;
   Expr* timecheck_cond = nullptr;
   std::string_view delayed_ref;
-  Expr* delayed_ref_expr = nullptr;   // A.7.5.2: optional [constant_mintypmax_expression]
+  Expr* delayed_ref_expr =
+      nullptr;  // A.7.5.2: optional [constant_mintypmax_expression]
   std::string_view delayed_data;
-  Expr* delayed_data_expr = nullptr;  // A.7.5.2: optional [constant_mintypmax_expression]
+  Expr* delayed_data_expr =
+      nullptr;  // A.7.5.2: optional [constant_mintypmax_expression]
   // §31.8: Extended arguments for $timeskew / $fullskew.
   Expr* event_based_flag = nullptr;
   Expr* remain_active_flag = nullptr;

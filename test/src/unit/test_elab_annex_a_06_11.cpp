@@ -21,14 +21,13 @@ struct ElabA611Fixture {
   bool has_errors = false;
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src,
-                                 ElabA611Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, ElabA611Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
-  auto *design = elab.Elaborate(cu->modules.back()->name);
+  auto* design = elab.Elaborate(cu->modules.back()->name);
   f.has_errors = f.diag.HasErrors();
   return design;
 }
@@ -42,7 +41,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src,
 // Plain clocking block declaration elaborates
 TEST(ElabA611, PlainClockingBlockElaborates) {
   ElabA611Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
       "    input data;\n"
@@ -57,7 +56,7 @@ TEST(ElabA611, PlainClockingBlockElaborates) {
 // Default clocking block declaration elaborates
 TEST(ElabA611, DefaultClockingElaborates) {
   ElabA611Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  default clocking cb @(posedge clk);\n"
       "    input data;\n"
@@ -71,7 +70,7 @@ TEST(ElabA611, DefaultClockingElaborates) {
 // Global clocking block declaration elaborates
 TEST(ElabA611, GlobalClockingElaborates) {
   ElabA611Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  global clocking gclk @(posedge sys_clk);\n"
       "  endclocking\n"
@@ -84,7 +83,7 @@ TEST(ElabA611, GlobalClockingElaborates) {
 // Clocking block with multiple direction groups elaborates
 TEST(ElabA611, MultipleDirectionGroupsElaborate) {
   ElabA611Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
       "    input a;\n"
@@ -100,7 +99,7 @@ TEST(ElabA611, MultipleDirectionGroupsElaborate) {
 // Clocking block with default skew elaborates
 TEST(ElabA611, DefaultSkewElaborates) {
   ElabA611Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
       "    default input #1 output #2;\n"
@@ -115,7 +114,7 @@ TEST(ElabA611, DefaultSkewElaborates) {
 // Multiple clocking blocks in same module elaborate
 TEST(ElabA611, MultipleClockingBlocksElaborate) {
   ElabA611Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  clocking cb1 @(posedge clk1);\n"
       "    input data;\n"
@@ -132,7 +131,7 @@ TEST(ElabA611, MultipleClockingBlocksElaborate) {
 // Clocking block with hierarchical expression elaborates
 TEST(ElabA611, HierExprElaborates) {
   ElabA611Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
       "    input sig = top.dut.sig;\n"
@@ -146,7 +145,7 @@ TEST(ElabA611, HierExprElaborates) {
 // Clocking block with skew variations elaborates
 TEST(ElabA611, SkewVariationsElaborate) {
   ElabA611Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
       "    input #1step data;\n"
@@ -162,7 +161,7 @@ TEST(ElabA611, SkewVariationsElaborate) {
 // Clocking block with assertion_item_declaration elaborates
 TEST(ElabA611, AssertionItemDeclElaborates) {
   ElabA611Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
       "    input data;\n"
