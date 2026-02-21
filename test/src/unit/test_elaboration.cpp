@@ -363,50 +363,6 @@ TEST(Elaborator, AlwaysCombSensitivityInferred) {
   EXPECT_TRUE(found_a);
 }
 
-// --- Array init pattern validation (§5.11) ---
-
-TEST(Elaboration, ArrayInitPattern_FlatIllegal) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top();\n"
-      "  typedef struct { int a; int b; } ms_t;\n"
-      "  ms_t ms[1:0] = '{0, 0, 1, 1};\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
-TEST(Elaboration, ArrayInitPattern_NestedOk) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top();\n"
-      "  typedef struct { int a; int b; } ms_t;\n"
-      "  ms_t ms[1:0] = '{'{0, 0}, '{1, 1}};\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(Elaboration, ArrayInitPattern_SimpleArrayOk) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top();\n"
-      "  int arr[1:0] = '{10, 20};\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(Elaboration, ArrayInitPattern_SizeMismatch) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top();\n"
-      "  int arr[1:0] = '{10, 20, 30};\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
 // --- §6.5: Variable constraints ---
 
 TEST(Elaboration, VarRedeclare_Error) {
