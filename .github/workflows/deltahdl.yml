@@ -292,7 +292,7 @@ jobs:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 200M
-    name: build-ubuntu-24-04-x86-64-clang-shard-${{ matrix.shard }}
+    name: build-ubuntu-24-04-x86-64-clang
     needs: [clang-tidy-src, clang-tidy-test]
     runs-on: ubuntu-24.04
     steps:
@@ -307,14 +307,11 @@ jobs:
         uses: actions/cache@v4
         with:
           key: >-
-            ccache-build-clang-release-shard-${{
-            matrix.shard }}-${{
+            ccache-build-clang-release-${{
             hashFiles('**/CMakeLists.txt') }}-${{
             inputs.sha }}
           path: .ccache
           restore-keys: |
-            ccache-build-clang-release-shard-${{
-              matrix.shard }}-
             ccache-build-clang-release-
       - name: Build
         run: |
@@ -326,19 +323,14 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build --parallel 4 --target deltahdl
           targets=$(grep -oP 'add_unit_test\(\K[^)]+' \
-            test/CMakeLists.txt \
-            | awk "(NR-1) % 1 == ${{ matrix.shard }}")
+            test/CMakeLists.txt)
           cmake --build build --parallel 4 --target $targets
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
-          name: build-ubuntu-24-04-x86-64-clang-shard-${{ matrix.shard }}
+          name: build-ubuntu-24-04-x86-64-clang
           path: build/
           retention-days: 1
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [0]
   build-ubuntu-24-04-x86-64-gcc:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
@@ -648,7 +640,7 @@ jobs:
       - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-ubuntu-24-04-x86-64-clang-shard-0
+          name: build-ubuntu-24-04-x86-64-clang
           path: build/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
@@ -794,7 +786,7 @@ jobs:
       - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-ubuntu-24-04-x86-64-clang-shard-0
+          name: build-ubuntu-24-04-x86-64-clang
           path: build/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
@@ -1063,7 +1055,7 @@ jobs:
       - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-ubuntu-24-04-x86-64-clang-shard-0
+          name: build-ubuntu-24-04-x86-64-clang
           path: build/
       - name: Fix permissions
         run: >-
