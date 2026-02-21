@@ -125,6 +125,20 @@ void Parser::ParseClockingItem(ModuleItem* item) {
     return;
   }
 
+  // §A.6.11: assertion_item_declaration inside clocking block.
+  if (Check(TokenKind::kKwProperty)) {
+    ParsePropertyDecl();
+    return;
+  }
+  if (Check(TokenKind::kKwSequence)) {
+    ParseSequenceDecl();
+    return;
+  }
+  if (Check(TokenKind::kKwLet)) {
+    ParseLetDecl();
+    return;
+  }
+
   // Parse clocking_direction and optional skews.
   Edge in_edge = Edge::kNone;
   Expr* in_delay = nullptr;

@@ -641,7 +641,17 @@ static bool IsCompoundAssignOp(TokenKind kind) {
 // assignment (§10.4.1 delay, §10.4.2 event, §9.4.5 repeat), then
 // parse the RHS expression.
 void Parser::ParseIntraAssignTiming(Stmt* stmt) {
-  if (Check(TokenKind::kHash)) {
+  if (Check(TokenKind::kHashHash)) {
+    // Cycle delay: a <= ##N b; (§14.16 clocking_drive)
+    Consume();
+    if (Check(TokenKind::kLParen)) {
+      Consume();
+      stmt->cycle_delay = ParseExpr();
+      Expect(TokenKind::kRParen);
+    } else {
+      stmt->cycle_delay = ParsePrimaryExpr();
+    }
+  } else if (Check(TokenKind::kHash)) {
     // Intra-assignment delay: a = #10 b;
     Consume();
     if (Check(TokenKind::kLParen)) {

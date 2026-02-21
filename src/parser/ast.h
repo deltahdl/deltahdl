@@ -274,6 +274,7 @@ struct Stmt {
   Expr* lhs = nullptr;
   Expr* rhs = nullptr;
   Expr* delay = nullptr;
+  Expr* cycle_delay = nullptr;  // Cycle delay ##N in clocking drive (§14.16)
 
   // For
   Stmt* for_init = nullptr;
