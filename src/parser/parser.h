@@ -114,6 +114,11 @@ class Parser {
   ModuleDecl* ParseCheckerDecl();
   Stmt* ParseRandcaseStmt();
   Stmt* ParseRandsequenceStmt();
+  RsProduction ParseRsProduction();
+  RsRule ParseRsRule();
+  RsProd ParseRsProd();
+  RsProductionItem ParseRsProductionItem();
+  RsCaseItem ParseRsCaseItem();
   void ParseCovergroupDecl(std::vector<ModuleItem*>& items);
   void SkipCovergroupItem();
 

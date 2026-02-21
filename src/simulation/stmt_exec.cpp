@@ -40,6 +40,146 @@ static ExecTask ExecRandcase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return StmtResult::kDone;
 }
 
+// --- Randsequence (IEEE §18.17) ---
+
+// Forward declare so recursive calls work.
+static ExecTask ExecRsProduction(const Stmt* stmt, std::string_view name,
+                                 SimContext& ctx, Arena& arena);
+
+static const RsProduction* FindProduction(const Stmt* stmt,
+                                          std::string_view name) {
+  for (const auto& prod : stmt->rs_productions) {
+    if (prod.name == name) return &prod;
+  }
+  return nullptr;
+}
+
+// Execute a single rs_prod item (code block, if, repeat, case, or sub-production).
+static ExecTask ExecRsProd(const Stmt* stmt, const RsProd& prod,
+                           SimContext& ctx, Arena& arena) {
+  switch (prod.kind) {
+    case RsProdKind::kCodeBlock: {
+      for (auto* s : prod.code_stmts) {
+        auto result = co_await ExecStmt(s, ctx, arena);
+        if (result == StmtResult::kBreak || result == StmtResult::kReturn) {
+          co_return result;
+        }
+      }
+      co_return StmtResult::kDone;
+    }
+    case RsProdKind::kItem: {
+      co_return co_await ExecRsProduction(stmt, prod.item.name, ctx, arena);
+    }
+    case RsProdKind::kIf: {
+      auto cond = EvalExpr(prod.condition, ctx, arena).ToUint64() != 0;
+      if (cond) {
+        co_return co_await ExecRsProduction(stmt, prod.if_true.name, ctx,
+                                            arena);
+      } else if (prod.has_else) {
+        co_return co_await ExecRsProduction(stmt, prod.if_false.name, ctx,
+                                            arena);
+      }
+      co_return StmtResult::kDone;
+    }
+    case RsProdKind::kRepeat: {
+      auto count = EvalExpr(prod.repeat_count, ctx, arena).ToUint64();
+      for (uint64_t i = 0; i < count; ++i) {
+        auto result =
+            co_await ExecRsProduction(stmt, prod.repeat_item.name, ctx, arena);
+        if (result == StmtResult::kBreak) co_return StmtResult::kBreak;
+        // return in repeat aborts entire randsequence per §18.17.4
+      }
+      co_return StmtResult::kDone;
+    }
+    case RsProdKind::kCase: {
+      auto val = EvalExpr(prod.case_expr, ctx, arena).ToUint64();
+      for (const auto& ci : prod.case_items) {
+        if (ci.is_default) {
+          co_return co_await ExecRsProduction(stmt, ci.item.name, ctx, arena);
+        }
+        for (auto* pat : ci.patterns) {
+          if (EvalExpr(pat, ctx, arena).ToUint64() == val) {
+            co_return co_await ExecRsProduction(stmt, ci.item.name, ctx,
+                                                arena);
+          }
+        }
+      }
+      co_return StmtResult::kDone;
+    }
+  }
+  co_return StmtResult::kDone;
+}
+
+// Execute a named production: select a rule (weighted random), then run prods.
+static ExecTask ExecRsProduction(const Stmt* stmt, std::string_view name,
+                                 SimContext& ctx, Arena& arena) {
+  const auto* production = FindProduction(stmt, name);
+  if (!production) co_return StmtResult::kDone;
+
+  // Select among alternative rules by weight.
+  const RsRule* selected = &production->rules[0];
+  if (production->rules.size() > 1) {
+    uint64_t total_weight = 0;
+    for (const auto& rule : production->rules) {
+      total_weight += rule.weight ? EvalExpr(rule.weight, ctx, arena).ToUint64()
+                                  : 1;
+    }
+    if (total_weight > 0) {
+      uint64_t pick = ctx.Urandom32() % total_weight;
+      uint64_t cumulative = 0;
+      for (const auto& rule : production->rules) {
+        cumulative += rule.weight
+                          ? EvalExpr(rule.weight, ctx, arena).ToUint64()
+                          : 1;
+        if (pick < cumulative) {
+          selected = &rule;
+          break;
+        }
+      }
+    }
+  }
+
+  // Execute weight code block if present.
+  for (auto* s : selected->weight_code) {
+    auto result = co_await ExecStmt(s, ctx, arena);
+    if (result == StmtResult::kBreak || result == StmtResult::kReturn) {
+      co_return result;
+    }
+  }
+
+  // Execute the production list.
+  if (selected->is_rand_join) {
+    // rand join: interleave items (simple sequential for now).
+    for (const auto& item : selected->rand_join_items) {
+      auto result = co_await ExecRsProduction(stmt, item.name, ctx, arena);
+      if (result == StmtResult::kBreak) co_return StmtResult::kBreak;
+      if (result == StmtResult::kReturn) co_return StmtResult::kDone;
+    }
+  } else {
+    for (const auto& prod : selected->prods) {
+      auto result = co_await ExecRsProd(stmt, prod, ctx, arena);
+      if (result == StmtResult::kBreak) co_return StmtResult::kBreak;
+      if (result == StmtResult::kReturn) co_return StmtResult::kDone;
+    }
+  }
+
+  co_return StmtResult::kDone;
+}
+
+static ExecTask ExecRandsequence(const Stmt* stmt, SimContext& ctx,
+                                 Arena& arena) {
+  if (stmt->rs_productions.empty()) co_return StmtResult::kDone;
+
+  // Determine top production.
+  std::string_view top = stmt->rs_top_production;
+  if (top.empty()) top = stmt->rs_productions[0].name;
+
+  auto result = co_await ExecRsProduction(stmt, top, ctx, arena);
+  // Break from randsequence just terminates it (not outer loops).
+  (void)result;
+  co_return StmtResult::kDone;
+}
+
 // --- Container coroutines (return ExecTask, support suspension) ---
 
 static ExecTask ExecBlock(const Stmt* stmt, SimContext& ctx, Arena& arena) {
@@ -504,6 +644,8 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       return ExecTask::Immediate(ExecReleaseOrDeassignImpl(stmt, ctx));
     case StmtKind::kRandcase:
       return ExecRandcase(stmt, ctx, arena);
+    case StmtKind::kRandsequence:
+      return ExecRandsequence(stmt, ctx, arena);
     case StmtKind::kVarDecl:
       return ExecTask::Immediate(ExecVarDeclImpl(stmt, ctx, arena));
     default:

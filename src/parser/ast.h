@@ -225,6 +225,7 @@ enum class StmtKind : uint8_t {
   kCoverImmediate,   // cover(expr) (§16.3)
   kWaitOrder,        // wait_order(ev1, ev2, ...) (§15.5.4)
   kRandcase,         // randcase ... endcase (§18.16)
+  kRandsequence,     // randsequence ... endsequence (§18.17)
   kVarDecl,          // Block-level variable declaration (§9.3.1)
   kBlockItemDecl,    // Block-level typedef/import/let (§A.2.8)
 };
@@ -253,6 +254,57 @@ enum class CaseQualifier : uint8_t {
   kUnique,
   kUnique0,
   kPriority,
+};
+
+// --- Randsequence AST (§18.17 / A.6.12) ---
+
+enum class RsProdKind : uint8_t {
+  kItem,       // rs_production_item
+  kCodeBlock,  // rs_code_block (brace-delimited statements)
+  kIf,         // rs_if_else
+  kRepeat,     // rs_repeat
+  kCase,       // rs_case
+};
+
+struct RsProductionItem {
+  std::string_view name;
+  std::vector<Expr*> args;
+};
+
+struct RsCaseItem {
+  std::vector<Expr*> patterns;
+  RsProductionItem item;
+  bool is_default = false;
+};
+
+struct RsProd {
+  RsProdKind kind = RsProdKind::kItem;
+  RsProductionItem item;                // kItem
+  std::vector<Stmt*> code_stmts;        // kCodeBlock
+  Expr* condition = nullptr;            // kIf / kRepeat
+  RsProductionItem if_true;             // kIf
+  RsProductionItem if_false;            // kIf (else branch)
+  bool has_else = false;                // kIf
+  Expr* repeat_count = nullptr;         // kRepeat
+  RsProductionItem repeat_item;         // kRepeat
+  Expr* case_expr = nullptr;            // kCase
+  std::vector<RsCaseItem> case_items;   // kCase
+};
+
+struct RsRule {
+  std::vector<RsProd> prods;
+  bool is_rand_join = false;
+  Expr* rand_join_expr = nullptr;  // Optional bias expression
+  std::vector<RsProductionItem> rand_join_items;
+  Expr* weight = nullptr;              // := weight_specification
+  std::vector<Stmt*> weight_code;      // Optional code block after weight
+};
+
+struct RsProduction {
+  std::string_view name;
+  bool has_return_type = false;
+  bool has_ports = false;
+  std::vector<RsRule> rules;
 };
 
 struct Stmt {
@@ -317,6 +369,10 @@ struct Stmt {
 
   // randcase (§18.16)
   std::vector<std::pair<Expr*, Stmt*>> randcase_items;  // weight : stmt
+
+  // randsequence (§18.17)
+  std::string_view rs_top_production;       // Optional top production name
+  std::vector<RsProduction> rs_productions;
 
   // Variable declaration (kVarDecl) — block-level data declaration (§9.3.1)
   DataType var_decl_type;
