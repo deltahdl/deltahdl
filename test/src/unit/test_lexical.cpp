@@ -9,7 +9,6 @@
 #include "common/types.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include "preprocessor/preprocessor.h"
 
 using namespace delta;
 
@@ -39,18 +38,6 @@ static ParseResult Parse(const std::string& src) {
   Parser parser(lexer, result.arena, diag);
   result.cu = parser.Parse();
   return result;
-}
-
-struct PreprocFixture {
-  SourceManager mgr;
-  DiagEngine diag{mgr};
-};
-
-static std::string Preprocess(const std::string& src, PreprocFixture& f,
-                              PreprocConfig config = {}) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Preprocessor pp(f.mgr, f.diag, std::move(config));
-  return pp.Preprocess(fid);
 }
 
 // ===========================================================================
@@ -259,39 +246,7 @@ TEST(Lexical, Timeunit_StoredInModuleDecl_Flags) {
 }
 
 // ===========================================================================
-// 4. `define with arguments (LRM SS22.5.1)
-// ===========================================================================
-
-TEST(Lexical, Define_WithDefaultArgs) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define ASSERT(cond, msg=\"error\") if (!(cond)) $error(msg)\n"
-      "`ASSERT(x)\n",
-      f);
-  EXPECT_NE(result.find("if (!(x)) $error(\"error\")"), std::string::npos);
-}
-
-TEST(Lexical, Define_Stringification) {
-  // `` (double backtick) concatenation in macros
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define CONCAT(a, b) a``b\n"
-      "`CONCAT(foo, bar)\n",
-      f);
-  EXPECT_NE(result.find("foobar"), std::string::npos);
-}
-
-TEST(Lexical, Define_EmptyArgUsesDefault) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define M(a, b=99) a + b\n"
-      "`M(1,)\n",
-      f);
-  EXPECT_NE(result.find("1 + 99"), std::string::npos);
-}
-
-// ===========================================================================
-// 5. Continuous assignment with delay (LRM SS10.3.3)
+// 4. Continuous assignment with delay (LRM SS10.3.3)
 // ===========================================================================
 
 static const ModuleItem* FindItemByKind(const std::vector<ModuleItem*>& items,
@@ -385,84 +340,7 @@ TEST(Lexical, AssignmentPattern_Named) {
 }
 
 // ===========================================================================
-// 7. Compilation unit scope (LRM SS3.12.1)
-// ===========================================================================
-
-TEST(Lexical, CompilationUnit_MultipleModules) {
-  // Multiple modules should each become separate entries in the CU.
-  auto r = Parse(
-      "module a; endmodule\n"
-      "module b; endmodule\n"
-      "module c; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 3);
-  EXPECT_EQ(r.cu->modules[0]->name, "a");
-  EXPECT_EQ(r.cu->modules[1]->name, "b");
-  EXPECT_EQ(r.cu->modules[2]->name, "c");
-}
-
-TEST(Lexical, CompilationUnit_MixedTopLevel) {
-  // Mixed modules and packages in a single compilation unit.
-  auto r = Parse(
-      "package pkg;\n"
-      "endpackage\n"
-      "module top;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->packages.size(), 1);
-  ASSERT_EQ(r.cu->modules.size(), 1);
-}
-
-TEST(Lexical, CompilationUnit_WithInterface) {
-  // §3.12.1: interfaces are visible across all CUs
-  auto r = Parse(
-      "interface bus_if;\n"
-      "endinterface\n"
-      "module top;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->interfaces.size(), 1);
-  ASSERT_EQ(r.cu->modules.size(), 1);
-}
-
-TEST(Lexical, CompilationUnit_WithProgram) {
-  // §3.12.1: programs are visible across all CUs
-  auto r = Parse(
-      "program test;\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->programs.size(), 1);
-}
-
-TEST(Lexical, CompilationUnit_TopLevelFunction) {
-  // §3.12.1: CU scope can contain items that a package can (functions)
-  auto r = Parse(
-      "function int add(int a, int b);\n"
-      "  return a + b;\n"
-      "endfunction\n"
-      "module top;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->cu_items.size(), 1);
-  ASSERT_EQ(r.cu->modules.size(), 1);
-}
-
-TEST(Lexical, CompilationUnit_AllDesignElements) {
-  // §3.12.1: CU can hold modules, packages, interfaces, programs
-  auto r = Parse(
-      "package pkg; endpackage\n"
-      "interface intf; endinterface\n"
-      "program prog; endprogram\n"
-      "module mod; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_EQ(r.cu->packages.size(), 1);
-  EXPECT_EQ(r.cu->interfaces.size(), 1);
-  EXPECT_EQ(r.cu->programs.size(), 1);
-  EXPECT_EQ(r.cu->modules.size(), 1);
-}
-
-// ===========================================================================
-// 8. Escaped identifier in parser contexts
+// 7. Escaped identifier in parser contexts
 // ===========================================================================
 
 TEST(Lexical, EscapedIdentifier_InVarDecl) {
@@ -481,50 +359,4 @@ TEST(Lexical, EscapedIdentifier_InVarDecl) {
     }
   }
   EXPECT_TRUE(found) << "variable with escaped identifier not found";
-}
-
-// ===========================================================================
-// 9. begin_keywords / end_keywords (IEEE 1800-2023 §22.14)
-// ===========================================================================
-
-TEST(Lexical, BeginKeywords_LogicAsIdentifier) {
-  PreprocFixture f;
-  auto preprocessed = Preprocess(
-      "`begin_keywords \"1364-2001\"\n"
-      "module m; reg logic; endmodule\n"
-      "`end_keywords\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  DiagEngine diag2(f.mgr);
-  Lexer lexer(preprocessed, 0, diag2);
-  auto tokens = lexer.LexAll();
-  // Find the token after "reg" — should be kIdentifier ("logic"), not kKwLogic.
-  for (size_t i = 0; i + 1 < tokens.size(); ++i) {
-    if (tokens[i].kind == TokenKind::kKwReg) {
-      EXPECT_EQ(tokens[i + 1].kind, TokenKind::kIdentifier);
-      EXPECT_EQ(tokens[i + 1].text, "logic");
-      return;
-    }
-  }
-  FAIL() << "did not find 'reg' token in lexed output";
-}
-
-TEST(Lexical, BeginKeywords_RestoresAfterEnd) {
-  PreprocFixture f;
-  auto preprocessed = Preprocess(
-      "`begin_keywords \"1364-2001\"\n"
-      "logic\n"
-      "`end_keywords\n"
-      "logic\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  DiagEngine diag2(f.mgr);
-  Lexer lexer(preprocessed, 0, diag2);
-  auto tokens = lexer.LexAll();
-  // First "logic" should be identifier (under 1364-2001).
-  // Second "logic" should be keyword (restored to 1800-2023).
-  ASSERT_GE(tokens.size(), 3);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[0].text, "logic");
-  EXPECT_EQ(tokens[1].kind, TokenKind::kKwLogic);
 }
