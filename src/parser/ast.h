@@ -814,7 +814,9 @@ struct TimingCheckDecl {
   Expr* timestamp_cond = nullptr;
   Expr* timecheck_cond = nullptr;
   std::string_view delayed_ref;
+  Expr* delayed_ref_expr = nullptr;   // A.7.5.2: optional [constant_mintypmax_expression]
   std::string_view delayed_data;
+  Expr* delayed_data_expr = nullptr;  // A.7.5.2: optional [constant_mintypmax_expression]
   // §31.8: Extended arguments for $timeskew / $fullskew.
   Expr* event_based_flag = nullptr;
   Expr* remain_active_flag = nullptr;

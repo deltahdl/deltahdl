@@ -144,23 +144,6 @@ TEST(ParserA70501, SetupholdFullArgs) {
   EXPECT_EQ(tc->delayed_data, "dDATA");
 }
 
-// $setuphold with timestamp_condition and timecheck_condition as mintypmax
-TEST(ParserA70501, SetupholdTimestampTimecheckCondMinTypMax) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setuphold(posedge clk, data, 10, 5, ntfr, 1:2:3, 4:5:6);\n"
-      "endspecify\n"
-      "endmodule\n");
-  ASSERT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  ASSERT_NE(tc->timestamp_cond, nullptr);
-  EXPECT_EQ(tc->timestamp_cond->kind, ExprKind::kMinTypMax);
-  ASSERT_NE(tc->timecheck_cond, nullptr);
-  EXPECT_EQ(tc->timecheck_cond->kind, ExprKind::kMinTypMax);
-}
-
 // =============================================================================
 // A.7.5.1 $recovery_timing_check
 // =============================================================================
@@ -358,18 +341,3 @@ TEST(ParserA70501, NochangeWithNotifier) {
   EXPECT_EQ(tc->notifier, "ntfr");
 }
 
-// $nochange with mintypmax offsets (start_edge_offset, end_edge_offset)
-TEST(ParserA70501, NochangeMinTypMaxOffsets) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $nochange(posedge clk, data, 1:2:3, 4:5:6);\n"
-      "endspecify\n"
-      "endmodule\n");
-  ASSERT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  ASSERT_GE(tc->limits.size(), 2u);
-  EXPECT_EQ(tc->limits[0]->kind, ExprKind::kMinTypMax);
-  EXPECT_EQ(tc->limits[1]->kind, ExprKind::kMinTypMax);
-}

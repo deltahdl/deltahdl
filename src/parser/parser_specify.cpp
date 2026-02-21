@@ -326,7 +326,7 @@ void Parser::ParseTimingCheckTrailingArgs(TimingCheckDecl& tc) {
       ParseExtendedTimingCheckArgs(tc);
       break;
     }
-    tc.limits.push_back(ParseExpr());
+    tc.limits.push_back(ParseMinTypMaxExpr());
   }
 }
 
@@ -340,34 +340,44 @@ void Parser::ParseExtendedTimingCheckArgs(TimingCheckDecl& tc) {
     if (!Check(TokenKind::kComma) && !Check(TokenKind::kRParen)) {
       tc.event_based_flag = ParseExpr();
     }
-    // remain_active_flag (expression or empty)
+    // A.7.5.2: remain_active_flag ::= constant_mintypmax_expression
     if (!Match(TokenKind::kComma) || Check(TokenKind::kRParen)) return;
     if (!Check(TokenKind::kComma) && !Check(TokenKind::kRParen)) {
-      tc.remain_active_flag = ParseExpr();
+      tc.remain_active_flag = ParseMinTypMaxExpr();
     }
     return;
   }
   // §31.9: $setuphold/$recrem: timestamp_cond, timecheck_cond,
   // delayed_reference, delayed_data.
-  // timestamp_condition (expression or empty)
+  // A.7.5.2: timestamp_condition ::= mintypmax_expression
   if (!Match(TokenKind::kComma) || Check(TokenKind::kRParen)) return;
   if (!Check(TokenKind::kComma) && !Check(TokenKind::kRParen)) {
-    tc.timestamp_cond = ParseExpr();
+    tc.timestamp_cond = ParseMinTypMaxExpr();
   }
-  // timecheck_condition (expression or empty)
+  // A.7.5.2: timecheck_condition ::= mintypmax_expression
   if (!Match(TokenKind::kComma) || Check(TokenKind::kRParen)) return;
   if (!Check(TokenKind::kComma) && !Check(TokenKind::kRParen)) {
-    tc.timecheck_cond = ParseExpr();
+    tc.timecheck_cond = ParseMinTypMaxExpr();
   }
-  // delayed_reference (identifier or empty)
+  // A.7.5.2: delayed_reference ::= terminal_identifier
+  //          | terminal_identifier [ constant_mintypmax_expression ]
   if (!Match(TokenKind::kComma) || Check(TokenKind::kRParen)) return;
   if (Check(TokenKind::kIdentifier)) {
     tc.delayed_ref = Consume().text;
+    if (Match(TokenKind::kLBracket)) {
+      tc.delayed_ref_expr = ParseMinTypMaxExpr();
+      Expect(TokenKind::kRBracket);
+    }
   }
-  // delayed_data (identifier or empty)
+  // A.7.5.2: delayed_data ::= terminal_identifier
+  //          | terminal_identifier [ constant_mintypmax_expression ]
   if (!Match(TokenKind::kComma) || Check(TokenKind::kRParen)) return;
   if (Check(TokenKind::kIdentifier)) {
     tc.delayed_data = Consume().text;
+    if (Match(TokenKind::kLBracket)) {
+      tc.delayed_data_expr = ParseMinTypMaxExpr();
+      Expect(TokenKind::kRBracket);
+    }
   }
 }
 
@@ -403,7 +413,10 @@ SpecifyItem* Parser::ParseTimingCheck() {
   }
 
   // Timing limit(s) and optional notifier / §31.9 extended args.
-  item->timing_check.limits.push_back(ParseExpr());
+  // A.7.5.2: timing_check_limit ::= expression; but start_edge_offset and
+  // end_edge_offset ($nochange) are mintypmax_expression. Using
+  // ParseMinTypMaxExpr() handles both forms uniformly.
+  item->timing_check.limits.push_back(ParseMinTypMaxExpr());
   ParseTimingCheckTrailingArgs(item->timing_check);
   Expect(TokenKind::kRParen);
   Expect(TokenKind::kSemicolon);

@@ -152,7 +152,7 @@ TEST(ParserA70502, DelayedDataWithBracketExpr) {
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
   EXPECT_EQ(tc->delayed_data, "dD");
-  // delayed_data_expr to be checked after AST extension
+  EXPECT_NE(tc->delayed_data_expr, nullptr);
 }
 
 // delayed_reference ::= terminal_identifier [ constant_mintypmax_expression ]
@@ -167,7 +167,8 @@ TEST(ParserA70502, DelayedReferenceWithBracketExpr) {
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
   EXPECT_EQ(tc->delayed_ref, "dCLK");
-  // delayed_ref_expr to be checked after AST extension
+  ASSERT_NE(tc->delayed_ref_expr, nullptr);
+  EXPECT_EQ(tc->delayed_ref_expr->kind, ExprKind::kMinTypMax);
 }
 
 // =============================================================================
@@ -220,7 +221,23 @@ TEST(ParserA70502, EventBasedFlagAndRemainActiveFlag) {
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
   EXPECT_EQ(tc->notifier, "ntfr");
-  // event_based_flag and remain_active_flag to be checked after AST extension
+  ASSERT_NE(tc->event_based_flag, nullptr);
+  ASSERT_NE(tc->remain_active_flag, nullptr);
+}
+
+// remain_active_flag ::= constant_mintypmax_expression
+TEST(ParserA70502, RemainActiveFlagMinTypMax) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $timeskew(posedge clk1, posedge clk2, 5, ntfr, 1, 1:2:3);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  ASSERT_NE(tc->remain_active_flag, nullptr);
+  EXPECT_EQ(tc->remain_active_flag->kind, ExprKind::kMinTypMax);
 }
 
 // =============================================================================
