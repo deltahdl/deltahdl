@@ -238,6 +238,33 @@ TEST(SimCh4424, NBAEventsAcrossMultipleTimeSlots) {
 // ---------------------------------------------------------------------------
 // §4.4.2.4 Multiple NBA events coexist and all execute.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// §4.4.2.4 NBA vs Re-NBA ordering
+// NBA in the active context goes to kNBA; in the reactive context it goes
+// to kReNBA.  NBA (active set) executes before Re-NBA (reactive set).
+// ---------------------------------------------------------------------------
+TEST(SimCh4424, NBAExecutesBeforeReNBA) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<int> order;
+
+  auto* ev_nba = sched.GetEventPool().Acquire();
+  ev_nba->callback = [&order]() { order.push_back(1); };
+  sched.ScheduleEvent({0}, Region::kNBA, ev_nba);
+
+  auto* ev_renba = sched.GetEventPool().Acquire();
+  ev_renba->callback = [&order]() { order.push_back(2); };
+  sched.ScheduleEvent({0}, Region::kReNBA, ev_renba);
+
+  sched.Run();
+  ASSERT_EQ(order.size(), 2u);
+  EXPECT_EQ(order[0], 1);
+  EXPECT_EQ(order[1], 2);
+}
+
+// ---------------------------------------------------------------------------
+// §4.4.2.4 Multiple NBA events coexist and all execute.
+// ---------------------------------------------------------------------------
 TEST(SimCh4424, NBARegionHoldsMultipleEvents) {
   Arena arena;
   Scheduler sched(arena);

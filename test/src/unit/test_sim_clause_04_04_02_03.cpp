@@ -249,6 +249,34 @@ TEST(SimCh4423, InactiveEventsAcrossMultipleTimeSlots) {
 // ---------------------------------------------------------------------------
 // §4.4.2.3 Multiple Inactive events coexist and all execute.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// §4.4.2.3 Inactive vs Re-Inactive ordering
+// A #0 delay in the active context goes to kInactive; in the reactive
+// context it goes to kReInactive.  Inactive (active set) executes before
+// Re-Inactive (reactive set).
+// ---------------------------------------------------------------------------
+TEST(SimCh4423, InactiveExecutesBeforeReInactive) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<int> order;
+
+  auto* ev_inactive = sched.GetEventPool().Acquire();
+  ev_inactive->callback = [&order]() { order.push_back(1); };
+  sched.ScheduleEvent({0}, Region::kInactive, ev_inactive);
+
+  auto* ev_reinactive = sched.GetEventPool().Acquire();
+  ev_reinactive->callback = [&order]() { order.push_back(2); };
+  sched.ScheduleEvent({0}, Region::kReInactive, ev_reinactive);
+
+  sched.Run();
+  ASSERT_EQ(order.size(), 2u);
+  EXPECT_EQ(order[0], 1);
+  EXPECT_EQ(order[1], 2);
+}
+
+// ---------------------------------------------------------------------------
+// §4.4.2.3 Multiple Inactive events coexist and all execute.
+// ---------------------------------------------------------------------------
 TEST(SimCh4423, InactiveRegionHoldsMultipleEvents) {
   Arena arena;
   Scheduler sched(arena);

@@ -4,6 +4,7 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "simulation/process.h"
 #include "simulation/scheduler.h"
 
 using namespace delta;
@@ -392,6 +393,24 @@ TEST(SimCh441, PrePostponedIsLastIterativeRegion) {
 // scheduler processes all 17 regions regardless of category, and each
 // region belongs to exactly one category.  Test that all 17 regions
 // are processed.
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// §4.4.1 Process reactive context: the is_reactive flag distinguishes
+// processes in the active region set from those in the reactive region set.
+// ---------------------------------------------------------------------------
+TEST(SimCh441, ProcessReactiveContextFlag) {
+  Process proc;
+  // Default should be non-reactive (active context).
+  EXPECT_FALSE(proc.is_reactive);
+
+  // Setting to reactive context.
+  proc.is_reactive = true;
+  EXPECT_TRUE(proc.is_reactive);
+}
+
+// ---------------------------------------------------------------------------
+// §4.4.1 All 17 regions = simulation regions + PLI regions.  The scheduler
+// processes all of them regardless of category.
 // ---------------------------------------------------------------------------
 TEST(SimCh441, AllRegionsCategorizedAndProcessed) {
   Arena arena;
