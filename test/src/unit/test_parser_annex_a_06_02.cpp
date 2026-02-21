@@ -34,18 +34,16 @@ ParseResult Parse(const std::string &src) {
 static ModuleItem *FindItem(const std::vector<ModuleItem *> &items,
                             ModuleItemKind kind) {
   for (auto *item : items) {
-    if (item->kind == kind)
-      return item;
+    if (item->kind == kind) return item;
   }
   return nullptr;
 }
 
-static std::vector<ModuleItem *>
-FindItems(const std::vector<ModuleItem *> &items, ModuleItemKind kind) {
+static std::vector<ModuleItem *> FindItems(
+    const std::vector<ModuleItem *> &items, ModuleItemKind kind) {
   std::vector<ModuleItem *> result;
   for (auto *item : items) {
-    if (item->kind == kind)
-      result.push_back(item);
+    if (item->kind == kind) result.push_back(item);
   }
   return result;
 }
@@ -53,8 +51,7 @@ FindItems(const std::vector<ModuleItem *> &items, ModuleItemKind kind) {
 // Return the first statement inside the first initial block's begin/end.
 static Stmt *FirstInitialStmt(ParseResult &r) {
   auto *item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
-  if (!item || !item->body)
-    return nullptr;
+  if (!item || !item->body) return nullptr;
   if (item->body->kind == StmtKind::kBlock) {
     return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
   }
@@ -64,14 +61,12 @@ static Stmt *FirstInitialStmt(ParseResult &r) {
 // Return all statements from the first initial block's begin/end.
 static std::vector<Stmt *> AllInitialStmts(ParseResult &r) {
   auto *item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
-  if (!item || !item->body)
-    return {};
-  if (item->body->kind == StmtKind::kBlock)
-    return item->body->stmts;
+  if (!item || !item->body) return {};
+  if (item->body->kind == StmtKind::kBlock) return item->body->stmts;
   return {item->body};
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.6.2 Production: initial_construct
@@ -79,9 +74,10 @@ static std::vector<Stmt *> AllInitialStmts(ParseResult &r) {
 // =============================================================================
 
 TEST(ParserA602, InitialConstruct_SingleStmt) {
-  auto r = Parse("module m;\n"
-                 "  initial $display(\"hello\");\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial $display(\"hello\");\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
@@ -90,12 +86,13 @@ TEST(ParserA602, InitialConstruct_SingleStmt) {
 }
 
 TEST(ParserA602, InitialConstruct_BeginEnd) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    a = 1;\n"
-                 "    b = 2;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a = 1;\n"
+      "    b = 2;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
@@ -107,9 +104,10 @@ TEST(ParserA602, InitialConstruct_BeginEnd) {
 
 TEST(ParserA602, InitialConstruct_NullStmt) {
   // initial with null statement (just a semicolon)
-  auto r = Parse("module m;\n"
-                 "  initial ;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial ;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
@@ -120,11 +118,12 @@ TEST(ParserA602, InitialConstruct_NullStmt) {
 
 TEST(ParserA602, InitialConstruct_Multiple) {
   // Multiple initial blocks in the same module
-  auto r = Parse("module m;\n"
-                 "  initial a = 0;\n"
-                 "  initial b = 0;\n"
-                 "  initial c = 0;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial a = 0;\n"
+      "  initial b = 0;\n"
+      "  initial c = 0;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto inits =
@@ -138,9 +137,10 @@ TEST(ParserA602, InitialConstruct_Multiple) {
 // =============================================================================
 
 TEST(ParserA602, AlwaysConstruct_PlainAlways) {
-  auto r = Parse("module m;\n"
-                 "  always @(posedge clk) q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk) q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysBlock);
@@ -150,9 +150,10 @@ TEST(ParserA602, AlwaysConstruct_PlainAlways) {
 }
 
 TEST(ParserA602, AlwaysConstruct_AlwaysComb) {
-  auto r = Parse("module m;\n"
-                 "  always_comb y = a & b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always_comb y = a & b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysBlock);
@@ -161,11 +162,12 @@ TEST(ParserA602, AlwaysConstruct_AlwaysComb) {
 }
 
 TEST(ParserA602, AlwaysConstruct_AlwaysFF) {
-  auto r = Parse("module m;\n"
-                 "  always_ff @(posedge clk or negedge rst_n)\n"
-                 "    if (!rst_n) q <= 0;\n"
-                 "    else q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always_ff @(posedge clk or negedge rst_n)\n"
+      "    if (!rst_n) q <= 0;\n"
+      "    else q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysBlock);
@@ -178,10 +180,11 @@ TEST(ParserA602, AlwaysConstruct_AlwaysFF) {
 }
 
 TEST(ParserA602, AlwaysConstruct_AlwaysLatch) {
-  auto r = Parse("module m;\n"
-                 "  always_latch\n"
-                 "    if (en) q = d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always_latch\n"
+      "    if (en) q = d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysBlock);
@@ -191,9 +194,10 @@ TEST(ParserA602, AlwaysConstruct_AlwaysLatch) {
 
 TEST(ParserA602, AlwaysConstruct_ImplicitSensitivityStar) {
   // @* implicit sensitivity
-  auto r = Parse("module m;\n"
-                 "  always @* y = a + b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @* y = a + b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysBlock);
@@ -202,9 +206,10 @@ TEST(ParserA602, AlwaysConstruct_ImplicitSensitivityStar) {
 
 TEST(ParserA602, AlwaysConstruct_ImplicitSensitivityParenStar) {
   // @(*) implicit sensitivity
-  auto r = Parse("module m;\n"
-                 "  always @(*) y = a + b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @(*) y = a + b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysBlock);
@@ -212,12 +217,13 @@ TEST(ParserA602, AlwaysConstruct_ImplicitSensitivityParenStar) {
 }
 
 TEST(ParserA602, AlwaysConstruct_WithBeginEnd) {
-  auto r = Parse("module m;\n"
-                 "  always @(posedge clk) begin\n"
-                 "    q <= d;\n"
-                 "    r <= e;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk) begin\n"
+      "    q <= d;\n"
+      "    r <= e;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysBlock);
@@ -233,12 +239,13 @@ TEST(ParserA602, AlwaysConstruct_WithBeginEnd) {
 // =============================================================================
 
 TEST(ParserA602, AlwaysKeyword_AllFourVariants) {
-  auto r = Parse("module m;\n"
-                 "  always @(posedge clk) a = 1;\n"
-                 "  always_comb b = 2;\n"
-                 "  always_latch if (en) c = 3;\n"
-                 "  always_ff @(posedge clk) d <= 4;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk) a = 1;\n"
+      "  always_comb b = 2;\n"
+      "  always_latch if (en) c = 3;\n"
+      "  always_ff @(posedge clk) d <= 4;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto blocks =
@@ -256,9 +263,10 @@ TEST(ParserA602, AlwaysKeyword_AllFourVariants) {
 // =============================================================================
 
 TEST(ParserA602, FinalConstruct_SingleStmt) {
-  auto r = Parse("module m;\n"
-                 "  final $display(\"done\");\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  final $display(\"done\");\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kFinalBlock);
@@ -267,12 +275,13 @@ TEST(ParserA602, FinalConstruct_SingleStmt) {
 }
 
 TEST(ParserA602, FinalConstruct_BeginEnd) {
-  auto r = Parse("module m;\n"
-                 "  final begin\n"
-                 "    $display(\"test1\");\n"
-                 "    $display(\"test2\");\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  final begin\n"
+      "    $display(\"test1\");\n"
+      "    $display(\"test2\");\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kFinalBlock);
@@ -283,10 +292,11 @@ TEST(ParserA602, FinalConstruct_BeginEnd) {
 }
 
 TEST(ParserA602, FinalConstruct_Multiple) {
-  auto r = Parse("module m;\n"
-                 "  final $display(\"a\");\n"
-                 "  final $display(\"b\");\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  final $display(\"a\");\n"
+      "  final $display(\"b\");\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto finals = FindItems(r.cu->modules[0]->items, ModuleItemKind::kFinalBlock);
@@ -305,9 +315,10 @@ TEST(ParserA602, FinalConstruct_Multiple) {
 // =============================================================================
 
 TEST(ParserA602, BlockingAssignment_Simple) {
-  auto r = Parse("module m;\n"
-                 "  initial begin a = 42; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin a = 42; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -319,9 +330,10 @@ TEST(ParserA602, BlockingAssignment_Simple) {
 
 TEST(ParserA602, BlockingAssignment_WithIntraDelay) {
   // §10.4.1: blocking with intra-assignment delay
-  auto r = Parse("module m;\n"
-                 "  initial begin a = #10 b; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin a = #10 b; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -333,9 +345,10 @@ TEST(ParserA602, BlockingAssignment_WithIntraDelay) {
 
 TEST(ParserA602, BlockingAssignment_WithIntraEvent) {
   // §10.4.2: blocking with intra-assignment event
-  auto r = Parse("module m;\n"
-                 "  initial begin a = @(posedge clk) b; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin a = @(posedge clk) b; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -347,9 +360,10 @@ TEST(ParserA602, BlockingAssignment_WithIntraEvent) {
 
 TEST(ParserA602, BlockingAssignment_WithRepeatEvent) {
   // §9.4.5: repeat(N) @(event) intra-assignment timing
-  auto r = Parse("module m;\n"
-                 "  initial begin a = repeat(3) @(posedge clk) b; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin a = repeat(3) @(posedge clk) b; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -360,9 +374,10 @@ TEST(ParserA602, BlockingAssignment_WithRepeatEvent) {
 }
 
 TEST(ParserA602, BlockingAssignment_ConcatLhs) {
-  auto r = Parse("module m;\n"
-                 "  initial begin {a, b} = {c, d}; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin {a, b} = {c, d}; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -372,9 +387,10 @@ TEST(ParserA602, BlockingAssignment_ConcatLhs) {
 }
 
 TEST(ParserA602, BlockingAssignment_BitSelectLhs) {
-  auto r = Parse("module m;\n"
-                 "  initial begin mem[3] = 8'hFF; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin mem[3] = 8'hFF; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -384,9 +400,10 @@ TEST(ParserA602, BlockingAssignment_BitSelectLhs) {
 }
 
 TEST(ParserA602, BlockingAssignment_PartSelectLhs) {
-  auto r = Parse("module m;\n"
-                 "  initial begin data[7:0] = 8'hAB; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin data[7:0] = 8'hAB; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -397,9 +414,10 @@ TEST(ParserA602, BlockingAssignment_PartSelectLhs) {
 
 TEST(ParserA602, BlockingAssignment_DynamicArrayNew) {
   // nonrange_variable_lvalue = dynamic_array_new
-  auto r = Parse("module m;\n"
-                 "  initial begin arr = new[10]; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin arr = new[10]; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -409,9 +427,10 @@ TEST(ParserA602, BlockingAssignment_DynamicArrayNew) {
 
 TEST(ParserA602, BlockingAssignment_DynamicArrayNewWithInit) {
   // dynamic_array_new with copy initializer: new[size](init)
-  auto r = Parse("module m;\n"
-                 "  initial begin arr = new[10](old_arr); end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin arr = new[10](old_arr); end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -421,9 +440,10 @@ TEST(ParserA602, BlockingAssignment_DynamicArrayNewWithInit) {
 
 TEST(ParserA602, BlockingAssignment_ClassNew) {
   // class_new: obj = new;
-  auto r = Parse("module m;\n"
-                 "  initial begin obj = new; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin obj = new; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -433,9 +453,10 @@ TEST(ParserA602, BlockingAssignment_ClassNew) {
 
 TEST(ParserA602, BlockingAssignment_ClassNewWithArgs) {
   // class_new with arguments: obj = new(arg1, arg2)
-  auto r = Parse("module m;\n"
-                 "  initial begin obj = new(1, 2); end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin obj = new(1, 2); end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -445,9 +466,10 @@ TEST(ParserA602, BlockingAssignment_ClassNewWithArgs) {
 
 TEST(ParserA602, BlockingAssignment_IncExpression) {
   // inc_or_dec_expression: i++
-  auto r = Parse("module m;\n"
-                 "  initial begin i++; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin i++; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -459,9 +481,10 @@ TEST(ParserA602, BlockingAssignment_IncExpression) {
 
 TEST(ParserA602, BlockingAssignment_DecExpression) {
   // inc_or_dec_expression: j--
-  auto r = Parse("module m;\n"
-                 "  initial begin j--; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin j--; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -472,9 +495,10 @@ TEST(ParserA602, BlockingAssignment_DecExpression) {
 
 TEST(ParserA602, BlockingAssignment_PrefixInc) {
   // prefix inc: ++i
-  auto r = Parse("module m;\n"
-                 "  initial begin ++i; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin ++i; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -485,9 +509,10 @@ TEST(ParserA602, BlockingAssignment_PrefixInc) {
 
 TEST(ParserA602, BlockingAssignment_PrefixDec) {
   // prefix dec: --j
-  auto r = Parse("module m;\n"
-                 "  initial begin --j; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin --j; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -502,9 +527,10 @@ TEST(ParserA602, BlockingAssignment_PrefixDec) {
 // =============================================================================
 
 TEST(ParserA602, OperatorAssignment_PlusEq) {
-  auto r = Parse("module m;\n"
-                 "  initial begin a += 1; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin a += 1; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -516,9 +542,10 @@ TEST(ParserA602, OperatorAssignment_PlusEq) {
 }
 
 TEST(ParserA602, OperatorAssignment_MinusEq) {
-  auto r = Parse("module m;\n"
-                 "  initial begin a -= 1; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin a -= 1; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -528,9 +555,10 @@ TEST(ParserA602, OperatorAssignment_MinusEq) {
 }
 
 TEST(ParserA602, OperatorAssignment_StarEq) {
-  auto r = Parse("module m;\n"
-                 "  initial begin a *= 2; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin a *= 2; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -540,9 +568,10 @@ TEST(ParserA602, OperatorAssignment_StarEq) {
 }
 
 TEST(ParserA602, OperatorAssignment_SlashEq) {
-  auto r = Parse("module m;\n"
-                 "  initial begin a /= 2; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin a /= 2; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -552,9 +581,10 @@ TEST(ParserA602, OperatorAssignment_SlashEq) {
 }
 
 TEST(ParserA602, OperatorAssignment_PercentEq) {
-  auto r = Parse("module m;\n"
-                 "  initial begin a %= 3; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin a %= 3; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -564,9 +594,10 @@ TEST(ParserA602, OperatorAssignment_PercentEq) {
 }
 
 TEST(ParserA602, OperatorAssignment_AmpEq) {
-  auto r = Parse("module m;\n"
-                 "  initial begin a &= 8'hFF; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin a &= 8'hFF; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -576,9 +607,10 @@ TEST(ParserA602, OperatorAssignment_AmpEq) {
 }
 
 TEST(ParserA602, OperatorAssignment_PipeEq) {
-  auto r = Parse("module m;\n"
-                 "  initial begin a |= 8'h01; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin a |= 8'h01; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -588,9 +620,10 @@ TEST(ParserA602, OperatorAssignment_PipeEq) {
 }
 
 TEST(ParserA602, OperatorAssignment_CaretEq) {
-  auto r = Parse("module m;\n"
-                 "  initial begin a ^= 8'hAA; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin a ^= 8'hAA; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -600,9 +633,10 @@ TEST(ParserA602, OperatorAssignment_CaretEq) {
 }
 
 TEST(ParserA602, OperatorAssignment_LeftShiftEq) {
-  auto r = Parse("module m;\n"
-                 "  initial begin a <<= 2; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin a <<= 2; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -612,9 +646,10 @@ TEST(ParserA602, OperatorAssignment_LeftShiftEq) {
 }
 
 TEST(ParserA602, OperatorAssignment_RightShiftEq) {
-  auto r = Parse("module m;\n"
-                 "  initial begin a >>= 2; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin a >>= 2; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -624,9 +659,10 @@ TEST(ParserA602, OperatorAssignment_RightShiftEq) {
 }
 
 TEST(ParserA602, OperatorAssignment_ArithLeftShiftEq) {
-  auto r = Parse("module m;\n"
-                 "  initial begin a <<<= 1; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin a <<<= 1; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -636,9 +672,10 @@ TEST(ParserA602, OperatorAssignment_ArithLeftShiftEq) {
 }
 
 TEST(ParserA602, OperatorAssignment_ArithRightShiftEq) {
-  auto r = Parse("module m;\n"
-                 "  initial begin a >>>= 1; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin a >>>= 1; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -649,9 +686,10 @@ TEST(ParserA602, OperatorAssignment_ArithRightShiftEq) {
 
 TEST(ParserA602, OperatorAssignment_WithSelectLhs) {
   // Compound assignment with array/bit-select LHS
-  auto r = Parse("module m;\n"
-                 "  initial begin mem[0] += 1; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin mem[0] += 1; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -670,23 +708,24 @@ TEST(ParserA602, OperatorAssignment_WithSelectLhs) {
 // =============================================================================
 
 TEST(ParserA602, AssignmentOperator_AllThirteen) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    a = 0;\n"
-                 "    a += 1;\n"
-                 "    a -= 1;\n"
-                 "    a *= 2;\n"
-                 "    a /= 2;\n"
-                 "    a %= 3;\n"
-                 "    a &= 8'hFF;\n"
-                 "    a |= 8'h01;\n"
-                 "    a ^= 8'hAA;\n"
-                 "    a <<= 1;\n"
-                 "    a >>= 1;\n"
-                 "    a <<<= 1;\n"
-                 "    a >>>= 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a = 0;\n"
+      "    a += 1;\n"
+      "    a -= 1;\n"
+      "    a *= 2;\n"
+      "    a /= 2;\n"
+      "    a %= 3;\n"
+      "    a &= 8'hFF;\n"
+      "    a |= 8'h01;\n"
+      "    a ^= 8'hAA;\n"
+      "    a <<= 1;\n"
+      "    a >>= 1;\n"
+      "    a <<<= 1;\n"
+      "    a >>>= 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto stmts = AllInitialStmts(r);
@@ -704,9 +743,10 @@ TEST(ParserA602, AssignmentOperator_AllThirteen) {
 // =============================================================================
 
 TEST(ParserA602, NonblockingAssignment_Simple) {
-  auto r = Parse("module m;\n"
-                 "  initial begin q <= d; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin q <= d; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -718,9 +758,10 @@ TEST(ParserA602, NonblockingAssignment_Simple) {
 
 TEST(ParserA602, NonblockingAssignment_WithIntraDelay) {
   // Nonblocking with intra-assignment delay
-  auto r = Parse("module m;\n"
-                 "  initial begin q <= #5 d; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin q <= #5 d; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -732,9 +773,10 @@ TEST(ParserA602, NonblockingAssignment_WithIntraDelay) {
 
 TEST(ParserA602, NonblockingAssignment_WithIntraEvent) {
   // Nonblocking with intra-assignment event control
-  auto r = Parse("module m;\n"
-                 "  initial begin q <= @(posedge clk) d; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin q <= @(posedge clk) d; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -745,9 +787,10 @@ TEST(ParserA602, NonblockingAssignment_WithIntraEvent) {
 
 TEST(ParserA602, NonblockingAssignment_WithRepeatEvent) {
   // Nonblocking with repeat(N) @(event) intra-assignment timing
-  auto r = Parse("module m;\n"
-                 "  initial begin q <= repeat(2) @(posedge clk) d; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin q <= repeat(2) @(posedge clk) d; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -758,9 +801,10 @@ TEST(ParserA602, NonblockingAssignment_WithRepeatEvent) {
 }
 
 TEST(ParserA602, NonblockingAssignment_ConcatLhs) {
-  auto r = Parse("module m;\n"
-                 "  initial begin {q, r} <= {d, e}; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin {q, r} <= {d, e}; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -770,9 +814,10 @@ TEST(ParserA602, NonblockingAssignment_ConcatLhs) {
 }
 
 TEST(ParserA602, NonblockingAssignment_BitSelectLhs) {
-  auto r = Parse("module m;\n"
-                 "  initial begin mem[0] <= 8'hFF; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin mem[0] <= 8'hFF; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -793,9 +838,10 @@ TEST(ParserA602, NonblockingAssignment_BitSelectLhs) {
 // =============================================================================
 
 TEST(ParserA602, ProceduralAssign_Basic) {
-  auto r = Parse("module m;\n"
-                 "  initial begin assign q = d; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin assign q = d; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -806,9 +852,10 @@ TEST(ParserA602, ProceduralAssign_Basic) {
 }
 
 TEST(ParserA602, ProceduralDeassign_Basic) {
-  auto r = Parse("module m;\n"
-                 "  initial begin deassign q; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin deassign q; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -819,9 +866,10 @@ TEST(ParserA602, ProceduralDeassign_Basic) {
 
 TEST(ParserA602, Force_Variable) {
   // force variable_assignment
-  auto r = Parse("module m;\n"
-                 "  initial begin force q = 1; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin force q = 1; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -833,9 +881,10 @@ TEST(ParserA602, Force_Variable) {
 
 TEST(ParserA602, Force_Net) {
   // force net_assignment
-  auto r = Parse("module m;\n"
-                 "  initial begin force net_a = 0; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin force net_a = 0; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -844,9 +893,10 @@ TEST(ParserA602, Force_Net) {
 }
 
 TEST(ParserA602, Release_Variable) {
-  auto r = Parse("module m;\n"
-                 "  initial begin release q; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin release q; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -856,9 +906,10 @@ TEST(ParserA602, Release_Variable) {
 }
 
 TEST(ParserA602, Release_Net) {
-  auto r = Parse("module m;\n"
-                 "  initial begin release net_a; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin release net_a; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -868,14 +919,15 @@ TEST(ParserA602, Release_Net) {
 
 TEST(ParserA602, ProceduralContinuous_AllForms) {
   // All four procedural continuous assignment forms in one block
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    assign q = d;\n"
-                 "    deassign q;\n"
-                 "    force y = 0;\n"
-                 "    release y;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    assign q = d;\n"
+      "    deassign q;\n"
+      "    force y = 0;\n"
+      "    release y;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto stmts = AllInitialStmts(r);
@@ -887,9 +939,10 @@ TEST(ParserA602, ProceduralContinuous_AllForms) {
 }
 
 TEST(ParserA602, ProceduralAssign_WithBitSelect) {
-  auto r = Parse("module m;\n"
-                 "  initial begin assign q[0] = d; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin assign q[0] = d; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -899,9 +952,10 @@ TEST(ParserA602, ProceduralAssign_WithBitSelect) {
 }
 
 TEST(ParserA602, Force_WithConcat) {
-  auto r = Parse("module m;\n"
-                 "  initial begin force {a, b} = 2'b11; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin force {a, b} = 2'b11; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -911,9 +965,10 @@ TEST(ParserA602, Force_WithConcat) {
 }
 
 TEST(ParserA602, Release_WithConcat) {
-  auto r = Parse("module m;\n"
-                 "  initial begin release {a, b}; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin release {a, b}; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -927,9 +982,10 @@ TEST(ParserA602, Release_WithConcat) {
 // =============================================================================
 
 TEST(ParserA602, VariableAssignment_SimpleExpr) {
-  auto r = Parse("module m;\n"
-                 "  initial begin x = a + b * c; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin x = a + b * c; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -939,9 +995,10 @@ TEST(ParserA602, VariableAssignment_SimpleExpr) {
 }
 
 TEST(ParserA602, VariableAssignment_TernaryRhs) {
-  auto r = Parse("module m;\n"
-                 "  initial begin x = sel ? a : b; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin x = sel ? a : b; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -951,9 +1008,10 @@ TEST(ParserA602, VariableAssignment_TernaryRhs) {
 }
 
 TEST(ParserA602, VariableAssignment_CallRhs) {
-  auto r = Parse("module m;\n"
-                 "  initial begin x = func(a, b); end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin x = func(a, b); end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -967,21 +1025,22 @@ TEST(ParserA602, VariableAssignment_CallRhs) {
 // =============================================================================
 
 TEST(ParserA602, MixedAssignments_BlockingAndNonblocking) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    a = 1;\n"
-                 "    b <= 2;\n"
-                 "    c += 3;\n"
-                 "    d <= #10 4;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a = 1;\n"
+      "    b <= 2;\n"
+      "    c += 3;\n"
+      "    d <= #10 4;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto stmts = AllInitialStmts(r);
   ASSERT_EQ(stmts.size(), 4u);
   EXPECT_EQ(stmts[0]->kind, StmtKind::kBlockingAssign);
   EXPECT_EQ(stmts[1]->kind, StmtKind::kNonblockingAssign);
-  EXPECT_EQ(stmts[2]->kind, StmtKind::kBlockingAssign); // compound
+  EXPECT_EQ(stmts[2]->kind, StmtKind::kBlockingAssign);  // compound
   EXPECT_EQ(stmts[3]->kind, StmtKind::kNonblockingAssign);
   EXPECT_NE(stmts[3]->delay, nullptr);
 }
@@ -992,17 +1051,18 @@ TEST(ParserA602, MixedAssignments_BlockingAndNonblocking) {
 
 TEST(ParserA602, Integration_AlwaysFFWithBlockingAndNonblocking) {
   // Typical always_ff pattern with reset
-  auto r = Parse("module m;\n"
-                 "  always_ff @(posedge clk or negedge rst_n) begin\n"
-                 "    if (!rst_n) begin\n"
-                 "      q <= 0;\n"
-                 "      r <= 0;\n"
-                 "    end else begin\n"
-                 "      q <= d;\n"
-                 "      r <= e;\n"
-                 "    end\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always_ff @(posedge clk or negedge rst_n) begin\n"
+      "    if (!rst_n) begin\n"
+      "      q <= 0;\n"
+      "      r <= 0;\n"
+      "    end else begin\n"
+      "      q <= d;\n"
+      "      r <= e;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysBlock);
@@ -1012,14 +1072,15 @@ TEST(ParserA602, Integration_AlwaysFFWithBlockingAndNonblocking) {
 }
 
 TEST(ParserA602, Integration_InitialWithTimingAndAssign) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    clk = 0;\n"
-                 "    #5 clk = 1;\n"
-                 "    #5 clk = 0;\n"
-                 "    @(posedge done) $finish;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    clk = 0;\n"
+      "    #5 clk = 1;\n"
+      "    #5 clk = 0;\n"
+      "    @(posedge done) $finish;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto stmts = AllInitialStmts(r);
@@ -1032,15 +1093,16 @@ TEST(ParserA602, Integration_InitialWithTimingAndAssign) {
 
 TEST(ParserA602, Integration_InitialFinalCoexistence) {
   // initial and final blocks coexist
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    $display(\"start\");\n"
-                 "    a = 0;\n"
-                 "  end\n"
-                 "  final begin\n"
-                 "    $display(\"end\");\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    $display(\"start\");\n"
+      "    a = 0;\n"
+      "  end\n"
+      "  final begin\n"
+      "    $display(\"end\");\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *init = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
@@ -1050,12 +1112,13 @@ TEST(ParserA602, Integration_InitialFinalCoexistence) {
 }
 
 TEST(ParserA602, Integration_AlwaysCombWithOperatorAssign) {
-  auto r = Parse("module m;\n"
-                 "  always_comb begin\n"
-                 "    sum = a + b;\n"
-                 "    sum += carry_in;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always_comb begin\n"
+      "    sum = a + b;\n"
+      "    sum += carry_in;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysBlock);
@@ -1068,9 +1131,10 @@ TEST(ParserA602, Integration_AlwaysCombWithOperatorAssign) {
 
 TEST(ParserA602, BlockingAssignment_ParenthesizedIntraDelay) {
   // Parenthesized intra-assignment delay with min:typ:max
-  auto r = Parse("module m;\n"
-                 "  initial begin a = #(1:2:3) b; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin a = #(1:2:3) b; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -1080,9 +1144,10 @@ TEST(ParserA602, BlockingAssignment_ParenthesizedIntraDelay) {
 }
 
 TEST(ParserA602, NonblockingAssignment_ParenthesizedIntraDelay) {
-  auto r = Parse("module m;\n"
-                 "  initial begin q <= #(5:10:15) d; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin q <= #(5:10:15) d; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);

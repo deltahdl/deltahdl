@@ -311,4 +311,3 @@ TEST(ParserA601, NetAlias_BitSelect) {
   ASSERT_NE(alias, nullptr);
   ASSERT_EQ(alias->alias_nets.size(), 2u);
 }
-
