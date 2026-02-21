@@ -186,61 +186,59 @@ Expr* Parser::ParseExprBp(int min_bp) {
   return ParseInfixBp(lhs, min_bp);
 }
 
+Expr* Parser::TryParseSpecialInfix(Expr*& lhs, const Token& tok, int min_bp) {
+  // Ternary: expr ? (* attr *) expr : expr
+  if (tok.kind == TokenKind::kQuestion && min_bp <= 1) {
+    Consume();
+    ParseAttributes();
+    auto* tern = arena_.Create<Expr>();
+    tern->kind = ExprKind::kTernary;
+    tern->condition = lhs;
+    tern->true_expr = ParseExprBp(0);
+    Expect(TokenKind::kColon);
+    tern->false_expr = ParseExprBp(0);
+    return tern;
+  }
+  // §A.6.6: &&& in cond_predicate
+  if (tok.kind == TokenKind::kAmpAmpAmp && min_bp <= 0) {
+    Consume();
+    auto* bin = arena_.Create<Expr>();
+    bin->kind = ExprKind::kBinary;
+    bin->op = TokenKind::kAmpAmpAmp;
+    bin->lhs = lhs;
+    bin->rhs = ParseExprBp(1);
+    return bin;
+  }
+  // inside expression: expr inside { range_list }
+  if (tok.kind == TokenKind::kKwInside && min_bp <= 1) {
+    return ParseInsideExpr(lhs);
+  }
+  // §12.6: matches expression
+  if (tok.kind == TokenKind::kKwMatches && min_bp <= 1) {
+    Consume();
+    auto* bin = arena_.Create<Expr>();
+    bin->kind = ExprKind::kBinary;
+    bin->op = TokenKind::kKwMatches;
+    bin->lhs = lhs;
+    bin->rhs = ParseExprBp(2);
+    return bin;
+  }
+  return nullptr;
+}
+
 Expr* Parser::ParseInfixBp(Expr* lhs, int min_bp) {
   while (true) {
     auto tok = CurrentToken();
-    if (tok.IsEof()) {
-      break;
-    }
+    if (tok.IsEof()) break;
 
-    // Ternary: expr ? (* attr *) expr : expr
-    if (tok.kind == TokenKind::kQuestion && min_bp <= 1) {
-      Consume();
-      ParseAttributes();  // optional attribute before true-branch
-      auto* tern = arena_.Create<Expr>();
-      tern->kind = ExprKind::kTernary;
-      tern->condition = lhs;
-      tern->true_expr = ParseExprBp(0);
-      Expect(TokenKind::kColon);
-      tern->false_expr = ParseExprBp(0);
-      lhs = tern;
-      continue;
-    }
-
-    // §A.6.6: &&& in cond_predicate — lowest precedence binary operator
-    if (tok.kind == TokenKind::kAmpAmpAmp && min_bp <= 0) {
-      Consume();
-      auto* bin = arena_.Create<Expr>();
-      bin->kind = ExprKind::kBinary;
-      bin->op = TokenKind::kAmpAmpAmp;
-      bin->lhs = lhs;
-      bin->rhs = ParseExprBp(1);
-      lhs = bin;
-      continue;
-    }
-
-    // inside expression: expr inside { range_list }
-    if (tok.kind == TokenKind::kKwInside && min_bp <= 1) {
-      lhs = ParseInsideExpr(lhs);
-      continue;
-    }
-
-    // §12.6: matches expression — expr matches pattern
-    if (tok.kind == TokenKind::kKwMatches && min_bp <= 1) {
-      Consume();
-      auto* bin = arena_.Create<Expr>();
-      bin->kind = ExprKind::kBinary;
-      bin->op = TokenKind::kKwMatches;
-      bin->lhs = lhs;
-      bin->rhs = ParseExprBp(2);
-      lhs = bin;
+    auto* special = TryParseSpecialInfix(lhs, tok, min_bp);
+    if (special) {
+      lhs = special;
       continue;
     }
 
     auto [lbp, rbp] = InfixBp(tok.kind);
-    if (lbp < 0 || lbp < min_bp) {
-      break;
-    }
+    if (lbp < 0 || lbp < min_bp) break;
 
     auto op = Consume();
     ParseAttributes();  // optional attribute before RHS operand
@@ -419,33 +417,7 @@ Expr* Parser::ParsePrimaryExpr() {
       break;
   }
 
-  // §6.24 type cast: type'(expr) — only if followed by apostrophe.
-  // §A.6.7.1: integer_atom_type'{...} — typed assignment pattern expression.
-  // Bare type keywords (e.g., $typename(logic)) are valid identifiers.
-  if (IsCastTypeToken(tok.kind)) {
-    auto saved = lexer_.SavePos();
-    auto type_tok = Consume();
-    // §A.6.7.1: integer_atom_type'{...} typed assignment pattern
-    if (Check(TokenKind::kApostropheLBrace)) {
-      auto* pat = ParseAssignmentPattern();
-      auto* typed = arena_.Create<Expr>();
-      typed->kind = ExprKind::kCast;
-      typed->text = type_tok.text;
-      typed->range.start = type_tok.loc;
-      typed->lhs = pat;
-      return typed;
-    }
-    if (Check(TokenKind::kApostrophe)) {
-      lexer_.RestorePos(saved);
-      return ParseCastExpr();
-    }
-    // Bare type keyword in expression context (§20.6 $typename(type))
-    auto* id = arena_.Create<Expr>();
-    id->kind = ExprKind::kIdentifier;
-    id->text = type_tok.text;
-    id->range.start = type_tok.loc;
-    return id;
-  }
+  if (IsCastTypeToken(tok.kind)) return ParseCastOrTypedPattern();
 
   diag_.Error(tok.loc, "expected expression");
   Consume();
@@ -453,6 +425,32 @@ Expr* Parser::ParsePrimaryExpr() {
   err->kind = ExprKind::kIntegerLiteral;
   err->range.start = tok.loc;
   return err;
+}
+
+Expr* Parser::ParseCastOrTypedPattern() {
+  auto saved = lexer_.SavePos();
+  auto type_tok = Consume();
+  // §A.6.7.1: integer_atom_type'{...} typed assignment pattern
+  if (Check(TokenKind::kApostropheLBrace)) {
+    auto* pat = ParseAssignmentPattern();
+    auto* typed = arena_.Create<Expr>();
+    typed->kind = ExprKind::kCast;
+    typed->text = type_tok.text;
+    typed->range.start = type_tok.loc;
+    typed->lhs = pat;
+    return typed;
+  }
+  // §6.24 type cast: type'(expr)
+  if (Check(TokenKind::kApostrophe)) {
+    lexer_.RestorePos(saved);
+    return ParseCastExpr();
+  }
+  // Bare type keyword in expression context (§20.6 $typename(type))
+  auto* id = arena_.Create<Expr>();
+  id->kind = ExprKind::kIdentifier;
+  id->text = type_tok.text;
+  id->range.start = type_tok.loc;
+  return id;
 }
 
 // Returns true if token is a keyword valid as a method/member name after '.'.

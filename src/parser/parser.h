@@ -263,8 +263,10 @@ class Parser {
   Expr* ParseExpr();
   Expr* ParseExprBp(int min_bp);
   Expr* ParseInfixBp(Expr* lhs, int min_bp);
+  Expr* TryParseSpecialInfix(Expr*& lhs, const Token& tok, int min_bp);
   Expr* ParsePrefixExpr();
   Expr* ParsePrimaryExpr();
+  Expr* ParseCastOrTypedPattern();
   Expr* MakeLiteral(ExprKind kind, const Token& tok);
   void WarnSizedOverflow(const Token& tok);
   Expr* ParseCallExpr(Expr* callee);
