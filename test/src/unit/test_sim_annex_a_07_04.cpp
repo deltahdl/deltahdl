@@ -146,7 +146,7 @@ TEST(SimA704, RuntimePathDelayTwelveDelays) {
   pd.dst_port = "out";
   pd.delay_count = 12;
   for (int i = 0; i < 12; ++i) {
-    pd.delays[i] = static_cast<uint64_t>(i + 1);
+    pd.delays[i] = static_cast<uint64_t>(i) + 1;
   }
   mgr.AddPathDelay(pd);
 
@@ -155,7 +155,7 @@ TEST(SimA704, RuntimePathDelayTwelveDelays) {
   ASSERT_EQ(delays.size(), 1u);
   EXPECT_EQ(delays[0].delay_count, 12u);
   for (int i = 0; i < 12; ++i) {
-    EXPECT_EQ(delays[0].delays[i], static_cast<uint64_t>(i + 1));
+    EXPECT_EQ(delays[0].delays[i], static_cast<uint64_t>(i) + 1);
   }
 }
 

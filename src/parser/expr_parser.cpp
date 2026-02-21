@@ -595,6 +595,14 @@ Expr* Parser::ParseIdentifierExpr() {
   return ParseWithClause(result);
 }
 
+// Parse one or more named args: .name(expr) {, .name(expr)}
+void Parser::ParseTrailingNamedArgs(Expr* call) {
+  ParseNamedArg(call);
+  while (Match(TokenKind::kComma)) {
+    ParseNamedArg(call);
+  }
+}
+
 Expr* Parser::ParseCallExpr(Expr* callee) {
   Expect(TokenKind::kLParen);
   auto* call = arena_.Create<Expr>();
@@ -604,20 +612,12 @@ Expr* Parser::ParseCallExpr(Expr* callee) {
   call->range.start = callee->range.start;
   if (!Check(TokenKind::kRParen)) {
     if (Check(TokenKind::kDot)) {
-      // Named arguments: .name(expr), ...
-      ParseNamedArg(call);
-      while (Match(TokenKind::kComma)) {
-        ParseNamedArg(call);
-      }
+      ParseTrailingNamedArgs(call);
     } else {
       call->args.push_back(ParseExpr());
       while (Match(TokenKind::kComma)) {
-        // §A.6.9: list_of_arguments allows positional then named args.
         if (Check(TokenKind::kDot)) {
-          ParseNamedArg(call);
-          while (Match(TokenKind::kComma)) {
-            ParseNamedArg(call);
-          }
+          ParseTrailingNamedArgs(call);
           break;
         }
         call->args.push_back(ParseExpr());

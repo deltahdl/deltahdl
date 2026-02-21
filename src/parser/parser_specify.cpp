@@ -126,9 +126,36 @@ static bool IsZorX(char c) {
 
 static bool IsZeroOrOne(char c) { return c == '0' || c == '1'; }
 
+// A.7.5.3: Parse the bracket list in edge [ edge_descriptor {, ...} ].
+void Parser::ParseEdgeDescriptorList(
+    std::vector<std::pair<char, char>>& descriptors) {
+  do {
+    auto text = CurrentToken().text;
+    // Single 2-char token: "01"/"10" (IntLiteral) or "x0"/"z1" (Identifier).
+    if ((Check(TokenKind::kIntLiteral) || Check(TokenKind::kIdentifier)) &&
+        text.size() == 2 && (IsZeroOrOne(text[0]) || IsZorX(text[0])) &&
+        IsZeroOrOne(text[1])) {
+      descriptors.push_back({text[0], text[1]});
+      Consume();
+    } else if (Check(TokenKind::kIntLiteral) && text.size() == 1 &&
+               IsZeroOrOne(text[0])) {
+      // Two-token form: "0"+"x", "1"+"z", etc.
+      char first = text[0];
+      Consume();
+      auto next_text = CurrentToken().text;
+      if (Check(TokenKind::kIdentifier) && next_text.size() == 1 &&
+          IsZorX(next_text[0])) {
+        descriptors.push_back({first, next_text[0]});
+        Consume();
+      }
+    } else {
+      Consume();
+    }
+  } while (Match(TokenKind::kComma));
+  Expect(TokenKind::kRBracket);
+}
+
 // Parse edge qualifier: posedge | negedge | edge [ [...] ] | (nothing)
-// A.7.5.3: edge_control_specifier ::= edge [ edge_descriptor { ,
-// edge_descriptor } ]
 SpecifyEdge Parser::ParseSpecifyEdge(
     std::vector<std::pair<char, char>>* edge_descriptors) {
   if (Check(TokenKind::kKwPosedge)) {
@@ -141,38 +168,8 @@ SpecifyEdge Parser::ParseSpecifyEdge(
   }
   if (Check(TokenKind::kKwEdge)) {
     Consume();
-    // A.7.5.3: Optional edge_control_specifier bracket list.
     if (edge_descriptors && Match(TokenKind::kLBracket)) {
-      // Parse edge_descriptor { , edge_descriptor }
-      do {
-        auto text = CurrentToken().text;
-        if (Check(TokenKind::kIntLiteral) && text.size() == 2 &&
-            IsZeroOrOne(text[0]) && IsZeroOrOne(text[1])) {
-          // 01 | 10 (or 00, 11 though unusual)
-          edge_descriptors->push_back({text[0], text[1]});
-          Consume();
-        } else if (Check(TokenKind::kIdentifier) && text.size() == 2 &&
-                   IsZorX(text[0]) && IsZeroOrOne(text[1])) {
-          // z_or_x zero_or_one: x0, x1, z0, z1, X0, X1, Z0, Z1
-          edge_descriptors->push_back({text[0], text[1]});
-          Consume();
-        } else if ((Check(TokenKind::kIntLiteral) && text.size() == 1 &&
-                    IsZeroOrOne(text[0]))) {
-          // zero_or_one z_or_x: 0x, 0z, 1x, 1z (two tokens)
-          char first = text[0];
-          Consume();
-          auto next_text = CurrentToken().text;
-          if (Check(TokenKind::kIdentifier) && next_text.size() == 1 &&
-              IsZorX(next_text[0])) {
-            edge_descriptors->push_back({first, next_text[0]});
-            Consume();
-          }
-        } else {
-          // Unknown token — skip to avoid infinite loop.
-          Consume();
-        }
-      } while (Match(TokenKind::kComma));
-      Expect(TokenKind::kRBracket);
+      ParseEdgeDescriptorList(*edge_descriptors);
     }
     return SpecifyEdge::kEdge;
   }
@@ -269,16 +266,13 @@ SpecifyItem* Parser::ParseSpecifyPathDecl() {
 
   // => (parallel) or *> (full)
   // Handle +=> lexed as += then > (kPlusEq kGt)
-  if (Match(TokenKind::kEqGt)) {
+  if (Match(TokenKind::kEqGt) ||
+      (item->path.polarity != SpecifyPolarity::kNone &&
+       Match(TokenKind::kGt))) {
     item->path.path_kind = SpecifyPathKind::kParallel;
   } else if (Match(TokenKind::kStarGt)) {
     item->path.path_kind = SpecifyPathKind::kFull;
-  } else if (item->path.polarity != SpecifyPolarity::kNone &&
-             Match(TokenKind::kGt)) {
-    // Polarity consumed a combined +=|-> token; kGt completes =>
-    item->path.path_kind = SpecifyPathKind::kParallel;
   } else {
-    // Try to recover
     Consume();
   }
 
@@ -375,37 +369,30 @@ void Parser::ParseTimingCheckTrailingArgs(TimingCheckDecl& tc) {
   }
 }
 
-// Parse extended args after notifier, dispatching by check kind.
-void Parser::ParseExtendedTimingCheckArgs(TimingCheckDecl& tc) {
-  // §31.8: $timeskew/$fullskew: event_based_flag, remain_active_flag.
-  if (tc.check_kind == TimingCheckKind::kTimeskew ||
-      tc.check_kind == TimingCheckKind::kFullskew) {
-    // event_based_flag (expression or empty)
-    if (!Match(TokenKind::kComma) || Check(TokenKind::kRParen)) return;
-    if (!Check(TokenKind::kComma) && !Check(TokenKind::kRParen)) {
-      tc.event_based_flag = ParseExpr();
-    }
-    // A.7.5.2: remain_active_flag ::= constant_mintypmax_expression
-    if (!Match(TokenKind::kComma) || Check(TokenKind::kRParen)) return;
-    if (!Check(TokenKind::kComma) && !Check(TokenKind::kRParen)) {
-      tc.remain_active_flag = ParseMinTypMaxExpr();
-    }
-    return;
+// §31.8: $timeskew/$fullskew extended args: event_based_flag,
+// remain_active_flag.
+void Parser::ParseTimeskewExtendedArgs(TimingCheckDecl& tc) {
+  if (!Match(TokenKind::kComma) || Check(TokenKind::kRParen)) return;
+  if (!Check(TokenKind::kComma) && !Check(TokenKind::kRParen)) {
+    tc.event_based_flag = ParseExpr();
   }
-  // §31.9: $setuphold/$recrem: timestamp_cond, timecheck_cond,
-  // delayed_reference, delayed_data.
-  // A.7.5.2: timestamp_condition ::= mintypmax_expression
+  if (!Match(TokenKind::kComma) || Check(TokenKind::kRParen)) return;
+  if (!Check(TokenKind::kComma) && !Check(TokenKind::kRParen)) {
+    tc.remain_active_flag = ParseMinTypMaxExpr();
+  }
+}
+
+// §31.9: $setuphold/$recrem extended args: timestamp_cond, timecheck_cond,
+// delayed_reference, delayed_data.
+void Parser::ParseSetupholdExtendedArgs(TimingCheckDecl& tc) {
   if (!Match(TokenKind::kComma) || Check(TokenKind::kRParen)) return;
   if (!Check(TokenKind::kComma) && !Check(TokenKind::kRParen)) {
     tc.timestamp_cond = ParseMinTypMaxExpr();
   }
-  // A.7.5.2: timecheck_condition ::= mintypmax_expression
   if (!Match(TokenKind::kComma) || Check(TokenKind::kRParen)) return;
   if (!Check(TokenKind::kComma) && !Check(TokenKind::kRParen)) {
     tc.timecheck_cond = ParseMinTypMaxExpr();
   }
-  // A.7.5.2: delayed_reference ::= terminal_identifier
-  //          | terminal_identifier [ constant_mintypmax_expression ]
   if (!Match(TokenKind::kComma) || Check(TokenKind::kRParen)) return;
   if (Check(TokenKind::kIdentifier)) {
     tc.delayed_ref = Consume().text;
@@ -414,8 +401,6 @@ void Parser::ParseExtendedTimingCheckArgs(TimingCheckDecl& tc) {
       Expect(TokenKind::kRBracket);
     }
   }
-  // A.7.5.2: delayed_data ::= terminal_identifier
-  //          | terminal_identifier [ constant_mintypmax_expression ]
   if (!Match(TokenKind::kComma) || Check(TokenKind::kRParen)) return;
   if (Check(TokenKind::kIdentifier)) {
     tc.delayed_data = Consume().text;
@@ -423,6 +408,16 @@ void Parser::ParseExtendedTimingCheckArgs(TimingCheckDecl& tc) {
       tc.delayed_data_expr = ParseMinTypMaxExpr();
       Expect(TokenKind::kRBracket);
     }
+  }
+}
+
+// Parse extended args after notifier, dispatching by check kind.
+void Parser::ParseExtendedTimingCheckArgs(TimingCheckDecl& tc) {
+  if (tc.check_kind == TimingCheckKind::kTimeskew ||
+      tc.check_kind == TimingCheckKind::kFullskew) {
+    ParseTimeskewExtendedArgs(tc);
+  } else {
+    ParseSetupholdExtendedArgs(tc);
   }
 }
 

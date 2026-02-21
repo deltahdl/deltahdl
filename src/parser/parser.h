@@ -117,6 +117,9 @@ class Parser {
   RsProduction ParseRsProduction();
   RsRule ParseRsRule();
   RsProd ParseRsProd();
+  void ParseRsCodeBlockStmts(std::vector<Stmt*>& stmts);
+  bool CheckColonEq();
+  bool MatchColonEq();
   RsProductionItem ParseRsProductionItem();
   RsCaseItem ParseRsCaseItem();
   void ParseCovergroupDecl(std::vector<ModuleItem*>& items);
@@ -138,11 +141,14 @@ class Parser {
   void ParsePathDelays(std::vector<Expr*>& delays);
   SpecifyEdge ParseSpecifyEdge(
       std::vector<std::pair<char, char>>* edge_descriptors = nullptr);
+  void ParseEdgeDescriptorList(std::vector<std::pair<char, char>>& descriptors);
   SpecifyPolarity ParseSpecifyPolarity();
   TimingCheckKind ParseTimingCheckKind(std::string_view name);
   bool CheckNextIsCommaOrRParen();
   void ParseTimingCheckTrailingArgs(TimingCheckDecl& tc);
   void ParseExtendedTimingCheckArgs(TimingCheckDecl& tc);
+  void ParseTimeskewExtendedArgs(TimingCheckDecl& tc);
+  void ParseSetupholdExtendedArgs(TimingCheckDecl& tc);
 
   // Library source text (A.1.1)
   LibraryDecl* ParseLibraryDecl();
@@ -279,6 +285,7 @@ class Parser {
   void WarnSizedOverflow(const Token& tok);
   Expr* ParseCallExpr(Expr* callee);
   void ParseNamedArg(Expr* call);
+  void ParseTrailingNamedArgs(Expr* call);
   Expr* ParseMemberAccessChain(Token tok);
   Expr* MakeMemberAccess(Expr* base);
   Expr* ParseParameterizedScope(Expr* base);

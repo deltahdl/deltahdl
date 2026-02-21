@@ -85,6 +85,17 @@ RsCaseItem Parser::ParseRsCaseItem() {
   return ci;
 }
 
+// Parse block-level statements: { data_declaration | statement }
+void Parser::ParseRsCodeBlockStmts(std::vector<Stmt*>& stmts) {
+  while (!Check(TokenKind::kRBrace) && !AtEnd()) {
+    if (IsBlockVarDeclStart()) {
+      ParseBlockVarDecls(stmts);
+    } else {
+      stmts.push_back(ParseStmt());
+    }
+  }
+}
+
 // §A.6.12: rs_prod ::= item | code_block | if_else | repeat | case
 RsProd Parser::ParseRsProd() {
   RsProd prod;
@@ -93,13 +104,7 @@ RsProd Parser::ParseRsProd() {
   if (Check(TokenKind::kLBrace)) {
     prod.kind = RsProdKind::kCodeBlock;
     Consume();  // '{'
-    while (!Check(TokenKind::kRBrace) && !AtEnd()) {
-      if (IsBlockVarDeclStart()) {
-        ParseBlockVarDecls(prod.code_stmts);
-      } else {
-        prod.code_stmts.push_back(ParseStmt());
-      }
-    }
+    ParseRsCodeBlockStmts(prod.code_stmts);
     Expect(TokenKind::kRBrace);
     return prod;
   }
@@ -150,32 +155,32 @@ RsProd Parser::ParseRsProd() {
   return prod;
 }
 
+// Check if current position is ':=' (colon + eq).
+bool Parser::CheckColonEq() {
+  if (!Check(TokenKind::kColon)) return false;
+  auto saved = lexer_.SavePos();
+  Consume();
+  bool result = Check(TokenKind::kEq);
+  lexer_.RestorePos(saved);
+  return result;
+}
+
+// Match ':=' (colon + eq), consuming both if matched.
+bool Parser::MatchColonEq() {
+  if (!Check(TokenKind::kColon)) return false;
+  auto saved = lexer_.SavePos();
+  Consume();
+  if (Check(TokenKind::kEq)) {
+    Consume();
+    return true;
+  }
+  lexer_.RestorePos(saved);
+  return false;
+}
+
 // §A.6.12: rs_rule ::= production_list [ := weight [code_block] ]
 RsRule Parser::ParseRsRule() {
   RsRule rule;
-
-  // Helper: check if current position is ':=' (colon + eq).
-  auto IsAtColonEq = [&]() {
-    if (!Check(TokenKind::kColon)) return false;
-    auto saved = lexer_.SavePos();
-    Consume();
-    bool result = Check(TokenKind::kEq);
-    lexer_.RestorePos(saved);
-    return result;
-  };
-
-  // Helper: match ':=' (colon + eq), consuming both if matched.
-  auto MatchColonEq = [&]() {
-    if (!Check(TokenKind::kColon)) return false;
-    auto saved = lexer_.SavePos();
-    Consume();
-    if (Check(TokenKind::kEq)) {
-      Consume();
-      return true;
-    }
-    lexer_.RestorePos(saved);
-    return false;
-  };
 
   // Check for rand join prefix.
   if (Check(TokenKind::kKwRand)) {
@@ -184,33 +189,26 @@ RsRule Parser::ParseRsRule() {
     if (Check(TokenKind::kKwJoin)) {
       Consume();
       rule.is_rand_join = true;
-      // Optional ( expression )
       if (Check(TokenKind::kLParen)) {
         Consume();
         rule.rand_join_expr = ParseExpr();
         Expect(TokenKind::kRParen);
       }
-      // Two or more production items.
       rule.rand_join_items.push_back(ParseRsProductionItem());
       rule.rand_join_items.push_back(ParseRsProductionItem());
-      while (CheckIdentifier() && !IsAtColonEq() &&
+      while (CheckIdentifier() && !CheckColonEq() &&
              !Check(TokenKind::kSemicolon) && !Check(TokenKind::kPipe)) {
         rule.rand_join_items.push_back(ParseRsProductionItem());
       }
     } else {
       lexer_.RestorePos(saved);
-      // Not rand join — parse as normal prod sequence.
     }
   }
 
   if (!rule.is_rand_join) {
-    // Parse sequence of rs_prod.
     rule.prods.push_back(ParseRsProd());
-    // Continue as long as the next token can start an rs_prod:
-    // identifier, '{', 'if', 'repeat', 'case'
-    while (!IsAtColonEq() && !Check(TokenKind::kSemicolon) &&
+    while (!CheckColonEq() && !Check(TokenKind::kSemicolon) &&
            !Check(TokenKind::kPipe) && !AtEnd()) {
-      // Must be start of an rs_prod.
       if (CheckIdentifier() || Check(TokenKind::kLBrace) ||
           Check(TokenKind::kKwIf) || Check(TokenKind::kKwRepeat) ||
           Check(TokenKind::kKwCase)) {
@@ -221,9 +219,7 @@ RsRule Parser::ParseRsRule() {
     }
   }
 
-  // Optional := weight_specification [code_block]
   if (MatchColonEq()) {
-    // rs_weight_specification: number | identifier | ( expr )
     if (Check(TokenKind::kLParen)) {
       Consume();
       rule.weight = ParseExpr();
@@ -231,16 +227,9 @@ RsRule Parser::ParseRsRule() {
     } else {
       rule.weight = ParsePrimaryExpr();
     }
-    // Optional code block after weight.
     if (Check(TokenKind::kLBrace)) {
       Consume();
-      while (!Check(TokenKind::kRBrace) && !AtEnd()) {
-        if (IsBlockVarDeclStart()) {
-          ParseBlockVarDecls(rule.weight_code);
-        } else {
-          rule.weight_code.push_back(ParseStmt());
-        }
-      }
+      ParseRsCodeBlockStmts(rule.weight_code);
       Expect(TokenKind::kRBrace);
     }
   }
@@ -253,16 +242,13 @@ RsProduction Parser::ParseRsProduction() {
   RsProduction prod;
 
   // Optional data_type_or_void prefix (before identifier).
-  // We check for void or a known type keyword before the production name.
-  if (Check(TokenKind::kKwVoid)) {
-    Consume();
-    prod.has_return_type = true;
-  } else if (Check(TokenKind::kKwInt) || Check(TokenKind::kKwBit) ||
-             Check(TokenKind::kKwLogic) || Check(TokenKind::kKwByte) ||
-             Check(TokenKind::kKwShortint) || Check(TokenKind::kKwLongint) ||
-             Check(TokenKind::kKwInteger) || Check(TokenKind::kKwString) ||
-             Check(TokenKind::kKwReal) || Check(TokenKind::kKwShortreal) ||
-             Check(TokenKind::kKwRealtime) || Check(TokenKind::kKwTime)) {
+  if (Check(TokenKind::kKwVoid) || Check(TokenKind::kKwInt) ||
+      Check(TokenKind::kKwBit) || Check(TokenKind::kKwLogic) ||
+      Check(TokenKind::kKwByte) || Check(TokenKind::kKwShortint) ||
+      Check(TokenKind::kKwLongint) || Check(TokenKind::kKwInteger) ||
+      Check(TokenKind::kKwString) || Check(TokenKind::kKwReal) ||
+      Check(TokenKind::kKwShortreal) || Check(TokenKind::kKwRealtime) ||
+      Check(TokenKind::kKwTime)) {
     Consume();
     prod.has_return_type = true;
   }
