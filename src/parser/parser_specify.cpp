@@ -135,11 +135,43 @@ SpecifyEdge Parser::ParseSpecifyEdge() {
   return SpecifyEdge::kNone;
 }
 
-// Parse port list inside path: a or a, b, c
-void Parser::ParsePathPorts(std::vector<std::string_view>& ports) {
-  ports.push_back(Expect(TokenKind::kIdentifier).text);
+// Parse a single specify terminal: identifier [ . identifier ] [ [ range ] ]
+SpecifyTerminal Parser::ParseSpecifyTerminal() {
+  SpecifyTerminal term;
+  term.name = Expect(TokenKind::kIdentifier).text;
+
+  // Check for dotted interface.port form
+  if (Match(TokenKind::kDot)) {
+    term.interface_name = term.name;
+    term.name = Expect(TokenKind::kIdentifier).text;
+  }
+
+  // Optional [ constant_range_expression ]
+  if (Match(TokenKind::kLBracket)) {
+    term.range_left = ParseExpr();
+    if (Match(TokenKind::kColon)) {
+      term.range_kind = SpecifyRangeKind::kPartSelect;
+      term.range_right = ParseExpr();
+    } else if (Match(TokenKind::kPlusColon)) {
+      term.range_kind = SpecifyRangeKind::kPlusIndexed;
+      term.range_right = ParseExpr();
+    } else if (Match(TokenKind::kMinusColon)) {
+      term.range_kind = SpecifyRangeKind::kMinusIndexed;
+      term.range_right = ParseExpr();
+    } else {
+      term.range_kind = SpecifyRangeKind::kBitSelect;
+    }
+    Expect(TokenKind::kRBracket);
+  }
+
+  return term;
+}
+
+// Parse port list inside path: terminal {, terminal}
+void Parser::ParsePathPorts(std::vector<SpecifyTerminal>& ports) {
+  ports.push_back(ParseSpecifyTerminal());
   while (Match(TokenKind::kComma)) {
-    ports.push_back(Expect(TokenKind::kIdentifier).text);
+    ports.push_back(ParseSpecifyTerminal());
   }
 }
 

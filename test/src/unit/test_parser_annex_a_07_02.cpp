@@ -171,9 +171,9 @@ TEST(ParserA702, SimplePathParallelSingleDelay) {
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
   ASSERT_EQ(si->path.src_ports.size(), 1u);
-  EXPECT_EQ(si->path.src_ports[0], "a");
+  EXPECT_EQ(si->path.src_ports[0].name, "a");
   ASSERT_EQ(si->path.dst_ports.size(), 1u);
-  EXPECT_EQ(si->path.dst_ports[0], "b");
+  EXPECT_EQ(si->path.dst_ports[0].name, "b");
   ASSERT_EQ(si->path.delays.size(), 1u);
 }
 
@@ -191,12 +191,12 @@ TEST(ParserA702, SimplePathFullMultiplePorts) {
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
   ASSERT_EQ(si->path.src_ports.size(), 3u);
-  EXPECT_EQ(si->path.src_ports[0], "a");
-  EXPECT_EQ(si->path.src_ports[1], "b");
-  EXPECT_EQ(si->path.src_ports[2], "c");
+  EXPECT_EQ(si->path.src_ports[0].name, "a");
+  EXPECT_EQ(si->path.src_ports[1].name, "b");
+  EXPECT_EQ(si->path.src_ports[2].name, "c");
   ASSERT_EQ(si->path.dst_ports.size(), 2u);
-  EXPECT_EQ(si->path.dst_ports[0], "x");
-  EXPECT_EQ(si->path.dst_ports[1], "y");
+  EXPECT_EQ(si->path.dst_ports[0].name, "x");
+  EXPECT_EQ(si->path.dst_ports[1].name, "y");
 }
 
 // =============================================================================
@@ -367,7 +367,7 @@ TEST(ParserA702, EdgeSensitiveParallelWithDataSource) {
   EXPECT_EQ(si->path.edge, SpecifyEdge::kPosedge);
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
   ASSERT_EQ(si->path.dst_ports.size(), 1u);
-  EXPECT_EQ(si->path.dst_ports[0], "q");
+  EXPECT_EQ(si->path.dst_ports[0].name, "q");
   EXPECT_NE(si->path.data_source, nullptr);
 }
 

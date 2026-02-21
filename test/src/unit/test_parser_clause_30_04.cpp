@@ -145,9 +145,9 @@ TEST(ParserSection28, Sec28_12_ConditionalPath) {
   EXPECT_NE(si->path.condition, nullptr);
   EXPECT_FALSE(si->path.is_ifnone);
   ASSERT_EQ(si->path.src_ports.size(), 1u);
-  EXPECT_EQ(si->path.src_ports[0], "a");
+  EXPECT_EQ(si->path.src_ports[0].name, "a");
   ASSERT_EQ(si->path.dst_ports.size(), 1u);
-  EXPECT_EQ(si->path.dst_ports[0], "b");
+  EXPECT_EQ(si->path.dst_ports[0].name, "b");
   ASSERT_EQ(si->path.delays.size(), 1u);
 }
 
@@ -183,9 +183,9 @@ TEST(ParserSection28, Sec28_12_PosedgeSensitivePath) {
   EXPECT_EQ(si->path.edge, SpecifyEdge::kPosedge);
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
   ASSERT_EQ(si->path.src_ports.size(), 1u);
-  EXPECT_EQ(si->path.src_ports[0], "clk");
+  EXPECT_EQ(si->path.src_ports[0].name, "clk");
   ASSERT_EQ(si->path.dst_ports.size(), 1u);
-  EXPECT_EQ(si->path.dst_ports[0], "q");
+  EXPECT_EQ(si->path.dst_ports[0].name, "q");
 }
 
 TEST(ParserSection28, Sec28_12_NegedgeSensitivePath) {
@@ -202,7 +202,7 @@ TEST(ParserSection28, Sec28_12_NegedgeSensitivePath) {
   EXPECT_EQ(si->kind, SpecifyItemKind::kPathDecl);
   EXPECT_EQ(si->path.edge, SpecifyEdge::kNegedge);
   ASSERT_EQ(si->path.src_ports.size(), 1u);
-  EXPECT_EQ(si->path.src_ports[0], "clk");
+  EXPECT_EQ(si->path.src_ports[0].name, "clk");
 }
 
 TEST(ParserSection28, Sec28_12_MultipleSourceDestPorts) {
@@ -219,12 +219,12 @@ TEST(ParserSection28, Sec28_12_MultipleSourceDestPorts) {
   EXPECT_EQ(si->kind, SpecifyItemKind::kPathDecl);
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
   ASSERT_EQ(si->path.src_ports.size(), 3u);
-  EXPECT_EQ(si->path.src_ports[0], "a");
-  EXPECT_EQ(si->path.src_ports[1], "b");
-  EXPECT_EQ(si->path.src_ports[2], "c");
+  EXPECT_EQ(si->path.src_ports[0].name, "a");
+  EXPECT_EQ(si->path.src_ports[1].name, "b");
+  EXPECT_EQ(si->path.src_ports[2].name, "c");
   ASSERT_EQ(si->path.dst_ports.size(), 2u);
-  EXPECT_EQ(si->path.dst_ports[0], "x");
-  EXPECT_EQ(si->path.dst_ports[1], "y");
+  EXPECT_EQ(si->path.dst_ports[0].name, "x");
+  EXPECT_EQ(si->path.dst_ports[1].name, "y");
 }
 
 TEST(ParserSection28, Sec28_12_PosedgeFullPath) {

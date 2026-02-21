@@ -63,9 +63,9 @@ TEST_F(SpecifyTest, ParallelPathDelay) {
   EXPECT_EQ(item->kind, SpecifyItemKind::kPathDecl);
   EXPECT_EQ(item->path.path_kind, SpecifyPathKind::kParallel);
   ASSERT_EQ(item->path.src_ports.size(), 1u);
-  EXPECT_EQ(item->path.src_ports[0], "a");
+  EXPECT_EQ(item->path.src_ports[0].name, "a");
   ASSERT_EQ(item->path.dst_ports.size(), 1u);
-  EXPECT_EQ(item->path.dst_ports[0], "b");
+  EXPECT_EQ(item->path.dst_ports[0].name, "b");
   ASSERT_EQ(item->path.delays.size(), 1u);
 }
 
@@ -124,8 +124,8 @@ TEST_F(SpecifyTest, PosedgePath) {
   ASSERT_EQ(spec->specify_items.size(), 1u);
   auto* path = spec->specify_items[0];
   EXPECT_EQ(path->path.edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(path->path.src_ports[0], "clk");
-  EXPECT_EQ(path->path.dst_ports[0], "q");
+  EXPECT_EQ(path->path.src_ports[0].name, "clk");
+  EXPECT_EQ(path->path.dst_ports[0].name, "q");
 }
 
 TEST_F(SpecifyTest, NegedgePath) {

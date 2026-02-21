@@ -133,7 +133,8 @@ class Parser {
   SpecifyItem* ParsePulsestyleDecl();
   SpecifyItem* ParseShowcancelledDecl();
   SpecifyItem* ParseSpecparamInSpecify();
-  void ParsePathPorts(std::vector<std::string_view>& ports);
+  void ParsePathPorts(std::vector<SpecifyTerminal>& ports);
+  SpecifyTerminal ParseSpecifyTerminal();
   void ParsePathDelays(std::vector<Expr*>& delays);
   SpecifyEdge ParseSpecifyEdge();
   SpecifyPolarity ParseSpecifyPolarity();

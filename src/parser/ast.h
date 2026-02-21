@@ -755,13 +755,29 @@ enum class SpecifyPolarity : uint8_t {
   kNegative,   // -
 };
 
+enum class SpecifyRangeKind : uint8_t {
+  kNone,          // no range
+  kBitSelect,     // [expr]
+  kPartSelect,    // [expr:expr]
+  kPlusIndexed,   // [expr+:expr]
+  kMinusIndexed,  // [expr-:expr]
+};
+
+struct SpecifyTerminal {
+  std::string_view name;           // port_identifier
+  std::string_view interface_name; // interface_identifier (empty if simple)
+  Expr* range_left = nullptr;      // first expr in range
+  Expr* range_right = nullptr;     // second expr (null for bit-select)
+  SpecifyRangeKind range_kind = SpecifyRangeKind::kNone;
+};
+
 struct SpecifyPathDecl {
   SpecifyPathKind path_kind = SpecifyPathKind::kParallel;
   SpecifyEdge edge = SpecifyEdge::kNone;
   SpecifyPolarity polarity = SpecifyPolarity::kNone;
   SpecifyPolarity dst_polarity = SpecifyPolarity::kNone;
-  std::vector<std::string_view> src_ports;
-  std::vector<std::string_view> dst_ports;
+  std::vector<SpecifyTerminal> src_ports;
+  std::vector<SpecifyTerminal> dst_ports;
   std::vector<Expr*> delays;  // 1, 2, 3, 6, or 12 delay values
   Expr* condition = nullptr;    // if (cond) path or ifnone path
   Expr* data_source = nullptr;  // edge-sensitive data_source_expression
