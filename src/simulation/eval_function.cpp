@@ -264,9 +264,15 @@ static int ResolveArgIndex(const ModuleItem* func, const Expr* expr,
   if (expr->arg_names.empty()) {
     return (param_idx < expr->args.size()) ? static_cast<int>(param_idx) : -1;
   }
+  // §A.6.9: list_of_arguments allows positional args followed by named args.
+  size_t positional_count = expr->args.size() - expr->arg_names.size();
+  if (param_idx < positional_count) {
+    return static_cast<int>(param_idx);
+  }
   auto param_name = func->func_args[param_idx].name;
   for (size_t j = 0; j < expr->arg_names.size(); ++j) {
-    if (expr->arg_names[j] == param_name) return static_cast<int>(j);
+    if (expr->arg_names[j] == param_name)
+      return static_cast<int>(positional_count + j);
   }
   return -1;
 }
@@ -770,7 +776,16 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
 // §13: Set up task call scope for coroutine-based execution.
 const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
-  if (!expr || expr->kind != ExprKind::kCall) return nullptr;
+  if (!expr) return nullptr;
+  // §A.6.9 footnote 42: tf_call without parentheses (bare identifier).
+  if (expr->kind == ExprKind::kIdentifier) {
+    auto* func = ctx.FindFunction(expr->text);
+    if (!func || func->kind != ModuleItemKind::kTaskDecl) return nullptr;
+    ctx.PushScope();
+    ctx.PushQueueRefFrame();
+    return func;
+  }
+  if (expr->kind != ExprKind::kCall) return nullptr;
   auto* func = ctx.FindFunction(expr->callee);
   if (!func || func->kind != ModuleItemKind::kTaskDecl) return nullptr;
   ctx.PushScope();

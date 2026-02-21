@@ -21,6 +21,7 @@ static bool IsCastTypeToken(TokenKind kind) {
     case TokenKind::kKwUnsigned:
     case TokenKind::kKwString:
     case TokenKind::kKwConst:
+    case TokenKind::kKwVoid:
       return true;
     default:
       return false;
@@ -611,6 +612,14 @@ Expr* Parser::ParseCallExpr(Expr* callee) {
     } else {
       call->args.push_back(ParseExpr());
       while (Match(TokenKind::kComma)) {
+        // §A.6.9: list_of_arguments allows positional then named args.
+        if (Check(TokenKind::kDot)) {
+          ParseNamedArg(call);
+          while (Match(TokenKind::kComma)) {
+            ParseNamedArg(call);
+          }
+          break;
+        }
         call->args.push_back(ParseExpr());
       }
     }
