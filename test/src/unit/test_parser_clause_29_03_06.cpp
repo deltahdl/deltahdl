@@ -39,14 +39,11 @@ static bool ParseOk(const std::string& src) {
 
 // =============================================================================
 // LRM section 29.3.6 -- UDP state table entries: symbol summary
-// The following symbols are valid in UDP table entries:
-//   0, 1, x, ?, b, -, *, r, f, p, n, (vw) edge notation
 // =============================================================================
 
 // --- Combinational UDP table symbols ---
 
 TEST(ParserSection29, TableSymbol0And1) {
-  // Basic 0 and 1 symbols in combinational UDP table
   auto r = Parse(
       "primitive and_gate(output out, input a, b);\n"
       "  table\n"
@@ -72,7 +69,6 @@ TEST(ParserSection29, TableSymbol0And1) {
 }
 
 TEST(ParserSection29, TableSymbolQuestionMark) {
-  // The ? symbol iterates over 0, 1, and x
   auto r = Parse(
       "primitive buf_udp(output out, input in);\n"
       "  table\n"
@@ -90,7 +86,6 @@ TEST(ParserSection29, TableSymbolQuestionMark) {
 }
 
 TEST(ParserSection29, TableSymbolX) {
-  // The x symbol represents unknown in input and output fields
   auto r = Parse(
       "primitive xor_udp(output out, input a, b);\n"
       "  table\n"
@@ -112,7 +107,6 @@ TEST(ParserSection29, TableSymbolX) {
 }
 
 TEST(ParserSection29, TableSymbolB) {
-  // The b symbol iterates over 0 and 1 (not x)
   auto r = Parse(
       "primitive or_udp(output out, input a, b);\n"
       "  table\n"
@@ -132,7 +126,6 @@ TEST(ParserSection29, TableSymbolB) {
 // --- Sequential UDP table symbols ---
 
 TEST(ParserSection29, TableSymbolDashNoChange) {
-  // The - symbol means no change; only valid in sequential UDP output field
   auto r = Parse(
       "primitive latch(output reg q, input d, en);\n"
       "  table\n"
@@ -152,7 +145,6 @@ TEST(ParserSection29, TableSymbolDashNoChange) {
 }
 
 TEST(ParserSection29, TableEdgeSymbolsRAndF) {
-  // r = rising edge (01), f = falling edge (10)
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"
       "  table\n"
@@ -172,7 +164,6 @@ TEST(ParserSection29, TableEdgeSymbolsRAndF) {
 }
 
 TEST(ParserSection29, TableEdgeSymbolStar) {
-  // * is equivalent to (??) -- any value change on input
   auto r = Parse(
       "primitive any_change(output reg q, input d, clk);\n"
       "  table\n"
@@ -189,7 +180,6 @@ TEST(ParserSection29, TableEdgeSymbolStar) {
 }
 
 TEST(ParserSection29, TableEdgeSymbolsPAndN) {
-  // p = positive edge (0x, x1, 01), n = negative edge (1x, x0, 10)
   EXPECT_TRUE(
       ParseOk("primitive pos_neg(output reg q, input d, clk);\n"
               "  table\n"
@@ -201,7 +191,6 @@ TEST(ParserSection29, TableEdgeSymbolsPAndN) {
 }
 
 TEST(ParserSection29, TableEdgeNotationParenthesized) {
-  // (vw) notation for explicit edge transitions
   EXPECT_TRUE(
       ParseOk("primitive edge_udp(output reg q, input d, clk);\n"
               "  table\n"
@@ -215,7 +204,6 @@ TEST(ParserSection29, TableEdgeNotationParenthesized) {
 }
 
 TEST(ParserSection29, SequentialCurrentStateField) {
-  // Verify current_state field is parsed correctly for sequential UDPs
   auto r = Parse(
       "primitive srff(output reg q, input s, r);\n"
       "  table\n"
