@@ -382,6 +382,17 @@ void Parser::ParseTimeskewExtendedArgs(TimingCheckDecl& tc) {
   }
 }
 
+// A.7.5.2: Parse optional delayed_reference/delayed_data identifier with
+// optional [constant_mintypmax_expression].
+void Parser::ParseOptionalDelayedRef(std::string_view& name, Expr*& expr) {
+  if (!Check(TokenKind::kIdentifier)) return;
+  name = Consume().text;
+  if (Match(TokenKind::kLBracket)) {
+    expr = ParseMinTypMaxExpr();
+    Expect(TokenKind::kRBracket);
+  }
+}
+
 // §31.9: $setuphold/$recrem extended args: timestamp_cond, timecheck_cond,
 // delayed_reference, delayed_data.
 void Parser::ParseSetupholdExtendedArgs(TimingCheckDecl& tc) {
@@ -394,21 +405,9 @@ void Parser::ParseSetupholdExtendedArgs(TimingCheckDecl& tc) {
     tc.timecheck_cond = ParseMinTypMaxExpr();
   }
   if (!Match(TokenKind::kComma) || Check(TokenKind::kRParen)) return;
-  if (Check(TokenKind::kIdentifier)) {
-    tc.delayed_ref = Consume().text;
-    if (Match(TokenKind::kLBracket)) {
-      tc.delayed_ref_expr = ParseMinTypMaxExpr();
-      Expect(TokenKind::kRBracket);
-    }
-  }
+  ParseOptionalDelayedRef(tc.delayed_ref, tc.delayed_ref_expr);
   if (!Match(TokenKind::kComma) || Check(TokenKind::kRParen)) return;
-  if (Check(TokenKind::kIdentifier)) {
-    tc.delayed_data = Consume().text;
-    if (Match(TokenKind::kLBracket)) {
-      tc.delayed_data_expr = ParseMinTypMaxExpr();
-      Expect(TokenKind::kRBracket);
-    }
-  }
+  ParseOptionalDelayedRef(tc.delayed_data, tc.delayed_data_expr);
 }
 
 // Parse extended args after notifier, dispatching by check kind.

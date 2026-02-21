@@ -116,6 +116,8 @@ class Parser {
   Stmt* ParseRandsequenceStmt();
   RsProduction ParseRsProduction();
   RsRule ParseRsRule();
+  void ParseRsRuleRandJoin(RsRule& rule);
+  void ParseRsRuleWeight(RsRule& rule);
   RsProd ParseRsProd();
   void ParseRsCodeBlockStmts(std::vector<Stmt*>& stmts);
   bool CheckColonEq();
@@ -149,6 +151,7 @@ class Parser {
   void ParseExtendedTimingCheckArgs(TimingCheckDecl& tc);
   void ParseTimeskewExtendedArgs(TimingCheckDecl& tc);
   void ParseSetupholdExtendedArgs(TimingCheckDecl& tc);
+  void ParseOptionalDelayedRef(std::string_view& name, Expr*& expr);
 
   // Library source text (A.1.1)
   LibraryDecl* ParseLibraryDecl();
@@ -284,6 +287,7 @@ class Parser {
   Expr* MakeLiteral(ExprKind kind, const Token& tok);
   void WarnSizedOverflow(const Token& tok);
   Expr* ParseCallExpr(Expr* callee);
+  void ParseCallArgs(Expr* call);
   void ParseNamedArg(Expr* call);
   void ParseTrailingNamedArgs(Expr* call);
   Expr* ParseMemberAccessChain(Token tok);

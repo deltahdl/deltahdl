@@ -140,6 +140,28 @@ static const RsRule& SelectRule(const RsProduction& production, SimContext& ctx,
   return production.rules[0];
 }
 
+// Execute rand join production items.
+static ExecTask ExecRandJoinItems(const Stmt* stmt, const RsRule& selected,
+                                  SimContext& ctx, Arena& arena) {
+  for (const auto& item : selected.rand_join_items) {
+    auto result = co_await ExecRsProduction(stmt, item.name, ctx, arena);
+    if (result == StmtResult::kBreak) co_return StmtResult::kBreak;
+    if (result == StmtResult::kReturn) co_return StmtResult::kDone;
+  }
+  co_return StmtResult::kDone;
+}
+
+// Execute a rule's production list.
+static ExecTask ExecRuleProds(const Stmt* stmt, const RsRule& selected,
+                              SimContext& ctx, Arena& arena) {
+  for (const auto& prod : selected.prods) {
+    auto result = co_await ExecRsProd(stmt, prod, ctx, arena);
+    if (result == StmtResult::kBreak) co_return StmtResult::kBreak;
+    if (result == StmtResult::kReturn) co_return StmtResult::kDone;
+  }
+  co_return StmtResult::kDone;
+}
+
 // Execute a selected rule's weight code and production list.
 static ExecTask ExecSelectedRule(const Stmt* stmt, const RsRule& selected,
                                  SimContext& ctx, Arena& arena) {
@@ -150,19 +172,9 @@ static ExecTask ExecSelectedRule(const Stmt* stmt, const RsRule& selected,
     }
   }
   if (selected.is_rand_join) {
-    for (const auto& item : selected.rand_join_items) {
-      auto result = co_await ExecRsProduction(stmt, item.name, ctx, arena);
-      if (result == StmtResult::kBreak) co_return StmtResult::kBreak;
-      if (result == StmtResult::kReturn) co_return StmtResult::kDone;
-    }
-  } else {
-    for (const auto& prod : selected.prods) {
-      auto result = co_await ExecRsProd(stmt, prod, ctx, arena);
-      if (result == StmtResult::kBreak) co_return StmtResult::kBreak;
-      if (result == StmtResult::kReturn) co_return StmtResult::kDone;
-    }
+    co_return co_await ExecRandJoinItems(stmt, selected, ctx, arena);
   }
-  co_return StmtResult::kDone;
+  co_return co_await ExecRuleProds(stmt, selected, ctx, arena);
 }
 
 // Execute a named production: select a rule, then run it.

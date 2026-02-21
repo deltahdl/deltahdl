@@ -178,60 +178,68 @@ bool Parser::MatchColonEq() {
   return false;
 }
 
+// Parse 'rand join [(expr)]' prefix and trailing production items.
+void Parser::ParseRsRuleRandJoin(RsRule& rule) {
+  auto saved = lexer_.SavePos();
+  Consume();  // 'rand'
+  if (!Check(TokenKind::kKwJoin)) {
+    lexer_.RestorePos(saved);
+    return;
+  }
+  Consume();  // 'join'
+  rule.is_rand_join = true;
+  if (Check(TokenKind::kLParen)) {
+    Consume();
+    rule.rand_join_expr = ParseExpr();
+    Expect(TokenKind::kRParen);
+  }
+  rule.rand_join_items.push_back(ParseRsProductionItem());
+  rule.rand_join_items.push_back(ParseRsProductionItem());
+  while (CheckIdentifier() && !CheckColonEq() &&
+         !Check(TokenKind::kSemicolon) && !Check(TokenKind::kPipe)) {
+    rule.rand_join_items.push_back(ParseRsProductionItem());
+  }
+}
+
+// Parse ':=' weight [code_block].
+void Parser::ParseRsRuleWeight(RsRule& rule) {
+  if (Check(TokenKind::kLParen)) {
+    Consume();
+    rule.weight = ParseExpr();
+    Expect(TokenKind::kRParen);
+  } else {
+    rule.weight = ParsePrimaryExpr();
+  }
+  if (Check(TokenKind::kLBrace)) {
+    Consume();
+    ParseRsCodeBlockStmts(rule.weight_code);
+    Expect(TokenKind::kRBrace);
+  }
+}
+
 // §A.6.12: rs_rule ::= production_list [ := weight [code_block] ]
 RsRule Parser::ParseRsRule() {
   RsRule rule;
 
-  // Check for rand join prefix.
   if (Check(TokenKind::kKwRand)) {
-    auto saved = lexer_.SavePos();
-    Consume();
-    if (Check(TokenKind::kKwJoin)) {
-      Consume();
-      rule.is_rand_join = true;
-      if (Check(TokenKind::kLParen)) {
-        Consume();
-        rule.rand_join_expr = ParseExpr();
-        Expect(TokenKind::kRParen);
-      }
-      rule.rand_join_items.push_back(ParseRsProductionItem());
-      rule.rand_join_items.push_back(ParseRsProductionItem());
-      while (CheckIdentifier() && !CheckColonEq() &&
-             !Check(TokenKind::kSemicolon) && !Check(TokenKind::kPipe)) {
-        rule.rand_join_items.push_back(ParseRsProductionItem());
-      }
-    } else {
-      lexer_.RestorePos(saved);
-    }
+    ParseRsRuleRandJoin(rule);
   }
 
   if (!rule.is_rand_join) {
     rule.prods.push_back(ParseRsProd());
     while (!CheckColonEq() && !Check(TokenKind::kSemicolon) &&
            !Check(TokenKind::kPipe) && !AtEnd()) {
-      if (CheckIdentifier() || Check(TokenKind::kLBrace) ||
-          Check(TokenKind::kKwIf) || Check(TokenKind::kKwRepeat) ||
-          Check(TokenKind::kKwCase)) {
-        rule.prods.push_back(ParseRsProd());
-      } else {
+      if (!CheckIdentifier() && !Check(TokenKind::kLBrace) &&
+          !Check(TokenKind::kKwIf) && !Check(TokenKind::kKwRepeat) &&
+          !Check(TokenKind::kKwCase)) {
         break;
       }
+      rule.prods.push_back(ParseRsProd());
     }
   }
 
   if (MatchColonEq()) {
-    if (Check(TokenKind::kLParen)) {
-      Consume();
-      rule.weight = ParseExpr();
-      Expect(TokenKind::kRParen);
-    } else {
-      rule.weight = ParsePrimaryExpr();
-    }
-    if (Check(TokenKind::kLBrace)) {
-      Consume();
-      ParseRsCodeBlockStmts(rule.weight_code);
-      Expect(TokenKind::kRBrace);
-    }
+    ParseRsRuleWeight(rule);
   }
 
   return rule;
