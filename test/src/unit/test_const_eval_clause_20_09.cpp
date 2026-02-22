@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §20.9: Bit vector system functions
 
 #include <gtest/gtest.h>
 #include "common/arena.h"
@@ -28,22 +28,6 @@ static Expr* ParseExprFrom(const std::string& src, EvalFixture& f) {
 }
 
 namespace {
-
-TEST(ConstEval, LongestStaticPrefixNested) {
-  Arena arena;
-  // m[1][i] → m[1] is static, [i] is not → prefix is "m[1]".
-  auto* inner = LspSelect(arena, LspId(arena, "m"), LspInt(arena, 1));
-  auto* outer = LspSelect(arena, inner, LspId(arena, "i"));
-  EXPECT_EQ(LongestStaticPrefix(outer), "m[1]");
-}
-
-TEST(ConstEval, LongestStaticPrefixParamIdx) {
-  Arena arena;
-  // m[P] where P=7 in scope → prefix is "m[7]".
-  ScopeMap scope = {{"P", 7}};
-  auto* sel = LspSelect(arena, LspId(arena, "m"), LspId(arena, "P"));
-  EXPECT_EQ(LongestStaticPrefix(sel, scope), "m[7]");
-}
 
 // ==========================================================================
 // §6.8: Implicit signedness of integer types
