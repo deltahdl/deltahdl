@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §6.11: Integer data types
 
 #include <gtest/gtest.h>
 #include "common/arena.h"
