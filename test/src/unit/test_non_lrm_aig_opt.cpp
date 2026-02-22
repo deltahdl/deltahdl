@@ -1,14 +1,16 @@
-#include <gtest/gtest.h>
+// Non-LRM tests
 
+#include <gtest/gtest.h>
 #include "synthesis/aig.h"
 #include "synthesis/aig_opt.h"
 
 using namespace delta;
 
+namespace {
+
 // =============================================================================
 // Constant propagation
 // =============================================================================
-
 TEST(AigOpt, ConstPropRemovesDeadAndWithConstant) {
   AigGraph g;
   auto a = g.AddInput();
@@ -53,7 +55,6 @@ TEST(AigOpt, ConstPropPreservesNonTrivial) {
 // =============================================================================
 // AIG balancing
 // =============================================================================
-
 TEST(AigOpt, BalanceReducesDepth) {
   // Create a left-skewed chain: AND(AND(AND(a, b), c), d)
   // Balanced should be: AND(AND(a, b), AND(c, d))
@@ -92,7 +93,6 @@ TEST(AigOpt, BalancePreservesSingleNode) {
 // =============================================================================
 // AIG rewriting (basic)
 // =============================================================================
-
 TEST(AigOpt, RewriteSimplifies) {
   AigGraph g;
   auto a = g.AddInput();
@@ -117,7 +117,6 @@ TEST(AigOpt, RewritePreservesConstants) {
 // =============================================================================
 // AIG refactoring (basic)
 // =============================================================================
-
 TEST(AigOpt, RefactorDoesNotCorrupt) {
   AigGraph g;
   auto a = g.AddInput();
@@ -135,7 +134,6 @@ TEST(AigOpt, RefactorDoesNotCorrupt) {
 // =============================================================================
 // Redundancy removal (basic)
 // =============================================================================
-
 TEST(AigOpt, RedundancyRemovalNoChange) {
   AigGraph g;
   auto a = g.AddInput();
@@ -148,3 +146,5 @@ TEST(AigOpt, RedundancyRemovalNoChange) {
   // Simple AND should not have redundancy.
   EXPECT_EQ(g.NodeCount(), before);
 }
+
+}  // namespace
