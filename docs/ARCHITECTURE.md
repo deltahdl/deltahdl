@@ -47,40 +47,31 @@ stage transforms the design into a progressively lower-level representation
 until it reaches either a running simulation or a mapped netlist.
 
 ```
-                         Source Files (.sv)
-                               │
-                               ▼
-                      ┌────────────────┐
-                      │  Preprocessor  │
-                      └───────┬────────┘
-                              │
-                              ▼
-                         ┌─────────┐
-                         │  Lexer  │
-                         └────┬────┘
-                              │
-                              ▼
-                        ┌──────────┐
-                        │  Parser  │
-                        └─────┬────┘
-                              │
-                              ▼
-                     CompilationUnit (AST)
-                              │
-                              ▼
-                      ┌──────────────┐
-                      │  Elaborator  │
-                      └──────┬───────┘
-                             │
-                             ▼
-                      RtlirDesign (RTLIR)
-                             │
-               ┌─────────────┴─────────────┐
-               │                           │
-               ▼                           ▼
-          ┌───────────┐            ┌──────────────┐
-          │ Simulator │            │ Synthesizer  │
-          └───────────┘            └──────────────┘
+                    ┌────────────────┐
+                    │  Preprocessor  │
+                    └───────┬────────┘
+                            │
+                            ▼
+                       ┌─────────┐
+                       │  Lexer  │
+                       └────┬────┘
+                            │
+                            ▼
+                      ┌──────────┐
+                      │  Parser  │
+                      └─────┬────┘
+                            │
+                            ▼
+                    ┌──────────────┐
+                    │  Elaborator  │
+                    └──────┬───────┘
+                           │
+             ┌─────────────┴─────────────┐
+             │                           │
+             ▼                           ▼
+        ┌───────────┐           ┌──────────────┐
+        │ Simulator │           │ Synthesizer  │
+        └───────────┘           └──────────────┘
 ```
 
 
