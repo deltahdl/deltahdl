@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §7.4.5: Indexing and slicing of arrays
 
 #include <gtest/gtest.h>
 #include <string>
@@ -48,73 +48,6 @@ static void VerifyStructField(const StructFieldInfo& field,
 }
 
 namespace {
-
-// =============================================================================
-// §11.2.2 Aggregate expressions — struct in set membership
-// =============================================================================
-TEST(AggregateExpr, PackedStructInsideSet) {
-  // A packed struct is just a bitvector — inside should work by value.
-  AggFixture f;
-  auto* var = f.ctx.CreateVariable("s", 8);
-  var->value = MakeLogic4VecVal(f.arena, 8, 5);
-  auto* expr = ParseExprFrom("s inside {5, 10, 15}", f);
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
-TEST(AggregateExpr, PackedStructNotInSet) {
-  AggFixture f;
-  auto* var = f.ctx.CreateVariable("s", 8);
-  var->value = MakeLogic4VecVal(f.arena, 8, 7);
-  auto* expr = ParseExprFrom("s inside {5, 10, 15}", f);
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-}
-
-// =============================================================================
-// §7.8.6: Accessing invalid associative array indices
-// =============================================================================
-TEST(AssocArray, ReadMissingKeyWarns) {
-  AggFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
-  aa->int_data[10] = MakeLogic4VecVal(f.arena, 32, 42);
-  // Read key 99 (does not exist).  Should return default and warn.
-  auto* sel = f.arena.Create<Expr>();
-  sel->kind = ExprKind::kSelect;
-  auto* base = f.arena.Create<Expr>();
-  base->kind = ExprKind::kIdentifier;
-  base->text = "aa";
-  sel->base = base;
-  auto* idx = f.arena.Create<Expr>();
-  idx->kind = ExprKind::kIntegerLiteral;
-  idx->int_val = 99;
-  sel->index = idx;
-  uint32_t before = f.diag.WarningCount();
-  auto result = EvalExpr(sel, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-  EXPECT_GT(f.diag.WarningCount(), before);
-}
-
-TEST(AssocArray, ReadExistingKeyNoWarning) {
-  AggFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
-  aa->int_data[10] = MakeLogic4VecVal(f.arena, 32, 42);
-  // Read key 10 (exists).  Should NOT warn.
-  auto* sel = f.arena.Create<Expr>();
-  sel->kind = ExprKind::kSelect;
-  auto* base = f.arena.Create<Expr>();
-  base->kind = ExprKind::kIdentifier;
-  base->text = "aa";
-  sel->base = base;
-  auto* idx = f.arena.Create<Expr>();
-  idx->kind = ExprKind::kIntegerLiteral;
-  idx->int_val = 10;
-  sel->index = idx;
-  uint32_t before = f.diag.WarningCount();
-  auto result = EvalExpr(sel, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 42u);
-  EXPECT_EQ(f.diag.WarningCount(), before);
-}
 
 TEST(ArrayAccess, OutOfBoundsReturnsX) {
   AggFixture f;
