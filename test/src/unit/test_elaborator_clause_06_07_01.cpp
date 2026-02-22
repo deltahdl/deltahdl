@@ -107,18 +107,6 @@ void InitializeTriregNet(Net& net, LocalChargeStrength str, Arena& arena) {
   }
 }
 
-// --- Helpers ---
-static uint8_t ValOf(const Variable& v) {
-  uint8_t a = v.value.words[0].aval & 1;
-  uint8_t b = v.value.words[0].bval & 1;
-  return static_cast<uint8_t>((b << 1) | a);
-}
-
-static constexpr uint8_t kVal1 = 1;
-
-static constexpr uint8_t kValX = 2;
-
-static constexpr uint8_t kValZ = 3;
 
 namespace {
 

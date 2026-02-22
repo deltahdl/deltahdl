@@ -12,6 +12,14 @@
 
 using namespace delta;
 
+
+struct MtSimFixture {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag};
+};
 namespace {
 
 // =============================================================================

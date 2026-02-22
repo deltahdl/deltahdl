@@ -42,6 +42,16 @@ static Variable* MakeVar(EvalAdvFixture& f, std::string_view name,
   return var;
 }
 
+
+static Expr* MakeRange(Arena& arena, Expr* lo, Expr* hi,
+                       TokenKind op = TokenKind::kEof) {
+  auto* r = arena.Create<Expr>();
+  r->kind = ExprKind::kSelect;
+  r->index = lo;
+  r->index_end = hi;
+  r->op = op;
+  return r;
+}
 namespace {
 
 // ==========================================================================

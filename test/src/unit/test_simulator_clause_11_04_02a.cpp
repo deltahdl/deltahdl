@@ -21,13 +21,6 @@ struct EvalAdvFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static Expr* MakeInt(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
-
 static Expr* MakeId(Arena& arena, std::string_view name) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
@@ -35,13 +28,23 @@ static Expr* MakeId(Arena& arena, std::string_view name) {
   return e;
 }
 
-static Variable* MakeVar(EvalAdvFixture& f, std::string_view name,
-                         uint32_t width, uint64_t val) {
-  auto* var = f.ctx.CreateVariable(name, width);
-  var->value = MakeLogic4VecVal(f.arena, width, val);
-  return var;
+static double AdvToDouble(const Logic4Vec& v) {
+  double d = 0.0;
+  uint64_t bits = v.ToUint64();
+  std::memcpy(&d, &bits, sizeof(double));
+  return d;
 }
 
+static Variable* MakeRealVarAdv(EvalAdvFixture& f, std::string_view name,
+                                double val) {
+  auto* var = f.ctx.CreateVariable(name, 64);
+  uint64_t bits = 0;
+  std::memcpy(&bits, &val, sizeof(double));
+  var->value = MakeLogic4VecVal(f.arena, 64, bits);
+  var->value.is_real = true;
+  f.ctx.RegisterRealVariable(name);
+  return var;
+}
 namespace {
 
 TEST(EvalAdv, RealIncrementBy1Point0) {

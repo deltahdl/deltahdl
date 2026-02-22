@@ -19,17 +19,6 @@ struct ExprFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static Expr* ParseExprFrom(const std::string& src, ExprFixture& f) {
-  std::string code = "module t; initial x = " + src + "; endmodule";
-  auto fid = f.mgr.AddFile("<test>", code);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  // Extract the RHS of the blocking assignment in the initial block.
-  auto* item = cu->modules[0]->items[0];
-  return item->body->rhs;
-}
-
 namespace {
 
 // =============================================================================

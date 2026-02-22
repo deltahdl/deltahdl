@@ -10,34 +10,9 @@
 #include "lexer/lexer.h"
 #include "parser/ast.h"
 #include "parser/parser.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 
 using namespace delta;
 
-// =============================================================================
-// Parse-level fixture
-// =============================================================================
-struct CheckerParseTest : ::testing::Test {
- protected:
-  CompilationUnit* Parse(const std::string& src) {
-    source_ = src;
-    lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
-    parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
-    return parser_->Parse();
-  }
-
-  SourceManager mgr_;
-  Arena arena_;
-  DiagEngine diag_{mgr_};
-  std::string source_;
-  std::unique_ptr<Lexer> lexer_;
-  std::unique_ptr<Parser> parser_;
-};
-
-// =============================================================================
-// Elaboration fixture
-// =============================================================================
 struct CheckerElabFixture {
   SourceManager mgr;
   Arena arena;
@@ -55,27 +30,8 @@ static RtlirDesign* ElaborateSource(const std::string& src,
   return elab.Elaborate(top_name);
 }
 
-static bool HasItemOfKind(const std::vector<ModuleItem*>& items,
-                          ModuleItemKind kind) {
-  for (const auto* item : items) {
-    if (item->kind == kind) return true;
-  }
-  return false;
-}
-
-static const ModuleItem* FindItemOfKind(const std::vector<ModuleItem*>& items,
-                                        ModuleItemKind kind) {
-  for (const auto* item : items) {
-    if (item->kind == kind) return item;
-  }
-  return nullptr;
-}
-
 namespace {
 
-// =============================================================================
-// §17.11 Checker elaboration — checker as elaboration target
-// =============================================================================
 TEST(CheckerElab, ElaborateCheckerWithVars) {
   CheckerElabFixture f;
   auto* design = ElaborateSource(

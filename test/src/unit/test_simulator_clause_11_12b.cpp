@@ -6,13 +6,56 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "simulation/assertion.h"
+#include "simulation/eval.h"
 #include "simulation/sim_context.h"
 
 using namespace delta;
 
+struct SampledLetFixture {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag};
+};
+
+static Expr* SLMakeId(Arena& arena, std::string_view name) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kIdentifier;
+  e->text = name;
+  return e;
+}
+
+static Expr* SLMakeSysCall(Arena& arena, std::string_view callee,
+                           std::vector<Expr*> args) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kSystemCall;
+  e->callee = callee;
+  e->args = std::move(args);
+  return e;
+}
+
+static Expr* SLMakeCall(Arena& arena, std::string_view callee,
+                        std::vector<Expr*> args) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kCall;
+  e->callee = callee;
+  e->args = std::move(args);
+  return e;
+}
+
+static ModuleItem* SLMakeLetDecl(Arena& arena, std::string_view name,
+                                 Expr* body,
+                                 std::vector<FunctionArg> args = {}) {
+  auto* item = arena.Create<ModuleItem>();
+  item->kind = ModuleItemKind::kLetDecl;
+  item->name = name;
+  item->init_expr = body;
+  item->func_args = std::move(args);
+  return item;
+}
 namespace {
 
-}
 TEST(Assertion, LetWithPastInBody) {
   SampledLetFixture f;
   // let get_past(x) = $past(x);

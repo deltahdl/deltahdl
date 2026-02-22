@@ -61,6 +61,53 @@ static Variable* MakeVar4(EvalOpXZFixture& f, std::string_view name,
   return var;
 }
 
+
+static Variable* MakeRealVar(EvalOpXZFixture& f, std::string_view name, double val) {
+  auto* var = f.ctx.CreateVariable(name, 64);
+  uint64_t bits = 0;
+  std::memcpy(&bits, &val, sizeof(double));
+  var->value = MakeLogic4VecVal(f.arena, 64, bits);
+  var->value.is_real = true;
+  f.ctx.RegisterRealVariable(name);
+  return var;
+}
+
+static double ToDouble(const Logic4Vec& v) {
+  double d = 0.0;
+  uint64_t bits = v.ToUint64();
+  std::memcpy(&d, &bits, sizeof(double));
+  return d;
+}
+
+static std::string VecToStr(const Logic4Vec& vec) {
+  std::string result;
+  uint32_t nbytes = vec.width / 8;
+  for (uint32_t i = nbytes; i > 0; --i) {
+    uint32_t byte_idx = i - 1;
+    uint32_t word = (byte_idx * 8) / 64;
+    uint32_t bit = (byte_idx * 8) % 64;
+    auto ch = static_cast<char>((vec.words[word].aval >> bit) & 0xFF);
+    result.push_back(ch);
+  }
+  return result;
+}
+
+static Variable* MakeStringVar(EvalOpXZFixture& f, std::string_view name,
+                               std::string_view value) {
+  uint32_t width = static_cast<uint32_t>(value.size()) * 8;
+  if (width == 0) width = 8;
+  auto* var = f.ctx.CreateVariable(name, width);
+  var->value = MakeLogic4Vec(f.arena, width);
+  for (size_t i = 0; i < value.size(); ++i) {
+    auto byte_idx = static_cast<uint32_t>(value.size() - 1 - i);
+    uint32_t word = (byte_idx * 8) / 64;
+    uint32_t bit = (byte_idx * 8) % 64;
+    var->value.words[word].aval |=
+        static_cast<uint64_t>(static_cast<unsigned char>(value[i])) << bit;
+  }
+  f.ctx.RegisterStringVariable(name);
+  return var;
+}
 namespace {
 
 // ==========================================================================

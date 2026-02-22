@@ -20,14 +20,6 @@ struct EvalOpFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-// Helper: build a simple integer literal Expr node.
-static Expr* MakeInt(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
-
 // Helper: build an identifier Expr node.
 static Expr* MakeId(Arena& arena, std::string_view name) {
   auto* e = arena.Create<Expr>();
@@ -42,16 +34,6 @@ static Expr* MakeUnary(Arena& arena, TokenKind op, Expr* operand) {
   e->kind = ExprKind::kUnary;
   e->op = op;
   e->lhs = operand;
-  return e;
-}
-
-// Helper: build a binary Expr.
-static Expr* MakeBinary(Arena& arena, TokenKind op, Expr* lhs, Expr* rhs) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kBinary;
-  e->op = op;
-  e->lhs = lhs;
-  e->rhs = rhs;
   return e;
 }
 

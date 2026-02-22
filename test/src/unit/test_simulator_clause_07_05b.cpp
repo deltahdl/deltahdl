@@ -25,26 +25,17 @@ struct AggFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static Expr* ParseExprFrom(const std::string& src, AggFixture& f) {
-  std::string code = "module t; initial x = " + src + "; endmodule";
-  auto fid = f.mgr.AddFile("<test>", code);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  auto* item = cu->modules[0]->items[0];
-  return item->body->rhs;
-}
-
-// =============================================================================
-// §7.2 Struct type metadata — StructTypeInfo registration
-// =============================================================================
-static void VerifyStructField(const StructFieldInfo& field,
-                              const char* expected_name,
-                              uint32_t expected_offset, uint32_t expected_width,
-                              size_t index) {
-  EXPECT_EQ(field.name, expected_name) << "field " << index;
-  EXPECT_EQ(field.bit_offset, expected_offset) << "field " << index;
-  EXPECT_EQ(field.width, expected_width) << "field " << index;
+static void MakeDynArray(AggFixture& f, std::string_view name,
+                         const std::vector<uint64_t>& vals) {
+  auto* q = f.ctx.CreateQueue(name, 32);
+  for (auto v : vals) {
+    q->elements.push_back(MakeLogic4VecVal(f.arena, 32, v));
+  }
+  ArrayInfo info;
+  info.is_dynamic = true;
+  info.elem_width = 32;
+  info.size = static_cast<uint32_t>(vals.size());
+  f.ctx.RegisterArray(name, info);
 }
 
 namespace {

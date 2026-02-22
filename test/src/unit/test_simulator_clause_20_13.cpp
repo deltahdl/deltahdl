@@ -9,6 +9,8 @@
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
 
+#include "simulation/coverage.h"
+
 using namespace delta;
 
 struct SysTaskFixture {

@@ -45,7 +45,12 @@ TEST(Elaborator, TypedefNamedResolution) {
 
   auto* mod = design->top_modules[0];
   bool found = false;
-  VerifyVariableByName(mod->variables, "data", 16u, true, found);
+  for (const auto& v : mod->variables) {
+    if (v.name == "data") {
+      EXPECT_EQ(v.width, 16u);
+      found = true;
+    }
+  }
   EXPECT_TRUE(found);
 }
 

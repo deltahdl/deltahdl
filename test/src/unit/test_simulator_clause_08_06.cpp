@@ -24,14 +24,6 @@ struct ClassFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-// AST helper: make an integer literal expression.
-static Expr* MkInt(Arena& a, uint64_t val) {
-  auto* e = a.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
-
 // AST helper: make an identifier expression.
 static Expr* MkId(Arena& a, std::string_view name) {
   auto* e = a.Create<Expr>();

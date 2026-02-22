@@ -56,42 +56,7 @@ static RtlirDesign* ElaborateSource(const std::string& src,
   return elab.Elaborate(top_name);
 }
 
-static const ModuleItem* FindItemOfKind(const std::vector<ModuleItem*>& items,
-                                        ModuleItemKind kind) {
-  for (const auto* item : items) {
-    if (item->kind == kind) return item;
-  }
-  return nullptr;
-}
-
-static int CountItemsOfKind(const std::vector<ModuleItem*>& items,
-                            ModuleItemKind kind) {
-  int count = 0;
-  for (const auto* item : items) {
-    if (item->kind == kind) ++count;
-  }
-  return count;
-}
-
 namespace {
-
-// =============================================================================
-// §24.9 Program elaboration — program as top-level target
-// =============================================================================
-TEST(ProgramElab, ElaborateProgramWithVars) {
-  ProgramElabFixture f;
-  auto* design = ElaborateSource(
-      "program my_prog;\n"
-      "  logic [7:0] data;\n"
-      "  assign data = 8'hAB;\n"
-      "endprogram\n",
-      f, "my_prog");
-  ASSERT_NE(design, nullptr);
-  auto* mod = design->top_modules[0];
-  EXPECT_EQ(mod->name, "my_prog");
-  EXPECT_FALSE(mod->variables.empty());
-  EXPECT_FALSE(mod->assigns.empty());
-}
 
 TEST(ProgramElab, ElaborateProgramWithPorts) {
   ProgramElabFixture f;

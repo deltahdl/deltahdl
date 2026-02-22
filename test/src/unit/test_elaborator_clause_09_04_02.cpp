@@ -15,19 +15,26 @@
 
 using namespace delta;
 
-struct ElabFixture {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
-};
+static Expr* SensId(Arena& arena, std::string_view name) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kIdentifier;
+  e->text = name;
+  return e;
+}
 
-static RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
+static Expr* SensSelect(Arena& arena, Expr* base, Expr* index) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kSelect;
+  e->base = base;
+  e->index = index;
+  return e;
+}
+
+static Expr* SensIntLit(Arena& arena, uint64_t val) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kIntegerLiteral;
+  e->int_val = val;
+  return e;
 }
 
 namespace {

@@ -21,13 +21,6 @@ struct EvalAdvFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static Expr* MakeInt(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
-
 static Expr* MakeId(Arena& arena, std::string_view name) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIdentifier;

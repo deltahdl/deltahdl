@@ -42,6 +42,25 @@ static Variable* MakeVar(EvalAdvFixture& f, std::string_view name,
   return var;
 }
 
+
+static Expr* MakeCall(Arena& arena, std::string_view callee,
+                      std::vector<Expr*> args) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kCall;
+  e->callee = callee;
+  e->args = std::move(args);
+  return e;
+}
+
+static ModuleItem* MakeLetDecl(Arena& arena, std::string_view name, Expr* body,
+                               std::vector<FunctionArg> args = {}) {
+  auto* item = arena.Create<ModuleItem>();
+  item->kind = ModuleItemKind::kLetDecl;
+  item->name = name;
+  item->init_expr = body;
+  item->func_args = std::move(args);
+  return item;
+}
 namespace {
 
 TEST(EvalAdv, LetExpandSimple) {

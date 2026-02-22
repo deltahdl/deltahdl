@@ -25,28 +25,20 @@ struct AggFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static Expr* ParseExprFrom(const std::string& src, AggFixture& f) {
-  std::string code = "module t; initial x = " + src + "; endmodule";
-  auto fid = f.mgr.AddFile("<test>", code);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  auto* item = cu->modules[0]->items[0];
-  return item->body->rhs;
-}
 
-// =============================================================================
-// §7.2 Struct type metadata — StructTypeInfo registration
-// =============================================================================
-static void VerifyStructField(const StructFieldInfo& field,
-                              const char* expected_name,
-                              uint32_t expected_offset, uint32_t expected_width,
-                              size_t index) {
-  EXPECT_EQ(field.name, expected_name) << "field " << index;
-  EXPECT_EQ(field.bit_offset, expected_offset) << "field " << index;
-  EXPECT_EQ(field.width, expected_width) << "field " << index;
+static Expr* MkSelect(Arena& arena, std::string_view name, uint64_t idx) {
+  auto* sel = arena.Create<Expr>();
+  sel->kind = ExprKind::kSelect;
+  auto* base = arena.Create<Expr>();
+  base->kind = ExprKind::kIdentifier;
+  base->text = name;
+  sel->base = base;
+  auto* idx_expr = arena.Create<Expr>();
+  idx_expr->kind = ExprKind::kIntegerLiteral;
+  idx_expr->int_val = idx;
+  sel->index = idx_expr;
+  return sel;
 }
-
 namespace {
 
 TEST(ArrayAccess, OutOfBoundsReturnsX) {

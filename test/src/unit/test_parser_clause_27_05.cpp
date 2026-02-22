@@ -36,36 +36,10 @@ static ParseResult Parse(const std::string& src) {
   return result;
 }
 
-static void VerifyEnumMemberNames(const std::vector<EnumMember>& members,
-                                  const std::string expected[], size_t count) {
-  ASSERT_EQ(members.size(), count);
-  for (size_t i = 0; i < count; ++i) {
-    EXPECT_EQ(members[i].name, expected[i]) << "member " << i;
-  }
-}
-
 struct StructMemberExpected {
   const char* name;
   DataTypeKind type_kind;
 };
-
-static void VerifyStructMembers(const std::vector<StructMember>& members,
-                                const StructMemberExpected expected[],
-                                size_t count) {
-  ASSERT_EQ(members.size(), count);
-  for (size_t i = 0; i < count; ++i) {
-    EXPECT_EQ(members[i].name, expected[i].name) << "member " << i;
-    EXPECT_EQ(members[i].type_kind, expected[i].type_kind) << "member " << i;
-  }
-}
-
-static ModuleItem* FindItemByKind(const std::vector<ModuleItem*>& items,
-                                  ModuleItemKind kind) {
-  for (auto* item : items) {
-    if (item->kind == kind) return item;
-  }
-  return nullptr;
-}
 
 static void VerifyGenerateCaseItem(const GenerateCaseItem& ci, size_t idx,
                                    bool expect_default,
@@ -79,16 +53,6 @@ struct ModportPortExpected {
   Direction dir;
   const char* name;
 };
-
-static void VerifyModportPorts(const std::vector<ModportPort>& ports,
-                               const ModportPortExpected expected[],
-                               size_t count) {
-  ASSERT_EQ(ports.size(), count);
-  for (size_t i = 0; i < count; ++i) {
-    EXPECT_EQ(ports[i].direction, expected[i].dir) << "port " << i;
-    EXPECT_EQ(ports[i].name, expected[i].name) << "port " << i;
-  }
-}
 
 namespace {
 

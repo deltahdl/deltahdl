@@ -64,16 +64,6 @@ static Stmt* MakeReturn(Arena& arena, Expr* expr) {
   return s;
 }
 
-// Helper: make a function call expression.
-static Expr* MakeCall(Arena& arena, std::string_view callee,
-                      std::vector<Expr*> args) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kCall;
-  e->callee = callee;
-  e->args = std::move(args);
-  return e;
-}
-
 // Helper: make a function call with named arguments.
 static Expr* MakeNamedCall(Arena& arena, std::string_view callee,
                            std::vector<Expr*> args,

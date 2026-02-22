@@ -45,34 +45,6 @@ struct ProgramElabFixture {
   DiagEngine diag{mgr};
 };
 
-static RtlirDesign* ElaborateSource(const std::string& src,
-                                    ProgramElabFixture& f,
-                                    std::string_view top_name) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(top_name);
-}
-
-static const ModuleItem* FindItemOfKind(const std::vector<ModuleItem*>& items,
-                                        ModuleItemKind kind) {
-  for (const auto* item : items) {
-    if (item->kind == kind) return item;
-  }
-  return nullptr;
-}
-
-static int CountItemsOfKind(const std::vector<ModuleItem*>& items,
-                            ModuleItemKind kind) {
-  int count = 0;
-  for (const auto* item : items) {
-    if (item->kind == kind) ++count;
-  }
-  return count;
-}
-
 namespace {
 
 // =============================================================================

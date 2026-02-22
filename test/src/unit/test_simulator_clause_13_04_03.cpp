@@ -47,15 +47,6 @@ static Expr* MakeBinary(Arena& arena, TokenKind op, Expr* lhs, Expr* rhs) {
   return e;
 }
 
-// Helper: make a blocking assignment statement.
-static Stmt* MakeAssign(Arena& arena, std::string_view lhs_name, Expr* rhs) {
-  auto* s = arena.Create<Stmt>();
-  s->kind = StmtKind::kBlockingAssign;
-  s->lhs = MakeIdent(arena, lhs_name);
-  s->rhs = rhs;
-  return s;
-}
-
 // Helper: make a return statement.
 static Stmt* MakeReturn(Arena& arena, Expr* expr) {
   auto* s = arena.Create<Stmt>();
@@ -71,18 +62,6 @@ static Expr* MakeCall(Arena& arena, std::string_view callee,
   e->kind = ExprKind::kCall;
   e->callee = callee;
   e->args = std::move(args);
-  return e;
-}
-
-// Helper: make a function call with named arguments.
-static Expr* MakeNamedCall(Arena& arena, std::string_view callee,
-                           std::vector<Expr*> args,
-                           std::vector<std::string_view> names) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kCall;
-  e->callee = callee;
-  e->args = std::move(args);
-  e->arg_names = std::move(names);
   return e;
 }
 

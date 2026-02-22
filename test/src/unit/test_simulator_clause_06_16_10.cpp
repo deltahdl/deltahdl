@@ -16,20 +16,6 @@
 using namespace delta;
 
 // =============================================================================
-// Helper: extract a std::string from a Logic4Vec (string encoding)
-// =============================================================================
-static std::string VecToString(const Logic4Vec& vec) {
-  std::string result;
-  uint64_t v = vec.ToUint64();
-  uint32_t nbytes = (vec.width + 7) / 8;
-  for (uint32_t i = nbytes; i > 0; --i) {
-    auto ch = static_cast<char>((v >> ((i - 1) * 8)) & 0xFF);
-    if (ch != 0) result += ch;
-  }
-  return result;
-}
-
-// =============================================================================
 // Test fixture: sets up SimContext with a string variable
 // =============================================================================
 struct StringFixture {
@@ -95,7 +81,6 @@ struct StringFixture {
     return lit;
   }
 };
-
 namespace {
 
 // =============================================================================

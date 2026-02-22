@@ -25,28 +25,31 @@ struct AggFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static Expr* ParseExprFrom(const std::string& src, AggFixture& f) {
-  std::string code = "module t; initial x = " + src + "; endmodule";
-  auto fid = f.mgr.AddFile("<test>", code);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  auto* item = cu->modules[0]->items[0];
-  return item->body->rhs;
+
+static Expr* MkEq(Arena& arena, std::string_view a, std::string_view b) {
+  auto* expr = arena.Create<Expr>();
+  expr->kind = ExprKind::kBinary;
+  expr->op = TokenKind::kEqEq;
+  auto* lhs = arena.Create<Expr>();
+  lhs->kind = ExprKind::kIdentifier;
+  lhs->text = a;
+  auto* rhs = arena.Create<Expr>();
+  rhs->kind = ExprKind::kIdentifier;
+  rhs->text = b;
+  expr->lhs = lhs;
+  expr->rhs = rhs;
+  return expr;
 }
 
-// =============================================================================
-// §7.2 Struct type metadata — StructTypeInfo registration
-// =============================================================================
-static void VerifyStructField(const StructFieldInfo& field,
-                              const char* expected_name,
-                              uint32_t expected_offset, uint32_t expected_width,
-                              size_t index) {
-  EXPECT_EQ(field.name, expected_name) << "field " << index;
-  EXPECT_EQ(field.bit_offset, expected_offset) << "field " << index;
-  EXPECT_EQ(field.width, expected_width) << "field " << index;
+static void MakeArray4(AggFixture& f, std::string_view name) {
+  f.ctx.RegisterArray(name, {0, 4, 8, false, false, false});
+  for (uint32_t i = 0; i < 4; ++i) {
+    auto tmp = std::string(name) + "[" + std::to_string(i) + "]";
+    auto* s = f.arena.AllocString(tmp.c_str(), tmp.size());
+    auto* v = f.ctx.CreateVariable(std::string_view(s, tmp.size()), 8);
+    v->value = MakeLogic4VecVal(f.arena, 8, static_cast<uint64_t>(i + 1) * 10);
+  }
 }
-
 namespace {
 
 TEST(ArrayEquality, EqualArrays) {

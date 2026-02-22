@@ -25,28 +25,28 @@ struct AggFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static Expr* ParseExprFrom(const std::string& src, AggFixture& f) {
-  std::string code = "module t; initial x = " + src + "; endmodule";
-  auto fid = f.mgr.AddFile("<test>", code);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  auto* item = cu->modules[0]->items[0];
-  return item->body->rhs;
-}
 
-// =============================================================================
-// §7.2 Struct type metadata — StructTypeInfo registration
-// =============================================================================
-static void VerifyStructField(const StructFieldInfo& field,
-                              const char* expected_name,
-                              uint32_t expected_offset, uint32_t expected_width,
-                              size_t index) {
-  EXPECT_EQ(field.name, expected_name) << "field " << index;
-  EXPECT_EQ(field.bit_offset, expected_offset) << "field " << index;
-  EXPECT_EQ(field.width, expected_width) << "field " << index;
+static Expr* MkAssocCall(Arena& arena, std::string_view var,
+                         std::string_view method, std::string_view ref) {
+  auto* expr = arena.Create<Expr>();
+  expr->kind = ExprKind::kCall;
+  auto* access = arena.Create<Expr>();
+  access->kind = ExprKind::kMemberAccess;
+  auto* base = arena.Create<Expr>();
+  base->kind = ExprKind::kIdentifier;
+  base->text = var;
+  auto* meth = arena.Create<Expr>();
+  meth->kind = ExprKind::kIdentifier;
+  meth->text = method;
+  access->lhs = base;
+  access->rhs = meth;
+  expr->lhs = access;
+  auto* arg = arena.Create<Expr>();
+  arg->kind = ExprKind::kIdentifier;
+  arg->text = ref;
+  expr->args.push_back(arg);
+  return expr;
 }
-
 namespace {
 
 TEST(AssocTraversal, FirstReturnsOneWhenWidthSufficient) {

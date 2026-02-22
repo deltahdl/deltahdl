@@ -10,6 +10,14 @@
 
 using namespace delta;
 
+
+struct AssertionSimFixture {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag};
+};
 namespace {
 
 TEST(Assertion, AttachEvaluatesOnSignalChange) {

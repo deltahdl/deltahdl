@@ -31,6 +31,14 @@ static ParseResult Parse(const std::string& src) {
   return result;
 }
 
+static ModuleItem* FindItemByKind(const std::vector<ModuleItem*>& items,
+                                  ModuleItemKind kind) {
+  for (auto* item : items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
+}
+
 namespace {
 
 TEST(Lexical, ContAssign_WithDelay) {

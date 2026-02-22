@@ -10,6 +10,14 @@
 
 using namespace delta;
 
+struct ClockingSimFixture {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag, /*seed=*/42};
+};
+
 namespace {
 
 TEST(Clocking, ScheduleOutputDrive) {

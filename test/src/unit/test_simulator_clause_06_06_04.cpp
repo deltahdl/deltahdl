@@ -8,6 +8,15 @@
 
 using namespace delta;
 
+
+static Logic4Vec MakeAllZ(Arena& arena, uint32_t width) {
+  auto vec = MakeLogic4Vec(arena, width);
+  for (uint32_t w = 0; w < vec.nwords; ++w) {
+    vec.words[w].aval = ~uint64_t{0};
+    vec.words[w].bval = ~uint64_t{0};
+  }
+  return vec;
+}
 namespace {
 
 // --- §6.6.4: Trireg charge retention ---

@@ -35,18 +35,6 @@ static Expr* ParseExprFrom(const std::string& src, AggFixture& f) {
   return item->body->rhs;
 }
 
-// =============================================================================
-// §7.2 Struct type metadata — StructTypeInfo registration
-// =============================================================================
-static void VerifyStructField(const StructFieldInfo& field,
-                              const char* expected_name,
-                              uint32_t expected_offset, uint32_t expected_width,
-                              size_t index) {
-  EXPECT_EQ(field.name, expected_name) << "field " << index;
-  EXPECT_EQ(field.bit_offset, expected_offset) << "field " << index;
-  EXPECT_EQ(field.width, expected_width) << "field " << index;
-}
-
 namespace {
 
 TEST(AssignmentPattern, SingleElement) {

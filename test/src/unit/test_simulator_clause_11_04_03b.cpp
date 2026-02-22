@@ -42,6 +42,23 @@ static Variable* MakeVar(EvalAdvFixture& f, std::string_view name,
   return var;
 }
 
+
+static Expr* MakeBinary(Arena& arena, TokenKind op, Expr* lhs, Expr* rhs) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kBinary;
+  e->op = op;
+  e->lhs = lhs;
+  e->rhs = rhs;
+  return e;
+}
+
+static Variable* MakeSignedVarAdv(EvalAdvFixture& f, std::string_view name,
+                                  uint32_t width, uint64_t val) {
+  auto* var = f.ctx.CreateVariable(name, width);
+  var->value = MakeLogic4VecVal(f.arena, width, val);
+  var->is_signed = true;
+  return var;
+}
 namespace {
 
 TEST(EvalAdv, PowZeroExp) {

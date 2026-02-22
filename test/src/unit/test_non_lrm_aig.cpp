@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 #include "synthesis/aig.h"
+#include "synthesis/aig_opt.h"
 
 using namespace delta;
 

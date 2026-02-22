@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 #include <cstdint>
+#include <functional>
 #include "common/arena.h"
 #include "simulation/net.h"
 #include "simulation/variable.h"
@@ -107,6 +108,29 @@ void InitializeTriregNet(Net& net, LocalChargeStrength str, Arena& arena) {
   }
 }
 
+using ResolutionFn = std::function<Logic4Vec(Arena&, const std::vector<Logic4Vec>&)>;
+
+struct UserNettype {
+  uint32_t bit_width = 1;
+  ResolutionFn resolution;
+};
+
+void ActivateResolutionAtTimeZero(Net& net, const UserNettype& nt,
+                                  Arena& arena) {
+  if (nt.resolution) {
+    Logic4Vec result = nt.resolution(arena, net.drivers);
+    net.resolved->value = result;
+  }
+}
+
+void SetUserNettypeInitialValue(Net& net, const UserNettype& nt, Arena& arena) {
+  net.resolved->value = MakeLogic4Vec(arena, nt.bit_width);
+  // Default for logic is X: aval=0, bval=all-ones.
+  for (uint32_t i = 0; i < net.resolved->value.nwords; ++i) {
+    net.resolved->value.words[i].bval = ~uint64_t{0};
+  }
+}
+
 // --- Helpers ---
 static uint8_t ValOf(const Variable& v) {
   uint8_t a = v.value.words[0].aval & 1;
@@ -114,11 +138,7 @@ static uint8_t ValOf(const Variable& v) {
   return static_cast<uint8_t>((b << 1) | a);
 }
 
-static constexpr uint8_t kVal1 = 1;
-
 static constexpr uint8_t kValX = 2;
-
-static constexpr uint8_t kValZ = 3;
 
 namespace {
 

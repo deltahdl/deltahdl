@@ -36,25 +36,14 @@ static Expr* MakeId(Arena& arena, std::string_view name) {
   return e;
 }
 
-// Helper: build a unary Expr.
-static Expr* MakeUnary(Arena& arena, TokenKind op, Expr* operand) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kUnary;
-  e->op = op;
-  e->lhs = operand;
-  return e;
+static Variable* MakeVar4(EvalOpFixture& f, std::string_view name,
+                          uint32_t width, uint64_t aval, uint64_t bval) {
+  auto* var = f.ctx.CreateVariable(name, width);
+  var->value = MakeLogic4Vec(f.arena, width);
+  var->value.words[0].aval = aval;
+  var->value.words[0].bval = bval;
+  return var;
 }
-
-// Helper: build a binary Expr.
-static Expr* MakeBinary(Arena& arena, TokenKind op, Expr* lhs, Expr* rhs) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kBinary;
-  e->op = op;
-  e->lhs = lhs;
-  e->rhs = rhs;
-  return e;
-}
-
 namespace {
 
 // ==========================================================================

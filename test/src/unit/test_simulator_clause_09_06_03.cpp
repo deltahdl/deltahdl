@@ -72,7 +72,6 @@ StmtResult RunStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   coro.Resume();
   return result.value;
 }
-
 namespace {
 
 // =============================================================================

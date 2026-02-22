@@ -103,6 +103,20 @@ uint64_t ComputeGateDelay(uint64_t d_rise, uint64_t d_fall, Val4 from,
   return (d_rise < d_fall) ? d_rise : d_fall;
 }
 
+
+static void CheckInversion(GateKind gate, GateKind inverted_gate) {
+  Val4 vals[] = {Val4::kV0, Val4::kV1, Val4::kX, Val4::kZ};
+  for (Val4 a : vals) {
+    for (Val4 b : vals) {
+      Val4 result = EvalNInputGate(gate, a, b);
+      Val4 inv_result = EvalNInputGate(inverted_gate, a, b);
+      EXPECT_EQ(inv_result, InvertVal4(result))
+          << "Gate " << static_cast<int>(gate) << " inv "
+          << static_cast<int>(inverted_gate) << " a=" << static_cast<int>(a)
+          << " b=" << static_cast<int>(b);
+    }
+  }
+}
 namespace {
 
 // =============================================================
