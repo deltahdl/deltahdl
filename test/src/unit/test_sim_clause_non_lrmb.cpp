@@ -1,8 +1,8 @@
-#include <gtest/gtest.h>
+// §non_lrm
 
+#include <gtest/gtest.h>
 #include <atomic>
 #include <vector>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -12,10 +12,11 @@
 
 using namespace delta;
 
+namespace {
+
 // =============================================================================
 // Partitioner
 // =============================================================================
-
 TEST(MtSim, IndependentProcessesSinglePartition) {
   Partitioner part;
   // Process 0 reads "a", writes "b".
@@ -60,7 +61,6 @@ TEST(MtSim, EmptyPartitioner) {
 // =============================================================================
 // MtScheduler
 // =============================================================================
-
 TEST(MtSim, MtSchedulerInit) {
   MtScheduler sched(4);
   EXPECT_EQ(sched.NumThreads(), 4u);
@@ -78,18 +78,6 @@ TEST(MtSim, MtSchedulerSetPartitions) {
   EXPECT_EQ(sched.Partitions()[0].process_ids.size(), 2u);
   EXPECT_EQ(sched.Partitions()[1].process_ids.size(), 2u);
 }
-
-// =============================================================================
-// RunTimestep execution
-// =============================================================================
-
-struct MtSimFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
 
 TEST(MtSim, RunTimestepExecutesProcesses) {
   MtSimFixture f;
@@ -165,3 +153,5 @@ TEST(MtSim, RunTimestepMultipleThreads) {
     EXPECT_EQ(vars[i]->value.ToUint64(), 1u) << "Variable " << names[i];
   }
 }
+
+}  // namespace
