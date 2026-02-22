@@ -1,5 +1,6 @@
-#include <gtest/gtest.h>
+// Non-LRM tests
 
+#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -25,6 +26,8 @@ static Expr* ParseExprFrom(const std::string& src, EvalFixture& f) {
   EXPECT_FALSE(cu->modules[0]->params.empty());
   return cu->modules[0]->params[0].second;
 }
+
+namespace {
 
 TEST(ConstEval, Arithmetic) {
   EvalFixture f;
@@ -153,35 +156,6 @@ TEST(ConstEval, BitsExpr) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$bits(16'h0)", f)), 16);
 }
 
-// ==========================================================================
-// §11.5.3: Longest static prefix
-// ==========================================================================
-
-// Helper: build a simple identifier expression.
-static Expr* LspId(Arena& arena, std::string_view name) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIdentifier;
-  e->text = name;
-  return e;
-}
-
-// Helper: build a select expression: base[index].
-static Expr* LspSelect(Arena& arena, Expr* base, Expr* index) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kSelect;
-  e->base = base;
-  e->index = index;
-  return e;
-}
-
-// Helper: build an integer literal.
-static Expr* LspInt(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
-
 TEST(ConstEval, LongestStaticPrefixSimpleId) {
   Arena arena;
   // Plain identifier "m" → prefix is "m".
@@ -221,11 +195,9 @@ TEST(ConstEval, LongestStaticPrefixParamIdx) {
 // ==========================================================================
 // §6.8: Implicit signedness of integer types
 // ==========================================================================
-
 // ==========================================================================
 // §13.4.3 / §20.9: Constant system functions
 // ==========================================================================
-
 TEST(ConstEval, Countones) {
   EvalFixture f;
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$countones(8'b10110010)", f)), 4);
@@ -249,7 +221,6 @@ TEST(ConstEval, Onehot0) {
 }
 
 #include "elaboration/type_eval.h"
-
 TEST(TypeEval, ImplicitlySignedTypes) {
   // §6.8: integer, int, shortint, longint, byte are implicitly signed.
   // logic, reg, bit are NOT implicitly signed.
@@ -272,3 +243,5 @@ TEST(TypeEval, ImplicitlySignedTypes) {
     EXPECT_EQ(IsImplicitlySigned(c.kind), c.expected) << c.label;
   }
 }
+
+}  // namespace
