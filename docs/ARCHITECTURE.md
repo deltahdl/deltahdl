@@ -1,11 +1,14 @@
 # Architecture
 
-1. [Compilation Pipeline](#compilation-pipeline)
+## Table of Contents
+
+1. [Introduction](#introduction)
+2. [Compilation Pipeline](#compilation-pipeline)
    1. [Preprocessor](#preprocessor)
    2. [Lexer](#lexer)
    3. [Parser](#parser)
    4. [Elaborator](#elaborator)
-2. [Simulation](#simulation)
+3. [Simulation](#simulation)
    1. [Lowerer](#lowerer)
    2. [SimContext](#simcontext)
    3. [Event Scheduler](#event-scheduler)
@@ -28,14 +31,16 @@
    20. [Class Objects](#class-objects)
    21. [Synchronization Objects](#synchronization-objects)
    22. [Advanced Simulation](#advanced-simulation)
-3. [Synthesis](#synthesis)
+4. [Synthesis](#synthesis)
    1. [SynthLower](#synthlower)
    2. [AIG](#aig)
    3. [AIG Optimization](#aig-optimization)
    4. [Memory Inference](#memory-inference)
    5. [Technology Mapping](#technology-mapping)
    6. [Netlist Writer](#netlist-writer)
-4. [Design Decisions](#design-decisions)
+5. [Design Decisions](#design-decisions)
+
+## Introduction
 
 DeltaHDL compiles SystemVerilog source files through a staged pipeline. Each
 stage transforms the design into a progressively lower-level representation
