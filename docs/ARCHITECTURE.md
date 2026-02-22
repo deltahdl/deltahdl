@@ -470,6 +470,27 @@ into a hardware netlist. The SynthLower translates the design into an
 And-Inverter Graph, optimization passes reduce its size and depth, and
 technology mapping produces the final netlist.
 
+```text
+     ┌───────────┐
+     │  Lowerer  │
+     └─────┬─────┘
+           │
+           ▼
+     ┌───────────┐
+     │ Optimizer │
+     └─────┬─────┘
+           │
+           ▼
+     ┌───────────┐
+     │  Mapper   │
+     └─────┬─────┘
+           │
+           ▼
+     ┌───────────┐
+     │  Writer   │
+     └───────────┘
+```
+
 #### SynthLower
 
 The synthesis lowerer converts an `RtlirModule` into an And-Inverter Graph
