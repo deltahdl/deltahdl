@@ -571,4 +571,27 @@ parser, AIG optimizer, and technology mapper are implemented from scratch.
 
 ### Appendix B: Abbreviations
 
+| Abbreviation | Expansion |
+|---|---|
+| AIG | And-Inverter Graph |
+| API | Application Programming Interface |
+| AST | Abstract Syntax Tree |
+| BFS | Breadth-First Search |
+| BLIF | Berkeley Logic Interchange Format |
+| DPI | Direct Programming Interface |
+| DPI-C | Direct Programming Interface for C |
+| EDIF | Electronic Design Interchange Format |
+| IEEE | Institute of Electrical and Electronics Engineers |
+| JSON | JavaScript Object Notation |
+| LUT | Look-Up Table |
+| MUX | Multiplexer |
+| NBA | Non-Blocking Assignment |
+| RAII | Resource Acquisition Is Initialization |
+| RTLIR | Register-Transfer Level Intermediate Representation |
+| SDF | Standard Delay Format |
+| SVA | SystemVerilog Assertion |
+| UDP | User-Defined Primitive |
+| VCD | Value Change Dump |
+| VPI | Verilog Procedural Interface |
+
 ### Appendix C: Glossary
