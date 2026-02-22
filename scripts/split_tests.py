@@ -210,7 +210,7 @@ def _parse_header(lines):
             break
         if stripped != "":
             break
-        i += 1
+        i += 1  # pragma: no cover — unreachable (second loop consumes blanks)
 
     while i < len(lines) and lines[i].strip() == "":
         i += 1
@@ -622,7 +622,7 @@ def generate_file(clause, title, parsed, tests):
     for item in parsed.global_preamble:
         for line in item.lines:
             cleaned = strip_lrm_quotes(line)
-            if cleaned or cleaned == "":
+            if cleaned or cleaned == "":  # pragma: no branch
                 out.append(cleaned)
         out.append("")
     out.append("namespace {")
@@ -884,5 +884,5 @@ def main():
         _run(_parse_args())
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()
