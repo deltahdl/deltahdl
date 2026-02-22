@@ -1,5 +1,6 @@
-#include <gtest/gtest.h>
+// Non-LRM tests
 
+#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -12,7 +13,6 @@ using namespace delta;
 // ============================================================================
 // Test fixture
 // ============================================================================
-
 struct QueueRefFixture {
   SourceManager mgr;
   Arena arena;
@@ -24,7 +24,6 @@ struct QueueRefFixture {
 // ============================================================================
 // AST helpers
 // ============================================================================
-
 static Expr* MkIntLit(Arena& arena, uint64_t val) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
@@ -99,7 +98,6 @@ static Stmt* MkReturn(Arena& arena, Expr* expr) {
 // ============================================================================
 // Queue helper: populate a queue with integer values.
 // ============================================================================
-
 static QueueObject* MakeQueue(QueueRefFixture& f, std::string_view name,
                               const std::vector<uint64_t>& vals) {
   auto* q = f.ctx.CreateQueue(name, 32);
@@ -124,10 +122,11 @@ static void RegAutoFunc(QueueRefFixture& f, std::string_view name,
   f.ctx.RegisterFunction(name, func);
 }
 
+namespace {
+
 // ============================================================================
 // A2: Queue ref binding — basic writeback
 // ============================================================================
-
 // Pass q[1] by ref, set v = 99, verify q[1] == 99.
 TEST(QueueRef, BasicRefWriteback) {
   QueueRefFixture f;
@@ -164,7 +163,6 @@ TEST(QueueRef, RefReadsCurrentValue) {
 // ============================================================================
 // A3: Outdating — writeback suppressed / preserved
 // ============================================================================
-
 // Ref outdated by delete(1): q.delete(1) removes the bound element.
 // Write 99 to ref — should NOT propagate back.
 TEST(QueueRef, OutdatedByDelete) {
@@ -294,7 +292,6 @@ TEST(QueueRef, OutdatedByPopFront) {
 // ============================================================================
 // A4: §6.21 — ValidateRefLifetime
 // ============================================================================
-
 // A static function with ref arg should produce a diagnostic error.
 TEST(QueueRef, RejectRefInStaticFunc) {
   QueueRefFixture f;
@@ -327,7 +324,6 @@ TEST(QueueRef, AcceptRefInAutoFunc) {
 // ============================================================================
 // A5: §6.22.2 — Type width check
 // ============================================================================
-
 // Queue elem_width=32 but function param is 16-bit ref → binding should fail
 // and fall back to pass-by-value (write does not propagate).
 TEST(QueueRef, WidthMismatchFallsBackToValue) {
@@ -356,3 +352,5 @@ TEST(QueueRef, WidthMismatchFallsBackToValue) {
   // q[1] should still be 20.
   EXPECT_EQ(q->elements[1].ToUint64(), 20u);
 }
+
+}  // namespace
