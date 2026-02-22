@@ -1,18 +1,19 @@
-#include <gtest/gtest.h>
+// Non-LRM tests
 
+#include <gtest/gtest.h>
 #include <cstdint>
 #include <string>
-
 #include "common/arena.h"
 #include "common/types.h"
 #include "simulation/adv_sim.h"
 
 using namespace delta;
 
+namespace {
+
 // =============================================================================
 // TwoStateDetector
 // =============================================================================
-
 TEST(AdvSim, TwoStateDetectorKnown2State) {
   Arena arena;
   auto vec = MakeLogic4VecVal(arena, 8, 0x42);
@@ -38,7 +39,6 @@ TEST(AdvSim, TwoStateDetectorZeroWidth) {
 // =============================================================================
 // EventCoalescer
 // =============================================================================
-
 TEST(AdvSim, EventCoalescerMergesDuplicates) {
   EventCoalescer coalescer;
   uint32_t target_id = 42;
@@ -70,78 +70,4 @@ TEST(AdvSim, EventCoalescerDrainClearsState) {
   EXPECT_TRUE(second.empty());
 }
 
-// =============================================================================
-// DynArray
-// =============================================================================
-
-TEST(AdvSim, DynArrayDefaultEmpty) {
-  DynArray arr;
-  EXPECT_EQ(arr.Size(), 0u);
-}
-
-TEST(AdvSim, DynArrayPushAndAccess) {
-  DynArray arr;
-  arr.Push(42);
-  arr.Push(99);
-  EXPECT_EQ(arr.Size(), 2u);
-  EXPECT_EQ(arr.At(0), 42u);
-  EXPECT_EQ(arr.At(1), 99u);
-}
-
-TEST(AdvSim, DynArrayDelete) {
-  DynArray arr;
-  arr.Push(10);
-  arr.Push(20);
-  arr.Delete();
-  EXPECT_EQ(arr.Size(), 0u);
-}
-
-// =============================================================================
-// AssocArray
-// =============================================================================
-
-TEST(AdvSim, AssocArrayInsertAndLookup) {
-  AssocArray arr;
-  arr.Insert("key1", 100);
-  arr.Insert("key2", 200);
-  EXPECT_EQ(arr.Size(), 2u);
-  EXPECT_EQ(arr.Lookup("key1"), 100u);
-  EXPECT_EQ(arr.Lookup("key2"), 200u);
-}
-
-TEST(AdvSim, AssocArrayExistsAndErase) {
-  AssocArray arr;
-  arr.Insert("k", 1);
-  EXPECT_TRUE(arr.Exists("k"));
-  EXPECT_FALSE(arr.Exists("other"));
-  arr.Erase("k");
-  EXPECT_FALSE(arr.Exists("k"));
-  EXPECT_EQ(arr.Size(), 0u);
-}
-
-// =============================================================================
-// SvString
-// =============================================================================
-
-TEST(AdvSim, SvStringDefaultEmpty) {
-  SvString s;
-  EXPECT_EQ(s.Len(), 0u);
-  EXPECT_EQ(s.Get(), "");
-}
-
-TEST(AdvSim, SvStringSetAndGet) {
-  SvString s;
-  s.Set("hello");
-  EXPECT_EQ(s.Get(), "hello");
-  EXPECT_EQ(s.Len(), 5u);
-}
-
-TEST(AdvSim, SvStringCompare) {
-  SvString a;
-  SvString b;
-  a.Set("abc");
-  b.Set("abc");
-  EXPECT_TRUE(a == b);
-  b.Set("xyz");
-  EXPECT_FALSE(a == b);
-}
+}  // namespace
