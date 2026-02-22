@@ -1,8 +1,8 @@
-#include <gtest/gtest.h>
+// §10.4.1: Blocking procedural assignments
 
+#include <gtest/gtest.h>
 #include <cstdint>
 #include <string_view>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -18,8 +18,6 @@
 #include "simulation/variable.h"
 
 using namespace delta;
-
-namespace {
 
 struct StmtFixture {
   SourceManager mgr;
@@ -59,12 +57,11 @@ StmtResult RunStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   return result.value;
 }
 
-}  // namespace
+namespace {
 
 // =============================================================================
 // 24. Blocking assignment to bit-select LHS (§7.4 / §10.3)
 // =============================================================================
-
 TEST(StmtExec, BlockingAssignBitSelect) {
   StmtFixture f;
   auto* var = f.ctx.CreateVariable("bs", 8);
@@ -88,7 +85,6 @@ TEST(StmtExec, BlockingAssignBitSelect) {
 // =============================================================================
 // 25. Blocking assignment to part-select LHS (§7.4.5 / §10.3)
 // =============================================================================
-
 TEST(StmtExec, BlockingAssignPartSelect) {
   StmtFixture f;
   auto* var = f.ctx.CreateVariable("ps", 8);
@@ -113,7 +109,6 @@ TEST(StmtExec, BlockingAssignPartSelect) {
 // =============================================================================
 // 26. Blocking assignment to member-access LHS (§7.2 / §10.3)
 // =============================================================================
-
 TEST(StmtExec, BlockingAssignMemberAccess) {
   StmtFixture f;
   // Create variable "s.a" to represent a struct member.
@@ -135,28 +130,4 @@ TEST(StmtExec, BlockingAssignMemberAccess) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// =============================================================================
-// 27. Nonblocking assignment to bit-select LHS (§10.4.2)
-// =============================================================================
-
-TEST(StmtExec, NonblockingAssignBitSelect) {
-  StmtFixture f;
-  auto* var = f.ctx.CreateVariable("nb", 8);
-  var->value = MakeLogic4VecVal(f.arena, 8, 0);
-
-  // nb[5] <= 1;
-  auto* sel = f.arena.Create<Expr>();
-  sel->kind = ExprKind::kSelect;
-  sel->base = MakeIdent(f.arena, "nb");
-  sel->index = MakeIntLit(f.arena, 5);
-
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kNonblockingAssign;
-  stmt->lhs = sel;
-  stmt->rhs = MakeIntLit(f.arena, 1);
-
-  RunStmt(stmt, f.ctx, f.arena);
-  // NBA is deferred -- drain the scheduler to apply it.
-  f.scheduler.Run();
-  EXPECT_EQ(var->value.ToUint64(), 0x20u);  // bit 5 set
-}
+}  // namespace
