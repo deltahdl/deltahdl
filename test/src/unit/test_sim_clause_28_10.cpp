@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §28.10: pullup and pulldown sources
 
 #include <gtest/gtest.h>
 #include <cstdint>
