@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §28.4: and, nand, nor, or, xor, and xnor gates
 
 #include <gtest/gtest.h>
 #include <cstdint>
@@ -201,47 +201,6 @@ TEST(LogicGates, NorIsInvertedOr) {
 
 TEST(LogicGates, XnorIsInvertedXor) {
   CheckInversion(GateKind::kXor, GateKind::kXnor);
-}
-
-// §28.4: Two delays — "the first delay shall determine the output rise
-//  delay, the second delay shall determine the output fall delay, and
-//  the smaller of the two delays shall apply to output transitions to x."
-TEST(LogicGates, TwoDelayRiseFallAndX) {
-  EXPECT_EQ(ComputeGateDelay(10, 12, Val4::kV0, Val4::kV1), 10u);  // rise
-  EXPECT_EQ(ComputeGateDelay(10, 12, Val4::kV1, Val4::kV0), 12u);  // fall
-  EXPECT_EQ(ComputeGateDelay(10, 12, Val4::kV0, Val4::kX), 10u);   // min
-  EXPECT_EQ(ComputeGateDelay(10, 12, Val4::kV1, Val4::kX), 10u);   // min
-}
-
-// §28.4: "If only one delay is specified, it shall specify both the
-//  rise delay and the fall delay."
-TEST(LogicGates, SingleDelayUsedForAll) {
-  EXPECT_EQ(ComputeGateDelay(10, 10, Val4::kV0, Val4::kV1), 10u);
-  EXPECT_EQ(ComputeGateDelay(10, 10, Val4::kV1, Val4::kV0), 10u);
-}
-
-// §28.4: "If there is no delay specification, there shall be no
-//  propagation delay through the gate."
-TEST(LogicGates, NoDelayZeroPropagation) {
-  EXPECT_EQ(ComputeGateDelay(0, 0, Val4::kV0, Val4::kV1), 0u);
-}
-
-// =============================================================
-// §28.5: buf and not gates
-// =============================================================
-// §28.5: Truth tables (Table 28-4)
-TEST(LogicGates, BufGateTruthTable) {
-  EXPECT_EQ(EvalNOutputGate(GateKind::kBuf, Val4::kV0), Val4::kV0);
-  EXPECT_EQ(EvalNOutputGate(GateKind::kBuf, Val4::kV1), Val4::kV1);
-  EXPECT_EQ(EvalNOutputGate(GateKind::kBuf, Val4::kX), Val4::kX);
-  EXPECT_EQ(EvalNOutputGate(GateKind::kBuf, Val4::kZ), Val4::kX);
-}
-
-TEST(LogicGates, NotGateTruthTable) {
-  EXPECT_EQ(EvalNOutputGate(GateKind::kNot, Val4::kV0), Val4::kV1);
-  EXPECT_EQ(EvalNOutputGate(GateKind::kNot, Val4::kV1), Val4::kV0);
-  EXPECT_EQ(EvalNOutputGate(GateKind::kNot, Val4::kX), Val4::kX);
-  EXPECT_EQ(EvalNOutputGate(GateKind::kNot, Val4::kZ), Val4::kX);
 }
 
 }  // namespace
