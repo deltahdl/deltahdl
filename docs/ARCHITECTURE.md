@@ -11,27 +11,8 @@
 3. [Back End](#back-end)
    1. [Simulator](#simulator)
       1. [Lowerer](#lowerer)
-      2. [SimContext](#simcontext)
-      3. [Event Scheduler](#event-scheduler)
-      4. [Process Model](#process-model)
-      5. [Four-Value Logic](#four-value-logic)
-      6. [Signal Strength](#signal-strength)
-      7. [Variables and Nets](#variables-and-nets)
-      8. [Expression Evaluation](#expression-evaluation)
-      9. [VCD Writer](#vcd-writer)
-      10. [VPI](#vpi)
-      11. [DPI-C](#dpi-c)
-      12. [Compiled Simulation](#compiled-simulation)
-      13. [Multi-Threaded Simulation](#multi-threaded-simulation)
-      14. [Clocking Blocks](#clocking-blocks)
-      15. [Concurrent Assertions](#concurrent-assertions)
-      16. [Functional Coverage](#functional-coverage)
-      17. [Constrained Random Verification](#constrained-random-verification)
-      18. [Timing Specification and SDF](#timing-specification-and-sdf)
-      19. [User-Defined Primitives](#user-defined-primitives)
-      20. [Class Objects](#class-objects)
-      21. [Synchronization Objects](#synchronization-objects)
-      22. [Advanced Simulation](#advanced-simulation)
+      2. [Scheduler](#scheduler)
+      3. [Evaluator](#evaluator)
    2. [Synthesizer](#synthesizer)
       1. [SynthLower](#synthlower)
       2. [AIG](#aig)
@@ -193,7 +174,7 @@ or a `CompiledProcess` depending on whether the body contains timing controls.
 Continuous assignments are lowered into processes scheduled in the Active
 region.
 
-#### SimContext
+##### SimContext
 
 `SimContext` owns the simulation state: variables, nets, the scheduler, the
 diagnostic engine, and auxiliary managers for VPI, DPI, clocking, assertions,
@@ -204,7 +185,58 @@ enums, and classes so that the expression evaluator can perform field access
 and method dispatch at runtime. It also manages dynamic arrays, associative
 arrays, and queues.
 
-#### Event Scheduler
+##### Four-Value Logic
+
+All simulation values use dual-rail aval/bval encoding per the VPI convention.
+
+```text
+  ┌───────┬──────┬──────┐
+  │ Value │ aval │ bval │
+  ├───────┼──────┼──────┤
+  │   0   │   0  │   0  │
+  │   1   │   1  │   0  │
+  │   x   │   0  │   1  │
+  │   z   │   1  │   1  │
+  └───────┴──────┴──────┘
+```
+
+Values are packed into 64-bit words. A `Logic4Word` holds one aval/bval pair
+and provides helpers for testing known/zero/one states. Four-value AND, OR,
+XOR, and NOT operations are implemented as bitwise functions on the two rails.
+A `Logic4Vec` holds a bit width and a pointer to an arena-allocated array of
+`Logic4Word` structs, with flags indicating whether the value represents a
+real number, a signed quantity, or a string.
+
+A `Logic2Vec` provides a two-state (bit/int/byte) counterpart where the bval
+rail is absent, used in contexts where x and z values cannot occur.
+
+##### Signal Strength
+
+Signals carry strength information per IEEE 1800-2023. The `Strength` enum
+covers all eight levels from highz through supply. A `StrengthVal` packs the
+drive-zero strength, drive-one strength, and logic value into a single byte.
+Strength-aware resolution is used when multiple drivers contend on a net.
+
+##### Variables and Nets
+
+A `Variable` stores a `Logic4Vec` value, a previous value for change
+detection, and an optional forced value for `force`/`release` semantics. It
+also holds a pending NBA value that is committed during the NBA region. A
+list of watcher callbacks provides the sensitivity mechanism: when a variable
+changes, `NotifyWatchers` moves the callback list, clears it, and invokes
+each callback. Callbacks that return false are re-registered for the next
+change (persistent watchers), while those that return true are consumed
+(one-shot semantics).
+
+A `Net` adds multi-driver resolution on top of a `Variable`. Each driver
+contributes a `Logic4Vec` value and a `DriverStrength` pair. The `Resolve`
+method applies the appropriate resolution function (wire, wand, wor) to
+produce the final value. Trireg nets support charge storage: when all drivers
+are at Z the net retains its previous value at the configured charge strength,
+subject to decay over time. Charge propagation between connected trireg nets
+is also supported.
+
+#### Scheduler
 
 The scheduler implements the IEEE 1800-2023 stratified event algorithm. Each
 simulation timestep is divided into 17 ordered regions.
@@ -257,7 +289,7 @@ events are recycled through a free-list to avoid per-event allocation
 overhead. Each event carries a callback and an intrusive next-pointer for
 queue linkage.
 
-#### Process Model
+##### Process Model
 
 Processes that contain timing controls (`#delay`, `@(posedge clk)`, `wait`)
 run as C++23 coroutines. The `SimCoroutine` type wraps a `coroutine_handle`
@@ -271,58 +303,38 @@ Each `Process` tracks its kind (initial, always, always_comb, always_latch,
 always_ff, final, or continuous assignment), its home region, and whether
 it belongs to the reactive set.
 
-#### Four-Value Logic
+##### Clocking Blocks
 
-All simulation values use dual-rail aval/bval encoding per the VPI convention.
+`ClockingManager` implements IEEE clocking block semantics. Each clocking
+block names a clock signal and edge, default input and output skews, and a
+list of member signals with optional per-signal skew overrides. On a clock
+edge the manager samples input signals and stores their values. Output drives
+are scheduled with skew delays as NBA-region events. Default and global
+clocking blocks are tracked. Each block can have an associated named-event
+variable that is triggered on its clock edge, and user callbacks can be
+registered to fire on those edges.
 
-```text
-  ┌───────┬──────┬──────┐
-  │ Value │ aval │ bval │
-  ├───────┼──────┼──────┤
-  │   0   │   0  │   0  │
-  │   1   │   1  │   0  │
-  │   x   │   0  │   1  │
-  │   z   │   1  │   1  │
-  └───────┴──────┴──────┘
-```
+##### VCD Writer
 
-Values are packed into 64-bit words. A `Logic4Word` holds one aval/bval pair
-and provides helpers for testing known/zero/one states. Four-value AND, OR,
-XOR, and NOT operations are implemented as bitwise functions on the two rails.
-A `Logic4Vec` holds a bit width and a pointer to an arena-allocated array of
-`Logic4Word` structs, with flags indicating whether the value represents a
-real number, a signed quantity, or a string.
+The VCD writer records signal changes during simulation and writes them in
+Value Change Dump format per IEEE 1800-2023. It assigns a short identifier
+character to each registered signal. The scheduler invokes it as a
+post-timestep callback so that changed values are flushed after each time
+advance.
 
-A `Logic2Vec` provides a two-state (bit/int/byte) counterpart where the bval
-rail is absent, used in contexts where x and z values cannot occur.
+##### Timing Specification and SDF
 
-#### Signal Strength
+`SpecifyManager` handles IEEE specify block semantics from sections 30
+through 32. It stores path delays (parallel and full, with edge
+qualifiers and up to twelve transition delays), timing checks (setup, hold,
+setuphold, recrem, and others with reference and data edges), and SDF
+annotations. Runtime queries check for setup and hold violations given
+signal transition times.
 
-Signals carry strength information per IEEE 1800-2023. The `Strength` enum
-covers all eight levels from highz through supply. A `StrengthVal` packs the
-drive-zero strength, drive-one strength, and logic value into a single byte.
-Strength-aware resolution is used when multiple drivers contend on a net.
+The SDF parser reads Standard Delay Format files and annotates the design
+with backannotated timing data.
 
-#### Variables and Nets
-
-A `Variable` stores a `Logic4Vec` value, a previous value for change
-detection, and an optional forced value for `force`/`release` semantics. It
-also holds a pending NBA value that is committed during the NBA region. A
-list of watcher callbacks provides the sensitivity mechanism: when a variable
-changes, `NotifyWatchers` moves the callback list, clears it, and invokes
-each callback. Callbacks that return false are re-registered for the next
-change (persistent watchers), while those that return true are consumed
-(one-shot semantics).
-
-A `Net` adds multi-driver resolution on top of a `Variable`. Each driver
-contributes a `Logic4Vec` value and a `DriverStrength` pair. The `Resolve`
-method applies the appropriate resolution function (wire, wand, wor) to
-produce the final value. Trireg nets support charge storage: when all drivers
-are at Z the net retains its previous value at the configured charge strength,
-subject to decay over time. Charge propagation between connected trireg nets
-is also supported.
-
-#### Expression Evaluation
+#### Evaluator
 
 The expression evaluator interprets AST expression nodes at runtime. It is
 split across several translation units by domain: general expression
@@ -337,15 +349,24 @@ assignment evaluation which handles blocking, non-blocking, continuous, and
 force/release assignment semantics. A `StmtResult` signals the control flow
 outcome of each statement (normal, break, continue, return, disable).
 
-#### VCD Writer
+##### Compiled Simulation
 
-The VCD writer records signal changes during simulation and writes them in
-Value Change Dump format per IEEE 1800-2023. It assigns a short identifier
-character to each registered signal. The scheduler invokes it as a
-post-timestep callback so that changed values are flushed after each time
-advance.
+The `ProcessCompiler` analyzes process bodies to determine whether they are
+eligible for compilation. Only pure combinational processes without timing
+controls qualify. For those that do, it produces a `CompiledProcess` wrapping
+a `std::function<void(SimContext&)>` lambda. The lambda evaluates the process
+body directly, avoiding the overhead of coroutine creation and suspension.
 
-#### VPI
+##### Multi-Threaded Simulation
+
+The `Partitioner` performs dependency analysis on compiled processes by
+examining which signals each process reads and writes. It groups
+non-conflicting processes (those that share no written signals) into
+partitions. The `MtScheduler` executes independent partitions in parallel
+using `std::jthread`, while partitions that conflict with one another run
+sequentially within the same thread.
+
+##### VPI
 
 The Verilog Procedural Interface exposes simulation objects to external C code
 through the standard `vpi_*` function set defined in IEEE 1800-2023 sections
@@ -357,7 +378,7 @@ real, vector), and callbacks for value changes, read-write synchronization,
 and end-of-simulation events. The C API type aliases and constant macros
 follow the IEEE-mandated naming conventions.
 
-#### DPI-C
+##### DPI-C
 
 The Direct Programming Interface allows SystemVerilog code to call C functions
 (imports) and C code to call SystemVerilog functions (exports). `DpiContext`
@@ -371,35 +392,7 @@ A separate `DpiRuntime` module provides the `svdpi.h` access functions
 routines) as well as scope and context management calls required by the
 IEEE standard.
 
-#### Compiled Simulation
-
-The `ProcessCompiler` analyzes process bodies to determine whether they are
-eligible for compilation. Only pure combinational processes without timing
-controls qualify. For those that do, it produces a `CompiledProcess` wrapping
-a `std::function<void(SimContext&)>` lambda. The lambda evaluates the process
-body directly, avoiding the overhead of coroutine creation and suspension.
-
-#### Multi-Threaded Simulation
-
-The `Partitioner` performs dependency analysis on compiled processes by
-examining which signals each process reads and writes. It groups
-non-conflicting processes (those that share no written signals) into
-partitions. The `MtScheduler` executes independent partitions in parallel
-using `std::jthread`, while partitions that conflict with one another run
-sequentially within the same thread.
-
-#### Clocking Blocks
-
-`ClockingManager` implements IEEE clocking block semantics. Each clocking
-block names a clock signal and edge, default input and output skews, and a
-list of member signals with optional per-signal skew overrides. On a clock
-edge the manager samples input signals and stores their values. Output drives
-are scheduled with skew delays as NBA-region events. Default and global
-clocking blocks are tracked. Each block can have an associated named-event
-variable that is triggered on its clock edge, and user callbacks can be
-registered to fire on those edges.
-
-#### Concurrent Assertions
+##### Concurrent Assertions
 
 Two layers implement SystemVerilog assertion semantics. The
 `AssertionMonitor` evaluates simple SVA-style properties (rose, fell, stable,
@@ -417,7 +410,7 @@ assertions are queued and flushed in the Observed region. Per-instance
 assertion control (enable, disable, kill, pass-off, fail-off) is managed
 by `AssertionControl`.
 
-#### Functional Coverage
+##### Functional Coverage
 
 `CoverageDB` implements the IEEE functional coverage model from section 19.
 Covergroups contain coverpoints and cross-coverage definitions. Coverpoints
@@ -429,7 +422,7 @@ updates bin counts given a set of named values, and coverage percentage
 queries are available at the coverpoint, cross, covergroup, and global
 levels.
 
-#### Constrained Random Verification
+##### Constrained Random Verification
 
 The `ConstraintSolver` implements the IEEE randomization model from section
 18. It supports rand and randc variable qualifiers, with randc variables
@@ -441,25 +434,13 @@ with` are supported. Per-variable `rand_mode` and per-block
 `constraint_mode` controls are available. Pre-randomize and post-randomize
 callbacks are invoked around each solve.
 
-#### Timing Specification and SDF
-
-`SpecifyManager` handles IEEE specify block semantics from sections 30
-through 32. It stores path delays (parallel and full, with edge
-qualifiers and up to twelve transition delays), timing checks (setup, hold,
-setuphold, recrem, and others with reference and data edges), and SDF
-annotations. Runtime queries check for setup and hold violations given
-signal transition times.
-
-The SDF parser reads Standard Delay Format files and annotates the design
-with backannotated timing data.
-
-#### User-Defined Primitives
+##### User-Defined Primitives
 
 The UDP evaluator executes user-defined primitive tables at simulation time,
 supporting both combinational and sequential primitive semantics as defined
 in section 29.
 
-#### Class Objects
+##### Class Objects
 
 `ClassObject` provides runtime storage for SystemVerilog class instances.
 The simulation context tracks class type information and allocates object
@@ -467,13 +448,13 @@ handles for `new` expressions. Properties are accessed by name through the
 expression evaluator. The `SvCallable` module supports SystemVerilog
 subroutine dispatch including virtual methods and interface class calls.
 
-#### Synchronization Objects
+##### Synchronization Objects
 
 Simulation-level synchronization primitives (semaphores and events) are
 provided through `SyncObjects`, supporting the inter-process communication
 patterns described in the IEEE standard.
 
-#### Advanced Simulation
+##### Advanced Simulation
 
 Several auxiliary simulation utilities reside in the advanced simulation
 module. A two-state fast-path detector identifies variables that have never
