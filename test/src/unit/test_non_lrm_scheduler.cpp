@@ -68,4 +68,69 @@ TEST(Scheduler, EventPoolIntegration) {
   EXPECT_EQ(pool.FreeCount(), 1);
 }
 
+// Helper fixture for clocking simulation tests.
+struct ClockingSimFixture {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag, /*seed=*/42};
+};
+
+// Schedule posedge at a given time through the scheduler.
+void SchedulePosedge(ClockingSimFixture &f, Variable *clk, uint64_t time) {
+  auto *ev = f.scheduler.GetEventPool().Acquire();
+  ev->callback = [clk, &f]() {
+    clk->prev_value = clk->value;
+    clk->value = MakeLogic4VecVal(f.arena, 1, 1);
+    clk->NotifyWatchers();
+  };
+  f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
+}
+
+// Schedule negedge at a given time through the scheduler.
+void ScheduleNegedge(ClockingSimFixture &f, Variable *clk, uint64_t time) {
+  auto *ev = f.scheduler.GetEventPool().Acquire();
+  ev->callback = [clk, &f]() {
+    clk->prev_value = clk->value;
+    clk->value = MakeLogic4VecVal(f.arena, 1, 0);
+    clk->NotifyWatchers();
+  };
+  f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
+}
+
+// =============================================================================
+// EventCoalescer
+// =============================================================================
+TEST(AdvSim, EventCoalescerMergesDuplicates) {
+  EventCoalescer coalescer;
+  uint32_t target_id = 42;
+  coalescer.Add(target_id, 100);
+  coalescer.Add(target_id, 200);
+  coalescer.Add(target_id, 300);
+  // Only last value for each target should survive.
+  auto entries = coalescer.Drain();
+  ASSERT_EQ(entries.size(), 1u);
+  EXPECT_EQ(entries[0].target_id, target_id);
+  EXPECT_EQ(entries[0].value, 300u);
+}
+
+TEST(AdvSim, EventCoalescerKeepsDistinctTargets) {
+  EventCoalescer coalescer;
+  coalescer.Add(1, 10);
+  coalescer.Add(2, 20);
+  coalescer.Add(3, 30);
+  auto entries = coalescer.Drain();
+  EXPECT_EQ(entries.size(), 3u);
+}
+
+TEST(AdvSim, EventCoalescerDrainClearsState) {
+  EventCoalescer coalescer;
+  coalescer.Add(1, 10);
+  auto first = coalescer.Drain();
+  EXPECT_EQ(first.size(), 1u);
+  auto second = coalescer.Drain();
+  EXPECT_TRUE(second.empty());
+}
+
 }  // namespace
