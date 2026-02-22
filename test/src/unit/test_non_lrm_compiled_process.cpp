@@ -75,4 +75,22 @@ TEST(CompiledSim, NestedTimingControlDetected) {
   EXPECT_FALSE(ProcessCompiler::IsCompilable(outer));
 }
 
+TEST(CompiledSim, NullBodyNotCompilable) {
+  EXPECT_FALSE(ProcessCompiler::IsCompilable(nullptr));
+}
+
+TEST(CompiledSim, CompileReturnsValidForCombinational) {
+  Arena arena;
+  auto* assign = arena.Create<Stmt>();
+  assign->kind = StmtKind::kBlockingAssign;
+
+  auto* block = arena.Create<Stmt>();
+  block->kind = StmtKind::kBlock;
+  block->stmts.push_back(assign);
+
+  auto compiled = ProcessCompiler::Compile(42, block);
+  EXPECT_TRUE(compiled.IsValid());
+  EXPECT_EQ(compiled.Id(), 42u);
+}
+
 }  // namespace
