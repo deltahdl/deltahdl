@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §20.8.1: Integer math functions
 
 #include <gtest/gtest.h>
 #include "common/arena.h"
@@ -34,33 +34,6 @@ TEST(ConstEval, Clog2) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$clog2(256)", f)), 8);
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$clog2(1)", f)), 0);
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$clog2(5)", f)), 3);
-}
-
-TEST(ConstEval, BitsExpr) {
-  EvalFixture f;
-  // §20.6.2: $bits(8'hFF) should return 8 (width of expression).
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("$bits(8'hFF)", f)), 8);
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("$bits(16'h0)", f)), 16);
-}
-
-TEST(ConstEval, LongestStaticPrefixSimpleId) {
-  Arena arena;
-  // Plain identifier "m" → prefix is "m".
-  EXPECT_EQ(LongestStaticPrefix(LspId(arena, "m")), "m");
-}
-
-TEST(ConstEval, LongestStaticPrefixConstIdx) {
-  Arena arena;
-  // m[1] where 1 is constant → prefix is "m[1]".
-  auto* sel = LspSelect(arena, LspId(arena, "m"), LspInt(arena, 1));
-  EXPECT_EQ(LongestStaticPrefix(sel), "m[1]");
-}
-
-TEST(ConstEval, LongestStaticPrefixVarIdx) {
-  Arena arena;
-  // m[i] where i is not constant → prefix is "m".
-  auto* sel = LspSelect(arena, LspId(arena, "m"), LspId(arena, "i"));
-  EXPECT_EQ(LongestStaticPrefix(sel), "m");
 }
 
 }  // namespace
