@@ -79,4 +79,153 @@ TEST(Parser, PackageAndModule) {
   EXPECT_EQ(r.cu->modules[0]->name, "top");
 }
 
+// =============================================================================
+// A.1.11 Package items
+// =============================================================================
+// package_item: package_or_generate_item_declaration — net/data/task/function
+TEST(SourceText, PackageOrGenerateItemDecl) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  wire w;\n"
+      "  int x;\n"
+      "  function void f(); endfunction\n"
+      "  task t(); endtask\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_GE(r.cu->packages[0]->items.size(), 4u);
+}
+
+// package_or_generate_item_declaration: checker_declaration
+TEST(SourceText, PackageItemCheckerDecl) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  checker chk; endchecker\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
+// package_or_generate_item_declaration: dpi_import_export
+TEST(SourceText, PackageItemDpiImportExport) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  import \"DPI-C\" function void c_func();\n"
+      "  export \"DPI-C\" function sv_func;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_GE(r.cu->packages[0]->items.size(), 2u);
+}
+
+// package_or_generate_item_declaration: extern_constraint_declaration
+TEST(SourceText, PackageItemExternConstraint) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  constraint MyClass::c { x > 0; }\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
+// package_or_generate_item_declaration: static extern_constraint_declaration
+TEST(SourceText, PackageItemStaticExternConstraint) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  static constraint MyClass::c { x > 0; }\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
+// package_or_generate_item_declaration: class_declaration
+TEST(SourceText, PackageItemClassDecl) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  class C;\n"
+      "    int x;\n"
+      "  endclass\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
+// package_or_generate_item_declaration: interface_class_declaration
+TEST(SourceText, PackageItemInterfaceClassDecl) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  interface class IC;\n"
+      "    pure virtual function void f();\n"
+      "  endclass\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
+// package_or_generate_item_declaration: class_constructor_declaration
+TEST(SourceText, PackageItemClassConstructorDecl) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  function MyClass::new(); endfunction\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
+// package_or_generate_item_declaration: local_parameter_declaration
+TEST(SourceText, PackageItemLocalparamDecl) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  localparam int A = 1;\n"
+      "  parameter int B = 2;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_GE(r.cu->packages[0]->items.size(), 2u);
+}
+
+// package_or_generate_item_declaration: covergroup_declaration
+TEST(SourceText, PackageItemCovergroupDecl) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  covergroup cg; endgroup\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
+// package_or_generate_item_declaration: assertion_item_declaration
+TEST(SourceText, PackageItemAssertionDecl) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  property p; 1; endproperty\n"
+      "  sequence s; 1; endsequence\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
+// package_or_generate_item_declaration: ; (empty statement)
+TEST(SourceText, PackageItemEmptyStmt) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  ;\n"
+      "  ;;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
 }  // namespace
