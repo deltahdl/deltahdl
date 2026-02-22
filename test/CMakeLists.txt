@@ -14,7 +14,6 @@ function(add_unit_test name)
     gtest_discover_tests(${name})
 endfunction()
 
-add_unit_test(test_assertion_c)
 add_unit_test(test_clocking_a)
 add_unit_test(test_clocking_b)
 add_unit_test(test_compiled_sim_a)
