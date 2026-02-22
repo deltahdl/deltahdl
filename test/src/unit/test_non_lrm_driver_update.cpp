@@ -1,13 +1,15 @@
-#include <gtest/gtest.h>
+// Non-LRM tests
 
+#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/types.h"
 #include "simulation/driver_update.h"
 
 using namespace delta;
 
-// --- DriverUpdate struct tests ---
+namespace {
 
+// --- DriverUpdate struct tests ---
 TEST(DriverUpdate, DefaultConstruction_ValueFields) {
   DriverUpdate du;
   EXPECT_EQ(du.value.width, 0);
@@ -24,7 +26,6 @@ TEST(DriverUpdate, DefaultConstruction_StrengthAndIndex) {
 }
 
 // --- DriverUpdatePool tests ---
-
 TEST(DriverUpdatePool, AcquireCreatesNew) {
   Arena arena;
   DriverUpdatePool pool(arena);
@@ -147,3 +148,5 @@ TEST(DriverUpdatePool, AcquireAfterPartialRelease) {
   (void)du1;
   (void)du3;
 }
+
+}  // namespace
