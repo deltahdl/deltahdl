@@ -1,3 +1,5 @@
+// §4.9.5: Switch (transistor) processing
+
 #include <gtest/gtest.h>
 
 #include "common/arena.h"
@@ -6,7 +8,7 @@
 
 using namespace delta;
 
-// --- Local types for switch processing (§4.9.5) ---
+// --- Local types for switch processing ---
 
 enum class SwitchKind : uint8_t {
   kTran,
@@ -187,13 +189,10 @@ static constexpr uint8_t kVal1 = 1;
 static constexpr uint8_t kValX = 2;
 static constexpr uint8_t kValZ = 3;
 
-// =============================================================
-// §4.9.5: Switch (transistor) processing
-// =============================================================
+namespace {
 
 // --- Bidirectional signal flow ---
 
-// §4.9.5: Switches provide bidirectional signal flow.
 TEST(SwitchProcessing, TranPropagatesDrivenToUndriven) {
   Arena arena;
   auto* va = arena.Create<Variable>();
@@ -210,7 +209,6 @@ TEST(SwitchProcessing, TranPropagatesDrivenToUndriven) {
   EXPECT_EQ(ValOf(*vb), kVal1);
 }
 
-// §4.9.5: Bidirectional — driving b propagates to a.
 TEST(SwitchProcessing, TranBidirectionalPropagation) {
   Arena arena;
   auto* va = arena.Create<Variable>();
@@ -229,9 +227,6 @@ TEST(SwitchProcessing, TranBidirectionalPropagation) {
 
 // --- Coordinated processing ---
 
-// §4.9.5: "Switch processing shall consider all the devices in a
-//  bidirectional switch-connected net before it can determine the
-//  appropriate value for any node on the net."
 TEST(SwitchProcessing, NetworkResolvesAllDevicesTogether) {
   Arena arena;
   auto* va = arena.Create<Variable>();
@@ -321,10 +316,6 @@ TEST(SwitchProcessing, Tranif0BlocksWhenControlHigh) {
 
 // --- Built-in net type, x/z control: exhaustive combination ---
 
-// §4.9.5: "solve the network repeatedly with these transistors set to
-//  all possible combinations ... Any node that has a unique logic level
-//  in all cases has steady-state response equal to this level. All
-//  other nodes have steady-state response x."
 TEST(SwitchProcessing, BuiltinNetXControlNonUniqueProducesX) {
   Arena arena;
   auto* va = arena.Create<Variable>();
@@ -335,7 +326,7 @@ TEST(SwitchProcessing, BuiltinNetXControlNonUniqueProducesX) {
   Net a = MakeNet1(arena, va, 1);
   Net b = MakeUndrivenNet(arena, vb);
 
-  // control = x: on→b=1, off→b=z. Not unique → x.
+  // control = x: on->b=1, off->b=z. Not unique -> x.
   std::vector<SwitchInst> sw;
   sw.push_back({&a, &b, SwitchKind::kTranif1, {0, 1}, false});
   ResolveSwitchNetwork(sw, arena);
@@ -352,7 +343,7 @@ TEST(SwitchProcessing, BuiltinNetZControlNonUniqueProducesX) {
   Net a = MakeNet1(arena, va, 0);
   Net b = MakeUndrivenNet(arena, vb);
 
-  // control = z: on→b=0, off→b=z. Not unique → x.
+  // control = z: on->b=0, off->b=z. Not unique -> x.
   std::vector<SwitchInst> sw;
   sw.push_back({&a, &b, SwitchKind::kTranif1, {1, 1}, false});
   ResolveSwitchNetwork(sw, arena);
@@ -361,8 +352,6 @@ TEST(SwitchProcessing, BuiltinNetZControlNonUniqueProducesX) {
 
 // --- User-defined net type, x/z control: treated as off ---
 
-// §4.9.5: "The bidirectional switch shall be treated as off for an x
-//  or z control input value."
 TEST(SwitchProcessing, UserDefinedNetXControlTreatedAsOff) {
   Arena arena;
   auto* va = arena.Create<Variable>();
@@ -395,10 +384,8 @@ TEST(SwitchProcessing, UserDefinedNetZControlTreatedAsOff) {
   EXPECT_EQ(ValOf(*vb), kValZ);
 }
 
-// --- User-defined net type: on → single net, off → separate ---
+// --- User-defined net type: on -> single net, off -> separate ---
 
-// §4.9.5: "If the control input is off, each net is resolved
-//  separately; otherwise, they are resolved as if a single net."
 TEST(SwitchProcessing, UserDefinedNetControlOnSingleNet) {
   Arena arena;
   auto* va = arena.Create<Variable>();
@@ -430,3 +417,5 @@ TEST(SwitchProcessing, UserDefinedNetControlOffSeparate) {
   ResolveSwitchNetwork(sw, arena);
   EXPECT_EQ(ValOf(*vb), kValZ);
 }
+
+}  // namespace
