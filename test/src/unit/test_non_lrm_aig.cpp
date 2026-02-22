@@ -1,8 +1,11 @@
-#include <gtest/gtest.h>
+// Non-LRM tests
 
+#include <gtest/gtest.h>
 #include "synthesis/aig.h"
 
 using namespace delta;
+
+namespace {
 
 TEST(Aig, LiteralHelpers) {
   for (uint32_t id = 0; id < 10; ++id) {
@@ -82,3 +85,5 @@ TEST(Aig, MuxConstruction) {
   auto m = graph.AddMux(s, a, b);
   EXPECT_GT(AigVar(m), 0);
 }
+
+}  // namespace
