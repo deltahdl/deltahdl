@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §10.9: Assignment patterns
 
 #include <gtest/gtest.h>
 #include <string>
