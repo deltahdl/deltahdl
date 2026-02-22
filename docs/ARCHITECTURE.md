@@ -172,8 +172,6 @@ or a `CompiledProcess` depending on whether the body contains timing controls.
 Continuous assignments are lowered into processes scheduled in the Active
 region.
 
-##### SimContext
-
 `SimContext` owns the simulation state: variables, nets, the scheduler, the
 diagnostic engine, and auxiliary managers for VPI, DPI, clocking, assertions,
 SVA, coverage, constraint solving, specify blocks, and SDF annotations. It
@@ -182,8 +180,6 @@ calls, and value read/write operations. It holds type information for structs,
 enums, and classes so that the expression evaluator can perform field access
 and method dispatch at runtime. It also manages dynamic arrays, associative
 arrays, and queues.
-
-##### Four-Value Logic
 
 All simulation values use dual-rail aval/bval encoding per the VPI convention.
 
@@ -208,14 +204,10 @@ real number, a signed quantity, or a string.
 A `Logic2Vec` provides a two-state (bit/int/byte) counterpart where the bval
 rail is absent, used in contexts where x and z values cannot occur.
 
-##### Signal Strength
-
 Signals carry strength information per IEEE 1800-2023. The `Strength` enum
 covers all eight levels from highz through supply. A `StrengthVal` packs the
 drive-zero strength, drive-one strength, and logic value into a single byte.
 Strength-aware resolution is used when multiple drivers contend on a net.
-
-##### Variables and Nets
 
 A `Variable` stores a `Logic4Vec` value, a previous value for change
 detection, and an optional forced value for `force`/`release` semantics. It
@@ -287,8 +279,6 @@ events are recycled through a free-list to avoid per-event allocation
 overhead. Each event carries a callback and an intrusive next-pointer for
 queue linkage.
 
-##### Process Model
-
 Processes that contain timing controls (`#delay`, `@(posedge clk)`, `wait`)
 run as C++23 coroutines. The `SimCoroutine` type wraps a `coroutine_handle`
 with RAII lifetime management. Each `co_await` suspends the coroutine and
@@ -301,8 +291,6 @@ Each `Process` tracks its kind (initial, always, always_comb, always_latch,
 always_ff, final, or continuous assignment), its home region, and whether
 it belongs to the reactive set.
 
-##### Clocking Blocks
-
 `ClockingManager` implements IEEE clocking block semantics. Each clocking
 block names a clock signal and edge, default input and output skews, and a
 list of member signals with optional per-signal skew overrides. On a clock
@@ -312,15 +300,11 @@ clocking blocks are tracked. Each block can have an associated named-event
 variable that is triggered on its clock edge, and user callbacks can be
 registered to fire on those edges.
 
-##### VCD Writer
-
 The VCD writer records signal changes during simulation and writes them in
 Value Change Dump format per IEEE 1800-2023. It assigns a short identifier
 character to each registered signal. The scheduler invokes it as a
 post-timestep callback so that changed values are flushed after each time
 advance.
-
-##### Timing Specification and SDF
 
 `SpecifyManager` handles IEEE specify block semantics from sections 30
 through 32. It stores path delays (parallel and full, with edge
@@ -347,15 +331,11 @@ assignment evaluation which handles blocking, non-blocking, continuous, and
 force/release assignment semantics. A `StmtResult` signals the control flow
 outcome of each statement (normal, break, continue, return, disable).
 
-##### Compiled Simulation
-
 The `ProcessCompiler` analyzes process bodies to determine whether they are
 eligible for compilation. Only pure combinational processes without timing
 controls qualify. For those that do, it produces a `CompiledProcess` wrapping
 a `std::function<void(SimContext&)>` lambda. The lambda evaluates the process
 body directly, avoiding the overhead of coroutine creation and suspension.
-
-##### Multi-Threaded Simulation
 
 The `Partitioner` performs dependency analysis on compiled processes by
 examining which signals each process reads and writes. It groups
@@ -363,8 +343,6 @@ non-conflicting processes (those that share no written signals) into
 partitions. The `MtScheduler` executes independent partitions in parallel
 using `std::jthread`, while partitions that conflict with one another run
 sequentially within the same thread.
-
-##### VPI
 
 The Verilog Procedural Interface exposes simulation objects to external C code
 through the standard `vpi_*` function set defined in IEEE 1800-2023 sections
@@ -375,8 +353,6 @@ value get/put in multiple formats (binary string, hex string, scalar, integer,
 real, vector), and callbacks for value changes, read-write synchronization,
 and end-of-simulation events. The C API type aliases and constant macros
 follow the IEEE-mandated naming conventions.
-
-##### DPI-C
 
 The Direct Programming Interface allows SystemVerilog code to call C functions
 (imports) and C code to call SystemVerilog functions (exports). `DpiContext`
@@ -389,8 +365,6 @@ A separate `DpiRuntime` module provides the `svdpi.h` access functions
 (`svGetBitselBit`, `svGetPartselLogic`, `svPutPartselLogic`, and related
 routines) as well as scope and context management calls required by the
 IEEE standard.
-
-##### Concurrent Assertions
 
 Two layers implement SystemVerilog assertion semantics. The
 `AssertionMonitor` evaluates simple SVA-style properties (rose, fell, stable,
@@ -408,8 +382,6 @@ assertions are queued and flushed in the Observed region. Per-instance
 assertion control (enable, disable, kill, pass-off, fail-off) is managed
 by `AssertionControl`.
 
-##### Functional Coverage
-
 `CoverageDB` implements the IEEE functional coverage model from section 19.
 Covergroups contain coverpoints and cross-coverage definitions. Coverpoints
 hold bins which may be explicit value sets, automatically generated ranges,
@@ -419,8 +391,6 @@ generates product bins across multiple coverpoints. The `Sample` method
 updates bin counts given a set of named values, and coverage percentage
 queries are available at the coverpoint, cross, covergroup, and global
 levels.
-
-##### Constrained Random Verification
 
 The `ConstraintSolver` implements the IEEE randomization model from section
 18. It supports rand and randc variable qualifiers, with randc variables
@@ -432,13 +402,9 @@ with` are supported. Per-variable `rand_mode` and per-block
 `constraint_mode` controls are available. Pre-randomize and post-randomize
 callbacks are invoked around each solve.
 
-##### User-Defined Primitives
-
 The UDP evaluator executes user-defined primitive tables at simulation time,
 supporting both combinational and sequential primitive semantics as defined
 in section 29.
-
-##### Class Objects
 
 `ClassObject` provides runtime storage for SystemVerilog class instances.
 The simulation context tracks class type information and allocates object
@@ -446,13 +412,9 @@ handles for `new` expressions. Properties are accessed by name through the
 expression evaluator. The `SvCallable` module supports SystemVerilog
 subroutine dispatch including virtual methods and interface class calls.
 
-##### Synchronization Objects
-
 Simulation-level synchronization primitives (semaphores and events) are
 provided through `SyncObjects`, supporting the inter-process communication
 patterns described in the IEEE standard.
-
-##### Advanced Simulation
 
 Several auxiliary simulation utilities reside in the advanced simulation
 module. A two-state fast-path detector identifies variables that have never
@@ -501,8 +463,6 @@ latches in the AIG. `always_latch` blocks are lowered similarly. If and case
 statements are lowered through MUX construction, where each branch contributes
 a set of signal bits that are multiplexed by the condition.
 
-##### AIG
-
 The And-Inverter Graph is the core synthesis data structure. Each node
 represents a two-input AND gate. Edges carry a complement flag in the least
 significant bit of the literal encoding, so a literal encodes both the node
@@ -513,8 +473,6 @@ state: each latch pairs a current-state primary input with a next-state
 literal. Structural hashing ensures that duplicate AND nodes are never created;
 a hash table maps each (fanin0, fanin1) pair to an existing node when one has
 already been allocated.
-
-##### Memory Inference
 
 The memory inference pass analyzes `always_ff` blocks in the RTLIR for
 array access patterns (indexed reads and writes) and replaces them with
