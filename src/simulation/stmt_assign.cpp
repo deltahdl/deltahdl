@@ -661,6 +661,24 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
 
   auto rhs_val = EvalRhsWithStructContext(stmt, ctx, arena);
 
+  // §10.10/A.8.1: Concatenation as LHS — unpack RHS across elements.
+  if (stmt->lhs->kind == ExprKind::kConcatenation) {
+    uint64_t rhs_raw = rhs_val.ToUint64();
+    uint32_t bit_offset = 0;
+    for (auto it = stmt->lhs->elements.rbegin();
+         it != stmt->lhs->elements.rend(); ++it) {
+      auto* var = ResolveLhsVariable(*it, ctx);
+      if (!var) continue;
+      uint32_t w = var->value.width;
+      uint64_t mask = (w >= 64) ? ~uint64_t{0} : (uint64_t{1} << w) - 1;
+      uint64_t slice = (rhs_raw >> bit_offset) & mask;
+      var->value = MakeLogic4VecVal(arena, w, slice);
+      var->NotifyWatchers();
+      bit_offset += w;
+    }
+    return StmtResult::kDone;
+  }
+
   if (stmt->lhs->kind == ExprKind::kSelect) {
     TrySelectBlockingAssign(stmt->lhs, rhs_val, ctx, arena);
     return StmtResult::kDone;

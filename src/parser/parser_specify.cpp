@@ -208,8 +208,17 @@ SpecifyTerminal Parser::ParseSpecifyTerminal() {
   return term;
 }
 
-// Parse port list inside path: terminal {, terminal}
+// Parse port list inside path: terminal {, terminal} or {terminal {, terminal}}
 void Parser::ParsePathPorts(std::vector<SpecifyTerminal>& ports) {
+  // A.8.1: module_path_concatenation ::= { port {, port} }
+  if (Match(TokenKind::kLBrace)) {
+    ports.push_back(ParseSpecifyTerminal());
+    while (Match(TokenKind::kComma)) {
+      ports.push_back(ParseSpecifyTerminal());
+    }
+    Expect(TokenKind::kRBrace);
+    return;
+  }
   ports.push_back(ParseSpecifyTerminal());
   while (Match(TokenKind::kComma)) {
     ports.push_back(ParseSpecifyTerminal());
