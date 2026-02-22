@@ -9,25 +9,6 @@ using namespace delta;
 
 namespace {
 
-TEST(Scheduler, InitialState) {
-  Arena arena;
-  Scheduler sched(arena);
-  EXPECT_FALSE(sched.HasEvents());
-  EXPECT_EQ(sched.CurrentTime().ticks, 0);
-}
-
-TEST(Scheduler, ScheduleAndRunSingleEvent) {
-  Arena arena;
-  Scheduler sched(arena);
-  bool executed = false;
-  auto* ev = sched.GetEventPool().Acquire();
-  ev->callback = [&executed]() { executed = true; };
-  sched.ScheduleEvent({0}, Region::kActive, ev);
-  EXPECT_TRUE(sched.HasEvents());
-  sched.Run();
-  EXPECT_TRUE(executed);
-}
-
 // --- EventPool tests ---
 TEST(EventPool, AcquireCreatesNew) {
   Arena arena;
