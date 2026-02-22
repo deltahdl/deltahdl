@@ -1,16 +1,17 @@
+// Non-LRM tests
+
 #include <gtest/gtest.h>
-
 #include <cstdint>
-
 #include "synthesis/aig.h"
 #include "synthesis/lut_map.h"
 
 using namespace delta;
 
+namespace {
+
 // =============================================================================
 // Single AND gate -> single LUT
 // =============================================================================
-
 TEST(LutMap, SingleAndGateMapsToOneLut) {
   AigGraph g;
   auto a = g.AddInput();
@@ -33,7 +34,6 @@ TEST(LutMap, SingleAndGateMapsToOneLut) {
 // =============================================================================
 // NOT gate (inverted input to output) -> single LUT
 // =============================================================================
-
 TEST(LutMap, NotGateMapsToOneLut) {
   AigGraph g;
   auto a = g.AddInput();
@@ -54,7 +54,6 @@ TEST(LutMap, NotGateMapsToOneLut) {
 // =============================================================================
 // Direct wire (input passed to output) -> single LUT
 // =============================================================================
-
 TEST(LutMap, DirectWireMapsToOneLut) {
   AigGraph g;
   auto a = g.AddInput();
@@ -74,7 +73,6 @@ TEST(LutMap, DirectWireMapsToOneLut) {
 // =============================================================================
 // Multiple outputs -> multiple LUTs
 // =============================================================================
-
 TEST(LutMap, MultipleOutputsProduceMultipleLuts) {
   AigGraph g;
   auto a = g.AddInput();
@@ -98,7 +96,6 @@ TEST(LutMap, MultipleOutputsProduceMultipleLuts) {
 // =============================================================================
 // Constant output -> trivial LUT
 // =============================================================================
-
 TEST(LutMap, ConstantFalseOutputProducesTrivialLut) {
   AigGraph g;
   g.AddOutput(AigGraph::kConstFalse);
@@ -126,7 +123,6 @@ TEST(LutMap, ConstantTrueOutputProducesTrivialLut) {
 // =============================================================================
 // LUT size parameter is respected
 // =============================================================================
-
 TEST(LutMap, LutSizeParameterIsRespected) {
   AigGraph g;
   auto a = g.AddInput();
@@ -157,7 +153,6 @@ TEST(LutMap, LutSizeParameterIsRespected) {
 // =============================================================================
 // OR gate truth table correctness
 // =============================================================================
-
 TEST(LutMap, OrGateTruthTable) {
   AigGraph g;
   auto a = g.AddInput();
@@ -181,3 +176,5 @@ TEST(LutMap, OrGateTruthTable) {
   }
   EXPECT_EQ(popcount, 3u);
 }
+
+}  // namespace
