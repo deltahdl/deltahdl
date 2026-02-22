@@ -1,7 +1,7 @@
+// §10.6.2: The force and release procedural statements
+
 #include <gtest/gtest.h>
-
 #include <cstdint>
-
 #include "common/arena.h"
 #include "simulation/net.h"
 #include "simulation/variable.h"
@@ -9,7 +9,6 @@
 using namespace delta;
 
 // --- Local types for force/release (§10.6.2) ---
-
 enum class ForceTarget : uint8_t {
   kSingularVariable,
   kNet,
@@ -27,10 +26,14 @@ struct ForceInfo {
 };
 
 bool ValidateForceTarget(const ForceInfo& info);
+
 void ForceVariable(Variable& var, const Logic4Vec& value);
+
 void ReleaseVariable(Variable& var, bool has_continuous_driver,
                      const Logic4Vec* continuous_value, Arena& arena);
+
 void ForceNet(Net& net, const Logic4Vec& value, Arena& arena);
+
 void ReleaseNet(Net& net, Arena& arena);
 
 bool ValidateForceTarget(const ForceInfo& info) {
@@ -80,7 +83,6 @@ void ReleaseNet(Net& net, Arena& arena) {
 }
 
 // --- Helpers ---
-
 static uint8_t ValOf(const Variable& v) {
   uint8_t a = v.value.words[0].aval & 1;
   uint8_t b = v.value.words[0].bval & 1;
@@ -88,14 +90,15 @@ static uint8_t ValOf(const Variable& v) {
 }
 
 static constexpr uint8_t kVal0 = 0;
+
 static constexpr uint8_t kVal1 = 1;
+
+namespace {
 
 // =============================================================
 // §10.6.2: The force and release procedural statements
 // =============================================================
-
 // --- Legal LHS targets ---
-
 // §10.6.2: "The left-hand side of the assignment can be a reference to
 //  a singular variable, a net, a constant bit-select of a vector net,
 //  a constant part-select of a vector net, or a concatenation of these."
@@ -125,8 +128,7 @@ TEST(ForceRelease, LegalTargetConcatenation) {
 }
 
 // --- Illegal LHS targets ---
-
-// §10.6.2: "It shall not be a bit-select or a part-select of a variable."
+// §10.6.2:
 TEST(ForceRelease, IllegalBitSelectVariable) {
   ForceInfo info{ForceTarget::kBitSelectVariable};
   EXPECT_FALSE(ValidateForceTarget(info));
@@ -153,7 +155,6 @@ TEST(ForceRelease, IllegalMixedAssignmentTarget) {
 }
 
 // --- Force on variable ---
-
 // §10.6.2: "A force statement to a variable shall override a procedural
 //  assignment, continuous assignment or an assign procedural continuous
 //  assignment to the variable."
@@ -202,7 +203,6 @@ TEST(ForceRelease, ReleaseContinuouslyDrivenVariableReestablishes) {
 }
 
 // --- Force on net ---
-
 // §10.6.2: "A force procedural statement on a net shall override all
 //  drivers of the net — gate outputs, module outputs, and continuous
 //  assignments."
@@ -241,7 +241,6 @@ TEST(ForceRelease, ReleaseNetImmediatelyRestoresDriverValue) {
 }
 
 // --- Normative example (§10.6.2) ---
-
 // §10.6.2 example: at time 0, d=0 (a&b&c=1&0&1=0), e=0 (and gate).
 // At time 10, force d and e to a|b|c=1. At time 20, release both back
 // to driver values (0).
@@ -298,3 +297,5 @@ TEST(ForceRelease, NormativeExampleForceAndRelease_ForceAndRelease) {
   EXPECT_EQ(ValOf(*vd), kVal0);
   EXPECT_EQ(ValOf(*ve), kVal0);
 }
+
+}  // namespace
