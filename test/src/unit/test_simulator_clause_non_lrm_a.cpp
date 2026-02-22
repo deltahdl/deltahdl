@@ -10,6 +10,7 @@
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "parser/ast.h"
+#include "simulation/adv_sim.h"
 #include "simulation/clocking.h"
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
@@ -67,6 +68,40 @@ TEST(ClockingSim, SimContextClockingManagerAccess) {
 
   f.ctx.SetClockingManager(&cmgr);
   EXPECT_EQ(f.ctx.GetClockingManager(), &cmgr);
+}
+
+// =============================================================================
+// EventCoalescer
+// =============================================================================
+TEST(AdvSim, EventCoalescerMergesDuplicates) {
+  EventCoalescer coalescer;
+  uint32_t target_id = 42;
+  coalescer.Add(target_id, 100);
+  coalescer.Add(target_id, 200);
+  coalescer.Add(target_id, 300);
+  // Only last value for each target should survive.
+  auto entries = coalescer.Drain();
+  ASSERT_EQ(entries.size(), 1u);
+  EXPECT_EQ(entries[0].target_id, target_id);
+  EXPECT_EQ(entries[0].value, 300u);
+}
+
+TEST(AdvSim, EventCoalescerKeepsDistinctTargets) {
+  EventCoalescer coalescer;
+  coalescer.Add(1, 10);
+  coalescer.Add(2, 20);
+  coalescer.Add(3, 30);
+  auto entries = coalescer.Drain();
+  EXPECT_EQ(entries.size(), 3u);
+}
+
+TEST(AdvSim, EventCoalescerDrainClearsState) {
+  EventCoalescer coalescer;
+  coalescer.Add(1, 10);
+  auto first = coalescer.Drain();
+  EXPECT_EQ(first.size(), 1u);
+  auto second = coalescer.Drain();
+  EXPECT_TRUE(second.empty());
 }
 
 }  // namespace
