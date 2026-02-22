@@ -14,6 +14,8 @@ function(add_unit_test name)
     gtest_discover_tests(${name})
 endfunction()
 
+add_unit_test(test_aig_a)
+add_unit_test(test_aig_b)
 add_unit_test(test_cov_clause_19_03)
 add_unit_test(test_cov_clause_19_04)
 add_unit_test(test_cov_clause_19_05)
