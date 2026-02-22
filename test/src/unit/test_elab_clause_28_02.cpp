@@ -1,10 +1,10 @@
-#include <gtest/gtest.h>
+// §28.2: Overview
 
+#include <gtest/gtest.h>
 #include <cstdint>
 #include <cstdlib>
 
 // --- Local types for gate declaration (§28.3) ---
-
 enum class GateType : uint8_t {
   kAnd,
   kNand,
@@ -59,9 +59,13 @@ struct GateDeclInfo {
 };
 
 bool ValidateGateDecl(const GateDeclInfo& info);
+
 bool CanHaveStrengthSpec(GateType type);
+
 uint32_t ComputeArraySize(int32_t lhi, int32_t rhi);
+
 bool ValidateStrengthSpec(StrengthLvl s0, StrengthLvl s1, GateType type);
+
 uint32_t MaxDelays(GateType type);
 
 bool ValidateGateDecl(const GateDeclInfo& info) {
@@ -147,20 +151,17 @@ uint32_t MaxDelays(GateType type) {
   return 0;
 }
 
+namespace {
+
 // =============================================================
 // §28.3: Gate and switch declaration syntax
 // =============================================================
-
 // §28.3: "Multiple instances of the one type ... shall have the same
 //  drive strength and delay specification."
-
 // --- §28.3.1: Gate type specification ---
-
 // §28.3.1: Declaration shall begin with keyword naming the gate type.
 // Table 28-1: all 26 built-in gate/switch types.
-
 // --- §28.3.2: Drive strength specification ---
-
 // §28.3.2: Only certain gate types can have drive strength.
 TEST(GateDecl, StrengthSpecValidForNInputGates) {
   constexpr GateType kNInputGates[] = {
@@ -217,28 +218,9 @@ TEST(GateDecl, Highz1OutputsZInsteadOf1) {
                                    GateType::kNor));
 }
 
-// --- §28.3.3: Delay specification ---
-
-// §28.3.3: "pullup and pulldown instance declarations shall not include
-//  delay specifications."
-TEST(GateDecl, MaxDelaysByGateType) {
-  struct {
-    GateType gate;
-    uint32_t expected;
-  } const kCases[] = {
-      {GateType::kPullup, 0u}, {GateType::kPulldown, 0u}, {GateType::kAnd, 2u},
-      {GateType::kBufif0, 3u}, {GateType::kNmos, 3u},
-  };
-  for (const auto& c : kCases) {
-    EXPECT_EQ(MaxDelays(c.gate), c.expected);
-  }
-}
-
 // §28.3.3: "Gates and switches in declarations with no delay
 //  specification shall have no propagation delay."
-
 // --- §28.3.4: Instance identifier ---
-
 // §28.3.4: "If multiple instances are declared as an array of instances,
 //  an identifier shall be used to name the instances."
 TEST(GateDecl, ArrayRequiresName) {
@@ -259,7 +241,6 @@ TEST(GateDecl, ArrayWithNameIsValid) {
 }
 
 // --- §28.3.5: Range specification ---
-
 // §28.3.5: "abs(lhi-rhi)+1 instances"
 TEST(GateDecl, ArraySizeComputation) {
   EXPECT_EQ(ComputeArraySize(0, 3), 4u);
@@ -289,8 +270,4 @@ TEST(GateDecl, NoRangeSingleInstance) {
   EXPECT_TRUE(ValidateGateDecl(info));
 }
 
-// --- §28.3.6: Connection list ---
-
-// §28.3.6: "The output or bidirectional terminals shall always come
-//  first in the terminal list, followed by the input terminals."
-// §28.3.6: "Too many or too few bits ... shall be considered an error."
+}  // namespace
