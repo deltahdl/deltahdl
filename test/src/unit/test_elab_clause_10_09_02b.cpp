@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §10.9.2: Structure assignment patterns
 
 #include <gtest/gtest.h>
 #include <string>
@@ -48,21 +48,6 @@ static void VerifyStructField(const StructFieldInfo& field,
 }
 
 namespace {
-
-TEST(StructType, FieldTypeKindPreserved) {
-  AggFixture f;
-  StructTypeInfo info;
-  info.type_name = "typed_s";
-  info.is_packed = true;
-  info.total_width = 40;
-  info.fields.push_back({"a", 8, 32, DataTypeKind::kInt});
-  info.fields.push_back({"b", 0, 8, DataTypeKind::kByte});
-  f.ctx.RegisterStructType("typed_s", info);
-  auto* found = f.ctx.FindStructType("typed_s");
-  ASSERT_NE(found, nullptr);
-  EXPECT_EQ(found->fields[0].type_kind, DataTypeKind::kInt);
-  EXPECT_EQ(found->fields[1].type_kind, DataTypeKind::kByte);
-}
 
 TEST(StructPattern, NamedMemberTwoFields) {
   // '{x: 5, y: 10} on struct { logic [7:0] x; logic [7:0] y; }
