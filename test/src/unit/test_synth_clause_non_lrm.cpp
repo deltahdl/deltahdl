@@ -1,17 +1,18 @@
+// §non_lrm
+
 #include <gtest/gtest.h>
-
 #include <cstdint>
-
 #include "synthesis/adv_synth.h"
 #include "synthesis/aig.h"
 #include "synthesis/lut_map.h"
 
 using namespace delta;
 
+namespace {
+
 // =============================================================================
 // RetimeForward
 // =============================================================================
-
 TEST(AdvSynth, RetimeForwardMovesLatch) {
   // Build: two inputs a, b. AND(a, b) feeds a latch next-state.
   // RetimeForward should detect the AND node and split into two latches.
@@ -61,7 +62,6 @@ TEST(AdvSynth, RetimeForwardSkipsNonAndNextState) {
 // =============================================================================
 // RetimeBackward
 // =============================================================================
-
 TEST(AdvSynth, RetimeBackwardPreservesOutputs) {
   AigGraph g;
   auto a = g.AddInput();
@@ -80,7 +80,6 @@ TEST(AdvSynth, RetimeBackwardPreservesOutputs) {
 // =============================================================================
 // MapForDelay
 // =============================================================================
-
 TEST(AdvSynth, MapForDelayReturnsValidMapping) {
   AigGraph g;
   auto a = g.AddInput();
@@ -113,7 +112,6 @@ TEST(AdvSynth, MapForDelayHandlesConstantOutput) {
 // =============================================================================
 // IterativeAreaDelay
 // =============================================================================
-
 TEST(AdvSynth, IterativeAreaDelayConverges) {
   AigGraph g;
   auto a = g.AddInput();
@@ -163,3 +161,5 @@ TEST(AdvSynth, IterativeAreaDelayZeroIterationsReturnsMappingForDelay) {
   auto mapping = IterativeAreaDelay(g, 4, 0);
   EXPECT_FALSE(mapping.cells.empty());
 }
+
+}  // namespace
