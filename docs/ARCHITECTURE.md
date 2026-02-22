@@ -42,9 +42,10 @@
 
 ## Introduction
 
-DeltaHDL compiles SystemVerilog source files through a staged pipeline. Each
-stage transforms the design into a progressively lower-level representation
-until it reaches either a running simulation or a mapped netlist.
+DeltaHDL compiles SystemVerilog source files through a staged pipeline. The
+front end (Preprocessor through Elaborator) is shared. After elaboration the
+user selects either simulation or synthesis, and the pipeline continues down
+one of the two paths.
 
 ```
                     ┌────────────────┐
