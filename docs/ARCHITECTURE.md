@@ -167,9 +167,6 @@ object, the SimContext holds all of that state, and the Scheduler drives the
 event loop that advances simulation time.
 
 ```text
-        RTLIR
-          │
-          ▼
       ┌───────────┐
       │  Lowerer  │
       └─────┬─────┘
