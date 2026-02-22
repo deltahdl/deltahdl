@@ -1,5 +1,4 @@
-// Tests for Annex I (svdpi.h) — IEEE 1800-2023 DPI C-layer header.
-// Verifies all mandated types, constants, macros, and function prototypes.
+// Annex I.3: svdpi.h source code
 
 #include <gtest/gtest.h>
 

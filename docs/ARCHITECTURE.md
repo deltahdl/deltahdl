@@ -295,7 +295,8 @@ src/
   preprocessor/    macro expansion, conditional compilation
   parser/          recursive-descent parser, Pratt expression parser, AST
   elaboration/     type checking, constant eval, sensitivity, RTLIR
-  simulation/      scheduler, processes, eval, VPI, DPI, VCD, clocking
+  simulation/      scheduler, processes, eval, VCD, clocking
+  vpi/             VPI object model, DPI context, svdpi.h, vpi_user.h
   synthesis/       AIG, optimization, LUT/cell mapping, netlist output
   main.cpp         CLI entry point
 
