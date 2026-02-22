@@ -166,6 +166,32 @@ design over time. The Lowerer translates each RTLIR element into a runtime
 object, the SimContext holds all of that state, and the Scheduler drives the
 event loop that advances simulation time.
 
+```text
+      ┌───────────┐
+      │   RTLIR   │
+      └─────┬─────┘
+            │
+            ▼
+      ┌───────────┐
+      │  Lowerer  │
+      └─────┬─────┘
+            │
+            ▼
+    ┌──────────────┐
+    │  SimContext   │
+    └───────┬──────┘
+            │
+            ▼
+  ┌───────────────────┐
+  │  Event Scheduler  │◄──┐
+  └─────────┬─────────┘   │
+            │              │ event
+            ▼              │ loop
+     ┌─────────────┐      │
+     │  Processes  │──────┘
+     └─────────────┘
+```
+
 #### Lowerer
 
 The lowerer translates an `RtlirDesign` into runtime simulation objects. For
