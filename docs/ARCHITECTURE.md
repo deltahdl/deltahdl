@@ -1,5 +1,42 @@
 # Architecture
 
+1. [Compilation Pipeline](#compilation-pipeline)
+   1. [Preprocessor](#preprocessor)
+   2. [Lexer](#lexer)
+   3. [Parser](#parser)
+   4. [Elaborator](#elaborator)
+2. [Simulation](#simulation)
+   1. [Lowerer](#lowerer)
+   2. [SimContext](#simcontext)
+   3. [Event Scheduler](#event-scheduler)
+   4. [Process Model](#process-model)
+   5. [Four-Value Logic](#four-value-logic)
+   6. [Signal Strength](#signal-strength)
+   7. [Variables and Nets](#variables-and-nets)
+   8. [Expression Evaluation](#expression-evaluation)
+   9. [VCD Writer](#vcd-writer)
+   10. [VPI](#vpi)
+   11. [DPI-C](#dpi-c)
+   12. [Compiled Simulation](#compiled-simulation)
+   13. [Multi-Threaded Simulation](#multi-threaded-simulation)
+   14. [Clocking Blocks](#clocking-blocks)
+   15. [Concurrent Assertions](#concurrent-assertions)
+   16. [Functional Coverage](#functional-coverage)
+   17. [Constrained Random Verification](#constrained-random-verification)
+   18. [Timing Specification and SDF](#timing-specification-and-sdf)
+   19. [User-Defined Primitives](#user-defined-primitives)
+   20. [Class Objects](#class-objects)
+   21. [Synchronization Objects](#synchronization-objects)
+   22. [Advanced Simulation](#advanced-simulation)
+3. [Synthesis](#synthesis)
+   1. [SynthLower](#synthlower)
+   2. [AIG](#aig)
+   3. [AIG Optimization](#aig-optimization)
+   4. [Memory Inference](#memory-inference)
+   5. [Technology Mapping](#technology-mapping)
+   6. [Netlist Writer](#netlist-writer)
+4. [Design Decisions](#design-decisions)
+
 DeltaHDL compiles SystemVerilog source files through a staged pipeline. Each
 stage transforms the design into a progressively lower-level representation
 until it reaches either a running simulation or a mapped netlist.
@@ -36,7 +73,9 @@ until it reaches either a running simulation or a mapped netlist.
                ┌─────────────┴─────────────┐
                │                           │
                ▼                           ▼
-        Simulation Path              Synthesis Path
+          ┌───────────┐            ┌──────────────┐
+          │ Simulator │            │ Synthesizer  │
+          └───────────┘            └──────────────┘
 ```
 
 
@@ -113,27 +152,25 @@ After elaboration the pipeline branches into either simulation or synthesis.
 ## Simulation
 
 ```
-              RtlirDesign
-                   │
-                   ▼
-             ┌──────────┐
-             │  Lowerer  │
-             └─────┬─────┘
-                   │
-                   ▼
-         SimContext + Scheduler
-                   │
-                   ▼
-          ┌────────────────┐
-          │ Event Scheduler│
-          └────────┬───────┘
-                   │
-       ┌───────────┼───────────┐
-       │           │           │
-       ▼           ▼           ▼
-  ┌──────────┐ ┌───────┐ ┌─────────┐
-  │VcdWriter │ │  VPI  │ │  DPI-C  │
-  └──────────┘ └───────┘ └─────────┘
+                    RtlirDesign
+                         │
+                         ▼
+                   ┌──────────┐
+                   │  Lowerer  │
+                   └─────┬─────┘
+                         │
+                         ▼
+  ┌───────┐        ┌───────────┐        ┌─────────┐
+  │  VPI  ├───────►│ SimContext │◄───────┤  DPI-C  │
+  └───────┘        └─────┬─────┘        └─────────┘
+                         │
+                         ▼
+                   ┌───────────┐
+                   │ Scheduler │
+                   └─────┬─────┘
+                         │
+                         ▼
+                  Waveforms (.vcd)
 ```
 
 ### Lowerer
@@ -440,32 +477,30 @@ and SystemVerilog strings are also provided here.
 ## Synthesis
 
 ```
-              RtlirDesign
-                   │
-                   ▼
-            ┌─────────────┐
-            │  SynthLower  │
-            └──────┬───────┘
-                   │
-                   ▼
-            ┌─────────────┐
-            │   AIG Opts   │
-            └──────┬───────┘
-                   │
-                   ▼
-       ┌───────────┴───────────┐
-       │                       │
-       ▼                       ▼
-  ┌──────────┐          ┌───────────┐
-  │ LUT Map  │          │ Cell Map  │
-  └─────┬────┘          └─────┬─────┘
-        │                     │
-        └──────────┬──────────┘
-                   │
-                   ▼
-          ┌────────────────┐
-          │ NetlistWriter  │
-          └────────────────┘
+                    RtlirDesign
+                         │
+                         ▼
+                   ┌─────────────┐
+                   │  SynthLower  │
+                   └──────┬───────┘
+                          │
+                          ▼
+                   ┌─────────────┐
+                   │   AIG Opts   │
+                   └──────┬───────┘
+                          │
+                          ▼
+              ┌───────────┴───────────┐
+              │                       │
+              ▼                       ▼
+         ┌──────────┐          ┌───────────┐
+         │ LUT Map  │          │ Cell Map  │
+         └─────┬────┘          └─────┬─────┘
+               │                     │
+               └──────────┬──────────┘
+                          │
+                          ▼
+              Netlist (.blif, .v, .json)
 ```
 
 ### SynthLower
@@ -535,33 +570,6 @@ The netlist writer serializes the AIG into one of four output formats: BLIF
 interchange), or EDIF. Since AIG nodes do not carry port names, generic names
 are synthesized: inputs are named i0, i1, and so on; outputs are named o0,
 o1, and so on; internal nodes use the prefix n followed by the node identifier.
-
-
-## Source Layout
-
-```
-  src/
-  ├── common/          arena allocator, types, diagnostics, source manager
-  ├── lexer/           tokenizer, keyword table, string escapes
-  ├── preprocessor/    macro expansion, conditional compilation
-  ├── parser/          recursive-descent parser, Pratt expression parser, AST
-  ├── elaboration/     type checking, constant eval, sensitivity, RTLIR
-  ├── simulation/      scheduler, lowerer, eval, processes, variables, nets,
-  │                    VCD, clocking, assertions, SVA, coverage, constraints,
-  │                    DPI, class objects, specify, SDF, UDP, compiled sim,
-  │                    multi-threaded sim
-  ├── synthesis/       AIG, optimization, memory inference, LUT/cell mapping,
-  │                    Liberty parser, retiming, netlist output
-  ├── vpi/             VPI C API, DPI runtime (svdpi.h), sv_vpi_user
-  └── main.cpp         CLI entry point
-
-  test/
-  ├── src/
-  │   ├── unit/        Google Test unit tests organized by LRM clause
-  │   └── e2e/         end-to-end simulation tests with .sv and .expected files
-  ├── lib/             test utilities and conftest helpers
-  └── scripts/         test runners (run_sim_tests, run_sv_tests)
-```
 
 
 ## Design Decisions
