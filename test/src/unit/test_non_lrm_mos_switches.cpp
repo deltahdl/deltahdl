@@ -1,10 +1,11 @@
-#include <gtest/gtest.h>
+// Non-LRM tests
 
+#include <gtest/gtest.h>
 #include <cstdint>
 
 // --- Local types for MOS/pass switches (§28.7, §28.8, §28.9) ---
-
 enum class Val4 : uint8_t { kV0 = 0, kV1 = 1, kX = 2, kZ = 3 };
+
 enum class Val4Ext : uint8_t {
   kV0 = 0,
   kV1 = 1,
@@ -30,12 +31,14 @@ enum class SwitchType : uint8_t {
 };
 
 Val4Ext EvalMosSwitch(SwitchType type, Val4 data, Val4 control);
+
 bool IsBidirectional(SwitchType type);
+
 bool AcceptsDelaySpec(SwitchType type);
+
 uint32_t MaxSwitchDelays(SwitchType type);
 
 // --- Implementations ---
-
 Val4Ext EvalMosSwitch(SwitchType type, Val4 data, Val4 control) {
   // §28.7 Table 28-6: z data always produces z regardless of control.
   if (data == Val4::kZ) return Val4Ext::kZ;
@@ -145,10 +148,11 @@ uint32_t MaxSwitchDelays(SwitchType type) {
   return 0;  // Unreachable.
 }
 
+namespace {
+
 // =============================================================
 // §28.7: MOS switches
 // =============================================================
-
 // §28.7: Truth tables (Table 28-6) — nmos conducts when control=1
 TEST(MosSwitches, NmosConductsWhenControlHigh) {
   EXPECT_EQ(EvalMosSwitch(SwitchType::kNmos, Val4::kV0, Val4::kV1),
@@ -196,7 +200,6 @@ TEST(MosSwitches, ZDataAlwaysZ) {
 // =============================================================
 // §28.8: Bidirectional pass switches
 // =============================================================
-
 // §28.8: tran and rtran are bidirectional.
 TEST(BidrectionalSwitches, TranIsBidirectional) {
   EXPECT_TRUE(IsBidirectional(SwitchType::kTran));
@@ -228,14 +231,11 @@ TEST(BidrectionalSwitches, TranifAcceptsDelays) {
 
 // §28.8: "These devices shall have no propagation delay through the
 //  bidirectional terminals."
-
 // §28.8: "tranif0, tranif1 ... when turned off, they shall block
 //  signals; and when they are turned on, they shall pass signals."
-
 // =============================================================
 // §28.9: CMOS switches
 // =============================================================
-
 // §28.9: "The cmos switch shall be treated as the combination of a
 //  pmos switch and an nmos switch."
 TEST(CmosSwitches, CmosIsNmosPlusPmos) {
@@ -248,9 +248,10 @@ TEST(CmosSwitches, CmosIsNmosPlusPmos) {
 // §28.9: cmos has output, input, n-control, p-control (4 terminals).
 // §28.9: "The rcmos switch shall be treated as the combination of an
 //  rpmos switch and an rnmos switch."
-
 // §28.9: 0-3 delays.
 TEST(CmosSwitches, CmosMaxThreeDelays) {
   EXPECT_EQ(MaxSwitchDelays(SwitchType::kCmos), 3u);
   EXPECT_EQ(MaxSwitchDelays(SwitchType::kRcmos), 3u);
 }
+
+}  // namespace
