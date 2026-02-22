@@ -1,7 +1,7 @@
+// Non-LRM tests
+
 #include <gtest/gtest.h>
-
 #include <cstring>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -61,10 +61,11 @@ static Variable* MakeVar4(EvalOpXZFixture& f, std::string_view name,
   return var;
 }
 
+namespace {
+
 // ==========================================================================
 // Inside operator X/Z — §11.4.13
 // ==========================================================================
-
 TEST(EvalOpXZ, InsideXOperand) {
   EvalOpXZFixture f;
   // x inside {3, 5, 7} → x (unknown operand, no definite match)
@@ -84,7 +85,6 @@ TEST(EvalOpXZ, InsideXOperand) {
 // ==========================================================================
 // Relational X/Z propagation — §11.4.4
 // ==========================================================================
-
 TEST(EvalOpXZ, RelationalLtX) {
   EvalOpXZFixture f;
   // 4'b1x00 < 4'b1010 → x
@@ -122,7 +122,6 @@ TEST(EvalOpXZ, RelationalKnownStillWorks) {
 // ==========================================================================
 // Equality X/Z propagation — §11.4.5, §11.4.6
 // ==========================================================================
-
 TEST(EvalOpXZ, LogicalEqX) {
   EvalOpXZFixture f;
   // 4'b1x00 == 4'b1100 → x
@@ -172,7 +171,6 @@ TEST(EvalOpXZ, CaseEqStillExact) {
 // ==========================================================================
 // Logical operator X/Z — §11.4.7
 // ==========================================================================
-
 TEST(EvalOpXZ, LogicalNotX) {
   EvalOpXZFixture f;
   // !4'b1x00 → x
@@ -249,7 +247,6 @@ TEST(EvalOpXZ, LogicalOrXX) {
 // ==========================================================================
 // Shift X/Z propagation — §11.4.10
 // ==========================================================================
-
 TEST(EvalOpXZ, ShiftXAmount) {
   EvalOpXZFixture f;
   // 4'b1100 << x → all-X
@@ -277,7 +274,6 @@ TEST(EvalOpXZ, ShiftLeftXOperand) {
 // ==========================================================================
 // Ternary X/Z condition — §11.4.11
 // ==========================================================================
-
 TEST(EvalOpXZ, TernaryZCond) {
   EvalOpXZFixture f;
   // z ? 4'b1100 : 4'b1010 → same as x condition (bit-by-bit combine)
@@ -338,7 +334,6 @@ TEST(EvalOpXZ, TernaryXCondDiff) {
 // ==========================================================================
 // Reduction X/Z propagation — §11.4.9
 // ==========================================================================
-
 TEST(EvalOpXZ, ReductionAndWithX) {
   EvalOpXZFixture f;
   // &4'b1x11 → x (not all bits known-1)
@@ -389,7 +384,6 @@ TEST(EvalOpXZ, ReductionXorWithX) {
 // ==========================================================================
 // Arithmetic X/Z propagation — §11.4.3
 // ==========================================================================
-
 TEST(EvalOpXZ, ArithAddX) {
   EvalOpXZFixture f;
   // 4'b1x00 + 4'b0001 → all-X (any X/Z operand)
@@ -424,7 +418,6 @@ TEST(EvalOpXZ, ModByZeroReturnsX) {
 // ==========================================================================
 // Binary XNOR (^~, ~^) — §11.4.8
 // ==========================================================================
-
 TEST(EvalOpXZ, BinaryXnorBasic) {
   EvalOpXZFixture f;
   // 4'b1100 ^~ 4'b1010 = 4'b1001 = 9
@@ -476,11 +469,9 @@ TEST(EvalOpXZ, BinaryXnorWithX) {
 
 // Signed comparison, signed arithmetic, expression type rules
 // moved to test_eval_advanced.cpp
-
 // ==========================================================================
 // Logical implication (->) and equivalence (<->) — §11.4.7
 // ==========================================================================
-
 TEST(EvalOpXZ, ImplTT) {
   EvalOpXZFixture f;
   // 1 -> 1 = 1
@@ -585,7 +576,6 @@ TEST(EvalOpXZ, EquivX) {
 // ==========================================================================
 // MinTypMax evaluation — §11.11
 // ==========================================================================
-
 TEST(EvalOpXZ, MinTypMaxDefaultTyp) {
   EvalOpXZFixture f;
   // Default delay mode is typ — should return middle expression.
@@ -625,7 +615,6 @@ TEST(EvalOpXZ, MinTypMaxMax) {
 // ==========================================================================
 // Bit-select/part-select X/Z address — §11.5.1
 // ==========================================================================
-
 TEST(EvalOpXZ, BitSelectXAddr) {
   EvalOpXZFixture f;
   // v[x] should return 1'bx when index is unknown.
@@ -661,7 +650,6 @@ TEST(EvalOpXZ, PartSelectXAddr) {
 // ==========================================================================
 // Context-determined bit widths — §11.6.1
 // ==========================================================================
-
 TEST(EvalOpXZ, WidthPropFromContext) {
   EvalOpXZFixture f;
   // 4-bit a + 4-bit b with 8-bit context → 8-bit result (no overflow).
@@ -700,28 +688,6 @@ TEST(EvalOpXZ, TernaryWidthFromBranches) {
   EXPECT_EQ(result.ToUint64(), 0xFFu);
 }
 
-// ==========================================================================
-// Real operator propagation — §11.3.1
-// ==========================================================================
-
-static Variable* MakeRealVar(EvalOpXZFixture& f, std::string_view name,
-                             double val) {
-  auto* var = f.ctx.CreateVariable(name, 64);
-  uint64_t bits = 0;
-  std::memcpy(&bits, &val, sizeof(double));
-  var->value = MakeLogic4VecVal(f.arena, 64, bits);
-  var->value.is_real = true;
-  f.ctx.RegisterRealVariable(name);
-  return var;
-}
-
-static double ToDouble(const Logic4Vec& v) {
-  double d = 0.0;
-  uint64_t bits = v.ToUint64();
-  std::memcpy(&d, &bits, sizeof(double));
-  return d;
-}
-
 TEST(EvalOpXZ, RealArithResult) {
   EvalOpXZFixture f;
   MakeRealVar(f, "ra", 2.5);
@@ -757,41 +723,6 @@ TEST(EvalOpXZ, MixedRealIntArith) {
   EXPECT_DOUBLE_EQ(ToDouble(result), 7.5);
 }
 
-// ==========================================================================
-// String concatenation/replication — §11.4.12.2
-// ==========================================================================
-
-static Variable* MakeStringVar(EvalOpXZFixture& f, std::string_view name,
-                               std::string_view value) {
-  uint32_t width = static_cast<uint32_t>(value.size()) * 8;
-  if (width == 0) width = 8;
-  auto* var = f.ctx.CreateVariable(name, width);
-  var->value = MakeLogic4Vec(f.arena, width);
-  for (size_t i = 0; i < value.size(); ++i) {
-    auto byte_idx = static_cast<uint32_t>(value.size() - 1 - i);
-    uint32_t word = (byte_idx * 8) / 64;
-    uint32_t bit = (byte_idx * 8) % 64;
-    var->value.words[word].aval |=
-        static_cast<uint64_t>(static_cast<unsigned char>(value[i])) << bit;
-  }
-  f.ctx.RegisterStringVariable(name);
-  return var;
-}
-
-static std::string VecToStr(const Logic4Vec& vec) {
-  std::string result;
-  uint32_t nbytes = vec.width / 8;
-  for (uint32_t i = nbytes; i > 0; --i) {
-    uint32_t byte_idx = i - 1;
-    uint32_t word = (byte_idx * 8) / 64;
-    uint32_t bit = (byte_idx * 8) % 64;
-    if (word >= vec.nwords) continue;
-    auto ch = static_cast<char>((vec.words[word].aval >> bit) & 0xFF);
-    if (ch != 0) result += ch;
-  }
-  return result;
-}
-
 TEST(EvalOpXZ, StringConcatDataType) {
   EvalOpXZFixture f;
   MakeStringVar(f, "s1", "hello");
@@ -818,7 +749,6 @@ TEST(EvalOpXZ, StringReplicateRuntime) {
 // ==========================================================================
 // Arithmetic X/Z — §11.4.3 (subtraction, multiply, power with X/Z)
 // ==========================================================================
-
 TEST(EvalOpXZ, ArithSubX) {
   EvalOpXZFixture f;
   // 4'b1x00 - 1 → all-X (X/Z operand in subtraction)
@@ -856,7 +786,6 @@ TEST(EvalOpXZ, ArithPowX) {
 // ==========================================================================
 // §6.16: String data type detection in concatenation/replication
 // ==========================================================================
-
 TEST(EvalOpXZ, StringConcatSetsIsString) {
   EvalOpXZFixture f;
   MakeStringVar(f, "sa", "hi");
@@ -901,4 +830,4 @@ TEST(EvalOpXZ, IdentifierStringPropagation) {
   EXPECT_TRUE(result.is_string);
 }
 
-// Inside operator advanced unit tests moved to test_eval_advanced.cpp
+}  // namespace
