@@ -1,15 +1,16 @@
+// Non-LRM tests
+
 #include <gtest/gtest.h>
-
 #include <string_view>
-
 #include "synthesis/liberty.h"
 
 using namespace delta;
 
+namespace {
+
 // =============================================================================
 // Parse empty library
 // =============================================================================
-
 TEST(Liberty, ParseEmptyLibrary) {
   constexpr std::string_view kSrc = R"lib(
     library(testlib) {
@@ -23,7 +24,6 @@ TEST(Liberty, ParseEmptyLibrary) {
 // =============================================================================
 // Parse library with one cell, one pin
 // =============================================================================
-
 TEST(Liberty, ParseOneCellOnePin_CellInfo) {
   constexpr std::string_view kSrc = R"lib(
     library(mylib) {
@@ -78,7 +78,6 @@ TEST(Liberty, ParseOneCellOnePin_PinDetails) {
 // =============================================================================
 // Parse library with timing data
 // =============================================================================
-
 TEST(Liberty, ParseTimingData) {
   constexpr std::string_view kSrc = R"lib(
     library(timlib) {
@@ -107,7 +106,6 @@ TEST(Liberty, ParseTimingData) {
 // =============================================================================
 // Parse multiple cells
 // =============================================================================
-
 TEST(Liberty, ParseMultipleCells) {
   constexpr std::string_view kSrc = R"lib(
     library(multilib) {
@@ -133,7 +131,6 @@ TEST(Liberty, ParseMultipleCells) {
 // =============================================================================
 // Parse pin function expressions
 // =============================================================================
-
 TEST(Liberty, ParsePinFunctionExpressions) {
   constexpr std::string_view kSrc = R"lib(
     library(funclib) {
@@ -158,7 +155,6 @@ TEST(Liberty, ParsePinFunctionExpressions) {
 // =============================================================================
 // Parse cell area values
 // =============================================================================
-
 TEST(Liberty, ParseCellAreaValues) {
   constexpr std::string_view kSrc = R"lib(
     library(arealib) {
@@ -182,3 +178,5 @@ TEST(Liberty, ParseCellAreaValues) {
   EXPECT_FLOAT_EQ(lib.cells[0].area, 1.5f);
   EXPECT_FLOAT_EQ(lib.cells[1].area, 4.0f);
 }
+
+}  // namespace
