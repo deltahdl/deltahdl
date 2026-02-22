@@ -1,7 +1,6 @@
-// Tests for §33 Configuration declarations — detailed AST verification
+// §33.4: Configurations
 
 #include <gtest/gtest.h>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -10,8 +9,6 @@
 #include "parser/parser.h"
 
 using namespace delta;
-
-namespace {
 
 struct ConfigTest : ::testing::Test {
  protected:
@@ -32,10 +29,11 @@ struct ConfigTest : ::testing::Test {
   std::unique_ptr<Parser> parser_;
 };
 
+namespace {
+
 // =============================================================================
 // §33.4.1.1 Design statement
 // =============================================================================
-
 TEST_F(ConfigTest, DesignStatementParsed) {
   auto* unit = Parse(R"(
     config cfg;
@@ -81,7 +79,6 @@ TEST_F(ConfigTest, DesignStatementMultipleTopCells) {
 // =============================================================================
 // §33.4.1.2 Default clause (liblist)
 // =============================================================================
-
 TEST_F(ConfigTest, DefaultLiblist) {
   auto* unit = Parse(R"(
     config cfg;
@@ -117,7 +114,6 @@ TEST_F(ConfigTest, DefaultLiblistSingleLib) {
 // =============================================================================
 // §33.4.1.3 Instance clause with liblist
 // =============================================================================
-
 TEST_F(ConfigTest, InstanceLiblist) {
   auto* unit = Parse(R"(
     config cfg;
@@ -144,7 +140,6 @@ TEST_F(ConfigTest, InstanceLiblist) {
 // =============================================================================
 // §33.4.1.3/6 Instance clause with use binding
 // =============================================================================
-
 TEST_F(ConfigTest, InstanceUseClause) {
   auto* unit = Parse(R"(
     config cfg;
@@ -165,7 +160,6 @@ TEST_F(ConfigTest, InstanceUseClause) {
 // =============================================================================
 // §33.4.1.4/5 Cell clause for library binding
 // =============================================================================
-
 TEST_F(ConfigTest, CellClauseLiblist) {
   auto* unit = Parse(R"(
     config cfg;
@@ -204,7 +198,6 @@ TEST_F(ConfigTest, CellClauseWithLibUse) {
 // =============================================================================
 // §33.4.2 Config with nested config references
 // =============================================================================
-
 TEST_F(ConfigTest, NestedConfigReference) {
   auto* unit = Parse(R"(
     config bot;
@@ -231,7 +224,6 @@ TEST_F(ConfigTest, NestedConfigReference) {
 // =============================================================================
 // §33.3 Library mapping (parsing only)
 // =============================================================================
-
 TEST_F(ConfigTest, LibraryMappingConfig) {
   // Config with library-qualified design cells
   auto* unit = Parse(R"(
@@ -252,7 +244,6 @@ TEST_F(ConfigTest, LibraryMappingConfig) {
 // =============================================================================
 // §33.4.3 Config with parameter override
 // =============================================================================
-
 TEST_F(ConfigTest, UseClauseWithParams) {
   auto* unit = Parse(R"(
     config cfg;
@@ -289,7 +280,6 @@ TEST_F(ConfigTest, LocalparamInConfig) {
 // =============================================================================
 // Multiple rules in single config
 // =============================================================================
-
 TEST_F(ConfigTest, MultipleRulesInConfig) {
   auto* unit = Parse(R"(
     config cfg;
@@ -310,7 +300,6 @@ TEST_F(ConfigTest, MultipleRulesInConfig) {
 // =============================================================================
 // Endconfig with label
 // =============================================================================
-
 TEST_F(ConfigTest, EndconfigWithLabel) {
   auto* unit = Parse(R"(
     config my_config;
