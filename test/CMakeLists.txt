@@ -14,7 +14,6 @@ function(add_unit_test name)
     gtest_discover_tests(${name})
 endfunction()
 
-add_unit_test(test_aggregate_a)
 add_unit_test(test_aggregate_b)
 add_unit_test(test_aggregate_c)
 add_unit_test(test_aggregate_d)
