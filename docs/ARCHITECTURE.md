@@ -200,8 +200,6 @@ VPI convention:
   └───────┴──────┴──────┘
 ```
 
-Figure 3: Four-value logic dual-rail encoding.
-
 Values are packed into 64-bit words. A `Logic4Word` holds one aval/bval pair
 with helpers for testing known/zero/one states, and four-value AND, OR, XOR,
 and NOT operations are implemented as bitwise functions on the two rails. A
@@ -272,7 +270,7 @@ dividing each simulation timestep into 17 ordered regions:
             └───────────────┘
 ```
 
-Figure 4: IEEE 1800-2023 stratified event regions within a
+Figure 3: IEEE 1800-2023 stratified event regions within a
 timestep.
 
 Events are stored in a calendar keyed by `SimTime`, with each time slot
@@ -397,7 +395,7 @@ technology mapping produces the final netlist.
      └─────────┘
 ```
 
-Figure 5: Synthesizer processing stages from RTLIR to netlist.
+Figure 4: Synthesizer processing stages from RTLIR to netlist.
 
 #### Synth Lowerer
 

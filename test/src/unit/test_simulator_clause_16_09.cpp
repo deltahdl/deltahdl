@@ -91,4 +91,40 @@ TEST(Assertion, StableDetection) {
   EXPECT_EQ(r2, AssertionResult::kFail);
 }
 
+// =============================================================================
+// Test fixture
+// =============================================================================
+struct SvaFixture {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag};
+  SvaEngine engine;
+};
+
+// =============================================================================
+// SequenceAttempt basics
+// =============================================================================
+TEST(SvaEngine, SequenceAttemptDefaultState) {
+  SequenceAttempt sa;
+  EXPECT_EQ(sa.position, 0u);
+  EXPECT_EQ(sa.delay_remaining, 0u);
+  EXPECT_EQ(sa.match_count, 0u);
+  EXPECT_FALSE(sa.completed);
+  EXPECT_FALSE(sa.failed);
+}
+
+TEST(SvaEngine, SequenceAttemptDelayCountdown) {
+  SequenceAttempt sa;
+  sa.delay_remaining = 3;
+  AdvanceSequence(sa);
+  EXPECT_EQ(sa.delay_remaining, 2u);
+  EXPECT_FALSE(sa.completed);
+  AdvanceSequence(sa);
+  EXPECT_EQ(sa.delay_remaining, 1u);
+  AdvanceSequence(sa);
+  EXPECT_EQ(sa.delay_remaining, 0u);
+}
+
 }  // namespace

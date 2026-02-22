@@ -119,4 +119,24 @@ TEST(SvaEngine, MultipleDeferredAssertionsQueued) {
   EXPECT_EQ(count, 5);
 }
 
+// =============================================================================
+// SvaEngine integration tests
+// =============================================================================
+TEST(SvaEngine, EngineDefaultState) {
+  SvaEngine engine;
+  EXPECT_EQ(engine.DeferredQueueSize(), 0u);
+}
+
+TEST(SvaEngine, FlushClearsQueue) {
+  SvaFixture f;
+
+  DeferredAssertion da;
+  da.condition_val = 1;
+  f.engine.QueueDeferredAssertion(da);
+  EXPECT_EQ(f.engine.DeferredQueueSize(), 1u);
+
+  f.engine.FlushDeferredAssertions(f.scheduler, SimTime{0});
+  EXPECT_EQ(f.engine.DeferredQueueSize(), 0u);
+}
+
 }  // namespace
