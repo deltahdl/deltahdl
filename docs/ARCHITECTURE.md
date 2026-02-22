@@ -14,12 +14,10 @@
       2. [Scheduler](#scheduler)
       3. [Evaluator](#evaluator)
    2. [Synthesizer](#synthesizer)
-      1. [SynthLower](#synthlower)
-      2. [AIG](#aig)
-      3. [AIG Optimization](#aig-optimization)
-      4. [Memory Inference](#memory-inference)
-      5. [Technology Mapping](#technology-mapping)
-      6. [Netlist Writer](#netlist-writer)
+      1. [Synth Lowerer](#synth-lowerer)
+      2. [Optimizer](#optimizer)
+      3. [Mapper](#mapper)
+      4. [Writer](#writer)
 4. [Appendixes](#appendixes)
    1. [Appendix A: Design Decisions](#appendix-a-design-decisions)
    2. [Appendix B: Abbreviations](#appendix-b-abbreviations)
@@ -471,27 +469,27 @@ And-Inverter Graph, optimization passes reduce its size and depth, and
 technology mapping produces the final netlist.
 
 ```text
-     ┌───────────┐
-     │  Lowerer  │
-     └─────┬─────┘
-           │
-           ▼
-     ┌───────────┐
-     │ Optimizer │
-     └─────┬─────┘
-           │
-           ▼
-     ┌───────────┐
-     │  Mapper   │
-     └─────┬─────┘
-           │
-           ▼
-     ┌───────────┐
-     │  Writer   │
-     └───────────┘
+  ┌───────────────┐
+  │ Synth Lowerer │
+  └───────┬───────┘
+          │
+          ▼
+    ┌───────────┐
+    │ Optimizer │
+    └─────┬─────┘
+          │
+          ▼
+     ┌─────────┐
+     │ Mapper  │
+     └────┬────┘
+          │
+          ▼
+     ┌─────────┐
+     │ Writer  │
+     └─────────┘
 ```
 
-#### SynthLower
+#### Synth Lowerer
 
 The synthesis lowerer converts an `RtlirModule` into an And-Inverter Graph
 (AIG). It first validates synthesizability, rejecting constructs that have no
@@ -503,7 +501,7 @@ latches in the AIG. `always_latch` blocks are lowered similarly. If and case
 statements are lowered through MUX construction, where each branch contributes
 a set of signal bits that are multiplexed by the condition.
 
-#### AIG
+##### AIG
 
 The And-Inverter Graph is the core synthesis data structure. Each node
 represents a two-input AND gate. Edges carry a complement flag in the least
@@ -516,7 +514,15 @@ literal. Structural hashing ensures that duplicate AND nodes are never created;
 a hash table maps each (fanin0, fanin1) pair to an existing node when one has
 already been allocated.
 
-#### AIG Optimization
+##### Memory Inference
+
+The memory inference pass analyzes `always_ff` blocks in the RTLIR for
+array access patterns (indexed reads and writes) and replaces them with
+dedicated memory primitives before AIG lowering. Each inferred memory
+records its depth, data width, and a set of read and write ports with
+address width, data width, and clock edge information.
+
+#### Optimizer
 
 Five optimization passes operate on the AIG. Constant propagation replaces
 outputs that are provably constant. Balancing restructures AND trees to
@@ -525,15 +531,7 @@ using cut enumeration to reduce node count. Refactoring performs
 larger-scope restructuring for area reduction. Redundancy removal identifies
 and eliminates stuck-at-fault redundant nodes.
 
-#### Memory Inference
-
-The memory inference pass analyzes `always_ff` blocks in the RTLIR for
-array access patterns (indexed reads and writes) and replaces them with
-dedicated memory primitives before AIG lowering. Each inferred memory
-records its depth, data width, and a set of read and write ports with
-address width, data width, and clock edge information.
-
-#### Technology Mapping
+#### Mapper
 
 LUT mapping partitions the AIG into K-input lookup tables. The `LutMapper`
 enumerates priority cuts for each AIG node and selects an area-oriented
@@ -551,7 +549,7 @@ Advanced synthesis passes provide delay-oriented LUT mapping that minimizes
 critical-path depth, iterative area-delay tradeoff optimization, and register
 retiming in both forward and backward directions.
 
-#### Netlist Writer
+#### Writer
 
 The netlist writer serializes the AIG into one of four output formats: BLIF
 (Berkeley Logic Interchange Format), gate-level Verilog, JSON (nextpnr
