@@ -40,7 +40,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA87Fixture &f) {
 
 static double ToDouble(const Variable *var) {
   uint64_t bits = var->value.ToUint64();
-  double d;
+  double d = 0.0;
   std::memcpy(&d, &bits, sizeof(double));
   return d;
 }

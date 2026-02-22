@@ -647,6 +647,38 @@ static bool TrySubarrayAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   return true;
 }
 
+// §10.10/A.8.1: Concatenation as LHS — unpack RHS across elements.
+static void UnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
+                            SimContext& ctx, Arena& arena) {
+  uint64_t rhs_raw = rhs_val.ToUint64();
+  uint32_t bit_offset = 0;
+  for (auto it = lhs->elements.rbegin(); it != lhs->elements.rend(); ++it) {
+    auto* var = ResolveLhsVariable(*it, ctx);
+    if (!var) continue;
+    uint32_t w = var->value.width;
+    uint64_t mask = (w >= 64) ? ~uint64_t{0} : (uint64_t{1} << w) - 1;
+    uint64_t slice = (rhs_raw >> bit_offset) & mask;
+    var->value = MakeLogic4VecVal(arena, w, slice);
+    var->NotifyWatchers();
+    bit_offset += w;
+  }
+}
+
+static void AssignToScalarLhs(const Stmt* stmt, Logic4Vec rhs_val,
+                              SimContext& ctx, Arena& arena) {
+  auto* var = ResolveLhsVariable(stmt->lhs, ctx);
+  if (var) {
+    rhs_val = ResizeToWidth(rhs_val, var->value.width, arena);
+    var->value = rhs_val;
+    var->NotifyWatchers();
+    // §7.3.2: Set tag when RHS is a tagged expression.
+    if (stmt->rhs && stmt->rhs->kind == ExprKind::kTagged && stmt->rhs->rhs)
+      ctx.SetVariableTag(stmt->lhs->text, stmt->rhs->rhs->text);
+  } else if (stmt->lhs->kind == ExprKind::kMemberAccess) {
+    WriteStructField(stmt->lhs, rhs_val, ctx, arena);
+  }
+}
+
 StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
                                   Arena& arena) {
   if (!stmt->lhs) return StmtResult::kDone;
@@ -661,21 +693,8 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
 
   auto rhs_val = EvalRhsWithStructContext(stmt, ctx, arena);
 
-  // §10.10/A.8.1: Concatenation as LHS — unpack RHS across elements.
   if (stmt->lhs->kind == ExprKind::kConcatenation) {
-    uint64_t rhs_raw = rhs_val.ToUint64();
-    uint32_t bit_offset = 0;
-    for (auto it = stmt->lhs->elements.rbegin();
-         it != stmt->lhs->elements.rend(); ++it) {
-      auto* var = ResolveLhsVariable(*it, ctx);
-      if (!var) continue;
-      uint32_t w = var->value.width;
-      uint64_t mask = (w >= 64) ? ~uint64_t{0} : (uint64_t{1} << w) - 1;
-      uint64_t slice = (rhs_raw >> bit_offset) & mask;
-      var->value = MakeLogic4VecVal(arena, w, slice);
-      var->NotifyWatchers();
-      bit_offset += w;
-    }
+    UnpackConcatLhs(stmt->lhs, rhs_val, ctx, arena);
     return StmtResult::kDone;
   }
 
@@ -686,17 +705,7 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
 
   if (TryArrayBlockingAssign(stmt, ctx, arena)) return StmtResult::kDone;
 
-  auto* var = ResolveLhsVariable(stmt->lhs, ctx);
-  if (var) {
-    rhs_val = ResizeToWidth(rhs_val, var->value.width, arena);
-    var->value = rhs_val;
-    var->NotifyWatchers();
-    // §7.3.2: Set tag when RHS is a tagged expression.
-    if (stmt->rhs && stmt->rhs->kind == ExprKind::kTagged && stmt->rhs->rhs)
-      ctx.SetVariableTag(stmt->lhs->text, stmt->rhs->rhs->text);
-  } else if (stmt->lhs->kind == ExprKind::kMemberAccess) {
-    WriteStructField(stmt->lhs, rhs_val, ctx, arena);
-  }
+  AssignToScalarLhs(stmt, rhs_val, ctx, arena);
   return StmtResult::kDone;
 }
 
