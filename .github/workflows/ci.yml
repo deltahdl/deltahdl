@@ -301,10 +301,16 @@ jobs:
 name: CI
 on:
   pull_request:
-    paths-ignore: [LICENSE]
+    paths-ignore:
+      - '**/*.md'
+      - .github/workflows/markdownlint.yml
+      - LICENSE
   push:
     branches: [main]
-    paths-ignore: [LICENSE]
+    paths-ignore:
+      - '**/*.md'
+      - .github/workflows/markdownlint.yml
+      - LICENSE
   workflow_dispatch:
     inputs:
       force-static-analysis:
