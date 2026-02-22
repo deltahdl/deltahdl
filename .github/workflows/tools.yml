@@ -57,13 +57,54 @@ jobs:
           restore-keys: |
             pip-${{ github.job }}-
       - name: Install tools
-        run: pip install mypy pylint
-      - name: Run pylint
+        run: |
+          pip install \
+            assert-no-inline-directives \
+            assert-no-linter-config-files \
+            assert-one-assert-per-pytest \
+            mypy pylint
+          npm install -g jscpd
+      - name: Assert no inline lint disables
+        run: >-
+          assert-no-inline-directives
+          --tools pylint,mypy
+          --verbose
+          ${{ github.workspace }}/scripts/split_tests.py
+          ${{ github.workspace }}/test/scripts/split_tests/**/*
+      - name: Assert no linter config files
+        run: >-
+          assert-no-linter-config-files
+          --linters pylint,mypy
+          --verbose
+          ${{ github.workspace }}
+      - name: Assert one assert per pytest
+        run: >-
+          assert-one-assert-per-pytest
+          --verbose
+          ${{ github.workspace }}/test/scripts/split_tests
+      - name: Run pylint on source
         run: >-
           PYTHONPATH=. python3 -m pylint scripts/split_tests.py
           --fail-on=C,R,W --fail-under=10.0
-      - name: Run mypy
+      - name: Run pylint on tests
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pylint --recursive=y
+          test/scripts/split_tests/
+          --fail-on=C,R,W --fail-under=10.0
+      - name: Run mypy on source
         run: PYTHONPATH=. python3 -m mypy scripts/split_tests.py
+      - name: Run mypy on tests
+        run: >-
+          MYPYPATH=.:scripts python3 -m mypy
+          test/scripts/split_tests/
+      - name: Detect copy-paste in source
+        run: >-
+          jscpd --pattern "**/*.py" --threshold 0
+          --reporters console scripts/
+      - name: Detect copy-paste in tests
+        run: >-
+          jscpd --pattern "**/*.py" --threshold 0
+          --reporters console test/scripts/split_tests/
   unit-test:
     needs: static-analysis
     runs-on: ubuntu-24.04
