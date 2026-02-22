@@ -1,5 +1,6 @@
-#include <gtest/gtest.h>
+// Non-LRM tests
 
+#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -9,10 +10,11 @@
 
 using namespace delta;
 
+namespace {
+
 // =============================================================================
 // CompiledProcess
 // =============================================================================
-
 TEST(CompiledSim, ValidCompiledProcess) {
   bool executed = false;
   CompiledProcess proc(1,
@@ -29,7 +31,6 @@ TEST(CompiledSim, InvalidCompiledProcess) {
 // =============================================================================
 // ProcessCompiler::IsCompilable
 // =============================================================================
-
 TEST(CompiledSim, PureCombinationalIsCompilable) {
   Arena arena;
   auto* assign = arena.Create<Stmt>();
@@ -91,18 +92,6 @@ TEST(CompiledSim, CompileReturnsValidForCombinational) {
   EXPECT_TRUE(compiled.IsValid());
   EXPECT_EQ(compiled.Id(), 42u);
 }
-
-// =============================================================================
-// Compiled process execution
-// =============================================================================
-
-struct CompiledSimFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
 
 TEST(CompiledSim, ExecuteBlockingAssign) {
   CompiledSimFixture f;
@@ -222,3 +211,5 @@ TEST(CompiledSim, ExecuteIfElse) {
   compiled.Execute(f.ctx);
   EXPECT_EQ(out->value.ToUint64(), 0u);
 }
+
+}  // namespace
