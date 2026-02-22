@@ -1,8 +1,8 @@
-#include <gtest/gtest.h>
+// Non-LRM tests
 
+#include <gtest/gtest.h>
 #include <cstdint>
 #include <vector>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -13,10 +13,11 @@
 
 using namespace delta;
 
+namespace {
+
 // =============================================================================
 // DpiContext registration
 // =============================================================================
-
 TEST(Dpi, RegisterImport) {
   DpiContext ctx;
   DpiFunction func;
@@ -79,18 +80,6 @@ TEST(Dpi, RegisterExport) {
   EXPECT_TRUE(ctx.HasExport("sv_callback"));
   EXPECT_FALSE(ctx.HasExport("missing"));
 }
-
-// =============================================================================
-// DPI-C integration with expression evaluator
-// =============================================================================
-
-struct DpiSimFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
 
 TEST(Dpi, EvalExprDispatchesToDpiImport) {
   DpiSimFixture f;
@@ -155,3 +144,5 @@ TEST(Dpi, EvalExprDpiMultipleArgs) {
   auto result = EvalExpr(call, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 42u);
 }
+
+}  // namespace
