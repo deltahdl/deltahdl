@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §7.12.2: Array ordering methods
 
 #include <gtest/gtest.h>
 #include <string>
@@ -56,35 +56,6 @@ TEST(DynArrayMethod, MaxReduction) {
   bool ok = TryEvalArrayProperty("d", "max", f.ctx, f.arena, out);
   ASSERT_TRUE(ok);
   EXPECT_EQ(out.ToUint64(), 50u);
-}
-
-// =============================================================================
-// Phase 3: §21.2.1 FormatArg specifiers
-// =============================================================================
-TEST(FormatArg, DecimalUnsigned) {
-  Arena arena;
-  auto val = MakeLogic4VecVal(arena, 8, 42);
-  EXPECT_EQ(FormatArg(val, 'd'), "42");
-}
-
-TEST(FormatArg, HexLeadingZeros) {
-  Arena arena;
-  auto val = MakeLogic4VecVal(arena, 8, 0x0A);
-  // %h for 8-bit value should be 2 hex digits.
-  EXPECT_EQ(FormatArg(val, 'h'), "0a");
-}
-
-TEST(FormatArg, OctalLeadingZeros) {
-  Arena arena;
-  auto val = MakeLogic4VecVal(arena, 8, 5);
-  // %o for 8-bit value: ceil(8/3) = 3 octal digits.
-  EXPECT_EQ(FormatArg(val, 'o'), "005");
-}
-
-TEST(FormatArg, BinaryReturnsToString) {
-  Arena arena;
-  auto val = MakeLogic4VecVal(arena, 4, 0b1010);
-  EXPECT_EQ(FormatArg(val, 'b'), "1010");
 }
 
 }  // namespace
