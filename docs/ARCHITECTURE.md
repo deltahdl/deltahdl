@@ -217,50 +217,8 @@ the configured charge strength, subject to decay over time.
 #### Scheduler
 
 The scheduler implements the IEEE 1800-2023 stratified event algorithm,
-dividing each simulation timestep into 17 ordered regions:
-
-```text
-            ┌───────────────┐
-            │  Preponed     │
-            ├───────────────┤
-            │  PreActive    │
-            ├───────────────┤
-          ┌─┤  Active       │◄─┐
-          │ ├───────────────┤  │
-          │ │  Inactive     │  │ active
-          │ ├───────────────┤  │ iteration
-          │ │  PreNBA       │  │ loop
-          │ ├───────────────┤  │
-          │ │  NBA          │  │
-          │ ├───────────────┤  │
-          └─┤  PostNBA      │──┘
-            ├───────────────┤
-            │  PreObserved  │
-            ├───────────────┤
-          ┌─┤  Observed     │◄─┐
-          │ ├───────────────┤  │
-          │ │  PostObserved │  │ reactive
-          │ ├───────────────┤  │ iteration
-          │ │  Reactive     │  │ loop
-          │ ├───────────────┤  │
-          │ │  ReInactive   │  │
-          │ ├───────────────┤  │
-          │ │  PreReNBA     │  │
-          │ ├───────────────┤  │
-          │ │  ReNBA        │  │
-          │ ├───────────────┤  │
-          └─┤  PostReNBA    │──┘
-            ├───────────────┤
-            │  PrePostponed │
-            ├───────────────┤
-            │  Postponed    │
-            └───────────────┘
-```
-
-Figure 3: IEEE 1800-2023 stratified event regions within a
-timestep.
-
-Events are stored in a calendar keyed by `SimTime`, with each time slot
+dividing each simulation timestep into 17 ordered regions. Events are
+stored in a calendar keyed by `SimTime`, with each time slot
 holding one event queue per region. Within a timestep the scheduler drains
 each region in order, iterating the active and reactive sets until they
 stabilize before advancing. Events are allocated from an `EventPool` backed
@@ -382,7 +340,7 @@ technology mapping produces the final netlist.
      └─────────┘
 ```
 
-Figure 4: Synthesizer processing stages from RTLIR to netlist.
+Figure 3: Synthesizer processing stages from RTLIR to netlist.
 
 #### Synth Lowerer
 
