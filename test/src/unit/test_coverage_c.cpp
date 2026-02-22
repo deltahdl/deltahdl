@@ -2,7 +2,6 @@
 
 #include <gtest/gtest.h>
 #include <string>
-#include <utility>
 #include <vector>
 #include "simulation/coverage.h"
 

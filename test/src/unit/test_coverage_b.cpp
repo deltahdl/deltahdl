@@ -3,7 +3,6 @@
 #include <gtest/gtest.h>
 #include <cstdint>
 #include <string>
-#include <utility>
 #include <vector>
 #include "simulation/coverage.h"
 
