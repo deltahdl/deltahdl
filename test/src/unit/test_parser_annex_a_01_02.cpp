@@ -1,7 +1,7 @@
+// Annex A.1.2: SystemVerilog source text
+
 #include <gtest/gtest.h>
-
 #include <string>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -11,7 +11,6 @@
 using namespace delta;
 
 // --- Test helpers ---
-
 namespace {
 
 struct ParseResult {
@@ -34,10 +33,11 @@ ParseResult Parse(const std::string& src) {
 
 }  // namespace
 
+namespace {
+
 // =============================================================================
 // A.1.2 source_text ::= [ timeunits_declaration ] { description }
 // =============================================================================
-
 // Empty source text.
 TEST(SourceText, EmptySourceText) {
   auto r = Parse("");
@@ -64,7 +64,6 @@ TEST(SourceText, MultipleDescriptions) {
 // =============================================================================
 // A.1.2 description — all alternatives
 // =============================================================================
-
 // description: module_declaration
 TEST(SourceText, DescriptionModule) {
   auto r = Parse("module m; endmodule\n");
@@ -150,7 +149,6 @@ TEST(SourceText, DescriptionChecker) {
 // =============================================================================
 // A.1.2 bind_directive (§23.11)
 // =============================================================================
-
 // Form 1: bind target_scope bind_instantiation
 TEST(SourceText, BindDirectiveBasic) {
   auto r = Parse("bind target_mod checker_mod chk_inst(.a(sig));\n");
@@ -234,7 +232,6 @@ TEST(SourceText, BindMixedWithOtherDescriptions) {
 // =============================================================================
 // A.1.2 module_declaration — all forms
 // =============================================================================
-
 // module_keyword ::= module | macromodule
 TEST(SourceText, ModuleKeywordMacromodule) {
   auto r = Parse("macromodule m; endmodule\n");
@@ -251,26 +248,6 @@ TEST(SourceText, ModuleWithLifetime) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 1u);
   EXPECT_EQ(r.cu->modules[0]->name, "m");
-}
-
-// Module with ANSI header (list_of_port_declarations).
-TEST(SourceText, ModuleAnsiHeader) {
-  auto r = Parse("module m(input logic a, output logic b); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->ports.size(), 2u);
-}
-
-// Module with non-ANSI header (list_of_ports).
-TEST(SourceText, ModuleNonAnsiHeader) {
-  auto r = Parse(
-      "module m(a, b);\n"
-      "  input a;\n"
-      "  output b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->ports.size(), 2u);
 }
 
 // Extern module declaration.
@@ -293,7 +270,6 @@ TEST(SourceText, ModuleEndLabel) {
 // =============================================================================
 // A.1.2 interface_declaration — all forms
 // =============================================================================
-
 // Interface with lifetime.
 TEST(SourceText, InterfaceWithLifetime) {
   auto r = Parse("interface automatic ifc; endinterface\n");
@@ -312,7 +288,6 @@ TEST(SourceText, InterfaceEndLabel) {
 // =============================================================================
 // A.1.2 program_declaration — all forms
 // =============================================================================
-
 // Program with lifetime.
 TEST(SourceText, ProgramWithLifetime) {
   auto r = Parse("program automatic prg; endprogram\n");
@@ -331,7 +306,6 @@ TEST(SourceText, ProgramEndLabel) {
 // =============================================================================
 // A.1.2 package_declaration — with optional lifetime
 // =============================================================================
-
 // Package with automatic lifetime (A.1.2 gap fix).
 TEST(SourceText, PackageAutomaticLifetime) {
   auto r = Parse("package automatic pkg; endpackage\n");
@@ -373,7 +347,6 @@ TEST(SourceText, PackageLifetimeWithItems) {
 // =============================================================================
 // A.1.2 checker_declaration
 // =============================================================================
-
 // Checker with ports.
 TEST(SourceText, CheckerWithPorts) {
   auto r = Parse("checker chk(event clk); endchecker\n");
@@ -393,7 +366,6 @@ TEST(SourceText, CheckerEndLabel) {
 // =============================================================================
 // A.1.2 class_declaration
 // =============================================================================
-
 // Virtual class.
 TEST(SourceText, VirtualClass) {
   auto r = Parse("virtual class C; endclass\n");
@@ -431,7 +403,6 @@ TEST(SourceText, ClassEndLabel) {
 // =============================================================================
 // A.1.2 timeunits_declaration — all 4 forms
 // =============================================================================
-
 // Form 1: timeunit time_literal ;
 TEST(SourceText, TimeunitOnly) {
   auto r = Parse("module m; timeunit 1ns; endmodule\n");
@@ -486,53 +457,6 @@ TEST(SourceText, DescriptionPackageItemTask) {
   ASSERT_EQ(r.cu->cu_items.size(), 1u);
 }
 
-// =============================================================================
-// A.1.2 module_declaration — wildcard port form: module m (.*);
-// =============================================================================
-
-TEST(SourceText, ModuleWildcardPorts) {
-  auto r = Parse("module m(.*); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->name, "m");
-  EXPECT_TRUE(r.cu->modules[0]->has_wildcard_ports);
-}
-
-// =============================================================================
-// A.1.2 interface_declaration — all 5 forms
-// =============================================================================
-
-// Interface with ANSI ports.
-TEST(SourceText, InterfaceAnsiHeader) {
-  auto r = Parse("interface ifc(input logic clk); endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 1u);
-}
-
-// Interface with non-ANSI ports.
-TEST(SourceText, InterfaceNonAnsiHeader) {
-  auto r = Parse(
-      "interface ifc(clk);\n"
-      "  input clk;\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 1u);
-}
-
-// Interface with wildcard ports: interface i(.*);
-TEST(SourceText, InterfaceWildcardPorts) {
-  auto r = Parse("interface ifc(.*); endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_TRUE(r.cu->interfaces[0]->has_wildcard_ports);
-}
-
 // Extern interface declaration.
 TEST(SourceText, ExternInterface) {
   auto r = Parse("extern interface ifc(input logic clk);\n");
@@ -541,40 +465,6 @@ TEST(SourceText, ExternInterface) {
   ASSERT_EQ(r.cu->interfaces.size(), 1u);
   EXPECT_TRUE(r.cu->interfaces[0]->is_extern);
   EXPECT_EQ(r.cu->interfaces[0]->name, "ifc");
-}
-
-// =============================================================================
-// A.1.2 program_declaration — all 5 forms
-// =============================================================================
-
-// Program with ANSI ports.
-TEST(SourceText, ProgramAnsiHeader) {
-  auto r = Parse("program prg(input logic clk); endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_EQ(r.cu->programs[0]->ports.size(), 1u);
-}
-
-// Program with non-ANSI ports.
-TEST(SourceText, ProgramNonAnsiHeader) {
-  auto r = Parse(
-      "program prg(clk);\n"
-      "  input clk;\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_EQ(r.cu->programs[0]->ports.size(), 1u);
-}
-
-// Program with wildcard ports: program p(.*);
-TEST(SourceText, ProgramWildcardPorts) {
-  auto r = Parse("program prg(.*); endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_TRUE(r.cu->programs[0]->has_wildcard_ports);
 }
 
 // Extern program declaration.
@@ -590,7 +480,6 @@ TEST(SourceText, ExternProgram) {
 // =============================================================================
 // A.1.2 class_declaration — additional forms
 // =============================================================================
-
 // Class with final_specifier: class :final C;
 TEST(SourceText, ClassWithFinal) {
   auto r = Parse("class :final C; endclass\n");
@@ -619,320 +508,4 @@ TEST(SourceText, InterfaceClassDecl) {
   EXPECT_EQ(r.cu->classes[0]->name, "IC");
 }
 
-// =============================================================================
-// A.1.3 Module parameters and ports
-// =============================================================================
-
-// parameter_port_list ::= #( )
-TEST(SourceText, EmptyParameterPortList) {
-  auto r = Parse("module m #(); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_TRUE(r.cu->modules[0]->params.empty());
-}
-
-// parameter_port_list with localparam (parameter_port_declaration form 2)
-TEST(SourceText, ParamPortLocalparam) {
-  auto r = Parse("module m #(localparam int X = 5); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->params.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->params[0].first, "X");
-}
-
-// parameter_port_list: data_type list_of_param_assignments (no keyword)
-TEST(SourceText, ParamPortDataTypeForm) {
-  auto r = Parse("module m #(int WIDTH = 8); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->params.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->params[0].first, "WIDTH");
-}
-
-// parameter_port_list: type parameter (#(type T = int))
-TEST(SourceText, ParamPortTypeParameter) {
-  auto r = Parse("module m #(type T = int); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->params.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->params[0].first, "T");
-}
-
-// parameter_port_list: mixed forms
-TEST(SourceText, ParamPortMixedForms) {
-  auto r = Parse(
-      "module m #(parameter int A = 1, localparam int B = 2,\n"
-      "           type T = logic, int C = 3);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->params.size(), 4u);
-  EXPECT_EQ(r.cu->modules[0]->params[0].first, "A");
-  EXPECT_EQ(r.cu->modules[0]->params[1].first, "B");
-  EXPECT_EQ(r.cu->modules[0]->params[2].first, "T");
-  EXPECT_EQ(r.cu->modules[0]->params[3].first, "C");
-}
-
-// list_of_port_declarations: empty ()
-TEST(SourceText, EmptyPortList) {
-  auto r = Parse("module m(); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_TRUE(r.cu->modules[0]->ports.empty());
-}
-
-// port_declaration: all 4 directions (port_direction ::=
-// input|output|inout|ref)
-TEST(SourceText, PortDirectionAllFour) {
-  auto r = Parse(
-      "module m(input logic a, output logic b,\n"
-      "         inout wire c, ref logic d);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& ports = r.cu->modules[0]->ports;
-  ASSERT_EQ(ports.size(), 4u);
-  EXPECT_EQ(ports[0].direction, Direction::kInput);
-  EXPECT_EQ(ports[1].direction, Direction::kOutput);
-  EXPECT_EQ(ports[2].direction, Direction::kInout);
-  EXPECT_EQ(ports[3].direction, Direction::kRef);
-}
-
-// ansi_port_declaration with default value: input logic a = 1'b0
-TEST(SourceText, AnsiPortWithDefault) {
-  auto r = Parse("module m(input logic a = 1'b0); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->ports.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].name, "a");
-  EXPECT_NE(r.cu->modules[0]->ports[0].default_value, nullptr);
-}
-
-// net_port_header: [port_direction] net_port_type — inout wire
-TEST(SourceText, NetPortHeader) {
-  auto r = Parse("module m(inout wire [7:0] data); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->ports.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInout);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].name, "data");
-}
-
-// variable_port_header: [port_direction] variable_port_type — input logic
-TEST(SourceText, VariablePortHeader) {
-  auto r = Parse("module m(input logic [3:0] sel); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->ports.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInput);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].name, "sel");
-}
-
-// Non-ANSI list_of_ports: port with multiple ports and body declarations
-TEST(SourceText, NonAnsiMultiplePorts) {
-  auto r = Parse(
-      "module m(a, b, c);\n"
-      "  input [7:0] a;\n"
-      "  output [7:0] b;\n"
-      "  inout c;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& ports = r.cu->modules[0]->ports;
-  ASSERT_EQ(ports.size(), 3u);
-  EXPECT_EQ(ports[0].direction, Direction::kInput);
-  EXPECT_EQ(ports[1].direction, Direction::kOutput);
-  EXPECT_EQ(ports[2].direction, Direction::kInout);
-}
-
-// Non-ANSI port_declaration with shared type: input [7:0] a, b;
-TEST(SourceText, NonAnsiSharedType) {
-  auto r = Parse(
-      "module m(a, b);\n"
-      "  input [7:0] a, b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& ports = r.cu->modules[0]->ports;
-  ASSERT_EQ(ports.size(), 2u);
-  EXPECT_EQ(ports[0].direction, Direction::kInput);
-  EXPECT_EQ(ports[1].direction, Direction::kInput);
-}
-
-// Module with both parameters and ports
-TEST(SourceText, ParamsAndPorts) {
-  auto r = Parse(
-      "module m #(parameter int W = 8)(input logic [W-1:0] data,\n"
-      "                                 output logic valid);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->params.size(), 1u);
-  ASSERT_EQ(r.cu->modules[0]->ports.size(), 2u);
-  EXPECT_EQ(r.cu->modules[0]->params[0].first, "W");
-  EXPECT_EQ(r.cu->modules[0]->ports[0].name, "data");
-  EXPECT_EQ(r.cu->modules[0]->ports[1].name, "valid");
-}
-
-// Interface parameter port list and ports
-TEST(SourceText, InterfaceParamsAndPorts) {
-  auto r = Parse(
-      "interface ifc #(parameter int W = 8)(input logic clk);\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces[0]->params.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 1u);
-}
-
-// Program parameter port list and ports
-TEST(SourceText, ProgramParamsAndPorts) {
-  auto r = Parse(
-      "program prg #(parameter int N = 10)(input logic clk);\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_EQ(r.cu->programs[0]->params.size(), 1u);
-  EXPECT_EQ(r.cu->programs[0]->ports.size(), 1u);
-}
-
-// =============================================================================
-// A.1.4 Module items
-// =============================================================================
-
-// severity_system_task: $fatal with finish_number and arguments.
-TEST(SourceText, ElabSeverityFatal) {
-  auto r = Parse(
-      "module m;\n"
-      "  $fatal(1, \"assertion failed\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->items.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kElabSystemTask);
-}
-
-// severity_system_task: all four forms ($fatal, $error, $warning, $info).
-TEST(SourceText, ElabSeverityAllForms) {
-  auto r = Parse(
-      "module m;\n"
-      "  $fatal;\n"
-      "  $error(\"err\");\n"
-      "  $warning(\"warn\");\n"
-      "  $info;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->items.size(), 4u);
-  for (size_t i = 0; i < 4; ++i) {
-    EXPECT_EQ(r.cu->modules[0]->items[i]->kind,
-              ModuleItemKind::kElabSystemTask);
-  }
-}
-
-// genvar_declaration: single and multiple identifiers.
-TEST(SourceText, GenvarDeclaration) {
-  auto r = Parse(
-      "module m;\n"
-      "  genvar i;\n"
-      "  genvar j, k, l;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  // genvar i → 1 item; genvar j, k, l → 3 items
-  ASSERT_EQ(r.cu->modules[0]->items.size(), 4u);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->name, "i");
-  EXPECT_EQ(r.cu->modules[0]->items[1]->name, "j");
-  EXPECT_EQ(r.cu->modules[0]->items[2]->name, "k");
-  EXPECT_EQ(r.cu->modules[0]->items[3]->name, "l");
-}
-
-// net_alias: alias net1 = net2 = net3;
-TEST(SourceText, NetAlias) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b, c;\n"
-      "  alias a = b = c;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
-  // 3 wire decls + 1 alias
-  auto* alias_item = items.back();
-  EXPECT_EQ(alias_item->kind, ModuleItemKind::kAlias);
-  EXPECT_EQ(alias_item->alias_nets.size(), 3u);
-}
-
-// default clocking as module_or_generate_item_declaration.
-TEST(SourceText, DefaultClockingAsModuleItem) {
-  auto r = Parse(
-      "module m;\n"
-      "  default clocking cb @(posedge clk);\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->items.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kClockingBlock);
-  EXPECT_TRUE(r.cu->modules[0]->items[0]->is_default_clocking);
-}
-
-// default disable iff expression_or_dist (module_or_generate_item_declaration).
-TEST(SourceText, DefaultDisableIff) {
-  auto r = Parse(
-      "module m;\n"
-      "  default disable iff rst;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->items.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind,
-            ModuleItemKind::kDefaultDisableIff);
-  EXPECT_NE(r.cu->modules[0]->items[0]->init_expr, nullptr);
-}
-
-// specparam_declaration as non_port_module_item (outside specify block).
-TEST(SourceText, SpecparamAsModuleItem) {
-  auto r = Parse(
-      "module m;\n"
-      "  specparam delay = 10;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->items.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kSpecparam);
-}
-
-// Nested module_declaration as non_port_module_item.
-TEST(SourceText, NestedModuleDeclaration) {
-  auto r = Parse(
-      "module outer;\n"
-      "  module inner;\n"
-      "  endmodule\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->items.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind,
-            ModuleItemKind::kNestedModuleDecl);
-  EXPECT_NE(r.cu->modules[0]->items[0]->nested_module_decl, nullptr);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->nested_module_decl->name, "inner");
-}
-
-// parameter_override: defparam list_of_defparam_assignments.
-TEST(SourceText, ParameterOverrideDefparam) {
-  auto r = Parse(
-      "module m;\n"
-      "  defparam sub.W = 16, sub.D = 8;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->items.size(), 1u);
-  auto* dp = r.cu->modules[0]->items[0];
-  EXPECT_EQ(dp->kind, ModuleItemKind::kDefparam);
-  EXPECT_EQ(dp->defparam_assigns.size(), 2u);
-}
+}  // namespace
