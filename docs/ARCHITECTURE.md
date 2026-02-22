@@ -595,3 +595,203 @@ parser, AIG optimizer, and technology mapper are implemented from scratch.
 | VPI | Verilog Procedural Interface |
 
 ### Appendix C: Glossary
+
+**arena allocator**
+
+> A memory allocation strategy that allocates objects from a contiguous block and frees them all at once rather than individually.
+
+**aval/bval**
+
+> The two bit rails in four-value logic encoding. The aval rail carries the logic value and the bval rail indicates whether the value is known (0) or unknown (1).
+
+**backannotation**
+
+> The process of applying post-layout timing data, typically from an SDF file, back onto a design's timing model.
+
+**bin**
+
+> A named bucket in a coverpoint that counts how many times a particular value or value range has been sampled.
+
+**blocking assignment**
+
+> An assignment (`=`) that takes effect immediately in the current simulation step.
+
+**clocking block**
+
+> A SystemVerilog construct that groups signals under a common clock and specifies input and output skews for testbench synchronization.
+
+**compiled process**
+
+> A process without timing controls that has been translated into a direct function call, bypassing coroutine overhead.
+
+**constant propagation**
+
+> An optimization that replaces signals with their known constant values.
+
+**continuous assignment**
+
+> An `assign` statement that drives a net whenever its right-hand side changes.
+
+**coroutine**
+
+> A C++23 function that can suspend and resume, used to model processes with timing controls.
+
+**covergroup**
+
+> A SystemVerilog construct that defines a set of coverpoints and crosses to measure functional coverage.
+
+**coverpoint**
+
+> A variable or expression monitored for functional coverage, with bins that track observed values.
+
+**cross-coverage**
+
+> Coverage defined over the Cartesian product of two or more coverpoints.
+
+**cut enumeration**
+
+> A technique that identifies all K-input subgraphs (cuts) feeding an AIG node, used during technology mapping.
+
+**defparam**
+
+> A SystemVerilog construct that overrides a parameter value at a specific point in the module hierarchy.
+
+**driver**
+
+> A source that contributes a value to a net. Multiple drivers on the same net require resolution.
+
+**dual-rail encoding**
+
+> A representation using two bit vectors (aval and bval) to encode four-value logic states.
+
+**elaboration**
+
+> The compilation phase that resolves parameters, expands generate blocks, evaluates types, and produces the RTLIR.
+
+**event coalescing**
+
+> Merging multiple pending updates to the same signal within a region into a single write.
+
+**event pool**
+
+> An arena-backed allocator for simulation events that recycles used events through a free-list.
+
+**force/release**
+
+> Simulation commands that override a variable's value (force) or restore normal driving (release).
+
+**four-value logic**
+
+> Logic with four states: 0, 1, x (unknown), and z (high-impedance).
+
+**free-list**
+
+> A linked list of previously allocated and now unused objects available for reuse without new allocation.
+
+**generate block**
+
+> A conditional or loop construct (`if`, `for`, `case`) that produces hardware structures at elaboration time based on parameter values.
+
+**latch**
+
+> A level-sensitive storage element in an AIG, pairing a current-state input with a next-state literal.
+
+**Liberty**
+
+> A standard file format (.lib) describing cell timing, area, and function for technology mapping.
+
+**literal**
+
+> In an AIG, an integer encoding both a node identity and an optional complement flag in its least significant bit.
+
+**lowering**
+
+> The translation of an intermediate representation into the structures required by a specific back end.
+
+**net**
+
+> A signal with a resolution function that combines values from multiple drivers (e.g., wire, wand, wor).
+
+**netlist**
+
+> A structural description of a circuit as a list of cells and their interconnections.
+
+**non-blocking assignment**
+
+> An assignment (`<=`) whose new value is scheduled and applied in the NBA region rather than immediately.
+
+**Pratt parser**
+
+> A top-down operator-precedence parsing technique used for expression parsing.
+
+**primary input**
+
+> An AIG node representing an external input to the circuit.
+
+**primary output**
+
+> An AIG literal representing an external output of the circuit.
+
+**process**
+
+> A simulation execution unit corresponding to an `always`, `initial`, or `final` block.
+
+**recursive descent**
+
+> A top-down parsing technique where each grammar rule is implemented as a function.
+
+**region**
+
+> One of the 17 ordered phases within a simulation timestep, as defined by the IEEE stratified event algorithm.
+
+**resolution function**
+
+> A function that combines multiple driver values on a net to produce a single resolved value.
+
+**retiming**
+
+> A synthesis optimization that moves registers across combinational logic to improve timing.
+
+**sensitivity list**
+
+> The set of signals whose changes cause a process to be re-evaluated.
+
+**specify block**
+
+> A SystemVerilog construct that declares path delays and timing checks for a module.
+
+**structural hashing**
+
+> A deduplication technique that ensures identical AIG nodes are shared rather than duplicated.
+
+**technology mapping**
+
+> The process of converting an AIG into cells from a target technology library or into LUTs.
+
+**timing control**
+
+> A statement (`#delay`, `@(event)`, `wait`) that suspends a process until a condition is met.
+
+**token**
+
+> A lexical unit produced by the lexer: a keyword, operator, literal, or identifier.
+
+**trireg**
+
+> A net type that retains its value through charge storage when all drivers are at high-impedance.
+
+**truth table**
+
+> A compact representation of a LUT's Boolean function, stored as a 64-bit word for K up to 6.
+
+**two-state logic**
+
+> Logic with only two states (0 and 1), used where x and z cannot occur.
+
+**variable**
+
+> A single-driver simulation storage element that holds a four-value logic vector.
+
+**watcher**
+
+> A callback registered on a variable that fires when the variable's value changes.
