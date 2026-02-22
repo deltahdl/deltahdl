@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §19.8: Predefined coverage methods
 
 #include <gtest/gtest.h>
 #include <string>
@@ -8,16 +8,6 @@
 using namespace delta;
 
 namespace {
-
-// =============================================================================
-// S19.7: Coverage options: at_least, weight, goal
-// =============================================================================
-TEST(Coverage, GoalOption) {
-  CoverageDB db;
-  auto* g = db.CreateGroup("cg");
-  g->options.goal = 90.0;
-  EXPECT_DOUBLE_EQ(g->options.goal, 90.0);
-}
 
 // =============================================================================
 // S19.8: Coverage methods
@@ -64,14 +54,6 @@ TEST(Coverage, GetInstCoverageMatchesGetCoverage) {
 
   db.Sample(g, {{"x", 0}});
   EXPECT_DOUBLE_EQ(CoverageDB::GetInstCoverage(g), CoverageDB::GetCoverage(g));
-}
-
-// =============================================================================
-// S19.9: $get_coverage system function
-// =============================================================================
-TEST(Coverage, GlobalCoverageEmpty) {
-  CoverageDB db;
-  EXPECT_DOUBLE_EQ(db.GetGlobalCoverage(), 0.0);
 }
 
 }  // namespace

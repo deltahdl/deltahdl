@@ -57,4 +57,14 @@ TEST(Coverage, WeightOption) {
   EXPECT_NEAR(global, 200.0 / 3.0, 0.01);
 }
 
+// =============================================================================
+// S19.7: Coverage options: at_least, weight, goal
+// =============================================================================
+TEST(Coverage, GoalOption) {
+  CoverageDB db;
+  auto* g = db.CreateGroup("cg");
+  g->options.goal = 90.0;
+  EXPECT_DOUBLE_EQ(g->options.goal, 90.0);
+}
+
 }  // namespace
