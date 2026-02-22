@@ -1,5 +1,6 @@
-#include <gtest/gtest.h>
+// §11.12: Let construct
 
+#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -34,10 +35,11 @@ static ModuleItem* FirstLetDecl(LetParseResult& r) {
   return nullptr;
 }
 
+namespace {
+
 // ==========================================================================
 // §11.12: Let declaration parsing
 // ==========================================================================
-
 TEST(ParserLet, DeclNoArgsParse) {
   auto r = Parse(
       "module t;\n"
@@ -171,7 +173,6 @@ TEST(ParserLet, DeclEmptyParens) {
 // ==========================================================================
 // §11.12: Let instantiation parsing (calls parsed as kCall expressions)
 // ==========================================================================
-
 TEST(ParserLet, InstantiationParsed) {
   // Let calls look syntactically like function calls — verify parsing.
   auto r = Parse(
@@ -218,7 +219,6 @@ TEST(ParserLet, InstantiationDefaultArgs) {
 // ==========================================================================
 // §11.12: Let in package scope
 // ==========================================================================
-
 TEST(ParserLet, DeclInPackage) {
   auto r = Parse(
       "package pkg;\n"
@@ -227,3 +227,5 @@ TEST(ParserLet, DeclInPackage) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
+
+}  // namespace
