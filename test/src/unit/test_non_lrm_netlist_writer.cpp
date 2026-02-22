@@ -1,9 +1,7 @@
-// §non_lrm
+// §non-lrm:netlist_writer
 
 #include <gtest/gtest.h>
-
 #include <string>
-
 #include "synthesis/aig.h"
 #include "synthesis/netlist_writer.h"
 
