@@ -1,5 +1,6 @@
-#include <gtest/gtest.h>
+// Non-LRM tests
 
+#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -12,7 +13,6 @@
 using namespace delta;
 
 // --- Test fixture ---
-
 struct MemInferFixture {
   SourceManager src_mgr;
   DiagEngine diag{src_mgr};
@@ -32,10 +32,11 @@ static const RtlirModule* ElaborateSrc(MemInferFixture& f,
   return design->top_modules[0];
 }
 
+namespace {
+
 // =============================================================================
 // Single-port write pattern: mem[addr] <= wdata inside always_ff
 // =============================================================================
-
 TEST(MemInfer, DetectSinglePortWrite) {
   MemInferFixture f;
   auto* mod = ElaborateSrc(f,
@@ -75,7 +76,6 @@ TEST(MemInfer, DetectSinglePortWrite_PortDetails) {
 // =============================================================================
 // Single-port read pattern: rdata <= mem[addr] inside always_ff
 // =============================================================================
-
 TEST(MemInfer, DetectSinglePortRead) {
   MemInferFixture f;
   auto* mod = ElaborateSrc(f,
@@ -115,7 +115,6 @@ TEST(MemInfer, DetectSinglePortRead_PortDetails) {
 // =============================================================================
 // Dual-port (read + write) detection in same always_ff block
 // =============================================================================
-
 TEST(MemInfer, DetectDualPort) {
   MemInferFixture f;
   auto* mod = ElaborateSrc(f,
@@ -141,7 +140,6 @@ TEST(MemInfer, DetectDualPort) {
 // =============================================================================
 // No memory when no array patterns (scalar assignments only)
 // =============================================================================
-
 TEST(MemInfer, NoMemoryForScalarAssign) {
   MemInferFixture f;
   auto* mod = ElaborateSrc(f,
@@ -159,7 +157,6 @@ TEST(MemInfer, NoMemoryForScalarAssign) {
 // =============================================================================
 // ROM inference: read-only array access (no writes)
 // =============================================================================
-
 TEST(MemInfer, RomInference) {
   MemInferFixture f;
   auto* mod = ElaborateSrc(f,
@@ -178,3 +175,5 @@ TEST(MemInfer, RomInference) {
   EXPECT_EQ(memories[0].read_ports.size(), 1u);
   EXPECT_TRUE(memories[0].write_ports.empty());
 }
+
+}  // namespace
