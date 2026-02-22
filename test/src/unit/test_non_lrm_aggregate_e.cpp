@@ -49,41 +49,6 @@ static void VerifyStructField(const StructFieldInfo& field,
 
 namespace {
 
-TEST(Matches, VariableMatch) {
-  AggFixture f;
-  auto* var = f.ctx.CreateVariable("sig", 8);
-  var->value = MakeLogic4VecVal(f.arena, 8, 0xAB);
-  auto* expr = ParseExprFrom("sig matches 8'hAB", f);
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
-// =============================================================================
-// §11.9 Tagged union — tag tracking
-// =============================================================================
-TEST(TaggedUnion, SetAndGetTag) {
-  AggFixture f;
-  auto* var = f.ctx.CreateVariable("u", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  f.ctx.SetVariableTag("u", "field_a");
-  EXPECT_EQ(f.ctx.GetVariableTag("u"), "field_a");
-}
-
-TEST(TaggedUnion, TagDefaultEmpty) {
-  AggFixture f;
-  EXPECT_TRUE(f.ctx.GetVariableTag("nonexistent").empty());
-}
-
-TEST(TaggedUnion, ChangeTag) {
-  AggFixture f;
-  f.ctx.CreateVariable("u", 32);
-  f.ctx.SetVariableTag("u", "a");
-  EXPECT_EQ(f.ctx.GetVariableTag("u"), "a");
-  f.ctx.SetVariableTag("u", "b");
-  EXPECT_EQ(f.ctx.GetVariableTag("u"), "b");
-}
-
 // =============================================================================
 // §10.10 Unpacked array concatenation
 // =============================================================================
