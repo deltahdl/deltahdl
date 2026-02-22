@@ -69,6 +69,11 @@ until it reaches either a running simulation or a mapped netlist.
              ┌─────────────┴─────────────┐
              │                           │
              ▼                           ▼
+      ┌─────────────┐           ┌──────────────┐
+      │ Sim Lowerer │           │ Synth Lowerer│
+      └──────┬──────┘           └──────┬───────┘
+             │                         │
+             ▼                         ▼
         ┌───────────┐           ┌──────────────┐
         │ Simulator │           │ Synthesizer  │
         └───────────┘           └──────────────┘
