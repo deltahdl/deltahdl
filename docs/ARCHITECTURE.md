@@ -173,7 +173,7 @@ event loop that advances simulation time.
             │
             ▼
     ┌──────────────┐
-    │  SimContext   │
+    │   Context    │
     └───────┬──────┘
             │
             ▼
