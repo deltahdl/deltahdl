@@ -88,15 +88,15 @@ jobs:
           --fail-on=C,R,W --fail-under=10.0
       - name: Run pylint on tests
         run: >-
-          PYTHONPATH=.:scripts python3 -m pylint --recursive=y
-          test/scripts/split_tests/
+          PYTHONPATH=.:scripts:test/scripts/split_tests/unit
+          python3 -m pylint --recursive=y test/scripts/split_tests/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run mypy on source
         run: PYTHONPATH=. python3 -m mypy scripts/split_tests.py
       - name: Run mypy on tests
         run: >-
-          MYPYPATH=.:scripts python3 -m mypy
-          test/scripts/split_tests/
+          MYPYPATH=.:scripts:test/scripts/split_tests/unit
+          python3 -m mypy test/scripts/split_tests/
       - name: Detect copy-paste in source
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
