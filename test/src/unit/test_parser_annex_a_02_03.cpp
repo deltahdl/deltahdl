@@ -15,11 +15,11 @@ namespace {
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
   bool has_errors = false;
 };
 
-ParseResult Parse(const std::string& src) {
+ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -30,7 +30,7 @@ ParseResult Parse(const std::string& src) {
   return result;
 }
 
-}  // namespace
+} // namespace
 
 // =============================================================================
 // A.2.3 Declaration lists
@@ -40,37 +40,34 @@ ParseResult Parse(const std::string& src) {
 // defparam_assignment { , defparam_assignment }
 
 TEST(ParserA23, ListOfDefparamAssignmentsSingle) {
-  auto r = Parse(
-      "module top;\n"
-      "  defparam u0.WIDTH = 8;\n"
-      "endmodule\n");
+  auto r = Parse("module top;\n"
+                 "  defparam u0.WIDTH = 8;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kDefparam);
   EXPECT_EQ(item->defparam_assigns.size(), 1u);
 }
 
 TEST(ParserA23, ListOfDefparamAssignmentsMultiple) {
-  auto r = Parse(
-      "module top;\n"
-      "  defparam u0.WIDTH = 16, u1.DEPTH = 8;\n"
-      "endmodule\n");
+  auto r = Parse("module top;\n"
+                 "  defparam u0.WIDTH = 16, u1.DEPTH = 8;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kDefparam);
   EXPECT_EQ(item->defparam_assigns.size(), 2u);
 }
 
 TEST(ParserA23, ListOfDefparamAssignmentsThree) {
-  auto r = Parse(
-      "module top;\n"
-      "  defparam u0.A = 1, u0.B = 2, u0.C = 3;\n"
-      "endmodule\n");
+  auto r = Parse("module top;\n"
+                 "  defparam u0.A = 1, u0.B = 2, u0.C = 3;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->defparam_assigns.size(), 3u);
 }
 
@@ -127,8 +124,9 @@ TEST(ParserA23, ListOfNetDeclAssignmentsSingle) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   int count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kNetDecl) count++;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kNetDecl)
+      count++;
   }
   EXPECT_EQ(count, 1);
 }
@@ -138,8 +136,9 @@ TEST(ParserA23, ListOfNetDeclAssignmentsMultiple) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   int count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kNetDecl) count++;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kNetDecl)
+      count++;
   }
   EXPECT_GE(count, 3);
 }
@@ -149,8 +148,9 @@ TEST(ParserA23, ListOfNetDeclAssignmentsWithInit) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   int count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kNetDecl) count++;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kNetDecl)
+      count++;
   }
   EXPECT_GE(count, 2);
 }
@@ -160,8 +160,9 @@ TEST(ParserA23, ListOfNetDeclAssignmentsWithUnpackedDim) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   int count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kNetDecl) count++;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kNetDecl)
+      count++;
   }
   EXPECT_GE(count, 2);
 }
@@ -181,22 +182,23 @@ TEST(ParserA23, ListOfParamAssignmentsMultiple) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   int count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kParamDecl) count++;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kParamDecl)
+      count++;
   }
   EXPECT_GE(count, 3);
 }
 
 TEST(ParserA23, ListOfParamAssignmentsWithDims) {
-  auto r = Parse(
-      "module m;\n"
-      "  parameter int A [2] = '{1, 2}, B [3] = '{3, 4, 5};\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  parameter int A [2] = '{1, 2}, B [3] = '{3, 4, 5};\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   int count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kParamDecl) count++;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kParamDecl)
+      count++;
   }
   EXPECT_GE(count, 2);
 }
@@ -218,7 +220,7 @@ TEST(ParserA23, ListOfPortIdentifiersMultipleNonAnsi) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules[0]->ports.size(), 2u);
-  for (auto& port : r.cu->modules[0]->ports) {
+  for (auto &port : r.cu->modules[0]->ports) {
     EXPECT_EQ(port.direction, Direction::kInput);
   }
 }
@@ -234,24 +236,22 @@ TEST(ParserA23, ListOfPortIdentifiersWithUnpackedDim) {
 // port_identifier { , port_identifier }
 
 TEST(ParserA23, ListOfUdpPortIdentifiersSingle) {
-  auto r = Parse(
-      "primitive buf_p(output out, input in);\n"
-      "  table 0 : 0; 1 : 1; endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive buf_p(output out, input in);\n"
+                 "  table 0 : 0; 1 : 1; endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA23, ListOfUdpPortIdentifiersMultiple) {
-  auto r = Parse(
-      "primitive mux(output out, input a, b, sel);\n"
-      "  table\n"
-      "    0 ? 0 : 0;\n"
-      "    1 ? 0 : 1;\n"
-      "    ? 0 1 : 0;\n"
-      "    ? 1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive mux(output out, input a, b, sel);\n"
+                 "  table\n"
+                 "    0 ? 0 : 0;\n"
+                 "    1 ? 0 : 1;\n"
+                 "    ? 0 1 : 0;\n"
+                 "    ? 1 1 : 1;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -260,10 +260,9 @@ TEST(ParserA23, ListOfUdpPortIdentifiersMultiple) {
 // specparam_assignment { , specparam_assignment }
 
 TEST(ParserA23, ListOfSpecparamAssignmentsSingle) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify specparam tRISE = 100; endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify specparam tRISE = 100; endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -282,31 +281,29 @@ TEST(ParserA23, ListOfSpecparamAssignmentsMultiple) {
 //     { , port_identifier { variable_dimension } [ = expression ] }
 
 TEST(ParserA23, ListOfTfVariableIdentifiersSingle) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int f;\n"
-      "    input int a;\n"
-      "    f = a;\n"
-      "  endfunction\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  function int f;\n"
+                 "    input int a;\n"
+                 "    f = a;\n"
+                 "  endfunction\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_EQ(item->func_args.size(), 1u);
 }
 
 TEST(ParserA23, ListOfTfVariableIdentifiersMultiple) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int add;\n"
-      "    input int a, b;\n"
-      "    add = a + b;\n"
-      "  endfunction\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  function int add;\n"
+                 "    input int a, b;\n"
+                 "    add = a + b;\n"
+                 "  endfunction\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_EQ(item->func_args.size(), 2u);
   EXPECT_EQ(item->func_args[0].name, "a");
@@ -314,16 +311,15 @@ TEST(ParserA23, ListOfTfVariableIdentifiersMultiple) {
 }
 
 TEST(ParserA23, ListOfTfVariableIdentifiersThree) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int sum3;\n"
-      "    input int x, y, z;\n"
-      "    sum3 = x + y + z;\n"
-      "  endfunction\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  function int sum3;\n"
+                 "    input int x, y, z;\n"
+                 "    sum3 = x + y + z;\n"
+                 "  endfunction\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->func_args.size(), 3u);
   EXPECT_EQ(item->func_args[0].name, "x");
   EXPECT_EQ(item->func_args[1].name, "y");
@@ -331,31 +327,29 @@ TEST(ParserA23, ListOfTfVariableIdentifiersThree) {
 }
 
 TEST(ParserA23, ListOfTfVariableIdentifiersWithDefaults) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int compute(input int a = 1, input int b = 2);\n"
-      "    compute = a + b;\n"
-      "  endfunction\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  function int compute(input int a = 1, input int b = 2);\n"
+                 "    compute = a + b;\n"
+                 "  endfunction\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->func_args.size(), 2u);
   EXPECT_NE(item->func_args[0].default_value, nullptr);
   EXPECT_NE(item->func_args[1].default_value, nullptr);
 }
 
 TEST(ParserA23, ListOfTfVariableIdentifiersTask) {
-  auto r = Parse(
-      "module m;\n"
-      "  task report;\n"
-      "    input int addr, data;\n"
-      "    output int status;\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task report;\n"
+                 "    input int addr, data;\n"
+                 "    output int status;\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
   EXPECT_EQ(item->func_args.size(), 3u);
   EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
@@ -379,8 +373,9 @@ TEST(ParserA23, ListOfTypeAssignmentsMultiple) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   int count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kParamDecl) count++;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kParamDecl)
+      count++;
   }
   EXPECT_GE(count, 3);
 }
@@ -400,8 +395,9 @@ TEST(ParserA23, ListOfVariableDeclAssignmentsMultiple) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   int count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kVarDecl) count++;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kVarDecl)
+      count++;
   }
   EXPECT_GE(count, 3);
 }
@@ -411,8 +407,9 @@ TEST(ParserA23, ListOfVariableDeclAssignmentsWithDims) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   int count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kVarDecl) count++;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kVarDecl)
+      count++;
   }
   EXPECT_GE(count, 2);
 }
@@ -435,7 +432,7 @@ TEST(ParserA23, ListOfVariableIdentifiersMultipleAnsi) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules[0]->ports.size(), 3u);
-  for (auto& port : r.cu->modules[0]->ports) {
+  for (auto &port : r.cu->modules[0]->ports) {
     EXPECT_EQ(port.direction, Direction::kInput);
   }
 }
@@ -455,7 +452,7 @@ TEST(ParserA23, ListOfVariablePortIdentifiersSingle) {
   auto r = Parse("module m(output logic q = 1'b0); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
+  auto &port = r.cu->modules[0]->ports[0];
   EXPECT_EQ(port.direction, Direction::kOutput);
   EXPECT_NE(port.default_value, nullptr);
 }
@@ -474,7 +471,7 @@ TEST(ParserA23, ListOfVariablePortIdentifiersWithDim) {
   auto r = Parse("module m(output logic q [1:0] = '{0, 0}); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
+  auto &port = r.cu->modules[0]->ports[0];
   EXPECT_FALSE(port.unpacked_dims.empty());
   EXPECT_NE(port.default_value, nullptr);
 }

@@ -1,9 +1,9 @@
 // §19.6: Defining cross coverage
 
+#include "simulation/coverage.h"
 #include <gtest/gtest.h>
 #include <string>
 #include <vector>
-#include "simulation/coverage.h"
 
 using namespace delta;
 
@@ -14,7 +14,7 @@ namespace {
 // =============================================================================
 TEST(Coverage, CrossCoverageCreation) {
   CoverageDB db;
-  auto* g = db.CreateGroup("cg");
+  auto *g = db.CreateGroup("cg");
   CoverageDB::AddCoverPoint(g, "a");
   CoverageDB::AddCoverPoint(g, "b");
 
@@ -38,7 +38,7 @@ TEST(Coverage, CrossCoverageCreation) {
 
 TEST(Coverage, CrossCoverageSampling) {
   CoverageDB db;
-  auto* g = db.CreateGroup("cg");
+  auto *g = db.CreateGroup("cg");
   CoverageDB::AddCoverPoint(g, "a");
   CoverageDB::AddCoverPoint(g, "b");
 
@@ -65,4 +65,4 @@ TEST(Coverage, CrossCoverageSampling) {
   EXPECT_EQ(g->crosses[0].bins[1].hit_count, 1u);
 }
 
-}  // namespace
+} // namespace

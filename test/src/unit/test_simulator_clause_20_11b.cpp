@@ -1,9 +1,5 @@
 // §20.11: Assertion control system tasks
 
-#include <gtest/gtest.h>
-#include <cstdint>
-#include <string_view>
-#include <vector>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -11,6 +7,10 @@
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
 #include "simulation/sva_engine.h"
+#include <cstdint>
+#include <gtest/gtest.h>
+#include <string_view>
+#include <vector>
 
 using namespace delta;
 
@@ -173,4 +173,4 @@ TEST(SvaEngine, KillClearsPendingAssertions) {
   EXPECT_EQ(count, 0);
 }
 
-}  // namespace
+} // namespace

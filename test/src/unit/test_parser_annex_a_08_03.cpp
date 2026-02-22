@@ -34,7 +34,8 @@ ParseResult Parse(const std::string &src) {
 
 static Stmt *FirstInitialStmt(ParseResult &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->kind != ModuleItemKind::kInitialBlock)
+      continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
     }
@@ -55,12 +56,13 @@ static Expr *FirstInitialRHS(ParseResult &r) {
 
 static Expr *FirstContAssignRHS(ParseResult &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kContAssign) return item->assign_rhs;
+    if (item->kind == ModuleItemKind::kContAssign)
+      return item->assign_rhs;
   }
   return nullptr;
 }
 
-}  // namespace
+} // namespace
 
 // =============================================================================
 // A.8.3 Expressions — inc_or_dec_expression
@@ -177,9 +179,8 @@ TEST(ParserA83, ConditionalExprWithBinaryCondition) {
 // § constant_expression ::= constant_primary
 
 TEST(ParserA83, ConstantExprPrimary) {
-  auto r = Parse(
-      "module m #(parameter int P = 42);\n"
-      "endmodule\n");
+  auto r = Parse("module m #(parameter int P = 42);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &params = r.cu->modules[0]->params;
@@ -192,9 +193,8 @@ TEST(ParserA83, ConstantExprPrimary) {
 // constant_primary
 
 TEST(ParserA83, ConstantExprUnary) {
-  auto r = Parse(
-      "module m #(parameter int P = -1);\n"
-      "endmodule\n");
+  auto r = Parse("module m #(parameter int P = -1);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &params = r.cu->modules[0]->params;
@@ -207,9 +207,8 @@ TEST(ParserA83, ConstantExprUnary) {
 // { attribute_instance } constant_expression
 
 TEST(ParserA83, ConstantExprBinary) {
-  auto r = Parse(
-      "module m #(parameter int P = 3 + 4);\n"
-      "endmodule\n");
+  auto r = Parse("module m #(parameter int P = 3 + 4);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &params = r.cu->modules[0]->params;
@@ -222,9 +221,8 @@ TEST(ParserA83, ConstantExprBinary) {
 // constant_expression : constant_expression
 
 TEST(ParserA83, ConstantExprTernary) {
-  auto r = Parse(
-      "module m #(parameter int P = 1 ? 10 : 20);\n"
-      "endmodule\n");
+  auto r = Parse("module m #(parameter int P = 1 ? 10 : 20);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &params = r.cu->modules[0]->params;
@@ -240,12 +238,11 @@ TEST(ParserA83, ConstantExprTernary) {
 // constant_expression : constant_expression
 
 TEST(ParserA83, ConstantMinTypMaxInSpecparam) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    specparam tpd = 1:2:3;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    specparam tpd = 1:2:3;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -257,9 +254,8 @@ TEST(ParserA83, ConstantMinTypMaxInSpecparam) {
 // § constant_param_expression ::= constant_mintypmax_expression | data_type | $
 
 TEST(ParserA83, ParamExprLiteralValue) {
-  auto r = Parse(
-      "module m #(parameter int P = 10);\n"
-      "endmodule\n");
+  auto r = Parse("module m #(parameter int P = 10);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->params[0].second->kind,
@@ -267,9 +263,8 @@ TEST(ParserA83, ParamExprLiteralValue) {
 }
 
 TEST(ParserA83, ParamExprBinaryOp) {
-  auto r = Parse(
-      "module m #(parameter int P = 2 * 8);\n"
-      "endmodule\n");
+  auto r = Parse("module m #(parameter int P = 2 * 8);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->params[0].second->kind, ExprKind::kBinary);
@@ -282,10 +277,9 @@ TEST(ParserA83, ParamExprBinaryOp) {
 // § constant_range ::= constant_expression : constant_expression
 
 TEST(ParserA83, ConstantRangeInPackedDim) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  logic [7:0] x;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -543,11 +537,10 @@ TEST(ParserA83, InsideExprMixedValuesAndRanges) {
 // § mintypmax_expression ::= expression : expression : expression
 
 TEST(ParserA83, MinTypMaxInDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire y;\n"
-      "  assign #(1:2:3) y = 1'b0;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire y;\n"
+                 "  assign #(1:2:3) y = 1'b0;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -555,11 +548,10 @@ TEST(ParserA83, MinTypMaxInDelay) {
 // § mintypmax_expression ::= expression (single form)
 
 TEST(ParserA83, MinTypMaxSingleExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire y;\n"
-      "  assign #5 y = 1'b0;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire y;\n"
+                 "  assign #5 y = 1'b0;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -614,15 +606,14 @@ TEST(ParserA83, PartSelectIndexedMinus) {
 // § genvar_expression ::= constant_expression (used in generate for)
 
 TEST(ParserA83, GenvarExprInGenerateFor) {
-  auto r = Parse(
-      "module m;\n"
-      "  genvar i;\n"
-      "  generate\n"
-      "    for (i = 0; i < 4; i = i + 1) begin : gen_blk\n"
-      "      wire w;\n"
-      "    end\n"
-      "  endgenerate\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  genvar i;\n"
+                 "  generate\n"
+                 "    for (i = 0; i < 4; i = i + 1) begin : gen_blk\n"
+                 "      wire w;\n"
+                 "    end\n"
+                 "  endgenerate\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -634,12 +625,11 @@ TEST(ParserA83, GenvarExprInGenerateFor) {
 // § module_path_expression used in specify block path conditions
 
 TEST(ParserA83, ModulePathExprInSpecify) {
-  auto r = Parse(
-      "module m(input a, output y);\n"
-      "  specify\n"
-      "    (a => y) = 1;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m(input a, output y);\n"
+                 "  specify\n"
+                 "    (a => y) = 1;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -647,13 +637,12 @@ TEST(ParserA83, ModulePathExprInSpecify) {
 // § module_path_conditional_expression used in specify ifnone
 
 TEST(ParserA83, ModulePathConditionalInSpecify) {
-  auto r = Parse(
-      "module m(input a, input en, output y);\n"
-      "  specify\n"
-      "    if (en) (a => y) = 2;\n"
-      "    ifnone (a => y) = 3;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m(input a, input en, output y);\n"
+                 "  specify\n"
+                 "    if (en) (a => y) = 2;\n"
+                 "    ifnone (a => y) = 3;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -767,12 +756,11 @@ TEST(ParserA83, ParenthesizedExpr) {
 // Continuous assignment with expression
 
 TEST(ParserA83, ExprInContAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire [7:0] y;\n"
-      "  wire [7:0] a, b;\n"
-      "  assign y = a + b;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire [7:0] y;\n"
+                 "  wire [7:0] a, b;\n"
+                 "  assign y = a + b;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstContAssignRHS(r);

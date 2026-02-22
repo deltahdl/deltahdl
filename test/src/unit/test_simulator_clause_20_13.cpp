@@ -21,17 +21,17 @@ struct SysTaskFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static Expr* MkSysCall(Arena& arena, std::string_view name,
-                       std::vector<Expr*> args) {
-  auto* e = arena.Create<Expr>();
+static Expr *MkSysCall(Arena &arena, std::string_view name,
+                       std::vector<Expr *> args) {
+  auto *e = arena.Create<Expr>();
   e->kind = ExprKind::kSystemCall;
   e->callee = name;
   e->args = std::move(args);
   return e;
 }
 
-static Expr* MkInt(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
+static Expr *MkInt(Arena &arena, uint64_t val) {
+  auto *e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
   e->int_val = val;
   return e;
@@ -41,7 +41,7 @@ namespace {
 
 TEST(SysTask, CoverageControlReturnsZero) {
   SysTaskFixture f;
-  auto* expr = MkSysCall(f.arena, "$coverage_control",
+  auto *expr = MkSysCall(f.arena, "$coverage_control",
                          {MkInt(f.arena, 1), MkInt(f.arena, 1),
                           MkInt(f.arena, 0), MkInt(f.arena, 0)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -50,7 +50,7 @@ TEST(SysTask, CoverageControlReturnsZero) {
 
 TEST(SysTask, CoverageGetMaxReturnsZero) {
   SysTaskFixture f;
-  auto* expr = MkSysCall(f.arena, "$coverage_get_max",
+  auto *expr = MkSysCall(f.arena, "$coverage_get_max",
                          {MkInt(f.arena, 1), MkInt(f.arena, 0)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
@@ -58,7 +58,7 @@ TEST(SysTask, CoverageGetMaxReturnsZero) {
 
 TEST(SysTask, CoverageGetReturnsZero) {
   SysTaskFixture f;
-  auto* expr = MkSysCall(f.arena, "$coverage_get",
+  auto *expr = MkSysCall(f.arena, "$coverage_get",
                          {MkInt(f.arena, 1), MkInt(f.arena, 0)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
@@ -66,14 +66,14 @@ TEST(SysTask, CoverageGetReturnsZero) {
 
 TEST(SysTask, CoverageMergeReturnsZero) {
   SysTaskFixture f;
-  auto* expr = MkSysCall(f.arena, "$coverage_merge", {});
+  auto *expr = MkSysCall(f.arena, "$coverage_merge", {});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
 TEST(SysTask, CoverageSaveReturnsZero) {
   SysTaskFixture f;
-  auto* expr = MkSysCall(f.arena, "$coverage_save", {});
+  auto *expr = MkSysCall(f.arena, "$coverage_save", {});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
@@ -83,8 +83,8 @@ TEST(SysTask, CoverageSaveReturnsZero) {
 // =============================================================================
 TEST(Coverage, GlobalCoverageSingleGroup) {
   CoverageDB db;
-  auto* g = db.CreateGroup("cg");
-  auto* cp = CoverageDB::AddCoverPoint(g, "x");
+  auto *g = db.CreateGroup("cg");
+  auto *cp = CoverageDB::AddCoverPoint(g, "x");
   CoverBin b;
   b.name = "b0";
   b.values = {0};
@@ -94,4 +94,4 @@ TEST(Coverage, GlobalCoverageSingleGroup) {
   EXPECT_DOUBLE_EQ(db.GetGlobalCoverage(), 100.0);
 }
 
-}  // namespace
+} // namespace

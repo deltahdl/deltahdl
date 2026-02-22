@@ -1,11 +1,11 @@
 // §24.3: The program construct
 
-#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -23,10 +23,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult Parse(const std::string& src) {
+static ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -37,13 +37,13 @@ static ParseResult Parse(const std::string& src) {
 }
 
 struct StructMemberExpected {
-  const char* name;
+  const char *name;
   DataTypeKind type_kind;
 };
 
 struct ModportPortExpected {
   Direction dir;
-  const char* name;
+  const char *name;
 };
 
 namespace {
@@ -58,14 +58,13 @@ TEST(Parser, EmptyProgram) {
 }
 
 TEST(Parser, ProgramWithInitial) {
-  auto r = Parse(
-      "program test_prog;\n"
-      "  initial $display(\"hello\");\n"
-      "endprogram\n");
+  auto r = Parse("program test_prog;\n"
+                 "  initial $display(\"hello\");\n"
+                 "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->programs.size(), 1);
   EXPECT_EQ(r.cu->programs[0]->items.size(), 1);
   EXPECT_EQ(r.cu->programs[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
 }
 
-}  // namespace
+} // namespace

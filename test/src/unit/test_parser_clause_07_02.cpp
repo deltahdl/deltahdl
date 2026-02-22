@@ -1,11 +1,11 @@
 // §7.2: Structures
 
-#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -23,10 +23,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult Parse(const std::string& src) {
+static ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -37,11 +37,11 @@ static ParseResult Parse(const std::string& src) {
 }
 
 struct StructMemberExpected {
-  const char* name;
+  const char *name;
   DataTypeKind type_kind;
 };
 
-static void VerifyStructMembers(const std::vector<StructMember>& members,
+static void VerifyStructMembers(const std::vector<StructMember> &members,
                                 const StructMemberExpected expected[],
                                 size_t count) {
   ASSERT_EQ(members.size(), count);
@@ -53,21 +53,20 @@ static void VerifyStructMembers(const std::vector<StructMember>& members,
 
 struct ModportPortExpected {
   Direction dir;
-  const char* name;
+  const char *name;
 };
 
 namespace {
 
 TEST(Parser, TypedefStruct) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct {\n"
-      "    logic [7:0] a;\n"
-      "    int b;\n"
-      "  } my_struct_t;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  typedef struct {\n"
+                 "    logic [7:0] a;\n"
+                 "    int b;\n"
+                 "  } my_struct_t;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
   EXPECT_EQ(item->name, "my_struct_t");
   EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kStruct);
@@ -80,31 +79,29 @@ TEST(Parser, TypedefStruct) {
 }
 
 TEST(Parser, TypedefStructPacked) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct packed {\n"
-      "    logic [3:0] hi;\n"
-      "    logic [3:0] lo;\n"
-      "  } byte_t;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  typedef struct packed {\n"
+                 "    logic [3:0] hi;\n"
+                 "    logic [3:0] lo;\n"
+                 "  } byte_t;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kStruct);
   EXPECT_TRUE(item->typedef_type.is_packed);
   ASSERT_EQ(item->typedef_type.struct_members.size(), 2);
 }
 
 TEST(Parser, InlineStructVar) {
-  auto r = Parse(
-      "module t;\n"
-      "  struct { int x; int y; } point;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  struct { int x; int y; } point;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(item->name, "point");
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kStruct);
   ASSERT_EQ(item->data_type.struct_members.size(), 2);
 }
 
-}  // namespace
+} // namespace

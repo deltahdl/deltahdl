@@ -1,8 +1,8 @@
 // §32.3: The SDF annotator
 
-#include <gtest/gtest.h>
 #include "simulation/sdf_parser.h"
 #include "simulation/specify.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -73,10 +73,10 @@ TEST(SdfParser, AnnotateTimingChecks) {
   AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
 
   ASSERT_EQ(mgr.TimingCheckCount(), 1u);
-  auto& checks = mgr.GetTimingChecks();
+  auto &checks = mgr.GetTimingChecks();
   EXPECT_EQ(checks[0].kind, TimingCheckKind::kSetup);
   EXPECT_EQ(checks[0].ref_signal, "clk");
   EXPECT_EQ(checks[0].limit, 50u);
 }
 
-}  // namespace
+} // namespace

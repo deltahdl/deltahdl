@@ -30,7 +30,7 @@ TEST(SimCh4425, ObservedRegionExecutesEvents) {
   Scheduler sched(arena);
   int executed = 0;
 
-  auto* ev = sched.GetEventPool().Acquire();
+  auto *ev = sched.GetEventPool().Acquire();
   ev->callback = [&]() { executed++; };
   sched.ScheduleEvent({0}, Region::kObserved, ev);
 
@@ -48,7 +48,7 @@ TEST(SimCh4425, ObservedRegionHoldsMultipleEvents) {
   int count = 0;
 
   for (int i = 0; i < 5; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&]() { count++; };
     sched.ScheduleEvent({0}, Region::kObserved, ev);
   }
@@ -66,11 +66,11 @@ TEST(SimCh4425, ObservedSchedulesPassFailIntoReactive) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto* obs = sched.GetEventPool().Acquire();
+  auto *obs = sched.GetEventPool().Acquire();
   obs->callback = [&]() {
     order.push_back("observed");
     // Property pass/fail action: schedule into Reactive.
-    auto* reactive = sched.GetEventPool().Acquire();
+    auto *reactive = sched.GetEventPool().Acquire();
     reactive->callback = [&order]() { order.push_back("reactive"); };
     sched.ScheduleEvent({0}, Region::kReactive, reactive);
   };
@@ -92,11 +92,11 @@ TEST(SimCh4425, MultiplePassFailActionsScheduledInReactive) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto* obs = sched.GetEventPool().Acquire();
+  auto *obs = sched.GetEventPool().Acquire();
   obs->callback = [&]() {
     order.push_back("observed");
     for (int i = 0; i < 3; ++i) {
-      auto* r = sched.GetEventPool().Acquire();
+      auto *r = sched.GetEventPool().Acquire();
       r->callback = [&order, i]() {
         order.push_back("reactive" + std::to_string(i));
       };
@@ -123,8 +123,8 @@ TEST(SimCh4425, ObservedExecutesAfterActiveRegionSet) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
+  auto schedule = [&](Region r, const std::string &label) {
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, label]() { order.push_back(label); };
     sched.ScheduleEvent({0}, r, ev);
   };
@@ -153,11 +153,11 @@ TEST(SimCh4425, ObservedToActiveRestart) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto* obs = sched.GetEventPool().Acquire();
+  auto *obs = sched.GetEventPool().Acquire();
   obs->callback = [&]() {
     order.push_back("observed");
     // Observed schedules a new Active event -> restarts active set.
-    auto* act = sched.GetEventPool().Acquire();
+    auto *act = sched.GetEventPool().Acquire();
     act->callback = [&order]() { order.push_back("active_restart"); };
     sched.ScheduleEvent({0}, Region::kActive, act);
   };
@@ -190,11 +190,11 @@ TEST(SimCh4425, PreObservedExecutesBeforeObserved) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto* obs = sched.GetEventPool().Acquire();
+  auto *obs = sched.GetEventPool().Acquire();
   obs->callback = [&]() { order.push_back("observed"); };
   sched.ScheduleEvent({0}, Region::kObserved, obs);
 
-  auto* pre_obs = sched.GetEventPool().Acquire();
+  auto *pre_obs = sched.GetEventPool().Acquire();
   pre_obs->callback = [&]() { order.push_back("pre_observed"); };
   sched.ScheduleEvent({0}, Region::kPreObserved, pre_obs);
 
@@ -213,11 +213,11 @@ TEST(SimCh4425, ObservedExecutesBeforePostObserved) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto* post_obs = sched.GetEventPool().Acquire();
+  auto *post_obs = sched.GetEventPool().Acquire();
   post_obs->callback = [&]() { order.push_back("post_observed"); };
   sched.ScheduleEvent({0}, Region::kPostObserved, post_obs);
 
-  auto* obs = sched.GetEventPool().Acquire();
+  auto *obs = sched.GetEventPool().Acquire();
   obs->callback = [&]() { order.push_back("observed"); };
   sched.ScheduleEvent({0}, Region::kObserved, obs);
 
@@ -237,7 +237,7 @@ TEST(SimCh4425, ObservedEventsAcrossMultipleTimeSlots) {
   std::vector<uint64_t> times;
 
   for (uint64_t t = 0; t < 3; ++t) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&times, &sched]() {
       times.push_back(sched.CurrentTime().ticks);
     };

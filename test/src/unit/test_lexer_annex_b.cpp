@@ -6,7 +6,7 @@
 
 using namespace delta;
 
-static std::vector<Token> Lex(const std::string& src) {
+static std::vector<Token> Lex(const std::string &src) {
   static SourceManager mgr;
   auto fid = mgr.AddFile("<test>", src);
   DiagEngine diag(mgr);
@@ -18,7 +18,7 @@ TEST(Lexer, AllAnnexBKeywords) {
   // Every IEEE 1800-2023 Annex B keyword must lex as a keyword, not
   // kIdentifier.  If this test fails, a keyword is missing from the
   // keyword table in keywords.cpp or token.h.
-  const char* const kKeywords[] = {
+  const char *const kKeywords[] = {
       "accept_on",
       "alias",
       "always",
@@ -268,7 +268,7 @@ TEST(Lexer, AllAnnexBKeywords) {
       "xnor",
       "xor",
   };
-  for (const char* kw : kKeywords) {
+  for (const char *kw : kKeywords) {
     auto tokens = Lex(kw);
     ASSERT_GE(tokens.size(), 2) << "keyword: " << kw;
     EXPECT_NE(tokens[0].kind, TokenKind::kIdentifier)

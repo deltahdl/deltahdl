@@ -12,11 +12,11 @@ using namespace delta;
 struct ParseResult305 {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult305 Parse(const std::string& src) {
+static ParseResult305 Parse(const std::string &src) {
   ParseResult305 result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
@@ -30,10 +30,11 @@ static ParseResult305 Parse(const std::string& src) {
   return result;
 }
 
-static bool HasItemOfKind(const std::vector<ModuleItem*>& items,
+static bool HasItemOfKind(const std::vector<ModuleItem *> &items,
                           ModuleItemKind kind) {
-  for (const auto* item : items)
-    if (item->kind == kind) return true;
+  for (const auto *item : items)
+    if (item->kind == kind)
+      return true;
   return false;
 }
 
@@ -44,13 +45,12 @@ static bool HasItemOfKind(const std::vector<ModuleItem*>& items,
 // §3.5 LRM example: simple_bus interface definition.
 // Also covers end label (endinterface : simple_bus) and interface port.
 TEST(ParserClause03, Cl3_5_LrmExample) {
-  auto r = Parse(
-      "interface simple_bus(input logic clk);\n"
-      "  logic req, gnt;\n"
-      "  logic [7:0] addr, data;\n"
-      "  logic [1:0] mode;\n"
-      "  logic start, rdy;\n"
-      "endinterface : simple_bus\n");
+  auto r = Parse("interface simple_bus(input logic clk);\n"
+                 "  logic req, gnt;\n"
+                 "  logic [7:0] addr, data;\n"
+                 "  logic [1:0] mode;\n"
+                 "  logic start, rdy;\n"
+                 "endinterface : simple_bus\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->interfaces.size(), 1u);
@@ -63,12 +63,11 @@ TEST(ParserClause03, Cl3_5_LrmExample) {
 
 // §3.5: "An interface can have parameters, constants, variables"
 TEST(ParserClause03, Cl3_5_ParametersConstantsVariables) {
-  auto r = Parse(
-      "interface ifc #(parameter WIDTH = 8);\n"
-      "  localparam DEPTH = 16;\n"
-      "  logic [WIDTH-1:0] data;\n"
-      "  wire valid;\n"
-      "endinterface\n");
+  auto r = Parse("interface ifc #(parameter WIDTH = 8);\n"
+                 "  localparam DEPTH = 16;\n"
+                 "  logic [WIDTH-1:0] data;\n"
+                 "  wire valid;\n"
+                 "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->interfaces.size(), 1u);
@@ -77,14 +76,13 @@ TEST(ParserClause03, Cl3_5_ParametersConstantsVariables) {
 
 // §3.5: "An interface can have ... functions, and tasks"
 TEST(ParserClause03, Cl3_5_FunctionsAndTasks) {
-  auto r = Parse(
-      "interface ifc;\n"
-      "  function automatic int get_data;\n"
-      "    return 42;\n"
-      "  endfunction\n"
-      "  task automatic send(input int val);\n"
-      "  endtask\n"
-      "endinterface\n");
+  auto r = Parse("interface ifc;\n"
+                 "  function automatic int get_data;\n"
+                 "    return 42;\n"
+                 "  endfunction\n"
+                 "  task automatic send(input int val);\n"
+                 "  endtask\n"
+                 "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(
@@ -96,13 +94,12 @@ TEST(ParserClause03, Cl3_5_FunctionsAndTasks) {
 // §3.5: "an interface can also contain processes (i.e., initial or always
 //        procedures) and continuous assignments"
 TEST(ParserClause03, Cl3_5_ProcessesAndContinuousAssign) {
-  auto r = Parse(
-      "interface ifc;\n"
-      "  logic sig_a, sig_b;\n"
-      "  initial sig_a = 0;\n"
-      "  always @(sig_a) sig_b = ~sig_a;\n"
-      "  assign sig_b = sig_a;\n"
-      "endinterface\n");
+  auto r = Parse("interface ifc;\n"
+                 "  logic sig_a, sig_b;\n"
+                 "  initial sig_a = 0;\n"
+                 "  always @(sig_a) sig_b = ~sig_a;\n"
+                 "  assign sig_b = sig_a;\n"
+                 "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(
@@ -115,13 +112,12 @@ TEST(ParserClause03, Cl3_5_ProcessesAndContinuousAssign) {
 
 // §3.5: "the modport construct is provided"
 TEST(ParserClause03, Cl3_5_Modport) {
-  auto r = Parse(
-      "interface myif;\n"
-      "  logic [7:0] data;\n"
-      "  logic valid, ready;\n"
-      "  modport master (output data, output valid, input ready);\n"
-      "  modport slave (input data, input valid, output ready);\n"
-      "endinterface\n");
+  auto r = Parse("interface myif;\n"
+                 "  logic [7:0] data;\n"
+                 "  logic valid, ready;\n"
+                 "  modport master (output data, output valid, input ready);\n"
+                 "  modport slave (input data, input valid, output ready);\n"
+                 "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->interfaces.size(), 1u);

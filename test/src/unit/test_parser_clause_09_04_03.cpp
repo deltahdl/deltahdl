@@ -1,11 +1,11 @@
 // §9.4.3: Level-sensitive event control
 
-#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -23,10 +23,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult Parse(const std::string& src) {
+static ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -36,17 +36,20 @@ static ParseResult Parse(const std::string& src) {
   return result;
 }
 
-static ModuleItem* FindItemByKind(const std::vector<ModuleItem*>& items,
+static ModuleItem *FindItemByKind(const std::vector<ModuleItem *> &items,
                                   ModuleItemKind kind) {
-  for (auto* item : items) {
-    if (item->kind == kind) return item;
+  for (auto *item : items) {
+    if (item->kind == kind)
+      return item;
   }
   return nullptr;
 }
 
-static Stmt* FirstInitialStmt(ParseResult& r) {
-  auto* item = FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
-  if (!item || !item->body) return nullptr;
+static Stmt *FirstInitialStmt(ParseResult &r) {
+  auto *item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
+  if (!item || !item->body)
+    return nullptr;
   if (item->body->kind == StmtKind::kBlock) {
     return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
   }
@@ -56,18 +59,17 @@ static Stmt* FirstInitialStmt(ParseResult& r) {
 namespace {
 
 TEST(Parser, WaitStatement) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    wait (ready) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  initial begin\n"
+                 "    wait (ready) x = 1;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kWait);
   EXPECT_NE(stmt->condition, nullptr);
   EXPECT_NE(stmt->body, nullptr);
 }
 
-}  // namespace
+} // namespace

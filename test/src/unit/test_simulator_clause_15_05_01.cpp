@@ -1,8 +1,5 @@
 // §15.5.1: Triggering an event
 
-#include <gtest/gtest.h>
-#include <cstdint>
-#include <string_view>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -17,6 +14,9 @@
 #include "simulation/stmt_result.h"
 #include "simulation/sync_objects.h"
 #include "simulation/variable.h"
+#include <cstdint>
+#include <gtest/gtest.h>
+#include <string_view>
 
 using namespace delta;
 
@@ -36,13 +36,13 @@ namespace {
 // =============================================================================
 TEST(IpcSync, EventVariableCreation) {
   SyncFixture f;
-  auto* ev = f.ctx.CreateVariable("ev1", 1);
+  auto *ev = f.ctx.CreateVariable("ev1", 1);
   ev->is_event = true;
   ev->value = MakeLogic4VecVal(f.arena, 1, 0);
 
-  auto* found = f.ctx.FindVariable("ev1");
+  auto *found = f.ctx.FindVariable("ev1");
   ASSERT_NE(found, nullptr);
   EXPECT_TRUE(found->is_event);
 }
 
-}  // namespace
+} // namespace

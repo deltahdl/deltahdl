@@ -1,8 +1,5 @@
 // §14.4: Input and output skews
 
-#include <gtest/gtest.h>
-#include <cstdint>
-#include <string_view>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -12,6 +9,9 @@
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
 #include "simulation/variable.h"
+#include <cstdint>
+#include <gtest/gtest.h>
+#include <string_view>
 
 using namespace delta;
 
@@ -25,8 +25,8 @@ struct ClockingSimFixture {
 };
 
 // Schedule posedge at a given time through the scheduler.
-void SchedulePosedge(ClockingSimFixture& f, Variable* clk, uint64_t time) {
-  auto* ev = f.scheduler.GetEventPool().Acquire();
+void SchedulePosedge(ClockingSimFixture &f, Variable *clk, uint64_t time) {
+  auto *ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [clk, &f]() {
     clk->prev_value = clk->value;
     clk->value = MakeLogic4VecVal(f.arena, 1, 1);
@@ -36,8 +36,8 @@ void SchedulePosedge(ClockingSimFixture& f, Variable* clk, uint64_t time) {
 }
 
 // Schedule negedge at a given time through the scheduler.
-void ScheduleNegedge(ClockingSimFixture& f, Variable* clk, uint64_t time) {
-  auto* ev = f.scheduler.GetEventPool().Acquire();
+void ScheduleNegedge(ClockingSimFixture &f, Variable *clk, uint64_t time) {
+  auto *ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [clk, &f]() {
     clk->prev_value = clk->value;
     clk->value = MakeLogic4VecVal(f.arena, 1, 0);
@@ -53,9 +53,9 @@ namespace {
 // =============================================================================
 TEST(ClockingSim, InputSkewSamplesBeforeClockEdge) {
   ClockingSimFixture f;
-  auto* clk = f.ctx.CreateVariable("clk", 1);
+  auto *clk = f.ctx.CreateVariable("clk", 1);
   clk->value = MakeLogic4VecVal(f.arena, 1, 0);
-  auto* data = f.ctx.CreateVariable("data_in", 8);
+  auto *data = f.ctx.CreateVariable("data_in", 8);
   data->value = MakeLogic4VecVal(f.arena, 8, 0xAB);
 
   ClockingManager cmgr;
@@ -86,9 +86,9 @@ TEST(ClockingSim, InputSkewSamplesBeforeClockEdge) {
 // =============================================================================
 TEST(ClockingSim, OutputSkewDrivesAfterClockEdge) {
   ClockingSimFixture f;
-  auto* clk = f.ctx.CreateVariable("clk", 1);
+  auto *clk = f.ctx.CreateVariable("clk", 1);
   clk->value = MakeLogic4VecVal(f.arena, 1, 0);
-  auto* data_out = f.ctx.CreateVariable("data_out", 8);
+  auto *data_out = f.ctx.CreateVariable("data_out", 8);
   data_out->value = MakeLogic4VecVal(f.arena, 8, 0);
 
   ClockingManager cmgr;
@@ -106,7 +106,7 @@ TEST(ClockingSim, OutputSkewDrivesAfterClockEdge) {
   cmgr.Register(block);
   cmgr.Attach(f.ctx, f.scheduler);
 
-  auto* ev = f.scheduler.GetEventPool().Acquire();
+  auto *ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [&cmgr, &f]() {
     cmgr.ScheduleOutputDrive("cb", "data_out", 0x55, f.ctx, f.scheduler);
   };
@@ -190,4 +190,4 @@ TEST(ClockingSim, PerSignalOutputSkewOverride) {
   EXPECT_EQ(cmgr.GetOutputSkew("cb", "other").ticks, 10u);
 }
 
-}  // namespace
+} // namespace

@@ -19,7 +19,7 @@ struct PreprocResult31402 {
   bool has_errors;
 };
 
-static PreprocResult31402 Preprocess(const std::string& src) {
+static PreprocResult31402 Preprocess(const std::string &src) {
   PreprocResult31402 result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
@@ -36,11 +36,11 @@ static PreprocResult31402 Preprocess(const std::string& src) {
 struct ParseResult31402 {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult31402 Parse(const std::string& src) {
+static ParseResult31402 Parse(const std::string &src) {
   ParseResult31402 result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
@@ -72,14 +72,13 @@ TEST(ParserClause03, Cl3_14_2_TimescaleDirectiveSetsUnitAndPrecision) {
 // 25. Way 2: timeunit and timeprecision keywords specify time unit and
 // precision independently.  "Using the keywords timeunit and timeprecision"
 TEST(ParserClause03, Cl3_14_2_KeywordsSetUnitAndPrecision) {
-  auto r = Parse(
-      "module m;\n"
-      "  timeunit 1ns;\n"
-      "  timeprecision 1ps;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  timeunit 1ns;\n"
+                 "  timeprecision 1ps;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* mod = r.cu->modules[0];
+  auto *mod = r.cu->modules[0];
   EXPECT_TRUE(mod->has_timeunit);
   EXPECT_TRUE(mod->has_timeprecision);
   EXPECT_EQ(mod->time_unit, TimeUnit::kNs);
@@ -88,13 +87,12 @@ TEST(ParserClause03, Cl3_14_2_KeywordsSetUnitAndPrecision) {
 
 // 26. Way 2 alternate: timeunit with slash separator combines both.
 TEST(ParserClause03, Cl3_14_2_TimeunitSlashCombinesBoth) {
-  auto r = Parse(
-      "module m;\n"
-      "  timeunit 1ns / 1ps;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  timeunit 1ns / 1ps;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* mod = r.cu->modules[0];
+  auto *mod = r.cu->modules[0];
   EXPECT_TRUE(mod->has_timeunit);
   EXPECT_TRUE(mod->has_timeprecision);
   EXPECT_EQ(mod->time_unit, TimeUnit::kNs);
@@ -155,11 +153,10 @@ TEST(ParserClause03, Cl3_14_2_EquivalentSpecifications) {
   auto pp = Preprocess("`timescale 1ns / 1ps\n");
   EXPECT_FALSE(pp.has_errors);
   // Way 2: keywords inside a module.
-  auto pr = Parse(
-      "module m;\n"
-      "  timeunit 1ns;\n"
-      "  timeprecision 1ps;\n"
-      "endmodule\n");
+  auto pr = Parse("module m;\n"
+                  "  timeunit 1ns;\n"
+                  "  timeprecision 1ps;\n"
+                  "endmodule\n");
   EXPECT_FALSE(pr.has_errors);
   // Both specify the same unit and precision.
   EXPECT_EQ(pp.timescale.unit, pr.cu->modules[0]->time_unit);
@@ -170,13 +167,12 @@ TEST(ParserClause03, Cl3_14_2_EquivalentSpecifications) {
 // has_timeunit=false (keywords were not used), but the preprocessor
 // carries the timescale state for this module.
 TEST(ParserClause03, Cl3_14_2_TimescaleWithoutKeywords) {
-  auto r = Parse(
-      "`timescale 1ns / 1ps\n"
-      "module m;\n"
-      "endmodule\n");
+  auto r = Parse("`timescale 1ns / 1ps\n"
+                 "module m;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* mod = r.cu->modules[0];
+  auto *mod = r.cu->modules[0];
   // Keywords were not used — flags are false.
   EXPECT_FALSE(mod->has_timeunit);
   EXPECT_FALSE(mod->has_timeprecision);

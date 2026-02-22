@@ -1,8 +1,5 @@
 // §15.4.6: Try_get()
 
-#include <gtest/gtest.h>
-#include <cstdint>
-#include <string_view>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -17,6 +14,9 @@
 #include "simulation/stmt_result.h"
 #include "simulation/sync_objects.h"
 #include "simulation/variable.h"
+#include <cstdint>
+#include <gtest/gtest.h>
+#include <string_view>
 
 using namespace delta;
 
@@ -49,4 +49,4 @@ TEST(IpcSync, MailboxTryGetEmpty) {
   EXPECT_EQ(mb.TryGet(msg), -1);
 }
 
-}  // namespace
+} // namespace

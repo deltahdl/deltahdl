@@ -15,11 +15,11 @@ namespace {
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
   bool has_errors = false;
 };
 
-ParseResult Parse(const std::string& src) {
+ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -30,9 +30,10 @@ ParseResult Parse(const std::string& src) {
   return result;
 }
 
-Stmt* FirstInitialStmt(ParseResult& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+Stmt *FirstInitialStmt(ParseResult &r) {
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock)
+      continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
     }
@@ -41,7 +42,7 @@ Stmt* FirstInitialStmt(ParseResult& r) {
   return nullptr;
 }
 
-}  // namespace
+} // namespace
 
 // =============================================================================
 // Annex D -- Optional system tasks
@@ -50,7 +51,7 @@ Stmt* FirstInitialStmt(ParseResult& r) {
 TEST(ParserAnnexD, AnnexDCountdrivers) {
   auto r = Parse("module m; initial $countdrivers(sig); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
   EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
@@ -59,32 +60,29 @@ TEST(ParserAnnexD, AnnexDCountdrivers) {
 TEST(ParserAnnexD, AnnexDList) {
   auto r = Parse("module m; initial $list; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
   EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
 }
 
 TEST(ParserAnnexD, AnnexDLog) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin $log(\"sim.log\"); $nolog; end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin $log(\"sim.log\"); $nolog; end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
 }
 
 TEST(ParserAnnexD, AnnexDSave) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin $save(\"s.sav\"); $restart(\"s.sav\"); end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin $save(\"s.sav\"); $restart(\"s.sav\"); end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
 }
 
 TEST(ParserAnnexD, AnnexDScope) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin $scope(m); $showscopes; end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin $scope(m); $showscopes; end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
 }

@@ -1,9 +1,9 @@
 // Non-LRM tests
 
-#include <gtest/gtest.h>
-#include <cstdint>
 #include "synthesis/aig.h"
 #include "synthesis/lut_map.h"
+#include <cstdint>
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -23,7 +23,7 @@ TEST(LutMap, SingleAndGateMapsToOneLut) {
   auto mapping = mapper.Map(g);
 
   ASSERT_EQ(mapping.cells.size(), 1);
-  const auto& cell = mapping.cells[0];
+  const auto &cell = mapping.cells[0];
   EXPECT_EQ(cell.output, AigVar(c));
   EXPECT_LE(cell.inputs.size(), 4u);
 
@@ -44,7 +44,7 @@ TEST(LutMap, NotGateMapsToOneLut) {
   auto mapping = mapper.Map(g);
 
   ASSERT_EQ(mapping.cells.size(), 1);
-  const auto& cell = mapping.cells[0];
+  const auto &cell = mapping.cells[0];
 
   // 1-input inverter: truth table 0b01 (output=1 when input=0).
   EXPECT_EQ(cell.inputs.size(), 1u);
@@ -63,7 +63,7 @@ TEST(LutMap, DirectWireMapsToOneLut) {
   auto mapping = mapper.Map(g);
 
   ASSERT_EQ(mapping.cells.size(), 1);
-  const auto& cell = mapping.cells[0];
+  const auto &cell = mapping.cells[0];
 
   // 1-input identity buffer: truth table 0b10.
   EXPECT_EQ(cell.inputs.size(), 1u);
@@ -136,7 +136,7 @@ TEST(LutMap, LutSizeParameterIsRespected) {
   LutMapper mapper2(2);
   auto mapping2 = mapper2.Map(g);
 
-  for (const auto& cell : mapping2.cells) {
+  for (const auto &cell : mapping2.cells) {
     EXPECT_LE(cell.inputs.size(), 2u);
   }
 
@@ -145,7 +145,7 @@ TEST(LutMap, LutSizeParameterIsRespected) {
   auto mapping4 = mapper4.Map(g);
 
   EXPECT_GE(mapping4.cells.size(), 1u);
-  for (const auto& cell : mapping4.cells) {
+  for (const auto &cell : mapping4.cells) {
     EXPECT_LE(cell.inputs.size(), 4u);
   }
 }
@@ -164,7 +164,7 @@ TEST(LutMap, OrGateTruthTable) {
   auto mapping = mapper.Map(g);
 
   ASSERT_EQ(mapping.cells.size(), 1);
-  const auto& cell = mapping.cells[0];
+  const auto &cell = mapping.cells[0];
 
   // OR truth table for 2 inputs: 0|0=0, 0|1=1, 1|0=1, 1|1=1 -> 0b1110 = 14.
   // However, the leaf ordering matters. Check that exactly 3 of 4 rows are 1.
@@ -177,4 +177,4 @@ TEST(LutMap, OrGateTruthTable) {
   EXPECT_EQ(popcount, 3u);
 }
 
-}  // namespace
+} // namespace

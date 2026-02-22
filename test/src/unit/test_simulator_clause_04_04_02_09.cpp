@@ -29,7 +29,7 @@ TEST(SimCh4429, PostponedRegionExecutesEvents) {
   Scheduler sched(arena);
   int executed = 0;
 
-  auto* ev = sched.GetEventPool().Acquire();
+  auto *ev = sched.GetEventPool().Acquire();
   ev->callback = [&]() { executed++; };
   sched.ScheduleEvent({0}, Region::kPostponed, ev);
 
@@ -47,7 +47,7 @@ TEST(SimCh4429, PostponedRegionHoldsMultipleEvents) {
   int count = 0;
 
   for (int i = 0; i < 5; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&]() { count++; };
     sched.ScheduleEvent({0}, Region::kPostponed, ev);
   }
@@ -68,27 +68,27 @@ TEST(SimCh4429, PostponedObservesFinalState) {
   int sampled = -1;
 
   // Active at time 0 sets value = 10.
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->callback = [&]() { value = 10; };
   sched.ScheduleEvent({0}, Region::kActive, active);
 
   // NBA at time 0 sets value = 20.
-  auto* nba = sched.GetEventPool().Acquire();
+  auto *nba = sched.GetEventPool().Acquire();
   nba->callback = [&]() { value = 20; };
   sched.ScheduleEvent({0}, Region::kNBA, nba);
 
   // Reactive at time 0 sets value = 30.
-  auto* reactive = sched.GetEventPool().Acquire();
+  auto *reactive = sched.GetEventPool().Acquire();
   reactive->callback = [&]() { value = 30; };
   sched.ScheduleEvent({0}, Region::kReactive, reactive);
 
   // Re-NBA at time 0 sets value = 40.
-  auto* renba = sched.GetEventPool().Acquire();
+  auto *renba = sched.GetEventPool().Acquire();
   renba->callback = [&]() { value = 40; };
   sched.ScheduleEvent({0}, Region::kReNBA, renba);
 
   // Postponed samples value — should see final state (40).
-  auto* postponed = sched.GetEventPool().Acquire();
+  auto *postponed = sched.GetEventPool().Acquire();
   postponed->callback = [&]() { sampled = value; };
   sched.ScheduleEvent({0}, Region::kPostponed, postponed);
 
@@ -106,8 +106,8 @@ TEST(SimCh4429, PostponedExecutesAfterAllOtherSimulationRegions) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
+  auto schedule = [&](Region r, const std::string &label) {
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, label]() { order.push_back(label); };
     sched.ScheduleEvent({0}, r, ev);
   };
@@ -149,17 +149,17 @@ TEST(SimCh4429, PostponedDoesNotReExecuteDuringIteration) {
   Scheduler sched(arena);
   int postponed_count = 0;
 
-  auto* postponed = sched.GetEventPool().Acquire();
+  auto *postponed = sched.GetEventPool().Acquire();
   postponed->callback = [&]() { postponed_count++; };
   sched.ScheduleEvent({0}, Region::kPostponed, postponed);
 
   // Active callback triggers NBA (causing active-set re-iteration).
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->callback = [&]() {
-    auto* nba = sched.GetEventPool().Acquire();
+    auto *nba = sched.GetEventPool().Acquire();
     nba->callback = [&]() {
       // NBA schedules new Active -> triggers re-iteration.
-      auto* act2 = sched.GetEventPool().Acquire();
+      auto *act2 = sched.GetEventPool().Acquire();
       act2->callback = []() {};
       sched.ScheduleEvent({0}, Region::kActive, act2);
     };
@@ -182,12 +182,12 @@ TEST(SimCh4429, PostponedAdvancesToNextTimeSlot) {
   std::vector<std::string> order;
 
   // Postponed at time 0.
-  auto* postponed0 = sched.GetEventPool().Acquire();
+  auto *postponed0 = sched.GetEventPool().Acquire();
   postponed0->callback = [&]() { order.push_back("postponed_t0"); };
   sched.ScheduleEvent({0}, Region::kPostponed, postponed0);
 
   // Preponed at time 1 — runs after Postponed at time 0.
-  auto* preponed1 = sched.GetEventPool().Acquire();
+  auto *preponed1 = sched.GetEventPool().Acquire();
   preponed1->callback = [&]() { order.push_back("preponed_t1"); };
   sched.ScheduleEvent({1}, Region::kPreponed, preponed1);
 
@@ -208,11 +208,11 @@ TEST(SimCh4429, PostponedPLIEventsExecuteInRegion) {
   std::vector<std::string> order;
 
   // Simulate a "PLI" event and a "simulation" event both in Postponed.
-  auto* pli_ev = sched.GetEventPool().Acquire();
+  auto *pli_ev = sched.GetEventPool().Acquire();
   pli_ev->callback = [&order]() { order.push_back("pli"); };
   sched.ScheduleEvent({0}, Region::kPostponed, pli_ev);
 
-  auto* sim_ev = sched.GetEventPool().Acquire();
+  auto *sim_ev = sched.GetEventPool().Acquire();
   sim_ev->callback = [&order]() { order.push_back("sim"); };
   sched.ScheduleEvent({0}, Region::kPostponed, sim_ev);
 
@@ -232,7 +232,7 @@ TEST(SimCh4429, PostponedEventsAcrossMultipleTimeSlots) {
   std::vector<uint64_t> times;
 
   for (uint64_t t = 0; t < 3; ++t) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&times, &sched]() {
       times.push_back(sched.CurrentTime().ticks);
     };
@@ -259,22 +259,22 @@ TEST(SimCh4429, PostponedStatePersistsToNextPreponed) {
   int sampled_preponed = -1;
 
   // Active at time 0 sets value = 100.
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->callback = [&]() { value = 100; };
   sched.ScheduleEvent({0}, Region::kActive, active);
 
   // Postponed at time 0 samples value.
-  auto* postponed = sched.GetEventPool().Acquire();
+  auto *postponed = sched.GetEventPool().Acquire();
   postponed->callback = [&]() { sampled_postponed = value; };
   sched.ScheduleEvent({0}, Region::kPostponed, postponed);
 
   // Preponed at time 1 samples value (should match Postponed at time 0).
-  auto* preponed = sched.GetEventPool().Acquire();
+  auto *preponed = sched.GetEventPool().Acquire();
   preponed->callback = [&]() { sampled_preponed = value; };
   sched.ScheduleEvent({1}, Region::kPreponed, preponed);
 
   // Active at time 1 modifies value — but Preponed already ran.
-  auto* active1 = sched.GetEventPool().Acquire();
+  auto *active1 = sched.GetEventPool().Acquire();
   active1->callback = [&]() { value = 999; };
   sched.ScheduleEvent({1}, Region::kActive, active1);
 

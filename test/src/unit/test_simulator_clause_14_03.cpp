@@ -1,12 +1,12 @@
 // §14.3: Clocking block declaration
 
-#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "simulation/clocking.h"
 #include "simulation/sim_context.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -26,7 +26,7 @@ TEST(Clocking, RegisterAndFind) {
   mgr.Register(block);
   EXPECT_EQ(mgr.Count(), 1u);
 
-  const auto* found = mgr.Find("cb_main");
+  const auto *found = mgr.Find("cb_main");
   ASSERT_NE(found, nullptr);
   EXPECT_EQ(found->clock_signal, "clk");
   EXPECT_EQ(found->default_input_skew.ticks, 2u);
@@ -37,4 +37,4 @@ TEST(Clocking, FindNonexistent) {
   EXPECT_EQ(mgr.Find("nonexistent"), nullptr);
 }
 
-}  // namespace
+} // namespace

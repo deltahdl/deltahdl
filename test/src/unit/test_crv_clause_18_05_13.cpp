@@ -1,13 +1,13 @@
 // §18.5.13: Soft constraints
 
-#include <gtest/gtest.h>
+#include "simulation/constraint_solver.h"
 #include <algorithm>
 #include <cstdint>
+#include <gtest/gtest.h>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include "simulation/constraint_solver.h"
 
 using namespace delta;
 
@@ -79,4 +79,4 @@ TEST(Constraint, SoftConstraintAloneSatisfied) {
   EXPECT_LE(solver.GetValue("x"), 100);
 }
 
-}  // namespace
+} // namespace

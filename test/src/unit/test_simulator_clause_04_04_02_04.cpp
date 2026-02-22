@@ -29,7 +29,7 @@ TEST(SimCh4424, NBARegionExecutesEvents) {
   Scheduler sched(arena);
   int executed = 0;
 
-  auto* ev = sched.GetEventPool().Acquire();
+  auto *ev = sched.GetEventPool().Acquire();
   ev->callback = [&]() { executed++; };
   sched.ScheduleEvent({0}, Region::kNBA, ev);
 
@@ -46,11 +46,11 @@ TEST(SimCh4424, NBAExecutesAfterInactive) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto* nba = sched.GetEventPool().Acquire();
+  auto *nba = sched.GetEventPool().Acquire();
   nba->callback = [&]() { order.push_back("nba"); };
   sched.ScheduleEvent({0}, Region::kNBA, nba);
 
-  auto* inactive = sched.GetEventPool().Acquire();
+  auto *inactive = sched.GetEventPool().Acquire();
   inactive->callback = [&]() { order.push_back("inactive"); };
   sched.ScheduleEvent({0}, Region::kInactive, inactive);
 
@@ -70,14 +70,14 @@ TEST(SimCh4424, AllInactiveEventsCompleteBeforeNBA) {
   std::vector<std::string> order;
 
   for (int i = 0; i < 3; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, i]() {
       order.push_back("inactive" + std::to_string(i));
     };
     sched.ScheduleEvent({0}, Region::kInactive, ev);
   }
 
-  auto* nba = sched.GetEventPool().Acquire();
+  auto *nba = sched.GetEventPool().Acquire();
   nba->callback = [&]() { order.push_back("nba"); };
   sched.ScheduleEvent({0}, Region::kNBA, nba);
 
@@ -96,11 +96,11 @@ TEST(SimCh4424, NonblockingAssignmentSchedulesNBACurrentTime) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->callback = [&]() {
     order.push_back("active");
     // Nonblocking assignment: schedule NBA at current time.
-    auto* nba = sched.GetEventPool().Acquire();
+    auto *nba = sched.GetEventPool().Acquire();
     nba->callback = [&order]() { order.push_back("nba"); };
     sched.ScheduleEvent({0}, Region::kNBA, nba);
   };
@@ -121,10 +121,10 @@ TEST(SimCh4424, NonblockingAssignmentSchedulesNBALaterTime) {
   Scheduler sched(arena);
   std::vector<uint64_t> nba_times;
 
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->callback = [&]() {
     // Nonblocking assignment with delay: schedule NBA at a later time.
-    auto* nba = sched.GetEventPool().Acquire();
+    auto *nba = sched.GetEventPool().Acquire();
     nba->callback = [&nba_times, &sched]() {
       nba_times.push_back(sched.CurrentTime().ticks);
     };
@@ -148,14 +148,14 @@ TEST(SimCh4424, NBAToActiveIteration) {
   std::vector<std::string> order;
 
   // Initial Active event schedules an NBA.
-  auto* act1 = sched.GetEventPool().Acquire();
+  auto *act1 = sched.GetEventPool().Acquire();
   act1->callback = [&]() {
     order.push_back("active1");
-    auto* nba = sched.GetEventPool().Acquire();
+    auto *nba = sched.GetEventPool().Acquire();
     nba->callback = [&]() {
       order.push_back("nba");
       // NBA schedules a new Active event -> triggers re-iteration.
-      auto* act2 = sched.GetEventPool().Acquire();
+      auto *act2 = sched.GetEventPool().Acquire();
       act2->callback = [&order]() { order.push_back("active2"); };
       sched.ScheduleEvent({0}, Region::kActive, act2);
     };
@@ -179,8 +179,8 @@ TEST(SimCh4424, NBAExecutesAfterActiveAndInactiveBeforeObserved) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
+  auto schedule = [&](Region r, const std::string &label) {
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, label]() { order.push_back(label); };
     sched.ScheduleEvent({0}, r, ev);
   };
@@ -221,7 +221,7 @@ TEST(SimCh4424, NBAEventsAcrossMultipleTimeSlots) {
   std::vector<uint64_t> times;
 
   for (uint64_t t = 0; t < 3; ++t) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&times, &sched]() {
       times.push_back(sched.CurrentTime().ticks);
     };
@@ -248,11 +248,11 @@ TEST(SimCh4424, NBAExecutesBeforeReNBA) {
   Scheduler sched(arena);
   std::vector<int> order;
 
-  auto* ev_nba = sched.GetEventPool().Acquire();
+  auto *ev_nba = sched.GetEventPool().Acquire();
   ev_nba->callback = [&order]() { order.push_back(1); };
   sched.ScheduleEvent({0}, Region::kNBA, ev_nba);
 
-  auto* ev_renba = sched.GetEventPool().Acquire();
+  auto *ev_renba = sched.GetEventPool().Acquire();
   ev_renba->callback = [&order]() { order.push_back(2); };
   sched.ScheduleEvent({0}, Region::kReNBA, ev_renba);
 
@@ -271,7 +271,7 @@ TEST(SimCh4424, NBARegionHoldsMultipleEvents) {
   int count = 0;
 
   for (int i = 0; i < 5; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&]() { count++; };
     sched.ScheduleEvent({0}, Region::kNBA, ev);
   }

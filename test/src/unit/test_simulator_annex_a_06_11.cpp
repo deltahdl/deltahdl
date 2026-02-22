@@ -44,7 +44,7 @@ void ScheduleNegedge(SimA611Fixture &f, Variable *clk, uint64_t time) {
   f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
 }
 
-}  // namespace
+} // namespace
 
 // =============================================================================
 // Simulation tests — A.6.11 Clocking block

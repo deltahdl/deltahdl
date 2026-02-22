@@ -1,9 +1,9 @@
 // Non-LRM tests
 
-#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/types.h"
 #include "simulation/scheduler.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -13,7 +13,7 @@ namespace {
 TEST(EventPool, AcquireCreatesNew) {
   Arena arena;
   EventPool pool(arena);
-  Event* ev = pool.Acquire();
+  Event *ev = pool.Acquire();
   ASSERT_NE(ev, nullptr);
   EXPECT_EQ(ev->kind, EventKind::kEvaluation);
   EXPECT_EQ(ev->target, nullptr);
@@ -23,15 +23,15 @@ TEST(EventPool, AcquireCreatesNew) {
 TEST(EventPool, ReleaseAndReuse) {
   Arena arena;
   EventPool pool(arena);
-  Event* ev = pool.Acquire();
+  Event *ev = pool.Acquire();
   ev->callback = []() {};
-  ev->target = reinterpret_cast<void*>(0x1234);
+  ev->target = reinterpret_cast<void *>(0x1234);
   pool.Release(ev);
   EXPECT_EQ(pool.FreeCount(), 1);
 
-  Event* reused = pool.Acquire();
-  EXPECT_EQ(reused, ev);               // Same pointer returned
-  EXPECT_EQ(reused->target, nullptr);  // Fields cleared
+  Event *reused = pool.Acquire();
+  EXPECT_EQ(reused, ev);              // Same pointer returned
+  EXPECT_EQ(reused->target, nullptr); // Fields cleared
   EXPECT_EQ(pool.FreeCount(), 0);
 }
 
@@ -40,8 +40,8 @@ TEST(EventPool, FreeCount) {
   EventPool pool(arena);
   EXPECT_EQ(pool.FreeCount(), 0);
 
-  Event* ev1 = pool.Acquire();
-  Event* ev2 = pool.Acquire();
+  Event *ev1 = pool.Acquire();
+  Event *ev2 = pool.Acquire();
   pool.Release(ev1);
   pool.Release(ev2);
   EXPECT_EQ(pool.FreeCount(), 2);
@@ -53,10 +53,10 @@ TEST(EventPool, FreeCount) {
 TEST(Scheduler, EventPoolIntegration) {
   Arena arena;
   Scheduler sched(arena);
-  auto& pool = sched.GetEventPool();
+  auto &pool = sched.GetEventPool();
   EXPECT_EQ(pool.FreeCount(), 0);
 
-  auto* ev = pool.Acquire();
+  auto *ev = pool.Acquire();
   bool ran = false;
   ev->callback = [&ran]() { ran = true; };
   sched.ScheduleEvent({0}, Region::kActive, ev);
@@ -67,4 +67,4 @@ TEST(Scheduler, EventPoolIntegration) {
   EXPECT_EQ(pool.FreeCount(), 1);
 }
 
-}  // namespace
+} // namespace

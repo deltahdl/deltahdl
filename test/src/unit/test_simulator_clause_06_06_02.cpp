@@ -1,10 +1,10 @@
 // §6.6.2: Unresolved nets
 
-#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "simulation/net.h"
 #include "simulation/scheduler.h"
 #include "simulation/variable.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -73,7 +73,7 @@ TEST(NetResolution, WireXPropagates) {
 // --- Net::Resolve ---
 TEST(NetResolution, ResolveSingleDriver) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
+  auto *var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 8);
   Net net;
   net.type = NetType::kWire;
@@ -86,7 +86,7 @@ TEST(NetResolution, ResolveSingleDriver) {
 
 TEST(NetResolution, ResolveMultipleDriversAgree) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
+  auto *var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 8);
   Net net;
   net.type = NetType::kWire;
@@ -101,7 +101,7 @@ TEST(NetResolution, ResolveMultipleDriversAgree) {
 
 TEST(NetResolution, ResolveMultipleDriversConflict) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
+  auto *var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 8);
   Net net;
   net.type = NetType::kWire;
@@ -118,7 +118,7 @@ TEST(NetResolution, ResolveMultipleDriversConflict) {
 
 TEST(NetResolution, ResolveEmptyDrivers) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
+  auto *var = arena.Create<Variable>();
   var->value = MakeLogic4VecVal(arena, 8, 99);
   Net net;
   net.resolved = var;
@@ -127,4 +127,4 @@ TEST(NetResolution, ResolveEmptyDrivers) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-}  // namespace
+} // namespace

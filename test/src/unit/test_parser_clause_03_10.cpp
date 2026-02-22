@@ -12,11 +12,11 @@ using namespace delta;
 struct ParseResult310 {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult310 Parse(const std::string& src) {
+static ParseResult310 Parse(const std::string &src) {
   ParseResult310 result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
@@ -38,13 +38,12 @@ static ParseResult310 Parse(const std::string& src) {
 //         which specify the binding information of module instances to specific
 //         SystemVerilog source code. Configurations utilize libraries."
 TEST(ParserClause03, Cl3_10_ConfigBindingAndLibraries) {
-  auto r = Parse(
-      "config cfg1;\n"
-      "  design work.top;\n"
-      "  default liblist work;\n"
-      "  instance top.u1 use lib2.fast_adder;\n"
-      "  cell adder liblist lib1 lib2;\n"
-      "endconfig : cfg1\n");
+  auto r = Parse("config cfg1;\n"
+                 "  design work.top;\n"
+                 "  default liblist work;\n"
+                 "  instance top.u1 use lib2.fast_adder;\n"
+                 "  cell adder liblist lib1 lib2;\n"
+                 "endconfig : cfg1\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->configs.size(), 1u);
@@ -58,12 +57,12 @@ TEST(ParserClause03, Cl3_10_ConfigBindingAndLibraries) {
   EXPECT_EQ(r.cu->configs[0]->rules[0]->kind, ConfigRuleKind::kDefault);
   ASSERT_EQ(r.cu->configs[0]->rules[0]->liblist.size(), 1u);
   EXPECT_EQ(r.cu->configs[0]->rules[0]->liblist[0], "work");
-  auto* r1 = r.cu->configs[0]->rules[1];
+  auto *r1 = r.cu->configs[0]->rules[1];
   EXPECT_EQ(r1->kind, ConfigRuleKind::kInstance);
   EXPECT_EQ(r1->inst_path, "top.u1");
   EXPECT_EQ(r1->use_lib, "lib2");
   EXPECT_EQ(r1->use_cell, "fast_adder");
-  auto* r2 = r.cu->configs[0]->rules[2];
+  auto *r2 = r.cu->configs[0]->rules[2];
   EXPECT_EQ(r2->kind, ConfigRuleKind::kCell);
   EXPECT_EQ(r2->cell_name, "adder");
   ASSERT_EQ(r2->liblist.size(), 2u);

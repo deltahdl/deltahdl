@@ -1,11 +1,11 @@
 // §6.19: Enumerations
 
-#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -23,10 +23,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult Parse(const std::string& src) {
+static ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -36,7 +36,7 @@ static ParseResult Parse(const std::string& src) {
   return result;
 }
 
-static void VerifyEnumMemberNames(const std::vector<EnumMember>& members,
+static void VerifyEnumMemberNames(const std::vector<EnumMember> &members,
                                   const std::string expected[], size_t count) {
   ASSERT_EQ(members.size(), count);
   for (size_t i = 0; i < count; ++i) {
@@ -45,24 +45,23 @@ static void VerifyEnumMemberNames(const std::vector<EnumMember>& members,
 }
 
 struct StructMemberExpected {
-  const char* name;
+  const char *name;
   DataTypeKind type_kind;
 };
 
 struct ModportPortExpected {
   Direction dir;
-  const char* name;
+  const char *name;
 };
 
 namespace {
 
 TEST(Parser, TypedefEnum) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef enum { A, B, C } state_t;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  typedef enum { A, B, C } state_t;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
   EXPECT_EQ(item->name, "state_t");
   EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kEnum);
@@ -72,12 +71,11 @@ TEST(Parser, TypedefEnum) {
 }
 
 TEST(Parser, EnumWithValues) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef enum { IDLE=0, RUN=1, STOP=2 } cmd_t;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  typedef enum { IDLE=0, RUN=1, STOP=2 } cmd_t;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto& members = r.cu->modules[0]->items[0]->typedef_type.enum_members;
+  auto &members = r.cu->modules[0]->items[0]->typedef_type.enum_members;
   std::string expected[] = {"IDLE", "RUN", "STOP"};
   ASSERT_EQ(members.size(), std::size(expected));
   for (size_t i = 0; i < std::size(expected); ++i) {
@@ -87,16 +85,15 @@ TEST(Parser, EnumWithValues) {
 }
 
 TEST(Parser, InlineEnumVar) {
-  auto r = Parse(
-      "module t;\n"
-      "  enum { X, Y } my_var;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  enum { X, Y } my_var;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(item->name, "my_var");
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kEnum);
   ASSERT_EQ(item->data_type.enum_members.size(), 2);
 }
 
-}  // namespace
+} // namespace

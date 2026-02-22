@@ -1,11 +1,11 @@
 // §25.5: Modports
 
-#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -23,10 +23,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult Parse(const std::string& src) {
+static ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -37,16 +37,16 @@ static ParseResult Parse(const std::string& src) {
 }
 
 struct StructMemberExpected {
-  const char* name;
+  const char *name;
   DataTypeKind type_kind;
 };
 
 struct ModportPortExpected {
   Direction dir;
-  const char* name;
+  const char *name;
 };
 
-static void VerifyModportPorts(const std::vector<ModportPort>& ports,
+static void VerifyModportPorts(const std::vector<ModportPort> &ports,
                                const ModportPortExpected expected[],
                                size_t count) {
   ASSERT_EQ(ports.size(), count);
@@ -59,32 +59,30 @@ static void VerifyModportPorts(const std::vector<ModportPort>& ports,
 namespace {
 
 TEST(Parser, InterfaceWithModport) {
-  auto r = Parse(
-      "interface bus;\n"
-      "  logic [7:0] data;\n"
-      "  modport master(output data);\n"
-      "endinterface\n");
+  auto r = Parse("interface bus;\n"
+                 "  logic [7:0] data;\n"
+                 "  modport master(output data);\n"
+                 "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->interfaces[0]->modports.size(), 1);
-  auto* mp = r.cu->interfaces[0]->modports[0];
+  auto *mp = r.cu->interfaces[0]->modports[0];
   EXPECT_EQ(mp->name, "master");
   ModportPortExpected expected[] = {{Direction::kOutput, "data"}};
   VerifyModportPorts(mp->ports, expected, std::size(expected));
 }
 
 TEST(Parser, ModportMultipleGroups) {
-  auto r = Parse(
-      "interface bus;\n"
-      "  logic addr;\n"
-      "  logic data;\n"
-      "  modport slave(input addr, input data);\n"
-      "endinterface\n");
+  auto r = Parse("interface bus;\n"
+                 "  logic addr;\n"
+                 "  logic data;\n"
+                 "  modport slave(input addr, input data);\n"
+                 "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mp = r.cu->interfaces[0]->modports[0];
+  auto *mp = r.cu->interfaces[0]->modports[0];
   EXPECT_EQ(mp->name, "slave");
   ASSERT_EQ(mp->ports.size(), 2);
   EXPECT_EQ(mp->ports[0].direction, Direction::kInput);
   EXPECT_EQ(mp->ports[1].direction, Direction::kInput);
 }
 
-}  // namespace
+} // namespace

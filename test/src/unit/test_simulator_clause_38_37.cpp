@@ -8,7 +8,7 @@ namespace delta {
 namespace {
 
 class VpiClause3837Test : public ::testing::Test {
- protected:
+protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
@@ -50,5 +50,5 @@ TEST_F(VpiClause3837Test, RegisterSystfNullptrDoesNotCrash) {
   EXPECT_TRUE(vpi_ctx_.RegisteredSystfs().empty());
 }
 
-}  // namespace
-}  // namespace delta
+} // namespace
+} // namespace delta

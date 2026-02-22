@@ -27,24 +27,24 @@ TEST(SimCh4092, ProceduralContinuousAssignmentCorrespondsToProcess) {
 
   // Model: assign dst = src; (procedural continuous assignment)
   // Each time src changes, the process re-evaluates.
-  auto* drive0 = sched.GetEventPool().Acquire();
+  auto *drive0 = sched.GetEventPool().Acquire();
   drive0->kind = EventKind::kEvaluation;
   drive0->callback = [&]() {
     src = 10;
     ++process_eval_count;
-    auto* update = sched.GetEventPool().Acquire();
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() { dst = src; };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
   };
   sched.ScheduleEvent({0}, Region::kActive, drive0);
 
-  auto* drive5 = sched.GetEventPool().Acquire();
+  auto *drive5 = sched.GetEventPool().Acquire();
   drive5->kind = EventKind::kEvaluation;
   drive5->callback = [&]() {
     src = 20;
     ++process_eval_count;
-    auto* update = sched.GetEventPool().Acquire();
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() { dst = src; };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
@@ -69,21 +69,22 @@ TEST(SimCh4092, AssignStatementOverridesProceduralAssignment) {
   bool assign_active = false;
 
   // Time 0: procedural assignment reg_val = 5;
-  auto* proc = sched.GetEventPool().Acquire();
+  auto *proc = sched.GetEventPool().Acquire();
   proc->kind = EventKind::kEvaluation;
   proc->callback = [&]() { reg_val = 5; };
   sched.ScheduleEvent({0}, Region::kActive, proc);
 
   // Time 1: assign reg_val = assign_src; → overrides procedural value.
-  auto* assign_stmt = sched.GetEventPool().Acquire();
+  auto *assign_stmt = sched.GetEventPool().Acquire();
   assign_stmt->kind = EventKind::kEvaluation;
   assign_stmt->callback = [&]() {
     assign_active = true;
     assign_src = 99;
-    auto* update = sched.GetEventPool().Acquire();
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() {
-      if (assign_active) reg_val = assign_src;
+      if (assign_active)
+        reg_val = assign_src;
     };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
   };
@@ -107,25 +108,26 @@ TEST(SimCh4092, ForceStatementOverridesAllDrivers) {
   bool force_active = false;
 
   // Time 0: normal continuous assignment drives net_val = 10.
-  auto* cont = sched.GetEventPool().Acquire();
+  auto *cont = sched.GetEventPool().Acquire();
   cont->kind = EventKind::kEvaluation;
   cont->callback = [&]() {
-    auto* update = sched.GetEventPool().Acquire();
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() {
-      if (!force_active) net_val = 10;
+      if (!force_active)
+        net_val = 10;
     };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
   };
   sched.ScheduleEvent({0}, Region::kActive, cont);
 
   // Time 1: force net_val = force_src; → overrides all drivers.
-  auto* force_stmt = sched.GetEventPool().Acquire();
+  auto *force_stmt = sched.GetEventPool().Acquire();
   force_stmt->kind = EventKind::kEvaluation;
   force_stmt->callback = [&]() {
     force_active = true;
     force_src = 77;
-    auto* update = sched.GetEventPool().Acquire();
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() { net_val = force_src; };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
@@ -152,12 +154,12 @@ TEST(SimCh4092, SensitiveToSourceElements) {
 
   // Model: assign dst = a + b;
   // Time 0: a changes → process triggers.
-  auto* change_a = sched.GetEventPool().Acquire();
+  auto *change_a = sched.GetEventPool().Acquire();
   change_a->kind = EventKind::kEvaluation;
   change_a->callback = [&]() {
     a = 3;
     ++eval_count;
-    auto* update = sched.GetEventPool().Acquire();
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() { dst = a + b; };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
@@ -165,12 +167,12 @@ TEST(SimCh4092, SensitiveToSourceElements) {
   sched.ScheduleEvent({0}, Region::kActive, change_a);
 
   // Time 1: b changes → process triggers again.
-  auto* change_b = sched.GetEventPool().Acquire();
+  auto *change_b = sched.GetEventPool().Acquire();
   change_b->kind = EventKind::kEvaluation;
   change_b->callback = [&]() {
     b = 4;
     ++eval_count;
-    auto* update = sched.GetEventPool().Acquire();
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() { dst = a + b; };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
@@ -194,15 +196,15 @@ TEST(SimCh4092, SchedulesActiveUpdateEvent) {
 
   // Schedule a procedural continuous assignment update in Active region
   // and an NBA event to prove it executes in Active (before NBA).
-  auto* eval = sched.GetEventPool().Acquire();
+  auto *eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-    auto* active_update = sched.GetEventPool().Acquire();
+    auto *active_update = sched.GetEventPool().Acquire();
     active_update->kind = EventKind::kUpdate;
     active_update->callback = [&]() { order.push_back("active_update"); };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, active_update);
 
-    auto* nba_update = sched.GetEventPool().Acquire();
+    auto *nba_update = sched.GetEventPool().Acquire();
     nba_update->kind = EventKind::kUpdate;
     nba_update->callback = [&]() { order.push_back("nba_update"); };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba_update);
@@ -228,10 +230,10 @@ TEST(SimCh4092, UsesCurrentValuesToDetermineTarget) {
   int target_b = 0;
 
   // Time 0: select=0, so assign targets target_a.
-  auto* eval0 = sched.GetEventPool().Acquire();
+  auto *eval0 = sched.GetEventPool().Acquire();
   eval0->kind = EventKind::kEvaluation;
   eval0->callback = [&]() {
-    auto* update = sched.GetEventPool().Acquire();
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() {
       if (select == 0) {
@@ -245,11 +247,11 @@ TEST(SimCh4092, UsesCurrentValuesToDetermineTarget) {
   sched.ScheduleEvent({0}, Region::kActive, eval0);
 
   // Time 1: select=1, so assign targets target_b.
-  auto* change_sel = sched.GetEventPool().Acquire();
+  auto *change_sel = sched.GetEventPool().Acquire();
   change_sel->kind = EventKind::kEvaluation;
   change_sel->callback = [&]() {
     select = 1;
-    auto* update = sched.GetEventPool().Acquire();
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() {
       if (select == 0) {
@@ -280,35 +282,37 @@ TEST(SimCh4092, DeassignDeactivatesAssign) {
   bool assign_active = false;
 
   // Time 0: assign reg_val = src; activates the proc cont assign.
-  auto* assign_stmt = sched.GetEventPool().Acquire();
+  auto *assign_stmt = sched.GetEventPool().Acquire();
   assign_stmt->kind = EventKind::kEvaluation;
   assign_stmt->callback = [&]() {
     assign_active = true;
     src = 10;
-    auto* update = sched.GetEventPool().Acquire();
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() {
-      if (assign_active) reg_val = src;
+      if (assign_active)
+        reg_val = src;
     };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
   };
   sched.ScheduleEvent({0}, Region::kActive, assign_stmt);
 
   // Time 1: deassign reg_val; → deactivates the assign.
-  auto* deassign_stmt = sched.GetEventPool().Acquire();
+  auto *deassign_stmt = sched.GetEventPool().Acquire();
   deassign_stmt->kind = EventKind::kEvaluation;
   deassign_stmt->callback = [&]() { assign_active = false; };
   sched.ScheduleEvent({1}, Region::kActive, deassign_stmt);
 
   // Time 2: src changes, but assign is deactivated → reg_val not driven.
-  auto* change_src = sched.GetEventPool().Acquire();
+  auto *change_src = sched.GetEventPool().Acquire();
   change_src->kind = EventKind::kEvaluation;
   change_src->callback = [&]() {
     src = 50;
-    auto* update = sched.GetEventPool().Acquire();
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() {
-      if (assign_active) reg_val = src;
+      if (assign_active)
+        reg_val = src;
     };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
   };
@@ -334,26 +338,27 @@ TEST(SimCh4092, ReleaseDeactivatesForce) {
   bool force_active = false;
 
   // Time 0: normal driver → net_val = 5.
-  auto* norm = sched.GetEventPool().Acquire();
+  auto *norm = sched.GetEventPool().Acquire();
   norm->kind = EventKind::kEvaluation;
   norm->callback = [&]() {
     normal_driver = 5;
-    auto* update = sched.GetEventPool().Acquire();
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() {
-      if (!force_active) net_val = normal_driver;
+      if (!force_active)
+        net_val = normal_driver;
     };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
   };
   sched.ScheduleEvent({0}, Region::kActive, norm);
 
   // Time 1: force net_val = 88;
-  auto* force_stmt = sched.GetEventPool().Acquire();
+  auto *force_stmt = sched.GetEventPool().Acquire();
   force_stmt->kind = EventKind::kEvaluation;
   force_stmt->callback = [&]() {
     force_active = true;
     force_src = 88;
-    auto* update = sched.GetEventPool().Acquire();
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() { net_val = force_src; };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
@@ -361,12 +366,12 @@ TEST(SimCh4092, ReleaseDeactivatesForce) {
   sched.ScheduleEvent({1}, Region::kActive, force_stmt);
 
   // Time 2: release net_val; → force deactivated, normal driver resumes.
-  auto* release_stmt = sched.GetEventPool().Acquire();
+  auto *release_stmt = sched.GetEventPool().Acquire();
   release_stmt->kind = EventKind::kEvaluation;
   release_stmt->callback = [&]() {
     force_active = false;
     // After release, the underlying driver reasserts.
-    auto* update = sched.GetEventPool().Acquire();
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() { net_val = normal_driver; };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
@@ -390,27 +395,28 @@ TEST(SimCh4092, DeassignAllowsSubsequentProceduralAssignment) {
   bool assign_active = false;
 
   // Time 0: assign reg_val = 30; (procedural continuous)
-  auto* assign_stmt = sched.GetEventPool().Acquire();
+  auto *assign_stmt = sched.GetEventPool().Acquire();
   assign_stmt->kind = EventKind::kEvaluation;
   assign_stmt->callback = [&]() {
     assign_active = true;
-    auto* update = sched.GetEventPool().Acquire();
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() {
-      if (assign_active) reg_val = 30;
+      if (assign_active)
+        reg_val = 30;
     };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
   };
   sched.ScheduleEvent({0}, Region::kActive, assign_stmt);
 
   // Time 1: deassign reg_val;
-  auto* deassign_stmt = sched.GetEventPool().Acquire();
+  auto *deassign_stmt = sched.GetEventPool().Acquire();
   deassign_stmt->kind = EventKind::kEvaluation;
   deassign_stmt->callback = [&]() { assign_active = false; };
   sched.ScheduleEvent({1}, Region::kActive, deassign_stmt);
 
   // Time 2: reg_val = 42; (normal procedural assignment, no longer blocked).
-  auto* proc_assign = sched.GetEventPool().Acquire();
+  auto *proc_assign = sched.GetEventPool().Acquire();
   proc_assign->kind = EventKind::kEvaluation;
   proc_assign->callback = [&]() { reg_val = 42; };
   sched.ScheduleEvent({2}, Region::kActive, proc_assign);
@@ -435,12 +441,12 @@ TEST(SimCh4092, ReEvaluatesOnEachSourceChange) {
   // Model: assign dst = src;
   // Source changes at time 0, 1, and 2.
   for (uint64_t t = 0; t < 3; ++t) {
-    auto* eval = sched.GetEventPool().Acquire();
+    auto *eval = sched.GetEventPool().Acquire();
     eval->kind = EventKind::kEvaluation;
     int val = static_cast<int>((t + 1) * 10);
     eval->callback = [&, val]() {
       src = val;
-      auto* update = sched.GetEventPool().Acquire();
+      auto *update = sched.GetEventPool().Acquire();
       update->kind = EventKind::kUpdate;
       update->callback = [&, val]() {
         dst = val;

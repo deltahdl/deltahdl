@@ -12,7 +12,7 @@ using namespace delta;
 // Section 5.11: Array literals
 // =========================================================================
 
-static bool ParseOk(const std::string& src) {
+static bool ParseOk(const std::string &src) {
   SourceManager mgr;
   Arena arena;
   auto fid = mgr.AddFile("<test>", src);
@@ -25,22 +25,19 @@ static bool ParseOk(const std::string& src) {
 
 TEST(ParserCh511, ArrayLiteral_Nested) {
   // int n[1:2][1:3] = '{'{0,1,2},'{3{4}}};
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  int n[1:2][1:3] = '{'{0,1,2},'{3{4}}};\n"
-              "endmodule"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  int n[1:2][1:3] = '{'{0,1,2},'{3{4}}};\n"
+                      "endmodule"));
 }
 
 TEST(ParserCh511, ArrayLiteral_Simple) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  int arr[0:2] = '{10, 20, 30};\n"
-              "endmodule"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  int arr[0:2] = '{10, 20, 30};\n"
+                      "endmodule"));
 }
 
 TEST(ParserCh511, ArrayLiteral_DefaultValue) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  int arr[0:3] = '{default:0};\n"
-              "endmodule"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  int arr[0:3] = '{default:0};\n"
+                      "endmodule"));
 }

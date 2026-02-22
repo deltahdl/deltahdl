@@ -1,6 +1,5 @@
 // §11.4.2: Increment and decrement operators
 
-#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -8,6 +7,7 @@
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -21,16 +21,16 @@ struct EvalOpFixture {
 };
 
 // Helper: build an identifier Expr node.
-static Expr* MakeId(Arena& arena, std::string_view name) {
-  auto* e = arena.Create<Expr>();
+static Expr *MakeId(Arena &arena, std::string_view name) {
+  auto *e = arena.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
   e->text = name;
   return e;
 }
 
 // Helper: build a unary Expr.
-static Expr* MakeUnary(Arena& arena, TokenKind op, Expr* operand) {
-  auto* e = arena.Create<Expr>();
+static Expr *MakeUnary(Arena &arena, TokenKind op, Expr *operand) {
+  auto *e = arena.Create<Expr>();
   e->kind = ExprKind::kUnary;
   e->op = op;
   e->lhs = operand;
@@ -47,10 +47,10 @@ namespace {
 // ==========================================================================
 TEST(EvalOp, PrefixIncrement) {
   EvalOpFixture f;
-  auto* var = f.ctx.CreateVariable("i", 32);
+  auto *var = f.ctx.CreateVariable("i", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 10);
 
-  auto* pre = MakeUnary(f.arena, TokenKind::kPlusPlus, MakeId(f.arena, "i"));
+  auto *pre = MakeUnary(f.arena, TokenKind::kPlusPlus, MakeId(f.arena, "i"));
 
   auto result = EvalExpr(pre, f.ctx, f.arena);
   // Returns NEW value (prefix semantics).
@@ -61,10 +61,10 @@ TEST(EvalOp, PrefixIncrement) {
 
 TEST(EvalOp, PrefixDecrement) {
   EvalOpFixture f;
-  auto* var = f.ctx.CreateVariable("j", 32);
+  auto *var = f.ctx.CreateVariable("j", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 5);
 
-  auto* pre = MakeUnary(f.arena, TokenKind::kMinusMinus, MakeId(f.arena, "j"));
+  auto *pre = MakeUnary(f.arena, TokenKind::kMinusMinus, MakeId(f.arena, "j"));
 
   auto result = EvalExpr(pre, f.ctx, f.arena);
   // Returns NEW value.
@@ -74,10 +74,10 @@ TEST(EvalOp, PrefixDecrement) {
 
 TEST(EvalOp, PostfixIncrement) {
   EvalOpFixture f;
-  auto* var = f.ctx.CreateVariable("i", 32);
+  auto *var = f.ctx.CreateVariable("i", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 10);
 
-  auto* post = f.arena.Create<Expr>();
+  auto *post = f.arena.Create<Expr>();
   post->kind = ExprKind::kPostfixUnary;
   post->op = TokenKind::kPlusPlus;
   post->lhs = MakeId(f.arena, "i");
@@ -91,10 +91,10 @@ TEST(EvalOp, PostfixIncrement) {
 
 TEST(EvalOp, PostfixDecrement) {
   EvalOpFixture f;
-  auto* var = f.ctx.CreateVariable("j", 32);
+  auto *var = f.ctx.CreateVariable("j", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 5);
 
-  auto* post = f.arena.Create<Expr>();
+  auto *post = f.arena.Create<Expr>();
   post->kind = ExprKind::kPostfixUnary;
   post->op = TokenKind::kMinusMinus;
   post->lhs = MakeId(f.arena, "j");
@@ -104,4 +104,4 @@ TEST(EvalOp, PostfixDecrement) {
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
-}  // namespace
+} // namespace

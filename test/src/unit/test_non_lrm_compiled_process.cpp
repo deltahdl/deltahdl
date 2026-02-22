@@ -1,12 +1,12 @@
 // §non-lrm:compiled_process
 
-#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "parser/ast.h"
 #include "simulation/compiled_sim.h"
 #include "simulation/sim_context.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -18,7 +18,7 @@ namespace {
 TEST(CompiledSim, ValidCompiledProcess) {
   bool executed = false;
   CompiledProcess proc(1,
-                       [&executed](SimContext& /*ctx*/) { executed = true; });
+                       [&executed](SimContext & /*ctx*/) { executed = true; });
   EXPECT_EQ(proc.Id(), 1u);
   EXPECT_TRUE(proc.IsValid());
 }
@@ -33,10 +33,10 @@ TEST(CompiledSim, InvalidCompiledProcess) {
 // =============================================================================
 TEST(CompiledSim, PureCombinationalIsCompilable) {
   Arena arena;
-  auto* assign = arena.Create<Stmt>();
+  auto *assign = arena.Create<Stmt>();
   assign->kind = StmtKind::kBlockingAssign;
 
-  auto* block = arena.Create<Stmt>();
+  auto *block = arena.Create<Stmt>();
   block->kind = StmtKind::kBlock;
   block->stmts.push_back(assign);
 
@@ -45,10 +45,10 @@ TEST(CompiledSim, PureCombinationalIsCompilable) {
 
 TEST(CompiledSim, TimingControlNotCompilable) {
   Arena arena;
-  auto* delay = arena.Create<Stmt>();
+  auto *delay = arena.Create<Stmt>();
   delay->kind = StmtKind::kDelay;
 
-  auto* block = arena.Create<Stmt>();
+  auto *block = arena.Create<Stmt>();
   block->kind = StmtKind::kBlock;
   block->stmts.push_back(delay);
 
@@ -57,18 +57,18 @@ TEST(CompiledSim, TimingControlNotCompilable) {
 
 TEST(CompiledSim, NestedTimingControlDetected) {
   Arena arena;
-  auto* event_ctrl = arena.Create<Stmt>();
+  auto *event_ctrl = arena.Create<Stmt>();
   event_ctrl->kind = StmtKind::kEventControl;
 
-  auto* inner = arena.Create<Stmt>();
+  auto *inner = arena.Create<Stmt>();
   inner->kind = StmtKind::kBlock;
   inner->stmts.push_back(event_ctrl);
 
-  auto* if_stmt = arena.Create<Stmt>();
+  auto *if_stmt = arena.Create<Stmt>();
   if_stmt->kind = StmtKind::kIf;
   if_stmt->then_branch = inner;
 
-  auto* outer = arena.Create<Stmt>();
+  auto *outer = arena.Create<Stmt>();
   outer->kind = StmtKind::kBlock;
   outer->stmts.push_back(if_stmt);
 
@@ -81,10 +81,10 @@ TEST(CompiledSim, NullBodyNotCompilable) {
 
 TEST(CompiledSim, CompileReturnsValidForCombinational) {
   Arena arena;
-  auto* assign = arena.Create<Stmt>();
+  auto *assign = arena.Create<Stmt>();
   assign->kind = StmtKind::kBlockingAssign;
 
-  auto* block = arena.Create<Stmt>();
+  auto *block = arena.Create<Stmt>();
   block->kind = StmtKind::kBlock;
   block->stmts.push_back(assign);
 
@@ -93,4 +93,4 @@ TEST(CompiledSim, CompileReturnsValidForCombinational) {
   EXPECT_EQ(compiled.Id(), 42u);
 }
 
-}  // namespace
+} // namespace

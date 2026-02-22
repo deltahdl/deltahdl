@@ -8,7 +8,7 @@
 
 using namespace delta;
 
-static std::vector<Token> Lex(const std::string& src) {
+static std::vector<Token> Lex(const std::string &src) {
   static SourceManager mgr;
   auto fid = mgr.AddFile("<test>", src);
   DiagEngine diag(mgr);

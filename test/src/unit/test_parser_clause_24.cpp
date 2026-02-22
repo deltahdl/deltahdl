@@ -14,8 +14,8 @@ using namespace delta;
 namespace {
 
 struct ProgramParseTest : ::testing::Test {
- protected:
-  CompilationUnit* Parse(const std::string& src) {
+protected:
+  CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
     parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
@@ -35,7 +35,7 @@ struct ProgramParseTest : ::testing::Test {
 // =============================================================================
 
 TEST_F(ProgramParseTest, EmptyProgram) {
-  auto* unit = Parse("program p; endprogram");
+  auto *unit = Parse("program p; endprogram");
   ASSERT_EQ(unit->programs.size(), 1u);
   EXPECT_EQ(unit->programs[0]->name, "p");
   EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
@@ -45,7 +45,7 @@ TEST_F(ProgramParseTest, EmptyProgram) {
 }
 
 TEST_F(ProgramParseTest, ProgramWithEndLabel) {
-  auto* unit = Parse("program p; endprogram : p");
+  auto *unit = Parse("program p; endprogram : p");
   ASSERT_EQ(unit->programs.size(), 1u);
   EXPECT_EQ(unit->programs[0]->name, "p");
   EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
@@ -56,9 +56,8 @@ TEST_F(ProgramParseTest, ProgramWithEndLabel) {
 // =============================================================================
 
 TEST_F(ProgramParseTest, ProgramWithPorts) {
-  auto* unit = Parse(
-      "program p(input logic clk, input logic rst);\n"
-      "endprogram\n");
+  auto *unit = Parse("program p(input logic clk, input logic rst);\n"
+                     "endprogram\n");
   ASSERT_EQ(unit->programs.size(), 1u);
   EXPECT_EQ(unit->programs[0]->name, "p");
   EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
@@ -70,9 +69,8 @@ TEST_F(ProgramParseTest, ProgramWithPorts) {
 }
 
 TEST_F(ProgramParseTest, ProgramWithParameters) {
-  auto* unit = Parse(
-      "program p #(parameter N = 8)(input logic clk);\n"
-      "endprogram\n");
+  auto *unit = Parse("program p #(parameter N = 8)(input logic clk);\n"
+                     "endprogram\n");
   ASSERT_EQ(unit->programs.size(), 1u);
   EXPECT_EQ(unit->programs[0]->name, "p");
   EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
@@ -87,12 +85,11 @@ TEST_F(ProgramParseTest, ProgramWithParameters) {
 // =============================================================================
 
 TEST_F(ProgramParseTest, ProgramWithInitialBlock) {
-  auto* unit = Parse(
-      "program p;\n"
-      "  initial begin\n"
-      "    $display(\"hello\");\n"
-      "  end\n"
-      "endprogram\n");
+  auto *unit = Parse("program p;\n"
+                     "  initial begin\n"
+                     "    $display(\"hello\");\n"
+                     "  end\n"
+                     "endprogram\n");
   ASSERT_EQ(unit->programs.size(), 1u);
   EXPECT_EQ(unit->programs[0]->name, "p");
   EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
@@ -101,12 +98,11 @@ TEST_F(ProgramParseTest, ProgramWithInitialBlock) {
 }
 
 TEST_F(ProgramParseTest, ProgramWithFinalBlock) {
-  auto* unit = Parse(
-      "program p;\n"
-      "  final begin\n"
-      "    $display(\"done\");\n"
-      "  end\n"
-      "endprogram\n");
+  auto *unit = Parse("program p;\n"
+                     "  final begin\n"
+                     "    $display(\"done\");\n"
+                     "  end\n"
+                     "endprogram\n");
   ASSERT_EQ(unit->programs.size(), 1u);
   EXPECT_EQ(unit->programs[0]->name, "p");
   EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
@@ -115,14 +111,13 @@ TEST_F(ProgramParseTest, ProgramWithFinalBlock) {
 }
 
 TEST_F(ProgramParseTest, ProgramWithMultipleItems) {
-  auto* unit = Parse(
-      "program p;\n"
-      "  logic [7:0] data;\n"
-      "  assign data = 8'hFF;\n"
-      "  initial begin\n"
-      "    $display(\"test\");\n"
-      "  end\n"
-      "endprogram\n");
+  auto *unit = Parse("program p;\n"
+                     "  logic [7:0] data;\n"
+                     "  assign data = 8'hFF;\n"
+                     "  initial begin\n"
+                     "    $display(\"test\");\n"
+                     "  end\n"
+                     "endprogram\n");
   ASSERT_EQ(unit->programs.size(), 1u);
   EXPECT_EQ(unit->programs[0]->name, "p");
   EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
@@ -130,10 +125,9 @@ TEST_F(ProgramParseTest, ProgramWithMultipleItems) {
 }
 
 TEST_F(ProgramParseTest, ProgramWithImportStatement) {
-  auto* unit = Parse(
-      "program p;\n"
-      "  import pkg::*;\n"
-      "endprogram\n");
+  auto *unit = Parse("program p;\n"
+                     "  import pkg::*;\n"
+                     "endprogram\n");
   ASSERT_EQ(unit->programs.size(), 1u);
   EXPECT_EQ(unit->programs[0]->name, "p");
   EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
@@ -148,11 +142,10 @@ TEST_F(ProgramParseTest, ProgramWithImportStatement) {
 // =============================================================================
 
 TEST_F(ProgramParseTest, ProgramCoexistsWithModule) {
-  auto* unit = Parse(
-      "module m;\n"
-      "endmodule\n"
-      "program p;\n"
-      "endprogram\n");
+  auto *unit = Parse("module m;\n"
+                     "endmodule\n"
+                     "program p;\n"
+                     "endprogram\n");
   ASSERT_EQ(unit->modules.size(), 1u);
   EXPECT_EQ(unit->modules[0]->name, "m");
   ASSERT_EQ(unit->programs.size(), 1u);
@@ -161,11 +154,10 @@ TEST_F(ProgramParseTest, ProgramCoexistsWithModule) {
 }
 
 TEST_F(ProgramParseTest, MultipleProgramsInCompilationUnit) {
-  auto* unit = Parse(
-      "program p1;\n"
-      "endprogram\n"
-      "program p2;\n"
-      "endprogram\n");
+  auto *unit = Parse("program p1;\n"
+                     "endprogram\n"
+                     "program p2;\n"
+                     "endprogram\n");
   ASSERT_EQ(unit->programs.size(), 2u);
   EXPECT_EQ(unit->programs[0]->name, "p1");
   EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
@@ -178,7 +170,7 @@ TEST_F(ProgramParseTest, MultipleProgramsInCompilationUnit) {
 // =============================================================================
 
 TEST_F(ProgramParseTest, ProgramWithAutomaticLifetime) {
-  auto* unit = Parse("program automatic p; endprogram");
+  auto *unit = Parse("program automatic p; endprogram");
   ASSERT_EQ(unit->programs.size(), 1u);
   EXPECT_EQ(unit->programs[0]->name, "p");
   EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
@@ -189,12 +181,11 @@ TEST_F(ProgramParseTest, ProgramWithAutomaticLifetime) {
 // =============================================================================
 
 TEST_F(ProgramParseTest, ProgramWithTaskDecl) {
-  auto* unit = Parse(
-      "program p;\n"
-      "  task run;\n"
-      "    $display(\"running\");\n"
-      "  endtask\n"
-      "endprogram\n");
+  auto *unit = Parse("program p;\n"
+                     "  task run;\n"
+                     "    $display(\"running\");\n"
+                     "  endtask\n"
+                     "endprogram\n");
   ASSERT_EQ(unit->programs.size(), 1u);
   EXPECT_EQ(unit->programs[0]->name, "p");
   EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
@@ -204,12 +195,11 @@ TEST_F(ProgramParseTest, ProgramWithTaskDecl) {
 }
 
 TEST_F(ProgramParseTest, ProgramWithFunctionDecl) {
-  auto* unit = Parse(
-      "program p;\n"
-      "  function int add(int a, int b);\n"
-      "    return a + b;\n"
-      "  endfunction\n"
-      "endprogram\n");
+  auto *unit = Parse("program p;\n"
+                     "  function int add(int a, int b);\n"
+                     "    return a + b;\n"
+                     "  endfunction\n"
+                     "endprogram\n");
   ASSERT_EQ(unit->programs.size(), 1u);
   EXPECT_EQ(unit->programs[0]->name, "p");
   EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
@@ -219,15 +209,14 @@ TEST_F(ProgramParseTest, ProgramWithFunctionDecl) {
 }
 
 TEST_F(ProgramParseTest, ProgramWithTaskAndFunction) {
-  auto* unit = Parse(
-      "program p;\n"
-      "  task run;\n"
-      "    $display(\"running\");\n"
-      "  endtask\n"
-      "  function int get_val;\n"
-      "    return 42;\n"
-      "  endfunction\n"
-      "endprogram\n");
+  auto *unit = Parse("program p;\n"
+                     "  task run;\n"
+                     "    $display(\"running\");\n"
+                     "  endtask\n"
+                     "  function int get_val;\n"
+                     "    return 42;\n"
+                     "  endfunction\n"
+                     "endprogram\n");
   ASSERT_EQ(unit->programs.size(), 1u);
   EXPECT_EQ(unit->programs[0]->name, "p");
   EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
@@ -236,4 +225,4 @@ TEST_F(ProgramParseTest, ProgramWithTaskAndFunction) {
   EXPECT_EQ(unit->programs[0]->items[1]->kind, ModuleItemKind::kFunctionDecl);
 }
 
-}  // namespace
+} // namespace

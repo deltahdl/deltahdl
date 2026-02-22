@@ -1,11 +1,11 @@
 // §6.17: Event data type
 
-#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -23,10 +23,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult Parse(const std::string& src) {
+static ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -37,28 +37,27 @@ static ParseResult Parse(const std::string& src) {
 }
 
 struct StructMemberExpected {
-  const char* name;
+  const char *name;
   DataTypeKind type_kind;
 };
 
 struct ModportPortExpected {
   Direction dir;
-  const char* name;
+  const char *name;
 };
 
 namespace {
 
 // --- Named event tests ---
 TEST(Parser, EventDeclaration) {
-  auto r = Parse(
-      "module t;\n"
-      "  event ev;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  event ev;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kEvent);
   EXPECT_EQ(item->name, "ev");
 }
 
-}  // namespace
+} // namespace

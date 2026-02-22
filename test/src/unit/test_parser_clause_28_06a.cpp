@@ -13,10 +13,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult Parse(const std::string& src) {
+static ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -27,15 +27,14 @@ static ParseResult Parse(const std::string& src) {
 }
 
 TEST(ParserSection28, EnableGates) {
-  auto r = Parse(
-      "module m;\n"
-      "  bufif0 (out, in, en);\n"
-      "  bufif1 (out, in, en);\n"
-      "  notif0 (out, in, en);\n"
-      "  notif1 (out, in, en);\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  bufif0 (out, in, en);\n"
+                 "  bufif1 (out, in, en);\n"
+                 "  notif0 (out, in, en);\n"
+                 "  notif1 (out, in, en);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
+  auto *mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 4);
   GateKind expected[] = {GateKind::kBufif0, GateKind::kBufif1,
                          GateKind::kNotif0, GateKind::kNotif1};

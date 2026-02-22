@@ -24,7 +24,7 @@ TEST(SimCh410, ImmediateExecutionCallback) {
 
   // Model: A PLI callback that fires immediately when an activity occurs.
   // The callback executes synchronously within the triggering event.
-  auto* eval = sched.GetEventPool().Acquire();
+  auto *eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
     activity_occurred = true;
@@ -51,7 +51,7 @@ TEST(SimCh410, OneShotEvaluationEvent) {
 
   // Model: A one-shot PLI callback registered in Pre-Active.
   // It executes exactly once when the Pre-Active region is processed.
-  auto* oneshot = sched.GetEventPool().Acquire();
+  auto *oneshot = sched.GetEventPool().Acquire();
   oneshot->kind = EventKind::kEvaluation;
   oneshot->callback = [&]() { fire_count++; };
   sched.ScheduleEvent({0}, Region::kPreActive, oneshot);
@@ -72,13 +72,13 @@ TEST(SimCh410, CbAfterDelayInPreActive) {
   std::vector<std::string> order;
 
   // Model: cbAfterDelay registered at time 5 → Pre-Active.
-  auto* cb = sched.GetEventPool().Acquire();
+  auto *cb = sched.GetEventPool().Acquire();
   cb->kind = EventKind::kEvaluation;
   cb->callback = [&]() { order.push_back("pre_active_cb"); };
   sched.ScheduleEvent({5}, Region::kPreActive, cb);
 
   // An Active event at the same time.
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->kind = EventKind::kEvaluation;
   active->callback = [&]() { order.push_back("active_event"); };
   sched.ScheduleEvent({5}, Region::kActive, active);
@@ -100,12 +100,12 @@ TEST(SimCh410, CbNextSimTimeInPreActive) {
   std::vector<std::string> order;
 
   // Model: cbNextSimTime fires at time 10 (next sim time) → Pre-Active.
-  auto* cb = sched.GetEventPool().Acquire();
+  auto *cb = sched.GetEventPool().Acquire();
   cb->kind = EventKind::kEvaluation;
   cb->callback = [&]() { order.push_back("pre_active_nextsim"); };
   sched.ScheduleEvent({10}, Region::kPreActive, cb);
 
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->kind = EventKind::kEvaluation;
   active->callback = [&]() { order.push_back("active_event"); };
   sched.ScheduleEvent({10}, Region::kActive, active);
@@ -127,12 +127,12 @@ TEST(SimCh410, CbAtStartOfSimTimeInPreActive) {
   std::vector<std::string> order;
 
   // Model: cbAtStartOfSimTime → Pre-Active at time 0.
-  auto* cb = sched.GetEventPool().Acquire();
+  auto *cb = sched.GetEventPool().Acquire();
   cb->kind = EventKind::kEvaluation;
   cb->callback = [&]() { order.push_back("pre_active_start"); };
   sched.ScheduleEvent({0}, Region::kPreActive, cb);
 
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->kind = EventKind::kEvaluation;
   active->callback = [&]() { order.push_back("active_event"); };
   sched.ScheduleEvent({0}, Region::kActive, active);
@@ -154,12 +154,12 @@ TEST(SimCh410, CbNbaSynchInPreNba) {
   std::vector<std::string> order;
 
   // Schedule Active, Pre-NBA, and NBA events to verify ordering.
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->kind = EventKind::kEvaluation;
   active->callback = [&]() {
     order.push_back("active");
     // Schedule NBA from Active region.
-    auto* nba = sched.GetEventPool().Acquire();
+    auto *nba = sched.GetEventPool().Acquire();
     nba->kind = EventKind::kUpdate;
     nba->callback = [&]() { order.push_back("nba"); };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
@@ -167,7 +167,7 @@ TEST(SimCh410, CbNbaSynchInPreNba) {
   sched.ScheduleEvent({0}, Region::kActive, active);
 
   // cbNBASynch → Pre-NBA.
-  auto* cb = sched.GetEventPool().Acquire();
+  auto *cb = sched.GetEventPool().Acquire();
   cb->kind = EventKind::kEvaluation;
   cb->callback = [&]() { order.push_back("pre_nba_cb"); };
   sched.ScheduleEvent({0}, Region::kPreNBA, cb);
@@ -190,11 +190,11 @@ TEST(SimCh410, CbReadWriteSynchInPreNbaOrPostNba) {
   std::vector<std::string> order;
 
   // Active event that schedules an NBA.
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->kind = EventKind::kEvaluation;
   active->callback = [&]() {
     order.push_back("active");
-    auto* nba = sched.GetEventPool().Acquire();
+    auto *nba = sched.GetEventPool().Acquire();
     nba->kind = EventKind::kUpdate;
     nba->callback = [&]() { order.push_back("nba"); };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
@@ -202,13 +202,13 @@ TEST(SimCh410, CbReadWriteSynchInPreNbaOrPostNba) {
   sched.ScheduleEvent({0}, Region::kActive, active);
 
   // cbReadWriteSynch in Pre-NBA.
-  auto* pre = sched.GetEventPool().Acquire();
+  auto *pre = sched.GetEventPool().Acquire();
   pre->kind = EventKind::kEvaluation;
   pre->callback = [&]() { order.push_back("pre_nba_rw"); };
   sched.ScheduleEvent({0}, Region::kPreNBA, pre);
 
   // cbReadWriteSynch in Post-NBA.
-  auto* post = sched.GetEventPool().Acquire();
+  auto *post = sched.GetEventPool().Acquire();
   post->kind = EventKind::kEvaluation;
   post->callback = [&]() { order.push_back("post_nba_rw"); };
   sched.ScheduleEvent({0}, Region::kPostNBA, post);
@@ -231,19 +231,19 @@ TEST(SimCh410, CbAtEndOfSimTimeInPrePostponed) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->kind = EventKind::kEvaluation;
   active->callback = [&]() { order.push_back("active"); };
   sched.ScheduleEvent({0}, Region::kActive, active);
 
   // cbAtEndOfSimTime → Pre-Postponed.
-  auto* cb = sched.GetEventPool().Acquire();
+  auto *cb = sched.GetEventPool().Acquire();
   cb->kind = EventKind::kEvaluation;
   cb->callback = [&]() { order.push_back("pre_postponed_cb"); };
   sched.ScheduleEvent({0}, Region::kPrePostponed, cb);
 
   // A Postponed event for comparison.
-  auto* postponed = sched.GetEventPool().Acquire();
+  auto *postponed = sched.GetEventPool().Acquire();
   postponed->kind = EventKind::kEvaluation;
   postponed->callback = [&]() { order.push_back("postponed"); };
   sched.ScheduleEvent({0}, Region::kPostponed, postponed);
@@ -266,13 +266,13 @@ TEST(SimCh410, CbReadOnlySynchInPostponed) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->kind = EventKind::kEvaluation;
   active->callback = [&]() { order.push_back("active"); };
   sched.ScheduleEvent({0}, Region::kActive, active);
 
   // cbReadOnlySynch → Postponed.
-  auto* cb = sched.GetEventPool().Acquire();
+  auto *cb = sched.GetEventPool().Acquire();
   cb->kind = EventKind::kEvaluation;
   cb->callback = [&]() { order.push_back("postponed_cb"); };
   sched.ScheduleEvent({0}, Region::kPostponed, cb);
@@ -284,10 +284,10 @@ TEST(SimCh410, CbReadOnlySynchInPostponed) {
 }
 
 // Helper: schedule an evaluation event that appends a label to an order log.
-static void ScheduleOrderEvent(Scheduler& sched, SimTime time, Region region,
-                               std::vector<std::string>& order,
-                               const std::string& label) {
-  auto* ev = sched.GetEventPool().Acquire();
+static void ScheduleOrderEvent(Scheduler &sched, SimTime time, Region region,
+                               std::vector<std::string> &order,
+                               const std::string &label) {
+  auto *ev = sched.GetEventPool().Acquire();
   ev->kind = EventKind::kEvaluation;
   ev->callback = [&order, label]() { order.push_back(label); };
   sched.ScheduleEvent(time, region, ev);
@@ -309,11 +309,11 @@ TEST(SimCh410, FullPliCallbackRegionOrdering) {
                      "pre_active");
 
   // Active (user logic) — schedules NBA from within its callback.
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->kind = EventKind::kEvaluation;
   active->callback = [&]() {
     order.push_back("active");
-    auto* nba = sched.GetEventPool().Acquire();
+    auto *nba = sched.GetEventPool().Acquire();
     nba->kind = EventKind::kUpdate;
     nba->callback = [&order]() { order.push_back("nba"); };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);

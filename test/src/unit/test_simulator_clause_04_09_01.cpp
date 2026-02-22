@@ -28,24 +28,24 @@ TEST(SimCh4091, ContinuousAssignmentCorrespondsToProcess) {
   // Model: assign dst = src;
   // Each time src changes, the process re-evaluates and schedules an update.
   // Change src at time 0 and time 5 to show the process triggers twice.
-  auto* drive0 = sched.GetEventPool().Acquire();
+  auto *drive0 = sched.GetEventPool().Acquire();
   drive0->kind = EventKind::kEvaluation;
   drive0->callback = [&]() {
     src = 10;
     ++process_eval_count;
-    auto* update = sched.GetEventPool().Acquire();
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() { dst = src; };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
   };
   sched.ScheduleEvent({0}, Region::kActive, drive0);
 
-  auto* drive5 = sched.GetEventPool().Acquire();
+  auto *drive5 = sched.GetEventPool().Acquire();
   drive5->kind = EventKind::kEvaluation;
   drive5->callback = [&]() {
     src = 20;
     ++process_eval_count;
-    auto* update = sched.GetEventPool().Acquire();
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() { dst = src; };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
@@ -73,13 +73,13 @@ TEST(SimCh4091, SensitiveToSourceElements) {
 
   // Model: assign dst = a + b;
   // Changing 'a' triggers the process; changing 'unrelated' does not.
-  auto* change_a = sched.GetEventPool().Acquire();
+  auto *change_a = sched.GetEventPool().Acquire();
   change_a->kind = EventKind::kEvaluation;
   change_a->callback = [&]() {
     a = 3;
     // Continuous assignment sensitive to a → triggers.
     cont_assign_triggered = true;
-    auto* update = sched.GetEventPool().Acquire();
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() { dst = a + b; };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
@@ -87,7 +87,7 @@ TEST(SimCh4091, SensitiveToSourceElements) {
   sched.ScheduleEvent({0}, Region::kActive, change_a);
 
   // Changing an unrelated signal does NOT trigger the continuous assignment.
-  auto* change_unrelated = sched.GetEventPool().Acquire();
+  auto *change_unrelated = sched.GetEventPool().Acquire();
   change_unrelated->kind = EventKind::kEvaluation;
   change_unrelated->callback = [&]() { unrelated = 99; };
   sched.ScheduleEvent({1}, Region::kActive, change_unrelated);
@@ -110,15 +110,15 @@ TEST(SimCh4091, SchedulesActiveUpdateEvent) {
 
   // Schedule a continuous assignment update in Active region and an NBA event
   // to prove the continuous assignment event executes in Active (before NBA).
-  auto* eval = sched.GetEventPool().Acquire();
+  auto *eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-    auto* active_update = sched.GetEventPool().Acquire();
+    auto *active_update = sched.GetEventPool().Acquire();
     active_update->kind = EventKind::kUpdate;
     active_update->callback = [&]() { order.push_back("active_update"); };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, active_update);
 
-    auto* nba_update = sched.GetEventPool().Acquire();
+    auto *nba_update = sched.GetEventPool().Acquire();
     nba_update->kind = EventKind::kUpdate;
     nba_update->callback = [&]() { order.push_back("nba_update"); };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba_update);
@@ -145,11 +145,11 @@ TEST(SimCh4091, UsesCurrentValuesToDetermineTarget) {
 
   // Model: assign (select ? dst_b : dst_a) = 1;
   // At time 0, schedule eval that reads current select to pick target.
-  auto* eval = sched.GetEventPool().Acquire();
+  auto *eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
     // Current value of select determines which target gets the update.
-    auto* update = sched.GetEventPool().Acquire();
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() {
       if (select == 0) {
@@ -178,10 +178,10 @@ TEST(SimCh4091, EvaluatedAtTimeZeroForConstantPropagation) {
   int dst = -1;
 
   // Model: assign dst = 42; → constant RHS, evaluated at time 0.
-  auto* const_assign = sched.GetEventPool().Acquire();
+  auto *const_assign = sched.GetEventPool().Acquire();
   const_assign->kind = EventKind::kEvaluation;
   const_assign->callback = [&]() {
-    auto* update = sched.GetEventPool().Acquire();
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() { dst = 42; };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
@@ -205,10 +205,10 @@ TEST(SimCh4091, TimeZeroEvalBeforeProceduralReads) {
   int read_val = -1;
 
   // Continuous assignment sets net_val at time 0 (Active update).
-  auto* cont_assign = sched.GetEventPool().Acquire();
+  auto *cont_assign = sched.GetEventPool().Acquire();
   cont_assign->kind = EventKind::kEvaluation;
   cont_assign->callback = [&]() {
-    auto* update = sched.GetEventPool().Acquire();
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() { net_val = 7; };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
@@ -216,7 +216,7 @@ TEST(SimCh4091, TimeZeroEvalBeforeProceduralReads) {
   sched.ScheduleEvent({0}, Region::kActive, cont_assign);
 
   // Procedural code in Inactive reads net_val after continuous assignment.
-  auto* proc_read = sched.GetEventPool().Acquire();
+  auto *proc_read = sched.GetEventPool().Acquire();
   proc_read->kind = EventKind::kEvaluation;
   proc_read->callback = [&]() { read_val = net_val; };
   sched.ScheduleEvent({0}, Region::kInactive, proc_read);
@@ -240,11 +240,11 @@ TEST(SimCh4091, ImplicitContinuousAssignmentFromInputPort) {
   // Model: module m(input wire in); → implicit: assign local_input =
   // outside_sig; Port connection is an implicit continuous assignment that
   // schedules an active update event, same as explicit assign.
-  auto* drive = sched.GetEventPool().Acquire();
+  auto *drive = sched.GetEventPool().Acquire();
   drive->kind = EventKind::kEvaluation;
   drive->callback = [&]() {
     outside_sig = 5;
-    auto* port_update = sched.GetEventPool().Acquire();
+    auto *port_update = sched.GetEventPool().Acquire();
     port_update->kind = EventKind::kUpdate;
     port_update->callback = [&]() { local_input = outside_sig; };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, port_update);
@@ -269,11 +269,11 @@ TEST(SimCh4091, ImplicitContinuousAssignmentFromOutputPort) {
   // Model: module m(output wire out); → implicit: assign outside_net =
   // local_output; The output port connection is also an implicit continuous
   // assignment, scheduled as an active update event.
-  auto* drive = sched.GetEventPool().Acquire();
+  auto *drive = sched.GetEventPool().Acquire();
   drive->kind = EventKind::kEvaluation;
   drive->callback = [&]() {
     local_output = 33;
-    auto* port_update = sched.GetEventPool().Acquire();
+    auto *port_update = sched.GetEventPool().Acquire();
     port_update->kind = EventKind::kUpdate;
     port_update->callback = [&]() { outside_net = local_output; };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, port_update);
@@ -298,22 +298,22 @@ TEST(SimCh4091, MultipleContinuousAssignmentsToSameNet) {
 
   // Model: assign net = driver_a; assign net = driver_b;
   // Both drivers schedule active update events independently.
-  auto* eval_a = sched.GetEventPool().Acquire();
+  auto *eval_a = sched.GetEventPool().Acquire();
   eval_a->kind = EventKind::kEvaluation;
   eval_a->callback = [&]() {
     driver_a = 1;
-    auto* update = sched.GetEventPool().Acquire();
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() { net = driver_a; };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
   };
   sched.ScheduleEvent({0}, Region::kActive, eval_a);
 
-  auto* eval_b = sched.GetEventPool().Acquire();
+  auto *eval_b = sched.GetEventPool().Acquire();
   eval_b->kind = EventKind::kEvaluation;
   eval_b->callback = [&]() {
     driver_b = 2;
-    auto* update = sched.GetEventPool().Acquire();
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() { net = driver_b; };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
@@ -339,11 +339,11 @@ TEST(SimCh4091, NoUpdateWhenExpressionUnchanged) {
   int update_count = 0;
 
   // Time 0: initial evaluation, src=5 → update dst.
-  auto* eval0 = sched.GetEventPool().Acquire();
+  auto *eval0 = sched.GetEventPool().Acquire();
   eval0->kind = EventKind::kEvaluation;
   eval0->callback = [&]() {
     int new_val = src;
-    auto* update = sched.GetEventPool().Acquire();
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&, new_val]() {
       dst = new_val;
@@ -355,12 +355,12 @@ TEST(SimCh4091, NoUpdateWhenExpressionUnchanged) {
 
   // Time 1: src is written but value doesn't change (still 5).
   // A well-modeled continuous assignment would not schedule an update.
-  auto* eval1 = sched.GetEventPool().Acquire();
+  auto *eval1 = sched.GetEventPool().Acquire();
   eval1->kind = EventKind::kEvaluation;
   eval1->callback = [&]() {
-    int new_val = src;  // still 5, no change
+    int new_val = src; // still 5, no change
     if (new_val != dst) {
-      auto* update = sched.GetEventPool().Acquire();
+      auto *update = sched.GetEventPool().Acquire();
       update->kind = EventKind::kUpdate;
       update->callback = [&, new_val]() {
         dst = new_val;

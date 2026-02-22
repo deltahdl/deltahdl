@@ -1,17 +1,16 @@
 // §non_lrm
 
-#include <gtest/gtest.h>
-#include <atomic>
-#include <vector>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "simulation/compiled_sim.h"
 #include "simulation/mt_sim.h"
 #include "simulation/sim_context.h"
+#include <atomic>
+#include <gtest/gtest.h>
+#include <vector>
 
 using namespace delta;
-
 
 struct MtSimFixture {
   SourceManager mgr;
@@ -89,20 +88,22 @@ TEST(MtSim, MtSchedulerSetPartitions) {
 
 TEST(MtSim, RunTimestepExecutesProcesses) {
   MtSimFixture f;
-  auto* a = f.ctx.CreateVariable("a", 32);
+  auto *a = f.ctx.CreateVariable("a", 32);
   a->value = MakeLogic4VecVal(f.arena, 32, 0);
-  auto* b = f.ctx.CreateVariable("b", 32);
+  auto *b = f.ctx.CreateVariable("b", 32);
   b->value = MakeLogic4VecVal(f.arena, 32, 0);
 
   // Two compiled processes: proc0 sets a=42, proc1 sets b=99.
   std::vector<CompiledProcess> processes;
-  processes.emplace_back(0, [](SimContext& ctx) {
-    auto* var = ctx.FindVariable("a");
-    if (var) var->value.words[0].aval = 42;
+  processes.emplace_back(0, [](SimContext &ctx) {
+    auto *var = ctx.FindVariable("a");
+    if (var)
+      var->value.words[0].aval = 42;
   });
-  processes.emplace_back(1, [](SimContext& ctx) {
-    auto* var = ctx.FindVariable("b");
-    if (var) var->value.words[0].aval = 99;
+  processes.emplace_back(1, [](SimContext &ctx) {
+    auto *var = ctx.FindVariable("b");
+    if (var)
+      var->value.words[0].aval = 99;
   });
 
   // Two independent partitions.
@@ -128,10 +129,10 @@ TEST(MtSim, RunTimestepMultipleThreads) {
   MtSimFixture f;
 
   // Use string literals for stable string_view keys.
-  const char* names[] = {"v0", "v1", "v2", "v3"};
-  std::vector<Variable*> vars;
+  const char *names[] = {"v0", "v1", "v2", "v3"};
+  std::vector<Variable *> vars;
   for (int i = 0; i < 4; ++i) {
-    auto* var = f.ctx.CreateVariable(names[i], 32);
+    auto *var = f.ctx.CreateVariable(names[i], 32);
     var->value = MakeLogic4VecVal(f.arena, 32, 0);
     vars.push_back(var);
   }
@@ -140,9 +141,10 @@ TEST(MtSim, RunTimestepMultipleThreads) {
   std::vector<CompiledProcess> processes;
   processes.reserve(4);
   for (uint32_t i = 0; i < 4; ++i) {
-    processes.emplace_back(i, [i, &names](SimContext& ctx) {
-      auto* var = ctx.FindVariable(names[i]);
-      if (var) var->value.words[0].aval += 1;
+    processes.emplace_back(i, [i, &names](SimContext &ctx) {
+      auto *var = ctx.FindVariable(names[i]);
+      if (var)
+        var->value.words[0].aval += 1;
     });
   }
 
@@ -162,4 +164,4 @@ TEST(MtSim, RunTimestepMultipleThreads) {
   }
 }
 
-}  // namespace
+} // namespace

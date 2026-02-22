@@ -29,7 +29,7 @@ TEST(SimCh4423, InactiveRegionExecutesEvents) {
   Scheduler sched(arena);
   int executed = 0;
 
-  auto* ev = sched.GetEventPool().Acquire();
+  auto *ev = sched.GetEventPool().Acquire();
   ev->callback = [&]() { executed++; };
   sched.ScheduleEvent({0}, Region::kInactive, ev);
 
@@ -46,11 +46,11 @@ TEST(SimCh4423, InactiveExecutesAfterActive) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto* inactive = sched.GetEventPool().Acquire();
+  auto *inactive = sched.GetEventPool().Acquire();
   inactive->callback = [&]() { order.push_back("inactive"); };
   sched.ScheduleEvent({0}, Region::kInactive, inactive);
 
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->callback = [&]() { order.push_back("active"); };
   sched.ScheduleEvent({0}, Region::kActive, active);
 
@@ -70,14 +70,14 @@ TEST(SimCh4423, AllActiveEventsCompleteBeforeInactive) {
   std::vector<std::string> order;
 
   for (int i = 0; i < 3; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, i]() {
       order.push_back("active" + std::to_string(i));
     };
     sched.ScheduleEvent({0}, Region::kActive, ev);
   }
 
-  auto* inactive = sched.GetEventPool().Acquire();
+  auto *inactive = sched.GetEventPool().Acquire();
   inactive->callback = [&]() { order.push_back("inactive"); };
   sched.ScheduleEvent({0}, Region::kInactive, inactive);
 
@@ -96,11 +96,11 @@ TEST(SimCh4423, ZeroDelaySchedulesIntoInactive) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->callback = [&]() {
     order.push_back("active");
     // #0 delay: schedule into Inactive at current time.
-    auto* delayed = sched.GetEventPool().Acquire();
+    auto *delayed = sched.GetEventPool().Acquire();
     delayed->callback = [&order]() { order.push_back("after_zero_delay"); };
     sched.ScheduleEvent({0}, Region::kInactive, delayed);
   };
@@ -124,14 +124,14 @@ TEST(SimCh4423, InactiveToActiveIteration) {
   std::vector<std::string> order;
 
   // Initial Active event schedules into Inactive (#0).
-  auto* act1 = sched.GetEventPool().Acquire();
+  auto *act1 = sched.GetEventPool().Acquire();
   act1->callback = [&]() {
     order.push_back("active1");
-    auto* inact = sched.GetEventPool().Acquire();
+    auto *inact = sched.GetEventPool().Acquire();
     inact->callback = [&]() {
       order.push_back("inactive");
       // Inactive schedules new Active event -> triggers re-iteration.
-      auto* act2 = sched.GetEventPool().Acquire();
+      auto *act2 = sched.GetEventPool().Acquire();
       act2->callback = [&order]() { order.push_back("active2"); };
       sched.ScheduleEvent({0}, Region::kActive, act2);
     };
@@ -159,22 +159,22 @@ TEST(SimCh4423, ChainedZeroDelayIteration) {
   auto log_inactive2 = [&order]() { order.push_back("inactive2"); };
   auto do_active2 = [&]() {
     order.push_back("active2");
-    auto* inact2 = sched.GetEventPool().Acquire();
+    auto *inact2 = sched.GetEventPool().Acquire();
     inact2->callback = log_inactive2;
     sched.ScheduleEvent({0}, Region::kInactive, inact2);
   };
   // Outer chain: active1 -> inactive1 -> (inner chain).
   auto do_inactive1 = [&]() {
     order.push_back("inactive1");
-    auto* act2 = sched.GetEventPool().Acquire();
+    auto *act2 = sched.GetEventPool().Acquire();
     act2->callback = do_active2;
     sched.ScheduleEvent({0}, Region::kActive, act2);
   };
 
-  auto* act1 = sched.GetEventPool().Acquire();
+  auto *act1 = sched.GetEventPool().Acquire();
   act1->callback = [&]() {
     order.push_back("active1");
-    auto* inact1 = sched.GetEventPool().Acquire();
+    auto *inact1 = sched.GetEventPool().Acquire();
     inact1->callback = do_inactive1;
     sched.ScheduleEvent({0}, Region::kInactive, inact1);
   };
@@ -208,11 +208,11 @@ TEST(SimCh4423, InactiveExecutesBeforeNBA) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto* nba = sched.GetEventPool().Acquire();
+  auto *nba = sched.GetEventPool().Acquire();
   nba->callback = [&]() { order.push_back("nba"); };
   sched.ScheduleEvent({0}, Region::kNBA, nba);
 
-  auto* inactive = sched.GetEventPool().Acquire();
+  auto *inactive = sched.GetEventPool().Acquire();
   inactive->callback = [&]() { order.push_back("inactive"); };
   sched.ScheduleEvent({0}, Region::kInactive, inactive);
 
@@ -232,7 +232,7 @@ TEST(SimCh4423, InactiveEventsAcrossMultipleTimeSlots) {
   std::vector<uint64_t> times;
 
   for (uint64_t t = 0; t < 3; ++t) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&times, &sched]() {
       times.push_back(sched.CurrentTime().ticks);
     };
@@ -260,11 +260,11 @@ TEST(SimCh4423, InactiveExecutesBeforeReInactive) {
   Scheduler sched(arena);
   std::vector<int> order;
 
-  auto* ev_inactive = sched.GetEventPool().Acquire();
+  auto *ev_inactive = sched.GetEventPool().Acquire();
   ev_inactive->callback = [&order]() { order.push_back(1); };
   sched.ScheduleEvent({0}, Region::kInactive, ev_inactive);
 
-  auto* ev_reinactive = sched.GetEventPool().Acquire();
+  auto *ev_reinactive = sched.GetEventPool().Acquire();
   ev_reinactive->callback = [&order]() { order.push_back(2); };
   sched.ScheduleEvent({0}, Region::kReInactive, ev_reinactive);
 
@@ -283,7 +283,7 @@ TEST(SimCh4423, InactiveRegionHoldsMultipleEvents) {
   int count = 0;
 
   for (int i = 0; i < 5; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&]() { count++; };
     sched.ScheduleEvent({0}, Region::kInactive, ev);
   }

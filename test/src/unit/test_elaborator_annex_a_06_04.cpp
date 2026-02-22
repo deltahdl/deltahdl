@@ -33,7 +33,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA604Fixture &f) {
   return design;
 }
 
-}  // namespace
+} // namespace
 
 // =============================================================================
 // A.6.4 Statements — Elaboration
@@ -46,26 +46,24 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA604Fixture &f) {
 // §13.4.4: return with value in void function is an error
 TEST(ElabA604, VoidFunctionReturnWithValueError) {
   ElabA604Fixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  function void f();\n"
-      "    return 42;\n"
-      "  endfunction\n"
-      "endmodule\n",
-      f);
+  ElaborateSrc("module m;\n"
+               "  function void f();\n"
+               "    return 42;\n"
+               "  endfunction\n"
+               "endmodule\n",
+               f);
   EXPECT_TRUE(f.has_errors);
 }
 
 // §13.4: non-void function can return a value
 TEST(ElabA604, NonVoidFunctionReturnWithValue) {
   ElabA604Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  function int f();\n"
-      "    return 42;\n"
-      "  endfunction\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  function int f();\n"
+                              "    return 42;\n"
+                              "  endfunction\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }

@@ -1,11 +1,11 @@
 // §27.4: Loop generate constructs
 
-#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -23,10 +23,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult Parse(const std::string& src) {
+static ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -37,35 +37,35 @@ static ParseResult Parse(const std::string& src) {
 }
 
 struct StructMemberExpected {
-  const char* name;
+  const char *name;
   DataTypeKind type_kind;
 };
 
-static ModuleItem* FindItemByKind(const std::vector<ModuleItem*>& items,
+static ModuleItem *FindItemByKind(const std::vector<ModuleItem *> &items,
                                   ModuleItemKind kind) {
-  for (auto* item : items) {
-    if (item->kind == kind) return item;
+  for (auto *item : items) {
+    if (item->kind == kind)
+      return item;
   }
   return nullptr;
 }
 
 struct ModportPortExpected {
   Direction dir;
-  const char* name;
+  const char *name;
 };
 
 namespace {
 
 TEST(Parser, GenerateFor) {
-  auto r = Parse(
-      "module t;\n"
-      "  genvar i;\n"
-      "  for (i = 0; i < 4; i = i + 1) begin\n"
-      "    assign a[i] = b[i];\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  genvar i;\n"
+                 "  for (i = 0; i < 4; i = i + 1) begin\n"
+                 "    assign a[i] = b[i];\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* gen =
+  auto *gen =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kGenerateFor);
   ASSERT_NE(gen, nullptr);
   EXPECT_NE(gen->gen_init, nullptr);
@@ -74,4 +74,4 @@ TEST(Parser, GenerateFor) {
   EXPECT_FALSE(gen->gen_body.empty());
 }
 
-}  // namespace
+} // namespace

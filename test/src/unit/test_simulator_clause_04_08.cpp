@@ -24,13 +24,13 @@ TEST(SimCh48, EvalAndUpdateEventsIntermingleInActive) {
   std::vector<std::string> order;
 
   // An evaluation event.
-  auto* eval = sched.GetEventPool().Acquire();
+  auto *eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() { order.push_back("eval"); };
   sched.ScheduleEvent({0}, Region::kActive, eval);
 
   // An update event.
-  auto* update = sched.GetEventPool().Acquire();
+  auto *update = sched.GetEventPool().Acquire();
   update->kind = EventKind::kUpdate;
   update->callback = [&]() { order.push_back("update"); };
   sched.ScheduleEvent({0}, Region::kActive, update);
@@ -56,12 +56,12 @@ TEST(SimCh48, BlockingAssignmentTriggersUpdateEvent) {
 
   // Simulate: at time 1, q = 0 (blocking assignment).
   // This triggers an update event for p (continuous assignment: assign p = q).
-  auto* assign_q = sched.GetEventPool().Acquire();
+  auto *assign_q = sched.GetEventPool().Acquire();
   assign_q->kind = EventKind::kEvaluation;
   assign_q->callback = [&]() {
     q = 0;
     // The continuous assignment "assign p = q" triggers an update event.
-    auto* update_p = sched.GetEventPool().Acquire();
+    auto *update_p = sched.GetEventPool().Acquire();
     update_p->kind = EventKind::kUpdate;
     update_p->callback = [&]() { p = q; };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update_p);
@@ -70,7 +70,7 @@ TEST(SimCh48, BlockingAssignmentTriggersUpdateEvent) {
 
   sched.Run();
   EXPECT_EQ(q, 0);
-  EXPECT_EQ(p, 0);  // Update event executed, p reflects new q.
+  EXPECT_EQ(p, 0); // Update event executed, p reflects new q.
 }
 
 // ---------------------------------------------------------------------------
@@ -86,18 +86,18 @@ TEST(SimCh48, UpdateEventRacesWithProcessContinuation) {
   int display_value = -1;
 
   // Process: q = 0 triggers update for p; $display(p) follows.
-  auto* process = sched.GetEventPool().Acquire();
+  auto *process = sched.GetEventPool().Acquire();
   process->kind = EventKind::kEvaluation;
   process->callback = [&]() {
     q = 0;
     // Schedule update event for p (from continuous assignment).
-    auto* update_p = sched.GetEventPool().Acquire();
+    auto *update_p = sched.GetEventPool().Acquire();
     update_p->kind = EventKind::kUpdate;
     update_p->callback = [&]() { p = q; };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update_p);
 
     // Schedule process continuation ($display(p)).
-    auto* display = sched.GetEventPool().Acquire();
+    auto *display = sched.GetEventPool().Acquire();
     display->kind = EventKind::kEvaluation;
     display->callback = [&]() { display_value = p; };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, display);
@@ -121,12 +121,12 @@ TEST(SimCh48, BothRaceOutcomesAreValid) {
   std::vector<int> observed_p;
 
   // Two interleaved events: update p, then read p.
-  auto* update_p = sched.GetEventPool().Acquire();
+  auto *update_p = sched.GetEventPool().Acquire();
   update_p->kind = EventKind::kUpdate;
   update_p->callback = [&]() { p = 0; };
   sched.ScheduleEvent({1}, Region::kActive, update_p);
 
-  auto* read_p = sched.GetEventPool().Acquire();
+  auto *read_p = sched.GetEventPool().Acquire();
   read_p->kind = EventKind::kEvaluation;
   read_p->callback = [&]() { observed_p.push_back(p); };
   sched.ScheduleEvent({1}, Region::kActive, read_p);
@@ -149,12 +149,12 @@ TEST(SimCh48, LRMExampleAssignPEqualsQ) {
   int display_result = -1;
 
   // Time 0: q = 1 (initial block starts).
-  auto* init_q = sched.GetEventPool().Acquire();
+  auto *init_q = sched.GetEventPool().Acquire();
   init_q->kind = EventKind::kEvaluation;
   init_q->callback = [&]() {
     q = 1;
     // Continuous assignment updates p.
-    auto* update_p = sched.GetEventPool().Acquire();
+    auto *update_p = sched.GetEventPool().Acquire();
     update_p->kind = EventKind::kUpdate;
     update_p->callback = [&]() { p = q; };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update_p);
@@ -162,18 +162,18 @@ TEST(SimCh48, LRMExampleAssignPEqualsQ) {
   sched.ScheduleEvent({0}, Region::kActive, init_q);
 
   // Time 1: q = 0 and $display(p) — these race.
-  auto* assign_zero = sched.GetEventPool().Acquire();
+  auto *assign_zero = sched.GetEventPool().Acquire();
   assign_zero->kind = EventKind::kEvaluation;
   assign_zero->callback = [&]() {
     q = 0;
     // Continuous assignment: assign p = q → schedule update.
-    auto* update_p = sched.GetEventPool().Acquire();
+    auto *update_p = sched.GetEventPool().Acquire();
     update_p->kind = EventKind::kUpdate;
     update_p->callback = [&]() { p = q; };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update_p);
 
     // $display(p) — races with the update.
-    auto* display = sched.GetEventPool().Acquire();
+    auto *display = sched.GetEventPool().Acquire();
     display->kind = EventKind::kEvaluation;
     display->callback = [&]() { display_result = p; };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, display);
@@ -199,17 +199,17 @@ TEST(SimCh48, MultipleUpdateEventsRaceWithEachOther) {
   int c = 0;
 
   // Three update events from different continuous assignments, all Active.
-  auto* u1 = sched.GetEventPool().Acquire();
+  auto *u1 = sched.GetEventPool().Acquire();
   u1->kind = EventKind::kUpdate;
   u1->callback = [&]() { a = 1; };
   sched.ScheduleEvent({0}, Region::kActive, u1);
 
-  auto* u2 = sched.GetEventPool().Acquire();
+  auto *u2 = sched.GetEventPool().Acquire();
   u2->kind = EventKind::kUpdate;
   u2->callback = [&]() { b = 2; };
   sched.ScheduleEvent({0}, Region::kActive, u2);
 
-  auto* u3 = sched.GetEventPool().Acquire();
+  auto *u3 = sched.GetEventPool().Acquire();
   u3->kind = EventKind::kUpdate;
   u3->callback = [&]() { c = 3; };
   sched.ScheduleEvent({0}, Region::kActive, u3);
@@ -237,24 +237,24 @@ TEST(SimCh48, RaceConditionAcrossMultipleNets) {
   int observed_net_y = -1;
 
   // Process: x = 10; y = 20; → triggers updates for net_x and net_y.
-  auto* process = sched.GetEventPool().Acquire();
+  auto *process = sched.GetEventPool().Acquire();
   process->kind = EventKind::kEvaluation;
   process->callback = [&]() {
     x = 10;
     y = 20;
 
-    auto* ux = sched.GetEventPool().Acquire();
+    auto *ux = sched.GetEventPool().Acquire();
     ux->kind = EventKind::kUpdate;
     ux->callback = [&]() { net_x = x; };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, ux);
 
-    auto* uy = sched.GetEventPool().Acquire();
+    auto *uy = sched.GetEventPool().Acquire();
     uy->kind = EventKind::kUpdate;
     uy->callback = [&]() { net_y = y; };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, uy);
 
     // Observe values — races with the updates.
-    auto* observe = sched.GetEventPool().Acquire();
+    auto *observe = sched.GetEventPool().Acquire();
     observe->kind = EventKind::kEvaluation;
     observe->callback = [&]() {
       observed_net_x = net_x;
@@ -283,12 +283,12 @@ TEST(SimCh48, EvalAndUpdateEventKindsDistinct) {
   Scheduler sched(arena);
   std::vector<EventKind> kinds;
 
-  auto* eval = sched.GetEventPool().Acquire();
+  auto *eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() { kinds.push_back(EventKind::kEvaluation); };
   sched.ScheduleEvent({0}, Region::kActive, eval);
 
-  auto* update = sched.GetEventPool().Acquire();
+  auto *update = sched.GetEventPool().Acquire();
   update->kind = EventKind::kUpdate;
   update->callback = [&]() { kinds.push_back(EventKind::kUpdate); };
   sched.ScheduleEvent({0}, Region::kActive, update);
@@ -312,13 +312,13 @@ TEST(SimCh48, NoRaceBetweenDifferentRegions) {
   int observed = -1;
 
   // Active region: set value.
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->kind = EventKind::kUpdate;
   active->callback = [&]() { value = 42; };
   sched.ScheduleEvent({0}, Region::kActive, active);
 
   // NBA region: read value — deterministically after Active.
-  auto* nba = sched.GetEventPool().Acquire();
+  auto *nba = sched.GetEventPool().Acquire();
   nba->kind = EventKind::kEvaluation;
   nba->callback = [&]() { observed = value; };
   sched.ScheduleEvent({0}, Region::kNBA, nba);
@@ -341,17 +341,17 @@ TEST(SimCh48, NBAEliminatesActiveRegionRace) {
   int display_value = -1;
 
   // Process in Active: q <= 0 (NBA), then $display(p).
-  auto* process = sched.GetEventPool().Acquire();
+  auto *process = sched.GetEventPool().Acquire();
   process->kind = EventKind::kEvaluation;
   process->callback = [&]() {
     // Schedule NBA for q.
-    auto* nba_q = sched.GetEventPool().Acquire();
+    auto *nba_q = sched.GetEventPool().Acquire();
     nba_q->kind = EventKind::kUpdate;
     nba_q->callback = [&]() {
       q = 0;
       // Continuous assignment: schedule update for p in Active (next
       // iteration).
-      auto* update_p = sched.GetEventPool().Acquire();
+      auto *update_p = sched.GetEventPool().Acquire();
       update_p->kind = EventKind::kUpdate;
       update_p->callback = [&]() { p = q; };
       sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update_p);

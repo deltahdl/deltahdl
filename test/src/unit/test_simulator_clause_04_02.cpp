@@ -36,26 +36,28 @@ struct SimCh4Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign* ElaborateSrc(const std::string& src, SimCh4Fixture& f) {
+static RtlirDesign *ElaborateSrc(const std::string &src, SimCh4Fixture &f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
+  auto *cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-static uint64_t RunAndGet(const std::string& src, const char* var_name) {
+static uint64_t RunAndGet(const std::string &src, const char *var_name) {
   SimCh4Fixture f;
-  auto* design = ElaborateSrc(src, f);
+  auto *design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
-  if (!design) return 0;
+  if (!design)
+    return 0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* var = f.ctx.FindVariable(var_name);
+  auto *var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
-  if (!var) return 0;
+  if (!var)
+    return 0;
   return var->value.ToUint64();
 }
 
@@ -64,31 +66,29 @@ static uint64_t RunAndGet(const std::string& src, const char* var_name) {
 //    Both blocks write to separate variables; both should complete.
 // ---------------------------------------------------------------------------
 TEST(SimCh4, ParallelInitialBlocks) {
-  auto a = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial a = 8'd42;\n"
-      "  initial b = 8'd99;\n"
-      "endmodule\n",
-      "a");
+  auto a = RunAndGet("module t;\n"
+                     "  logic [7:0] a, b;\n"
+                     "  initial a = 8'd42;\n"
+                     "  initial b = 8'd99;\n"
+                     "endmodule\n",
+                     "a");
   EXPECT_EQ(a, 42u);
 }
 
 TEST(SimCh4, ParallelInitialBlocksBothComplete) {
   SimCh4Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial a = 8'd42;\n"
-      "  initial b = 8'd99;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] a, b;\n"
+                              "  initial a = 8'd42;\n"
+                              "  initial b = 8'd99;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
+  auto *va = f.ctx.FindVariable("a");
+  auto *vb = f.ctx.FindVariable("b");
   ASSERT_NE(va, nullptr);
   ASSERT_NE(vb, nullptr);
   EXPECT_EQ(va->value.ToUint64(), 42u);
@@ -100,16 +100,15 @@ TEST(SimCh4, ParallelInitialBlocksBothComplete) {
 //    Statements execute in source order within a single process.
 // ---------------------------------------------------------------------------
 TEST(SimCh4, SequentialWithinBeginEnd) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd1;\n"
-      "    x = 8'd2;\n"
-      "    x = 8'd3;\n"
-      "  end\n"
-      "endmodule\n",
-      "x");
+  auto result = RunAndGet("module t;\n"
+                          "  logic [7:0] x;\n"
+                          "  initial begin\n"
+                          "    x = 8'd1;\n"
+                          "    x = 8'd2;\n"
+                          "    x = 8'd3;\n"
+                          "  end\n"
+                          "endmodule\n",
+                          "x");
   EXPECT_EQ(result, 3u);
 }
 
@@ -119,25 +118,24 @@ TEST(SimCh4, SequentialWithinBeginEnd) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, ParallelProcessesSequentialBodies) {
   SimCh4Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial begin\n"
-      "    a = 8'd10;\n"
-      "    a = a + 8'd5;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    b = 8'd20;\n"
-      "    b = b + 8'd7;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] a, b;\n"
+                              "  initial begin\n"
+                              "    a = 8'd10;\n"
+                              "    a = a + 8'd5;\n"
+                              "  end\n"
+                              "  initial begin\n"
+                              "    b = 8'd20;\n"
+                              "    b = b + 8'd7;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
+  auto *va = f.ctx.FindVariable("a");
+  auto *vb = f.ctx.FindVariable("b");
   ASSERT_NE(va, nullptr);
   ASSERT_NE(vb, nullptr);
   EXPECT_EQ(va->value.ToUint64(), 15u);
@@ -150,18 +148,17 @@ TEST(SimCh4, ParallelProcessesSequentialBodies) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, InitialAndAlwaysCombConcurrent) {
   SimCh4Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, result;\n"
-      "  initial a = 8'd10;\n"
-      "  always_comb result = a + 8'd1;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] a, result;\n"
+                              "  initial a = 8'd10;\n"
+                              "  always_comb result = a + 8'd1;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+  auto *var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 11u);
 }
@@ -172,19 +169,18 @@ TEST(SimCh4, InitialAndAlwaysCombConcurrent) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, BehavioralAndDataflowCoexist) {
   SimCh4Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  assign b = a + 8'd1;\n"
-      "  initial a = 8'd5;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] a, b;\n"
+                              "  assign b = a + 8'd1;\n"
+                              "  initial a = 8'd5;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
+  auto *va = f.ctx.FindVariable("a");
+  auto *vb = f.ctx.FindVariable("b");
   ASSERT_NE(va, nullptr);
   ASSERT_NE(vb, nullptr);
   EXPECT_EQ(va->value.ToUint64(), 5u);
@@ -197,22 +193,21 @@ TEST(SimCh4, BehavioralAndDataflowCoexist) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, SameTimeSlotExecution) {
   SimCh4Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial begin\n"
-      "    a = 8'd1;\n"
-      "    b = 8'd2;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] a, b;\n"
+                              "  initial begin\n"
+                              "    a = 8'd1;\n"
+                              "    b = 8'd2;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
+  auto *va = f.ctx.FindVariable("a");
+  auto *vb = f.ctx.FindVariable("b");
   ASSERT_NE(va, nullptr);
   ASSERT_NE(vb, nullptr);
   EXPECT_EQ(va->value.ToUint64(), 1u);
@@ -225,20 +220,19 @@ TEST(SimCh4, SameTimeSlotExecution) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, SimulationTimeAdvances) {
   SimCh4Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    #10 x = 8'd1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] x;\n"
+                              "  initial begin\n"
+                              "    x = 8'd0;\n"
+                              "    #10 x = 8'd1;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+  auto *var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -249,25 +243,24 @@ TEST(SimCh4, SimulationTimeAdvances) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, MultipleProcessesAcrossTime) {
   SimCh4Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial begin\n"
-      "    a = 8'd1;\n"
-      "    #5 a = 8'd2;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    b = 8'd10;\n"
-      "    #10 b = 8'd20;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] a, b;\n"
+                              "  initial begin\n"
+                              "    a = 8'd1;\n"
+                              "    #5 a = 8'd2;\n"
+                              "  end\n"
+                              "  initial begin\n"
+                              "    b = 8'd10;\n"
+                              "    #10 b = 8'd20;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
+  auto *va = f.ctx.FindVariable("a");
+  auto *vb = f.ctx.FindVariable("b");
   ASSERT_NE(va, nullptr);
   ASSERT_NE(vb, nullptr);
   EXPECT_EQ(va->value.ToUint64(), 2u);
@@ -280,21 +273,20 @@ TEST(SimCh4, MultipleProcessesAcrossTime) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, AlwaysCombReactsToDelayedChange) {
   SimCh4Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, result;\n"
-      "  initial begin\n"
-      "    a = 8'd0;\n"
-      "    #5 a = 8'd7;\n"
-      "  end\n"
-      "  always_comb result = a * 8'd2;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] a, result;\n"
+                              "  initial begin\n"
+                              "    a = 8'd0;\n"
+                              "    #5 a = 8'd7;\n"
+                              "  end\n"
+                              "  always_comb result = a * 8'd2;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+  auto *var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 14u);
 }
@@ -305,21 +297,20 @@ TEST(SimCh4, AlwaysCombReactsToDelayedChange) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, CombAndSequentialAbstractions) {
   SimCh4Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, sum;\n"
-      "  initial begin\n"
-      "    a = 8'd3;\n"
-      "    b = 8'd4;\n"
-      "  end\n"
-      "  always_comb sum = a + b;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] a, b, sum;\n"
+                              "  initial begin\n"
+                              "    a = 8'd3;\n"
+                              "    b = 8'd4;\n"
+                              "  end\n"
+                              "  always_comb sum = a + b;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("sum");
+  auto *var = f.ctx.FindVariable("sum");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
@@ -329,14 +320,13 @@ TEST(SimCh4, CombAndSequentialAbstractions) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, ThreeParallelInitialBlocks) {
   SimCh4Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, c;\n"
-      "  initial a = 8'd11;\n"
-      "  initial b = 8'd22;\n"
-      "  initial c = 8'd33;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] a, b, c;\n"
+                              "  initial a = 8'd11;\n"
+                              "  initial b = 8'd22;\n"
+                              "  initial c = 8'd33;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -351,15 +341,14 @@ TEST(SimCh4, ThreeParallelInitialBlocks) {
 //     ones in the same begin-end block.
 // ---------------------------------------------------------------------------
 TEST(SimCh4, BlockingOverwriteInOrder) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd100;\n"
-      "    x = 8'd200;\n"
-      "  end\n"
-      "endmodule\n",
-      "x");
+  auto result = RunAndGet("module t;\n"
+                          "  logic [7:0] x;\n"
+                          "  initial begin\n"
+                          "    x = 8'd100;\n"
+                          "    x = 8'd200;\n"
+                          "  end\n"
+                          "endmodule\n",
+                          "x");
   EXPECT_EQ(result, 200u);
 }
 
@@ -369,18 +358,17 @@ TEST(SimCh4, BlockingOverwriteInOrder) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, ContinuousAssignAsProcess) {
   SimCh4Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] in_val, out_val;\n"
-      "  assign out_val = in_val;\n"
-      "  initial in_val = 8'd55;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] in_val, out_val;\n"
+                              "  assign out_val = in_val;\n"
+                              "  initial in_val = 8'd55;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("out_val");
+  auto *var = f.ctx.FindVariable("out_val");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
@@ -391,14 +379,13 @@ TEST(SimCh4, ContinuousAssignAsProcess) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, CascadeOfProcesses) {
   SimCh4Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, c;\n"
-      "  initial a = 8'd5;\n"
-      "  assign b = a + 8'd1;\n"
-      "  always_comb c = b * 8'd2;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] a, b, c;\n"
+                              "  initial a = 8'd5;\n"
+                              "  assign b = a + 8'd1;\n"
+                              "  always_comb c = b * 8'd2;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -414,21 +401,20 @@ TEST(SimCh4, CascadeOfProcesses) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, TimeZeroSemantics) {
   SimCh4Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial begin\n"
-      "    a = 8'd1;\n"
-      "    b = a + 8'd1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] a, b;\n"
+                              "  initial begin\n"
+                              "    a = 8'd1;\n"
+                              "    b = a + 8'd1;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
+  auto *va = f.ctx.FindVariable("a");
+  auto *vb = f.ctx.FindVariable("b");
   ASSERT_NE(va, nullptr);
   ASSERT_NE(vb, nullptr);
   EXPECT_EQ(va->value.ToUint64(), 1u);
@@ -441,14 +427,13 @@ TEST(SimCh4, TimeZeroSemantics) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, ConcurrentAlwaysCombBlocks) {
   SimCh4Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, r1, r2;\n"
-      "  initial a = 8'd10;\n"
-      "  always_comb r1 = a + 8'd1;\n"
-      "  always_comb r2 = a + 8'd2;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] a, r1, r2;\n"
+                              "  initial a = 8'd10;\n"
+                              "  always_comb r1 = a + 8'd1;\n"
+                              "  always_comb r2 = a + 8'd2;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -463,22 +448,21 @@ TEST(SimCh4, ConcurrentAlwaysCombBlocks) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, ProcessInteractionMultipleTimeSteps) {
   SimCh4Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, doubled;\n"
-      "  initial begin\n"
-      "    a = 8'd1;\n"
-      "    #5 a = 8'd4;\n"
-      "    #5 a = 8'd8;\n"
-      "  end\n"
-      "  always_comb doubled = a * 8'd2;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] a, doubled;\n"
+                              "  initial begin\n"
+                              "    a = 8'd1;\n"
+                              "    #5 a = 8'd4;\n"
+                              "    #5 a = 8'd8;\n"
+                              "  end\n"
+                              "  always_comb doubled = a * 8'd2;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("doubled");
+  auto *var = f.ctx.FindVariable("doubled");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 16u);
 }
@@ -489,19 +473,18 @@ TEST(SimCh4, ProcessInteractionMultipleTimeSteps) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, ParallelConditionalLogic) {
   SimCh4Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial begin\n"
-      "    if (1) a = 8'd1;\n"
-      "    else a = 8'd0;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    if (0) b = 8'd1;\n"
-      "    else b = 8'd0;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] a, b;\n"
+                              "  initial begin\n"
+                              "    if (1) a = 8'd1;\n"
+                              "    else a = 8'd0;\n"
+                              "  end\n"
+                              "  initial begin\n"
+                              "    if (0) b = 8'd1;\n"
+                              "    else b = 8'd0;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -515,17 +498,16 @@ TEST(SimCh4, ParallelConditionalLogic) {
 //     sequential computation within a process.
 // ---------------------------------------------------------------------------
 TEST(SimCh4, ComputationChainInProcess) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [15:0] x;\n"
-      "  initial begin\n"
-      "    x = 16'd1;\n"
-      "    x = x + 16'd1;\n"
-      "    x = x * 16'd3;\n"
-      "    x = x - 16'd1;\n"
-      "  end\n"
-      "endmodule\n",
-      "x");
+  auto result = RunAndGet("module t;\n"
+                          "  logic [15:0] x;\n"
+                          "  initial begin\n"
+                          "    x = 16'd1;\n"
+                          "    x = x + 16'd1;\n"
+                          "    x = x * 16'd3;\n"
+                          "    x = x - 16'd1;\n"
+                          "  end\n"
+                          "endmodule\n",
+                          "x");
   // x = 1, then 2, then 6, then 5.
   EXPECT_EQ(result, 5u);
 }
@@ -535,14 +517,13 @@ TEST(SimCh4, ComputationChainInProcess) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, MultipleContinuousAssignments) {
   SimCh4Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, c;\n"
-      "  initial a = 8'd10;\n"
-      "  assign b = a + 8'd1;\n"
-      "  assign c = a + 8'd2;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] a, b, c;\n"
+                              "  initial a = 8'd10;\n"
+                              "  assign b = a + 8'd1;\n"
+                              "  assign c = a + 8'd2;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -557,16 +538,15 @@ TEST(SimCh4, MultipleContinuousAssignments) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, AlwaysCombWithBeginEnd) {
   SimCh4Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, r1, r2;\n"
-      "  initial a = 8'd5;\n"
-      "  always_comb begin\n"
-      "    r1 = a + 8'd1;\n"
-      "    r2 = a + 8'd2;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] a, r1, r2;\n"
+                              "  initial a = 8'd5;\n"
+                              "  always_comb begin\n"
+                              "    r1 = a + 8'd1;\n"
+                              "    r2 = a + 8'd2;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -581,16 +561,15 @@ TEST(SimCh4, AlwaysCombWithBeginEnd) {
 //     final values reflect the later assignment.
 // ---------------------------------------------------------------------------
 TEST(SimCh4, SimulationNeverGoesBackward) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd1;\n"
-      "    #10 x = 8'd2;\n"
-      "    #10 x = 8'd3;\n"
-      "  end\n"
-      "endmodule\n",
-      "x");
+  auto result = RunAndGet("module t;\n"
+                          "  logic [7:0] x;\n"
+                          "  initial begin\n"
+                          "    x = 8'd1;\n"
+                          "    #10 x = 8'd2;\n"
+                          "    #10 x = 8'd3;\n"
+                          "  end\n"
+                          "endmodule\n",
+                          "x");
   EXPECT_EQ(result, 3u);
 }
 
@@ -600,14 +579,13 @@ TEST(SimCh4, SimulationNeverGoesBackward) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, ThreeAbstractionLevels) {
   SimCh4Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, c;\n"
-      "  initial a = 8'd3;\n"
-      "  assign b = a << 1;\n"
-      "  always_comb c = b + 8'd1;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] a, b, c;\n"
+                              "  initial a = 8'd3;\n"
+                              "  assign b = a << 1;\n"
+                              "  always_comb c = b + 8'd1;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -624,13 +602,12 @@ TEST(SimCh4, ThreeAbstractionLevels) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, EmptyProcessNoInterference) {
   SimCh4Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a;\n"
-      "  initial begin end\n"
-      "  initial a = 8'd77;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] a;\n"
+                              "  initial begin end\n"
+                              "  initial a = 8'd77;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -644,16 +621,15 @@ TEST(SimCh4, EmptyProcessNoInterference) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, FiveParallelInitialBlocks) {
   SimCh4Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, c, d, e;\n"
-      "  initial a = 8'd1;\n"
-      "  initial b = 8'd2;\n"
-      "  initial c = 8'd3;\n"
-      "  initial d = 8'd4;\n"
-      "  initial e = 8'd5;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] a, b, c, d, e;\n"
+                              "  initial a = 8'd1;\n"
+                              "  initial b = 8'd2;\n"
+                              "  initial c = 8'd3;\n"
+                              "  initial d = 8'd4;\n"
+                              "  initial e = 8'd5;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -671,19 +647,18 @@ TEST(SimCh4, FiveParallelInitialBlocks) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, InterleavedTimeExecution) {
   SimCh4Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial begin\n"
-      "    #5 a = 8'd1;\n"
-      "    #10 a = 8'd3;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    #10 b = 8'd2;\n"
-      "    #5 b = 8'd4;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] a, b;\n"
+                              "  initial begin\n"
+                              "    #5 a = 8'd1;\n"
+                              "    #10 a = 8'd3;\n"
+                              "  end\n"
+                              "  initial begin\n"
+                              "    #10 b = 8'd2;\n"
+                              "    #5 b = 8'd4;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -698,17 +673,16 @@ TEST(SimCh4, InterleavedTimeExecution) {
 //     construct inside a single process.
 // ---------------------------------------------------------------------------
 TEST(SimCh4, ProcessWithLoop) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [15:0] sum;\n"
-      "  initial begin\n"
-      "    integer i;\n"
-      "    sum = 0;\n"
-      "    for (i = 1; i <= 5; i = i + 1)\n"
-      "      sum = sum + i[15:0];\n"
-      "  end\n"
-      "endmodule\n",
-      "sum");
+  auto result = RunAndGet("module t;\n"
+                          "  logic [15:0] sum;\n"
+                          "  initial begin\n"
+                          "    integer i;\n"
+                          "    sum = 0;\n"
+                          "    for (i = 1; i <= 5; i = i + 1)\n"
+                          "      sum = sum + i[15:0];\n"
+                          "  end\n"
+                          "endmodule\n",
+                          "sum");
   // 1+2+3+4+5 = 15
   EXPECT_EQ(result, 15u);
 }
@@ -719,14 +693,13 @@ TEST(SimCh4, ProcessWithLoop) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, ContinuousAssignChain) {
   SimCh4Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, c;\n"
-      "  initial a = 8'd7;\n"
-      "  assign b = a;\n"
-      "  assign c = b;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] a, b, c;\n"
+                              "  initial a = 8'd7;\n"
+                              "  assign b = a;\n"
+                              "  assign c = b;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -742,29 +715,28 @@ TEST(SimCh4, ContinuousAssignChain) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, AlwaysCombReEvaluatesOnChange) {
   SimCh4Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] sel, a, b, result;\n"
-      "  initial begin\n"
-      "    a = 8'd10;\n"
-      "    b = 8'd20;\n"
-      "    sel = 8'd0;\n"
-      "    #5 sel = 8'd1;\n"
-      "  end\n"
-      "  always_comb begin\n"
-      "    if (sel)\n"
-      "      result = b;\n"
-      "    else\n"
-      "      result = a;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] sel, a, b, result;\n"
+                              "  initial begin\n"
+                              "    a = 8'd10;\n"
+                              "    b = 8'd20;\n"
+                              "    sel = 8'd0;\n"
+                              "    #5 sel = 8'd1;\n"
+                              "  end\n"
+                              "  always_comb begin\n"
+                              "    if (sel)\n"
+                              "      result = b;\n"
+                              "    else\n"
+                              "      result = a;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
   // After #5, sel=1 so result=b=20.
-  auto* var = f.ctx.FindVariable("result");
+  auto *var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
@@ -776,15 +748,14 @@ TEST(SimCh4, AlwaysCombReEvaluatesOnChange) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, CanonicalSimulationSemantics) {
   SimCh4Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, c, d;\n"
-      "  initial a = 8'd4;\n"
-      "  assign b = a + 8'd10;\n"
-      "  always_comb c = b - 8'd5;\n"
-      "  assign d = c * 8'd2;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] a, b, c, d;\n"
+                              "  initial a = 8'd4;\n"
+                              "  assign b = a + 8'd10;\n"
+                              "  always_comb c = b - 8'd5;\n"
+                              "  assign d = c * 8'd2;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);

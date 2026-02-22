@@ -29,16 +29,16 @@ struct SimA705Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA705Fixture& f) {
+static RtlirDesign *ElaborateSrc(const std::string &src, SimA705Fixture &f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
+  auto *cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-}  // namespace
+} // namespace
 
 // =============================================================================
 // A.7.5 Runtime — TimingCheckEntry kind for each system_timing_check type
@@ -100,20 +100,19 @@ TEST(SimA705, RuntimeAllTwelveKinds) {
 // Module with $setup timing check simulates correctly
 TEST(SimA705, SetupTimingCheckSimulates) {
   SimA705Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  specify\n"
-      "    $setup(data, posedge clk, 10);\n"
-      "  endspecify\n"
-      "  initial x = 8'd42;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] x;\n"
+                              "  specify\n"
+                              "    $setup(data, posedge clk, 10);\n"
+                              "  endspecify\n"
+                              "  initial x = 8'd42;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+  auto *var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -121,22 +120,21 @@ TEST(SimA705, SetupTimingCheckSimulates) {
 // Module with multiple timing checks simulates correctly
 TEST(SimA705, MultipleTimingChecksSimulate) {
   SimA705Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  specify\n"
-      "    $setup(d, posedge clk, 10);\n"
-      "    $hold(posedge clk, d, 5);\n"
-      "    $period(posedge clk, 50);\n"
-      "  endspecify\n"
-      "  initial x = 8'd99;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] x;\n"
+                              "  specify\n"
+                              "    $setup(d, posedge clk, 10);\n"
+                              "    $hold(posedge clk, d, 5);\n"
+                              "    $period(posedge clk, 50);\n"
+                              "  endspecify\n"
+                              "  initial x = 8'd99;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+  auto *var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
@@ -144,21 +142,20 @@ TEST(SimA705, MultipleTimingChecksSimulate) {
 // Module with timing checks and path delays simulates correctly
 TEST(SimA705, TimingChecksWithPathsSimulate) {
   SimA705Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  specify\n"
-      "    (a => b) = 5;\n"
-      "    $setup(d, posedge clk, 10);\n"
-      "  endspecify\n"
-      "  initial x = 8'd77;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] x;\n"
+                              "  specify\n"
+                              "    (a => b) = 5;\n"
+                              "    $setup(d, posedge clk, 10);\n"
+                              "  endspecify\n"
+                              "  initial x = 8'd77;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+  auto *var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }

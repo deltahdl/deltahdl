@@ -23,8 +23,7 @@ struct ElabA86Fixture {
   bool has_errors = false;
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src,
-                                 ElabA86Fixture &f) {
+static RtlirDesign *ElaborateSrc(const std::string &src, ElabA86Fixture &f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
@@ -35,7 +34,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src,
   return design;
 }
 
-}  // namespace
+} // namespace
 
 // =============================================================================
 // A.8.6 Operators — Elaboration
@@ -45,139 +44,128 @@ static RtlirDesign *ElaborateSrc(const std::string &src,
 
 TEST(ElabA86, UnaryPlusElaborates) {
   ElabA86Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] x, a;\n"
-      "  initial x = +a;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic [7:0] x, a;\n"
+                              "  initial x = +a;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ElabA86, UnaryMinusElaborates) {
   ElabA86Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] x, a;\n"
-      "  initial x = -a;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic [7:0] x, a;\n"
+                              "  initial x = -a;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ElabA86, UnaryLogicalNotElaborates) {
   ElabA86Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic x, a;\n"
-      "  initial x = !a;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic x, a;\n"
+                              "  initial x = !a;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ElabA86, UnaryBitwiseNotElaborates) {
   ElabA86Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] x, a;\n"
-      "  initial x = ~a;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic [7:0] x, a;\n"
+                              "  initial x = ~a;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ElabA86, UnaryReductionAndElaborates) {
   ElabA86Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] a;\n"
-      "  logic x;\n"
-      "  initial x = &a;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic [7:0] a;\n"
+                              "  logic x;\n"
+                              "  initial x = &a;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ElabA86, UnaryReductionNandElaborates) {
   ElabA86Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] a;\n"
-      "  logic x;\n"
-      "  initial x = ~&a;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic [7:0] a;\n"
+                              "  logic x;\n"
+                              "  initial x = ~&a;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ElabA86, UnaryReductionOrElaborates) {
   ElabA86Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] a;\n"
-      "  logic x;\n"
-      "  initial x = |a;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic [7:0] a;\n"
+                              "  logic x;\n"
+                              "  initial x = |a;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ElabA86, UnaryReductionNorElaborates) {
   ElabA86Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] a;\n"
-      "  logic x;\n"
-      "  initial x = ~|a;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic [7:0] a;\n"
+                              "  logic x;\n"
+                              "  initial x = ~|a;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ElabA86, UnaryReductionXorElaborates) {
   ElabA86Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] a;\n"
-      "  logic x;\n"
-      "  initial x = ^a;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic [7:0] a;\n"
+                              "  logic x;\n"
+                              "  initial x = ^a;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ElabA86, UnaryReductionXnorElaborates) {
   ElabA86Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] a;\n"
-      "  logic x;\n"
-      "  initial x = ~^a;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic [7:0] a;\n"
+                              "  logic x;\n"
+                              "  initial x = ~^a;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ElabA86, UnaryReductionXnorAltElaborates) {
   ElabA86Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] a;\n"
-      "  logic x;\n"
-      "  initial x = ^~a;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic [7:0] a;\n"
+                              "  logic x;\n"
+                              "  initial x = ^~a;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -186,48 +174,44 @@ TEST(ElabA86, UnaryReductionXnorAltElaborates) {
 
 TEST(ElabA86, BinaryAddElaborates) {
   ElabA86Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'd3 + 8'd4;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic [7:0] x;\n"
+                              "  initial x = 8'd3 + 8'd4;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ElabA86, BinaryDivElaborates) {
   ElabA86Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'd20 / 8'd4;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic [7:0] x;\n"
+                              "  initial x = 8'd20 / 8'd4;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ElabA86, BinaryModElaborates) {
   ElabA86Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'd17 % 8'd5;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic [7:0] x;\n"
+                              "  initial x = 8'd17 % 8'd5;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ElabA86, BinaryPowerElaborates) {
   ElabA86Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'd2 ** 8'd3;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic [7:0] x;\n"
+                              "  initial x = 8'd2 ** 8'd3;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -236,48 +220,44 @@ TEST(ElabA86, BinaryPowerElaborates) {
 
 TEST(ElabA86, BinaryCaseEqElaborates) {
   ElabA86Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic x;\n"
-      "  initial x = (8'd5 === 8'd5);\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic x;\n"
+                              "  initial x = (8'd5 === 8'd5);\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ElabA86, BinaryCaseNeqElaborates) {
   ElabA86Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic x;\n"
-      "  initial x = (8'd5 !== 8'd3);\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic x;\n"
+                              "  initial x = (8'd5 !== 8'd3);\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ElabA86, BinaryWildcardEqElaborates) {
   ElabA86Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic x;\n"
-      "  initial x = (8'd5 ==? 8'd5);\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic x;\n"
+                              "  initial x = (8'd5 ==? 8'd5);\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ElabA86, BinaryWildcardNeqElaborates) {
   ElabA86Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic x;\n"
-      "  initial x = (8'd5 !=? 8'd3);\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic x;\n"
+                              "  initial x = (8'd5 !=? 8'd3);\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -286,24 +266,22 @@ TEST(ElabA86, BinaryWildcardNeqElaborates) {
 
 TEST(ElabA86, BinaryArithShiftRightElaborates) {
   ElabA86Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'd128 >>> 2;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic [7:0] x;\n"
+                              "  initial x = 8'd128 >>> 2;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ElabA86, BinaryArithShiftLeftElaborates) {
   ElabA86Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'd1 <<< 3;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic [7:0] x;\n"
+                              "  initial x = 8'd1 <<< 3;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -312,12 +290,11 @@ TEST(ElabA86, BinaryArithShiftLeftElaborates) {
 
 TEST(ElabA86, BinaryBitwiseXnorElaborates) {
   ElabA86Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'hFF ^~ 8'h0F;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic [7:0] x;\n"
+                              "  initial x = 8'hFF ^~ 8'h0F;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -326,24 +303,22 @@ TEST(ElabA86, BinaryBitwiseXnorElaborates) {
 
 TEST(ElabA86, BinaryImplicationElaborates) {
   ElabA86Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic x;\n"
-      "  initial x = (1'b0 -> 1'b1);\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic x;\n"
+                              "  initial x = (1'b0 -> 1'b1);\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ElabA86, BinaryEquivalenceElaborates) {
   ElabA86Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic x;\n"
-      "  initial x = (1'b1 <-> 1'b1);\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic x;\n"
+                              "  initial x = (1'b1 <-> 1'b1);\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -352,12 +327,11 @@ TEST(ElabA86, BinaryEquivalenceElaborates) {
 
 TEST(ElabA86, IncOrDecElaborates) {
   ElabA86Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  int x;\n"
-      "  initial begin x = 10; ++x; x--; end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  int x;\n"
+                              "  initial begin x = 10; ++x; x--; end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -366,13 +340,12 @@ TEST(ElabA86, IncOrDecElaborates) {
 
 TEST(ElabA86, ModulePathOperatorsElaborate) {
   ElabA86Fixture f;
-  auto *design = ElaborateSrc(
-      "module m(input a, input b, output y);\n"
-      "  specify\n"
-      "    if (a && b) (a => y) = 1;\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m(input a, input b, output y);\n"
+                              "  specify\n"
+                              "    if (a && b) (a => y) = 1;\n"
+                              "  endspecify\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }

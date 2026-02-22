@@ -1,8 +1,5 @@
 // §15.4.7: Peek()
 
-#include <gtest/gtest.h>
-#include <cstdint>
-#include <string_view>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -17,6 +14,9 @@
 #include "simulation/stmt_result.h"
 #include "simulation/sync_objects.h"
 #include "simulation/variable.h"
+#include <cstdint>
+#include <gtest/gtest.h>
+#include <string_view>
 
 using namespace delta;
 
@@ -40,7 +40,7 @@ TEST(IpcSync, MailboxTryPeekSuccess) {
   uint64_t msg = 0;
   EXPECT_EQ(mb.TryPeek(msg), 0);
   EXPECT_EQ(msg, 42u);
-  EXPECT_EQ(mb.Num(), 1);  // Peek does not remove.
+  EXPECT_EQ(mb.Num(), 1); // Peek does not remove.
 }
 
 TEST(IpcSync, MailboxTryPeekEmpty) {
@@ -68,4 +68,4 @@ TEST(IpcSync, MailboxPeekDoesNotConsume) {
   EXPECT_EQ(mb.Num(), 0);
 }
 
-}  // namespace
+} // namespace

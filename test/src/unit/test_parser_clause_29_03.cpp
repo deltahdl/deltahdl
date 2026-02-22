@@ -13,10 +13,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult Parse(const std::string& src) {
+static ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -26,8 +26,8 @@ static ParseResult Parse(const std::string& src) {
   return result;
 }
 
-static void VerifyUdpRowInputs(const UdpTableRow& row,
-                               const std::string& expected) {
+static void VerifyUdpRowInputs(const UdpTableRow &row,
+                               const std::string &expected) {
   ASSERT_EQ(row.inputs.size(), expected.size());
   for (size_t j = 0; j < expected.size(); ++j) {
     EXPECT_EQ(row.inputs[j], expected[j]);
@@ -39,7 +39,7 @@ struct CombUdpRow {
   char output;
 };
 
-static void VerifyCombUdpTable(const UdpDecl* udp, const CombUdpRow expected[],
+static void VerifyCombUdpTable(const UdpDecl *udp, const CombUdpRow expected[],
                                size_t count) {
   ASSERT_EQ(udp->table.size(), count);
   for (size_t i = 0; i < count; ++i) {
@@ -48,7 +48,7 @@ static void VerifyCombUdpTable(const UdpDecl* udp, const CombUdpRow expected[],
   }
 }
 
-static void VerifyUdpInputNames(const UdpDecl* udp,
+static void VerifyUdpInputNames(const UdpDecl *udp,
                                 const std::string expected[], size_t count) {
   ASSERT_EQ(udp->input_names.size(), count);
   for (size_t i = 0; i < count; ++i) {
@@ -57,18 +57,17 @@ static void VerifyUdpInputNames(const UdpDecl* udp,
 }
 
 TEST(ParserSection29, CombinationalUdp) {
-  auto r = Parse(
-      "primitive mux(output out, input a, b, sel);\n"
-      "  table\n"
-      "    0 ? 0 : 0;\n"
-      "    1 ? 0 : 1;\n"
-      "    ? 0 1 : 0;\n"
-      "    ? 1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive mux(output out, input a, b, sel);\n"
+                 "  table\n"
+                 "    0 ? 0 : 0;\n"
+                 "    1 ? 0 : 1;\n"
+                 "    ? 0 1 : 0;\n"
+                 "    ? 1 1 : 1;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->udps.size(), 1);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
   EXPECT_EQ(udp->name, "mux");
   EXPECT_EQ(udp->output_name, "out");
   EXPECT_FALSE(udp->is_sequential);
@@ -81,16 +80,15 @@ TEST(ParserSection29, CombinationalUdp) {
 }
 
 TEST(ParserSection29, UdpTableSpecialChars) {
-  auto r = Parse(
-      "primitive edge_detect(output reg q, input d, clk);\n"
-      "  table\n"
-      "    ? f : ? : 1;\n"
-      "    ? p : ? : 0;\n"
-      "    * ? : ? : -;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive edge_detect(output reg q, input d, clk);\n"
+                 "  table\n"
+                 "    ? f : ? : 1;\n"
+                 "    ? p : ? : 0;\n"
+                 "    * ? : ? : -;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
   ASSERT_EQ(udp->table.size(), 3);
 
   struct Check {
@@ -99,7 +97,7 @@ TEST(ParserSection29, UdpTableSpecialChars) {
     char val;
   };
   Check input_checks[] = {{0, 1, 'f'}, {1, 1, 'p'}, {2, 0, '*'}};
-  for (const auto& c : input_checks) {
+  for (const auto &c : input_checks) {
     EXPECT_EQ(udp->table[c.row].inputs[c.col], c.val);
   }
   EXPECT_EQ(udp->table[2].output, '-');

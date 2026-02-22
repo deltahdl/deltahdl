@@ -1,12 +1,12 @@
 // Non-LRM tests
 
-#include <gtest/gtest.h>
-#include <cstdint>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "simulation/assertion.h"
 #include "simulation/sim_context.h"
+#include <cstdint>
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -23,7 +23,7 @@ TEST(Assertion, CustomCheckFunction) {
   monitor.AddProperty(prop);
 
   monitor.Evaluate("p_custom", 10);
-  auto* entry = const_cast<AssertionEntry*>(monitor.FindEntry("p_custom"));
+  auto *entry = const_cast<AssertionEntry *>(monitor.FindEntry("p_custom"));
   entry->cycle_count = 1;
 
   auto r1 = monitor.Evaluate("p_custom", 20);
@@ -34,4 +34,4 @@ TEST(Assertion, CustomCheckFunction) {
   EXPECT_EQ(r2, AssertionResult::kFail);
 }
 
-}  // namespace
+} // namespace

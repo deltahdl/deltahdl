@@ -1,11 +1,11 @@
 // §8.6: Object methods
 
-#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -23,10 +23,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult Parse(const std::string& src) {
+static ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -37,29 +37,28 @@ static ParseResult Parse(const std::string& src) {
 }
 
 struct StructMemberExpected {
-  const char* name;
+  const char *name;
   DataTypeKind type_kind;
 };
 
 struct ModportPortExpected {
   Direction dir;
-  const char* name;
+  const char *name;
 };
 
 namespace {
 
 TEST(Parser, ClassWithMethod) {
-  auto r = Parse(
-      "class pkt;\n"
-      "  function int get_data();\n"
-      "    return data;\n"
-      "  endfunction\n"
-      "endclass\n");
+  auto r = Parse("class pkt;\n"
+                 "  function int get_data();\n"
+                 "    return data;\n"
+                 "  endfunction\n"
+                 "endclass\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* cls = r.cu->classes[0];
+  auto *cls = r.cu->classes[0];
   ASSERT_EQ(cls->members.size(), 1);
   EXPECT_EQ(cls->members[0]->kind, ClassMemberKind::kMethod);
   EXPECT_NE(cls->members[0]->method, nullptr);
 }
 
-}  // namespace
+} // namespace

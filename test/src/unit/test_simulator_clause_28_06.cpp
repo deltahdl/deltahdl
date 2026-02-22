@@ -28,7 +28,8 @@ Val4Ext PassGateValue(Val4 data, bool invert) {
     else
       v = Val4::kX;
   }
-  if (v == Val4::kZ) v = Val4::kX;
+  if (v == Val4::kZ)
+    v = Val4::kX;
   return static_cast<Val4Ext>(v);
 }
 
@@ -41,10 +42,14 @@ Val4Ext EvalTristateGate(TristateKind kind, Val4 data, Val4 control) {
           : Val4::kV1;
   Val4 block = (conduct == Val4::kV0) ? Val4::kV1 : Val4::kV0;
 
-  if (control == conduct) return PassGateValue(data, invert);
-  if (control == block) return Val4Ext::kZ;
-  if (data == Val4::kV0) return invert ? Val4Ext::kH : Val4Ext::kL;
-  if (data == Val4::kV1) return invert ? Val4Ext::kL : Val4Ext::kH;
+  if (control == conduct)
+    return PassGateValue(data, invert);
+  if (control == block)
+    return Val4Ext::kZ;
+  if (data == Val4::kV0)
+    return invert ? Val4Ext::kH : Val4Ext::kL;
+  if (data == Val4::kV1)
+    return invert ? Val4Ext::kL : Val4Ext::kH;
   return Val4Ext::kX;
 }
 
@@ -52,14 +57,14 @@ uint64_t ComputeTristateDelay(uint64_t d_rise, uint64_t d_fall, uint64_t d_z,
                               Val4Ext from, Val4Ext to) {
   (void)from;
   switch (to) {
-    case Val4Ext::kV1:
-      return d_rise;
-    case Val4Ext::kV0:
-      return d_fall;
-    case Val4Ext::kZ:
-      return d_z;
-    default:
-      return std::min({d_rise, d_fall, d_z});
+  case Val4Ext::kV1:
+    return d_rise;
+  case Val4Ext::kV0:
+    return d_fall;
+  case Val4Ext::kZ:
+    return d_z;
+  default:
+    return std::min({d_rise, d_fall, d_z});
   }
 }
 
@@ -89,7 +94,7 @@ TEST(TristateGates, Bufif0TruthTable) {
       {Val4::kX, Val4::kZ, Val4Ext::kX},
       {Val4::kZ, Val4::kZ, Val4Ext::kX},
   };
-  for (const auto& c : cases) {
+  for (const auto &c : cases) {
     EXPECT_EQ(EvalTristateGate(TristateKind::kBufif0, c.data, c.control),
               c.expected)
         << "Bufif0(" << static_cast<int>(c.data) << ", "
@@ -104,14 +109,11 @@ TEST(TristateGates, Bufif1TruthTable) {
     Val4Ext expected;
   };
   Case cases[] = {
-      {Val4::kV0, Val4::kV0, Val4Ext::kZ},
-      {Val4::kV0, Val4::kV1, Val4Ext::kV0},
-      {Val4::kV1, Val4::kV0, Val4Ext::kZ},
-      {Val4::kV1, Val4::kV1, Val4Ext::kV1},
-      {Val4::kV0, Val4::kX, Val4Ext::kL},
-      {Val4::kV1, Val4::kX, Val4Ext::kH},
+      {Val4::kV0, Val4::kV0, Val4Ext::kZ}, {Val4::kV0, Val4::kV1, Val4Ext::kV0},
+      {Val4::kV1, Val4::kV0, Val4Ext::kZ}, {Val4::kV1, Val4::kV1, Val4Ext::kV1},
+      {Val4::kV0, Val4::kX, Val4Ext::kL},  {Val4::kV1, Val4::kX, Val4Ext::kH},
   };
-  for (const auto& c : cases) {
+  for (const auto &c : cases) {
     EXPECT_EQ(EvalTristateGate(TristateKind::kBufif1, c.data, c.control),
               c.expected)
         << "Bufif1(" << static_cast<int>(c.data) << ", "
@@ -133,7 +135,7 @@ TEST(TristateGates, Notif0TruthTable) {
       {Val4::kV0, Val4::kX, Val4Ext::kH},
       {Val4::kV1, Val4::kX, Val4Ext::kL},
   };
-  for (const auto& c : cases) {
+  for (const auto &c : cases) {
     EXPECT_EQ(EvalTristateGate(TristateKind::kNotif0, c.data, c.control),
               c.expected)
         << "Notif0(" << static_cast<int>(c.data) << ", "
@@ -148,14 +150,11 @@ TEST(TristateGates, Notif1TruthTable) {
     Val4Ext expected;
   };
   Case cases[] = {
-      {Val4::kV0, Val4::kV0, Val4Ext::kZ},
-      {Val4::kV0, Val4::kV1, Val4Ext::kV1},
-      {Val4::kV1, Val4::kV0, Val4Ext::kZ},
-      {Val4::kV1, Val4::kV1, Val4Ext::kV0},
-      {Val4::kV0, Val4::kX, Val4Ext::kH},
-      {Val4::kV1, Val4::kX, Val4Ext::kL},
+      {Val4::kV0, Val4::kV0, Val4Ext::kZ}, {Val4::kV0, Val4::kV1, Val4Ext::kV1},
+      {Val4::kV1, Val4::kV0, Val4Ext::kZ}, {Val4::kV1, Val4::kV1, Val4Ext::kV0},
+      {Val4::kV0, Val4::kX, Val4Ext::kH},  {Val4::kV1, Val4::kX, Val4Ext::kL},
   };
-  for (const auto& c : cases) {
+  for (const auto &c : cases) {
     EXPECT_EQ(EvalTristateGate(TristateKind::kNotif1, c.data, c.control),
               c.expected)
         << "Notif1(" << static_cast<int>(c.data) << ", "
@@ -175,4 +174,4 @@ TEST(TristateGates, DelayToLOrHSameAsX) {
   EXPECT_EQ(ComputeTristateDelay(10, 12, 11, Val4Ext::kV0, Val4Ext::kH), 10u);
 }
 
-}  // namespace
+} // namespace

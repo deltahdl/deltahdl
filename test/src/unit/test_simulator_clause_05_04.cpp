@@ -25,26 +25,28 @@ struct SimCh504Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign* ElaborateSrc(const std::string& src, SimCh504Fixture& f) {
+static RtlirDesign *ElaborateSrc(const std::string &src, SimCh504Fixture &f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
+  auto *cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-static uint64_t RunAndGet(const std::string& src, const char* var_name) {
+static uint64_t RunAndGet(const std::string &src, const char *var_name) {
   SimCh504Fixture f;
-  auto* design = ElaborateSrc(src, f);
+  auto *design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
-  if (!design) return 0;
+  if (!design)
+    return 0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* var = f.ctx.FindVariable(var_name);
+  auto *var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
-  if (!var) return 0;
+  if (!var)
+    return 0;
   return var->value.ToUint64();
 }
 
@@ -53,12 +55,11 @@ static uint64_t RunAndGet(const std::string& src, const char* var_name) {
 // ---------------------------------------------------------------------------
 TEST(SimCh504, CommentLineCommentStripped) {
   // §5.4: One-line comment starts with // and ends with newline.
-  auto result = RunAndGet(
-      "module t; // module declaration\n"
-      "  logic [7:0] result; // variable\n"
-      "  initial result = 8'd77; // assignment\n"
-      "endmodule // end\n",
-      "result");
+  auto result = RunAndGet("module t; // module declaration\n"
+                          "  logic [7:0] result; // variable\n"
+                          "  initial result = 8'd77; // assignment\n"
+                          "endmodule // end\n",
+                          "result");
   EXPECT_EQ(result, 77u);
 }
 
@@ -82,12 +83,11 @@ TEST(SimCh504, CommentBlockCommentStripped) {
 TEST(SimCh504, CommentBlockNotNested) {
   // §5.4: Block comments are not nested.
   // "/* outer /* inner */" ends at first */ — remaining code is active.
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  initial /* outer /* inner */ result = 8'd33;\n"
-      "endmodule\n",
-      "result");
+  auto result = RunAndGet("module t;\n"
+                          "  logic [7:0] result;\n"
+                          "  initial /* outer /* inner */ result = 8'd33;\n"
+                          "endmodule\n",
+                          "result");
   EXPECT_EQ(result, 33u);
 }
 
@@ -96,14 +96,13 @@ TEST(SimCh504, CommentBlockNotNested) {
 // ---------------------------------------------------------------------------
 TEST(SimCh504, CommentLineInsideBlockNoEffect) {
   // §5.4: // has no special meaning inside a block comment.
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  /* // this is not a line comment\n"
-      "     still inside block comment */\n"
-      "  initial result = 8'd99;\n"
-      "endmodule\n",
-      "result");
+  auto result = RunAndGet("module t;\n"
+                          "  logic [7:0] result;\n"
+                          "  /* // this is not a line comment\n"
+                          "     still inside block comment */\n"
+                          "  initial result = 8'd99;\n"
+                          "endmodule\n",
+                          "result");
   EXPECT_EQ(result, 99u);
 }
 
@@ -112,14 +111,13 @@ TEST(SimCh504, CommentLineInsideBlockNoEffect) {
 // ---------------------------------------------------------------------------
 TEST(SimCh504, CommentBlockInsideLineNoEffect) {
   // §5.4: /* and */ have no special meaning inside a one-line comment.
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  // /* this does not start a block comment\n"
-      "  initial result = 8'd22;\n"
-      "  // */ this does not end a block comment\n"
-      "endmodule\n",
-      "result");
+  auto result = RunAndGet("module t;\n"
+                          "  logic [7:0] result;\n"
+                          "  // /* this does not start a block comment\n"
+                          "  initial result = 8'd22;\n"
+                          "  // */ this does not end a block comment\n"
+                          "endmodule\n",
+                          "result");
   EXPECT_EQ(result, 22u);
 }
 
@@ -128,16 +126,15 @@ TEST(SimCh504, CommentBlockInsideLineNoEffect) {
 // ---------------------------------------------------------------------------
 TEST(SimCh504, CommentMixedInExpression) {
   // Both comment forms within an expression do not alter results.
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] a, b, result;\n"
-      "  initial begin\n"
-      "    a = 8'd10; // ten\n"
-      "    b = /* twenty */ 8'd20;\n"
-      "    result = a /* plus */ + /* b */ b; // sum\n"
-      "  end\n"
-      "endmodule\n",
-      "result");
+  auto result = RunAndGet("module t;\n"
+                          "  logic [7:0] a, b, result;\n"
+                          "  initial begin\n"
+                          "    a = 8'd10; // ten\n"
+                          "    b = /* twenty */ 8'd20;\n"
+                          "    result = a /* plus */ + /* b */ b; // sum\n"
+                          "  end\n"
+                          "endmodule\n",
+                          "result");
   EXPECT_EQ(result, 30u);
 }
 
@@ -146,17 +143,16 @@ TEST(SimCh504, CommentMixedInExpression) {
 // ---------------------------------------------------------------------------
 TEST(SimCh504, CommentMultilineBlockSpan) {
   // A block comment spanning multiple lines removes all enclosed text.
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  initial begin\n"
-      "    /* This block comment\n"
-      "       spans multiple\n"
-      "       lines */\n"
-      "    result = 8'd11;\n"
-      "  end\n"
-      "endmodule\n",
-      "result");
+  auto result = RunAndGet("module t;\n"
+                          "  logic [7:0] result;\n"
+                          "  initial begin\n"
+                          "    /* This block comment\n"
+                          "       spans multiple\n"
+                          "       lines */\n"
+                          "    result = 8'd11;\n"
+                          "  end\n"
+                          "endmodule\n",
+                          "result");
   EXPECT_EQ(result, 11u);
 }
 
@@ -165,9 +161,9 @@ TEST(SimCh504, CommentMultilineBlockSpan) {
 // ---------------------------------------------------------------------------
 TEST(SimCh504, CommentBlockAsSeparator) {
   // §5.4: Block comments serve as token separators, just like whitespace.
-  auto result = RunAndGet(
-      "module/**/t;logic/**/[7:0]/**/result;initial/**/result=8'd71;"
-      "endmodule",
-      "result");
+  auto result =
+      RunAndGet("module/**/t;logic/**/[7:0]/**/result;initial/**/result=8'd71;"
+                "endmodule",
+                "result");
   EXPECT_EQ(result, 71u);
 }

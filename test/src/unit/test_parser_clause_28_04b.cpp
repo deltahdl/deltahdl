@@ -1,11 +1,11 @@
 // §28.4: and, nand, nor, or, xor, and xnor gates
 
-#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -23,10 +23,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult Parse(const std::string& src) {
+static ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -37,13 +37,13 @@ static ParseResult Parse(const std::string& src) {
 }
 
 struct StructMemberExpected {
-  const char* name;
+  const char *name;
   DataTypeKind type_kind;
 };
 
 struct ModportPortExpected {
   Direction dir;
-  const char* name;
+  const char *name;
 };
 
 namespace {
@@ -52,7 +52,7 @@ namespace {
 TEST(Parser, GateAndInst) {
   auto r = Parse("module t; and g1(out, a, b); endmodule");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
   EXPECT_EQ(item->gate_kind, GateKind::kAnd);
   EXPECT_EQ(item->gate_inst_name, "g1");
@@ -62,11 +62,11 @@ TEST(Parser, GateAndInst) {
 TEST(Parser, GateNandWithDelay) {
   auto r = Parse("module t; nand #(5) g2(out, a, b); endmodule");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->gate_kind, GateKind::kNand);
   EXPECT_EQ(item->gate_inst_name, "g2");
   EXPECT_NE(item->gate_delay, nullptr);
   EXPECT_EQ(item->gate_terminals.size(), 3u);
 }
 
-}  // namespace
+} // namespace

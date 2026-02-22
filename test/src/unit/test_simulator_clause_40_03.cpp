@@ -1,10 +1,10 @@
 // §40.3: SystemVerilog real-time coverage access
 
-#include <gtest/gtest.h>
+#include "simulation/dpi_runtime.h"
 #include <cstdint>
+#include <gtest/gtest.h>
 #include <string>
 #include <vector>
-#include "simulation/dpi_runtime.h"
 
 using namespace delta;
 
@@ -15,7 +15,7 @@ namespace {
 // =============================================================================
 TEST(Api, CoverageControlStartStop) {
   CoverageApi cov;
-  EXPECT_EQ(cov.GetControl(), CoverageControl::kStart);  // Default.
+  EXPECT_EQ(cov.GetControl(), CoverageControl::kStart); // Default.
 
   cov.SetControl(CoverageControl::kStop);
   EXPECT_EQ(cov.GetControl(), CoverageControl::kStop);
@@ -26,7 +26,7 @@ TEST(Api, CoverageControlStartStop) {
 
 TEST(Api, CoverageGetMaxBins) {
   CoverageApi cov;
-  EXPECT_EQ(cov.GetMaxBins(), 64u);  // Default.
+  EXPECT_EQ(cov.GetMaxBins(), 64u); // Default.
 
   cov.SetMaxBins(128);
   EXPECT_EQ(cov.GetMaxBins(), 128u);
@@ -34,7 +34,7 @@ TEST(Api, CoverageGetMaxBins) {
 
 TEST(Api, CoverageActiveState) {
   CoverageApi cov;
-  EXPECT_TRUE(cov.IsActive());  // Default.
+  EXPECT_TRUE(cov.IsActive()); // Default.
 
   cov.SetActive(false);
   EXPECT_FALSE(cov.IsActive());
@@ -49,4 +49,4 @@ TEST(Api, CoverageDbAccess) {
   EXPECT_DOUBLE_EQ(cov.GetValue("nonexistent"), 0.0);
 }
 
-}  // namespace
+} // namespace

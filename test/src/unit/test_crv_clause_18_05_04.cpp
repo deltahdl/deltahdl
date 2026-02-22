@@ -1,13 +1,13 @@
 // §18.5.4: Uniqueness constraints
 
-#include <gtest/gtest.h>
+#include "simulation/constraint_solver.h"
 #include <algorithm>
 #include <cstdint>
+#include <gtest/gtest.h>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include "simulation/constraint_solver.h"
 
 using namespace delta;
 
@@ -36,7 +36,8 @@ TEST(Constraint, DistributionWeighted) {
   int count_10 = 0;
   for (int i = 0; i < 100; ++i) {
     ASSERT_TRUE(solver.Solve());
-    if (solver.GetValue("x") == 10) ++count_10;
+    if (solver.GetValue("x") == 10)
+      ++count_10;
   }
   EXPECT_GT(count_10, 80);
 }
@@ -63,4 +64,4 @@ TEST(Constraint, DistributionUniform) {
   EXPECT_TRUE(val >= 1 && val <= 3);
 }
 
-}  // namespace
+} // namespace

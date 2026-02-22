@@ -10,7 +10,7 @@ using namespace delta;
 
 // --- §5.6.2 Keywords ---
 
-static bool ParseOk(const std::string& src) {
+static bool ParseOk(const std::string &src) {
   SourceManager mgr;
   Arena arena;
   auto fid = mgr.AddFile("<test>", src);

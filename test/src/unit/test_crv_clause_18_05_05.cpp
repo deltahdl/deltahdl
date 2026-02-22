@@ -1,13 +1,13 @@
 // §18.5.5: Implication
 
-#include <gtest/gtest.h>
+#include "simulation/constraint_solver.h"
 #include <algorithm>
 #include <cstdint>
+#include <gtest/gtest.h>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include "simulation/constraint_solver.h"
 
 using namespace delta;
 
@@ -43,4 +43,4 @@ TEST(Constraint, UniqueConstraint) {
   EXPECT_NE(v0, v2);
 }
 
-}  // namespace
+} // namespace

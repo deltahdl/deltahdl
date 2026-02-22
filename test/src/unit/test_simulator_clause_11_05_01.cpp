@@ -1,14 +1,14 @@
 // §11.5.1: Vector bit-select and part-select addressing
 
-#include <gtest/gtest.h>
-#include <cstring>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"  // StructTypeInfo, StructFieldInfo
+#include "simulation/sim_context.h" // StructTypeInfo, StructFieldInfo
+#include <cstring>
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -21,23 +21,23 @@ struct EvalAdvFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static Expr* MakeInt(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
+static Expr *MakeInt(Arena &arena, uint64_t val) {
+  auto *e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
   e->int_val = val;
   return e;
 }
 
-static Expr* MakeId(Arena& arena, std::string_view name) {
-  auto* e = arena.Create<Expr>();
+static Expr *MakeId(Arena &arena, std::string_view name) {
+  auto *e = arena.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
   e->text = name;
   return e;
 }
 
-static Variable* MakeVar(EvalAdvFixture& f, std::string_view name,
+static Variable *MakeVar(EvalAdvFixture &f, std::string_view name,
                          uint32_t width, uint64_t val) {
-  auto* var = f.ctx.CreateVariable(name, width);
+  auto *var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4VecVal(f.arena, width, val);
   return var;
 }
@@ -51,7 +51,7 @@ TEST(EvalAdv, PartSelectPartialOOB) {
   EvalAdvFixture f;
   // §11.5.1: v[6 +: 4] on 8-bit var → bits 6,7 valid, bits 8,9 OOB → X.
   MakeVar(f, "ov", 8, 0xFF);
-  auto* sel = f.arena.Create<Expr>();
+  auto *sel = f.arena.Create<Expr>();
   sel->kind = ExprKind::kSelect;
   sel->base = MakeId(f.arena, "ov");
   sel->index = MakeInt(f.arena, 6);
@@ -80,19 +80,19 @@ TEST(EvalAdv, ArrayXZAddrReturnsX) {
   f.ctx.RegisterArray("arr4", info);
 
   // arr4[x] — X address should return X.
-  auto* sel = f.arena.Create<Expr>();
+  auto *sel = f.arena.Create<Expr>();
   sel->kind = ExprKind::kSelect;
   sel->base = MakeId(f.arena, "arr4");
   // Create an X-valued index.
-  auto* idx = MakeInt(f.arena, 0);
+  auto *idx = MakeInt(f.arena, 0);
   sel->index = idx;
   // Manually set bval to make it X.
   // Evaluate: since we can't directly set bval on a literal,
   // create a variable with X value and use it.
-  auto* xvar = f.ctx.CreateVariable("xidx", 8);
+  auto *xvar = f.ctx.CreateVariable("xidx", 8);
   xvar->value = MakeLogic4Vec(f.arena, 8);
   xvar->value.words[0].aval = 1;
-  xvar->value.words[0].bval = 1;  // aval=1, bval=1 → X
+  xvar->value.words[0].bval = 1; // aval=1, bval=1 → X
   sel->index = MakeId(f.arena, "xidx");
 
   auto result = EvalExpr(sel, f.ctx, f.arena);
@@ -101,4 +101,4 @@ TEST(EvalAdv, ArrayXZAddrReturnsX) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-}  // namespace
+} // namespace

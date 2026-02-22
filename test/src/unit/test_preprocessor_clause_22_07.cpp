@@ -12,8 +12,8 @@ struct PreprocFixture {
   DiagEngine diag{mgr};
 };
 
-static std::string PreprocessWithPP(const std::string& src, PreprocFixture& f,
-                                    Preprocessor& pp) {
+static std::string PreprocessWithPP(const std::string &src, PreprocFixture &f,
+                                    Preprocessor &pp) {
   auto fid = f.mgr.AddFile("<test>", src);
   return pp.Preprocess(fid);
 }

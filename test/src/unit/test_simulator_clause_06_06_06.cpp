@@ -1,10 +1,10 @@
 // §6.6.6: Supply nets
 
-#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "simulation/net.h"
 #include "simulation/scheduler.h"
 #include "simulation/variable.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -13,7 +13,7 @@ namespace {
 // --- §6.6.6: Supply net resolution ---
 TEST(NetResolution, Supply0AlwaysZero) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
+  auto *var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 8);
   Net net;
   net.type = NetType::kSupply0;
@@ -26,7 +26,7 @@ TEST(NetResolution, Supply0AlwaysZero) {
 
 TEST(NetResolution, Supply1AlwaysOne) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
+  auto *var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 8);
   Net net;
   net.type = NetType::kSupply1;
@@ -39,7 +39,7 @@ TEST(NetResolution, Supply1AlwaysOne) {
 
 TEST(NetResolution, Supply0OverridesMultipleDrivers) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
+  auto *var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 8);
   Net net;
   net.type = NetType::kSupply0;
@@ -50,4 +50,4 @@ TEST(NetResolution, Supply0OverridesMultipleDrivers) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-}  // namespace
+} // namespace

@@ -25,7 +25,7 @@ TEST(SimCh47, ActiveRegionProcessesAllEvents) {
   int count = 0;
 
   for (int i = 0; i < 5; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&]() { count++; };
     sched.ScheduleEvent({0}, Region::kActive, ev);
   }
@@ -45,7 +45,7 @@ TEST(SimCh47, ReactiveRegionProcessesAllEvents) {
   int count = 0;
 
   for (int i = 0; i < 5; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&]() { count++; };
     sched.ScheduleEvent({0}, Region::kReactive, ev);
   }
@@ -66,12 +66,12 @@ TEST(SimCh47, IndependentActiveProcessesInterleave) {
   int b = 0;
 
   // Process A writes a.
-  auto* ev_a = sched.GetEventPool().Acquire();
+  auto *ev_a = sched.GetEventPool().Acquire();
   ev_a->callback = [&]() { a = 1; };
   sched.ScheduleEvent({0}, Region::kActive, ev_a);
 
   // Process B writes b.
-  auto* ev_b = sched.GetEventPool().Acquire();
+  auto *ev_b = sched.GetEventPool().Acquire();
   ev_b->callback = [&]() { b = 2; };
   sched.ScheduleEvent({0}, Region::kActive, ev_b);
 
@@ -91,11 +91,11 @@ TEST(SimCh47, IndependentReactiveProcessesInterleave) {
   int a = 0;
   int b = 0;
 
-  auto* ev_a = sched.GetEventPool().Acquire();
+  auto *ev_a = sched.GetEventPool().Acquire();
   ev_a->callback = [&]() { a = 10; };
   sched.ScheduleEvent({0}, Region::kReactive, ev_a);
 
-  auto* ev_b = sched.GetEventPool().Acquire();
+  auto *ev_b = sched.GetEventPool().Acquire();
   ev_b->callback = [&]() { b = 20; };
   sched.ScheduleEvent({0}, Region::kReactive, ev_b);
 
@@ -116,17 +116,17 @@ TEST(SimCh47, ProcessSuspensionViaPendingEvent) {
   std::vector<std::string> order;
 
   // Process A: executes part 1, suspends (schedules continuation in Inactive).
-  auto* a_part1 = sched.GetEventPool().Acquire();
+  auto *a_part1 = sched.GetEventPool().Acquire();
   a_part1->callback = [&]() {
     order.push_back("A_part1");
-    auto* a_part2 = sched.GetEventPool().Acquire();
+    auto *a_part2 = sched.GetEventPool().Acquire();
     a_part2->callback = [&]() { order.push_back("A_part2"); };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kInactive, a_part2);
   };
   sched.ScheduleEvent({0}, Region::kActive, a_part1);
 
   // Process B: runs during A's suspension.
-  auto* b = sched.GetEventPool().Acquire();
+  auto *b = sched.GetEventPool().Acquire();
   b->callback = [&]() { order.push_back("B"); };
   sched.ScheduleEvent({0}, Region::kActive, b);
 
@@ -149,25 +149,25 @@ TEST(SimCh47, MultipleProcessInterleaving) {
   std::vector<std::string> order;
 
   // Process A: part1 in Active, part2 in Inactive.
-  auto* a1 = sched.GetEventPool().Acquire();
+  auto *a1 = sched.GetEventPool().Acquire();
   a1->callback = [&]() {
     order.push_back("A1");
-    auto* a2 = sched.GetEventPool().Acquire();
+    auto *a2 = sched.GetEventPool().Acquire();
     a2->callback = [&]() { order.push_back("A2"); };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kInactive, a2);
   };
   sched.ScheduleEvent({0}, Region::kActive, a1);
 
   // Process B: runs in Active without suspension.
-  auto* b = sched.GetEventPool().Acquire();
+  auto *b = sched.GetEventPool().Acquire();
   b->callback = [&]() { order.push_back("B"); };
   sched.ScheduleEvent({0}, Region::kActive, b);
 
   // Process C: part1 in Active, part2 in Inactive.
-  auto* c1 = sched.GetEventPool().Acquire();
+  auto *c1 = sched.GetEventPool().Acquire();
   c1->callback = [&]() {
     order.push_back("C1");
-    auto* c2 = sched.GetEventPool().Acquire();
+    auto *c2 = sched.GetEventPool().Acquire();
     c2->callback = [&]() { order.push_back("C2"); };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kInactive, c2);
   };
@@ -197,11 +197,11 @@ TEST(SimCh47, ConflictingWritesInActiveRegion) {
 
   // Two processes both write to x — the final value depends on execution
   // order. We verify both writes execute (x is set by one of them).
-  auto* ev1 = sched.GetEventPool().Acquire();
+  auto *ev1 = sched.GetEventPool().Acquire();
   ev1->callback = [&]() { x = 10; };
   sched.ScheduleEvent({0}, Region::kActive, ev1);
 
-  auto* ev2 = sched.GetEventPool().Acquire();
+  auto *ev2 = sched.GetEventPool().Acquire();
   ev2->callback = [&]() { x = 20; };
   sched.ScheduleEvent({0}, Region::kActive, ev2);
 
@@ -222,11 +222,11 @@ TEST(SimCh47, DynamicallyGeneratedActiveEventsExecute) {
   std::vector<int> order;
 
   // An Active callback generates three more Active events.
-  auto* gen = sched.GetEventPool().Acquire();
+  auto *gen = sched.GetEventPool().Acquire();
   gen->callback = [&]() {
     order.push_back(0);
     for (int i = 1; i <= 3; ++i) {
-      auto* ev = sched.GetEventPool().Acquire();
+      auto *ev = sched.GetEventPool().Acquire();
       ev->callback = [&order, i]() { order.push_back(i); };
       sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, ev);
     }
@@ -253,17 +253,17 @@ TEST(SimCh47, ReactiveProcessSuspensionViaReInactive) {
   std::vector<std::string> order;
 
   // Reactive process A: suspends via Re-Inactive.
-  auto* a1 = sched.GetEventPool().Acquire();
+  auto *a1 = sched.GetEventPool().Acquire();
   a1->callback = [&]() {
     order.push_back("RA1");
-    auto* a2 = sched.GetEventPool().Acquire();
+    auto *a2 = sched.GetEventPool().Acquire();
     a2->callback = [&]() { order.push_back("RA2"); };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kReInactive, a2);
   };
   sched.ScheduleEvent({0}, Region::kReactive, a1);
 
   // Reactive process B.
-  auto* b = sched.GetEventPool().Acquire();
+  auto *b = sched.GetEventPool().Acquire();
   b->callback = [&]() { order.push_back("RB"); };
   sched.ScheduleEvent({0}, Region::kReactive, b);
 
@@ -286,20 +286,20 @@ TEST(SimCh47, NondeterminismAcrossTimeSlots) {
   std::vector<std::string> order;
 
   // Time 0: two independent processes.
-  auto* t0a = sched.GetEventPool().Acquire();
+  auto *t0a = sched.GetEventPool().Acquire();
   t0a->callback = [&]() { order.push_back("t0_a"); };
   sched.ScheduleEvent({0}, Region::kActive, t0a);
 
-  auto* t0b = sched.GetEventPool().Acquire();
+  auto *t0b = sched.GetEventPool().Acquire();
   t0b->callback = [&]() { order.push_back("t0_b"); };
   sched.ScheduleEvent({0}, Region::kActive, t0b);
 
   // Time 5: two independent processes.
-  auto* t5a = sched.GetEventPool().Acquire();
+  auto *t5a = sched.GetEventPool().Acquire();
   t5a->callback = [&]() { order.push_back("t5_a"); };
   sched.ScheduleEvent({5}, Region::kActive, t5a);
 
-  auto* t5b = sched.GetEventPool().Acquire();
+  auto *t5b = sched.GetEventPool().Acquire();
   t5b->callback = [&]() { order.push_back("t5_b"); };
   sched.ScheduleEvent({5}, Region::kActive, t5b);
 

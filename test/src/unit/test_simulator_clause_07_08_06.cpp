@@ -1,7 +1,5 @@
 // §7.8.6: Accessing invalid indices
 
-#include <gtest/gtest.h>
-#include <string>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -11,6 +9,8 @@
 #include "simulation/eval.h"
 #include "simulation/eval_array.h"
 #include "simulation/sim_context.h"
+#include <gtest/gtest.h>
+#include <string>
 
 using namespace delta;
 
@@ -32,16 +32,16 @@ namespace {
 // =============================================================================
 TEST(AssocArray, ReadMissingKeyWarns) {
   AggFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
+  auto *aa = f.ctx.CreateAssocArray("aa", 32, false);
   aa->int_data[10] = MakeLogic4VecVal(f.arena, 32, 42);
   // Read key 99 (does not exist).  Should return default and warn.
-  auto* sel = f.arena.Create<Expr>();
+  auto *sel = f.arena.Create<Expr>();
   sel->kind = ExprKind::kSelect;
-  auto* base = f.arena.Create<Expr>();
+  auto *base = f.arena.Create<Expr>();
   base->kind = ExprKind::kIdentifier;
   base->text = "aa";
   sel->base = base;
-  auto* idx = f.arena.Create<Expr>();
+  auto *idx = f.arena.Create<Expr>();
   idx->kind = ExprKind::kIntegerLiteral;
   idx->int_val = 99;
   sel->index = idx;
@@ -53,16 +53,16 @@ TEST(AssocArray, ReadMissingKeyWarns) {
 
 TEST(AssocArray, ReadExistingKeyNoWarning) {
   AggFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
+  auto *aa = f.ctx.CreateAssocArray("aa", 32, false);
   aa->int_data[10] = MakeLogic4VecVal(f.arena, 32, 42);
   // Read key 10 (exists).  Should NOT warn.
-  auto* sel = f.arena.Create<Expr>();
+  auto *sel = f.arena.Create<Expr>();
   sel->kind = ExprKind::kSelect;
-  auto* base = f.arena.Create<Expr>();
+  auto *base = f.arena.Create<Expr>();
   base->kind = ExprKind::kIdentifier;
   base->text = "aa";
   sel->base = base;
-  auto* idx = f.arena.Create<Expr>();
+  auto *idx = f.arena.Create<Expr>();
   idx->kind = ExprKind::kIntegerLiteral;
   idx->int_val = 10;
   sel->index = idx;
@@ -72,4 +72,4 @@ TEST(AssocArray, ReadExistingKeyNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), before);
 }
 
-}  // namespace
+} // namespace

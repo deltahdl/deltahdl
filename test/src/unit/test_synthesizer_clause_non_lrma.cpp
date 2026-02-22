@@ -1,10 +1,10 @@
 // §non_lrm
 
-#include <gtest/gtest.h>
-#include <cstdint>
 #include "synthesis/adv_synth.h"
 #include "synthesis/aig.h"
 #include "synthesis/lut_map.h"
+#include <cstdint>
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -94,7 +94,7 @@ TEST(AdvSynth, MapForDelayReturnsValidMapping) {
 
   // All cells must respect the LUT size constraint.
   EXPECT_FALSE(mapping.cells.empty());
-  for (const auto& cell : mapping.cells) {
+  for (const auto &cell : mapping.cells) {
     EXPECT_LE(cell.inputs.size(), static_cast<size_t>(lut_size));
   }
   EXPECT_EQ(mapping.lut_size, lut_size);
@@ -129,7 +129,7 @@ TEST(AdvSynth, IterativeAreaDelayConverges) {
 
   // Result must be a valid mapping.
   EXPECT_FALSE(mapping.cells.empty());
-  for (const auto& cell : mapping.cells) {
+  for (const auto &cell : mapping.cells) {
     EXPECT_LE(cell.inputs.size(), static_cast<size_t>(lut_size));
   }
   EXPECT_EQ(mapping.lut_size, lut_size);
@@ -145,7 +145,7 @@ TEST(AdvSynth, IterativeAreaDelayWithSingleNode) {
   auto mapping = IterativeAreaDelay(g, 4, 2);
 
   EXPECT_FALSE(mapping.cells.empty());
-  for (const auto& cell : mapping.cells) {
+  for (const auto &cell : mapping.cells) {
     EXPECT_LE(cell.inputs.size(), 4u);
   }
 }
@@ -162,4 +162,4 @@ TEST(AdvSynth, IterativeAreaDelayZeroIterationsReturnsMappingForDelay) {
   EXPECT_FALSE(mapping.cells.empty());
 }
 
-}  // namespace
+} // namespace

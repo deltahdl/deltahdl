@@ -1,11 +1,11 @@
 // §7.8: Associative arrays
 
-#include <gtest/gtest.h>
-#include <cstdint>
-#include <string>
 #include "common/arena.h"
 #include "common/types.h"
 #include "simulation/adv_sim.h"
+#include <cstdint>
+#include <gtest/gtest.h>
+#include <string>
 
 using namespace delta;
 
@@ -33,4 +33,4 @@ TEST(AdvSim, AssocArrayExistsAndErase) {
   EXPECT_EQ(arr.Size(), 0u);
 }
 
-}  // namespace
+} // namespace

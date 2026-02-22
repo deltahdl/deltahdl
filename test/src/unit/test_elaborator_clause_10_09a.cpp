@@ -1,7 +1,5 @@
 // §10.9: Assignment patterns
 
-#include <gtest/gtest.h>
-#include <string>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -11,6 +9,8 @@
 #include "simulation/eval.h"
 #include "simulation/eval_array.h"
 #include "simulation/sim_context.h"
+#include <gtest/gtest.h>
+#include <string>
 
 using namespace delta;
 
@@ -25,19 +25,18 @@ struct AggFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static Expr* ParseExprFrom(const std::string& src, AggFixture& f) {
+static Expr *ParseExprFrom(const std::string &src, AggFixture &f) {
   std::string code = "module t; initial x = " + src + "; endmodule";
   auto fid = f.mgr.AddFile("<test>", code);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  auto* item = cu->modules[0]->items[0];
+  auto *cu = parser.Parse();
+  auto *item = cu->modules[0]->items[0];
   return item->body->rhs;
 }
 
-
-static Expr* MakeIntLit(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
+static Expr *MakeIntLit(Arena &arena, uint64_t val) {
+  auto *e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
   e->int_val = val;
   return e;
@@ -54,7 +53,7 @@ TEST(StructPattern, DefaultWithNamedOverride) {
   info.fields.push_back({"a", 8, 8, DataTypeKind::kLogic});
   info.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
 
-  auto* pat = f.arena.Create<Expr>();
+  auto *pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"a", "default"};
   pat->elements = {MakeIntLit(f.arena, 1), MakeIntLit(f.arena, 0)};
@@ -73,7 +72,7 @@ TEST(StructPattern, TypeKeyedInt) {
   info.fields.push_back({"a", 8, 32, DataTypeKind::kInt});
   info.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
 
-  auto* pat = f.arena.Create<Expr>();
+  auto *pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"int"};
   pat->elements = {MakeIntLit(f.arena, 42)};
@@ -96,7 +95,7 @@ TEST(StructPattern, MixedPrecedence) {
   info.fields.push_back({"b", 8, 8, DataTypeKind::kByte});
   info.fields.push_back({"c", 0, 8, DataTypeKind::kLogic});
 
-  auto* pat = f.arena.Create<Expr>();
+  auto *pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"a", "byte", "default"};
   pat->elements = {MakeIntLit(f.arena, 1), MakeIntLit(f.arena, 2),
@@ -113,11 +112,11 @@ TEST(StructPattern, MixedPrecedence) {
 TEST(AssignmentPattern, PositionalTwoElements) {
   // '{a, b} with 8-bit variables → 16-bit packed result
   AggFixture f;
-  auto* a = f.ctx.CreateVariable("a", 8);
-  auto* b = f.ctx.CreateVariable("b", 8);
+  auto *a = f.ctx.CreateVariable("a", 8);
+  auto *b = f.ctx.CreateVariable("b", 8);
   a->value = MakeLogic4VecVal(f.arena, 8, 5);
   b->value = MakeLogic4VecVal(f.arena, 8, 10);
-  auto* expr = ParseExprFrom("'{a, b}", f);
+  auto *expr = ParseExprFrom("'{a, b}", f);
   ASSERT_NE(expr, nullptr);
   EXPECT_EQ(expr->kind, ExprKind::kAssignmentPattern);
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -128,17 +127,17 @@ TEST(AssignmentPattern, PositionalTwoElements) {
 
 TEST(AssignmentPattern, PositionalThreeElements) {
   AggFixture f;
-  auto* a = f.ctx.CreateVariable("a", 4);
-  auto* b = f.ctx.CreateVariable("b", 4);
-  auto* c = f.ctx.CreateVariable("c", 4);
+  auto *a = f.ctx.CreateVariable("a", 4);
+  auto *b = f.ctx.CreateVariable("b", 4);
+  auto *c = f.ctx.CreateVariable("c", 4);
   a->value = MakeLogic4VecVal(f.arena, 4, 1);
   b->value = MakeLogic4VecVal(f.arena, 4, 2);
   c->value = MakeLogic4VecVal(f.arena, 4, 3);
-  auto* expr = ParseExprFrom("'{a, b, c}", f);
+  auto *expr = ParseExprFrom("'{a, b, c}", f);
   auto result = EvalExpr(expr, f.ctx, f.arena);
   // {1, 2, 3} → 12-bit: 0x123
   EXPECT_EQ(result.width, 12u);
   EXPECT_EQ(result.ToUint64(), 0x123u);
 }
 
-}  // namespace
+} // namespace

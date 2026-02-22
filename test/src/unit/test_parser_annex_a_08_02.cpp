@@ -34,7 +34,8 @@ ParseResult Parse(const std::string &src) {
 
 static Stmt *FirstInitialStmt(ParseResult &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->kind != ModuleItemKind::kInitialBlock)
+      continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
     }
@@ -50,12 +51,13 @@ static Expr *FirstInitialExpr(ParseResult &r) {
 
 static Expr *FirstContAssignRHS(ParseResult &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kContAssign) return item->assign_rhs;
+    if (item->kind == ModuleItemKind::kContAssign)
+      return item->assign_rhs;
   }
   return nullptr;
 }
 
-}  // namespace
+} // namespace
 
 // =============================================================================
 // A.8.2 Subroutine calls — constant_function_call
@@ -64,10 +66,9 @@ static Expr *FirstContAssignRHS(ParseResult &r) {
 // § constant_function_call ::= function_subroutine_call (footnote 41)
 
 TEST(ParserA82, ConstantFunctionCallInParam) {
-  auto r = Parse(
-      "module m #(parameter int P = calc(4));\n"
-      "  function int calc(int n); return n * 2; endfunction\n"
-      "endmodule\n");
+  auto r = Parse("module m #(parameter int P = calc(4));\n"
+                 "  function int calc(int n); return n * 2; endfunction\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &params = r.cu->modules[0]->params;
@@ -78,11 +79,11 @@ TEST(ParserA82, ConstantFunctionCallInParam) {
 }
 
 TEST(ParserA82, ConstantFunctionCallInLocalparam) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int clog2_fn(int n); return $clog2(n); endfunction\n"
-      "  localparam int W = clog2_fn(256);\n"
-      "endmodule\n");
+  auto r =
+      Parse("module m;\n"
+            "  function int clog2_fn(int n); return $clog2(n); endfunction\n"
+            "  localparam int W = clog2_fn(256);\n"
+            "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -96,10 +97,9 @@ TEST(ParserA82, ConstantFunctionCallInLocalparam) {
 
 // tf_call as expression (function return value used in RHS)
 TEST(ParserA82, TfCallAsExprInAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = func(1, 2);\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial x = func(1, 2);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -112,10 +112,9 @@ TEST(ParserA82, TfCallAsExprInAssign) {
 
 // tf_call with no arguments (footnote 42: only legal for tasks/void/class)
 TEST(ParserA82, TfCallNoArgs) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin foo(); end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin foo(); end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *expr = FirstInitialExpr(r);
@@ -127,14 +126,13 @@ TEST(ParserA82, TfCallNoArgs) {
 
 // tf_call in continuous assignment (function_subroutine_call as primary)
 TEST(ParserA82, TfCallInContAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire [7:0] y;\n"
-      "  function logic [7:0] compute(input logic [7:0] a);\n"
-      "    return a + 8'd1;\n"
-      "  endfunction\n"
-      "  assign y = compute(8'd5);\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire [7:0] y;\n"
+                 "  function logic [7:0] compute(input logic [7:0] a);\n"
+                 "    return a + 8'd1;\n"
+                 "  endfunction\n"
+                 "  assign y = compute(8'd5);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstContAssignRHS(r);
@@ -153,10 +151,9 @@ TEST(ParserA82, TfCallInContAssign) {
 
 // system_tf_call as expression ($clog2 returns a value)
 TEST(ParserA82, SystemTfCallAsExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = $clog2(256);\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial x = $clog2(256);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -169,11 +166,10 @@ TEST(ParserA82, SystemTfCallAsExpr) {
 
 // system_tf_call with expression argument: $bits(variable)
 TEST(ParserA82, SystemTfCallBitsExprArg) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [7:0] v;\n"
-      "  initial x = $bits(v);\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  logic [7:0] v;\n"
+                 "  initial x = $bits(v);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -185,10 +181,9 @@ TEST(ParserA82, SystemTfCallBitsExprArg) {
 
 // system_tf_call with multiple expression arguments
 TEST(ParserA82, SystemTfCallMultipleExprArgs) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial $display(\"%d %d\", 1, 2);\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial $display(\"%d %d\", 1, 2);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *expr = FirstInitialExpr(r);
@@ -199,10 +194,9 @@ TEST(ParserA82, SystemTfCallMultipleExprArgs) {
 
 // system_tf_call with empty positional arg slots
 TEST(ParserA82, SystemTfCallEmptyArgSlots) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial $display(,,42);\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial $display(,,42);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *expr = FirstInitialExpr(r);
@@ -224,10 +218,9 @@ TEST(ParserA82, SystemTfCallEmptyArgSlots) {
 
 // function_subroutine_call nested in expression
 TEST(ParserA82, FunctionSubroutineCallNested) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = f(g(1));\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial x = f(g(1));\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -243,10 +236,9 @@ TEST(ParserA82, FunctionSubroutineCallNested) {
 
 // function_subroutine_call in binary expression
 TEST(ParserA82, FunctionCallInBinaryExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = f(1) + g(2);\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial x = f(1) + g(2);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -269,10 +261,9 @@ TEST(ParserA82, FunctionCallInBinaryExpr) {
 
 // Positional arguments only
 TEST(ParserA82, ListOfArgsPositionalOnly) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin foo(1, 2, 3); end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin foo(1, 2, 3); end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *expr = FirstInitialExpr(r);
@@ -284,10 +275,9 @@ TEST(ParserA82, ListOfArgsPositionalOnly) {
 
 // All named arguments
 TEST(ParserA82, ListOfArgsAllNamed) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin foo(.x(10), .y(20)); end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin foo(.x(10), .y(20)); end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *expr = FirstInitialExpr(r);
@@ -300,10 +290,9 @@ TEST(ParserA82, ListOfArgsAllNamed) {
 
 // Mixed positional + named arguments
 TEST(ParserA82, ListOfArgsMixed) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin foo(1, .b(2)); end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin foo(1, .b(2)); end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *expr = FirstInitialExpr(r);
@@ -316,10 +305,9 @@ TEST(ParserA82, ListOfArgsMixed) {
 
 // Named argument with empty expression
 TEST(ParserA82, ListOfArgsNamedEmptyExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin foo(.a(), .b(1)); end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin foo(.a(), .b(1)); end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *expr = FirstInitialExpr(r);
@@ -338,10 +326,9 @@ TEST(ParserA82, ListOfArgsNamedEmptyExpr) {
 
 // Basic method call on identifier
 TEST(ParserA82, MethodCallBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin obj.method(); end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin obj.method(); end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *expr = FirstInitialExpr(r);
@@ -353,10 +340,9 @@ TEST(ParserA82, MethodCallBasic) {
 
 // Method call with arguments
 TEST(ParserA82, MethodCallWithArgs) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin obj.method(1, 2); end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin obj.method(1, 2); end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *expr = FirstInitialExpr(r);
@@ -367,10 +353,9 @@ TEST(ParserA82, MethodCallWithArgs) {
 
 // Chained method call: a.b.c()
 TEST(ParserA82, MethodCallChained) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin a.b.c(); end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin a.b.c(); end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *expr = FirstInitialExpr(r);
@@ -380,10 +365,9 @@ TEST(ParserA82, MethodCallChained) {
 
 // method_call_root: implicit_class_handle (this)
 TEST(ParserA82, MethodCallRootThis) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin this.method(); end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin this.method(); end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *expr = FirstInitialExpr(r);
@@ -393,10 +377,9 @@ TEST(ParserA82, MethodCallRootThis) {
 
 // method_call_root: implicit_class_handle (super)
 TEST(ParserA82, MethodCallRootSuper) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin super.method(); end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin super.method(); end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *expr = FirstInitialExpr(r);
@@ -423,10 +406,9 @@ TEST(ParserA82, MethodCallRootSuper) {
 
 // array_manipulation_call: sum with no args
 TEST(ParserA82, ArrayManipCallSum) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin x = arr.sum(); end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin x = arr.sum(); end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -437,12 +419,11 @@ TEST(ParserA82, ArrayManipCallSum) {
 
 // array_manipulation_call with 'with' clause
 TEST(ParserA82, ArrayManipCallWithClause) {
-  auto r = Parse(
-      "module m;\n"
-      "  int arr[4];\n"
-      "  int result[$];\n"
-      "  initial begin result = arr.find with (item > 5); end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  int arr[4];\n"
+                 "  int result[$];\n"
+                 "  initial begin result = arr.find with (item > 5); end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -454,37 +435,33 @@ TEST(ParserA82, ArrayManipCallWithClause) {
 // § array_method_name ::= method_identifier | unique | and | or | xor
 
 TEST(ParserA82, ArrayMethodNameUnique) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin x = arr.unique(); end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin x = arr.unique(); end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA82, ArrayMethodNameAnd) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin x = arr.and(); end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin x = arr.and(); end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA82, ArrayMethodNameOr) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin x = arr.or(); end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin x = arr.or(); end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA82, ArrayMethodNameXor) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin x = arr.xor(); end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin x = arr.xor(); end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -498,47 +475,42 @@ TEST(ParserA82, ArrayMethodNameXor) {
 //   [ with [ ( [ identifier_list ] ) ] constraint_block ]
 
 TEST(ParserA82, RandomizeCallBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin obj.randomize(); end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin obj.randomize(); end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA82, RandomizeCallWithConstraintBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin obj.randomize() with { x < 10; }; end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin obj.randomize() with { x < 10; }; end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA82, RandomizeCallWithNull) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin obj.randomize(null); end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin obj.randomize(null); end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA82, RandomizeCallWithVarList) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin obj.randomize(x, y); end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin obj.randomize(x, y); end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 // § std::randomize_call (subroutine_call alternative)
 TEST(ParserA82, StdRandomizeCall) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin std::randomize(x) with { x > 0; }; end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin std::randomize(x) with { x > 0; }; end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -554,10 +526,9 @@ TEST(ParserA82, StdRandomizeCall) {
 
 // variable_identifier_list in randomize
 TEST(ParserA82, VariableIdentifierList) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin obj.randomize(a, b, c); end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin obj.randomize(a, b, c); end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *expr = FirstInitialExpr(r);

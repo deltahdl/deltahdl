@@ -1,9 +1,5 @@
 // §6.19.5.3: Next()
 
-#include <gtest/gtest.h>
-#include <string>
-#include <string_view>
-#include <vector>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -11,6 +7,10 @@
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
+#include <gtest/gtest.h>
+#include <string>
+#include <string_view>
+#include <vector>
 
 using namespace delta;
 
@@ -26,59 +26,59 @@ struct EnumFixture {
 
   // Register an enum type with the given members and values.
   // Returns the variable associated with the enum.
-  Variable* RegisterEnum(
-      std::string_view var_name, std::string_view type_name,
-      const std::vector<std::pair<std::string, uint64_t>>& members) {
+  Variable *
+  RegisterEnum(std::string_view var_name, std::string_view type_name,
+               const std::vector<std::pair<std::string, uint64_t>> &members) {
     EnumTypeInfo info;
-    char* tn = arena.AllocString(type_name.data(), type_name.size());
+    char *tn = arena.AllocString(type_name.data(), type_name.size());
     info.type_name = std::string_view(tn, type_name.size());
-    for (auto& [name, val] : members) {
+    for (auto &[name, val] : members) {
       EnumMemberInfo m;
-      char* mn = arena.AllocString(name.c_str(), name.size());
+      char *mn = arena.AllocString(name.c_str(), name.size());
       m.name = std::string_view(mn, name.size());
       m.value = val;
       info.members.push_back(m);
     }
     ctx.RegisterEnumType(info.type_name, info);
 
-    auto* var = ctx.CreateVariable(var_name, 32);
+    auto *var = ctx.CreateVariable(var_name, 32);
     var->value = MakeLogic4VecVal(arena, 32, members[0].second);
     ctx.SetVariableEnumType(var_name, info.type_name);
     return var;
   }
 
   // Build a method call expression: var_name.method_name(args...)
-  Expr* MakeEnumMethodCall(std::string_view var_name,
+  Expr *MakeEnumMethodCall(std::string_view var_name,
                            std::string_view method_name) {
     return MakeEnumMethodCallWithArgs(var_name, method_name, {});
   }
 
-  Expr* MakeEnumMethodCallWithArgs(std::string_view var_name,
+  Expr *MakeEnumMethodCallWithArgs(std::string_view var_name,
                                    std::string_view method_name,
-                                   std::vector<Expr*> args) {
+                                   std::vector<Expr *> args) {
     // Build: var_name.method_name(args...)
-    auto* id = arena.Create<Expr>();
+    auto *id = arena.Create<Expr>();
     id->kind = ExprKind::kIdentifier;
     id->text = var_name;
 
-    auto* member = arena.Create<Expr>();
+    auto *member = arena.Create<Expr>();
     member->kind = ExprKind::kIdentifier;
     member->text = method_name;
 
-    auto* access = arena.Create<Expr>();
+    auto *access = arena.Create<Expr>();
     access->kind = ExprKind::kMemberAccess;
     access->lhs = id;
     access->rhs = member;
 
-    auto* call = arena.Create<Expr>();
+    auto *call = arena.Create<Expr>();
     call->kind = ExprKind::kCall;
     call->lhs = access;
     call->args = std::move(args);
     return call;
   }
 
-  Expr* MakeIntLiteral(uint64_t val) {
-    auto* lit = arena.Create<Expr>();
+  Expr *MakeIntLiteral(uint64_t val) {
+    auto *lit = arena.Create<Expr>();
     lit->kind = ExprKind::kIntegerLiteral;
     lit->int_val = val;
     return lit;
@@ -91,54 +91,54 @@ namespace {
 // =============================================================================
 TEST(EnumMethods, NextReturnsNextMember) {
   EnumFixture f;
-  auto* var = f.RegisterEnum("color", "color_t",
+  auto *var = f.RegisterEnum("color", "color_t",
                              {{"RED", 0}, {"GREEN", 1}, {"BLUE", 2}});
-  var->value = MakeLogic4VecVal(f.arena, 32, 0);  // RED
-  auto* call = f.MakeEnumMethodCall("color", "next");
+  var->value = MakeLogic4VecVal(f.arena, 32, 0); // RED
+  auto *call = f.MakeEnumMethodCall("color", "next");
   auto result = EvalExpr(call, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);  // GREEN
+  EXPECT_EQ(result.ToUint64(), 1u); // GREEN
 }
 
 TEST(EnumMethods, NextFromMiddle) {
   EnumFixture f;
-  auto* var = f.RegisterEnum("color", "color_t",
+  auto *var = f.RegisterEnum("color", "color_t",
                              {{"RED", 0}, {"GREEN", 1}, {"BLUE", 2}});
-  var->value = MakeLogic4VecVal(f.arena, 32, 1);  // GREEN
-  auto* call = f.MakeEnumMethodCall("color", "next");
+  var->value = MakeLogic4VecVal(f.arena, 32, 1); // GREEN
+  auto *call = f.MakeEnumMethodCall("color", "next");
   auto result = EvalExpr(call, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 2u);  // BLUE
+  EXPECT_EQ(result.ToUint64(), 2u); // BLUE
 }
 
 TEST(EnumMethods, NextWrapsFromLast) {
   EnumFixture f;
-  auto* var = f.RegisterEnum("color", "color_t",
+  auto *var = f.RegisterEnum("color", "color_t",
                              {{"RED", 0}, {"GREEN", 1}, {"BLUE", 2}});
-  var->value = MakeLogic4VecVal(f.arena, 32, 2);  // BLUE
-  auto* call = f.MakeEnumMethodCall("color", "next");
+  var->value = MakeLogic4VecVal(f.arena, 32, 2); // BLUE
+  auto *call = f.MakeEnumMethodCall("color", "next");
   auto result = EvalExpr(call, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);  // wraps to RED
+  EXPECT_EQ(result.ToUint64(), 0u); // wraps to RED
 }
 
 TEST(EnumMethods, NextWithCount) {
   EnumFixture f;
-  auto* var = f.RegisterEnum("color", "color_t",
+  auto *var = f.RegisterEnum("color", "color_t",
                              {{"RED", 0}, {"GREEN", 1}, {"BLUE", 2}});
-  var->value = MakeLogic4VecVal(f.arena, 32, 0);  // RED
-  auto* call =
+  var->value = MakeLogic4VecVal(f.arena, 32, 0); // RED
+  auto *call =
       f.MakeEnumMethodCallWithArgs("color", "next", {f.MakeIntLiteral(2)});
   auto result = EvalExpr(call, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 2u);  // BLUE (skip 2 from RED)
+  EXPECT_EQ(result.ToUint64(), 2u); // BLUE (skip 2 from RED)
 }
 
 TEST(EnumMethods, NextWithCountWraps) {
   EnumFixture f;
-  auto* var = f.RegisterEnum("color", "color_t",
+  auto *var = f.RegisterEnum("color", "color_t",
                              {{"RED", 0}, {"GREEN", 1}, {"BLUE", 2}});
-  var->value = MakeLogic4VecVal(f.arena, 32, 1);  // GREEN
-  auto* call =
+  var->value = MakeLogic4VecVal(f.arena, 32, 1); // GREEN
+  auto *call =
       f.MakeEnumMethodCallWithArgs("color", "next", {f.MakeIntLiteral(3)});
   auto result = EvalExpr(call, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);  // wraps around: GREEN
+  EXPECT_EQ(result.ToUint64(), 1u); // wraps around: GREEN
 }
 
 // =============================================================================
@@ -146,11 +146,11 @@ TEST(EnumMethods, NextWithCountWraps) {
 // =============================================================================
 TEST(EnumMethods, NextOnNonMemberValue) {
   EnumFixture f;
-  auto* var = f.RegisterEnum("color", "color_t",
+  auto *var = f.RegisterEnum("color", "color_t",
                              {{"RED", 0}, {"GREEN", 1}, {"BLUE", 2}});
   // Set to an invalid enum value.
   var->value = MakeLogic4VecVal(f.arena, 32, 99);
-  auto* call = f.MakeEnumMethodCall("color", "next");
+  auto *call = f.MakeEnumMethodCall("color", "next");
   auto result = EvalExpr(call, f.ctx, f.arena);
   // For invalid current value, next() returns first member.
   EXPECT_EQ(result.ToUint64(), 0u);
@@ -159,18 +159,18 @@ TEST(EnumMethods, NextOnNonMemberValue) {
 TEST(EnumMethods, FullIteration) {
   // Verify next() can iterate through all members and wrap around.
   EnumFixture f;
-  auto* var = f.RegisterEnum("state", "state_t",
+  auto *var = f.RegisterEnum("state", "state_t",
                              {{"A", 10}, {"B", 20}, {"C", 30}, {"D", 40}});
-  var->value = MakeLogic4VecVal(f.arena, 32, 10);  // A
+  var->value = MakeLogic4VecVal(f.arena, 32, 10); // A
 
   std::vector<uint64_t> visited;
   for (int i = 0; i < 5; ++i) {
     visited.push_back(var->value.ToUint64());
-    auto* call = f.MakeEnumMethodCall("state", "next");
+    auto *call = f.MakeEnumMethodCall("state", "next");
     auto result = EvalExpr(call, f.ctx, f.arena);
     var->value = result;
   }
   EXPECT_EQ(visited, (std::vector<uint64_t>{10, 20, 30, 40, 10}));
 }
 
-}  // namespace
+} // namespace

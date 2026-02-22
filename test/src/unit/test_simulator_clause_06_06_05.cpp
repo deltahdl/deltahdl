@@ -1,10 +1,10 @@
 // §6.6.5: Tri0 and tri1 nets
 
-#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "simulation/net.h"
 #include "simulation/scheduler.h"
 #include "simulation/variable.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -12,14 +12,14 @@ namespace {
 
 TEST(NetResolution, Tri0ResolvesToZero) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
+  auto *var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 8);
   Net net;
   net.type = NetType::kTri0;
   net.resolved = var;
   // Single driver with z → resolves to 0 for tri0.
   auto drv = MakeLogic4Vec(arena, 8);
-  drv.words[0].aval = ~uint64_t{0};  // All z.
+  drv.words[0].aval = ~uint64_t{0}; // All z.
   drv.words[0].bval = ~uint64_t{0};
   net.drivers.push_back(drv);
   net.Resolve(arena);
@@ -29,7 +29,7 @@ TEST(NetResolution, Tri0ResolvesToZero) {
 
 TEST(NetResolution, Tri1ResolvesToOne) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
+  auto *var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 8);
   Net net;
   net.type = NetType::kTri1;
@@ -44,4 +44,4 @@ TEST(NetResolution, Tri1ResolvesToOne) {
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0u);
 }
 
-}  // namespace
+} // namespace

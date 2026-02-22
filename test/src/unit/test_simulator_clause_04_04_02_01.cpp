@@ -26,8 +26,8 @@ TEST(SimCh4421, PreponedExecutesBeforeAllOtherRegions) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
+  auto schedule = [&](Region r, const std::string &label) {
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, label]() { order.push_back(label); };
     sched.ScheduleEvent({0}, r, ev);
   };
@@ -59,7 +59,7 @@ TEST(SimCh4421, PreponedSamplesBeforeActiveModifications) {
   int sampled_in_active = -1;
 
   // Active at time 0 sets shared_value = 42.
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->callback = [&]() {
     shared_value = 42;
     sampled_in_active = shared_value;
@@ -67,7 +67,7 @@ TEST(SimCh4421, PreponedSamplesBeforeActiveModifications) {
   sched.ScheduleEvent({0}, Region::kActive, active);
 
   // Preponed at time 0 samples shared_value before Active runs.
-  auto* preponed = sched.GetEventPool().Acquire();
+  auto *preponed = sched.GetEventPool().Acquire();
   preponed->callback = [&]() { sampled_in_preponed = shared_value; };
   sched.ScheduleEvent({0}, Region::kPreponed, preponed);
 
@@ -89,22 +89,22 @@ TEST(SimCh4421, PreponedEquivalentToPreviousPostponed) {
   int sampled_in_preponed = -1;
 
   // Active at time 0 sets shared_value = 100.
-  auto* active0 = sched.GetEventPool().Acquire();
+  auto *active0 = sched.GetEventPool().Acquire();
   active0->callback = [&]() { shared_value = 100; };
   sched.ScheduleEvent({0}, Region::kActive, active0);
 
   // Postponed at time 0 samples shared_value after all time-0 activity.
-  auto* postponed0 = sched.GetEventPool().Acquire();
+  auto *postponed0 = sched.GetEventPool().Acquire();
   postponed0->callback = [&]() { sampled_in_postponed = shared_value; };
   sched.ScheduleEvent({0}, Region::kPostponed, postponed0);
 
   // Preponed at time 1 samples shared_value before time-1 activity.
-  auto* preponed1 = sched.GetEventPool().Acquire();
+  auto *preponed1 = sched.GetEventPool().Acquire();
   preponed1->callback = [&]() { sampled_in_preponed = shared_value; };
   sched.ScheduleEvent({1}, Region::kPreponed, preponed1);
 
   // Active at time 1 modifies shared_value — but Preponed already ran.
-  auto* active1 = sched.GetEventPool().Acquire();
+  auto *active1 = sched.GetEventPool().Acquire();
   active1->callback = [&]() { shared_value = 999; };
   sched.ScheduleEvent({1}, Region::kActive, active1);
 
@@ -124,14 +124,14 @@ TEST(SimCh4421, PreponedDoesNotReExecuteDuringIteration) {
   int preponed_count = 0;
 
   // Preponed callback counts executions.
-  auto* prep = sched.GetEventPool().Acquire();
+  auto *prep = sched.GetEventPool().Acquire();
   prep->callback = [&]() { preponed_count++; };
   sched.ScheduleEvent({0}, Region::kPreponed, prep);
 
   // Active callback schedules an NBA (triggering active-set re-iteration).
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->callback = [&]() {
-    auto* nba = sched.GetEventPool().Acquire();
+    auto *nba = sched.GetEventPool().Acquire();
     nba->callback = []() {};
     sched.ScheduleEvent({0}, Region::kNBA, nba);
   };
@@ -152,11 +152,11 @@ TEST(SimCh4421, PreponedPLIEventsExecuteInRegion) {
   std::vector<std::string> order;
 
   // Simulate a "PLI" event and a "simulation" event both in Preponed.
-  auto* pli_ev = sched.GetEventPool().Acquire();
+  auto *pli_ev = sched.GetEventPool().Acquire();
   pli_ev->callback = [&order]() { order.push_back("pli"); };
   sched.ScheduleEvent({0}, Region::kPreponed, pli_ev);
 
-  auto* sim_ev = sched.GetEventPool().Acquire();
+  auto *sim_ev = sched.GetEventPool().Acquire();
   sim_ev->callback = [&order]() { order.push_back("sim"); };
   sched.ScheduleEvent({0}, Region::kPreponed, sim_ev);
 
@@ -177,7 +177,7 @@ TEST(SimCh4421, PreponedRunsOncePerTimeSlot) {
 
   // Schedule Preponed events at 3 different times.
   for (uint64_t t = 0; t < 3; ++t) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&]() { preponed_count++; };
     sched.ScheduleEvent({t}, Region::kPreponed, ev);
   }
@@ -198,17 +198,17 @@ TEST(SimCh4421, OneStepDelayMechanismViaPreponedRegion) {
   int one_step_sample = -1;
 
   // Time 0: Active sets value = 20, Postponed sees 20.
-  auto* act0 = sched.GetEventPool().Acquire();
+  auto *act0 = sched.GetEventPool().Acquire();
   act0->callback = [&]() { value = 20; };
   sched.ScheduleEvent({0}, Region::kActive, act0);
 
   // Time 1: Preponed (#1step sample) captures value before time-1 starts.
-  auto* prep1 = sched.GetEventPool().Acquire();
+  auto *prep1 = sched.GetEventPool().Acquire();
   prep1->callback = [&]() { one_step_sample = value; };
   sched.ScheduleEvent({1}, Region::kPreponed, prep1);
 
   // Time 1: Active modifies value = 30 (after Preponed already sampled).
-  auto* act1 = sched.GetEventPool().Acquire();
+  auto *act1 = sched.GetEventPool().Acquire();
   act1->callback = [&]() { value = 30; };
   sched.ScheduleEvent({1}, Region::kActive, act1);
 
@@ -227,14 +227,14 @@ TEST(SimCh4421, PreponedNotReExecutedByReactiveToActiveRestart) {
   Scheduler sched(arena);
   int preponed_count = 0;
 
-  auto* prep = sched.GetEventPool().Acquire();
+  auto *prep = sched.GetEventPool().Acquire();
   prep->callback = [&]() { preponed_count++; };
   sched.ScheduleEvent({0}, Region::kPreponed, prep);
 
   // Reactive callback schedules an Active event (triggers restart).
-  auto* reactive = sched.GetEventPool().Acquire();
+  auto *reactive = sched.GetEventPool().Acquire();
   reactive->callback = [&]() {
-    auto* active2 = sched.GetEventPool().Acquire();
+    auto *active2 = sched.GetEventPool().Acquire();
     active2->callback = []() {};
     sched.ScheduleEvent({0}, Region::kActive, active2);
   };
@@ -265,21 +265,21 @@ TEST(SimCh4421, PreponedSeesCorrectStateAcrossMultipleTimeSlots) {
   std::vector<int> preponed_samples;
 
   // Time 0: Active sets value = 10.
-  auto* act0 = sched.GetEventPool().Acquire();
+  auto *act0 = sched.GetEventPool().Acquire();
   act0->callback = [&]() { value = 10; };
   sched.ScheduleEvent({0}, Region::kActive, act0);
 
   // Time 1: Preponed samples, Active sets value = 20.
-  auto* prep1 = sched.GetEventPool().Acquire();
+  auto *prep1 = sched.GetEventPool().Acquire();
   prep1->callback = [&]() { preponed_samples.push_back(value); };
   sched.ScheduleEvent({1}, Region::kPreponed, prep1);
 
-  auto* act1 = sched.GetEventPool().Acquire();
+  auto *act1 = sched.GetEventPool().Acquire();
   act1->callback = [&]() { value = 20; };
   sched.ScheduleEvent({1}, Region::kActive, act1);
 
   // Time 2: Preponed samples.
-  auto* prep2 = sched.GetEventPool().Acquire();
+  auto *prep2 = sched.GetEventPool().Acquire();
   prep2->callback = [&]() { preponed_samples.push_back(value); };
   sched.ScheduleEvent({2}, Region::kPreponed, prep2);
 

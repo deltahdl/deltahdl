@@ -14,8 +14,8 @@ using namespace delta;
 namespace {
 
 struct SpecifyParseTest : ::testing::Test {
- protected:
-  CompilationUnit* Parse(const std::string& src) {
+protected:
+  CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
     parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
@@ -31,28 +31,28 @@ struct SpecifyParseTest : ::testing::Test {
 };
 
 TEST_F(SpecifyParseTest, SpecparamDeclaration) {
-  auto* unit = Parse("module m; specparam tRISE = 10; endmodule");
+  auto *unit = Parse("module m; specparam tRISE = 10; endmodule");
   ASSERT_EQ(unit->modules.size(), 1u);
-  auto& items = unit->modules[0]->items;
+  auto &items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kSpecparam);
   EXPECT_EQ(items[0]->name, "tRISE");
 }
 
 TEST_F(SpecifyParseTest, SpecparamWithRange) {
-  auto* unit = Parse("module m; specparam [31:0] tDELAY = 100; endmodule");
+  auto *unit = Parse("module m; specparam [31:0] tDELAY = 100; endmodule");
   ASSERT_EQ(unit->modules.size(), 1u);
-  auto& items = unit->modules[0]->items;
+  auto &items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kSpecparam);
   EXPECT_EQ(items[0]->name, "tDELAY");
 }
 
 TEST_F(SpecifyParseTest, MultipleSpecparams) {
-  auto* unit =
+  auto *unit =
       Parse("module m; specparam tRISE = 10; specparam tFALL = 12; endmodule");
   ASSERT_EQ(unit->modules.size(), 1u);
-  auto& items = unit->modules[0]->items;
+  auto &items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 2u);
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kSpecparam);
   EXPECT_EQ(items[0]->name, "tRISE");
@@ -60,4 +60,4 @@ TEST_F(SpecifyParseTest, MultipleSpecparams) {
   EXPECT_EQ(items[1]->name, "tFALL");
 }
 
-}  // namespace
+} // namespace

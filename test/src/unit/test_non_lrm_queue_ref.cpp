@@ -1,12 +1,12 @@
 // Non-LRM tests
 
-#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -24,23 +24,23 @@ struct QueueRefFixture {
 // ============================================================================
 // AST helpers
 // ============================================================================
-static Expr* MkIntLit(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
+static Expr *MkIntLit(Arena &arena, uint64_t val) {
+  auto *e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
   e->int_val = val;
   return e;
 }
 
-static Expr* MkIdent(Arena& arena, std::string_view name) {
-  auto* e = arena.Create<Expr>();
+static Expr *MkIdent(Arena &arena, std::string_view name) {
+  auto *e = arena.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
   e->text = name;
   return e;
 }
 
 // Build a[i] (kSelect).
-static Expr* MkSelect(Arena& arena, std::string_view base, uint64_t idx) {
-  auto* e = arena.Create<Expr>();
+static Expr *MkSelect(Arena &arena, std::string_view base, uint64_t idx) {
+  auto *e = arena.Create<Expr>();
   e->kind = ExprKind::kSelect;
   e->base = MkIdent(arena, base);
   e->index = MkIntLit(arena, idx);
@@ -48,23 +48,23 @@ static Expr* MkSelect(Arena& arena, std::string_view base, uint64_t idx) {
 }
 
 // Build a.method(args...) (kCall with kMemberAccess lhs).
-static Expr* MkMethodCall(Arena& arena, std::string_view obj,
-                          std::string_view method, std::vector<Expr*> args) {
-  auto* access = arena.Create<Expr>();
+static Expr *MkMethodCall(Arena &arena, std::string_view obj,
+                          std::string_view method, std::vector<Expr *> args) {
+  auto *access = arena.Create<Expr>();
   access->kind = ExprKind::kMemberAccess;
   access->lhs = MkIdent(arena, obj);
   access->rhs = MkIdent(arena, method);
 
-  auto* call = arena.Create<Expr>();
+  auto *call = arena.Create<Expr>();
   call->kind = ExprKind::kCall;
   call->lhs = access;
   call->args = std::move(args);
   return call;
 }
 
-static Expr* MkCall(Arena& arena, std::string_view callee,
-                    std::vector<Expr*> args) {
-  auto* e = arena.Create<Expr>();
+static Expr *MkCall(Arena &arena, std::string_view callee,
+                    std::vector<Expr *> args) {
+  auto *e = arena.Create<Expr>();
   e->kind = ExprKind::kCall;
   e->callee = callee;
   e->args = std::move(args);
@@ -72,8 +72,8 @@ static Expr* MkCall(Arena& arena, std::string_view callee,
 }
 
 // Build: lhs_name = rhs;
-static Stmt* MkAssign(Arena& arena, std::string_view lhs_name, Expr* rhs) {
-  auto* s = arena.Create<Stmt>();
+static Stmt *MkAssign(Arena &arena, std::string_view lhs_name, Expr *rhs) {
+  auto *s = arena.Create<Stmt>();
   s->kind = StmtKind::kBlockingAssign;
   s->lhs = MkIdent(arena, lhs_name);
   s->rhs = rhs;
@@ -81,15 +81,15 @@ static Stmt* MkAssign(Arena& arena, std::string_view lhs_name, Expr* rhs) {
 }
 
 // Build: expr; (expression statement, e.g. method call).
-static Stmt* MkExprStmt(Arena& arena, Expr* expr) {
-  auto* s = arena.Create<Stmt>();
+static Stmt *MkExprStmt(Arena &arena, Expr *expr) {
+  auto *s = arena.Create<Stmt>();
   s->kind = StmtKind::kExprStmt;
   s->expr = expr;
   return s;
 }
 
-static Stmt* MkReturn(Arena& arena, Expr* expr) {
-  auto* s = arena.Create<Stmt>();
+static Stmt *MkReturn(Arena &arena, Expr *expr) {
+  auto *s = arena.Create<Stmt>();
   s->kind = StmtKind::kReturn;
   s->expr = expr;
   return s;
@@ -98,9 +98,9 @@ static Stmt* MkReturn(Arena& arena, Expr* expr) {
 // ============================================================================
 // Queue helper: populate a queue with integer values.
 // ============================================================================
-static QueueObject* MakeQueue(QueueRefFixture& f, std::string_view name,
-                              const std::vector<uint64_t>& vals) {
-  auto* q = f.ctx.CreateQueue(name, 32);
+static QueueObject *MakeQueue(QueueRefFixture &f, std::string_view name,
+                              const std::vector<uint64_t> &vals) {
+  auto *q = f.ctx.CreateQueue(name, 32);
   for (auto v : vals) {
     q->elements.push_back(MakeLogic4VecVal(f.arena, 32, v));
   }
@@ -109,10 +109,10 @@ static QueueObject* MakeQueue(QueueRefFixture& f, std::string_view name,
 }
 
 // Register an automatic void function with given args and body.
-static void RegAutoFunc(QueueRefFixture& f, std::string_view name,
+static void RegAutoFunc(QueueRefFixture &f, std::string_view name,
                         std::vector<FunctionArg> args,
-                        std::vector<Stmt*> body) {
-  auto* func = f.arena.Create<ModuleItem>();
+                        std::vector<Stmt *> body) {
+  auto *func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = name;
   func->is_automatic = true;
@@ -130,13 +130,13 @@ namespace {
 // Pass q[1] by ref, set v = 99, verify q[1] == 99.
 TEST(QueueRef, BasicRefWriteback) {
   QueueRefFixture f;
-  auto* q = MakeQueue(f, "q", {10, 20, 30});
+  auto *q = MakeQueue(f, "q", {10, 20, 30});
 
   // function automatic void set_val(ref int v); v = 99; endfunction
   RegAutoFunc(f, "set_val", {{Direction::kRef, false, {}, "v", nullptr, {}}},
               {MkAssign(f.arena, "v", MkIntLit(f.arena, 99))});
 
-  auto* call = MkCall(f.arena, "set_val", {MkSelect(f.arena, "q", 1)});
+  auto *call = MkCall(f.arena, "set_val", {MkSelect(f.arena, "q", 1)});
   EvalExpr(call, f.ctx, f.arena);
 
   EXPECT_EQ(q->elements[1].ToUint64(), 99u);
@@ -148,7 +148,7 @@ TEST(QueueRef, RefReadsCurrentValue) {
   MakeQueue(f, "q", {10, 20, 30});
 
   // function automatic int read_ref(ref int v); return v; endfunction
-  auto* func = f.arena.Create<ModuleItem>();
+  auto *func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "read_ref";
   func->is_automatic = true;
@@ -156,7 +156,7 @@ TEST(QueueRef, RefReadsCurrentValue) {
   func->func_body_stmts = {MkReturn(f.arena, MkIdent(f.arena, "v"))};
   f.ctx.RegisterFunction("read_ref", func);
 
-  auto* call = MkCall(f.arena, "read_ref", {MkSelect(f.arena, "q", 1)});
+  auto *call = MkCall(f.arena, "read_ref", {MkSelect(f.arena, "q", 1)});
   EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 20u);
 }
 
@@ -167,7 +167,7 @@ TEST(QueueRef, RefReadsCurrentValue) {
 // Write 99 to ref — should NOT propagate back.
 TEST(QueueRef, OutdatedByDelete) {
   QueueRefFixture f;
-  auto* q = MakeQueue(f, "q", {10, 20, 30});
+  auto *q = MakeQueue(f, "q", {10, 20, 30});
 
   // function automatic void test_fn(ref int v);
   //   q.delete(1);
@@ -178,7 +178,7 @@ TEST(QueueRef, OutdatedByDelete) {
                                                 {MkIntLit(f.arena, 1)})),
                MkAssign(f.arena, "v", MkIntLit(f.arena, 99))});
 
-  auto* call = MkCall(f.arena, "test_fn", {MkSelect(f.arena, "q", 1)});
+  auto *call = MkCall(f.arena, "test_fn", {MkSelect(f.arena, "q", 1)});
   EvalExpr(call, f.ctx, f.arena);
 
   // q now has {10, 30}. Element 20 was deleted → ref is outdated.
@@ -191,7 +191,7 @@ TEST(QueueRef, OutdatedByDelete) {
 // Ref outdated by whole-queue assignment.
 TEST(QueueRef, OutdatedByWholeAssign) {
   QueueRefFixture f;
-  auto* q = MakeQueue(f, "q", {10, 20, 30});
+  auto *q = MakeQueue(f, "q", {10, 20, 30});
 
   // function automatic void test_fn(ref int v);
   //   q = '{100, 200};   // whole-queue assignment
@@ -210,7 +210,7 @@ TEST(QueueRef, OutdatedByWholeAssign) {
                                                 {MkIntLit(f.arena, 200)})),
                MkAssign(f.arena, "v", MkIntLit(f.arena, 99))});
 
-  auto* call = MkCall(f.arena, "test_fn", {MkSelect(f.arena, "q", 1)});
+  auto *call = MkCall(f.arena, "test_fn", {MkSelect(f.arena, "q", 1)});
   EvalExpr(call, f.ctx, f.arena);
 
   // q now has {100, 200}. All original IDs are gone → ref is outdated.
@@ -222,7 +222,7 @@ TEST(QueueRef, OutdatedByWholeAssign) {
 // Ref survives push_back: push_back never outdates refs.
 TEST(QueueRef, SurvivesPushBack) {
   QueueRefFixture f;
-  auto* q = MakeQueue(f, "q", {10, 20, 30});
+  auto *q = MakeQueue(f, "q", {10, 20, 30});
 
   // function automatic void test_fn(ref int v);
   //   q.push_back(40);
@@ -233,7 +233,7 @@ TEST(QueueRef, SurvivesPushBack) {
                                                 {MkIntLit(f.arena, 40)})),
                MkAssign(f.arena, "v", MkIntLit(f.arena, 99))});
 
-  auto* call = MkCall(f.arena, "test_fn", {MkSelect(f.arena, "q", 1)});
+  auto *call = MkCall(f.arena, "test_fn", {MkSelect(f.arena, "q", 1)});
   EvalExpr(call, f.ctx, f.arena);
 
   // q now has {10, 99, 30, 40}. q[1] should be 99 (ref survived push_back).
@@ -244,7 +244,7 @@ TEST(QueueRef, SurvivesPushBack) {
 // Ref survives push_front: push_front shifts indices but ref tracks element.
 TEST(QueueRef, SurvivesPushFront) {
   QueueRefFixture f;
-  auto* q = MakeQueue(f, "q", {10, 20, 30});
+  auto *q = MakeQueue(f, "q", {10, 20, 30});
 
   // function automatic void test_fn(ref int v);
   //   q.push_front(5);   // q[1] (val=20) shifts to q[2]
@@ -255,7 +255,7 @@ TEST(QueueRef, SurvivesPushFront) {
                                                 {MkIntLit(f.arena, 5)})),
                MkAssign(f.arena, "v", MkIntLit(f.arena, 99))});
 
-  auto* call = MkCall(f.arena, "test_fn", {MkSelect(f.arena, "q", 1)});
+  auto *call = MkCall(f.arena, "test_fn", {MkSelect(f.arena, "q", 1)});
   EvalExpr(call, f.ctx, f.arena);
 
   // q now has {5, 10, 99, 30}. Original q[1] (val=20) shifted to index 2.
@@ -270,7 +270,7 @@ TEST(QueueRef, SurvivesPushFront) {
 // Ref outdated by pop_front when the ref points to element 0.
 TEST(QueueRef, OutdatedByPopFront) {
   QueueRefFixture f;
-  auto* q = MakeQueue(f, "q", {10, 20, 30});
+  auto *q = MakeQueue(f, "q", {10, 20, 30});
 
   // function automatic void test_fn(ref int v);
   //   q.pop_front();   // removes q[0] (the bound element)
@@ -280,7 +280,7 @@ TEST(QueueRef, OutdatedByPopFront) {
               {MkExprStmt(f.arena, MkMethodCall(f.arena, "q", "pop_front", {})),
                MkAssign(f.arena, "v", MkIntLit(f.arena, 99))});
 
-  auto* call = MkCall(f.arena, "test_fn", {MkSelect(f.arena, "q", 0)});
+  auto *call = MkCall(f.arena, "test_fn", {MkSelect(f.arena, "q", 0)});
   EvalExpr(call, f.ctx, f.arena);
 
   // q now has {20, 30}. Element 10 was popped → ref is outdated.
@@ -296,7 +296,7 @@ TEST(QueueRef, OutdatedByPopFront) {
 TEST(QueueRef, RejectRefInStaticFunc) {
   QueueRefFixture f;
 
-  auto* func = f.arena.Create<ModuleItem>();
+  auto *func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "bad_func";
   func->is_static = true;
@@ -311,7 +311,7 @@ TEST(QueueRef, RejectRefInStaticFunc) {
 TEST(QueueRef, AcceptRefInAutoFunc) {
   QueueRefFixture f;
 
-  auto* func = f.arena.Create<ModuleItem>();
+  auto *func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "good_func";
   func->is_automatic = true;
@@ -328,11 +328,11 @@ TEST(QueueRef, AcceptRefInAutoFunc) {
 // and fall back to pass-by-value (write does not propagate).
 TEST(QueueRef, WidthMismatchFallsBackToValue) {
   QueueRefFixture f;
-  auto* q = MakeQueue(f, "q", {10, 20, 30});
+  auto *q = MakeQueue(f, "q", {10, 20, 30});
 
   // function automatic void set_val(ref shortint v); v = 99; endfunction
   // shortint = 16-bit, queue elements are 32-bit.
-  auto* func = f.arena.Create<ModuleItem>();
+  auto *func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "set_val16";
   func->is_automatic = true;
@@ -345,7 +345,7 @@ TEST(QueueRef, WidthMismatchFallsBackToValue) {
   func->func_body_stmts = {MkAssign(f.arena, "v", MkIntLit(f.arena, 99))};
   f.ctx.RegisterFunction("set_val16", func);
 
-  auto* call = MkCall(f.arena, "set_val16", {MkSelect(f.arena, "q", 1)});
+  auto *call = MkCall(f.arena, "set_val16", {MkSelect(f.arena, "q", 1)});
   EvalExpr(call, f.ctx, f.arena);
 
   // Width mismatch → ref binding rejected → falls back to value.
@@ -353,4 +353,4 @@ TEST(QueueRef, WidthMismatchFallsBackToValue) {
   EXPECT_EQ(q->elements[1].ToUint64(), 20u);
 }
 
-}  // namespace
+} // namespace

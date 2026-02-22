@@ -9,7 +9,7 @@
 
 using namespace delta;
 
-static bool ParseOk(const std::string& src) {
+static bool ParseOk(const std::string &src) {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);
@@ -24,17 +24,15 @@ static bool ParseOk(const std::string& src) {
 }
 
 TEST(ParserSection22, ResetallDirective) {
-  EXPECT_TRUE(
-      ParseOk("`resetall\n"
-              "module t;\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("`resetall\n"
+                      "module t;\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserSection22, ResetallBeforeMultipleModules) {
-  EXPECT_TRUE(
-      ParseOk("`resetall\n"
-              "module m1;\n"
-              "endmodule\n"
-              "module m2;\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("`resetall\n"
+                      "module m1;\n"
+                      "endmodule\n"
+                      "module m2;\n"
+                      "endmodule\n"));
 }

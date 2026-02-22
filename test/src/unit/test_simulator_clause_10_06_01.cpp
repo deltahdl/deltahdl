@@ -1,8 +1,5 @@
 // §10.6.1: The assign and deassign procedural statements
 
-#include <gtest/gtest.h>
-#include <cstdint>
-#include <string_view>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -16,6 +13,9 @@
 #include "simulation/stmt_exec.h"
 #include "simulation/stmt_result.h"
 #include "simulation/variable.h"
+#include <cstdint>
+#include <gtest/gtest.h>
+#include <string_view>
 
 using namespace delta;
 
@@ -29,25 +29,25 @@ struct StmtFixture {
 };
 
 // Helper to create a simple identifier expression.
-Expr* MakeIdent(Arena& arena, std::string_view name) {
-  auto* e = arena.Create<Expr>();
+Expr *MakeIdent(Arena &arena, std::string_view name) {
+  auto *e = arena.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
   e->text = name;
   return e;
 }
 
 // Helper to create an integer literal expression.
-Expr* MakeIntLit(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
+Expr *MakeIntLit(Arena &arena, uint64_t val) {
+  auto *e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
   e->int_val = val;
   return e;
 }
 
 // Helper to create a blocking assignment statement: lhs = rhs_val.
-Stmt* MakeBlockAssign(Arena& arena, std::string_view lhs_name,
+Stmt *MakeBlockAssign(Arena &arena, std::string_view lhs_name,
                       uint64_t rhs_val) {
-  auto* s = arena.Create<Stmt>();
+  auto *s = arena.Create<Stmt>();
   s->kind = StmtKind::kBlockingAssign;
   s->lhs = MakeIdent(arena, lhs_name);
   s->rhs = MakeIntLit(arena, rhs_val);
@@ -59,14 +59,14 @@ struct DriverResult {
   StmtResult value = StmtResult::kDone;
 };
 
-SimCoroutine DriverCoroutine(const Stmt* stmt, SimContext& ctx, Arena& arena,
-                             DriverResult* out) {
+SimCoroutine DriverCoroutine(const Stmt *stmt, SimContext &ctx, Arena &arena,
+                             DriverResult *out) {
   out->value = co_await ExecStmt(stmt, ctx, arena);
 }
 
 // Helper to run ExecStmt synchronously (for non-suspending statements).
 // Creates a wrapper coroutine, resumes it, and returns the result.
-StmtResult RunStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+StmtResult RunStmt(const Stmt *stmt, SimContext &ctx, Arena &arena) {
   DriverResult result;
   auto coro = DriverCoroutine(stmt, ctx, arena, &result);
   coro.Resume();
@@ -79,10 +79,10 @@ namespace {
 // =============================================================================
 TEST(StmtExec, ProceduralAssignSetsValue) {
   StmtFixture f;
-  auto* var = f.ctx.CreateVariable("a", 32);
+  auto *var = f.ctx.CreateVariable("a", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  auto* stmt = f.arena.Create<Stmt>();
+  auto *stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kAssign;
   stmt->lhs = MakeIdent(f.arena, "a");
   stmt->rhs = MakeIntLit(f.arena, 77);
@@ -94,12 +94,12 @@ TEST(StmtExec, ProceduralAssignSetsValue) {
 
 TEST(StmtExec, DeassignReleasesProceduralAssign) {
   StmtFixture f;
-  auto* var = f.ctx.CreateVariable("b", 32);
+  auto *var = f.ctx.CreateVariable("b", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 50);
   var->is_forced = true;
   var->forced_value = MakeLogic4VecVal(f.arena, 32, 50);
 
-  auto* stmt = f.arena.Create<Stmt>();
+  auto *stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kDeassign;
   stmt->lhs = MakeIdent(f.arena, "b");
 
@@ -109,7 +109,7 @@ TEST(StmtExec, DeassignReleasesProceduralAssign) {
 
 TEST(StmtExec, DeassignNullLhsNoOp) {
   StmtFixture f;
-  auto* stmt = f.arena.Create<Stmt>();
+  auto *stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kDeassign;
   stmt->lhs = nullptr;
 
@@ -122,11 +122,11 @@ TEST(StmtExec, DeassignNullLhsNoOp) {
 // =============================================================================
 TEST(StmtExec, AssignDeassignBlockingAssign) {
   StmtFixture f;
-  auto* var = f.ctx.CreateVariable("adb", 32);
+  auto *var = f.ctx.CreateVariable("adb", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
   // assign adb = 33;
-  auto* assign_stmt = f.arena.Create<Stmt>();
+  auto *assign_stmt = f.arena.Create<Stmt>();
   assign_stmt->kind = StmtKind::kAssign;
   assign_stmt->lhs = MakeIdent(f.arena, "adb");
   assign_stmt->rhs = MakeIntLit(f.arena, 33);
@@ -135,16 +135,16 @@ TEST(StmtExec, AssignDeassignBlockingAssign) {
   EXPECT_TRUE(var->is_forced);
 
   // deassign adb;
-  auto* deassign_stmt = f.arena.Create<Stmt>();
+  auto *deassign_stmt = f.arena.Create<Stmt>();
   deassign_stmt->kind = StmtKind::kDeassign;
   deassign_stmt->lhs = MakeIdent(f.arena, "adb");
   RunStmt(deassign_stmt, f.ctx, f.arena);
   EXPECT_FALSE(var->is_forced);
 
   // adb = 44;
-  auto* blocking_stmt = MakeBlockAssign(f.arena, "adb", 44);
+  auto *blocking_stmt = MakeBlockAssign(f.arena, "adb", 44);
   RunStmt(blocking_stmt, f.ctx, f.arena);
   EXPECT_EQ(var->value.ToUint64(), 44u);
 }
 
-}  // namespace
+} // namespace

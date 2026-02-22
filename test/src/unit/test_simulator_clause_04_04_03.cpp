@@ -118,8 +118,8 @@ TEST(SimCh443, PreActiveExecutesBetweenPreponedAndActive) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
+  auto schedule = [&](Region r, const std::string &label) {
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, label]() { order.push_back(label); };
     sched.ScheduleEvent({0}, r, ev);
   };
@@ -144,8 +144,8 @@ TEST(SimCh443, PreNBAExecutesBetweenInactiveAndNBA) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
+  auto schedule = [&](Region r, const std::string &label) {
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, label]() { order.push_back(label); };
     sched.ScheduleEvent({0}, r, ev);
   };
@@ -170,8 +170,8 @@ TEST(SimCh443, PostNBAExecutesAfterNBA) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
+  auto schedule = [&](Region r, const std::string &label) {
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, label]() { order.push_back(label); };
     sched.ScheduleEvent({0}, r, ev);
   };
@@ -195,8 +195,8 @@ TEST(SimCh443, PreObservedExecutesBetweenPostNBAAndObserved) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
+  auto schedule = [&](Region r, const std::string &label) {
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, label]() { order.push_back(label); };
     sched.ScheduleEvent({0}, r, ev);
   };
@@ -222,8 +222,8 @@ TEST(SimCh443, PostObservedExecutesBetweenObservedAndReactive) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
+  auto schedule = [&](Region r, const std::string &label) {
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, label]() { order.push_back(label); };
     sched.ScheduleEvent({0}, r, ev);
   };
@@ -249,8 +249,8 @@ TEST(SimCh443, PreReNBAExecutesBetweenReInactiveAndReNBA) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
+  auto schedule = [&](Region r, const std::string &label) {
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, label]() { order.push_back(label); };
     sched.ScheduleEvent({0}, r, ev);
   };
@@ -276,8 +276,8 @@ TEST(SimCh443, PostReNBAExecutesBetweenReNBAAndPrePostponed) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
+  auto schedule = [&](Region r, const std::string &label) {
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, label]() { order.push_back(label); };
     sched.ScheduleEvent({0}, r, ev);
   };
@@ -302,8 +302,8 @@ TEST(SimCh443, PrePostponedExecutesBeforePostponed) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
+  auto schedule = [&](Region r, const std::string &label) {
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, label]() { order.push_back(label); };
     sched.ScheduleEvent({0}, r, ev);
   };
@@ -327,8 +327,8 @@ TEST(SimCh443, FullPLIRegionOrderingPerFigure41) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
+  auto schedule = [&](Region r, const std::string &label) {
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, label]() { order.push_back(label); };
     sched.ScheduleEvent({0}, r, ev);
   };
@@ -371,8 +371,8 @@ TEST(SimCh443, PLIRegionsExecuteAcrossMultipleTimeSlots) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](uint64_t t, Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
+  auto schedule = [&](uint64_t t, Region r, const std::string &label) {
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, label]() { order.push_back(label); };
     sched.ScheduleEvent({t}, r, ev);
   };
@@ -405,10 +405,10 @@ TEST(SimCh443, PLICallbackSchedulesIntoSimulationRegion) {
   std::vector<std::string> order;
 
   // Pre-Active callback schedules an Active event.
-  auto* pli_ev = sched.GetEventPool().Acquire();
+  auto *pli_ev = sched.GetEventPool().Acquire();
   pli_ev->callback = [&]() {
     order.push_back("pre_active");
-    auto* active_ev = sched.GetEventPool().Acquire();
+    auto *active_ev = sched.GetEventPool().Acquire();
     active_ev->callback = [&order]() { order.push_back("active_from_pli"); };
     sched.ScheduleEvent({0}, Region::kActive, active_ev);
   };

@@ -1,11 +1,11 @@
 // §8.13: Inheritance and subclasses
 
-#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -23,10 +23,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult Parse(const std::string& src) {
+static ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -37,13 +37,13 @@ static ParseResult Parse(const std::string& src) {
 }
 
 struct StructMemberExpected {
-  const char* name;
+  const char *name;
   DataTypeKind type_kind;
 };
 
 struct ModportPortExpected {
   Direction dir;
-  const char* name;
+  const char *name;
 };
 
 namespace {
@@ -51,9 +51,9 @@ namespace {
 TEST(Parser, ClassExtends) {
   auto r = Parse("class child extends parent; endclass");
   ASSERT_NE(r.cu, nullptr);
-  auto* cls = r.cu->classes[0];
+  auto *cls = r.cu->classes[0];
   EXPECT_EQ(cls->name, "child");
   EXPECT_EQ(cls->base_class, "parent");
 }
 
-}  // namespace
+} // namespace

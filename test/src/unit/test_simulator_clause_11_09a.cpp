@@ -1,14 +1,14 @@
 // §11.9: Tagged union expressions and member access
 
-#include <gtest/gtest.h>
-#include <cstring>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"  // StructTypeInfo, StructFieldInfo
+#include "simulation/sim_context.h" // StructTypeInfo, StructFieldInfo
+#include <cstring>
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -21,23 +21,23 @@ struct EvalAdvFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static Expr* MakeInt(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
+static Expr *MakeInt(Arena &arena, uint64_t val) {
+  auto *e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
   e->int_val = val;
   return e;
 }
 
-static Expr* MakeId(Arena& arena, std::string_view name) {
-  auto* e = arena.Create<Expr>();
+static Expr *MakeId(Arena &arena, std::string_view name) {
+  auto *e = arena.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
   e->text = name;
   return e;
 }
 
-static Variable* MakeVar(EvalAdvFixture& f, std::string_view name,
+static Variable *MakeVar(EvalAdvFixture &f, std::string_view name,
                          uint32_t width, uint64_t val) {
-  auto* var = f.ctx.CreateVariable(name, width);
+  auto *var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4VecVal(f.arena, width, val);
   return var;
 }
@@ -65,7 +65,7 @@ TEST(EvalAdv, TaggedUnionMismatchReturnsX) {
   f.ctx.SetVariableTag("u", "a");
 
   // Access u.a — tag matches, should return 0x42.
-  auto* access_a = f.arena.Create<Expr>();
+  auto *access_a = f.arena.Create<Expr>();
   access_a->kind = ExprKind::kMemberAccess;
   access_a->lhs = MakeId(f.arena, "u");
   access_a->rhs = MakeId(f.arena, "a");
@@ -73,7 +73,7 @@ TEST(EvalAdv, TaggedUnionMismatchReturnsX) {
   EXPECT_EQ(result_a.ToUint64(), 0x42u);
 
   // Access u.b — tag mismatch (active tag is "a"), should return X.
-  auto* access_b = f.arena.Create<Expr>();
+  auto *access_b = f.arena.Create<Expr>();
   access_b->kind = ExprKind::kMemberAccess;
   access_b->lhs = MakeId(f.arena, "u");
   access_b->rhs = MakeId(f.arena, "b");
@@ -97,7 +97,7 @@ TEST(EvalAdv, TaggedUnionNoTagSetAccessesNormally) {
   MakeVar(f, "v", 8, 0xFF);
   f.ctx.SetVariableStructType("v", "simple_u");
   // No tag set — access v.x should return the value normally.
-  auto* access_x = f.arena.Create<Expr>();
+  auto *access_x = f.arena.Create<Expr>();
   access_x->kind = ExprKind::kMemberAccess;
   access_x->lhs = MakeId(f.arena, "v");
   access_x->rhs = MakeId(f.arena, "x");
@@ -111,9 +111,9 @@ TEST(EvalAdv, TaggedUnionNoTagSetAccessesNormally) {
 TEST(EvalAdv, TaggedExprWithValue) {
   EvalAdvFixture f;
   // tagged Valid 42 → evaluates to 42.
-  auto* tagged = f.arena.Create<Expr>();
+  auto *tagged = f.arena.Create<Expr>();
   tagged->kind = ExprKind::kTagged;
-  auto* member = f.arena.Create<Expr>();
+  auto *member = f.arena.Create<Expr>();
   member->kind = ExprKind::kIdentifier;
   member->text = "Valid";
   tagged->rhs = member;
@@ -125,9 +125,9 @@ TEST(EvalAdv, TaggedExprWithValue) {
 TEST(EvalAdv, TaggedExprVoidMember) {
   EvalAdvFixture f;
   // tagged Invalid (void member, no value) → 0.
-  auto* tagged = f.arena.Create<Expr>();
+  auto *tagged = f.arena.Create<Expr>();
   tagged->kind = ExprKind::kTagged;
-  auto* member = f.arena.Create<Expr>();
+  auto *member = f.arena.Create<Expr>();
   member->kind = ExprKind::kIdentifier;
   member->text = "Invalid";
   tagged->rhs = member;
@@ -136,4 +136,4 @@ TEST(EvalAdv, TaggedExprVoidMember) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-}  // namespace
+} // namespace

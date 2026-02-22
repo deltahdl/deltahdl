@@ -38,26 +38,28 @@ struct SimCh43Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign* ElaborateSrc43(const std::string& src, SimCh43Fixture& f) {
+static RtlirDesign *ElaborateSrc43(const std::string &src, SimCh43Fixture &f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
+  auto *cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-static uint64_t RunAndGet43(const std::string& src, const char* var_name) {
+static uint64_t RunAndGet43(const std::string &src, const char *var_name) {
   SimCh43Fixture f;
-  auto* design = ElaborateSrc43(src, f);
+  auto *design = ElaborateSrc43(src, f);
   EXPECT_NE(design, nullptr);
-  if (!design) return 0;
+  if (!design)
+    return 0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* var = f.ctx.FindVariable(var_name);
+  auto *var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
-  if (!var) return 0;
+  if (!var)
+    return 0;
   return var->value.ToUint64();
 }
 
@@ -66,12 +68,11 @@ static uint64_t RunAndGet43(const std::string& src, const char* var_name) {
 // has state, and produces output.
 // ---------------------------------------------------------------------------
 TEST(SimCh43, InitialProcedureIsProcess) {
-  auto result = RunAndGet43(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'd42;\n"
-      "endmodule\n",
-      "x");
+  auto result = RunAndGet43("module t;\n"
+                            "  logic [7:0] x;\n"
+                            "  initial x = 8'd42;\n"
+                            "endmodule\n",
+                            "x");
   EXPECT_EQ(result, 42u);
 }
 
@@ -80,13 +81,12 @@ TEST(SimCh43, InitialProcedureIsProcess) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, AlwaysCombIsProcess) {
   SimCh43Fixture f;
-  auto* design = ElaborateSrc43(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial a = 8'd5;\n"
-      "  always_comb b = a + 8'd1;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc43("module t;\n"
+                                "  logic [7:0] a, b;\n"
+                                "  initial a = 8'd5;\n"
+                                "  always_comb b = a + 8'd1;\n"
+                                "endmodule\n",
+                                f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -99,17 +99,16 @@ TEST(SimCh43, AlwaysCombIsProcess) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, AlwaysLatchIsProcess) {
   SimCh43Fixture f;
-  auto* design = ElaborateSrc43(
-      "module t;\n"
-      "  logic [7:0] d, q;\n"
-      "  logic en;\n"
-      "  initial begin\n"
-      "    en = 1;\n"
-      "    d = 8'd99;\n"
-      "  end\n"
-      "  always_latch if (en) q = d;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc43("module t;\n"
+                                "  logic [7:0] d, q;\n"
+                                "  logic en;\n"
+                                "  initial begin\n"
+                                "    en = 1;\n"
+                                "    d = 8'd99;\n"
+                                "  end\n"
+                                "  always_latch if (en) q = d;\n"
+                                "endmodule\n",
+                                f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -122,18 +121,17 @@ TEST(SimCh43, AlwaysLatchIsProcess) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, AlwaysFFIsProcess) {
   SimCh43Fixture f;
-  auto* design = ElaborateSrc43(
-      "module t;\n"
-      "  logic clk;\n"
-      "  logic [7:0] d, q;\n"
-      "  initial begin\n"
-      "    clk = 0;\n"
-      "    d = 8'd55;\n"
-      "    #5 clk = 1;\n"
-      "  end\n"
-      "  always_ff @(posedge clk) q <= d;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc43("module t;\n"
+                                "  logic clk;\n"
+                                "  logic [7:0] d, q;\n"
+                                "  initial begin\n"
+                                "    clk = 0;\n"
+                                "    d = 8'd55;\n"
+                                "    #5 clk = 1;\n"
+                                "  end\n"
+                                "  always_ff @(posedge clk) q <= d;\n"
+                                "endmodule\n",
+                                f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -146,13 +144,12 @@ TEST(SimCh43, AlwaysFFIsProcess) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, ContinuousAssignIsProcess) {
   SimCh43Fixture f;
-  auto* design = ElaborateSrc43(
-      "module t;\n"
-      "  logic [7:0] src, dst;\n"
-      "  assign dst = src;\n"
-      "  initial src = 8'd33;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc43("module t;\n"
+                                "  logic [7:0] src, dst;\n"
+                                "  assign dst = src;\n"
+                                "  initial src = 8'd33;\n"
+                                "endmodule\n",
+                                f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -165,15 +162,14 @@ TEST(SimCh43, ContinuousAssignIsProcess) {
 // sequentially within the process.
 // ---------------------------------------------------------------------------
 TEST(SimCh43, ProceduralAssignmentInProcess) {
-  auto result = RunAndGet43(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd10;\n"
-      "    x = x + 8'd5;\n"
-      "  end\n"
-      "endmodule\n",
-      "x");
+  auto result = RunAndGet43("module t;\n"
+                            "  logic [7:0] x;\n"
+                            "  initial begin\n"
+                            "    x = 8'd10;\n"
+                            "    x = x + 8'd5;\n"
+                            "  end\n"
+                            "endmodule\n",
+                            "x");
   EXPECT_EQ(result, 15u);
 }
 
@@ -183,13 +179,12 @@ TEST(SimCh43, ProceduralAssignmentInProcess) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, BlockingAssignCreatesUpdateEvent) {
   SimCh43Fixture f;
-  auto* design = ElaborateSrc43(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial a = 8'd7;\n"
-      "  always_comb b = a * 8'd3;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc43("module t;\n"
+                                "  logic [7:0] a, b;\n"
+                                "  initial a = 8'd7;\n"
+                                "  always_comb b = a * 8'd3;\n"
+                                "endmodule\n",
+                                f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -203,14 +198,13 @@ TEST(SimCh43, BlockingAssignCreatesUpdateEvent) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, NonBlockingAssignCreatesUpdateEvent) {
   SimCh43Fixture f;
-  auto* design = ElaborateSrc43(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x <= 8'd88;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc43("module t;\n"
+                                "  logic [7:0] x;\n"
+                                "  initial begin\n"
+                                "    x <= 8'd88;\n"
+                                "  end\n"
+                                "endmodule\n",
+                                f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -223,14 +217,13 @@ TEST(SimCh43, NonBlockingAssignCreatesUpdateEvent) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, ContinuousAssignUpdateEvent) {
   SimCh43Fixture f;
-  auto* design = ElaborateSrc43(
-      "module t;\n"
-      "  logic [7:0] a, b, c;\n"
-      "  initial a = 8'd4;\n"
-      "  assign b = a + 8'd1;\n"
-      "  assign c = b + 8'd1;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc43("module t;\n"
+                                "  logic [7:0] a, b, c;\n"
+                                "  initial a = 8'd4;\n"
+                                "  assign b = a + 8'd1;\n"
+                                "  assign c = b + 8'd1;\n"
+                                "endmodule\n",
+                                f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -245,16 +238,15 @@ TEST(SimCh43, ContinuousAssignUpdateEvent) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, EvaluationEventOnInputChange) {
   SimCh43Fixture f;
-  auto* design = ElaborateSrc43(
-      "module t;\n"
-      "  logic [7:0] a, result;\n"
-      "  initial begin\n"
-      "    a = 8'd1;\n"
-      "    #5 a = 8'd10;\n"
-      "  end\n"
-      "  always_comb result = a + 8'd100;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc43("module t;\n"
+                                "  logic [7:0] a, result;\n"
+                                "  initial begin\n"
+                                "    a = 8'd1;\n"
+                                "    #5 a = 8'd10;\n"
+                                "  end\n"
+                                "  always_comb result = a + 8'd100;\n"
+                                "endmodule\n",
+                                f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -268,14 +260,13 @@ TEST(SimCh43, EvaluationEventOnInputChange) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, MultipleProcessesSensitiveToSameEvent) {
   SimCh43Fixture f;
-  auto* design = ElaborateSrc43(
-      "module t;\n"
-      "  logic [7:0] src, r1, r2;\n"
-      "  initial src = 8'd5;\n"
-      "  always_comb r1 = src + 8'd1;\n"
-      "  always_comb r2 = src + 8'd2;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc43("module t;\n"
+                                "  logic [7:0] src, r1, r2;\n"
+                                "  initial src = 8'd5;\n"
+                                "  always_comb r1 = src + 8'd1;\n"
+                                "  always_comb r2 = src + 8'd2;\n"
+                                "endmodule\n",
+                                f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -290,14 +281,13 @@ TEST(SimCh43, MultipleProcessesSensitiveToSameEvent) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, MixedProcessTypesSensitiveToSameVariable) {
   SimCh43Fixture f;
-  auto* design = ElaborateSrc43(
-      "module t;\n"
-      "  logic [7:0] src, via_assign, via_comb;\n"
-      "  initial src = 8'd10;\n"
-      "  assign via_assign = src * 8'd2;\n"
-      "  always_comb via_comb = src * 8'd3;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc43("module t;\n"
+                                "  logic [7:0] src, via_assign, via_comb;\n"
+                                "  initial src = 8'd10;\n"
+                                "  assign via_assign = src * 8'd2;\n"
+                                "  always_comb via_comb = src * 8'd3;\n"
+                                "endmodule\n",
+                                f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -319,12 +309,11 @@ TEST(SimCh43, SimulationTimeStartsAtZero) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, NoDelayExecutesAtTimeZero) {
   SimCh43Fixture f;
-  auto* design = ElaborateSrc43(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'd1;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc43("module t;\n"
+                                "  logic [7:0] x;\n"
+                                "  initial x = 8'd1;\n"
+                                "endmodule\n",
+                                f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -337,15 +326,14 @@ TEST(SimCh43, NoDelayExecutesAtTimeZero) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, DelayAdvancesSimulationTime) {
   SimCh43Fixture f;
-  auto* design = ElaborateSrc43(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    #10 x = 8'd1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc43("module t;\n"
+                                "  logic [7:0] x;\n"
+                                "  initial begin\n"
+                                "    x = 8'd0;\n"
+                                "    #10 x = 8'd1;\n"
+                                "  end\n"
+                                "endmodule\n",
+                                f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -357,17 +345,16 @@ TEST(SimCh43, DelayAdvancesSimulationTime) {
 // §4.3 Simulation time: multiple delays accumulate correctly.
 // ---------------------------------------------------------------------------
 TEST(SimCh43, MultipleDelaysAccumulate) {
-  auto result = RunAndGet43(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    #5 x = 8'd1;\n"
-      "    #5 x = 8'd2;\n"
-      "    #5 x = 8'd3;\n"
-      "  end\n"
-      "endmodule\n",
-      "x");
+  auto result = RunAndGet43("module t;\n"
+                            "  logic [7:0] x;\n"
+                            "  initial begin\n"
+                            "    x = 8'd0;\n"
+                            "    #5 x = 8'd1;\n"
+                            "    #5 x = 8'd2;\n"
+                            "    #5 x = 8'd3;\n"
+                            "  end\n"
+                            "endmodule\n",
+                            "x");
   EXPECT_EQ(result, 3u);
 }
 
@@ -377,17 +364,16 @@ TEST(SimCh43, MultipleDelaysAccumulate) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, EventsExecuteInChronologicalOrder) {
   SimCh43Fixture f;
-  auto* design = ElaborateSrc43(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial begin\n"
-      "    #10 a = 8'd10;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    #5 b = 8'd5;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc43("module t;\n"
+                                "  logic [7:0] a, b;\n"
+                                "  initial begin\n"
+                                "    #10 a = 8'd10;\n"
+                                "  end\n"
+                                "  initial begin\n"
+                                "    #5 b = 8'd5;\n"
+                                "  end\n"
+                                "endmodule\n",
+                                f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -403,15 +389,14 @@ TEST(SimCh43, EventsExecuteInChronologicalOrder) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, ActiveRegionBeforeNBARegion) {
   SimCh43Fixture f;
-  auto* design = ElaborateSrc43(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial begin\n"
-      "    a = 8'd1;\n"
-      "    b <= 8'd2;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc43("module t;\n"
+                                "  logic [7:0] a, b;\n"
+                                "  initial begin\n"
+                                "    a = 8'd1;\n"
+                                "    b <= 8'd2;\n"
+                                "  end\n"
+                                "endmodule\n",
+                                f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -427,15 +412,14 @@ TEST(SimCh43, ActiveRegionBeforeNBARegion) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, NBAUpdateVisibleAfterActiveRegion) {
   SimCh43Fixture f;
-  auto* design = ElaborateSrc43(
-      "module t;\n"
-      "  logic [7:0] x, y;\n"
-      "  initial begin\n"
-      "    x <= 8'd50;\n"
-      "  end\n"
-      "  always_comb y = x + 8'd1;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc43("module t;\n"
+                                "  logic [7:0] x, y;\n"
+                                "  initial begin\n"
+                                "    x <= 8'd50;\n"
+                                "  end\n"
+                                "  always_comb y = x + 8'd1;\n"
+                                "endmodule\n",
+                                f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -448,16 +432,15 @@ TEST(SimCh43, NBAUpdateVisibleAfterActiveRegion) {
 // §4.3 Processes have state: a process maintains state across time steps.
 // ---------------------------------------------------------------------------
 TEST(SimCh43, ProcessMaintainsStateAcrossTime) {
-  auto result = RunAndGet43(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd1;\n"
-      "    #5 x = x + 8'd1;\n"
-      "    #5 x = x + 8'd1;\n"
-      "  end\n"
-      "endmodule\n",
-      "x");
+  auto result = RunAndGet43("module t;\n"
+                            "  logic [7:0] x;\n"
+                            "  initial begin\n"
+                            "    x = 8'd1;\n"
+                            "    #5 x = x + 8'd1;\n"
+                            "    #5 x = x + 8'd1;\n"
+                            "  end\n"
+                            "endmodule\n",
+                            "x");
   EXPECT_EQ(result, 3u);
 }
 
@@ -467,17 +450,16 @@ TEST(SimCh43, ProcessMaintainsStateAcrossTime) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, ProcessRespondsToMultipleInputChanges) {
   SimCh43Fixture f;
-  auto* design = ElaborateSrc43(
-      "module t;\n"
-      "  logic [7:0] a, doubled;\n"
-      "  initial begin\n"
-      "    a = 8'd1;\n"
-      "    #5 a = 8'd5;\n"
-      "    #5 a = 8'd10;\n"
-      "  end\n"
-      "  always_comb doubled = a * 8'd2;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc43("module t;\n"
+                                "  logic [7:0] a, doubled;\n"
+                                "  initial begin\n"
+                                "    a = 8'd1;\n"
+                                "    #5 a = 8'd5;\n"
+                                "    #5 a = 8'd10;\n"
+                                "  end\n"
+                                "  always_comb doubled = a * 8'd2;\n"
+                                "endmodule\n",
+                                f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -491,14 +473,13 @@ TEST(SimCh43, ProcessRespondsToMultipleInputChanges) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, ConcurrentProcessTypes) {
   SimCh43Fixture f;
-  auto* design = ElaborateSrc43(
-      "module t;\n"
-      "  logic [7:0] a, b, c;\n"
-      "  initial a = 8'd2;\n"
-      "  assign b = a + 8'd3;\n"
-      "  always_comb c = b + 8'd4;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc43("module t;\n"
+                                "  logic [7:0] a, b, c;\n"
+                                "  initial a = 8'd2;\n"
+                                "  assign b = a + 8'd3;\n"
+                                "  always_comb c = b + 8'd4;\n"
+                                "endmodule\n",
+                                f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -514,15 +495,14 @@ TEST(SimCh43, ConcurrentProcessTypes) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, UpdateEventCascade) {
   SimCh43Fixture f;
-  auto* design = ElaborateSrc43(
-      "module t;\n"
-      "  logic [7:0] a, b, c, d;\n"
-      "  initial a = 8'd1;\n"
-      "  assign b = a + 8'd1;\n"
-      "  assign c = b + 8'd1;\n"
-      "  assign d = c + 8'd1;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc43("module t;\n"
+                                "  logic [7:0] a, b, c, d;\n"
+                                "  initial a = 8'd1;\n"
+                                "  assign b = a + 8'd1;\n"
+                                "  assign c = b + 8'd1;\n"
+                                "  assign d = c + 8'd1;\n"
+                                "endmodule\n",
+                                f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -540,16 +520,15 @@ TEST(SimCh43, UpdateEventCascade) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, RegionOrderingPredictableInteraction) {
   SimCh43Fixture f;
-  auto* design = ElaborateSrc43(
-      "module t;\n"
-      "  logic [7:0] a, b, result;\n"
-      "  initial begin\n"
-      "    a = 8'd10;\n"
-      "    b <= 8'd20;\n"
-      "  end\n"
-      "  always_comb result = a + b;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc43("module t;\n"
+                                "  logic [7:0] a, b, result;\n"
+                                "  initial begin\n"
+                                "    a = 8'd10;\n"
+                                "    b <= 8'd20;\n"
+                                "  end\n"
+                                "  always_comb result = a + b;\n"
+                                "endmodule\n",
+                                f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -563,14 +542,13 @@ TEST(SimCh43, RegionOrderingPredictableInteraction) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, ProcessProducesOutputVisibleToOthers) {
   SimCh43Fixture f;
-  auto* design = ElaborateSrc43(
-      "module t;\n"
-      "  logic [7:0] a, mid, out;\n"
-      "  initial a = 8'd6;\n"
-      "  always_comb mid = a * 8'd2;\n"
-      "  assign out = mid + 8'd1;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc43("module t;\n"
+                                "  logic [7:0] a, mid, out;\n"
+                                "  initial a = 8'd6;\n"
+                                "  always_comb mid = a * 8'd2;\n"
+                                "  assign out = mid + 8'd1;\n"
+                                "endmodule\n",
+                                f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -585,17 +563,16 @@ TEST(SimCh43, ProcessProducesOutputVisibleToOthers) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, DiscreteEventsInTimeOrder) {
   SimCh43Fixture f;
-  auto* design = ElaborateSrc43(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    #10 x = 8'd2;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    #5 x = 8'd1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc43("module t;\n"
+                                "  logic [7:0] x;\n"
+                                "  initial begin\n"
+                                "    #10 x = 8'd2;\n"
+                                "  end\n"
+                                "  initial begin\n"
+                                "    #5 x = 8'd1;\n"
+                                "  end\n"
+                                "endmodule\n",
+                                f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -610,11 +587,11 @@ TEST(SimCh43, DiscreteEventsInTimeOrder) {
 TEST(SimCh43, EventPoolRecycles) {
   Arena arena;
   EventPool pool(arena);
-  Event* ev = pool.Acquire();
+  Event *ev = pool.Acquire();
   ASSERT_NE(ev, nullptr);
   pool.Release(ev);
   EXPECT_EQ(pool.FreeCount(), 1u);
-  Event* reused = pool.Acquire();
+  Event *reused = pool.Acquire();
   EXPECT_EQ(reused, ev);
   EXPECT_EQ(pool.FreeCount(), 0u);
 }
@@ -629,7 +606,7 @@ TEST(SimCh43, SameTimeAndRegionFIFO) {
   std::vector<int> order;
 
   for (int i = 0; i < 3; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, i]() { order.push_back(i); };
     sched.ScheduleEvent({0}, Region::kActive, ev);
   }
@@ -649,11 +626,11 @@ TEST(SimCh43, SchedulerTimeOrdering) {
   Scheduler sched(arena);
   std::vector<int> order;
 
-  auto* ev_late = sched.GetEventPool().Acquire();
+  auto *ev_late = sched.GetEventPool().Acquire();
   ev_late->callback = [&order]() { order.push_back(2); };
   sched.ScheduleEvent({10}, Region::kActive, ev_late);
 
-  auto* ev_early = sched.GetEventPool().Acquire();
+  auto *ev_early = sched.GetEventPool().Acquire();
   ev_early->callback = [&order]() { order.push_back(1); };
   sched.ScheduleEvent({5}, Region::kActive, ev_early);
 
@@ -672,15 +649,15 @@ TEST(SimCh43, SchedulerRegionOrdering) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto* ev_nba = sched.GetEventPool().Acquire();
+  auto *ev_nba = sched.GetEventPool().Acquire();
   ev_nba->callback = [&order]() { order.push_back("nba"); };
   sched.ScheduleEvent({0}, Region::kNBA, ev_nba);
 
-  auto* ev_inactive = sched.GetEventPool().Acquire();
+  auto *ev_inactive = sched.GetEventPool().Acquire();
   ev_inactive->callback = [&order]() { order.push_back("inactive"); };
   sched.ScheduleEvent({0}, Region::kInactive, ev_inactive);
 
-  auto* ev_active = sched.GetEventPool().Acquire();
+  auto *ev_active = sched.GetEventPool().Acquire();
   ev_active->callback = [&order]() { order.push_back("active"); };
   sched.ScheduleEvent({0}, Region::kActive, ev_active);
 
@@ -701,12 +678,12 @@ TEST(SimCh43, UpdateAndEvaluationEventKinds) {
   bool update_ran = false;
   bool eval_ran = false;
 
-  auto* ev_up = sched.GetEventPool().Acquire();
+  auto *ev_up = sched.GetEventPool().Acquire();
   ev_up->kind = EventKind::kUpdate;
   ev_up->callback = [&update_ran]() { update_ran = true; };
   sched.ScheduleEvent({0}, Region::kActive, ev_up);
 
-  auto* ev_ev = sched.GetEventPool().Acquire();
+  auto *ev_ev = sched.GetEventPool().Acquire();
   ev_ev->kind = EventKind::kEvaluation;
   ev_ev->callback = [&eval_ran]() { eval_ran = true; };
   sched.ScheduleEvent({0}, Region::kActive, ev_ev);

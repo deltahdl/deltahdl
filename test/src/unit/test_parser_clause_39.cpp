@@ -14,10 +14,10 @@ using namespace delta;
 struct ParseResult39 {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult39 Parse(const std::string& src) {
+static ParseResult39 Parse(const std::string &src) {
   ParseResult39 result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -27,7 +27,7 @@ static ParseResult39 Parse(const std::string& src) {
   return result;
 }
 
-static bool ParseOk(const std::string& src) {
+static bool ParseOk(const std::string &src) {
   SourceManager mgr;
   Arena arena;
   auto fid = mgr.AddFile("<test>", src);
@@ -113,7 +113,7 @@ TEST(ParserSection39, AssertPropertyStatement) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
   // Find the assert property item
   bool found_assert = false;
-  for (auto* item : r.cu->modules[0]->items) {
+  for (auto *item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kAssertProperty) {
       found_assert = true;
     }

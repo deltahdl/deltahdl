@@ -13,10 +13,10 @@ using namespace delta;
 struct ParseResult501 {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult501 Parse(const std::string& src) {
+static ParseResult501 Parse(const std::string &src) {
   ParseResult501 result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -26,7 +26,7 @@ static ParseResult501 Parse(const std::string& src) {
   return result;
 }
 
-static bool ParseOk(const std::string& src) {
+static bool ParseOk(const std::string &src) {
   SourceManager mgr;
   Arena arena;
   auto fid = mgr.AddFile("<test>", src);
@@ -37,8 +37,8 @@ static bool ParseOk(const std::string& src) {
   return !diag.HasErrors();
 }
 
-static Stmt* FirstInitialStmt(ParseResult501& r) {
-  for (auto* item : r.cu->modules[0]->items) {
+static Stmt *FirstInitialStmt(ParseResult501 &r) {
+  for (auto *item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kInitialBlock) {
       if (item->body && item->body->kind == StmtKind::kBlock) {
         return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
@@ -49,9 +49,10 @@ static Stmt* FirstInitialStmt(ParseResult501& r) {
   return nullptr;
 }
 
-static ModuleItem* FirstItem(ParseResult501& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
+static ModuleItem *FirstItem(ParseResult501 &r) {
+  if (!r.cu || r.cu->modules.empty())
+    return nullptr;
+  auto &items = r.cu->modules[0]->items;
   return items.empty() ? nullptr : items[0];
 }
 
@@ -67,14 +68,13 @@ TEST(ParserCh501, Sec5_1_WhitespaceTabDelimiter) {
 
 TEST(ParserCh501, Sec5_1_WhitespaceNewlineDelimiter) {
   // Every token on its own line.
-  EXPECT_TRUE(
-      ParseOk("module\n"
-              "t\n"
-              ";\n"
-              "logic\n"
-              "a\n"
-              ";\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module\n"
+                      "t\n"
+                      ";\n"
+                      "logic\n"
+                      "a\n"
+                      ";\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserCh501, Sec5_1_WhitespaceSpaceDelimiter) {
@@ -88,12 +88,11 @@ TEST(ParserCh501, Sec5_1_WhitespaceSpaceDelimiter) {
 
 TEST(ParserCh501, Sec5_1_WhitespaceInsideStringPreserved) {
   // Whitespace within a string literal must be preserved, not collapsed.
-  auto r = Parse(
-      "module m;\n"
-      "  initial $display(\"  hello   world  \");\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial $display(\"  hello   world  \");\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->expr, nullptr);
   ASSERT_GE(stmt->expr->args.size(), 1u);
@@ -134,11 +133,10 @@ TEST(ParserCh501, Sec5_1_EmptyModuleExcessiveWhitespace) {
 
 TEST(ParserCh501, Sec5_1_CommentDoesNotProduceTokens) {
   // A module containing only comments and no actual items parses cleanly.
-  auto r = Parse(
-      "module m;\n"
-      "  // line comment\n"
-      "  /* block comment */\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  // line comment\n"
+                 "  /* block comment */\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
   EXPECT_TRUE(r.cu->modules[0]->items.empty());
@@ -168,11 +166,10 @@ TEST(ParserCh501, Sec5_1_BlockCommentBetweenTokens) {
 
 TEST(ParserCh501, Sec5_1_BlockCommentInsideExpression) {
   // Block comment between operands in a continuous assignment expression.
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  logic a, b, c;\n"
-              "  assign a = b /* comment */ + c;\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  logic a, b, c;\n"
+                      "  assign a = b /* comment */ + c;\n"
+                      "endmodule\n"));
 }
 
 // =========================================================================
@@ -181,11 +178,10 @@ TEST(ParserCh501, Sec5_1_BlockCommentInsideExpression) {
 
 TEST(ParserCh501, Sec5_1_NestedBlockCommentStartInsideLineComment) {
   // A /* inside a // comment is not treated as the start of a block comment.
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  // this /* is not special\n"
-              "  logic a;\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module t;\n"
+                      "  // this /* is not special\n"
+                      "  logic a;\n"
+                      "endmodule\n"));
 }
 
 // =========================================================================
@@ -194,15 +190,14 @@ TEST(ParserCh501, Sec5_1_NestedBlockCommentStartInsideLineComment) {
 
 TEST(ParserCh501, Sec5_1_AdjacentLineComments) {
   // Multiple consecutive line comments behave as whitespace.
-  auto r = Parse(
-      "module m;\n"
-      "  // first comment\n"
-      "  // second comment\n"
-      "  // third comment\n"
-      "  logic a;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  // first comment\n"
+                 "  // second comment\n"
+                 "  // third comment\n"
+                 "  logic a;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(item->name, "a");
@@ -214,20 +209,19 @@ TEST(ParserCh501, Sec5_1_AdjacentLineComments) {
 
 TEST(ParserCh501, Sec5_1_SingleCharOperators) {
   // Exercise +, -, *, /, %, &, |, ^, ~ as single-character operators.
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    x = a + b;\n"
-              "    x = a - b;\n"
-              "    x = a * b;\n"
-              "    x = a / b;\n"
-              "    x = a % b;\n"
-              "    x = a & b;\n"
-              "    x = a | b;\n"
-              "    x = a ^ b;\n"
-              "    x = ~a;\n"
-              "  end\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  initial begin\n"
+                      "    x = a + b;\n"
+                      "    x = a - b;\n"
+                      "    x = a * b;\n"
+                      "    x = a / b;\n"
+                      "    x = a % b;\n"
+                      "    x = a & b;\n"
+                      "    x = a | b;\n"
+                      "    x = a ^ b;\n"
+                      "    x = ~a;\n"
+                      "  end\n"
+                      "endmodule\n"));
 }
 
 // =========================================================================
@@ -236,35 +230,33 @@ TEST(ParserCh501, Sec5_1_SingleCharOperators) {
 
 TEST(ParserCh501, Sec5_1_TwoCharOperators) {
   // Exercise ==, !=, <=, >=, &&, ||, <<, >>, +=, -=, *=, /=, etc.
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    x = (a == b);\n"
-              "    x = (a != b);\n"
-              "    x = (a <= b);\n"
-              "    x = (a >= b);\n"
-              "    x = (a && b);\n"
-              "    x = (a || b);\n"
-              "    x = a << 1;\n"
-              "    x = a >> 1;\n"
-              "    a += 1;\n"
-              "    a -= 1;\n"
-              "    a *= 2;\n"
-              "    a /= 2;\n"
-              "  end\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  initial begin\n"
+                      "    x = (a == b);\n"
+                      "    x = (a != b);\n"
+                      "    x = (a <= b);\n"
+                      "    x = (a >= b);\n"
+                      "    x = (a && b);\n"
+                      "    x = (a || b);\n"
+                      "    x = a << 1;\n"
+                      "    x = a >> 1;\n"
+                      "    a += 1;\n"
+                      "    a -= 1;\n"
+                      "    a *= 2;\n"
+                      "    a /= 2;\n"
+                      "  end\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserCh501, Sec5_1_TwoCharOperatorTokenKinds) {
   // Verify the specific TokenKind for == in an expression.
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = (a == b);\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial x = (a == b);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
+  auto *rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kEqEq);
@@ -276,29 +268,27 @@ TEST(ParserCh501, Sec5_1_TwoCharOperatorTokenKinds) {
 
 TEST(ParserCh501, Sec5_1_ThreeCharOperators) {
   // ===, !==, <<<, >>>, ==?, !=?
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    x = (a === b);\n"
-              "    x = (a !== b);\n"
-              "    x = a <<< 2;\n"
-              "    x = a >>> 2;\n"
-              "    x = (a ==? b);\n"
-              "    x = (a !=? b);\n"
-              "  end\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  initial begin\n"
+                      "    x = (a === b);\n"
+                      "    x = (a !== b);\n"
+                      "    x = a <<< 2;\n"
+                      "    x = a >>> 2;\n"
+                      "    x = (a ==? b);\n"
+                      "    x = (a !=? b);\n"
+                      "  end\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserCh501, Sec5_1_ThreeCharOperatorWildcardInequality) {
   // Verify !=? parses to the correct token kind.
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = (a !=? b);\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial x = (a !=? b);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
+  auto *rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kBangEqQuestion);
@@ -311,16 +301,15 @@ TEST(ParserCh501, Sec5_1_ThreeCharOperatorWildcardInequality) {
 TEST(ParserCh501, Sec5_1_KeywordsAreReserved) {
   // module, endmodule, wire, logic, assign, initial, begin, end, if, else
   // are all reserved keywords that parse correctly.
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  wire w;\n"
-              "  logic l;\n"
-              "  assign w = 0;\n"
-              "  initial begin\n"
-              "    if (l) w = 1;\n"
-              "    else w = 0;\n"
-              "  end\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  wire w;\n"
+                      "  logic l;\n"
+                      "  assign w = 0;\n"
+                      "  initial begin\n"
+                      "    if (l) w = 1;\n"
+                      "    else w = 0;\n"
+                      "  end\n"
+                      "endmodule\n"));
 }
 
 // =========================================================================
@@ -331,7 +320,7 @@ TEST(ParserCh501, Sec5_1_IdentifierAllLegalChars) {
   // An identifier may contain letters, digits, underscore, and dollar sign.
   auto r = Parse("module m; logic abc_123$xyz; endmodule");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "abc_123$xyz");
 }
@@ -343,7 +332,7 @@ TEST(ParserCh501, Sec5_1_IdentifierAllLegalChars) {
 TEST(ParserCh501, Sec5_1_IdentifierStartsWithUnderscore) {
   auto r = Parse("module m; logic _start_val; endmodule");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "_start_val");
 }
@@ -355,7 +344,7 @@ TEST(ParserCh501, Sec5_1_IdentifierStartsWithUnderscore) {
 TEST(ParserCh501, Sec5_1_IdentifierStartsWithLetter) {
   auto r = Parse("module m; logic Data0; endmodule");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "Data0");
 }
@@ -367,14 +356,13 @@ TEST(ParserCh501, Sec5_1_IdentifierStartsWithLetter) {
 TEST(ParserCh501, Sec5_1_NumberFollowedByIdentifier) {
   // "42" and "abc" are separate tokens even without whitespace between the
   // numeric literal and an identifier in expression context.
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = 42 + abc;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial x = 42 + abc;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
+  auto *rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
@@ -393,14 +381,13 @@ TEST(ParserCh501, Sec5_1_NumberFollowedByIdentifier) {
 
 TEST(ParserCh501, Sec5_1_OperatorFollowedByNumber) {
   // No space between operator and number: "a+1" must tokenize correctly.
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = a+1;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial x = a+1;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
+  auto *rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
@@ -424,12 +411,11 @@ TEST(ParserCh501, Sec5_1_MixedTokensNoWhitespace) {
 // =========================================================================
 
 TEST(ParserCh501, Sec5_1_MultipleStatementsOnOneLine) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin x = 1; y = 2; z = 3; end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin x = 1; y = 2; z = 3; end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   ASSERT_EQ(item->kind, ModuleItemKind::kInitialBlock);
   ASSERT_NE(item->body, nullptr);
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
@@ -442,23 +428,22 @@ TEST(ParserCh501, Sec5_1_MultipleStatementsOnOneLine) {
 
 TEST(ParserCh501, Sec5_1_StatementSpanningManyLines) {
   // A single continuous assignment split across many lines.
-  auto r = Parse(
-      "module m;\n"
-      "  logic a, b, c, d;\n"
-      "  assign\n"
-      "    a\n"
-      "    =\n"
-      "    b\n"
-      "    +\n"
-      "    c\n"
-      "    +\n"
-      "    d\n"
-      "    ;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  logic a, b, c, d;\n"
+                 "  assign\n"
+                 "    a\n"
+                 "    =\n"
+                 "    b\n"
+                 "    +\n"
+                 "    c\n"
+                 "    +\n"
+                 "    d\n"
+                 "    ;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   // The declarations produce 4 items (a,b,c,d) and the assign produces 1.
   ASSERT_GE(r.cu->modules[0]->items.size(), 5u);
-  auto* assign_item = r.cu->modules[0]->items[4];
+  auto *assign_item = r.cu->modules[0]->items[4];
   EXPECT_EQ(assign_item->kind, ModuleItemKind::kContAssign);
 }
 
@@ -468,11 +453,10 @@ TEST(ParserCh501, Sec5_1_StatementSpanningManyLines) {
 
 TEST(ParserCh501, Sec5_1_TabCharactersAsWhitespace) {
   // Tabs used throughout instead of spaces.
-  EXPECT_TRUE(
-      ParseOk("module\tm;\n"
-              "\tlogic\ta;\n"
-              "\tassign\ta\t=\t1'b1;\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module\tm;\n"
+                      "\tlogic\ta;\n"
+                      "\tassign\ta\t=\t1'b1;\n"
+                      "endmodule\n"));
 }
 
 // =========================================================================
@@ -481,10 +465,9 @@ TEST(ParserCh501, Sec5_1_TabCharactersAsWhitespace) {
 
 TEST(ParserCh501, Sec5_1_CarriageReturnLineFeed) {
   // Windows-style \r\n line endings must parse identically to \n.
-  EXPECT_TRUE(
-      ParseOk("module t;\r\n"
-              "  logic a;\r\n"
-              "endmodule\r\n"));
+  EXPECT_TRUE(ParseOk("module t;\r\n"
+                      "  logic a;\r\n"
+                      "endmodule\r\n"));
 }
 
 // =========================================================================
@@ -501,10 +484,9 @@ TEST(ParserCh501, Sec5_1_EmptyCuWhitespaceOnly) {
 
 TEST(ParserCh501, Sec5_1_EmptyCuCommentsOnly) {
   // A compilation unit containing only comments parses to an empty CU.
-  auto r = Parse(
-      "// line comment\n"
-      "/* block\n"
-      "   comment */\n");
+  auto r = Parse("// line comment\n"
+                 "/* block\n"
+                 "   comment */\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_TRUE(r.cu->modules.empty());
   EXPECT_TRUE(r.cu->packages.empty());
@@ -529,23 +511,21 @@ TEST(ParserCh501, FreeFormatLayout) {
 
 TEST(ParserCh501, FreeFormatMultiline) {
   // Same construct spread over many lines.
-  EXPECT_TRUE(
-      ParseOk("module\n"
-              "  t\n"
-              ";\n"
-              "  logic\n"
-              "    a\n"
-              ";\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module\n"
+                      "  t\n"
+                      ";\n"
+                      "  logic\n"
+                      "    a\n"
+                      ";\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserCh501, AllTokenTypesPresent) {
   // §5.1 lists: white space, comments, operators, numbers, string
   // literals, identifiers, keywords. This test exercises them all.
-  EXPECT_TRUE(
-      ParseOk("module t; // one-line comment\n"
-              "  /* block comment */\n"
-              "  logic [7:0] data = 8'hAB;\n"
-              "  initial $display(\"hello\");\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module t; // one-line comment\n"
+                      "  /* block comment */\n"
+                      "  logic [7:0] data = 8'hAB;\n"
+                      "  initial $display(\"hello\");\n"
+                      "endmodule\n"));
 }

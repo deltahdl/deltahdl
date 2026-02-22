@@ -1,13 +1,13 @@
 // §18.4: Random variables
 
-#include <gtest/gtest.h>
+#include "simulation/constraint_solver.h"
 #include <algorithm>
 #include <cstdint>
+#include <gtest/gtest.h>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include "simulation/constraint_solver.h"
 
 using namespace delta;
 
@@ -33,7 +33,7 @@ TEST(Constraint, RandVariableBasic) {
 
 TEST(Constraint, RandVariableMultiple) {
   ConstraintSolver solver(42);
-  for (const auto& name : {"a", "b", "c"}) {
+  for (const auto &name : {"a", "b", "c"}) {
     RandVariable v;
     v.name = name;
     v.min_val = 0;
@@ -41,7 +41,7 @@ TEST(Constraint, RandVariableMultiple) {
     solver.AddVariable(v);
   }
   ASSERT_TRUE(solver.Solve());
-  for (const auto& name : {"a", "b", "c"}) {
+  for (const auto &name : {"a", "b", "c"}) {
     int64_t val = solver.GetValue(name);
     EXPECT_GE(val, 0);
     EXPECT_LE(val, 255);
@@ -92,4 +92,4 @@ TEST(Constraint, RandcCycleResets) {
   EXPECT_EQ(cycle2.size(), 2u);
 }
 
-}  // namespace
+} // namespace

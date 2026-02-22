@@ -1,11 +1,11 @@
 // §25.3: Interface syntax
 
-#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -23,10 +23,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult Parse(const std::string& src) {
+static ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -37,13 +37,13 @@ static ParseResult Parse(const std::string& src) {
 }
 
 struct StructMemberExpected {
-  const char* name;
+  const char *name;
   DataTypeKind type_kind;
 };
 
 struct ModportPortExpected {
   Direction dir;
-  const char* name;
+  const char *name;
 };
 
 namespace {
@@ -58,12 +58,11 @@ TEST(Parser, EmptyInterface) {
 }
 
 TEST(Parser, InterfaceAndModule) {
-  auto r = Parse(
-      "interface bus; endinterface\n"
-      "module top; endmodule\n");
+  auto r = Parse("interface bus; endinterface\n"
+                 "module top; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_EQ(r.cu->interfaces.size(), 1);
   EXPECT_EQ(r.cu->modules.size(), 1);
 }
 
-}  // namespace
+} // namespace

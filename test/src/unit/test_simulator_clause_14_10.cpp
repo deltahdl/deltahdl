@@ -1,8 +1,5 @@
 // §14.10: Clocking block events
 
-#include <gtest/gtest.h>
-#include <cstdint>
-#include <string_view>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -12,6 +9,9 @@
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
 #include "simulation/variable.h"
+#include <cstdint>
+#include <gtest/gtest.h>
+#include <string_view>
 
 using namespace delta;
 
@@ -25,8 +25,8 @@ struct ClockingSimFixture {
 };
 
 // Schedule posedge at a given time through the scheduler.
-void SchedulePosedge(ClockingSimFixture& f, Variable* clk, uint64_t time) {
-  auto* ev = f.scheduler.GetEventPool().Acquire();
+void SchedulePosedge(ClockingSimFixture &f, Variable *clk, uint64_t time) {
+  auto *ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [clk, &f]() {
     clk->prev_value = clk->value;
     clk->value = MakeLogic4VecVal(f.arena, 1, 1);
@@ -36,8 +36,8 @@ void SchedulePosedge(ClockingSimFixture& f, Variable* clk, uint64_t time) {
 }
 
 // Schedule negedge at a given time through the scheduler.
-void ScheduleNegedge(ClockingSimFixture& f, Variable* clk, uint64_t time) {
-  auto* ev = f.scheduler.GetEventPool().Acquire();
+void ScheduleNegedge(ClockingSimFixture &f, Variable *clk, uint64_t time) {
+  auto *ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [clk, &f]() {
     clk->prev_value = clk->value;
     clk->value = MakeLogic4VecVal(f.arena, 1, 0);
@@ -53,7 +53,7 @@ namespace {
 // =============================================================================
 TEST(ClockingSim, ClockingBlockEvent) {
   ClockingSimFixture f;
-  auto* clk = f.ctx.CreateVariable("clk", 1);
+  auto *clk = f.ctx.CreateVariable("clk", 1);
   clk->value = MakeLogic4VecVal(f.arena, 1, 0);
 
   ClockingManager cmgr;
@@ -65,7 +65,7 @@ TEST(ClockingSim, ClockingBlockEvent) {
   block.default_output_skew = SimTime{0};
   cmgr.Register(block);
 
-  auto* cb_event = f.ctx.CreateVariable("__cb_event", 1);
+  auto *cb_event = f.ctx.CreateVariable("__cb_event", 1);
   cb_event->is_event = true;
   cmgr.SetBlockEventVar("cb", cb_event);
 
@@ -88,7 +88,7 @@ TEST(ClockingSim, ClockingBlockEvent) {
 // =============================================================================
 TEST(ClockingSim, EdgeCallbackOnPosedge) {
   ClockingSimFixture f;
-  auto* clk = f.ctx.CreateVariable("clk", 1);
+  auto *clk = f.ctx.CreateVariable("clk", 1);
   clk->value = MakeLogic4VecVal(f.arena, 1, 0);
 
   ClockingManager cmgr;
@@ -113,4 +113,4 @@ TEST(ClockingSim, EdgeCallbackOnPosedge) {
   EXPECT_EQ(count, 2u);
 }
 
-}  // namespace
+} // namespace

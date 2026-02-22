@@ -28,7 +28,7 @@ TEST(SimCh4435, PreObservedRegionExecutesPLICallbacks) {
   Scheduler sched(arena);
   int executed = 0;
 
-  auto* ev = sched.GetEventPool().Acquire();
+  auto *ev = sched.GetEventPool().Acquire();
   ev->callback = [&]() { executed++; };
   sched.ScheduleEvent({0}, Region::kPreObserved, ev);
 
@@ -47,12 +47,12 @@ TEST(SimCh4435, PreObservedCanReadValues) {
   int sampled = -1;
 
   // Active sets value = 42.
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->callback = [&]() { value = 42; };
   sched.ScheduleEvent({0}, Region::kActive, active);
 
   // Pre-Observed reads value — should see 42.
-  auto* ev = sched.GetEventPool().Acquire();
+  auto *ev = sched.GetEventPool().Acquire();
   ev->callback = [&]() { sampled = value; };
   sched.ScheduleEvent({0}, Region::kPreObserved, ev);
 
@@ -73,16 +73,16 @@ TEST(SimCh4435, PreObservedReadsAfterActiveRegionSetStabilized) {
 
   // PostNBA is the last region in the active region set.
   // It overwrites what Active set.
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->callback = [&]() { value = 10; };
   sched.ScheduleEvent({0}, Region::kActive, active);
 
-  auto* post_nba = sched.GetEventPool().Acquire();
+  auto *post_nba = sched.GetEventPool().Acquire();
   post_nba->callback = [&]() { value = 77; };
   sched.ScheduleEvent({0}, Region::kPostNBA, post_nba);
 
   // Pre-Observed should see 77 (final state after active set stabilized).
-  auto* ev = sched.GetEventPool().Acquire();
+  auto *ev = sched.GetEventPool().Acquire();
   ev->callback = [&]() { sampled = value; };
   sched.ScheduleEvent({0}, Region::kPreObserved, ev);
 
@@ -99,8 +99,8 @@ TEST(SimCh4435, PreObservedExecutesAfterPostNBABeforeObserved) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
+  auto schedule = [&](Region r, const std::string &label) {
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, label]() { order.push_back(label); };
     sched.ScheduleEvent({0}, r, ev);
   };
@@ -127,8 +127,8 @@ TEST(SimCh4435, PreObservedExecutesAfterEntireActiveRegionSet) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
+  auto schedule = [&](Region r, const std::string &label) {
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, label]() { order.push_back(label); };
     sched.ScheduleEvent({0}, r, ev);
   };
@@ -168,7 +168,7 @@ TEST(SimCh4435, PreObservedRegionHoldsMultiplePLICallbacks) {
   int count = 0;
 
   for (int i = 0; i < 5; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&]() { count++; };
     sched.ScheduleEvent({0}, Region::kPreObserved, ev);
   }
@@ -187,7 +187,7 @@ TEST(SimCh4435, PreObservedEventsAcrossMultipleTimeSlots) {
   std::vector<uint64_t> times;
 
   for (uint64_t t = 0; t < 3; ++t) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&times, &sched]() {
       times.push_back(sched.CurrentTime().ticks);
     };
@@ -215,7 +215,7 @@ TEST(SimCh4435, PreObservedProvidesReadOnlySnapshotAfterActiveSet) {
   int sum_in_pre_observed = -1;
 
   // Active at time 0 sets both a and b.
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->callback = [&]() {
     a = 10;
     b = 20;
@@ -223,7 +223,7 @@ TEST(SimCh4435, PreObservedProvidesReadOnlySnapshotAfterActiveSet) {
   sched.ScheduleEvent({0}, Region::kActive, active);
 
   // Pre-Observed reads both — should see the values Active set.
-  auto* pre_obs = sched.GetEventPool().Acquire();
+  auto *pre_obs = sched.GetEventPool().Acquire();
   pre_obs->callback = [&]() { sum_in_pre_observed = a + b; };
   sched.ScheduleEvent({0}, Region::kPreObserved, pre_obs);
 
@@ -248,16 +248,16 @@ TEST(SimCh4435, PreObservedReadsFullyStabilizedActiveSetState) {
   // Pre-Observed should see 99.
   auto set_final = [&]() { value = 99; };
   auto schedule_reentry = [&]() {
-    auto* active2 = sched.GetEventPool().Acquire();
+    auto *active2 = sched.GetEventPool().Acquire();
     active2->callback = set_final;
     sched.ScheduleEvent({0}, Region::kActive, active2);
   };
 
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->callback = [&]() {
     if (value == 0) {
       value = 1;
-      auto* inactive = sched.GetEventPool().Acquire();
+      auto *inactive = sched.GetEventPool().Acquire();
       inactive->callback = schedule_reentry;
       sched.ScheduleEvent({0}, Region::kInactive, inactive);
     }
@@ -265,7 +265,7 @@ TEST(SimCh4435, PreObservedReadsFullyStabilizedActiveSetState) {
   sched.ScheduleEvent({0}, Region::kActive, active);
 
   // Pre-Observed samples the fully-stabilized value.
-  auto* pre_obs = sched.GetEventPool().Acquire();
+  auto *pre_obs = sched.GetEventPool().Acquire();
   pre_obs->callback = [&]() { sampled = value; };
   sched.ScheduleEvent({0}, Region::kPreObserved, pre_obs);
 

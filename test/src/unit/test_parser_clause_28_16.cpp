@@ -13,10 +13,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult Parse(const std::string& src) {
+static ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -27,34 +27,31 @@ static ParseResult Parse(const std::string& src) {
 }
 
 TEST(ParserSection28, GateWithTwoDelays) {
-  auto r = Parse(
-      "module m;\n"
-      "  and #(10, 12) a2(out, in1, in2);\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  and #(10, 12) a2(out, in1, in2);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->gate_kind, GateKind::kAnd);
   EXPECT_NE(item->gate_delay, nullptr);
 }
 
 TEST(ParserSection28, GateWithThreeDelays) {
-  auto r = Parse(
-      "module m;\n"
-      "  bufif0 #(10, 12, 11) b3(out, in, ctrl);\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  bufif0 #(10, 12, 11) b3(out, in, ctrl);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->gate_kind, GateKind::kBufif0);
   EXPECT_NE(item->gate_delay, nullptr);
 }
 
 TEST(ParserSection28, GateMinTypMaxDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  bufif0 #(5:7:9, 8:10:12, 15:18:21) b1(io1, io2, dir);\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  bufif0 #(5:7:9, 8:10:12, 15:18:21) b1(io1, io2, dir);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->gate_kind, GateKind::kBufif0);
   EXPECT_NE(item->gate_delay, nullptr);
 }

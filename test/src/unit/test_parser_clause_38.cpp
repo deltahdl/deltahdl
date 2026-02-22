@@ -14,11 +14,11 @@ using namespace delta;
 struct ParseResult38 {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult38 Parse(const std::string& src) {
+static ParseResult38 Parse(const std::string &src) {
   ParseResult38 result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -29,7 +29,7 @@ static ParseResult38 Parse(const std::string& src) {
   return result;
 }
 
-static bool ParseOk38(const std::string& src) {
+static bool ParseOk38(const std::string &src) {
   SourceManager mgr;
   Arena arena;
   auto fid = mgr.AddFile("<test>", src);
@@ -40,9 +40,10 @@ static bool ParseOk38(const std::string& src) {
   return !diag.HasErrors();
 }
 
-static ModuleItem* FindItemByKind(ParseResult38& r, ModuleItemKind kind) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == kind) return item;
+static ModuleItem *FindItemByKind(ParseResult38 &r, ModuleItemKind kind) {
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == kind)
+      return item;
   }
   return nullptr;
 }
@@ -54,47 +55,43 @@ static ModuleItem* FindItemByKind(ParseResult38& r, ModuleItemKind kind) {
 // =============================================================================
 
 TEST(ParserSection38, VpiSystemCallDeposit) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    $deposit(sig, 1'b1);\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    $deposit(sig, 1'b1);\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserSection38, VpiSystemCallForce) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    force sig = 1'b0;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    force sig = 1'b0;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserSection38, VpiSystemCallRelease) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    release sig;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    release sig;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserSection38, DpiImportForVpiAccess) {
-  auto r = Parse(
-      "module m;\n"
-      "  import \"DPI-C\" context function void\n"
-      "    set_value(input int handle, input int val);\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  import \"DPI-C\" context function void\n"
+                 "    set_value(input int handle, input int val);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* dpi = FindItemByKind(r, ModuleItemKind::kDpiImport);
+  auto *dpi = FindItemByKind(r, ModuleItemKind::kDpiImport);
   ASSERT_NE(dpi, nullptr);
   EXPECT_EQ(dpi->name, "set_value");
   EXPECT_TRUE(dpi->dpi_is_context);
@@ -111,7 +108,7 @@ TEST(ParserSection38, DpiImportVoidCallbackFunction) {
   )");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
+  auto &items = r.cu->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
   EXPECT_EQ(items[0]->name, "my_callback");
@@ -129,7 +126,7 @@ TEST(ParserSection38, DpiImportContextCallbackWithArgs) {
   )");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
+  auto &items = r.cu->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
   EXPECT_TRUE(items[0]->dpi_is_context);
   EXPECT_EQ(items[0]->name, "register_cb_wrapper");
@@ -145,7 +142,7 @@ TEST(ParserSection38, DpiImportWithCNameForCallback) {
   )");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
+  auto &items = r.cu->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
   EXPECT_EQ(items[0]->dpi_c_name, "vpi_cb_rtn");
   EXPECT_EQ(items[0]->name, "cb_value_change");
@@ -160,7 +157,7 @@ TEST(ParserSection38, DpiImportPureFunctionForSizetf) {
   )");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
+  auto &items = r.cu->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
   EXPECT_TRUE(items[0]->dpi_is_pure);
   EXPECT_FALSE(items[0]->dpi_is_context);
@@ -181,7 +178,7 @@ TEST(ParserSection38, DpiExportFunctionForCalltf) {
   )");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
+  auto &items = r.cu->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiExport);
   EXPECT_EQ(items[0]->name, "calltf_routine");
@@ -197,7 +194,7 @@ TEST(ParserSection38, DpiExportTaskForSystf) {
   )");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
+  auto &items = r.cu->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiExport);
   EXPECT_TRUE(items[0]->dpi_is_task);
@@ -212,7 +209,7 @@ TEST(ParserSection38, DpiExportWithCNameForSystf) {
   )");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
+  auto &items = r.cu->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
   EXPECT_EQ(items[0]->dpi_c_name, "my_c_calltf");
   EXPECT_EQ(items[0]->name, "sv_calltf");
@@ -241,7 +238,7 @@ TEST(ParserSection38, DpiImportContextTask) {
   )");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
+  auto &items = r.cu->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
   EXPECT_TRUE(items[0]->dpi_is_context);
   EXPECT_TRUE(items[0]->dpi_is_task);

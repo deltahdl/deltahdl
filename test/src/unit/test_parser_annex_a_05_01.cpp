@@ -16,11 +16,11 @@ namespace {
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
   bool has_errors = false;
 };
 
-ParseResult Parse(const std::string& src) {
+ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -31,7 +31,7 @@ ParseResult Parse(const std::string& src) {
   return result;
 }
 
-}  // namespace
+} // namespace
 
 // =============================================================================
 // A.5.1 -- UDP declaration
@@ -58,19 +58,18 @@ ParseResult Parse(const std::string& src) {
 // --- udp_ansi_declaration: combinational ---
 
 TEST(ParserAnnexA051, AnsiCombinational) {
-  auto r = Parse(
-      "primitive and_gate(output out, input a, input b);\n"
-      "  table\n"
-      "    0 0 : 0;\n"
-      "    0 1 : 0;\n"
-      "    1 0 : 0;\n"
-      "    1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive and_gate(output out, input a, input b);\n"
+                 "  table\n"
+                 "    0 0 : 0;\n"
+                 "    0 1 : 0;\n"
+                 "    1 0 : 0;\n"
+                 "    1 1 : 1;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
   EXPECT_EQ(udp->name, "and_gate");
   EXPECT_EQ(udp->output_name, "out");
   EXPECT_FALSE(udp->is_sequential);
@@ -83,17 +82,16 @@ TEST(ParserAnnexA051, AnsiCombinational) {
 // --- udp_ansi_declaration: sequential (output reg) ---
 
 TEST(ParserAnnexA051, AnsiSequential) {
-  auto r = Parse(
-      "primitive dff(output reg q, input d, input clk);\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive dff(output reg q, input d, input clk);\n"
+                 "  table\n"
+                 "    0 r : ? : 0;\n"
+                 "    1 r : ? : 1;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
   EXPECT_EQ(udp->name, "dff");
   EXPECT_TRUE(udp->is_sequential);
   EXPECT_EQ(udp->output_name, "q");
@@ -104,19 +102,18 @@ TEST(ParserAnnexA051, AnsiSequential) {
 // --- udp_ansi_declaration: multiple inputs with shared input keyword ---
 
 TEST(ParserAnnexA051, AnsiSharedInputKeyword) {
-  auto r = Parse(
-      "primitive mux(output out, input a, b, sel);\n"
-      "  table\n"
-      "    0 ? 0 : 0;\n"
-      "    1 ? 0 : 1;\n"
-      "    ? 0 1 : 0;\n"
-      "    ? 1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive mux(output out, input a, b, sel);\n"
+                 "  table\n"
+                 "    0 ? 0 : 0;\n"
+                 "    1 ? 0 : 1;\n"
+                 "    ? 0 1 : 0;\n"
+                 "    ? 1 1 : 1;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
   ASSERT_EQ(udp->input_names.size(), 3u);
   EXPECT_EQ(udp->input_names[0], "a");
   EXPECT_EQ(udp->input_names[1], "b");
@@ -126,13 +123,12 @@ TEST(ParserAnnexA051, AnsiSharedInputKeyword) {
 // --- udp_declaration: endprimitive with end label ---
 
 TEST(ParserAnnexA051, EndLabel) {
-  auto r = Parse(
-      "primitive inv(output out, input in);\n"
-      "  table\n"
-      "    0 : 1;\n"
-      "    1 : 0;\n"
-      "  endtable\n"
-      "endprimitive : inv\n");
+  auto r = Parse("primitive inv(output out, input in);\n"
+                 "  table\n"
+                 "    0 : 1;\n"
+                 "    1 : 0;\n"
+                 "  endtable\n"
+                 "endprimitive : inv\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);
@@ -146,7 +142,7 @@ TEST(ParserAnnexA051, ExternAnsi) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
   EXPECT_EQ(udp->name, "inv");
   EXPECT_EQ(udp->output_name, "out");
   ASSERT_EQ(udp->input_names.size(), 1u);
@@ -161,7 +157,7 @@ TEST(ParserAnnexA051, ExternNonAnsi) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
   EXPECT_EQ(udp->name, "inv");
   EXPECT_EQ(udp->output_name, "out");
   ASSERT_EQ(udp->input_names.size(), 1u);
@@ -176,7 +172,7 @@ TEST(ParserAnnexA051, ExternAnsiSequential) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
   EXPECT_EQ(udp->name, "dff");
   EXPECT_TRUE(udp->is_sequential);
   EXPECT_EQ(udp->output_name, "q");
@@ -186,19 +182,18 @@ TEST(ParserAnnexA051, ExternAnsiSequential) {
 // --- udp_declaration: multiple UDPs in compilation unit ---
 
 TEST(ParserAnnexA051, MultipleUdps) {
-  auto r = Parse(
-      "primitive inv(output out, input in);\n"
-      "  table\n"
-      "    0 : 1;\n"
-      "    1 : 0;\n"
-      "  endtable\n"
-      "endprimitive\n"
-      "primitive buf2(output out, input in);\n"
-      "  table\n"
-      "    0 : 0;\n"
-      "    1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive inv(output out, input in);\n"
+                 "  table\n"
+                 "    0 : 1;\n"
+                 "    1 : 0;\n"
+                 "  endtable\n"
+                 "endprimitive\n"
+                 "primitive buf2(output out, input in);\n"
+                 "  table\n"
+                 "    0 : 0;\n"
+                 "    1 : 1;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 2u);
@@ -209,15 +204,14 @@ TEST(ParserAnnexA051, MultipleUdps) {
 // --- udp_declaration: coexistence with modules ---
 
 TEST(ParserAnnexA051, UdpWithModule) {
-  auto r = Parse(
-      "primitive inv(output out, input in);\n"
-      "  table\n"
-      "    0 : 1;\n"
-      "    1 : 0;\n"
-      "  endtable\n"
-      "endprimitive\n"
-      "module top;\n"
-      "endmodule\n");
+  auto r = Parse("primitive inv(output out, input in);\n"
+                 "  table\n"
+                 "    0 : 1;\n"
+                 "    1 : 0;\n"
+                 "  endtable\n"
+                 "endprimitive\n"
+                 "module top;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);
@@ -227,18 +221,17 @@ TEST(ParserAnnexA051, UdpWithModule) {
 // --- udp_declaration: sequential with initial statement ---
 
 TEST(ParserAnnexA051, SequentialWithInitial) {
-  auto r = Parse(
-      "primitive srff(output reg q, input s, input r);\n"
-      "  initial q = 1'b0;\n"
-      "  table\n"
-      "    1 0 : ? : 1;\n"
-      "    0 1 : ? : 0;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive srff(output reg q, input s, input r);\n"
+                 "  initial q = 1'b0;\n"
+                 "  table\n"
+                 "    1 0 : ? : 1;\n"
+                 "    0 1 : ? : 0;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
   EXPECT_TRUE(udp->is_sequential);
   EXPECT_TRUE(udp->has_initial);
   EXPECT_EQ(udp->initial_value, '0');
@@ -247,18 +240,17 @@ TEST(ParserAnnexA051, SequentialWithInitial) {
 // --- udp_declaration: sequential with initial value 1 ---
 
 TEST(ParserAnnexA051, SequentialInitialOne) {
-  auto r = Parse(
-      "primitive latch(output reg q, input d, input en);\n"
-      "  initial q = 1'b1;\n"
-      "  table\n"
-      "    ? 0 : ? : -;\n"
-      "    0 1 : ? : 0;\n"
-      "    1 1 : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive latch(output reg q, input d, input en);\n"
+                 "  initial q = 1'b1;\n"
+                 "  table\n"
+                 "    ? 0 : ? : -;\n"
+                 "    0 1 : ? : 0;\n"
+                 "    1 1 : ? : 1;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
   EXPECT_TRUE(udp->has_initial);
   EXPECT_EQ(udp->initial_value, '1');
 }
@@ -266,17 +258,16 @@ TEST(ParserAnnexA051, SequentialInitialOne) {
 // --- udp_declaration: sequential with initial value x ---
 
 TEST(ParserAnnexA051, SequentialInitialX) {
-  auto r = Parse(
-      "primitive dff_x(output reg q, input d, input clk);\n"
-      "  initial q = 1'bx;\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive dff_x(output reg q, input d, input clk);\n"
+                 "  initial q = 1'bx;\n"
+                 "  table\n"
+                 "    0 r : ? : 0;\n"
+                 "    1 r : ? : 1;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
   EXPECT_TRUE(udp->has_initial);
   EXPECT_EQ(udp->initial_value, 'x');
 }
@@ -284,17 +275,16 @@ TEST(ParserAnnexA051, SequentialInitialX) {
 // --- udp_declaration: table row with edge symbols ---
 
 TEST(ParserAnnexA051, TableEdgeSymbols) {
-  auto r = Parse(
-      "primitive edge_det(output reg q, input d, input clk);\n"
-      "  table\n"
-      "    ? f : ? : 1;\n"
-      "    ? p : ? : 0;\n"
-      "    * ? : ? : -;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive edge_det(output reg q, input d, input clk);\n"
+                 "  table\n"
+                 "    ? f : ? : 1;\n"
+                 "    ? p : ? : 0;\n"
+                 "    * ? : ? : -;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
   ASSERT_EQ(udp->table.size(), 3u);
   EXPECT_EQ(udp->table[0].inputs[1], 'f');
   EXPECT_EQ(udp->table[1].inputs[1], 'p');
@@ -305,16 +295,15 @@ TEST(ParserAnnexA051, TableEdgeSymbols) {
 // --- udp_declaration: table with wildcard symbols ---
 
 TEST(ParserAnnexA051, TableWildcardSymbols) {
-  auto r = Parse(
-      "primitive wild(output out, input a, input b);\n"
-      "  table\n"
-      "    ? ? : 0;\n"
-      "    b b : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive wild(output out, input a, input b);\n"
+                 "  table\n"
+                 "    ? ? : 0;\n"
+                 "    b b : 1;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
   ASSERT_EQ(udp->table.size(), 2u);
   EXPECT_EQ(udp->table[0].inputs[0], '?');
   EXPECT_EQ(udp->table[0].inputs[1], '?');
@@ -325,16 +314,15 @@ TEST(ParserAnnexA051, TableWildcardSymbols) {
 // --- udp_declaration: single input UDP ---
 
 TEST(ParserAnnexA051, SingleInput) {
-  auto r = Parse(
-      "primitive inv(output out, input in);\n"
-      "  table\n"
-      "    0 : 1;\n"
-      "    1 : 0;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive inv(output out, input in);\n"
+                 "  table\n"
+                 "    0 : 1;\n"
+                 "    1 : 0;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
   EXPECT_EQ(udp->output_name, "out");
   ASSERT_EQ(udp->input_names.size(), 1u);
   EXPECT_EQ(udp->input_names[0], "in");
@@ -347,16 +335,15 @@ TEST(ParserAnnexA051, SingleInput) {
 // --- udp_declaration: many inputs ---
 
 TEST(ParserAnnexA051, ManyInputs) {
-  auto r = Parse(
-      "primitive gate5(output out, input a, b, c, d, e);\n"
-      "  table\n"
-      "    0 0 0 0 0 : 0;\n"
-      "    1 1 1 1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive gate5(output out, input a, b, c, d, e);\n"
+                 "  table\n"
+                 "    0 0 0 0 0 : 0;\n"
+                 "    1 1 1 1 1 : 1;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
   ASSERT_EQ(udp->input_names.size(), 5u);
   EXPECT_EQ(udp->input_names[4], "e");
   ASSERT_EQ(udp->table[0].inputs.size(), 5u);
@@ -365,13 +352,12 @@ TEST(ParserAnnexA051, ManyInputs) {
 // --- udp_declaration: endprimitive with end label on sequential ---
 
 TEST(ParserAnnexA051, EndLabelSequential) {
-  auto r = Parse(
-      "primitive dff(output reg q, input d, input clk);\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive : dff\n");
+  auto r = Parse("primitive dff(output reg q, input d, input clk);\n"
+                 "  table\n"
+                 "    0 r : ? : 0;\n"
+                 "    1 r : ? : 1;\n"
+                 "  endtable\n"
+                 "endprimitive : dff\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);
@@ -382,14 +368,13 @@ TEST(ParserAnnexA051, EndLabelSequential) {
 // --- udp_declaration: extern followed by full definition ---
 
 TEST(ParserAnnexA051, ExternThenDefinition) {
-  auto r = Parse(
-      "extern primitive inv(output out, input in);\n"
-      "primitive inv(output out, input in);\n"
-      "  table\n"
-      "    0 : 1;\n"
-      "    1 : 0;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("extern primitive inv(output out, input in);\n"
+                 "primitive inv(output out, input in);\n"
+                 "  table\n"
+                 "    0 : 1;\n"
+                 "    1 : 0;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 2u);
@@ -402,19 +387,18 @@ TEST(ParserAnnexA051, ExternThenDefinition) {
 // --- udp_declaration: wildcard port form primitive id ( .* ) ---
 
 TEST(ParserAnnexA051, WildcardPort) {
-  auto r = Parse(
-      "primitive inv(.*);\n"
-      "  output out;\n"
-      "  input in;\n"
-      "  table\n"
-      "    0 : 1;\n"
-      "    1 : 0;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive inv(.*);\n"
+                 "  output out;\n"
+                 "  input in;\n"
+                 "  table\n"
+                 "    0 : 1;\n"
+                 "    1 : 0;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
   EXPECT_EQ(udp->name, "inv");
   EXPECT_EQ(udp->output_name, "out");
   ASSERT_EQ(udp->input_names.size(), 1u);
@@ -425,20 +409,19 @@ TEST(ParserAnnexA051, WildcardPort) {
 // --- udp_declaration: wildcard port with sequential ---
 
 TEST(ParserAnnexA051, WildcardPortSequential) {
-  auto r = Parse(
-      "primitive dff(.*);\n"
-      "  output reg q;\n"
-      "  input d;\n"
-      "  input clk;\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive dff(.*);\n"
+                 "  output reg q;\n"
+                 "  input d;\n"
+                 "  input clk;\n"
+                 "  table\n"
+                 "    0 r : ? : 0;\n"
+                 "    1 r : ? : 1;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
   EXPECT_EQ(udp->name, "dff");
   EXPECT_TRUE(udp->is_sequential);
   EXPECT_EQ(udp->output_name, "q");
@@ -448,19 +431,18 @@ TEST(ParserAnnexA051, WildcardPortSequential) {
 // --- udp_nonansi_declaration: non-ANSI with separate port declarations ---
 
 TEST(ParserAnnexA051, NonAnsiWithPortDecls) {
-  auto r = Parse(
-      "primitive inv(out, in);\n"
-      "  output out;\n"
-      "  input in;\n"
-      "  table\n"
-      "    0 : 1;\n"
-      "    1 : 0;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive inv(out, in);\n"
+                 "  output out;\n"
+                 "  input in;\n"
+                 "  table\n"
+                 "    0 : 1;\n"
+                 "    1 : 0;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
   EXPECT_EQ(udp->name, "inv");
   EXPECT_EQ(udp->output_name, "out");
   ASSERT_EQ(udp->input_names.size(), 1u);
@@ -470,20 +452,19 @@ TEST(ParserAnnexA051, NonAnsiWithPortDecls) {
 // --- udp_nonansi_declaration: non-ANSI sequential with reg declaration ---
 
 TEST(ParserAnnexA051, NonAnsiSequentialWithReg) {
-  auto r = Parse(
-      "primitive dff(q, d, clk);\n"
-      "  output reg q;\n"
-      "  input d;\n"
-      "  input clk;\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive dff(q, d, clk);\n"
+                 "  output reg q;\n"
+                 "  input d;\n"
+                 "  input clk;\n"
+                 "  table\n"
+                 "    0 r : ? : 0;\n"
+                 "    1 r : ? : 1;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
   EXPECT_EQ(udp->name, "dff");
   EXPECT_TRUE(udp->is_sequential);
   EXPECT_EQ(udp->output_name, "q");
@@ -499,18 +480,17 @@ TEST(ParserAnnexA051, NonAnsiSequentialWithReg) {
 // --- Combinational UDP evaluation ---
 
 TEST(ParserAnnexA051, SimCombinationalEval) {
-  auto r = Parse(
-      "primitive and_gate(output out, input a, input b);\n"
-      "  table\n"
-      "    0 0 : 0;\n"
-      "    0 1 : 0;\n"
-      "    1 0 : 0;\n"
-      "    1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive and_gate(output out, input a, input b);\n"
+                 "  table\n"
+                 "    0 0 : 0;\n"
+                 "    0 1 : 0;\n"
+                 "    1 0 : 0;\n"
+                 "    1 1 : 1;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
 
   UdpEvalState state(*udp);
   EXPECT_EQ(state.Evaluate({'0', '0'}), '0');
@@ -522,18 +502,17 @@ TEST(ParserAnnexA051, SimCombinationalEval) {
 // --- Sequential UDP evaluation with initial value ---
 
 TEST(ParserAnnexA051, SimSequentialWithInitial) {
-  auto r = Parse(
-      "primitive latch(output reg q, input d, input en);\n"
-      "  initial q = 1'b0;\n"
-      "  table\n"
-      "    ? 0 : ? : -;\n"
-      "    0 1 : ? : 0;\n"
-      "    1 1 : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive latch(output reg q, input d, input en);\n"
+                 "  initial q = 1'b0;\n"
+                 "  table\n"
+                 "    ? 0 : ? : -;\n"
+                 "    0 1 : ? : 0;\n"
+                 "    1 1 : ? : 1;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
 
   UdpEvalState state(*udp);
   EXPECT_EQ(state.GetOutput(), '0');
@@ -551,19 +530,18 @@ TEST(ParserAnnexA051, SimSequentialWithInitial) {
 // --- Sequential UDP edge-sensitive evaluation ---
 
 TEST(ParserAnnexA051, SimSequentialEdgeSensitive) {
-  auto r = Parse(
-      "primitive dff(output reg q, input d, input clk);\n"
-      "  initial q = 1'bx;\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "    ? f : ? : -;\n"
-      "    * ? : ? : -;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive dff(output reg q, input d, input clk);\n"
+                 "  initial q = 1'bx;\n"
+                 "  table\n"
+                 "    0 r : ? : 0;\n"
+                 "    1 r : ? : 1;\n"
+                 "    ? f : ? : -;\n"
+                 "    * ? : ? : -;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
 
   UdpEvalState state(*udp);
   EXPECT_EQ(state.GetOutput(), 'x');
@@ -585,18 +563,17 @@ TEST(ParserAnnexA051, SimSequentialEdgeSensitive) {
 // --- Combinational UDP with wildcard matching in simulation ---
 
 TEST(ParserAnnexA051, SimCombinationalWildcard) {
-  auto r = Parse(
-      "primitive mux(output out, input a, b, sel);\n"
-      "  table\n"
-      "    0 ? 0 : 0;\n"
-      "    1 ? 0 : 1;\n"
-      "    ? 0 1 : 0;\n"
-      "    ? 1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive mux(output out, input a, b, sel);\n"
+                 "  table\n"
+                 "    0 ? 0 : 0;\n"
+                 "    1 ? 0 : 1;\n"
+                 "    ? 0 1 : 0;\n"
+                 "    ? 1 1 : 1;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
 
   UdpEvalState state(*udp);
   EXPECT_EQ(state.Evaluate({'0', '1', '0'}), '0');
@@ -608,16 +585,15 @@ TEST(ParserAnnexA051, SimCombinationalWildcard) {
 // --- Unmatched inputs produce x ---
 
 TEST(ParserAnnexA051, SimUnmatchedInputsX) {
-  auto r = Parse(
-      "primitive partial(output out, input a, input b);\n"
-      "  table\n"
-      "    0 0 : 0;\n"
-      "    1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive partial(output out, input a, input b);\n"
+                 "  table\n"
+                 "    0 0 : 0;\n"
+                 "    1 1 : 1;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
 
   UdpEvalState state(*udp);
   EXPECT_EQ(state.Evaluate({'0', '1'}), 'x');

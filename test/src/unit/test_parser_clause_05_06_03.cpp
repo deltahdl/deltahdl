@@ -15,10 +15,10 @@ using namespace delta;
 struct ParseResult50603 {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult50603 Parse(const std::string& src) {
+static ParseResult50603 Parse(const std::string &src) {
   ParseResult50603 result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -28,7 +28,7 @@ static ParseResult50603 Parse(const std::string& src) {
   return result;
 }
 
-static bool ParseOk(const std::string& src) {
+static bool ParseOk(const std::string &src) {
   SourceManager mgr;
   Arena arena;
   auto fid = mgr.AddFile("<test>", src);
@@ -39,8 +39,8 @@ static bool ParseOk(const std::string& src) {
   return !diag.HasErrors();
 }
 
-static Stmt* FirstInitialStmt(ParseResult50603& r) {
-  for (auto* item : r.cu->modules[0]->items) {
+static Stmt *FirstInitialStmt(ParseResult50603 &r) {
+  for (auto *item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kInitialBlock) {
       if (item->body && item->body->kind == StmtKind::kBlock) {
         return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
@@ -53,12 +53,11 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 
 TEST(ParserCh50603, SystemTask_Display) {
   // $display is a system task call (Section 5.6.3, Section 21.2).
-  auto r = Parse(
-      "module m;\n"
-      "  initial $display(\"hello\");\n"
-      "endmodule");
+  auto r = Parse("module m;\n"
+                 "  initial $display(\"hello\");\n"
+                 "endmodule");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
   ASSERT_NE(stmt->expr, nullptr);
@@ -72,8 +71,7 @@ TEST(ParserCh50603, SystemTask_FinishNoArgs) {
 
 TEST(ParserCh50603, SystemFunction_InExpression) {
   // A system function like $clog2 used inside an expression.
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  parameter W = $clog2(256);\n"
-              "endmodule"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  parameter W = $clog2(256);\n"
+                      "endmodule"));
 }

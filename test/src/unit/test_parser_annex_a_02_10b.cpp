@@ -15,11 +15,11 @@ namespace {
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
   bool has_errors = false;
 };
 
-ParseResult Parse(const std::string& src) {
+ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -30,7 +30,7 @@ ParseResult Parse(const std::string& src) {
   return result;
 }
 
-static bool ParseOk(const std::string& src) {
+static bool ParseOk(const std::string &src) {
   SourceManager mgr;
   Arena arena;
   auto fid = mgr.AddFile("<test>", src);
@@ -41,10 +41,11 @@ static bool ParseOk(const std::string& src) {
   return !diag.HasErrors();
 }
 
-static ModuleItem* FindItemByKind(const std::vector<ModuleItem*>& items,
+static ModuleItem *FindItemByKind(const std::vector<ModuleItem *> &items,
                                   ModuleItemKind kind) {
-  for (auto* item : items) {
-    if (item->kind == kind) return item;
+  for (auto *item : items) {
+    if (item->kind == kind)
+      return item;
   }
   return nullptr;
 }
@@ -57,24 +58,22 @@ static ModuleItem* FindItemByKind(const std::vector<ModuleItem*>& items,
 // =============================================================================
 
 TEST(ParserA210, PropertyCaseItem_MultiExpr) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk)\n"
-              "    case (sel)\n"
-              "      2'b00, 2'b01: a |-> b;\n"
-              "      default: 1;\n"
-              "    endcase);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk)\n"
+                      "    case (sel)\n"
+                      "      2'b00, 2'b01: a |-> b;\n"
+                      "      default: 1;\n"
+                      "    endcase);\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA210, PropertyCaseItem_DefaultOnly) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk)\n"
-              "    case (sel)\n"
-              "      default: a;\n"
-              "    endcase);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk)\n"
+                      "    case (sel)\n"
+                      "      default: a;\n"
+                      "    endcase);\n"
+                      "endmodule\n"));
 }
 
 // =============================================================================
@@ -87,37 +86,34 @@ TEST(ParserA210, PropertyCaseItem_DefaultOnly) {
 // =============================================================================
 
 TEST(ParserA210, SequenceDecl_WithEndLabel) {
-  auto r = Parse(
-      "module m;\n"
-      "  sequence s_req;\n"
-      "    req ##[1:3] ack;\n"
-      "  endsequence : s_req\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  sequence s_req;\n"
+                 "    req ##[1:3] ack;\n"
+                 "  endsequence : s_req\n"
+                 "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto* item =
+  auto *item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kSequenceDecl);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "s_req");
 }
 
 TEST(ParserA210, SequenceDecl_WithPortList) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  sequence s(a, b);\n"
-              "    a ##1 b;\n"
-              "  endsequence\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  sequence s(a, b);\n"
+                      "    a ##1 b;\n"
+                      "  endsequence\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA210, SequenceDecl_SourceLoc) {
-  auto r = Parse(
-      "module m;\n"
-      "  sequence my_seq;\n"
-      "    a;\n"
-      "  endsequence\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  sequence my_seq;\n"
+                 "    a;\n"
+                 "  endsequence\n"
+                 "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto* item =
+  auto *item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kSequenceDecl);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->loc.IsValid());
@@ -132,12 +128,11 @@ TEST(ParserA210, SequenceDecl_SourceLoc) {
 // =============================================================================
 
 TEST(ParserA210, SequencePortItem_LocalInout) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  sequence s(local inout int x);\n"
-              "    x > 0;\n"
-              "  endsequence\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  sequence s(local inout int x);\n"
+                      "    x > 0;\n"
+                      "  endsequence\n"
+                      "endmodule\n"));
 }
 
 // =============================================================================
@@ -146,21 +141,19 @@ TEST(ParserA210, SequencePortItem_LocalInout) {
 // =============================================================================
 
 TEST(ParserA210, SequenceLvarPortDirection_Input) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  sequence s(local input int x);\n"
-              "    x;\n"
-              "  endsequence\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  sequence s(local input int x);\n"
+                      "    x;\n"
+                      "  endsequence\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA210, SequenceLvarPortDirection_Output) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  sequence s(local output int x);\n"
-              "    (1, x = a) ##1 (1, x = b);\n"
-              "  endsequence\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  sequence s(local output int x);\n"
+                      "    (1, x = a) ##1 (1, x = b);\n"
+                      "  endsequence\n"
+                      "endmodule\n"));
 }
 
 // =============================================================================
@@ -169,30 +162,27 @@ TEST(ParserA210, SequenceLvarPortDirection_Output) {
 // =============================================================================
 
 TEST(ParserA210, SequenceFormalType_Sequence) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  sequence s(sequence sub_seq);\n"
-              "    sub_seq ##1 a;\n"
-              "  endsequence\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  sequence s(sequence sub_seq);\n"
+                      "    sub_seq ##1 a;\n"
+                      "  endsequence\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA210, SequenceFormalType_Untyped) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  sequence s(untyped x);\n"
-              "    x ##1 a;\n"
-              "  endsequence\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  sequence s(untyped x);\n"
+                      "    x ##1 a;\n"
+                      "  endsequence\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA210, SequenceFormalType_DataType) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  sequence s(int x);\n"
-              "    x > 0;\n"
-              "  endsequence\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  sequence s(int x);\n"
+                      "    x > 0;\n"
+                      "  endsequence\n"
+                      "endmodule\n"));
 }
 
 // =============================================================================
@@ -201,87 +191,77 @@ TEST(ParserA210, SequenceFormalType_DataType) {
 
 // sequence_expr ::= cycle_delay_range sequence_expr ...
 TEST(ParserA210, SequenceExpr_CycleDelay) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk) ##2 a);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk) ##2 a);\n"
+                      "endmodule\n"));
 }
 
 // sequence_expr ::= sequence_expr cycle_delay_range sequence_expr ...
 TEST(ParserA210, SequenceExpr_Concatenation) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk) a ##1 b ##2 c);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk) a ##1 b ##2 c);\n"
+                      "endmodule\n"));
 }
 
 // sequence_expr ::= expression_or_dist [ boolean_abbrev ]
 TEST(ParserA210, SequenceExpr_ExprWithBooleanAbbrev) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk) a [*3]);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk) a [*3]);\n"
+                      "endmodule\n"));
 }
 
 // sequence_expr ::= ( sequence_expr {, sequence_match_item} ) [sequence_abbrev]
 TEST(ParserA210, SequenceExpr_ParenWithMatchItems) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk)\n"
-              "    (a ##1 b, x = c) |-> d);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk)\n"
+                      "    (a ##1 b, x = c) |-> d);\n"
+                      "endmodule\n"));
 }
 
 // sequence_expr ::= sequence_expr and sequence_expr
 TEST(ParserA210, SequenceExpr_And) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk) a and b);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk) a and b);\n"
+                      "endmodule\n"));
 }
 
 // sequence_expr ::= sequence_expr intersect sequence_expr
 TEST(ParserA210, SequenceExpr_Intersect) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk)\n"
-              "    (a ##1 b) intersect (c ##1 d));\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk)\n"
+                      "    (a ##1 b) intersect (c ##1 d));\n"
+                      "endmodule\n"));
 }
 
 // sequence_expr ::= sequence_expr or sequence_expr
 TEST(ParserA210, SequenceExpr_Or) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk) a or b);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk) a or b);\n"
+                      "endmodule\n"));
 }
 
 // sequence_expr ::= first_match ( sequence_expr {, sequence_match_item} )
 TEST(ParserA210, SequenceExpr_FirstMatch) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk)\n"
-              "    first_match(a ##[1:5] b));\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk)\n"
+                      "    first_match(a ##[1:5] b));\n"
+                      "endmodule\n"));
 }
 
 // sequence_expr ::= expression_or_dist throughout sequence_expr
 TEST(ParserA210, SequenceExpr_Throughout) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk)\n"
-              "    en throughout (a ##1 b ##1 c));\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk)\n"
+                      "    en throughout (a ##1 b ##1 c));\n"
+                      "endmodule\n"));
 }
 
 // sequence_expr ::= sequence_expr within sequence_expr
 TEST(ParserA210, SequenceExpr_Within) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk)\n"
-              "    (a ##1 b) within (c ##[1:5] d));\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk)\n"
+                      "    (a ##1 b) within (c ##[1:5] d));\n"
+                      "endmodule\n"));
 }
 
 // sequence_expr ::= clocking_event sequence_expr
@@ -302,45 +282,39 @@ TEST(ParserA210, SequenceExpr_ClockingEvent) {
 // =============================================================================
 
 TEST(ParserA210, CycleDelayRange_Constant) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk) a ##1 b);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk) a ##1 b);\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA210, CycleDelayRange_Range) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk) a ##[1:5] b);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk) a ##[1:5] b);\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA210, CycleDelayRange_OpenEndRange) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk) a ##[1:$] b);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk) a ##[1:$] b);\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA210, CycleDelayRange_Star) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk) ##[*] a);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk) ##[*] a);\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA210, CycleDelayRange_Plus) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk) ##[+] a);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk) ##[+] a);\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA210, CycleDelayRange_Zero) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk) a ##0 b);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk) a ##0 b);\n"
+                      "endmodule\n"));
 }
 
 // =============================================================================
@@ -349,19 +323,17 @@ TEST(ParserA210, CycleDelayRange_Zero) {
 // =============================================================================
 
 TEST(ParserA210, SequenceMethodCall_Triggered) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  sequence s; a ##1 b; endsequence\n"
-              "  assert property (@(posedge clk) s.triggered |-> c);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  sequence s; a ##1 b; endsequence\n"
+                      "  assert property (@(posedge clk) s.triggered |-> c);\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA210, SequenceMethodCall_Matched) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  sequence s; a ##1 b; endsequence\n"
-              "  assert property (@(posedge clk) s.matched |-> c);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  sequence s; a ##1 b; endsequence\n"
+                      "  assert property (@(posedge clk) s.matched |-> c);\n"
+                      "endmodule\n"));
 }
 
 // =============================================================================
@@ -371,11 +343,10 @@ TEST(ParserA210, SequenceMethodCall_Matched) {
 // =============================================================================
 
 TEST(ParserA210, SequenceMatchItem_Assignment) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk)\n"
-              "    (a ##1 b, x = c) |-> d);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk)\n"
+                      "    (a ##1 b, x = c) |-> d);\n"
+                      "endmodule\n"));
 }
 
 // =============================================================================
@@ -386,12 +357,11 @@ TEST(ParserA210, SequenceMatchItem_Assignment) {
 // =============================================================================
 
 TEST(ParserA210, SequenceInstance_InProperty) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  sequence s; a ##1 b; endsequence\n"
-              "  property p; s |-> c; endproperty\n"
-              "  assert property (p);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  sequence s; a ##1 b; endsequence\n"
+                      "  property p; s |-> c; endproperty\n"
+                      "  assert property (p);\n"
+                      "endmodule\n"));
 }
 
 // =============================================================================
@@ -399,11 +369,10 @@ TEST(ParserA210, SequenceInstance_InProperty) {
 // =============================================================================
 
 TEST(ParserA210, SequenceListOfArguments_Positional) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  sequence s(a, b); a ##1 b; endsequence\n"
-              "  assert property (@(posedge clk) s(x, y));\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  sequence s(a, b); a ##1 b; endsequence\n"
+                      "  assert property (@(posedge clk) s(x, y));\n"
+                      "endmodule\n"));
 }
 
 // =============================================================================
@@ -412,11 +381,10 @@ TEST(ParserA210, SequenceListOfArguments_Positional) {
 // =============================================================================
 
 TEST(ParserA210, SequenceActualArg_Dollar) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  sequence s(a, b); a ##1 b; endsequence\n"
-              "  assert property (@(posedge clk) s(x, $));\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  sequence s(a, b); a ##1 b; endsequence\n"
+                      "  assert property (@(posedge clk) s(x, $));\n"
+                      "endmodule\n"));
 }
 
 // =============================================================================
@@ -432,31 +400,27 @@ TEST(ParserA210, SequenceActualArg_Dollar) {
 // consecutive_repetition ::= [* const_or_range_expression ] | [*] | [+]
 
 TEST(ParserA210, ConsecutiveRepetition_Exact) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk) a [*3] |-> b);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk) a [*3] |-> b);\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA210, ConsecutiveRepetition_Range) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk) a [*1:3] |-> b);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk) a [*1:3] |-> b);\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA210, ConsecutiveRepetition_Star) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk) a [*] ##1 b);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk) a [*] ##1 b);\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA210, ConsecutiveRepetition_Plus) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk) a [+] ##1 b);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk) a [+] ##1 b);\n"
+                      "endmodule\n"));
 }
 
 // =============================================================================
@@ -465,17 +429,15 @@ TEST(ParserA210, ConsecutiveRepetition_Plus) {
 // =============================================================================
 
 TEST(ParserA210, NonconsecutiveRepetition) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk) a [=3] |-> b);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk) a [=3] |-> b);\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA210, NonconsecutiveRepetition_Range) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk) a [=1:3] |-> b);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk) a [=1:3] |-> b);\n"
+                      "endmodule\n"));
 }
 
 // =============================================================================
@@ -484,17 +446,15 @@ TEST(ParserA210, NonconsecutiveRepetition_Range) {
 // =============================================================================
 
 TEST(ParserA210, GotoRepetition_Exact) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk) a [->2] |-> b);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk) a [->2] |-> b);\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA210, GotoRepetition_Range) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk) a [->1:3] |-> b);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk) a [->1:3] |-> b);\n"
+                      "endmodule\n"));
 }
 
 // =============================================================================
@@ -504,17 +464,15 @@ TEST(ParserA210, GotoRepetition_Range) {
 // =============================================================================
 
 TEST(ParserA210, ConstOrRangeExpr_Constant) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk) a [*5]);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk) a [*5]);\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA210, ConstOrRangeExpr_Range) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk) a [*2:8]);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk) a [*2:8]);\n"
+                      "endmodule\n"));
 }
 
 // =============================================================================
@@ -525,17 +483,15 @@ TEST(ParserA210, ConstOrRangeExpr_Range) {
 // =============================================================================
 
 TEST(ParserA210, CycleDelayConstRange_FiniteRange) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk) a ##[2:5] b);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk) a ##[2:5] b);\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA210, CycleDelayConstRange_OpenEnd) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk) a ##[1:$] b);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk) a ##[1:$] b);\n"
+                      "endmodule\n"));
 }
 
 // =============================================================================
@@ -545,23 +501,21 @@ TEST(ParserA210, CycleDelayConstRange_OpenEnd) {
 // =============================================================================
 
 TEST(ParserA210, AssertionVariableDecl_InProperty) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  property p;\n"
-              "    int x;\n"
-              "    (a, x = b) |-> (c == x);\n"
-              "  endproperty\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  property p;\n"
+                      "    int x;\n"
+                      "    (a, x = b) |-> (c == x);\n"
+                      "  endproperty\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA210, AssertionVariableDecl_InSequence) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  sequence s;\n"
-              "    int x;\n"
-              "    (a, x = b) ##1 (c == x);\n"
-              "  endsequence\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  sequence s;\n"
+                      "    int x;\n"
+                      "    (a, x = b) ##1 (c == x);\n"
+                      "  endsequence\n"
+                      "endmodule\n"));
 }
 
 // =============================================================================
@@ -569,14 +523,13 @@ TEST(ParserA210, AssertionVariableDecl_InSequence) {
 // =============================================================================
 
 TEST(ParserA210, AllFiveConcurrentAssertionTypes) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (a |-> b);\n"
-      "  assume property (c |-> d);\n"
-      "  cover property (e ##1 f);\n"
-      "  cover sequence (g ##1 h);\n"
-      "  restrict property (i |-> j);\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  assert property (a |-> b);\n"
+                 "  assume property (c |-> d);\n"
+                 "  cover property (e ##1 f);\n"
+                 "  cover sequence (g ##1 h);\n"
+                 "  restrict property (i |-> j);\n"
+                 "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty),
@@ -596,13 +549,12 @@ TEST(ParserA210, AllFiveConcurrentAssertionTypes) {
 }
 
 TEST(ParserA210, PropertyAndSequenceDeclsTogether) {
-  auto r = Parse(
-      "module m;\n"
-      "  property p; a; endproperty\n"
-      "  sequence s; b; endsequence\n"
-      "  assert property (p);\n"
-      "  cover sequence (s);\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  property p; a; endproperty\n"
+                 "  sequence s; b; endsequence\n"
+                 "  assert property (p);\n"
+                 "  cover sequence (s);\n"
+                 "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kPropertyDecl),
@@ -613,24 +565,22 @@ TEST(ParserA210, PropertyAndSequenceDeclsTogether) {
 }
 
 TEST(ParserA210, RestrictProperty_HasAssertExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  restrict property (@(posedge clk) a);\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  restrict property (@(posedge clk) a);\n"
+                 "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindItemByKind(r.cu->modules[0]->items,
+  auto *item = FindItemByKind(r.cu->modules[0]->items,
                               ModuleItemKind::kRestrictProperty);
   ASSERT_NE(item, nullptr);
   EXPECT_NE(item->assert_expr, nullptr);
 }
 
 TEST(ParserA210, CoverSequence_HasAssertExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  cover sequence (@(posedge clk) a ##1 b);\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  cover sequence (@(posedge clk) a ##1 b);\n"
+                 "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto* item =
+  auto *item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kCoverSequence);
   ASSERT_NE(item, nullptr);
   EXPECT_NE(item->assert_expr, nullptr);
@@ -643,67 +593,60 @@ TEST(ParserA210, CoverSequence_HasAssertExpr) {
 // concurrent_assertion_item ::= [ block_identifier : ]
 // concurrent_assertion_statement
 TEST(ParserA210, ConcurrentAssertionItem_Labeled) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  always @(posedge clk) begin\n"
-              "    my_check: assert(a == b);\n"
-              "  end\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  always @(posedge clk) begin\n"
+                      "    my_check: assert(a == b);\n"
+                      "  end\n"
+                      "endmodule\n"));
 }
 
 // sequence_match_item ::= inc_or_dec_expression
 TEST(ParserA210, SequenceMatchItem_IncDec) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk)\n"
-              "    (a ##1 b, x++) |-> c);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk)\n"
+                      "    (a ##1 b, x++) |-> c);\n"
+                      "endmodule\n"));
 }
 
 // sequence_match_item ::= subroutine_call
 TEST(ParserA210, SequenceMatchItem_SubroutineCall) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk)\n"
-              "    (a ##1 b, $display(\"match\")) |-> c);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk)\n"
+                      "    (a ##1 b, $display(\"match\")) |-> c);\n"
+                      "endmodule\n"));
 }
 
 // sequence_list_of_arguments — named arguments
 TEST(ParserA210, SequenceListOfArguments_Named) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  sequence s(a, b); a ##1 b; endsequence\n"
-              "  assert property (@(posedge clk) s(.a(x), .b(y)));\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  sequence s(a, b); a ##1 b; endsequence\n"
+                      "  assert property (@(posedge clk) s(.a(x), .b(y)));\n"
+                      "endmodule\n"));
 }
 
 // property_list_of_arguments — mixed positional + named
 TEST(ParserA210, PropertyListOfArguments_Mixed) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  property p(x, y, z); x |-> y ##1 z; endproperty\n"
-              "  assert property (p(a, .y(b), .z(c)));\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  property p(x, y, z); x |-> y ##1 z; endproperty\n"
+                      "  assert property (p(a, .y(b), .z(c)));\n"
+                      "endmodule\n"));
 }
 
 // sequence_actual_arg ::= event_expression
 TEST(ParserA210, SequenceActualArg_EventExpr) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  sequence s(a, b); a ##1 b; endsequence\n"
-              "  assert property (@(posedge clk) s(posedge x, y));\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  sequence s(a, b); a ##1 b; endsequence\n"
+                      "  assert property (@(posedge clk) s(posedge x, y));\n"
+                      "endmodule\n"));
 }
 
 // assume_property_statement with no action block
 TEST(ParserA210, AssumeProperty_NoActionBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  assume property (@(posedge clk) req |-> ack);\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  assume property (@(posedge clk) req |-> ack);\n"
+                 "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto* item =
+  auto *item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssumeProperty);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->assert_pass_stmt, nullptr);
@@ -712,74 +655,67 @@ TEST(ParserA210, AssumeProperty_NoActionBlock) {
 
 // property_port_list — empty port list
 TEST(ParserA210, PropertyPortList_Empty) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  property p();\n"
-              "    a |-> b;\n"
-              "  endproperty\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  property p();\n"
+                      "    a |-> b;\n"
+                      "  endproperty\n"
+                      "endmodule\n"));
 }
 
 // sequence_port_item with default value
 TEST(ParserA210, SequencePortItem_DefaultValue) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  sequence s(a, b = 1'b1);\n"
-              "    a ##1 b;\n"
-              "  endsequence\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  sequence s(a, b = 1'b1);\n"
+                      "    a ##1 b;\n"
+                      "  endsequence\n"
+                      "endmodule\n"));
 }
 
 // sequence_instance with sequence_abbrev
 TEST(ParserA210, SequenceExpr_SequenceInstanceWithAbbrev) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  sequence s; a ##1 b; endsequence\n"
-              "  assert property (@(posedge clk) s [*3] |-> c);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  sequence s; a ##1 b; endsequence\n"
+                      "  assert property (@(posedge clk) s [*3] |-> c);\n"
+                      "endmodule\n"));
 }
 
 // sequence_list_of_arguments — mixed positional + named
 TEST(ParserA210, SequenceListOfArguments_Mixed) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  sequence s(a, b, c); a ##1 b ##1 c; endsequence\n"
-              "  assert property (@(posedge clk) s(x, .b(y), .c(z)));\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  sequence s(a, b, c); a ##1 b ##1 c; endsequence\n"
+                      "  assert property (@(posedge clk) s(x, .b(y), .c(z)));\n"
+                      "endmodule\n"));
 }
 
 // assertion_variable_declaration — multiple vars and complex type
 TEST(ParserA210, AssertionVariableDecl_MultipleVars) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  property p;\n"
-              "    int x;\n"
-              "    logic [7:0] y;\n"
-              "    (a, x = b) |-> (c == x);\n"
-              "  endproperty\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  property p;\n"
+                      "    int x;\n"
+                      "    logic [7:0] y;\n"
+                      "    (a, x = b) |-> (c == x);\n"
+                      "  endproperty\n"
+                      "endmodule\n"));
 }
 
 // property_case_item — default without colon
 TEST(ParserA210, PropertyCaseItem_DefaultNoColon) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk)\n"
-              "    case (sel)\n"
-              "      2'b00: a |-> b;\n"
-              "      default a;\n"
-              "    endcase);\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  assert property (@(posedge clk)\n"
+                      "    case (sel)\n"
+                      "      2'b00: a |-> b;\n"
+                      "      default a;\n"
+                      "    endcase);\n"
+                      "endmodule\n"));
 }
 
 // property_formal_type — implicit (no type)
 TEST(ParserA210, PropertyFormalType_Implicit) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  property p(x);\n"
-              "    x;\n"
-              "  endproperty\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  property p(x);\n"
+                      "    x;\n"
+                      "  endproperty\n"
+                      "endmodule\n"));
 }
 
-}  // namespace
+} // namespace

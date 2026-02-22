@@ -14,8 +14,8 @@ using namespace delta;
 namespace {
 
 struct ConfigParseTest : ::testing::Test {
- protected:
-  CompilationUnit* Parse(const std::string& src) {
+protected:
+  CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
     parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
@@ -35,7 +35,7 @@ struct ConfigParseTest : ::testing::Test {
 // =============================================================================
 
 TEST_F(ConfigParseTest, BasicConfig) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     config cfg;
       design lib.top;
     endconfig
@@ -45,7 +45,7 @@ TEST_F(ConfigParseTest, BasicConfig) {
 }
 
 TEST_F(ConfigParseTest, ConfigWithEndLabel) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     config cfg;
       design lib.top;
     endconfig : cfg
@@ -55,7 +55,7 @@ TEST_F(ConfigParseTest, ConfigWithEndLabel) {
 }
 
 TEST_F(ConfigParseTest, ConfigWithDefaultClause) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     config cfg;
       design lib.top;
       default liblist lib1 lib2;
@@ -66,7 +66,7 @@ TEST_F(ConfigParseTest, ConfigWithDefaultClause) {
 }
 
 TEST_F(ConfigParseTest, ConfigWithInstanceClause) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     config cfg;
       design lib.top;
       instance top.u1 liblist lib2;
@@ -77,7 +77,7 @@ TEST_F(ConfigParseTest, ConfigWithInstanceClause) {
 }
 
 TEST_F(ConfigParseTest, ConfigWithCellClause) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     config cfg;
       design lib.top;
       cell top use lib.other;
@@ -88,7 +88,7 @@ TEST_F(ConfigParseTest, ConfigWithCellClause) {
 }
 
 TEST_F(ConfigParseTest, ConfigCoexistsWithModule) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     module m;
     endmodule
     config cfg;
@@ -101,7 +101,7 @@ TEST_F(ConfigParseTest, ConfigCoexistsWithModule) {
 }
 
 TEST_F(ConfigParseTest, MultipleConfigs) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     config cfg1;
       design lib.top1;
     endconfig
@@ -114,4 +114,4 @@ TEST_F(ConfigParseTest, MultipleConfigs) {
   EXPECT_EQ(unit->configs[1]->name, "cfg2");
 }
 
-}  // namespace
+} // namespace

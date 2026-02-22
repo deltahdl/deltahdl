@@ -1,9 +1,9 @@
 // §non_lrm
 
-#include <gtest/gtest.h>
-#include <string>
 #include "synthesis/aig.h"
 #include "synthesis/netlist_writer.h"
+#include <gtest/gtest.h>
+#include <string>
 
 using namespace delta;
 
@@ -134,8 +134,8 @@ TEST(NetlistWriter, BlifMultiInputMultiOutput) {
   EXPECT_NE(blif.find(".model multi"), std::string::npos);
   EXPECT_NE(blif.find(".end"), std::string::npos);
   // Three inputs and three outputs.
-  const char* const kExpectedNames[] = {"i0", "i1", "i2", "o0", "o1", "o2"};
-  for (const char* name : kExpectedNames) {
+  const char *const kExpectedNames[] = {"i0", "i1", "i2", "o0", "o1", "o2"};
+  for (const char *name : kExpectedNames) {
     EXPECT_NE(blif.find(name), std::string::npos);
   }
 }
@@ -159,4 +159,4 @@ TEST(NetlistWriter, DispatchByFormat) {
   EXPECT_NE(edif.find("test"), std::string::npos);
 }
 
-}  // namespace
+} // namespace

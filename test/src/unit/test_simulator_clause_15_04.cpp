@@ -1,8 +1,5 @@
 // §15.4: Mailboxes
 
-#include <gtest/gtest.h>
-#include <cstdint>
-#include <string_view>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -17,6 +14,9 @@
 #include "simulation/stmt_result.h"
 #include "simulation/sync_objects.h"
 #include "simulation/variable.h"
+#include <cstdint>
+#include <gtest/gtest.h>
+#include <string_view>
 
 using namespace delta;
 
@@ -51,14 +51,14 @@ TEST(IpcSync, MailboxTryGetFifoOrder) {
 // =============================================================================
 TEST(IpcSync, MailboxContextCreateFind) {
   SyncFixture f;
-  auto* mb = f.ctx.CreateMailbox("mbox1", 10);
+  auto *mb = f.ctx.CreateMailbox("mbox1", 10);
   ASSERT_NE(mb, nullptr);
   EXPECT_EQ(mb->bound, 10);
 
-  auto* found = f.ctx.FindMailbox("mbox1");
+  auto *found = f.ctx.FindMailbox("mbox1");
   EXPECT_EQ(found, mb);
 
-  auto* not_found = f.ctx.FindMailbox("no_such_mbox");
+  auto *not_found = f.ctx.FindMailbox("no_such_mbox");
   EXPECT_EQ(not_found, nullptr);
 }
 
@@ -97,7 +97,7 @@ TEST(IpcSync, MailboxIsFullUnbounded) {
   for (int i = 0; i < 1000; ++i) {
     mb.TryPut(static_cast<uint64_t>(i));
   }
-  EXPECT_FALSE(mb.IsFull());  // Unbounded never full.
+  EXPECT_FALSE(mb.IsFull()); // Unbounded never full.
 }
 
 // =============================================================================
@@ -120,8 +120,8 @@ TEST(IpcSync, MailboxParameterizedTypeValues) {
 // =============================================================================
 TEST(IpcSync, MultipleMailboxesInContext) {
   SyncFixture f;
-  auto* mb1 = f.ctx.CreateMailbox("m1", 0);
-  auto* mb2 = f.ctx.CreateMailbox("m2", 3);
+  auto *mb1 = f.ctx.CreateMailbox("m1", 0);
+  auto *mb2 = f.ctx.CreateMailbox("m2", 3);
   mb1->TryPut(100);
   mb2->TryPut(200);
   uint64_t msg = 0;
@@ -131,4 +131,4 @@ TEST(IpcSync, MultipleMailboxesInContext) {
   EXPECT_EQ(msg, 200u);
 }
 
-}  // namespace
+} // namespace

@@ -15,10 +15,10 @@ using namespace delta;
 struct ParseResult505 {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult505 Parse(const std::string& src) {
+static ParseResult505 Parse(const std::string &src) {
   ParseResult505 result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -28,7 +28,7 @@ static ParseResult505 Parse(const std::string& src) {
   return result;
 }
 
-static bool ParseOk(const std::string& src) {
+static bool ParseOk(const std::string &src) {
   SourceManager mgr;
   Arena arena;
   auto fid = mgr.AddFile("<test>", src);
@@ -39,8 +39,8 @@ static bool ParseOk(const std::string& src) {
   return !diag.HasErrors();
 }
 
-static Stmt* FirstInitialStmt(ParseResult505& r) {
-  for (auto* item : r.cu->modules[0]->items) {
+static Stmt *FirstInitialStmt(ParseResult505 &r) {
+  for (auto *item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kInitialBlock) {
       if (item->body && item->body->kind == StmtKind::kBlock) {
         return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
@@ -52,42 +52,39 @@ static Stmt* FirstInitialStmt(ParseResult505& r) {
 }
 
 TEST(ParserCh505, Operator_UnaryBitwiseNegate) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = ~y;\n"
-      "endmodule");
+  auto r = Parse("module m;\n"
+                 "  initial x = ~y;\n"
+                 "endmodule");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
+  auto *rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kTilde);
 }
 
 TEST(ParserCh505, Operator_BinaryAdd) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = a + b;\n"
-      "endmodule");
+  auto r = Parse("module m;\n"
+                 "  initial x = a + b;\n"
+                 "endmodule");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
+  auto *rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
 }
 
 TEST(ParserCh505, Operator_Ternary) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = sel ? a : b;\n"
-      "endmodule");
+  auto r = Parse("module m;\n"
+                 "  initial x = sel ? a : b;\n"
+                 "endmodule");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
+  auto *rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
   ASSERT_NE(rhs->condition, nullptr);
@@ -105,14 +102,13 @@ TEST(ParserCh505, Operator_ArithShiftRight) {
 
 TEST(ParserCh505, Operator_CaseEquality) {
   // === is the case equality operator.
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = (a === b);\n"
-      "endmodule");
+  auto r = Parse("module m;\n"
+                 "  initial x = (a === b);\n"
+                 "endmodule");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
+  auto *rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kEqEqEq);
@@ -124,14 +120,13 @@ TEST(ParserCh505, Operator_CaseInequality) {
 }
 
 TEST(ParserCh505, Operator_ReductionAnd) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = &y;\n"
-      "endmodule");
+  auto r = Parse("module m;\n"
+                 "  initial x = &y;\n"
+                 "endmodule");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
+  auto *rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kAmp);

@@ -1,10 +1,10 @@
 // §6.7.1: Net declarations with built-in net types
 
-#include <gtest/gtest.h>
-#include <cstdint>
 #include "common/arena.h"
 #include "simulation/net.h"
 #include "simulation/variable.h"
+#include <cstdint>
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -39,23 +39,27 @@ struct NetDeclInfo {
   NetDataTypeKind data_kind = NetDataTypeKind::k4StateIntegral;
 };
 
-bool ValidateNetDecl(const NetDeclInfo& info);
+bool ValidateNetDecl(const NetDeclInfo &info);
 
 bool ValidateNetDataType(NetDataTypeKind kind);
 
-void InitializeNet(Net& net, NetType type, Arena& arena);
+void InitializeNet(Net &net, NetType type, Arena &arena);
 
-void InitializeTriregNet(Net& net, LocalChargeStrength str, Arena& arena);
+void InitializeTriregNet(Net &net, LocalChargeStrength str, Arena &arena);
 
-static bool ValidateInterconnectDecl(const NetDeclInfo& info) {
-  if (info.has_data_type) return false;
-  if (info.has_drive_strength) return false;
-  if (info.has_charge_strength) return false;
-  if (info.has_assignment) return false;
+static bool ValidateInterconnectDecl(const NetDeclInfo &info) {
+  if (info.has_data_type)
+    return false;
+  if (info.has_drive_strength)
+    return false;
+  if (info.has_charge_strength)
+    return false;
+  if (info.has_assignment)
+    return false;
   return info.delay_count <= 1;
 }
 
-bool ValidateNetDecl(const NetDeclInfo& info) {
+bool ValidateNetDecl(const NetDeclInfo &info) {
   // Charge strength only allowed on trireg.
   if (info.has_charge_strength && info.type != NetType::kTrireg &&
       !info.is_interconnect)
@@ -64,25 +68,26 @@ bool ValidateNetDecl(const NetDeclInfo& info) {
   if ((info.is_vectored || info.is_scalared) && info.packed_dim_count == 0)
     return false;
   // Interconnect constraints.
-  if (info.is_interconnect) return ValidateInterconnectDecl(info);
+  if (info.is_interconnect)
+    return ValidateInterconnectDecl(info);
   return true;
 }
 
 bool ValidateNetDataType(NetDataTypeKind kind) {
   switch (kind) {
-    case NetDataTypeKind::k4StateIntegral:
-    case NetDataTypeKind::kFixedUnpackedValid:
-      return true;
-    case NetDataTypeKind::k2StateIntegral:
-    case NetDataTypeKind::kReal:
-    case NetDataTypeKind::kDynamicArray:
-    case NetDataTypeKind::kString:
-      return false;
+  case NetDataTypeKind::k4StateIntegral:
+  case NetDataTypeKind::kFixedUnpackedValid:
+    return true;
+  case NetDataTypeKind::k2StateIntegral:
+  case NetDataTypeKind::kReal:
+  case NetDataTypeKind::kDynamicArray:
+  case NetDataTypeKind::kString:
+    return false;
   }
   return false;
 }
 
-void InitializeNet(Net& net, NetType type, Arena& arena) {
+void InitializeNet(Net &net, NetType type, Arena &arena) {
   (void)type;
   (void)arena;
   if (!net.drivers.empty()) {
@@ -97,7 +102,7 @@ void InitializeNet(Net& net, NetType type, Arena& arena) {
   }
 }
 
-void InitializeTriregNet(Net& net, LocalChargeStrength str, Arena& arena) {
+void InitializeTriregNet(Net &net, LocalChargeStrength str, Arena &arena) {
   (void)str;
   (void)arena;
   // Set value to x: aval=0, bval=1.
@@ -106,7 +111,6 @@ void InitializeTriregNet(Net& net, LocalChargeStrength str, Arena& arena) {
     net.resolved->value.words[i].bval = 1;
   }
 }
-
 
 namespace {
 
@@ -195,4 +199,4 @@ TEST(NetDecl, InvalidNetDataTypeString) {
   EXPECT_FALSE(ValidateNetDataType(NetDataTypeKind::kString));
 }
 
-}  // namespace
+} // namespace

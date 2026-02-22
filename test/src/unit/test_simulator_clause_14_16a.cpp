@@ -1,8 +1,5 @@
 // §14.16: Synchronous drives
 
-#include <gtest/gtest.h>
-#include <cstdint>
-#include <string_view>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -12,6 +9,9 @@
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
 #include "simulation/variable.h"
+#include <cstdint>
+#include <gtest/gtest.h>
+#include <string_view>
 
 using namespace delta;
 
@@ -25,8 +25,8 @@ struct ClockingSimFixture {
 };
 
 // Schedule posedge at a given time through the scheduler.
-void SchedulePosedge(ClockingSimFixture& f, Variable* clk, uint64_t time) {
-  auto* ev = f.scheduler.GetEventPool().Acquire();
+void SchedulePosedge(ClockingSimFixture &f, Variable *clk, uint64_t time) {
+  auto *ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [clk, &f]() {
     clk->prev_value = clk->value;
     clk->value = MakeLogic4VecVal(f.arena, 1, 1);
@@ -36,8 +36,8 @@ void SchedulePosedge(ClockingSimFixture& f, Variable* clk, uint64_t time) {
 }
 
 // Schedule negedge at a given time through the scheduler.
-void ScheduleNegedge(ClockingSimFixture& f, Variable* clk, uint64_t time) {
-  auto* ev = f.scheduler.GetEventPool().Acquire();
+void ScheduleNegedge(ClockingSimFixture &f, Variable *clk, uint64_t time) {
+  auto *ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [clk, &f]() {
     clk->prev_value = clk->value;
     clk->value = MakeLogic4VecVal(f.arena, 1, 0);
@@ -53,9 +53,9 @@ namespace {
 // =============================================================================
 TEST(ClockingSim, OutputDriving) {
   ClockingSimFixture f;
-  auto* clk = f.ctx.CreateVariable("clk", 1);
+  auto *clk = f.ctx.CreateVariable("clk", 1);
   clk->value = MakeLogic4VecVal(f.arena, 1, 0);
-  auto* out = f.ctx.CreateVariable("out_data", 8);
+  auto *out = f.ctx.CreateVariable("out_data", 8);
   out->value = MakeLogic4VecVal(f.arena, 8, 0);
 
   ClockingManager cmgr;
@@ -73,7 +73,7 @@ TEST(ClockingSim, OutputDriving) {
   cmgr.Register(block);
   cmgr.Attach(f.ctx, f.scheduler);
 
-  auto* ev = f.scheduler.GetEventPool().Acquire();
+  auto *ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [&cmgr, &f]() {
     cmgr.ScheduleOutputDrive("cb", "out_data", 0xFE, f.ctx, f.scheduler);
   };
@@ -88,9 +88,9 @@ TEST(ClockingSim, OutputDriving) {
 // =============================================================================
 TEST(ClockingSim, SynchronousDriveSchedulesAtNextClock) {
   ClockingSimFixture f;
-  auto* clk = f.ctx.CreateVariable("clk", 1);
+  auto *clk = f.ctx.CreateVariable("clk", 1);
   clk->value = MakeLogic4VecVal(f.arena, 1, 0);
-  auto* out = f.ctx.CreateVariable("sync_out", 8);
+  auto *out = f.ctx.CreateVariable("sync_out", 8);
   out->value = MakeLogic4VecVal(f.arena, 8, 0);
 
   ClockingManager cmgr;
@@ -108,7 +108,7 @@ TEST(ClockingSim, SynchronousDriveSchedulesAtNextClock) {
   cmgr.Register(block);
   cmgr.Attach(f.ctx, f.scheduler);
 
-  auto* ev = f.scheduler.GetEventPool().Acquire();
+  auto *ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [&cmgr, &f]() {
     cmgr.ScheduleOutputDrive("cb", "sync_out", 0x42, f.ctx, f.scheduler);
   };
@@ -118,4 +118,4 @@ TEST(ClockingSim, SynchronousDriveSchedulesAtNextClock) {
   EXPECT_EQ(out->value.ToUint64(), 0x42u);
 }
 
-}  // namespace
+} // namespace

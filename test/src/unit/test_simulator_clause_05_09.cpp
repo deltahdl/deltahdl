@@ -25,26 +25,28 @@ struct SimCh509Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign* ElaborateSrc(const std::string& src, SimCh509Fixture& f) {
+static RtlirDesign *ElaborateSrc(const std::string &src, SimCh509Fixture &f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
+  auto *cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-static uint64_t RunAndGet(const std::string& src, const char* var_name) {
+static uint64_t RunAndGet(const std::string &src, const char *var_name) {
   SimCh509Fixture f;
-  auto* design = ElaborateSrc(src, f);
+  auto *design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
-  if (!design) return 0;
+  if (!design)
+    return 0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* var = f.ctx.FindVariable(var_name);
+  auto *var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
-  if (!var) return 0;
+  if (!var)
+    return 0;
   return var->value.ToUint64();
 }
 
@@ -97,10 +99,9 @@ TEST(SimCh509, StrLitTruncateLeft) {
 // ---------------------------------------------------------------------------
 TEST(SimCh509, StrLitTripleBasic) {
   // §5.9: Triple-quoted string literal.
-  auto v = RunAndGet(
-      "module t;\n  bit [15:0] s;\n"
-      "  initial s = \"\"\"AB\"\"\";\nendmodule\n",
-      "s");
+  auto v = RunAndGet("module t;\n  bit [15:0] s;\n"
+                     "  initial s = \"\"\"AB\"\"\";\nendmodule\n",
+                     "s");
   EXPECT_EQ(v, 0x4142u);
 }
 
@@ -109,10 +110,9 @@ TEST(SimCh509, StrLitTripleBasic) {
 // ---------------------------------------------------------------------------
 TEST(SimCh509, StrLitTripleNewline) {
   // §5.9: Triple-quoted string allows direct newline characters.
-  auto v = RunAndGet(
-      "module t;\n  bit [23:0] s;\n"
-      "  initial s = \"\"\"A\nB\"\"\";\nendmodule\n",
-      "s");
+  auto v = RunAndGet("module t;\n  bit [23:0] s;\n"
+                     "  initial s = \"\"\"A\nB\"\"\";\nendmodule\n",
+                     "s");
   EXPECT_EQ(v, 0x410A42u);
 }
 
@@ -121,10 +121,9 @@ TEST(SimCh509, StrLitTripleNewline) {
 // ---------------------------------------------------------------------------
 TEST(SimCh509, StrLitTripleQuote) {
   // §5.9: Triple-quoted string allows embedded double-quote without escape.
-  auto v = RunAndGet(
-      "module t;\n  bit [23:0] s;\n"
-      "  initial s = \"\"\"A\"B\"\"\";\nendmodule\n",
-      "s");
+  auto v = RunAndGet("module t;\n  bit [23:0] s;\n"
+                     "  initial s = \"\"\"A\"B\"\"\";\nendmodule\n",
+                     "s");
   EXPECT_EQ(v, 0x412242u);
 }
 
@@ -133,10 +132,9 @@ TEST(SimCh509, StrLitTripleQuote) {
 // ---------------------------------------------------------------------------
 TEST(SimCh509, StrLitLineContinuation) {
   // §5.9: Line continuation — backslash-newline stripped from string.
-  auto v = RunAndGet(
-      "module t;\n  bit [31:0] s;\n"
-      "  initial s = \"AB\\\nCD\";\nendmodule\n",
-      "s");
+  auto v = RunAndGet("module t;\n  bit [31:0] s;\n"
+                     "  initial s = \"AB\\\nCD\";\nendmodule\n",
+                     "s");
   EXPECT_EQ(v, 0x41424344u);
 }
 
@@ -146,10 +144,9 @@ TEST(SimCh509, StrLitLineContinuation) {
 TEST(SimCh509, StrLitDoubleBackslashNewline) {
   // §5.9.1: \\\<newline> -> \\ is backslash escape, \<newline> is
   // line continuation.  "A" + '\' + "B" = 0x415C42.
-  auto v = RunAndGet(
-      "module t;\n  bit [23:0] s;\n"
-      "  initial s = \"A\\\\\\\nB\";\nendmodule\n",
-      "s");
+  auto v = RunAndGet("module t;\n  bit [23:0] s;\n"
+                     "  initial s = \"A\\\\\\\nB\";\nendmodule\n",
+                     "s");
   EXPECT_EQ(v, 0x415C42u);
 }
 
@@ -158,9 +155,8 @@ TEST(SimCh509, StrLitDoubleBackslashNewline) {
 // ---------------------------------------------------------------------------
 TEST(SimCh509, StrLitTripleContinuation) {
   // §5.9: Triple-quoted line continuation behaves like single-quoted.
-  auto v = RunAndGet(
-      "module t;\n  bit [31:0] s;\n"
-      "  initial s = \"\"\"AB\\\nCD\"\"\";\nendmodule\n",
-      "s");
+  auto v = RunAndGet("module t;\n  bit [31:0] s;\n"
+                     "  initial s = \"\"\"AB\\\nCD\"\"\";\nendmodule\n",
+                     "s");
   EXPECT_EQ(v, 0x41424344u);
 }

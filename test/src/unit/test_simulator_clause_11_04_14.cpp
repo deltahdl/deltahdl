@@ -1,14 +1,14 @@
 // §11.4.14: Streaming operators (pack/unpack)
 
-#include <gtest/gtest.h>
-#include <cstring>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"  // StructTypeInfo, StructFieldInfo
+#include "simulation/sim_context.h" // StructTypeInfo, StructFieldInfo
+#include <cstring>
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -21,16 +21,16 @@ struct EvalAdvFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static Expr* MakeId(Arena& arena, std::string_view name) {
-  auto* e = arena.Create<Expr>();
+static Expr *MakeId(Arena &arena, std::string_view name) {
+  auto *e = arena.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
   e->text = name;
   return e;
 }
 
-static Variable* MakeVar(EvalAdvFixture& f, std::string_view name,
+static Variable *MakeVar(EvalAdvFixture &f, std::string_view name,
                          uint32_t width, uint64_t val) {
-  auto* var = f.ctx.CreateVariable(name, width);
+  auto *var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4VecVal(f.arena, width, val);
   return var;
 }
@@ -44,10 +44,10 @@ TEST(EvalAdv, StreamingLeftShiftReversesSlices) {
   EvalAdvFixture f;
   // {<< 8 {16'hABCD}} → reverse 8-bit slices: 0xCDAB
   MakeVar(f, "sv", 16, 0xABCD);
-  auto* stream = f.arena.Create<Expr>();
+  auto *stream = f.arena.Create<Expr>();
   stream->kind = ExprKind::kStreamingConcat;
   stream->op = TokenKind::kLtLt;
-  auto* size_expr = f.arena.Create<Expr>();
+  auto *size_expr = f.arena.Create<Expr>();
   size_expr->kind = ExprKind::kIntegerLiteral;
   size_expr->text = "8";
   size_expr->int_val = 8;
@@ -61,10 +61,10 @@ TEST(EvalAdv, StreamingRightShiftPreservesOrder) {
   EvalAdvFixture f;
   // {>> 8 {16'hABCD}} → no reversal, same as concat.
   MakeVar(f, "sv2", 16, 0xABCD);
-  auto* stream = f.arena.Create<Expr>();
+  auto *stream = f.arena.Create<Expr>();
   stream->kind = ExprKind::kStreamingConcat;
   stream->op = TokenKind::kGtGt;
-  auto* size_expr = f.arena.Create<Expr>();
+  auto *size_expr = f.arena.Create<Expr>();
   size_expr->kind = ExprKind::kIntegerLiteral;
   size_expr->text = "8";
   size_expr->int_val = 8;
@@ -89,7 +89,7 @@ TEST(EvalAdv, StreamingUnpackedArrayConcat) {
   f.ctx.RegisterArray("arr", info);
 
   // {>> {arr}} → right-shift stream: concatenate MSB-first = 0xABCD.
-  auto* stream = f.arena.Create<Expr>();
+  auto *stream = f.arena.Create<Expr>();
   stream->kind = ExprKind::kStreamingConcat;
   stream->op = TokenKind::kGtGt;
   stream->elements.push_back(MakeId(f.arena, "arr"));
@@ -110,10 +110,10 @@ TEST(EvalAdv, StreamingUnpackedArrayLeftShift) {
   f.ctx.RegisterArray("arr2", info);
 
   // {<< 8 {arr2}} → left-shift stream with 8-bit slices: reversal = 0xCDAB.
-  auto* stream = f.arena.Create<Expr>();
+  auto *stream = f.arena.Create<Expr>();
   stream->kind = ExprKind::kStreamingConcat;
   stream->op = TokenKind::kLtLt;
-  auto* size_expr = f.arena.Create<Expr>();
+  auto *size_expr = f.arena.Create<Expr>();
   size_expr->kind = ExprKind::kIntegerLiteral;
   size_expr->text = "8";
   size_expr->int_val = 8;
@@ -135,7 +135,7 @@ TEST(EvalAdv, StreamingUnpackedArrayMissingElemGivesX) {
   info.elem_width = 8;
   f.ctx.RegisterArray("arr3", info);
 
-  auto* stream = f.arena.Create<Expr>();
+  auto *stream = f.arena.Create<Expr>();
   stream->kind = ExprKind::kStreamingConcat;
   stream->op = TokenKind::kGtGt;
   stream->elements.push_back(MakeId(f.arena, "arr3"));
@@ -145,4 +145,4 @@ TEST(EvalAdv, StreamingUnpackedArrayMissingElemGivesX) {
   EXPECT_EQ(result.ToUint64(), 0x110033u);
 }
 
-}  // namespace
+} // namespace

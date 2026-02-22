@@ -37,7 +37,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA83Fixture &f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-}  // namespace
+} // namespace
 
 // =============================================================================
 // A.8.3 Expressions — Simulation
@@ -47,12 +47,11 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA83Fixture &f) {
 
 TEST(SimA83, PrefixIncrement) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin x = 8'd5; ++x; end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] x;\n"
+                              "  initial begin x = 8'd5; ++x; end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -66,12 +65,11 @@ TEST(SimA83, PrefixIncrement) {
 
 TEST(SimA83, PrefixDecrement) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin x = 8'd10; --x; end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] x;\n"
+                              "  initial begin x = 8'd10; --x; end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -85,12 +83,11 @@ TEST(SimA83, PrefixDecrement) {
 
 TEST(SimA83, PostfixIncrement) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin x = 8'd5; x++; end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] x;\n"
+                              "  initial begin x = 8'd5; x++; end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -104,12 +101,11 @@ TEST(SimA83, PostfixIncrement) {
 
 TEST(SimA83, PostfixDecrement) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin x = 8'd10; x--; end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] x;\n"
+                              "  initial begin x = 8'd10; x--; end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -123,12 +119,11 @@ TEST(SimA83, PostfixDecrement) {
 
 TEST(SimA83, TernaryTrueBranch) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 1 ? 8'd10 : 8'd20;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] x;\n"
+                              "  initial x = 1 ? 8'd10 : 8'd20;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -142,12 +137,11 @@ TEST(SimA83, TernaryTrueBranch) {
 
 TEST(SimA83, TernaryFalseBranch) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 0 ? 8'd10 : 8'd20;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] x;\n"
+                              "  initial x = 0 ? 8'd10 : 8'd20;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -161,12 +155,11 @@ TEST(SimA83, TernaryFalseBranch) {
 
 TEST(SimA83, NestedTernary) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 1 ? (0 ? 8'd1 : 8'd2) : 8'd3;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] x;\n"
+                              "  initial x = 1 ? (0 ? 8'd1 : 8'd2) : 8'd3;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -180,12 +173,11 @@ TEST(SimA83, NestedTernary) {
 
 TEST(SimA83, BinaryAddition) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'd3 + 8'd7;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] x;\n"
+                              "  initial x = 8'd3 + 8'd7;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -199,12 +191,11 @@ TEST(SimA83, BinaryAddition) {
 
 TEST(SimA83, BinarySubtraction) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'd10 - 8'd3;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] x;\n"
+                              "  initial x = 8'd10 - 8'd3;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -218,12 +209,11 @@ TEST(SimA83, BinarySubtraction) {
 
 TEST(SimA83, BinaryMultiplication) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'd5 * 8'd6;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] x;\n"
+                              "  initial x = 8'd5 * 8'd6;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -237,12 +227,11 @@ TEST(SimA83, BinaryMultiplication) {
 
 TEST(SimA83, UnaryNegate) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = -8'd1;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] x;\n"
+                              "  initial x = -8'd1;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -256,12 +245,11 @@ TEST(SimA83, UnaryNegate) {
 
 TEST(SimA83, LeftShift) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'd1 << 3;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] x;\n"
+                              "  initial x = 8'd1 << 3;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -275,12 +263,11 @@ TEST(SimA83, LeftShift) {
 
 TEST(SimA83, RightShift) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'd16 >> 2;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] x;\n"
+                              "  initial x = 8'd16 >> 2;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -294,12 +281,11 @@ TEST(SimA83, RightShift) {
 
 TEST(SimA83, EqualityTrue) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic x;\n"
-      "  initial x = (8'd5 == 8'd5);\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic x;\n"
+                              "  initial x = (8'd5 == 8'd5);\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -313,12 +299,11 @@ TEST(SimA83, EqualityTrue) {
 
 TEST(SimA83, InequalityTrue) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic x;\n"
-      "  initial x = (8'd5 != 8'd3);\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic x;\n"
+                              "  initial x = (8'd5 != 8'd3);\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -332,12 +317,11 @@ TEST(SimA83, InequalityTrue) {
 
 TEST(SimA83, LogicalAnd) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic x;\n"
-      "  initial x = (8'd1 && 8'd1);\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic x;\n"
+                              "  initial x = (8'd1 && 8'd1);\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -351,12 +335,11 @@ TEST(SimA83, LogicalAnd) {
 
 TEST(SimA83, LogicalOr) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic x;\n"
-      "  initial x = (8'd0 || 8'd1);\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic x;\n"
+                              "  initial x = (8'd0 || 8'd1);\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -370,12 +353,11 @@ TEST(SimA83, LogicalOr) {
 
 TEST(SimA83, PrecedenceMulBeforeAdd) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'd2 + 8'd3 * 8'd4;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] x;\n"
+                              "  initial x = 8'd2 + 8'd3 * 8'd4;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -389,12 +371,11 @@ TEST(SimA83, PrecedenceMulBeforeAdd) {
 
 TEST(SimA83, InsideValueMatch) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic x;\n"
-      "  initial x = 8'd5 inside {8'd3, 8'd5, 8'd7};\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic x;\n"
+                              "  initial x = 8'd5 inside {8'd3, 8'd5, 8'd7};\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -408,12 +389,11 @@ TEST(SimA83, InsideValueMatch) {
 
 TEST(SimA83, InsideValueNoMatch) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic x;\n"
-      "  initial x = 8'd4 inside {8'd3, 8'd5, 8'd7};\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic x;\n"
+                              "  initial x = 8'd4 inside {8'd3, 8'd5, 8'd7};\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -427,12 +407,11 @@ TEST(SimA83, InsideValueNoMatch) {
 
 TEST(SimA83, InsideRangeMatch) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic x;\n"
-      "  initial x = 8'd5 inside {[8'd1:8'd10]};\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic x;\n"
+                              "  initial x = 8'd5 inside {[8'd1:8'd10]};\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -446,16 +425,15 @@ TEST(SimA83, InsideRangeMatch) {
 
 TEST(SimA83, PartSelectRange) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] data;\n"
-      "  logic [3:0] x;\n"
-      "  initial begin\n"
-      "    data = 8'hA5;\n"
-      "    x = data[3:0];\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] data;\n"
+                              "  logic [3:0] x;\n"
+                              "  initial begin\n"
+                              "    data = 8'hA5;\n"
+                              "    x = data[3:0];\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -469,16 +447,15 @@ TEST(SimA83, PartSelectRange) {
 
 TEST(SimA83, IndexedPartSelectPlus) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] data;\n"
-      "  logic [3:0] x;\n"
-      "  initial begin\n"
-      "    data = 8'hA5;\n"
-      "    x = data[0+:4];\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] data;\n"
+                              "  logic [3:0] x;\n"
+                              "  initial begin\n"
+                              "    data = 8'hA5;\n"
+                              "    x = data[0+:4];\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -492,16 +469,15 @@ TEST(SimA83, IndexedPartSelectPlus) {
 
 TEST(SimA83, IndexedPartSelectMinus) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] data;\n"
-      "  logic [3:0] x;\n"
-      "  initial begin\n"
-      "    data = 8'hA5;\n"
-      "    x = data[7-:4];\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] data;\n"
+                              "  logic [3:0] x;\n"
+                              "  initial begin\n"
+                              "    data = 8'hA5;\n"
+                              "    x = data[7-:4];\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -515,12 +491,11 @@ TEST(SimA83, IndexedPartSelectMinus) {
 
 TEST(SimA83, ReductionAnd) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic x;\n"
-      "  initial x = &8'hFF;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic x;\n"
+                              "  initial x = &8'hFF;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -534,12 +509,11 @@ TEST(SimA83, ReductionAnd) {
 
 TEST(SimA83, ReductionOr) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic x;\n"
-      "  initial x = |8'h00;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic x;\n"
+                              "  initial x = |8'h00;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);

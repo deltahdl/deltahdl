@@ -15,10 +15,10 @@ using namespace delta;
 struct ParseResult40 {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult40 Parse(const std::string& src) {
+static ParseResult40 Parse(const std::string &src) {
   ParseResult40 result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -28,7 +28,7 @@ static ParseResult40 Parse(const std::string& src) {
   return result;
 }
 
-static bool ParseOk(const std::string& src) {
+static bool ParseOk(const std::string &src) {
   SourceManager mgr;
   Arena arena;
   auto fid = mgr.AddFile("<test>", src);

@@ -11,11 +11,11 @@ using namespace delta;
 struct ParseResult6f {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult6f Parse(const std::string& src) {
+static ParseResult6f Parse(const std::string &src) {
   ParseResult6f result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -26,7 +26,7 @@ static ParseResult6f Parse(const std::string& src) {
   return result;
 }
 
-static bool ParseOk(const std::string& src) {
+static bool ParseOk(const std::string &src) {
   SourceManager mgr;
   Arena arena;
   auto fid = mgr.AddFile("<test>", src);
@@ -37,9 +37,10 @@ static bool ParseOk(const std::string& src) {
   return !diag.HasErrors();
 }
 
-static ModuleItem* FirstItem(ParseResult6f& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
+static ModuleItem *FirstItem(ParseResult6f &r) {
+  if (!r.cu || r.cu->modules.empty())
+    return nullptr;
+  auto &items = r.cu->modules[0]->items;
   return items.empty() ? nullptr : items[0];
 }
 
@@ -49,13 +50,12 @@ static ModuleItem* FirstItem(ParseResult6f& r) {
 
 // §6.7.1: Wire with multiple variable names produces separate items.
 TEST(ParserSection6, Sec6_7_1_WireMultipleNames) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire a, b, c;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  wire a, b, c;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
+  auto &items = r.cu->modules[0]->items;
   ASSERT_EQ(items.size(), 3u);
   EXPECT_EQ(items[0]->name, "a");
   EXPECT_EQ(items[1]->name, "b");
@@ -64,14 +64,13 @@ TEST(ParserSection6, Sec6_7_1_WireMultipleNames) {
 
 // §6.7.1: Each item from a multi-name wire declaration is a kNetDecl.
 TEST(ParserSection6, Sec6_7_1_WireMultipleNamesAllNetDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire a, b, c;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  wire a, b, c;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto& items = r.cu->modules[0]->items;
+  auto &items = r.cu->modules[0]->items;
   ASSERT_EQ(items.size(), 3u);
-  for (auto* item : items) {
+  for (auto *item : items) {
     EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
     EXPECT_EQ(item->data_type.kind, DataTypeKind::kWire);
     EXPECT_TRUE(item->data_type.is_net);
@@ -80,13 +79,12 @@ TEST(ParserSection6, Sec6_7_1_WireMultipleNamesAllNetDecl) {
 
 // §6.7.1: Wire with initializer (implicit continuous assignment).
 TEST(ParserSection6, Sec6_7_1_WireWithInitializer) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire w = 1'b1;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  wire w = 1'b1;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_EQ(item->name, "w");
@@ -95,13 +93,12 @@ TEST(ParserSection6, Sec6_7_1_WireWithInitializer) {
 
 // §6.7.1: Tri net with range.
 TEST(ParserSection6, Sec6_7_1_TriWithRange) {
-  auto r = Parse(
-      "module t;\n"
-      "  tri [7:0] t1;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  tri [7:0] t1;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kTri);
@@ -114,13 +111,12 @@ TEST(ParserSection6, Sec6_7_1_TriWithRange) {
 
 // §6.7.1: Wand net declaration.
 TEST(ParserSection6, Sec6_7_1_WandDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  wand w;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  wand w;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kWand);
@@ -130,13 +126,12 @@ TEST(ParserSection6, Sec6_7_1_WandDecl) {
 
 // §6.7.1: Wor net declaration.
 TEST(ParserSection6, Sec6_7_1_WorDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  wor w;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  wor w;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kWor);
@@ -146,13 +141,12 @@ TEST(ParserSection6, Sec6_7_1_WorDecl) {
 
 // §6.7.1: Triand net declaration.
 TEST(ParserSection6, Sec6_7_1_TriandDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  triand ta;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  triand ta;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kTriand);
@@ -161,13 +155,12 @@ TEST(ParserSection6, Sec6_7_1_TriandDecl) {
 
 // §6.7.1: Trior net declaration.
 TEST(ParserSection6, Sec6_7_1_TriorDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  trior to1;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  trior to1;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrior);
@@ -176,13 +169,12 @@ TEST(ParserSection6, Sec6_7_1_TriorDecl) {
 
 // §6.7.1: Tri0 net declaration.
 TEST(ParserSection6, Sec6_7_1_Tri0Decl) {
-  auto r = Parse(
-      "module t;\n"
-      "  tri0 t0;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  tri0 t0;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kTri0);
@@ -191,13 +183,12 @@ TEST(ParserSection6, Sec6_7_1_Tri0Decl) {
 
 // §6.7.1: Tri1 net declaration.
 TEST(ParserSection6, Sec6_7_1_Tri1Decl) {
-  auto r = Parse(
-      "module t;\n"
-      "  tri1 t1;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  tri1 t1;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kTri1);
@@ -206,13 +197,12 @@ TEST(ParserSection6, Sec6_7_1_Tri1Decl) {
 
 // §6.7.1: Supply0 net declaration.
 TEST(ParserSection6, Sec6_7_1_Supply0Decl) {
-  auto r = Parse(
-      "module t;\n"
-      "  supply0 gnd;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  supply0 gnd;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kSupply0);
@@ -222,13 +212,12 @@ TEST(ParserSection6, Sec6_7_1_Supply0Decl) {
 
 // §6.7.1: Supply1 net declaration.
 TEST(ParserSection6, Sec6_7_1_Supply1Decl) {
-  auto r = Parse(
-      "module t;\n"
-      "  supply1 vdd;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  supply1 vdd;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kSupply1);
@@ -238,13 +227,12 @@ TEST(ParserSection6, Sec6_7_1_Supply1Decl) {
 
 // §6.7.1: Uwire net declaration.
 TEST(ParserSection6, Sec6_7_1_UwireDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  uwire uw;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  uwire uw;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kUwire);
@@ -254,13 +242,12 @@ TEST(ParserSection6, Sec6_7_1_UwireDecl) {
 
 // §6.7.1: Net with signed qualifier.
 TEST(ParserSection6, Sec6_7_1_WireSignedQualifier) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire signed [7:0] s;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  wire signed [7:0] s;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_TRUE(item->data_type.is_signed);
@@ -271,13 +258,12 @@ TEST(ParserSection6, Sec6_7_1_WireSignedQualifier) {
 
 // §6.7.1: Net with vectored qualifier.
 TEST(ParserSection6, Sec6_7_1_WireVectoredQualifier) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire vectored [7:0] v;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  wire vectored [7:0] v;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_TRUE(item->data_type.is_vectored);
@@ -286,13 +272,12 @@ TEST(ParserSection6, Sec6_7_1_WireVectoredQualifier) {
 
 // §6.7.1: Net with scalared qualifier.
 TEST(ParserSection6, Sec6_7_1_WireScalaredQualifier) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire scalared [7:0] sc;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  wire scalared [7:0] sc;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_TRUE(item->data_type.is_scalared);
@@ -301,13 +286,12 @@ TEST(ParserSection6, Sec6_7_1_WireScalaredQualifier) {
 
 // §6.7.1: Wire with explicit bit type.
 TEST(ParserSection6, Sec6_7_1_WireWithBitType) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire bit [3:0] b;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  wire bit [3:0] b;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_TRUE(item->data_type.is_net);
@@ -316,13 +300,12 @@ TEST(ParserSection6, Sec6_7_1_WireWithBitType) {
 
 // §6.7.1: Net with single delay value.
 TEST(ParserSection6, Sec6_7_1_WireWithDelay) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire #5 w;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  wire #5 w;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   ASSERT_NE(item->net_delay, nullptr);
@@ -333,13 +316,12 @@ TEST(ParserSection6, Sec6_7_1_WireWithDelay) {
 
 // §6.7.1: Net with two delays (rise, fall).
 TEST(ParserSection6, Sec6_7_1_WireTwoDelays) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire #(3, 5) w;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  wire #(3, 5) w;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   ASSERT_NE(item->net_delay, nullptr);
@@ -351,13 +333,12 @@ TEST(ParserSection6, Sec6_7_1_WireTwoDelays) {
 
 // §6.7.1: Net with three delays (rise, fall, turnoff).
 TEST(ParserSection6, Sec6_7_1_WireThreeDelays) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire #(2, 4, 6) w;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  wire #(2, 4, 6) w;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   ASSERT_NE(item->net_delay, nullptr);
@@ -370,17 +351,16 @@ TEST(ParserSection6, Sec6_7_1_WireThreeDelays) {
 
 // §6.7.1: Multiple net declarations of different types in the same module.
 TEST(ParserSection6, Sec6_7_1_MixedNetTypesInModule) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire w;\n"
-      "  tri t1;\n"
-      "  wand wa;\n"
-      "  supply0 gnd;\n"
-      "  supply1 vdd;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  wire w;\n"
+                 "  tri t1;\n"
+                 "  wand wa;\n"
+                 "  supply0 gnd;\n"
+                 "  supply1 vdd;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
+  auto &items = r.cu->modules[0]->items;
   ASSERT_EQ(items.size(), 5u);
   EXPECT_EQ(items[0]->data_type.kind, DataTypeKind::kWire);
   EXPECT_EQ(items[1]->data_type.kind, DataTypeKind::kTri);
@@ -391,13 +371,12 @@ TEST(ParserSection6, Sec6_7_1_MixedNetTypesInModule) {
 
 // §6.7.1: Net declaration with unpacked dimension.
 TEST(ParserSection6, Sec6_7_1_WireUnpackedDim) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire w [0:3];\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  wire w [0:3];\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_EQ(item->name, "w");
@@ -406,13 +385,12 @@ TEST(ParserSection6, Sec6_7_1_WireUnpackedDim) {
 
 // §6.7.1: Wire with both packed and unpacked dimensions.
 TEST(ParserSection6, Sec6_7_1_WirePackedAndUnpackedDims) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire [7:0] mem [0:255];\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  wire [7:0] mem [0:255];\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   ASSERT_NE(item->data_type.packed_dim_left, nullptr);
@@ -422,13 +400,12 @@ TEST(ParserSection6, Sec6_7_1_WirePackedAndUnpackedDims) {
 
 // §6.7.1: Net with drive strength (strong0, pull1).
 TEST(ParserSection6, Sec6_7_1_WireDriveStrength) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire (strong0, pull1) w = 1'b0;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  wire (strong0, pull1) w = 1'b0;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   // 4=strong, 3=pull (parser encoding)
@@ -438,13 +415,12 @@ TEST(ParserSection6, Sec6_7_1_WireDriveStrength) {
 
 // §6.7.1: Trireg with charge strength (medium).
 TEST(ParserSection6, Sec6_7_1_TriregChargeStrengthMedium) {
-  auto r = Parse(
-      "module t;\n"
-      "  trireg (medium) m1;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  trireg (medium) m1;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
   EXPECT_EQ(item->data_type.charge_strength, 2);
@@ -452,15 +428,14 @@ TEST(ParserSection6, Sec6_7_1_TriregChargeStrengthMedium) {
 
 // §6.7.1: Net coexisting with variable declarations in the same module.
 TEST(ParserSection6, Sec6_7_1_NetCoexistsWithVarDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire [7:0] net_w;\n"
-      "  logic [7:0] var_v;\n"
-      "  int count;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  wire [7:0] net_w;\n"
+                 "  logic [7:0] var_v;\n"
+                 "  int count;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
+  auto &items = r.cu->modules[0]->items;
   ASSERT_EQ(items.size(), 3u);
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kNetDecl);
   EXPECT_TRUE(items[0]->data_type.is_net);
@@ -472,15 +447,14 @@ TEST(ParserSection6, Sec6_7_1_NetCoexistsWithVarDecl) {
 
 // §6.7.1: Wire with range and multiple names.
 TEST(ParserSection6, Sec6_7_1_WireRangeMultipleNames) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire [3:0] x, y, z;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  wire [3:0] x, y, z;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
+  auto &items = r.cu->modules[0]->items;
   ASSERT_EQ(items.size(), 3u);
-  for (auto* item : items) {
+  for (auto *item : items) {
     EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
     ASSERT_NE(item->data_type.packed_dim_left, nullptr);
     EXPECT_EQ(item->data_type.packed_dim_left->int_val, 3u);
@@ -492,13 +466,12 @@ TEST(ParserSection6, Sec6_7_1_WireRangeMultipleNames) {
 
 // §6.7.1: Tri net with signed qualifier and range.
 TEST(ParserSection6, Sec6_7_1_TriSignedWithRange) {
-  auto r = Parse(
-      "module t;\n"
-      "  tri signed [15:0] ts;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  tri signed [15:0] ts;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kTri);
   EXPECT_TRUE(item->data_type.is_signed);
@@ -509,13 +482,12 @@ TEST(ParserSection6, Sec6_7_1_TriSignedWithRange) {
 
 // §6.7.1: Wand with range.
 TEST(ParserSection6, Sec6_7_1_WandWithRange) {
-  auto r = Parse(
-      "module t;\n"
-      "  wand [31:0] bus;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  wand [31:0] bus;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kWand);
   ASSERT_NE(item->data_type.packed_dim_left, nullptr);
@@ -525,29 +497,26 @@ TEST(ParserSection6, Sec6_7_1_WandWithRange) {
 
 // §6.7.1: Supply0 with range.
 TEST(ParserSection6, Sec6_7_1_Supply0WithRange) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  supply0 [3:0] gnd_bus;\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module t;\n"
+                      "  supply0 [3:0] gnd_bus;\n"
+                      "endmodule\n"));
 }
 
 // §6.7.1: Supply1 with range.
 TEST(ParserSection6, Sec6_7_1_Supply1WithRange) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  supply1 [3:0] vdd_bus;\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module t;\n"
+                      "  supply1 [3:0] vdd_bus;\n"
+                      "endmodule\n"));
 }
 
 // §6.7.1: Net with drive strength using reversed order (pull1, strong0).
 TEST(ParserSection6, Sec6_7_1_WireDriveStrengthReversedOrder) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire (pull1, weak0) w = 1'b1;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  wire (pull1, weak0) w = 1'b1;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   // 2=weak, 3=pull (parser encoding)
@@ -557,13 +526,12 @@ TEST(ParserSection6, Sec6_7_1_WireDriveStrengthReversedOrder) {
 
 // §6.7.1: Trireg with charge strength and delay combined.
 TEST(ParserSection6, Sec6_7_1_TriregChargeStrengthWithDelay) {
-  auto r = Parse(
-      "module t;\n"
-      "  trireg (small) #(5, 10, 15) cap;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  trireg (small) #(5, 10, 15) cap;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
   EXPECT_EQ(item->data_type.charge_strength, 1);
@@ -577,13 +545,12 @@ TEST(ParserSection6, Sec6_7_1_TriregChargeStrengthWithDelay) {
 
 // §6.7.1: Wire with delay and initializer together.
 TEST(ParserSection6, Sec6_7_1_WireDelayWithInit) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire #3 w = 1'b0;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  wire #3 w = 1'b0;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   ASSERT_NE(item->net_delay, nullptr);

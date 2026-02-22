@@ -18,7 +18,7 @@ struct LexResult {
   Token token;
 };
 
-static LexResult LexOne(const std::string& src) {
+static LexResult LexOne(const std::string &src) {
   LexResult result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
@@ -31,11 +31,11 @@ static LexResult LexOne(const std::string& src) {
 struct ParseResult314 {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult314 Parse(const std::string& src) {
+static ParseResult314 Parse(const std::string &src) {
   ParseResult314 result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
@@ -49,7 +49,7 @@ static ParseResult314 Parse(const std::string& src) {
   return result;
 }
 
-static bool ParseOk(const std::string& src) {
+static bool ParseOk(const std::string &src) {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);
@@ -128,7 +128,7 @@ TEST(ParserClause03, Cl3_14_Table3_1_InvalidStrings) {
   EXPECT_FALSE(ParseTimeUnitStr("", u));
   EXPECT_FALSE(ParseTimeUnitStr("xs", u));
   EXPECT_FALSE(ParseTimeUnitStr("sec", u));
-  EXPECT_FALSE(ParseTimeUnitStr("NS", u));  // case-sensitive
+  EXPECT_FALSE(ParseTimeUnitStr("NS", u)); // case-sensitive
 }
 
 // 4. "us" represents microseconds (substitution for the mu-s symbol).
@@ -136,7 +136,7 @@ TEST(ParserClause03, Cl3_14_UsForMicroseconds) {
   TimeUnit u = TimeUnit::kNs;
   EXPECT_TRUE(ParseTimeUnitStr("us", u));
   EXPECT_EQ(u, TimeUnit::kUs);
-  EXPECT_EQ(static_cast<int8_t>(u), -6);  // 10^-6 = microsecond
+  EXPECT_EQ(static_cast<int8_t>(u), -6); // 10^-6 = microsecond
 }
 
 // 5. TimeScale struct: time values have two components (unit + precision).
@@ -249,15 +249,14 @@ TEST(ParserClause03, Cl3_14_PrecisionAtLeastAsPreciseAsUnit) {
 // 13. Time values stored in design element: module with timeunit and
 // timeprecision stores both components.
 TEST(ParserClause03, Cl3_14_TimeValuesInDesignElement) {
-  auto r = Parse(
-      "module m;\n"
-      "  timeunit 1ns;\n"
-      "  timeprecision 1ps;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  timeunit 1ns;\n"
+                 "  timeprecision 1ps;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto* mod = r.cu->modules[0];
+  auto *mod = r.cu->modules[0];
   EXPECT_TRUE(mod->has_timeunit);
   EXPECT_TRUE(mod->has_timeprecision);
   EXPECT_EQ(mod->time_unit, TimeUnit::kNs);

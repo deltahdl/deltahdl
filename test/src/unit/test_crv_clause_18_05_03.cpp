@@ -1,13 +1,13 @@
 // §18.5.3: Distribution
 
-#include <gtest/gtest.h>
+#include "simulation/constraint_solver.h"
 #include <algorithm>
 #include <cstdint>
+#include <gtest/gtest.h>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include "simulation/constraint_solver.h"
 
 using namespace delta;
 
@@ -59,4 +59,4 @@ TEST(Constraint, InsideSetSingleValue) {
   EXPECT_EQ(solver.GetValue("x"), 77);
 }
 
-}  // namespace
+} // namespace

@@ -1,11 +1,11 @@
 // §8.18: Data hiding and encapsulation
 
-#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -23,10 +23,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult Parse(const std::string& src) {
+static ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -37,28 +37,27 @@ static ParseResult Parse(const std::string& src) {
 }
 
 struct StructMemberExpected {
-  const char* name;
+  const char *name;
   DataTypeKind type_kind;
 };
 
 struct ModportPortExpected {
   Direction dir;
-  const char* name;
+  const char *name;
 };
 
 namespace {
 
 TEST(Parser, ClassPropertyQualifiers) {
-  auto r = Parse(
-      "class pkt;\n"
-      "  rand int data;\n"
-      "  local int secret;\n"
-      "endclass\n");
+  auto r = Parse("class pkt;\n"
+                 "  rand int data;\n"
+                 "  local int secret;\n"
+                 "endclass\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* cls = r.cu->classes[0];
+  auto *cls = r.cu->classes[0];
   ASSERT_EQ(cls->members.size(), 2);
   EXPECT_TRUE(cls->members[0]->is_rand);
   EXPECT_TRUE(cls->members[1]->is_local);
 }
 
-}  // namespace
+} // namespace

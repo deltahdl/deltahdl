@@ -1,9 +1,5 @@
 // §20.8: Math functions
 
-#include <gtest/gtest.h>
-#include <cmath>
-#include <cstring>
-#include <string>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -11,13 +7,17 @@
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
+#include <cmath>
+#include <cstring>
+#include <gtest/gtest.h>
+#include <string>
 
 using namespace delta;
 
 // =============================================================================
 // Helper: extract double from a Logic4Vec stored as IEEE 754 bits
 // =============================================================================
-static double VecToDouble(const Logic4Vec& vec) {
+static double VecToDouble(const Logic4Vec &vec) {
   uint64_t bits = vec.ToUint64();
   double d = 0.0;
   std::memcpy(&d, &bits, sizeof(double));
@@ -34,22 +34,22 @@ struct RealFixture {
   DiagEngine diag{mgr};
   SimContext ctx{scheduler, arena, diag};
 
-  Expr* MakeRealLiteral(double val) {
-    auto* lit = arena.Create<Expr>();
+  Expr *MakeRealLiteral(double val) {
+    auto *lit = arena.Create<Expr>();
     lit->kind = ExprKind::kRealLiteral;
     lit->real_val = val;
     return lit;
   }
 
-  Expr* MakeIntLiteral(uint64_t val) {
-    auto* lit = arena.Create<Expr>();
+  Expr *MakeIntLiteral(uint64_t val) {
+    auto *lit = arena.Create<Expr>();
     lit->kind = ExprKind::kIntegerLiteral;
     lit->int_val = val;
     return lit;
   }
 
-  Variable* CreateRealVar(std::string_view name, double val) {
-    auto* var = ctx.CreateVariable(name, 64);
+  Variable *CreateRealVar(std::string_view name, double val) {
+    auto *var = ctx.CreateVariable(name, 64);
     uint64_t bits = 0;
     std::memcpy(&bits, &val, sizeof(double));
     var->value = MakeLogic4VecVal(arena, 64, bits);
@@ -65,7 +65,7 @@ namespace {
 TEST(RealTypes, MathSqrtReal) {
   RealFixture f;
   // $sqrt(4.0) should return 2.0.
-  auto* call = f.arena.Create<Expr>();
+  auto *call = f.arena.Create<Expr>();
   call->kind = ExprKind::kSystemCall;
   call->callee = "$sqrt";
   call->args = {f.MakeRealLiteral(4.0)};
@@ -76,7 +76,7 @@ TEST(RealTypes, MathSqrtReal) {
 TEST(RealTypes, MathLnReal) {
   RealFixture f;
   // $ln(1.0) should return 0.0.
-  auto* call = f.arena.Create<Expr>();
+  auto *call = f.arena.Create<Expr>();
   call->kind = ExprKind::kSystemCall;
   call->callee = "$ln";
   call->args = {f.MakeRealLiteral(1.0)};
@@ -84,4 +84,4 @@ TEST(RealTypes, MathLnReal) {
   EXPECT_NEAR(VecToDouble(result), 0.0, 1e-10);
 }
 
-}  // namespace
+} // namespace

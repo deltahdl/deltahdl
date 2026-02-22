@@ -44,26 +44,28 @@ struct SimCh44Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign* ElaborateSrc44(const std::string& src, SimCh44Fixture& f) {
+static RtlirDesign *ElaborateSrc44(const std::string &src, SimCh44Fixture &f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
+  auto *cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-static uint64_t RunAndGet44(const std::string& src, const char* var_name) {
+static uint64_t RunAndGet44(const std::string &src, const char *var_name) {
   SimCh44Fixture f;
-  auto* design = ElaborateSrc44(src, f);
+  auto *design = ElaborateSrc44(src, f);
   EXPECT_NE(design, nullptr);
-  if (!design) return 0;
+  if (!design)
+    return 0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* var = f.ctx.FindVariable(var_name);
+  auto *var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
-  if (!var) return 0;
+  if (!var)
+    return 0;
   return var->value.ToUint64();
 }
 
@@ -80,7 +82,7 @@ TEST(SimCh44, EventsDynamicallyScheduledAndExecuted) {
   Scheduler sched(arena);
   bool executed = false;
 
-  auto* ev = sched.GetEventPool().Acquire();
+  auto *ev = sched.GetEventPool().Acquire();
   ev->callback = [&executed]() { executed = true; };
   sched.ScheduleEvent({0}, Region::kActive, ev);
 
@@ -96,9 +98,9 @@ TEST(SimCh44, EventsDynamicallyScheduledAndExecuted) {
 TEST(SimCh44, EventsRemovedAfterExecution) {
   Arena arena;
   Scheduler sched(arena);
-  auto& pool = sched.GetEventPool();
+  auto &pool = sched.GetEventPool();
 
-  auto* ev = pool.Acquire();
+  auto *ev = pool.Acquire();
   ev->callback = []() {};
   sched.ScheduleEvent({0}, Region::kActive, ev);
 
@@ -123,7 +125,7 @@ TEST(SimCh44, FirstDivisionByTime) {
       [&]() { exec_times.push_back(sched.CurrentTime().ticks); });
 
   for (uint64_t t : {0, 10, 20}) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = []() {};
     sched.ScheduleEvent({t}, Region::kActive, ev);
   }
@@ -149,7 +151,7 @@ TEST(SimCh44, AllEventsAtSameTimeFormOneTimeSlot) {
   sched.SetPostTimestepCallback([&]() { timestep_count++; });
 
   for (int i = 0; i < 5; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&event_count]() { event_count++; };
     sched.ScheduleEvent({0}, Region::kActive, ev);
   }
@@ -172,14 +174,14 @@ TEST(SimCh44, AllEventsInCurrentSlotBeforeNext) {
   std::vector<std::pair<uint64_t, int>> log;
 
   for (int i = 0; i < 3; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&log, &sched, i]() {
       log.push_back({sched.CurrentTime().ticks, i});
     };
     sched.ScheduleEvent({5}, Region::kActive, ev);
   }
 
-  auto* ev_later = sched.GetEventPool().Acquire();
+  auto *ev_later = sched.GetEventPool().Acquire();
   ev_later->callback = [&log, &sched]() {
     log.push_back({sched.CurrentTime().ticks, 99});
   };
@@ -209,7 +211,7 @@ TEST(SimCh44, SimulatorNeverGoesBackwardsInTime) {
       [&]() { times.push_back(sched.CurrentTime().ticks); });
 
   for (uint64_t t : {100, 50, 25, 10, 5}) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = []() {};
     sched.ScheduleEvent({t}, Region::kActive, ev);
   }
@@ -234,7 +236,7 @@ TEST(SimCh44, EmptyTimeSlotsSkipped) {
       [&]() { times.push_back(sched.CurrentTime().ticks); });
 
   for (uint64_t t : {0, 100, 500}) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = []() {};
     sched.ScheduleEvent({t}, Region::kActive, ev);
   }
@@ -307,7 +309,7 @@ TEST(SimCh44, AllRegionsExecuteInOrder) {
   std::vector<int> order;
 
   for (int r = 0; r < static_cast<int>(Region::kCOUNT); ++r) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, r]() { order.push_back(r); };
     sched.ScheduleEvent({0}, static_cast<Region>(r), ev);
   }
@@ -329,7 +331,7 @@ TEST(SimCh44, TimeSlotAnyNonemptyInRange) {
 
   EXPECT_FALSE(slot.AnyNonemptyIn(Region::kActive, Region::kNBA));
 
-  auto* ev = pool.Acquire();
+  auto *ev = pool.Acquire();
   ev->callback = []() {};
   slot.regions[static_cast<size_t>(Region::kInactive)].Push(ev);
 
@@ -346,9 +348,9 @@ TEST(SimCh44, EventQueueFIFOOrder) {
   EventPool pool(arena);
   EventQueue queue;
 
-  auto* ev1 = pool.Acquire();
-  auto* ev2 = pool.Acquire();
-  auto* ev3 = pool.Acquire();
+  auto *ev1 = pool.Acquire();
+  auto *ev2 = pool.Acquire();
+  auto *ev3 = pool.Acquire();
 
   queue.Push(ev1);
   queue.Push(ev2);
@@ -369,7 +371,7 @@ TEST(SimCh44, EventQueueClear) {
   EventPool pool(arena);
   EventQueue queue;
 
-  auto* ev = pool.Acquire();
+  auto *ev = pool.Acquire();
   queue.Push(ev);
   EXPECT_FALSE(queue.empty());
 
@@ -387,15 +389,14 @@ TEST(SimCh44, EventQueueClear) {
 // ---------------------------------------------------------------------------
 TEST(SimCh44, RegionsPredictableDesignTestbenchInteraction) {
   SimCh44Fixture f;
-  auto* design = ElaborateSrc44(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial begin\n"
-      "    a = 8'd10;\n"
-      "    b <= 8'd20;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc44("module t;\n"
+                                "  logic [7:0] a, b;\n"
+                                "  initial begin\n"
+                                "    a = 8'd10;\n"
+                                "    b <= 8'd20;\n"
+                                "  end\n"
+                                "endmodule\n",
+                                f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -411,13 +412,12 @@ TEST(SimCh44, RegionsPredictableDesignTestbenchInteraction) {
 // ---------------------------------------------------------------------------
 TEST(SimCh44, PredictableNBAToAlwaysCombInteraction) {
   SimCh44Fixture f;
-  auto* design = ElaborateSrc44(
-      "module t;\n"
-      "  logic [7:0] x, y;\n"
-      "  initial x <= 8'd50;\n"
-      "  always_comb y = x + 8'd1;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc44("module t;\n"
+                                "  logic [7:0] x, y;\n"
+                                "  initial x <= 8'd50;\n"
+                                "  always_comb y = x + 8'd1;\n"
+                                "endmodule\n",
+                                f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -439,9 +439,9 @@ TEST(SimCh44, DynamicSchedulingWithinSameTimeSlot) {
 
   sched.SetPostTimestepCallback([&]() { timestep_count++; });
 
-  auto* ev = sched.GetEventPool().Acquire();
+  auto *ev = sched.GetEventPool().Acquire();
   ev->callback = [&]() {
-    auto* inner = sched.GetEventPool().Acquire();
+    auto *inner = sched.GetEventPool().Acquire();
     inner->callback = [&inner_ran]() { inner_ran = true; };
     sched.ScheduleEvent({0}, Region::kNBA, inner);
   };
@@ -459,16 +459,15 @@ TEST(SimCh44, DynamicSchedulingWithinSameTimeSlot) {
 // ---------------------------------------------------------------------------
 TEST(SimCh44, BlockingAndNBACompleteInSameTimeSlot) {
   SimCh44Fixture f;
-  auto* design = ElaborateSrc44(
-      "module t;\n"
-      "  logic [7:0] a, b, c;\n"
-      "  initial begin\n"
-      "    a = 8'd1;\n"
-      "    b <= 8'd2;\n"
-      "    c = 8'd3;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc44("module t;\n"
+                                "  logic [7:0] a, b, c;\n"
+                                "  initial begin\n"
+                                "    a = 8'd1;\n"
+                                "    b <= 8'd2;\n"
+                                "    c = 8'd3;\n"
+                                "  end\n"
+                                "endmodule\n",
+                                f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -483,17 +482,16 @@ TEST(SimCh44, BlockingAndNBACompleteInSameTimeSlot) {
 // Events at time 5, 10, and 15 each form separate time slots.
 // ---------------------------------------------------------------------------
 TEST(SimCh44, MultipleTimeSlotsFormDistinctSlots) {
-  auto result = RunAndGet44(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    #5 x = x + 8'd1;\n"
-      "    #5 x = x + 8'd1;\n"
-      "    #5 x = x + 8'd1;\n"
-      "  end\n"
-      "endmodule\n",
-      "x");
+  auto result = RunAndGet44("module t;\n"
+                            "  logic [7:0] x;\n"
+                            "  initial begin\n"
+                            "    x = 8'd0;\n"
+                            "    #5 x = x + 8'd1;\n"
+                            "    #5 x = x + 8'd1;\n"
+                            "    #5 x = x + 8'd1;\n"
+                            "  end\n"
+                            "endmodule\n",
+                            "x");
   EXPECT_EQ(result, 3u);
 }
 
@@ -514,7 +512,7 @@ TEST(SimCh44, EventCalendarTimeOrdered) {
       [&]() { times.push_back(sched.CurrentTime().ticks); });
 
   for (uint64_t t : {30, 10, 50, 20, 40}) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = []() {};
     sched.ScheduleEvent({t}, Region::kActive, ev);
   }
@@ -550,8 +548,8 @@ TEST(SimCh44, RegionOrderingPerTimeSlot) {
   Scheduler sched(arena);
   std::vector<std::pair<uint64_t, std::string>> log;
 
-  auto schedule = [&](uint64_t t, Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
+  auto schedule = [&](uint64_t t, Region r, const std::string &label) {
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&log, &sched, label]() {
       log.push_back({sched.CurrentTime().ticks, label});
     };

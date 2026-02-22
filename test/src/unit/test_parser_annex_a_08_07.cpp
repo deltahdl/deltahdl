@@ -34,7 +34,8 @@ ParseResult Parse(const std::string &src) {
 
 static Expr *FirstInitialRHS(ParseResult &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->kind != ModuleItemKind::kInitialBlock)
+      continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0]->rhs;
     }
@@ -43,7 +44,7 @@ static Expr *FirstInitialRHS(ParseResult &r) {
   return nullptr;
 }
 
-}  // namespace
+} // namespace
 
 // =============================================================================
 // A.8.7 Numbers — Parser
@@ -169,8 +170,7 @@ TEST(ParserA87, DecimalZDigit) {
 // § binary_number — [size] binary_base binary_value
 
 TEST(ParserA87, BinaryNumber) {
-  auto r =
-      Parse("module m; logic [3:0] x; initial x = 4'b1100; endmodule\n");
+  auto r = Parse("module m; logic [3:0] x; initial x = 4'b1100; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -182,8 +182,7 @@ TEST(ParserA87, BinaryNumber) {
 // § octal_number — [size] octal_base octal_value
 
 TEST(ParserA87, OctalNumber) {
-  auto r =
-      Parse("module m; logic [11:0] x; initial x = 12'o7654; endmodule\n");
+  auto r = Parse("module m; logic [11:0] x; initial x = 12'o7654; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -195,8 +194,7 @@ TEST(ParserA87, OctalNumber) {
 // § hex_number — [size] hex_base hex_value
 
 TEST(ParserA87, HexNumber) {
-  auto r =
-      Parse("module m; logic [15:0] x; initial x = 16'hABCD; endmodule\n");
+  auto r = Parse("module m; logic [15:0] x; initial x = 16'hABCD; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -318,8 +316,7 @@ TEST(ParserA87, ExpUppercase) {
 // § unsigned_number — decimal_digit { _ | decimal_digit }
 
 TEST(ParserA87, UnsignedNumberWithUnderscores) {
-  auto r =
-      Parse("module m; int x; initial x = 1_000_000; endmodule\n");
+  auto r = Parse("module m; int x; initial x = 1_000_000; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -331,8 +328,8 @@ TEST(ParserA87, UnsignedNumberWithUnderscores) {
 // § binary_value — binary_digit { _ | binary_digit }
 
 TEST(ParserA87, BinaryValueWithUnderscores) {
-  auto r = Parse(
-      "module m; logic [7:0] x; initial x = 8'b1010_1010; endmodule\n");
+  auto r =
+      Parse("module m; logic [7:0] x; initial x = 8'b1010_1010; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -344,8 +341,8 @@ TEST(ParserA87, BinaryValueWithUnderscores) {
 // § octal_value — octal_digit { _ | octal_digit }
 
 TEST(ParserA87, OctalValueWithUnderscores) {
-  auto r = Parse(
-      "module m; logic [11:0] x; initial x = 12'o77_77; endmodule\n");
+  auto r =
+      Parse("module m; logic [11:0] x; initial x = 12'o77_77; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -357,8 +354,8 @@ TEST(ParserA87, OctalValueWithUnderscores) {
 // § hex_value — hex_digit { _ | hex_digit }
 
 TEST(ParserA87, HexValueWithUnderscores) {
-  auto r = Parse(
-      "module m; logic [15:0] x; initial x = 16'hAB_CD; endmodule\n");
+  auto r =
+      Parse("module m; logic [15:0] x; initial x = 16'hAB_CD; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -414,8 +411,7 @@ TEST(ParserA87, DecimalBaseSignedUpper) {
 // § binary_base — 'b
 
 TEST(ParserA87, BinaryBaseLower) {
-  auto r =
-      Parse("module m; logic [3:0] x; initial x = 4'b1111; endmodule\n");
+  auto r = Parse("module m; logic [3:0] x; initial x = 4'b1111; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -426,8 +422,7 @@ TEST(ParserA87, BinaryBaseLower) {
 // § binary_base — 'B
 
 TEST(ParserA87, BinaryBaseUpper) {
-  auto r =
-      Parse("module m; logic [3:0] x; initial x = 4'B1111; endmodule\n");
+  auto r = Parse("module m; logic [3:0] x; initial x = 4'B1111; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -438,8 +433,7 @@ TEST(ParserA87, BinaryBaseUpper) {
 // § binary_base — 'sb (signed)
 
 TEST(ParserA87, BinaryBaseSignedLower) {
-  auto r =
-      Parse("module m; logic [3:0] x; initial x = 4'sb1111; endmodule\n");
+  auto r = Parse("module m; logic [3:0] x; initial x = 4'sb1111; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -450,8 +444,7 @@ TEST(ParserA87, BinaryBaseSignedLower) {
 // § binary_base — 'SB
 
 TEST(ParserA87, BinaryBaseSignedUpper) {
-  auto r =
-      Parse("module m; logic [3:0] x; initial x = 4'SB1111; endmodule\n");
+  auto r = Parse("module m; logic [3:0] x; initial x = 4'SB1111; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -550,8 +543,7 @@ TEST(ParserA87, HexBaseSignedUpper) {
 // § decimal_digit — 0 through 9
 
 TEST(ParserA87, DecimalDigitAll) {
-  auto r =
-      Parse("module m; int x; initial x = 1234567890; endmodule\n");
+  auto r = Parse("module m; int x; initial x = 1234567890; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -562,8 +554,7 @@ TEST(ParserA87, DecimalDigitAll) {
 // § binary_digit — 0 and 1
 
 TEST(ParserA87, BinaryDigitZeroOne) {
-  auto r =
-      Parse("module m; logic [3:0] x; initial x = 4'b0101; endmodule\n");
+  auto r = Parse("module m; logic [3:0] x; initial x = 4'b0101; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -574,8 +565,8 @@ TEST(ParserA87, BinaryDigitZeroOne) {
 // § octal_digit — 0 through 7
 
 TEST(ParserA87, OctalDigitAll) {
-  auto r = Parse(
-      "module m; logic [23:0] x; initial x = 24'o01234567; endmodule\n");
+  auto r =
+      Parse("module m; logic [23:0] x; initial x = 24'o01234567; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -586,8 +577,8 @@ TEST(ParserA87, OctalDigitAll) {
 // § hex_digit — 0-9, a-f, A-F
 
 TEST(ParserA87, HexDigitLowercase) {
-  auto r = Parse(
-      "module m; logic [23:0] x; initial x = 24'habcdef; endmodule\n");
+  auto r =
+      Parse("module m; logic [23:0] x; initial x = 24'habcdef; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -596,8 +587,8 @@ TEST(ParserA87, HexDigitLowercase) {
 }
 
 TEST(ParserA87, HexDigitUppercase) {
-  auto r = Parse(
-      "module m; logic [23:0] x; initial x = 24'hABCDEF; endmodule\n");
+  auto r =
+      Parse("module m; logic [23:0] x; initial x = 24'hABCDEF; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -608,8 +599,7 @@ TEST(ParserA87, HexDigitUppercase) {
 // § x_digit — x
 
 TEST(ParserA87, XDigitLower) {
-  auto r =
-      Parse("module m; logic [3:0] x; initial x = 4'hx; endmodule\n");
+  auto r = Parse("module m; logic [3:0] x; initial x = 4'hx; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -620,8 +610,7 @@ TEST(ParserA87, XDigitLower) {
 // § x_digit — X
 
 TEST(ParserA87, XDigitUpper) {
-  auto r =
-      Parse("module m; logic [3:0] x; initial x = 4'hX; endmodule\n");
+  auto r = Parse("module m; logic [3:0] x; initial x = 4'hX; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -632,8 +621,7 @@ TEST(ParserA87, XDigitUpper) {
 // § z_digit — z
 
 TEST(ParserA87, ZDigitLower) {
-  auto r =
-      Parse("module m; logic [3:0] x; initial x = 4'hz; endmodule\n");
+  auto r = Parse("module m; logic [3:0] x; initial x = 4'hz; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -644,8 +632,7 @@ TEST(ParserA87, ZDigitLower) {
 // § z_digit — Z
 
 TEST(ParserA87, ZDigitUpper) {
-  auto r =
-      Parse("module m; logic [3:0] x; initial x = 4'hZ; endmodule\n");
+  auto r = Parse("module m; logic [3:0] x; initial x = 4'hZ; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -656,8 +643,7 @@ TEST(ParserA87, ZDigitUpper) {
 // § z_digit — ?
 
 TEST(ParserA87, ZDigitQuestion) {
-  auto r =
-      Parse("module m; logic [3:0] x; initial x = 4'b?; endmodule\n");
+  auto r = Parse("module m; logic [3:0] x; initial x = 4'b?; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);

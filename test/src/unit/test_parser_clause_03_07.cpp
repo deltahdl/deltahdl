@@ -12,11 +12,11 @@ using namespace delta;
 struct ParseResult307 {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult307 Parse(const std::string& src) {
+static ParseResult307 Parse(const std::string &src) {
   ParseResult307 result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
@@ -30,17 +30,18 @@ static ParseResult307 Parse(const std::string& src) {
   return result;
 }
 
-static int CountItemsByKind(const std::vector<ModuleItem*>& items,
+static int CountItemsByKind(const std::vector<ModuleItem *> &items,
                             ModuleItemKind kind) {
   int count = 0;
-  for (const auto* item : items)
-    if (item->kind == kind) ++count;
+  for (const auto *item : items)
+    if (item->kind == kind)
+      ++count;
   return count;
 }
 
-static bool HasGateOfKind(const std::vector<ModuleItem*>& items,
+static bool HasGateOfKind(const std::vector<ModuleItem *> &items,
                           GateKind kind) {
-  for (const auto* item : items)
+  for (const auto *item : items)
     if (item->kind == ModuleItemKind::kGateInst && item->gate_kind == kind)
       return true;
   return false;
@@ -53,13 +54,12 @@ static bool HasGateOfKind(const std::vector<ModuleItem*>& items,
 // §3.7: "SystemVerilog includes a number of built-in primitive types"
 //       — logic gates and switches instantiated inside a module.
 TEST(ParserClause03, Cl3_7_BuiltInPrimitives) {
-  auto r = Parse(
-      "module gate_test(input a, b, c, output w, x, y, z);\n"
-      "  and g1(w, a, b);\n"
-      "  nand g2(x, a, b, c);\n"
-      "  bufif0 g3(y, a, b);\n"
-      "  nmos g4(z, a, b);\n"
-      "endmodule\n");
+  auto r = Parse("module gate_test(input a, b, c, output w, x, y, z);\n"
+                 "  and g1(w, a, b);\n"
+                 "  nand g2(x, a, b, c);\n"
+                 "  bufif0 g3(y, a, b);\n"
+                 "  nmos g4(z, a, b);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 1u);
@@ -76,19 +76,18 @@ TEST(ParserClause03, Cl3_7_BuiltInPrimitives) {
 //        primitive...endprimitive."
 //        Combinational UDP with truth table for gate-level modeling.
 TEST(ParserClause03, Cl3_7_CombinationalUdp) {
-  auto r = Parse(
-      "primitive udp_or (output out, input a, b);\n"
-      "  table\n"
-      "    0 0 : 0;\n"
-      "    0 1 : 1;\n"
-      "    1 0 : 1;\n"
-      "    1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive udp_or (output out, input a, b);\n"
+                 "  table\n"
+                 "    0 0 : 0;\n"
+                 "    0 1 : 1;\n"
+                 "    1 0 : 1;\n"
+                 "    1 1 : 1;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);
-  const auto* udp = r.cu->udps[0];
+  const auto *udp = r.cu->udps[0];
   EXPECT_EQ(udp->name, "udp_or");
   EXPECT_EQ(udp->output_name, "out");
   ASSERT_EQ(udp->input_names.size(), 2u);
@@ -103,19 +102,18 @@ TEST(ParserClause03, Cl3_7_CombinationalUdp) {
 // §3.7: Sequential UDP with initial statement — timing-accurate modeling
 //        for sequential gate-level circuits.
 TEST(ParserClause03, Cl3_7_SequentialUdp) {
-  auto r = Parse(
-      "primitive udp_latch (output reg q, input d, en);\n"
-      "  initial q = 0;\n"
-      "  table\n"
-      "    1 1 : ? : 1;\n"
-      "    0 1 : ? : 0;\n"
-      "    ? 0 : ? : -;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive udp_latch (output reg q, input d, en);\n"
+                 "  initial q = 0;\n"
+                 "  table\n"
+                 "    1 1 : ? : 1;\n"
+                 "    0 1 : ? : 0;\n"
+                 "    ? 0 : ? : -;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);
-  const auto* udp = r.cu->udps[0];
+  const auto *udp = r.cu->udps[0];
   EXPECT_EQ(udp->name, "udp_latch");
   EXPECT_TRUE(udp->is_sequential);
   EXPECT_TRUE(udp->has_initial);

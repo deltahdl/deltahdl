@@ -1,7 +1,5 @@
 // §17.2: Checker declaration
 
-#include <gtest/gtest.h>
-#include <string>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -12,6 +10,8 @@
 #include "parser/parser.h"
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
+#include <gtest/gtest.h>
+#include <string>
 
 using namespace delta;
 
@@ -19,8 +19,8 @@ using namespace delta;
 // Parse-level fixture
 // =============================================================================
 struct CheckerParseTest : ::testing::Test {
- protected:
-  CompilationUnit* Parse(const std::string& src) {
+protected:
+  CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
     parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
@@ -44,10 +44,11 @@ struct CheckerElabFixture {
   DiagEngine diag{mgr};
 };
 
-static bool HasItemOfKind(const std::vector<ModuleItem*>& items,
+static bool HasItemOfKind(const std::vector<ModuleItem *> &items,
                           ModuleItemKind kind) {
-  for (const auto* item : items) {
-    if (item->kind == kind) return true;
+  for (const auto *item : items) {
+    if (item->kind == kind)
+      return true;
   }
   return false;
 }
@@ -58,7 +59,7 @@ namespace {
 // §17.1 Basic checker declaration
 // =============================================================================
 TEST_F(CheckerParseTest, EmptyChecker) {
-  auto* unit = Parse("checker my_check; endchecker");
+  auto *unit = Parse("checker my_check; endchecker");
   ASSERT_EQ(unit->checkers.size(), 1u);
   EXPECT_EQ(unit->checkers[0]->name, "my_check");
   EXPECT_EQ(unit->checkers[0]->decl_kind, ModuleDeclKind::kChecker);
@@ -67,7 +68,7 @@ TEST_F(CheckerParseTest, EmptyChecker) {
 }
 
 TEST_F(CheckerParseTest, CheckerWithEndLabel) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     checker labeled_check;
     endchecker : labeled_check
   )");
@@ -79,7 +80,7 @@ TEST_F(CheckerParseTest, CheckerWithEndLabel) {
 // §17.2 Checker ports
 // =============================================================================
 TEST_F(CheckerParseTest, CheckerWithInputPorts) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     checker port_check(input logic clk, input logic rst);
     endchecker
   )");
@@ -92,7 +93,7 @@ TEST_F(CheckerParseTest, CheckerWithInputPorts) {
 }
 
 TEST_F(CheckerParseTest, CheckerWithOutputPorts) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     checker out_check(input logic clk, output logic valid);
     endchecker
   )");
@@ -103,7 +104,7 @@ TEST_F(CheckerParseTest, CheckerWithOutputPorts) {
 }
 
 TEST_F(CheckerParseTest, CheckerWithNoPorts) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     checker no_ports;
     endchecker
   )");
@@ -112,7 +113,7 @@ TEST_F(CheckerParseTest, CheckerWithNoPorts) {
 }
 
 TEST_F(CheckerParseTest, CheckerWithEmptyParenPorts) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     checker empty_parens();
     endchecker
   )");
@@ -124,7 +125,7 @@ TEST_F(CheckerParseTest, CheckerWithEmptyParenPorts) {
 // §17.3 Checker body with properties and sequences
 // =============================================================================
 TEST_F(CheckerParseTest, CheckerWithPropertyDecl) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     checker prop_check(input logic clk, input logic a, input logic b);
       property p1;
         a |-> b;
@@ -138,7 +139,7 @@ TEST_F(CheckerParseTest, CheckerWithPropertyDecl) {
 }
 
 TEST_F(CheckerParseTest, CheckerWithSequenceDecl) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     checker seq_check(input logic clk, input logic a);
       sequence s1;
         a;
@@ -155,7 +156,7 @@ TEST_F(CheckerParseTest, CheckerWithSequenceDecl) {
 // §17.7 Multiple checkers
 // =============================================================================
 TEST_F(CheckerParseTest, MultipleCheckers) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     checker c1; endchecker
     checker c2; endchecker
     checker c3; endchecker
@@ -170,7 +171,7 @@ TEST_F(CheckerParseTest, MultipleCheckers) {
 // §17.8 Checker coexists with module and program
 // =============================================================================
 TEST_F(CheckerParseTest, CheckerCoexistsWithModuleAndProgram) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     module m; endmodule
     program p; endprogram
     checker c; endchecker
@@ -184,7 +185,7 @@ TEST_F(CheckerParseTest, CheckerCoexistsWithModuleAndProgram) {
 // §17.9 Checker with assert property
 // =============================================================================
 TEST_F(CheckerParseTest, CheckerWithAssertProperty) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     checker assert_check(input logic clk, input logic a, input logic b);
       assert property (@(posedge clk) a |-> b);
     endchecker
@@ -198,7 +199,7 @@ TEST_F(CheckerParseTest, CheckerWithAssertProperty) {
 // §17.13 Checker with continuous assignment
 // =============================================================================
 TEST_F(CheckerParseTest, CheckerWithContAssign) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     checker assign_check;
       logic a, b;
       assign a = b;
@@ -209,4 +210,4 @@ TEST_F(CheckerParseTest, CheckerWithContAssign) {
       HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kContAssign));
 }
 
-}  // namespace
+} // namespace

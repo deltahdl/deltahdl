@@ -1,6 +1,5 @@
 // §11.6: Expression bit lengths
 
-#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -12,6 +11,7 @@
 #include "lexer/lexer.h"
 #include "lexer/token.h"
 #include "parser/parser.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -21,11 +21,11 @@ struct ElabFixture {
   DiagEngine diag{mgr};
 };
 
-static RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f) {
+static RtlirDesign *ElaborateSrc(const std::string &src, ElabFixture &f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
+  auto *cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -35,14 +35,13 @@ namespace {
 // --- Width inference tests ---
 TEST(Elaboration, WidthInference_ContAssignWidth) {
   ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  logic [7:0] a, b;\n"
-      "  assign a = b;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module top;\n"
+                              "  logic [7:0] a, b;\n"
+                              "  assign a = b;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
-  auto* mod = design->top_modules[0];
+  auto *mod = design->top_modules[0];
   ASSERT_EQ(mod->assigns.size(), 1);
   EXPECT_EQ(mod->assigns[0].width, 8);
 }
@@ -90,7 +89,7 @@ TEST(Elaboration, WidthInference_Concatenation) {
   Expr concat;
   concat.kind = ExprKind::kConcatenation;
   concat.elements = {&a, &b};
-  EXPECT_EQ(InferExprWidth(&concat, typedefs), 64);  // 32 + 32
+  EXPECT_EQ(InferExprWidth(&concat, typedefs), 64); // 32 + 32
 }
 
-}  // namespace
+} // namespace

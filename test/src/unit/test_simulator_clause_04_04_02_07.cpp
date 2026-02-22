@@ -29,7 +29,7 @@ TEST(SimCh4427, ReInactiveRegionExecutesEvents) {
   Scheduler sched(arena);
   int executed = 0;
 
-  auto* ev = sched.GetEventPool().Acquire();
+  auto *ev = sched.GetEventPool().Acquire();
   ev->callback = [&]() { executed++; };
   sched.ScheduleEvent({0}, Region::kReInactive, ev);
 
@@ -46,11 +46,11 @@ TEST(SimCh4427, ReInactiveExecutesAfterReactive) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto* reinactive = sched.GetEventPool().Acquire();
+  auto *reinactive = sched.GetEventPool().Acquire();
   reinactive->callback = [&]() { order.push_back("reinactive"); };
   sched.ScheduleEvent({0}, Region::kReInactive, reinactive);
 
-  auto* reactive = sched.GetEventPool().Acquire();
+  auto *reactive = sched.GetEventPool().Acquire();
   reactive->callback = [&]() { order.push_back("reactive"); };
   sched.ScheduleEvent({0}, Region::kReactive, reactive);
 
@@ -70,14 +70,14 @@ TEST(SimCh4427, AllReactiveEventsCompleteBeforeReInactive) {
   std::vector<std::string> order;
 
   for (int i = 0; i < 3; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, i]() {
       order.push_back("reactive" + std::to_string(i));
     };
     sched.ScheduleEvent({0}, Region::kReactive, ev);
   }
 
-  auto* reinactive = sched.GetEventPool().Acquire();
+  auto *reinactive = sched.GetEventPool().Acquire();
   reinactive->callback = [&]() { order.push_back("reinactive"); };
   sched.ScheduleEvent({0}, Region::kReInactive, reinactive);
 
@@ -97,11 +97,11 @@ TEST(SimCh4427, ZeroDelaySchedulesIntoReInactive) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto* reactive = sched.GetEventPool().Acquire();
+  auto *reactive = sched.GetEventPool().Acquire();
   reactive->callback = [&]() {
     order.push_back("reactive");
     // #0 delay: schedule into Re-Inactive at current time.
-    auto* delayed = sched.GetEventPool().Acquire();
+    auto *delayed = sched.GetEventPool().Acquire();
     delayed->callback = [&order]() { order.push_back("after_zero_delay"); };
     sched.ScheduleEvent({0}, Region::kReInactive, delayed);
   };
@@ -125,14 +125,14 @@ TEST(SimCh4427, ReInactiveToReactiveIteration) {
   std::vector<std::string> order;
 
   // Initial Reactive event schedules into Re-Inactive (#0).
-  auto* react1 = sched.GetEventPool().Acquire();
+  auto *react1 = sched.GetEventPool().Acquire();
   react1->callback = [&]() {
     order.push_back("reactive1");
-    auto* reinact = sched.GetEventPool().Acquire();
+    auto *reinact = sched.GetEventPool().Acquire();
     reinact->callback = [&]() {
       order.push_back("reinactive");
       // Re-Inactive schedules new Reactive event -> triggers re-iteration.
-      auto* react2 = sched.GetEventPool().Acquire();
+      auto *react2 = sched.GetEventPool().Acquire();
       react2->callback = [&order]() { order.push_back("reactive2"); };
       sched.ScheduleEvent({0}, Region::kReactive, react2);
     };
@@ -161,22 +161,22 @@ TEST(SimCh4427, ChainedZeroDelayIteration) {
   auto log_reinactive2 = [&order]() { order.push_back("reinactive2"); };
   auto do_reactive2 = [&]() {
     order.push_back("reactive2");
-    auto* reinact2 = sched.GetEventPool().Acquire();
+    auto *reinact2 = sched.GetEventPool().Acquire();
     reinact2->callback = log_reinactive2;
     sched.ScheduleEvent({0}, Region::kReInactive, reinact2);
   };
   // Outer chain: reactive1 -> reinactive1 -> (inner chain).
   auto do_reinactive1 = [&]() {
     order.push_back("reinactive1");
-    auto* react2 = sched.GetEventPool().Acquire();
+    auto *react2 = sched.GetEventPool().Acquire();
     react2->callback = do_reactive2;
     sched.ScheduleEvent({0}, Region::kReactive, react2);
   };
 
-  auto* react1 = sched.GetEventPool().Acquire();
+  auto *react1 = sched.GetEventPool().Acquire();
   react1->callback = [&]() {
     order.push_back("reactive1");
-    auto* reinact1 = sched.GetEventPool().Acquire();
+    auto *reinact1 = sched.GetEventPool().Acquire();
     reinact1->callback = do_reinactive1;
     sched.ScheduleEvent({0}, Region::kReInactive, reinact1);
   };
@@ -210,11 +210,11 @@ TEST(SimCh4427, ReInactiveExecutesBeforeReNBA) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto* renba = sched.GetEventPool().Acquire();
+  auto *renba = sched.GetEventPool().Acquire();
   renba->callback = [&]() { order.push_back("renba"); };
   sched.ScheduleEvent({0}, Region::kReNBA, renba);
 
-  auto* reinactive = sched.GetEventPool().Acquire();
+  auto *reinactive = sched.GetEventPool().Acquire();
   reinactive->callback = [&]() { order.push_back("reinactive"); };
   sched.ScheduleEvent({0}, Region::kReInactive, reinactive);
 
@@ -234,7 +234,7 @@ TEST(SimCh4427, ReInactiveEventsAcrossMultipleTimeSlots) {
   std::vector<uint64_t> times;
 
   for (uint64_t t = 0; t < 3; ++t) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&times, &sched]() {
       times.push_back(sched.CurrentTime().ticks);
     };
@@ -257,7 +257,7 @@ TEST(SimCh4427, ReInactiveRegionHoldsMultipleEvents) {
   int count = 0;
 
   for (int i = 0; i < 5; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&]() { count++; };
     sched.ScheduleEvent({0}, Region::kReInactive, ev);
   }

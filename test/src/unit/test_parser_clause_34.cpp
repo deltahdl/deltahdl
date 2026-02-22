@@ -15,10 +15,10 @@ using namespace delta;
 struct ParseResult34 {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult34 Parse(const std::string& src) {
+static ParseResult34 Parse(const std::string &src) {
   ParseResult34 result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -58,7 +58,7 @@ TEST(ParserSection34, ConfigWithMultipleLibraries) {
   )");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->configs.size(), 1u);
-  auto* cfg = r.cu->configs[0];
+  auto *cfg = r.cu->configs[0];
   EXPECT_EQ(cfg->name, "design_cfg");
   // Should have design cells
   ASSERT_GE(cfg->design_cells.size(), 1u);
@@ -89,7 +89,7 @@ TEST(ParserSection34, ConfigWithInstanceAndLiblist) {
   )");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->configs.size(), 1u);
-  auto* cfg = r.cu->configs[0];
+  auto *cfg = r.cu->configs[0];
   ASSERT_GE(cfg->rules.size(), 2u);
 }
 

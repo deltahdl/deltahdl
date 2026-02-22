@@ -1,11 +1,11 @@
 // §9.2.2: Always procedures
 
-#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -23,10 +23,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult Parse(const std::string& src) {
+static ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -37,29 +37,28 @@ static ParseResult Parse(const std::string& src) {
 }
 
 struct StructMemberExpected {
-  const char* name;
+  const char *name;
   DataTypeKind type_kind;
 };
 
 struct ModportPortExpected {
   Direction dir;
-  const char* name;
+  const char *name;
 };
 
 namespace {
 
 TEST(Parser, AlwaysFFBlock) {
-  auto r = Parse(
-      "module counter(input logic clk, rst);\n"
-      "  logic [7:0] count;\n"
-      "  always_ff @(posedge clk or posedge rst)\n"
-      "    if (rst) count <= '0;\n"
-      "    else count <= count + 1;\n"
-      "endmodule\n");
+  auto r = Parse("module counter(input logic clk, rst);\n"
+                 "  logic [7:0] count;\n"
+                 "  always_ff @(posedge clk or posedge rst)\n"
+                 "    if (rst) count <= '0;\n"
+                 "    else count <= count + 1;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
+  auto *mod = r.cu->modules[0];
   bool found_ff = false;
-  for (auto* item : mod->items) {
+  for (auto *item : mod->items) {
     if (item->kind == ModuleItemKind::kAlwaysBlock &&
         item->always_kind == AlwaysKind::kAlwaysFF) {
       found_ff = true;
@@ -68,4 +67,4 @@ TEST(Parser, AlwaysFFBlock) {
   EXPECT_TRUE(found_ff);
 }
 
-}  // namespace
+} // namespace

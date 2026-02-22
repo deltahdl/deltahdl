@@ -11,7 +11,7 @@ namespace delta {
 namespace {
 
 class VpiClause3836Test : public ::testing::Test {
- protected:
+protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
@@ -65,7 +65,7 @@ TEST_F(VpiClause3836Test, RemoveCbNullReturnsZero) {
 }
 
 TEST_F(VpiClause3836Test, CbValueChangeWithWatcherFires) {
-  auto* var = sim_ctx_.CreateVariable("sig", 1);
+  auto *var = sim_ctx_.CreateVariable("sig", 1);
   var->value = MakeLogic4VecVal(arena_, 1, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
@@ -84,5 +84,5 @@ TEST_F(VpiClause3836Test, CbValueChangeWithWatcherFires) {
   EXPECT_TRUE(fired);
 }
 
-}  // namespace
-}  // namespace delta
+} // namespace
+} // namespace delta

@@ -18,16 +18,18 @@ struct SynthFixture {
   Arena arena;
 };
 
-static const RtlirModule* ElaborateSrc(SynthFixture& f,
-                                       const std::string& src) {
+static const RtlirModule *ElaborateSrc(SynthFixture &f,
+                                       const std::string &src) {
   auto fid = f.src_mgr.AddFile("<test>", src);
   Lexer lexer(f.src_mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  if (!cu || cu->modules.empty()) return nullptr;
+  auto *cu = parser.Parse();
+  if (!cu || cu->modules.empty())
+    return nullptr;
   Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(cu->modules.back()->name);
-  if (!design || design->top_modules.empty()) return nullptr;
+  auto *design = elab.Elaborate(cu->modules.back()->name);
+  if (!design || design->top_modules.empty())
+    return nullptr;
   return design->top_modules[0];
 }
 
@@ -35,12 +37,12 @@ namespace {
 
 TEST(SynthLower, RejectInitialBlock) {
   SynthFixture f;
-  auto* mod = ElaborateSrc(f, "module m; initial begin end endmodule");
+  auto *mod = ElaborateSrc(f, "module m; initial begin end endmodule");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
-  auto* aig = synth.Lower(mod);
+  auto *aig = synth.Lower(mod);
   EXPECT_EQ(aig, nullptr);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+} // namespace

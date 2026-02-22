@@ -15,11 +15,11 @@ namespace {
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
   bool has_errors = false;
 };
 
-ParseResult Parse(const std::string& src) {
+ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -30,22 +30,21 @@ ParseResult Parse(const std::string& src) {
   return result;
 }
 
-}  // namespace
+} // namespace
 
 // =============================================================================
 // A.5 -- UDP declarations
 // =============================================================================
 
 TEST(ParserAnnexA, A5UdpCombinational) {
-  auto r = Parse(
-      "primitive mux2(output y, input a, input b, input s);\n"
-      "  table\n"
-      "    0 ? 0 : 0 ;\n"
-      "    1 ? 0 : 1 ;\n"
-      "    ? 0 1 : 0 ;\n"
-      "    ? 1 1 : 1 ;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive mux2(output y, input a, input b, input s);\n"
+                 "  table\n"
+                 "    0 ? 0 : 0 ;\n"
+                 "    1 ? 0 : 1 ;\n"
+                 "    ? 0 1 : 0 ;\n"
+                 "    ? 1 1 : 1 ;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);
@@ -54,13 +53,12 @@ TEST(ParserAnnexA, A5UdpCombinational) {
 }
 
 TEST(ParserAnnexA, A5UdpSequential) {
-  auto r = Parse(
-      "primitive dff(output reg q, input d, input clk);\n"
-      "  table\n"
-      "    0 r : ? : 0 ;\n"
-      "    1 r : ? : 1 ;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive dff(output reg q, input d, input clk);\n"
+                 "  table\n"
+                 "    0 r : ? : 0 ;\n"
+                 "    1 r : ? : 1 ;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);

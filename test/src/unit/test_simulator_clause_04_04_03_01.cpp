@@ -28,7 +28,7 @@ TEST(SimCh4431, PreponedRegionExecutesPLICallbacks) {
   Scheduler sched(arena);
   int executed = 0;
 
-  auto* ev = sched.GetEventPool().Acquire();
+  auto *ev = sched.GetEventPool().Acquire();
   ev->callback = [&]() { executed++; };
   sched.ScheduleEvent({0}, Region::kPreponed, ev);
 
@@ -48,12 +48,12 @@ TEST(SimCh4431, PreponedAccessesDataBeforeAnyStateChange) {
   int sampled_in_preponed = -1;
 
   // Active at time 0 changes value.
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->callback = [&]() { value = 100; };
   sched.ScheduleEvent({0}, Region::kActive, active);
 
   // Preponed at time 0 samples value — should see original (42).
-  auto* preponed = sched.GetEventPool().Acquire();
+  auto *preponed = sched.GetEventPool().Acquire();
   preponed->callback = [&]() { sampled_in_preponed = value; };
   sched.ScheduleEvent({0}, Region::kPreponed, preponed);
 
@@ -74,7 +74,7 @@ TEST(SimCh4431, PreponedSeesStateBeforeAllSimulationRegions) {
 
   // Multiple simulation regions all modify value.
   auto schedule_mod = [&](Region r, int new_val) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&value, new_val]() { value = new_val; };
     sched.ScheduleEvent({0}, r, ev);
   };
@@ -86,7 +86,7 @@ TEST(SimCh4431, PreponedSeesStateBeforeAllSimulationRegions) {
   schedule_mod(Region::kReNBA, 50);
 
   // Preponed should see value = 0 (initial state).
-  auto* preponed = sched.GetEventPool().Acquire();
+  auto *preponed = sched.GetEventPool().Acquire();
   preponed->callback = [&]() { sampled = value; };
   sched.ScheduleEvent({0}, Region::kPreponed, preponed);
 
@@ -104,11 +104,11 @@ TEST(SimCh4431, PreponedExecutesBeforePreActive) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto* pre_active = sched.GetEventPool().Acquire();
+  auto *pre_active = sched.GetEventPool().Acquire();
   pre_active->callback = [&]() { order.push_back("pre_active"); };
   sched.ScheduleEvent({0}, Region::kPreActive, pre_active);
 
-  auto* preponed = sched.GetEventPool().Acquire();
+  auto *preponed = sched.GetEventPool().Acquire();
   preponed->callback = [&]() { order.push_back("preponed"); };
   sched.ScheduleEvent({0}, Region::kPreponed, preponed);
 
@@ -136,7 +136,7 @@ TEST(SimCh4431, PreponedRegionHoldsMultiplePLICallbacks) {
   int count = 0;
 
   for (int i = 0; i < 5; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&]() { count++; };
     sched.ScheduleEvent({0}, Region::kPreponed, ev);
   }
@@ -157,12 +157,12 @@ TEST(SimCh4431, PreponedSeesStatefromPreviousTimeSlot) {
   int sampled_t1 = -1;
 
   // Active at time 0 sets value = 77.
-  auto* active0 = sched.GetEventPool().Acquire();
+  auto *active0 = sched.GetEventPool().Acquire();
   active0->callback = [&]() { value = 77; };
   sched.ScheduleEvent({0}, Region::kActive, active0);
 
   // Preponed at time 1 should see value = 77 (final state from time 0).
-  auto* preponed1 = sched.GetEventPool().Acquire();
+  auto *preponed1 = sched.GetEventPool().Acquire();
   preponed1->callback = [&]() { sampled_t1 = value; };
   sched.ScheduleEvent({1}, Region::kPreponed, preponed1);
 
@@ -179,8 +179,8 @@ TEST(SimCh4431, PreponedExecutesBeforeAllOtherRegions) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
+  auto schedule = [&](Region r, const std::string &label) {
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, label]() { order.push_back(label); };
     sched.ScheduleEvent({0}, r, ev);
   };
@@ -207,7 +207,7 @@ TEST(SimCh4431, PreponedEventsAcrossMultipleTimeSlots) {
   std::vector<uint64_t> times;
 
   for (uint64_t t = 0; t < 3; ++t) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&times, &sched]() {
       times.push_back(sched.CurrentTime().ticks);
     };
@@ -235,7 +235,7 @@ TEST(SimCh4431, PreponedProvidesConsistentReadOnlySnapshot) {
   int sum_in_preponed = -1;
 
   // Active at time 0 will change both a and b.
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->callback = [&]() {
     a = 100;
     b = 200;
@@ -243,7 +243,7 @@ TEST(SimCh4431, PreponedProvidesConsistentReadOnlySnapshot) {
   sched.ScheduleEvent({0}, Region::kActive, active);
 
   // Preponed at time 0 reads both — should see original values.
-  auto* preponed = sched.GetEventPool().Acquire();
+  auto *preponed = sched.GetEventPool().Acquire();
   preponed->callback = [&]() { sum_in_preponed = a + b; };
   sched.ScheduleEvent({0}, Region::kPreponed, preponed);
 

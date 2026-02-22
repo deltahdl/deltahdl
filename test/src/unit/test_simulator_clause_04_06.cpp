@@ -24,7 +24,7 @@ TEST(SimCh46, SequentialStatementsExecuteInSourceOrder) {
 
   // Simulate a begin-end block: three sequential statements.
   for (int i = 0; i < 3; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, i]() { order.push_back(i); };
     sched.ScheduleEvent({0}, Region::kActive, ev);
   }
@@ -47,18 +47,18 @@ TEST(SimCh46, SuspendedProcessResumesInOrder) {
   std::vector<std::string> order;
 
   // Process A: stmt0, then suspends (schedules stmt2 in Inactive).
-  auto* a0 = sched.GetEventPool().Acquire();
+  auto *a0 = sched.GetEventPool().Acquire();
   a0->callback = [&]() {
     order.push_back("A0");
     // A suspends: schedules continuation in Inactive region.
-    auto* a1 = sched.GetEventPool().Acquire();
+    auto *a1 = sched.GetEventPool().Acquire();
     a1->callback = [&]() { order.push_back("A1"); };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kInactive, a1);
   };
   sched.ScheduleEvent({0}, Region::kActive, a0);
 
   // Process B: runs while A is suspended.
-  auto* b0 = sched.GetEventPool().Acquire();
+  auto *b0 = sched.GetEventPool().Acquire();
   b0->callback = [&]() { order.push_back("B0"); };
   sched.ScheduleEvent({0}, Region::kActive, b0);
 
@@ -80,7 +80,7 @@ TEST(SimCh46, LargeSequentialBlockPreservesOrder) {
   std::vector<int> order;
 
   for (int i = 0; i < 20; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, i]() { order.push_back(i); };
     sched.ScheduleEvent({0}, Region::kActive, ev);
   }
@@ -103,7 +103,7 @@ TEST(SimCh46, NBAExecutionOrder) {
 
   // Simulate: a <= 0; a <= 1; a <= 2; (three NBAs in execution order).
   for (int i = 0; i < 3; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&nba_order, i]() { nba_order.push_back(i); };
     sched.ScheduleEvent({0}, Region::kNBA, ev);
   }
@@ -125,12 +125,12 @@ TEST(SimCh46, NBALastAssignmentWins) {
   int a = -1;
 
   // a <= 0;
-  auto* nba0 = sched.GetEventPool().Acquire();
+  auto *nba0 = sched.GetEventPool().Acquire();
   nba0->callback = [&]() { a = 0; };
   sched.ScheduleEvent({0}, Region::kNBA, nba0);
 
   // a <= 1;
-  auto* nba1 = sched.GetEventPool().Acquire();
+  auto *nba1 = sched.GetEventPool().Acquire();
   nba1->callback = [&]() { a = 1; };
   sched.ScheduleEvent({0}, Region::kNBA, nba1);
 
@@ -148,10 +148,10 @@ TEST(SimCh46, ActiveGeneratedNBAsExecuteInOrder) {
   std::vector<int> nba_order;
 
   // An Active callback generates three NBAs.
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->callback = [&]() {
     for (int i = 0; i < 3; ++i) {
-      auto* nba = sched.GetEventPool().Acquire();
+      auto *nba = sched.GetEventPool().Acquire();
       nba->callback = [&nba_order, i]() { nba_order.push_back(i); };
       sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
     }
@@ -177,10 +177,10 @@ TEST(SimCh46, SequentialStatementsProduceOrderedNBAs) {
   // Simulate a begin-end block with three sequential NBA assignments.
   // Each Active event represents a statement; it creates an NBA.
   for (int i = 0; i < 3; ++i) {
-    auto* stmt = sched.GetEventPool().Acquire();
+    auto *stmt = sched.GetEventPool().Acquire();
     stmt->callback = [&, i]() {
       log.push_back("stmt" + std::to_string(i));
-      auto* nba = sched.GetEventPool().Acquire();
+      auto *nba = sched.GetEventPool().Acquire();
       nba->callback = [&, i]() { log.push_back("nba" + std::to_string(i)); };
       sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
     };
@@ -205,7 +205,7 @@ TEST(SimCh46, SourceOrderPreservedAcrossTimeSlots) {
 
   // Time 0: two statements.
   for (int i = 0; i < 2; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, i]() {
       order.push_back("t0_" + std::to_string(i));
     };
@@ -214,7 +214,7 @@ TEST(SimCh46, SourceOrderPreservedAcrossTimeSlots) {
 
   // Time 5: two statements.
   for (int i = 0; i < 2; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, i]() {
       order.push_back("t5_" + std::to_string(i));
     };
@@ -240,36 +240,36 @@ TEST(SimCh46, NBAOrderingAcrossTimeSlots) {
   int a = -1;
 
   // Time 0: a <= 10; a <= 20;
-  auto* nba0a = sched.GetEventPool().Acquire();
+  auto *nba0a = sched.GetEventPool().Acquire();
   nba0a->callback = [&]() { a = 10; };
   sched.ScheduleEvent({0}, Region::kNBA, nba0a);
 
-  auto* nba0b = sched.GetEventPool().Acquire();
+  auto *nba0b = sched.GetEventPool().Acquire();
   nba0b->callback = [&]() { a = 20; };
   sched.ScheduleEvent({0}, Region::kNBA, nba0b);
 
   // Postponed at time 0 samples the value after NBA.
-  auto* sample0 = sched.GetEventPool().Acquire();
+  auto *sample0 = sched.GetEventPool().Acquire();
   sample0->callback = [&]() { values.push_back(a); };
   sched.ScheduleEvent({0}, Region::kPostponed, sample0);
 
   // Time 5: a <= 30; a <= 40;
-  auto* nba5a = sched.GetEventPool().Acquire();
+  auto *nba5a = sched.GetEventPool().Acquire();
   nba5a->callback = [&]() { a = 30; };
   sched.ScheduleEvent({5}, Region::kNBA, nba5a);
 
-  auto* nba5b = sched.GetEventPool().Acquire();
+  auto *nba5b = sched.GetEventPool().Acquire();
   nba5b->callback = [&]() { a = 40; };
   sched.ScheduleEvent({5}, Region::kNBA, nba5b);
 
-  auto* sample5 = sched.GetEventPool().Acquire();
+  auto *sample5 = sched.GetEventPool().Acquire();
   sample5->callback = [&]() { values.push_back(a); };
   sched.ScheduleEvent({5}, Region::kPostponed, sample5);
 
   sched.Run();
   ASSERT_EQ(values.size(), 2u);
-  EXPECT_EQ(values[0], 20);  // Last NBA at time 0 wins.
-  EXPECT_EQ(values[1], 40);  // Last NBA at time 5 wins.
+  EXPECT_EQ(values[0], 20); // Last NBA at time 0 wins.
+  EXPECT_EQ(values[1], 40); // Last NBA at time 5 wins.
 }
 
 // ---------------------------------------------------------------------------
@@ -281,7 +281,7 @@ TEST(SimCh46, ReactiveNBAExecutionOrder) {
   std::vector<int> order;
 
   for (int i = 0; i < 3; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, i]() { order.push_back(i); };
     sched.ScheduleEvent({0}, Region::kReNBA, ev);
   }

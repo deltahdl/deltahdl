@@ -18,11 +18,11 @@ namespace {
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
   bool has_errors = false;
 };
 
-ParseResult Parse(const std::string& src) {
+ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -33,37 +33,39 @@ ParseResult Parse(const std::string& src) {
   return result;
 }
 
-ModuleItem* FindSpecifyBlock(const std::vector<ModuleItem*>& items) {
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
+ModuleItem *FindSpecifyBlock(const std::vector<ModuleItem *> &items) {
+  for (auto *item : items) {
+    if (item->kind == ModuleItemKind::kSpecifyBlock)
+      return item;
   }
   return nullptr;
 }
 
-TimingCheckDecl* GetSoleTimingCheck(ParseResult& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  if (!spec || spec->specify_items.empty()) return nullptr;
+TimingCheckDecl *GetSoleTimingCheck(ParseResult &r) {
+  if (!r.cu || r.cu->modules.empty())
+    return nullptr;
+  auto *spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  if (!spec || spec->specify_items.empty())
+    return nullptr;
   if (spec->specify_items[0]->kind != SpecifyItemKind::kTimingCheck)
     return nullptr;
   return &spec->specify_items[0]->timing_check;
 }
 
-}  // namespace
+} // namespace
 
 // =============================================================================
 // A.7.5.2 timing_check_limit ::= expression
 // =============================================================================
 
 TEST(ParserA70502, TimingCheckLimitExpression) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data, posedge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "specify\n"
+                 "  $setup(data, posedge clk, 10);\n"
+                 "endspecify\n"
+                 "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
+  auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
   ASSERT_EQ(tc->limits.size(), 1u);
   EXPECT_NE(tc->limits[0], nullptr);
@@ -75,14 +77,13 @@ TEST(ParserA70502, TimingCheckLimitExpression) {
 
 // $nochange offsets as mintypmax expressions
 TEST(ParserA70502, StartEndEdgeOffsetMinTypMax) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $nochange(posedge clk, data, 1:2:3, 4:5:6);\n"
-      "endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "specify\n"
+                 "  $nochange(posedge clk, data, 1:2:3, 4:5:6);\n"
+                 "endspecify\n"
+                 "endmodule\n");
   ASSERT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
+  auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
   ASSERT_GE(tc->limits.size(), 2u);
   EXPECT_EQ(tc->limits[0]->kind, ExprKind::kMinTypMax);
@@ -94,28 +95,26 @@ TEST(ParserA70502, StartEndEdgeOffsetMinTypMax) {
 // =============================================================================
 
 TEST(ParserA70502, TimestampCondMinTypMax) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setuphold(posedge clk, data, 10, 5, ntfr, 1:2:3);\n"
-      "endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "specify\n"
+                 "  $setuphold(posedge clk, data, 10, 5, ntfr, 1:2:3);\n"
+                 "endspecify\n"
+                 "endmodule\n");
   ASSERT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
+  auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
   ASSERT_NE(tc->timestamp_cond, nullptr);
   EXPECT_EQ(tc->timestamp_cond->kind, ExprKind::kMinTypMax);
 }
 
 TEST(ParserA70502, TimecheckCondMinTypMax) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setuphold(posedge clk, data, 10, 5, ntfr, 1:2:3, 4:5:6);\n"
-      "endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "specify\n"
+                 "  $setuphold(posedge clk, data, 10, 5, ntfr, 1:2:3, 4:5:6);\n"
+                 "endspecify\n"
+                 "endmodule\n");
   ASSERT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
+  auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
   ASSERT_NE(tc->timecheck_cond, nullptr);
   EXPECT_EQ(tc->timecheck_cond->kind, ExprKind::kMinTypMax);
@@ -127,14 +126,14 @@ TEST(ParserA70502, TimecheckCondMinTypMax) {
 
 // Simple delayed_reference / delayed_data (identifier only)
 TEST(ParserA70502, DelayedRefDataSimple) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setuphold(posedge clk, data, 10, 5, ntfr, , , dCLK, dDATA);\n"
-      "endspecify\n"
-      "endmodule\n");
+  auto r =
+      Parse("module m;\n"
+            "specify\n"
+            "  $setuphold(posedge clk, data, 10, 5, ntfr, , , dCLK, dDATA);\n"
+            "endspecify\n"
+            "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
+  auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
   EXPECT_EQ(tc->delayed_ref, "dCLK");
   EXPECT_EQ(tc->delayed_data, "dDATA");
@@ -142,14 +141,14 @@ TEST(ParserA70502, DelayedRefDataSimple) {
 
 // delayed_data ::= terminal_identifier [ constant_mintypmax_expression ]
 TEST(ParserA70502, DelayedDataWithBracketExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setuphold(posedge clk, data, 10, 5, ntfr, , , dCLK, dD[3]);\n"
-      "endspecify\n"
-      "endmodule\n");
+  auto r =
+      Parse("module m;\n"
+            "specify\n"
+            "  $setuphold(posedge clk, data, 10, 5, ntfr, , , dCLK, dD[3]);\n"
+            "endspecify\n"
+            "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
+  auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
   EXPECT_EQ(tc->delayed_data, "dD");
   EXPECT_NE(tc->delayed_data_expr, nullptr);
@@ -164,7 +163,7 @@ TEST(ParserA70502, DelayedReferenceWithBracketExpr) {
       "endspecify\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
+  auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
   EXPECT_EQ(tc->delayed_ref, "dCLK");
   ASSERT_NE(tc->delayed_ref_expr, nullptr);
@@ -176,14 +175,13 @@ TEST(ParserA70502, DelayedReferenceWithBracketExpr) {
 // =============================================================================
 
 TEST(ParserA70502, ThresholdExpression) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $width(posedge clk, 20, 1);\n"
-      "endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "specify\n"
+                 "  $width(posedge clk, 20, 1);\n"
+                 "endspecify\n"
+                 "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
+  auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
   ASSERT_GE(tc->limits.size(), 2u);
 }
@@ -193,14 +191,13 @@ TEST(ParserA70502, ThresholdExpression) {
 // =============================================================================
 
 TEST(ParserA70502, NotifierVariable) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data, posedge clk, 10, ntfr);\n"
-      "endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "specify\n"
+                 "  $setup(data, posedge clk, 10, ntfr);\n"
+                 "endspecify\n"
+                 "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
+  auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
   EXPECT_EQ(tc->notifier, "ntfr");
 }
@@ -211,14 +208,13 @@ TEST(ParserA70502, NotifierVariable) {
 
 // $timeskew with event_based_flag and remain_active_flag
 TEST(ParserA70502, EventBasedFlagAndRemainActiveFlag) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $timeskew(posedge clk1, posedge clk2, 5, ntfr, 1, 0);\n"
-      "endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "specify\n"
+                 "  $timeskew(posedge clk1, posedge clk2, 5, ntfr, 1, 0);\n"
+                 "endspecify\n"
+                 "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
+  auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
   EXPECT_EQ(tc->notifier, "ntfr");
   ASSERT_NE(tc->event_based_flag, nullptr);
@@ -227,14 +223,13 @@ TEST(ParserA70502, EventBasedFlagAndRemainActiveFlag) {
 
 // remain_active_flag ::= constant_mintypmax_expression
 TEST(ParserA70502, RemainActiveFlagMinTypMax) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $timeskew(posedge clk1, posedge clk2, 5, ntfr, 1, 1:2:3);\n"
-      "endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "specify\n"
+                 "  $timeskew(posedge clk1, posedge clk2, 5, ntfr, 1, 1:2:3);\n"
+                 "endspecify\n"
+                 "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
+  auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
   ASSERT_NE(tc->remain_active_flag, nullptr);
   EXPECT_EQ(tc->remain_active_flag->kind, ExprKind::kMinTypMax);
@@ -246,14 +241,13 @@ TEST(ParserA70502, RemainActiveFlagMinTypMax) {
 
 // $period requires controlled_reference_event (mandatory edge)
 TEST(ParserA70502, ControlledReferenceEvent) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $period(posedge clk, 50);\n"
-      "endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "specify\n"
+                 "  $period(posedge clk, 50);\n"
+                 "endspecify\n"
+                 "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
+  auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
   EXPECT_EQ(tc->ref_edge, SpecifyEdge::kPosedge);
 }

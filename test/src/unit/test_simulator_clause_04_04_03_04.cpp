@@ -28,7 +28,7 @@ TEST(SimCh4434, PostNBARegionExecutesPLICallbacks) {
   Scheduler sched(arena);
   int executed = 0;
 
-  auto* ev = sched.GetEventPool().Acquire();
+  auto *ev = sched.GetEventPool().Acquire();
   ev->callback = [&]() { executed++; };
   sched.ScheduleEvent({0}, Region::kPostNBA, ev);
 
@@ -47,12 +47,12 @@ TEST(SimCh4434, PostNBACanReadValues) {
   int sampled = -1;
 
   // NBA sets value = 42.
-  auto* nba = sched.GetEventPool().Acquire();
+  auto *nba = sched.GetEventPool().Acquire();
   nba->callback = [&]() { value = 42; };
   sched.ScheduleEvent({0}, Region::kNBA, nba);
 
   // Post-NBA reads value — should see 42.
-  auto* ev = sched.GetEventPool().Acquire();
+  auto *ev = sched.GetEventPool().Acquire();
   ev->callback = [&]() { sampled = value; };
   sched.ScheduleEvent({0}, Region::kPostNBA, ev);
 
@@ -71,12 +71,12 @@ TEST(SimCh4434, PostNBACanWriteValues) {
   int sampled_in_observed = -1;
 
   // Post-NBA writes a value.
-  auto* post_nba = sched.GetEventPool().Acquire();
+  auto *post_nba = sched.GetEventPool().Acquire();
   post_nba->callback = [&]() { value = 99; };
   sched.ScheduleEvent({0}, Region::kPostNBA, post_nba);
 
   // Observed reads the value — should see 99.
-  auto* observed = sched.GetEventPool().Acquire();
+  auto *observed = sched.GetEventPool().Acquire();
   observed->callback = [&]() { sampled_in_observed = value; };
   sched.ScheduleEvent({0}, Region::kObserved, observed);
 
@@ -93,11 +93,11 @@ TEST(SimCh4434, PostNBACanCreateEvents) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto* post_nba = sched.GetEventPool().Acquire();
+  auto *post_nba = sched.GetEventPool().Acquire();
   post_nba->callback = [&]() {
     order.push_back("post_nba");
     // Create an event in the Observed region from Post-NBA.
-    auto* new_ev = sched.GetEventPool().Acquire();
+    auto *new_ev = sched.GetEventPool().Acquire();
     new_ev->callback = [&order]() { order.push_back("created_observed"); };
     sched.ScheduleEvent({0}, Region::kObserved, new_ev);
   };
@@ -119,11 +119,11 @@ TEST(SimCh4434, PostNBAExecutesAfterNBA) {
   std::vector<std::string> order;
 
   // Schedule Post-NBA first, then NBA — ordering must still hold.
-  auto* post_nba = sched.GetEventPool().Acquire();
+  auto *post_nba = sched.GetEventPool().Acquire();
   post_nba->callback = [&]() { order.push_back("post_nba"); };
   sched.ScheduleEvent({0}, Region::kPostNBA, post_nba);
 
-  auto* nba = sched.GetEventPool().Acquire();
+  auto *nba = sched.GetEventPool().Acquire();
   nba->callback = [&]() { order.push_back("nba"); };
   sched.ScheduleEvent({0}, Region::kNBA, nba);
 
@@ -142,8 +142,8 @@ TEST(SimCh4434, PostNBAExecutesAfterNBABeforePreObserved) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
+  auto schedule = [&](Region r, const std::string &label) {
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, label]() { order.push_back(label); };
     sched.ScheduleEvent({0}, r, ev);
   };
@@ -182,7 +182,7 @@ TEST(SimCh4434, PostNBARegionHoldsMultiplePLICallbacks) {
   int count = 0;
 
   for (int i = 0; i < 5; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&]() { count++; };
     sched.ScheduleEvent({0}, Region::kPostNBA, ev);
   }
@@ -201,7 +201,7 @@ TEST(SimCh4434, PostNBAEventsAcrossMultipleTimeSlots) {
   std::vector<uint64_t> times;
 
   for (uint64_t t = 0; t < 3; ++t) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&times, &sched]() {
       times.push_back(sched.CurrentTime().ticks);
     };
@@ -229,12 +229,12 @@ TEST(SimCh4434, PostNBAReadWriteInActiveRegionSetContext) {
   int observed_sample = -1;
 
   // NBA writes value = 10.
-  auto* nba = sched.GetEventPool().Acquire();
+  auto *nba = sched.GetEventPool().Acquire();
   nba->callback = [&]() { value = 10; };
   sched.ScheduleEvent({0}, Region::kNBA, nba);
 
   // Post-NBA reads the NBA-set value and overwrites it to 55.
-  auto* post_nba = sched.GetEventPool().Acquire();
+  auto *post_nba = sched.GetEventPool().Acquire();
   post_nba->callback = [&]() {
     nba_sample = value;
     value = 55;
@@ -242,7 +242,7 @@ TEST(SimCh4434, PostNBAReadWriteInActiveRegionSetContext) {
   sched.ScheduleEvent({0}, Region::kPostNBA, post_nba);
 
   // Observed samples value — should see 55 from Post-NBA.
-  auto* observed = sched.GetEventPool().Acquire();
+  auto *observed = sched.GetEventPool().Acquire();
   observed->callback = [&]() { observed_sample = value; };
   sched.ScheduleEvent({0}, Region::kObserved, observed);
 

@@ -1,8 +1,8 @@
 // §6.3: Value set
 
-#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/types.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -12,7 +12,7 @@ TEST(Types, Logic4WordBasicValues_IsKnown) {
   struct Case {
     Logic4Word val;
     bool expected;
-    const char* label;
+    const char *label;
   };
   const Case kCases[] = {
       {{0, 0}, true, "zero"},
@@ -20,7 +20,7 @@ TEST(Types, Logic4WordBasicValues_IsKnown) {
       {{0, 1}, false, "x"},
       {{1, 1}, false, "z"},
   };
-  for (const auto& c : kCases) {
+  for (const auto &c : kCases) {
     EXPECT_EQ(c.val.IsKnown(), c.expected) << c.label;
   }
 }
@@ -44,4 +44,4 @@ TEST(Types, Logic4VecCreationAndToString) {
   EXPECT_EQ(vec.ToString(), "10100101");
 }
 
-}  // namespace
+} // namespace

@@ -1,7 +1,5 @@
 // §8.5: Object properties and object parameter data
 
-#include <gtest/gtest.h>
-#include <string>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -9,6 +7,8 @@
 #include "simulation/class_object.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
+#include <gtest/gtest.h>
+#include <string>
 
 using namespace delta;
 
@@ -24,10 +24,10 @@ struct ClassFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 // Build a simple ClassTypeInfo and register it with the context.
-static ClassTypeInfo* MakeClassType(
-    ClassFixture& f, std::string_view name,
-    const std::vector<std::string_view>& props) {
-  auto* info = f.arena.Create<ClassTypeInfo>();
+static ClassTypeInfo *
+MakeClassType(ClassFixture &f, std::string_view name,
+              const std::vector<std::string_view> &props) {
+  auto *info = f.arena.Create<ClassTypeInfo>();
   info->name = name;
   for (auto p : props) {
     info->properties.push_back({p, 32, false});
@@ -37,12 +37,12 @@ static ClassTypeInfo* MakeClassType(
 }
 
 // Allocate a ClassObject of the given type, returning (handle_id, object*).
-static std::pair<uint64_t, ClassObject*> MakeObj(ClassFixture& f,
-                                                 ClassTypeInfo* type) {
-  auto* obj = f.arena.Create<ClassObject>();
+static std::pair<uint64_t, ClassObject *> MakeObj(ClassFixture &f,
+                                                  ClassTypeInfo *type) {
+  auto *obj = f.arena.Create<ClassObject>();
   obj->type = type;
   // Initialize properties to 0.
-  for (const auto& p : type->properties) {
+  for (const auto &p : type->properties) {
     obj->properties[std::string(p.name)] =
         MakeLogic4VecVal(f.arena, p.width, 0);
   }
@@ -57,7 +57,7 @@ namespace {
 // =============================================================================
 TEST(ClassSim, PropertySetAndGet) {
   ClassFixture f;
-  auto* type = MakeClassType(f, "Packet", {"data"});
+  auto *type = MakeClassType(f, "Packet", {"data"});
   auto [handle, obj] = MakeObj(f, type);
 
   obj->SetProperty("data", MakeLogic4VecVal(f.arena, 32, 42));
@@ -66,7 +66,7 @@ TEST(ClassSim, PropertySetAndGet) {
 
 TEST(ClassSim, MultipleProperties) {
   ClassFixture f;
-  auto* type = MakeClassType(f, "Packet", {"header", "payload", "crc"});
+  auto *type = MakeClassType(f, "Packet", {"header", "payload", "crc"});
   auto [handle, obj] = MakeObj(f, type);
 
   obj->SetProperty("header", MakeLogic4VecVal(f.arena, 32, 1));
@@ -80,10 +80,10 @@ TEST(ClassSim, MultipleProperties) {
 
 TEST(ClassSim, UndefinedPropertyReturnsZero) {
   ClassFixture f;
-  auto* type = MakeClassType(f, "Empty", {});
+  auto *type = MakeClassType(f, "Empty", {});
   auto [handle, obj] = MakeObj(f, type);
 
   EXPECT_EQ(obj->GetProperty("nonexistent", f.arena).ToUint64(), 0u);
 }
 
-}  // namespace
+} // namespace

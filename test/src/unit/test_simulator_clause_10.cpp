@@ -22,11 +22,11 @@ struct SimCh10Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign* ElaborateSrc(const std::string& src, SimCh10Fixture& f) {
+static RtlirDesign *ElaborateSrc(const std::string &src, SimCh10Fixture &f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
+  auto *cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -36,21 +36,20 @@ static RtlirDesign* ElaborateSrc(const std::string& src, SimCh10Fixture& f) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, SimpleBlockingAssign) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int a;\n"
-      "  initial begin\n"
-      "    a = 5;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  int a;\n"
+                              "  initial begin\n"
+                              "    a = 5;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* var = f.ctx.FindVariable("a");
+  auto *var = f.ctx.FindVariable("a");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
@@ -60,22 +59,21 @@ TEST(SimCh10, SimpleBlockingAssign) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, SequentialBlockingImmediate) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int a, b;\n"
-      "  initial begin\n"
-      "    a = 1;\n"
-      "    b = a + 1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  int a, b;\n"
+                              "  initial begin\n"
+                              "    a = 1;\n"
+                              "    b = a + 1;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* b = f.ctx.FindVariable("b");
+  auto *b = f.ctx.FindVariable("b");
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(b->value.ToUint64(), 2u);
 }
@@ -85,21 +83,20 @@ TEST(SimCh10, SequentialBlockingImmediate) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignExpression) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int a;\n"
-      "  initial begin\n"
-      "    a = 3 * 4 + 1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  int a;\n"
+                              "  initial begin\n"
+                              "    a = 3 * 4 + 1;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* var = f.ctx.FindVariable("a");
+  auto *var = f.ctx.FindVariable("a");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 13u);
 }
@@ -109,22 +106,21 @@ TEST(SimCh10, BlockingAssignExpression) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignBitSelect) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a;\n"
-      "  initial begin\n"
-      "    a = 8'h00;\n"
-      "    a[0] = 1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] a;\n"
+                              "  initial begin\n"
+                              "    a = 8'h00;\n"
+                              "    a[0] = 1;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* var = f.ctx.FindVariable("a");
+  auto *var = f.ctx.FindVariable("a");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x01u);
 }
@@ -134,22 +130,21 @@ TEST(SimCh10, BlockingAssignBitSelect) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignPartSelect) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a;\n"
-      "  initial begin\n"
-      "    a = 8'h00;\n"
-      "    a[3:0] = 4'hF;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] a;\n"
+                              "  initial begin\n"
+                              "    a = 8'h00;\n"
+                              "    a[3:0] = 4'hF;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* var = f.ctx.FindVariable("a");
+  auto *var = f.ctx.FindVariable("a");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x0Fu);
 }
@@ -159,25 +154,24 @@ TEST(SimCh10, BlockingAssignPartSelect) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignSplitPacked) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [15:0] packed_val;\n"
-      "  logic [7:0] hi, lo;\n"
-      "  initial begin\n"
-      "    packed_val = 16'hDEAD;\n"
-      "    hi = packed_val[15:8];\n"
-      "    lo = packed_val[7:0];\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [15:0] packed_val;\n"
+                              "  logic [7:0] hi, lo;\n"
+                              "  initial begin\n"
+                              "    packed_val = 16'hDEAD;\n"
+                              "    hi = packed_val[15:8];\n"
+                              "    lo = packed_val[7:0];\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* hi = f.ctx.FindVariable("hi");
-  auto* lo = f.ctx.FindVariable("lo");
+  auto *hi = f.ctx.FindVariable("hi");
+  auto *lo = f.ctx.FindVariable("lo");
   ASSERT_NE(hi, nullptr);
   ASSERT_NE(lo, nullptr);
   EXPECT_EQ(hi->value.ToUint64(), 0xDEu);
@@ -189,24 +183,23 @@ TEST(SimCh10, BlockingAssignSplitPacked) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignConcatRHS) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  logic [15:0] c;\n"
-      "  initial begin\n"
-      "    a = 8'hCA;\n"
-      "    b = 8'hFE;\n"
-      "    c = {a, b};\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] a, b;\n"
+                              "  logic [15:0] c;\n"
+                              "  initial begin\n"
+                              "    a = 8'hCA;\n"
+                              "    b = 8'hFE;\n"
+                              "    c = {a, b};\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* c = f.ctx.FindVariable("c");
+  auto *c = f.ctx.FindVariable("c");
   ASSERT_NE(c, nullptr);
   EXPECT_EQ(c->value.ToUint64(), 0xCAFEu);
 }
@@ -216,22 +209,21 @@ TEST(SimCh10, BlockingAssignConcatRHS) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignTernary) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int sel, result;\n"
-      "  initial begin\n"
-      "    sel = 1;\n"
-      "    result = sel ? 42 : 99;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  int sel, result;\n"
+                              "  initial begin\n"
+                              "    sel = 1;\n"
+                              "    result = sel ? 42 : 99;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* var = f.ctx.FindVariable("result");
+  auto *var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -241,25 +233,24 @@ TEST(SimCh10, BlockingAssignTernary) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignIfElse) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int x, y;\n"
-      "  initial begin\n"
-      "    x = 10;\n"
-      "    if (x == 10)\n"
-      "      y = 1;\n"
-      "    else\n"
-      "      y = 0;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  int x, y;\n"
+                              "  initial begin\n"
+                              "    x = 10;\n"
+                              "    if (x == 10)\n"
+                              "      y = 1;\n"
+                              "    else\n"
+                              "      y = 0;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* y = f.ctx.FindVariable("y");
+  auto *y = f.ctx.FindVariable("y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 1u);
 }
@@ -269,28 +260,27 @@ TEST(SimCh10, BlockingAssignIfElse) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignCase) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [1:0] sel;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    sel = 2;\n"
-      "    case (sel)\n"
-      "      0: result = 10;\n"
-      "      1: result = 20;\n"
-      "      2: result = 30;\n"
-      "      default: result = 0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [1:0] sel;\n"
+                              "  int result;\n"
+                              "  initial begin\n"
+                              "    sel = 2;\n"
+                              "    case (sel)\n"
+                              "      0: result = 10;\n"
+                              "      1: result = 20;\n"
+                              "      2: result = 30;\n"
+                              "      default: result = 0;\n"
+                              "    endcase\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* var = f.ctx.FindVariable("result");
+  auto *var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
@@ -300,25 +290,24 @@ TEST(SimCh10, BlockingAssignCase) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignForLoop) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int sum;\n"
-      "  int i;\n"
-      "  initial begin\n"
-      "    sum = 0;\n"
-      "    for (i = 1; i <= 5; i = i + 1) begin\n"
-      "      sum = sum + i;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  int sum;\n"
+                              "  int i;\n"
+                              "  initial begin\n"
+                              "    sum = 0;\n"
+                              "    for (i = 1; i <= 5; i = i + 1) begin\n"
+                              "      sum = sum + i;\n"
+                              "    end\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* var = f.ctx.FindVariable("sum");
+  auto *var = f.ctx.FindVariable("sum");
   ASSERT_NE(var, nullptr);
   // 1+2+3+4+5 = 15
   EXPECT_EQ(var->value.ToUint64(), 15u);
@@ -329,25 +318,24 @@ TEST(SimCh10, BlockingAssignForLoop) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignBeginEnd) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int a, b, c;\n"
-      "  initial begin\n"
-      "    begin\n"
-      "      a = 10;\n"
-      "      b = 20;\n"
-      "      c = a + b;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  int a, b, c;\n"
+                              "  initial begin\n"
+                              "    begin\n"
+                              "      a = 10;\n"
+                              "      b = 20;\n"
+                              "      c = a + b;\n"
+                              "    end\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* c = f.ctx.FindVariable("c");
+  auto *c = f.ctx.FindVariable("c");
   ASSERT_NE(c, nullptr);
   EXPECT_EQ(c->value.ToUint64(), 30u);
 }
@@ -357,24 +345,23 @@ TEST(SimCh10, BlockingAssignBeginEnd) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignFunctionCall) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  function integer add(integer a, integer b);\n"
-      "    return a + b;\n"
-      "  endfunction\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    result = add(7, 3);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  function integer add(integer a, integer b);\n"
+                              "    return a + b;\n"
+                              "  endfunction\n"
+                              "  int result;\n"
+                              "  initial begin\n"
+                              "    result = add(7, 3);\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* var = f.ctx.FindVariable("result");
+  auto *var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
@@ -384,21 +371,20 @@ TEST(SimCh10, BlockingAssignFunctionCall) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignSysClog2) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    result = $clog2(256);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  int result;\n"
+                              "  initial begin\n"
+                              "    result = $clog2(256);\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* var = f.ctx.FindVariable("result");
+  auto *var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   // $clog2(256) = 8
   EXPECT_EQ(var->value.ToUint64(), 8u);
@@ -409,25 +395,24 @@ TEST(SimCh10, BlockingAssignSysClog2) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignUnaryOps) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int a;\n"
-      "  int r_not, r_bang;\n"
-      "  initial begin\n"
-      "    a = 0;\n"
-      "    r_not = !a;\n"
-      "    r_bang = !5;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  int a;\n"
+                              "  int r_not, r_bang;\n"
+                              "  initial begin\n"
+                              "    a = 0;\n"
+                              "    r_not = !a;\n"
+                              "    r_bang = !5;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* r_not = f.ctx.FindVariable("r_not");
-  auto* r_bang = f.ctx.FindVariable("r_bang");
+  auto *r_not = f.ctx.FindVariable("r_not");
+  auto *r_bang = f.ctx.FindVariable("r_bang");
   ASSERT_NE(r_not, nullptr);
   ASSERT_NE(r_bang, nullptr);
   // !0 = 1
@@ -441,29 +426,28 @@ TEST(SimCh10, BlockingAssignUnaryOps) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignUnaryLogicalNotAndMinus) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int a, neg_result, not_result;\n"
-      "  initial begin\n"
-      "    a = 5;\n"
-      "    neg_result = -a;\n"
-      "    not_result = !a;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  int a, neg_result, not_result;\n"
+                              "  initial begin\n"
+                              "    a = 5;\n"
+                              "    neg_result = -a;\n"
+                              "    not_result = !a;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* neg = f.ctx.FindVariable("neg_result");
+  auto *neg = f.ctx.FindVariable("neg_result");
   ASSERT_NE(neg, nullptr);
   // -5 as 32-bit unsigned = 0xFFFFFFFB
   auto neg5_32bit = static_cast<uint32_t>(-5);
   EXPECT_EQ(neg->value.ToUint64(), neg5_32bit);
 
-  auto* notv = f.ctx.FindVariable("not_result");
+  auto *notv = f.ctx.FindVariable("not_result");
   ASSERT_NE(notv, nullptr);
   // !5 = 0
   EXPECT_EQ(notv->value.ToUint64(), 0u);
@@ -474,27 +458,26 @@ TEST(SimCh10, BlockingAssignUnaryLogicalNotAndMinus) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignArithmeticOps) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int r_add, r_sub, r_mul, r_div;\n"
-      "  initial begin\n"
-      "    r_add = 10 + 3;\n"
-      "    r_sub = 10 - 3;\n"
-      "    r_mul = 10 * 3;\n"
-      "    r_div = 10 / 3;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  int r_add, r_sub, r_mul, r_div;\n"
+                              "  initial begin\n"
+                              "    r_add = 10 + 3;\n"
+                              "    r_sub = 10 - 3;\n"
+                              "    r_mul = 10 * 3;\n"
+                              "    r_div = 10 / 3;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* r_add = f.ctx.FindVariable("r_add");
-  auto* r_sub = f.ctx.FindVariable("r_sub");
-  auto* r_mul = f.ctx.FindVariable("r_mul");
-  auto* r_div = f.ctx.FindVariable("r_div");
+  auto *r_add = f.ctx.FindVariable("r_add");
+  auto *r_sub = f.ctx.FindVariable("r_sub");
+  auto *r_mul = f.ctx.FindVariable("r_mul");
+  auto *r_div = f.ctx.FindVariable("r_div");
   ASSERT_NE(r_add, nullptr);
   ASSERT_NE(r_sub, nullptr);
   ASSERT_NE(r_mul, nullptr);
@@ -510,28 +493,27 @@ TEST(SimCh10, BlockingAssignArithmeticOps) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignBitwiseOps) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int a, b;\n"
-      "  int r_and, r_or, r_xor;\n"
-      "  initial begin\n"
-      "    a = 240;\n"
-      "    b = 60;\n"
-      "    r_and = a & b;\n"
-      "    r_or  = a | b;\n"
-      "    r_xor = a ^ b;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  int a, b;\n"
+                              "  int r_and, r_or, r_xor;\n"
+                              "  initial begin\n"
+                              "    a = 240;\n"
+                              "    b = 60;\n"
+                              "    r_and = a & b;\n"
+                              "    r_or  = a | b;\n"
+                              "    r_xor = a ^ b;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* r_and = f.ctx.FindVariable("r_and");
-  auto* r_or = f.ctx.FindVariable("r_or");
-  auto* r_xor = f.ctx.FindVariable("r_xor");
+  auto *r_and = f.ctx.FindVariable("r_and");
+  auto *r_or = f.ctx.FindVariable("r_or");
+  auto *r_xor = f.ctx.FindVariable("r_xor");
   ASSERT_NE(r_and, nullptr);
   ASSERT_NE(r_or, nullptr);
   ASSERT_NE(r_xor, nullptr);
@@ -548,25 +530,24 @@ TEST(SimCh10, BlockingAssignBitwiseOps) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignShiftOps) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a;\n"
-      "  logic [7:0] r_shl, r_shr;\n"
-      "  initial begin\n"
-      "    a = 8'h0F;\n"
-      "    r_shl = a << 2;\n"
-      "    r_shr = a >> 2;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] a;\n"
+                              "  logic [7:0] r_shl, r_shr;\n"
+                              "  initial begin\n"
+                              "    a = 8'h0F;\n"
+                              "    r_shl = a << 2;\n"
+                              "    r_shr = a >> 2;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* shl = f.ctx.FindVariable("r_shl");
-  auto* shr = f.ctx.FindVariable("r_shr");
+  auto *shl = f.ctx.FindVariable("r_shl");
+  auto *shr = f.ctx.FindVariable("r_shr");
   ASSERT_NE(shl, nullptr);
   ASSERT_NE(shr, nullptr);
   // 0x0F << 2 = 0x3C (8-bit)
@@ -580,46 +561,45 @@ TEST(SimCh10, BlockingAssignShiftOps) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignComparisonOps) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int a, b;\n"
-      "  int r_eq, r_ne, r_lt, r_gt, r_le, r_ge;\n"
-      "  initial begin\n"
-      "    a = 10;\n"
-      "    b = 20;\n"
-      "    r_eq = (a == b);\n"
-      "    r_ne = (a != b);\n"
-      "    r_lt = (a < b);\n"
-      "    r_gt = (a > b);\n"
-      "    r_le = (a <= b);\n"
-      "    r_ge = (a >= b);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  int a, b;\n"
+                              "  int r_eq, r_ne, r_lt, r_gt, r_le, r_ge;\n"
+                              "  initial begin\n"
+                              "    a = 10;\n"
+                              "    b = 20;\n"
+                              "    r_eq = (a == b);\n"
+                              "    r_ne = (a != b);\n"
+                              "    r_lt = (a < b);\n"
+                              "    r_gt = (a > b);\n"
+                              "    r_le = (a <= b);\n"
+                              "    r_ge = (a >= b);\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* r_eq = f.ctx.FindVariable("r_eq");
-  auto* r_ne = f.ctx.FindVariable("r_ne");
-  auto* r_lt = f.ctx.FindVariable("r_lt");
-  auto* r_gt = f.ctx.FindVariable("r_gt");
-  auto* r_le = f.ctx.FindVariable("r_le");
-  auto* r_ge = f.ctx.FindVariable("r_ge");
+  auto *r_eq = f.ctx.FindVariable("r_eq");
+  auto *r_ne = f.ctx.FindVariable("r_ne");
+  auto *r_lt = f.ctx.FindVariable("r_lt");
+  auto *r_gt = f.ctx.FindVariable("r_gt");
+  auto *r_le = f.ctx.FindVariable("r_le");
+  auto *r_ge = f.ctx.FindVariable("r_ge");
   ASSERT_NE(r_eq, nullptr);
   ASSERT_NE(r_ne, nullptr);
   ASSERT_NE(r_lt, nullptr);
   ASSERT_NE(r_gt, nullptr);
   ASSERT_NE(r_le, nullptr);
   ASSERT_NE(r_ge, nullptr);
-  EXPECT_EQ(r_eq->value.ToUint64(), 0u);  // 10 == 20 -> false
-  EXPECT_EQ(r_ne->value.ToUint64(), 1u);  // 10 != 20 -> true
-  EXPECT_EQ(r_lt->value.ToUint64(), 1u);  // 10 < 20  -> true
-  EXPECT_EQ(r_gt->value.ToUint64(), 0u);  // 10 > 20  -> false
-  EXPECT_EQ(r_le->value.ToUint64(), 1u);  // 10 <= 20 -> true
-  EXPECT_EQ(r_ge->value.ToUint64(), 0u);  // 10 >= 20 -> false
+  EXPECT_EQ(r_eq->value.ToUint64(), 0u); // 10 == 20 -> false
+  EXPECT_EQ(r_ne->value.ToUint64(), 1u); // 10 != 20 -> true
+  EXPECT_EQ(r_lt->value.ToUint64(), 1u); // 10 < 20  -> true
+  EXPECT_EQ(r_gt->value.ToUint64(), 0u); // 10 > 20  -> false
+  EXPECT_EQ(r_le->value.ToUint64(), 1u); // 10 <= 20 -> true
+  EXPECT_EQ(r_ge->value.ToUint64(), 0u); // 10 >= 20 -> false
 }
 
 // ---------------------------------------------------------------------------
@@ -627,30 +607,29 @@ TEST(SimCh10, BlockingAssignComparisonOps) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignLogicalOps) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int a, b;\n"
-      "  int r_and, r_or;\n"
-      "  initial begin\n"
-      "    a = 1;\n"
-      "    b = 0;\n"
-      "    r_and = a && b;\n"
-      "    r_or  = a || b;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  int a, b;\n"
+                              "  int r_and, r_or;\n"
+                              "  initial begin\n"
+                              "    a = 1;\n"
+                              "    b = 0;\n"
+                              "    r_and = a && b;\n"
+                              "    r_or  = a || b;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* r_and = f.ctx.FindVariable("r_and");
-  auto* r_or = f.ctx.FindVariable("r_or");
+  auto *r_and = f.ctx.FindVariable("r_and");
+  auto *r_or = f.ctx.FindVariable("r_or");
   ASSERT_NE(r_and, nullptr);
   ASSERT_NE(r_or, nullptr);
-  EXPECT_EQ(r_and->value.ToUint64(), 0u);  // 1 && 0 = 0
-  EXPECT_EQ(r_or->value.ToUint64(), 1u);   // 1 || 0 = 1
+  EXPECT_EQ(r_and->value.ToUint64(), 0u); // 1 && 0 = 0
+  EXPECT_EQ(r_or->value.ToUint64(), 1u);  // 1 || 0 = 1
 }
 
 // ---------------------------------------------------------------------------
@@ -658,23 +637,22 @@ TEST(SimCh10, BlockingAssignLogicalOps) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignLastWins) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int x;\n"
-      "  initial begin\n"
-      "    x = 1;\n"
-      "    x = 2;\n"
-      "    x = 3;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  int x;\n"
+                              "  initial begin\n"
+                              "    x = 1;\n"
+                              "    x = 2;\n"
+                              "    x = 3;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* var = f.ctx.FindVariable("x");
+  auto *var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
@@ -684,25 +662,24 @@ TEST(SimCh10, BlockingAssignLastWins) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignChain) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int a, b, c;\n"
-      "  initial begin\n"
-      "    a = 1;\n"
-      "    b = a;\n"
-      "    c = b;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  int a, b, c;\n"
+                              "  initial begin\n"
+                              "    a = 1;\n"
+                              "    b = a;\n"
+                              "    c = b;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* a = f.ctx.FindVariable("a");
-  auto* b = f.ctx.FindVariable("b");
-  auto* c = f.ctx.FindVariable("c");
+  auto *a = f.ctx.FindVariable("a");
+  auto *b = f.ctx.FindVariable("b");
+  auto *c = f.ctx.FindVariable("c");
   ASSERT_NE(a, nullptr);
   ASSERT_NE(b, nullptr);
   ASSERT_NE(c, nullptr);
@@ -716,23 +693,22 @@ TEST(SimCh10, BlockingAssignChain) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignTypeCast) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    x = 8'hFF;\n"
-      "    result = signed'(x);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] x;\n"
+                              "  int result;\n"
+                              "  initial begin\n"
+                              "    x = 8'hFF;\n"
+                              "    result = signed'(x);\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* var = f.ctx.FindVariable("result");
+  auto *var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   // 8'hFF sign-extended to 32 bits = 0xFFFFFFFF.
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
@@ -743,21 +719,20 @@ TEST(SimCh10, BlockingAssignTypeCast) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignTruncation) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [3:0] narrow;\n"
-      "  initial begin\n"
-      "    narrow = 8'hFF;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [3:0] narrow;\n"
+                              "  initial begin\n"
+                              "    narrow = 8'hFF;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* var = f.ctx.FindVariable("narrow");
+  auto *var = f.ctx.FindVariable("narrow");
   ASSERT_NE(var, nullptr);
   // 8'hFF truncated to 4 bits = 0xF.
   EXPECT_EQ(var->value.width, 4u);
@@ -769,21 +744,20 @@ TEST(SimCh10, BlockingAssignTruncation) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, VerifyWidthAndToUint64_8bit) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] val;\n"
-      "  initial begin\n"
-      "    val = 8'hAB;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] val;\n"
+                              "  initial begin\n"
+                              "    val = 8'hAB;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* var = f.ctx.FindVariable("val");
+  auto *var = f.ctx.FindVariable("val");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 8u);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
@@ -794,21 +768,20 @@ TEST(SimCh10, VerifyWidthAndToUint64_8bit) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, VerifyWidthAndToUint64_32bit) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int val;\n"
-      "  initial begin\n"
-      "    val = 32'hDEADBEEF;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  int val;\n"
+                              "  initial begin\n"
+                              "    val = 32'hDEADBEEF;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* var = f.ctx.FindVariable("val");
+  auto *var = f.ctx.FindVariable("val");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 32u);
   EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFu);
@@ -819,22 +792,21 @@ TEST(SimCh10, VerifyWidthAndToUint64_32bit) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignTernaryFalse) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int sel, result;\n"
-      "  initial begin\n"
-      "    sel = 0;\n"
-      "    result = sel ? 42 : 99;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  int sel, result;\n"
+                              "  initial begin\n"
+                              "    sel = 0;\n"
+                              "    result = sel ? 42 : 99;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* var = f.ctx.FindVariable("result");
+  auto *var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
@@ -844,21 +816,20 @@ TEST(SimCh10, BlockingAssignTernaryFalse) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignModulo) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    result = 17 % 5;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  int result;\n"
+                              "  initial begin\n"
+                              "    result = 17 % 5;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* var = f.ctx.FindVariable("result");
+  auto *var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   // 17 % 5 = 2
   EXPECT_EQ(var->value.ToUint64(), 2u);
@@ -869,22 +840,21 @@ TEST(SimCh10, BlockingAssignModulo) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignUnaryPlus) {
   SimCh10Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int a, result;\n"
-      "  initial begin\n"
-      "    a = 42;\n"
-      "    result = +a;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  int a, result;\n"
+                              "  initial begin\n"
+                              "    a = 42;\n"
+                              "    result = +a;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* var = f.ctx.FindVariable("result");
+  auto *var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }

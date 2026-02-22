@@ -1,10 +1,10 @@
 // §19.5.4: Wildcard specification of coverage point bins
 
-#include <gtest/gtest.h>
+#include "simulation/coverage.h"
 #include <cstdint>
+#include <gtest/gtest.h>
 #include <string>
 #include <vector>
-#include "simulation/coverage.h"
 
 using namespace delta;
 
@@ -15,8 +15,8 @@ namespace {
 // =============================================================================
 TEST(Coverage, TransitionBinNotMatchedByScalar) {
   CoverageDB db;
-  auto* g = db.CreateGroup("cg");
-  auto* cp = CoverageDB::AddCoverPoint(g, "sig");
+  auto *g = db.CreateGroup("cg");
+  auto *cp = CoverageDB::AddCoverPoint(g, "sig");
   CoverBin tbin;
   tbin.name = "t_01";
   tbin.kind = CoverBinKind::kTransition;
@@ -29,4 +29,4 @@ TEST(Coverage, TransitionBinNotMatchedByScalar) {
   EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 0u);
 }
 
-}  // namespace
+} // namespace

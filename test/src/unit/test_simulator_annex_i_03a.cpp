@@ -101,7 +101,7 @@ TEST(SvDpi, TimeConstants) {
 // =============================================================================
 
 TEST(SvDpi, BitSelectBit) {
-  svBitVecVal bv = 0x0A;  // binary: 1010
+  svBitVecVal bv = 0x0A; // binary: 1010
   EXPECT_EQ(svGetBitselBit(&bv, 0), 0u);
   EXPECT_EQ(svGetBitselBit(&bv, 1), 1u);
   EXPECT_EQ(svGetBitselBit(&bv, 2), 0u);
@@ -110,8 +110,8 @@ TEST(SvDpi, BitSelectBit) {
 
 TEST(SvDpi, BitSelectLogic) {
   svLogicVecVal lv;
-  lv.aval = 0x03;  // bits 0,1 = 1
-  lv.bval = 0x02;  // bit 1 has bval set -> x
+  lv.aval = 0x03; // bits 0,1 = 1
+  lv.bval = 0x02; // bit 1 has bval set -> x
   // bit 0: aval=1, bval=0 -> sv_1
   EXPECT_EQ(svGetBitselLogic(&lv, 0), sv_1);
   // bit 1: aval=1, bval=1 -> sv_x
@@ -131,7 +131,7 @@ TEST(SvDpi, PutBitSelectLogic) {
   svPutBitselLogic(&lv, 0, sv_1);
   EXPECT_EQ(lv.aval, 1u);
   EXPECT_EQ(lv.bval, 0u);
-  svPutBitselLogic(&lv, 2, sv_z);  // z: aval=0, bval=1
+  svPutBitselLogic(&lv, 2, sv_z); // z: aval=0, bval=1
   EXPECT_EQ(lv.aval & (1u << 2), 0u);
   EXPECT_EQ(lv.bval & (1u << 2), 4u);
 }
@@ -151,7 +151,7 @@ TEST(SvDpi, ScopeGetSetRoundTrip) {
 }
 
 TEST(SvDpi, DpiVersionReturnsNonNull) {
-  const char* ver = svDpiVersion();
+  const char *ver = svDpiVersion();
   ASSERT_NE(ver, nullptr);
   EXPECT_GT(strlen(ver), 0u);
 }
@@ -163,15 +163,15 @@ TEST(SvDpi, DpiVersionReturnsNonNull) {
 TEST(SvDpi, PartSelectBit) {
   svBitVecVal src = 0xABCD;
   svBitVecVal dst = 0;
-  svGetPartselBit(&dst, &src, 4, 8);  // extract bits [11:4] = 0xBC
+  svGetPartselBit(&dst, &src, 4, 8); // extract bits [11:4] = 0xBC
   EXPECT_EQ(dst, 0xBCu);
 }
 
 TEST(SvDpi, PutPartSelectBit) {
   svBitVecVal dst = 0;
   svBitVecVal src = 0x0F;
-  svPutPartselBit(&dst, src, 4, 8);  // insert 0x0F at bits [11:4]
+  svPutPartselBit(&dst, src, 4, 8); // insert 0x0F at bits [11:4]
   EXPECT_EQ(dst, 0xF0u);
 }
 
-}  // namespace
+} // namespace

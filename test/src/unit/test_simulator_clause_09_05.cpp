@@ -1,7 +1,7 @@
 // §9.5: Process execution threads
 
-#include <gtest/gtest.h>
 #include "simulation/process.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -35,4 +35,4 @@ TEST(Process, ProcessWithCoroutine) {
   EXPECT_TRUE(p.Done());
 }
 
-}  // namespace
+} // namespace

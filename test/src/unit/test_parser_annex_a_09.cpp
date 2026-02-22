@@ -15,11 +15,11 @@ namespace {
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
   bool has_errors = false;
 };
 
-ParseResult Parse(const std::string& src) {
+ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -30,7 +30,7 @@ ParseResult Parse(const std::string& src) {
   return result;
 }
 
-}  // namespace
+} // namespace
 
 // =============================================================================
 // A.9 -- General (attributes, identifiers)
@@ -53,8 +53,9 @@ TEST(ParserAnnexA, A9DefparamDecl) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   bool found = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kDefparam) found = true;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kDefparam)
+      found = true;
   }
   EXPECT_TRUE(found);
 }

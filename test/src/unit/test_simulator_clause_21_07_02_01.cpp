@@ -8,15 +8,15 @@
 #include <string>
 
 #include "common/arena.h"
-#include "gtest/gtest.h"
 #include "simulation/variable.h"
 #include "simulation/vcd_writer.h"
+#include "gtest/gtest.h"
 
 namespace delta {
 namespace {
 
 class VcdClause21070201Test : public ::testing::Test {
- protected:
+protected:
   void SetUp() override {
     char tmpl[] = "/tmp/test_vcd_XXXXXX";
     int fd = mkstemp(tmpl);
@@ -53,11 +53,11 @@ TEST_F(VcdClause21070201Test, IdentifierWrapsAround) {
     VcdWriter vcd(tmp_path_);
     vcd.WriteHeader("1ns");
     for (int i = 0; i < 94; ++i) {
-      auto* var = arena_.Create<Variable>();
+      auto *var = arena_.Create<Variable>();
       var->value = MakeLogic4VecVal(arena_, 1, 0);
       vcd.RegisterSignal("s", 1, var);
     }
-    auto* var = arena_.Create<Variable>();
+    auto *var = arena_.Create<Variable>();
     var->value = MakeLogic4VecVal(arena_, 1, 0);
     vcd.RegisterSignal("wrap", 1, var);
     vcd.EndDefinitions();
@@ -66,5 +66,5 @@ TEST_F(VcdClause21070201Test, IdentifierWrapsAround) {
   EXPECT_NE(content.find("$var wire 1 ! wrap $end"), std::string::npos);
 }
 
-}  // namespace
-}  // namespace delta
+} // namespace
+} // namespace delta

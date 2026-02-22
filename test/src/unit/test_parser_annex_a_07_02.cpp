@@ -18,11 +18,11 @@ namespace {
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
   bool has_errors = false;
 };
 
-ParseResult Parse(const std::string& src) {
+ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -33,21 +33,24 @@ ParseResult Parse(const std::string& src) {
   return result;
 }
 
-ModuleItem* FindSpecifyBlock(const std::vector<ModuleItem*>& items) {
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
+ModuleItem *FindSpecifyBlock(const std::vector<ModuleItem *> &items) {
+  for (auto *item : items) {
+    if (item->kind == ModuleItemKind::kSpecifyBlock)
+      return item;
   }
   return nullptr;
 }
 
-SpecifyItem* GetSolePathItem(ParseResult& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  if (!spec || spec->specify_items.empty()) return nullptr;
+SpecifyItem *GetSolePathItem(ParseResult &r) {
+  if (!r.cu || r.cu->modules.empty())
+    return nullptr;
+  auto *spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  if (!spec || spec->specify_items.empty())
+    return nullptr;
   return spec->specify_items[0];
 }
 
-}  // namespace
+} // namespace
 
 // =============================================================================
 // A.7.2 path_declaration — 3 alternatives
@@ -55,15 +58,14 @@ SpecifyItem* GetSolePathItem(ParseResult& r) {
 
 // path_declaration ::= simple_path_declaration ;
 TEST(ParserA702, PathDeclSimpleParallel) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (a => b) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    (a => b) = 5;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->kind, SpecifyItemKind::kPathDecl);
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
@@ -74,15 +76,14 @@ TEST(ParserA702, PathDeclSimpleParallel) {
 
 // path_declaration ::= simple_path_declaration ; (full connection)
 TEST(ParserA702, PathDeclSimpleFull) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (a, b *> c) = 10;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    (a, b *> c) = 10;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
   ASSERT_EQ(si->path.src_ports.size(), 2u);
@@ -91,15 +92,14 @@ TEST(ParserA702, PathDeclSimpleFull) {
 
 // path_declaration ::= edge_sensitive_path_declaration ;
 TEST(ParserA702, PathDeclEdgeSensitiveParallel) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (posedge clk => q) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    (posedge clk => q) = 5;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->path.edge, SpecifyEdge::kPosedge);
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
@@ -107,15 +107,14 @@ TEST(ParserA702, PathDeclEdgeSensitiveParallel) {
 
 // path_declaration ::= edge_sensitive_path_declaration ; (full)
 TEST(ParserA702, PathDeclEdgeSensitiveFull) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (posedge clk *> q, qb) = (3, 5);\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    (posedge clk *> q, qb) = (3, 5);\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->path.edge, SpecifyEdge::kPosedge);
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
@@ -124,15 +123,14 @@ TEST(ParserA702, PathDeclEdgeSensitiveFull) {
 
 // path_declaration ::= state_dependent_path_declaration ; (if)
 TEST(ParserA702, PathDeclStateDependentIf) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    if (en) (a => b) = 10;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    if (en) (a => b) = 10;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_NE(si->path.condition, nullptr);
   EXPECT_FALSE(si->path.is_ifnone);
@@ -140,15 +138,14 @@ TEST(ParserA702, PathDeclStateDependentIf) {
 
 // path_declaration ::= state_dependent_path_declaration ; (ifnone)
 TEST(ParserA702, PathDeclStateDependentIfnone) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    ifnone (a => b) = 15;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    ifnone (a => b) = 15;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_TRUE(si->path.is_ifnone);
   EXPECT_EQ(si->path.condition, nullptr);
@@ -159,15 +156,14 @@ TEST(ParserA702, PathDeclStateDependentIfnone) {
 // =============================================================================
 
 TEST(ParserA702, SimplePathParallelSingleDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (a => b) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    (a => b) = 5;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
   ASSERT_EQ(si->path.src_ports.size(), 1u);
@@ -179,15 +175,14 @@ TEST(ParserA702, SimplePathParallelSingleDelay) {
 
 // simple_path_declaration — full_path_description = path_delay_value
 TEST(ParserA702, SimplePathFullMultiplePorts) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (a, b, c *> x, y) = 12;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    (a, b, c *> x, y) = 12;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
   ASSERT_EQ(si->path.src_ports.size(), 3u);
@@ -205,15 +200,14 @@ TEST(ParserA702, SimplePathFullMultiplePorts) {
 
 // ( input + => output ) — positive polarity, parallel
 TEST(ParserA702, ParallelPathPositivePolarity) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (a + => b) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    (a + => b) = 5;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kPositive);
@@ -221,15 +215,14 @@ TEST(ParserA702, ParallelPathPositivePolarity) {
 
 // ( input - => output ) — negative polarity, parallel
 TEST(ParserA702, ParallelPathNegativePolarity) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (a - => b) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    (a - => b) = 5;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNegative);
@@ -237,15 +230,14 @@ TEST(ParserA702, ParallelPathNegativePolarity) {
 
 // ( input => output ) — no polarity (default)
 TEST(ParserA702, ParallelPathNoPolarity) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (a => b) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    (a => b) = 5;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNone);
 }
@@ -256,15 +248,14 @@ TEST(ParserA702, ParallelPathNoPolarity) {
 
 // ( inputs + *> outputs ) — positive polarity, full
 TEST(ParserA702, FullPathPositivePolarity) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (a + *> b) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    (a + *> b) = 5;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kPositive);
@@ -272,15 +263,14 @@ TEST(ParserA702, FullPathPositivePolarity) {
 
 // ( inputs - *> outputs ) — negative polarity, full
 TEST(ParserA702, FullPathNegativePolarity) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (a - *> b) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    (a - *> b) = 5;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNegative);
@@ -288,15 +278,14 @@ TEST(ParserA702, FullPathNegativePolarity) {
 
 // ( inputs *> outputs ) — no polarity (default)
 TEST(ParserA702, FullPathNoPolarity) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (a, b *> c) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    (a, b *> c) = 5;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNone);
@@ -307,43 +296,40 @@ TEST(ParserA702, FullPathNoPolarity) {
 // =============================================================================
 
 TEST(ParserA702, EdgeIdentifierPosedge) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (posedge clk => q) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    (posedge clk => q) = 5;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->path.edge, SpecifyEdge::kPosedge);
 }
 
 TEST(ParserA702, EdgeIdentifierNegedge) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (negedge clk => q) = 8;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    (negedge clk => q) = 8;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->path.edge, SpecifyEdge::kNegedge);
 }
 
 TEST(ParserA702, EdgeIdentifierEdge) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (edge clk => q) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    (edge clk => q) = 5;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->path.edge, SpecifyEdge::kEdge);
 }
@@ -354,15 +340,14 @@ TEST(ParserA702, EdgeIdentifierEdge) {
 
 // parallel_edge_sensitive_path_description with data_source
 TEST(ParserA702, EdgeSensitiveParallelWithDataSource) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (posedge clk => (q : d)) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    (posedge clk => (q : d)) = 5;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->path.edge, SpecifyEdge::kPosedge);
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
@@ -373,15 +358,14 @@ TEST(ParserA702, EdgeSensitiveParallelWithDataSource) {
 
 // parallel_edge_sensitive_path_description without data_source
 TEST(ParserA702, EdgeSensitiveParallelWithoutDataSource) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (negedge clk => q) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    (negedge clk => q) = 5;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->path.edge, SpecifyEdge::kNegedge);
   EXPECT_EQ(si->path.data_source, nullptr);
@@ -389,15 +373,14 @@ TEST(ParserA702, EdgeSensitiveParallelWithoutDataSource) {
 
 // parallel_edge_sensitive_path_description with polarity and data_source
 TEST(ParserA702, EdgeSensitiveParallelPolarityAndDataSource) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (posedge clk + => (q : d)) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    (posedge clk + => (q : d)) = 5;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->path.edge, SpecifyEdge::kPosedge);
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kPositive);
@@ -410,15 +393,14 @@ TEST(ParserA702, EdgeSensitiveParallelPolarityAndDataSource) {
 
 // full_edge_sensitive_path_description with data_source
 TEST(ParserA702, EdgeSensitiveFullWithDataSource) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (posedge clk *> (q : d)) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    (posedge clk *> (q : d)) = 5;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->path.edge, SpecifyEdge::kPosedge);
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
@@ -427,15 +409,14 @@ TEST(ParserA702, EdgeSensitiveFullWithDataSource) {
 
 // full_edge_sensitive_path_description without data_source
 TEST(ParserA702, EdgeSensitiveFullWithoutDataSource) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (posedge clk *> q, qb) = (3, 5);\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    (posedge clk *> q, qb) = (3, 5);\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->path.edge, SpecifyEdge::kPosedge);
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
@@ -444,15 +425,14 @@ TEST(ParserA702, EdgeSensitiveFullWithoutDataSource) {
 
 // full_edge_sensitive_path_description with edge keyword and data_source
 TEST(ParserA702, EdgeSensitiveFullEdgeKeywordWithDataSource) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (edge clk *> (q : d)) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    (edge clk *> (q : d)) = 5;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->path.edge, SpecifyEdge::kEdge);
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
@@ -465,15 +445,14 @@ TEST(ParserA702, EdgeSensitiveFullEdgeKeywordWithDataSource) {
 
 // if (expr) simple_path_declaration — parallel
 TEST(ParserA702, StateDependentIfSimpleParallel) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    if (en) (a => b) = 10;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    if (en) (a => b) = 10;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_NE(si->path.condition, nullptr);
   EXPECT_FALSE(si->path.is_ifnone);
@@ -482,15 +461,14 @@ TEST(ParserA702, StateDependentIfSimpleParallel) {
 
 // if (expr) simple_path_declaration — full
 TEST(ParserA702, StateDependentIfSimpleFull) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    if (en) (a, b *> c) = 10;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    if (en) (a, b *> c) = 10;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_NE(si->path.condition, nullptr);
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
@@ -498,15 +476,14 @@ TEST(ParserA702, StateDependentIfSimpleFull) {
 
 // if (expr) edge_sensitive_path_declaration
 TEST(ParserA702, StateDependentIfEdgeSensitive) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    if (en) (posedge clk => q) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    if (en) (posedge clk => q) = 5;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_NE(si->path.condition, nullptr);
   EXPECT_EQ(si->path.edge, SpecifyEdge::kPosedge);
@@ -514,15 +491,14 @@ TEST(ParserA702, StateDependentIfEdgeSensitive) {
 
 // ifnone simple_path_declaration
 TEST(ParserA702, StateDependentIfnoneSimple) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    ifnone (a => b) = 15;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    ifnone (a => b) = 15;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_TRUE(si->path.is_ifnone);
   EXPECT_EQ(si->path.condition, nullptr);
@@ -535,15 +511,14 @@ TEST(ParserA702, StateDependentIfnoneSimple) {
 
 // Polarity with edge-sensitive full path
 TEST(ParserA702, PolarityWithEdgeFullPath) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (negedge clk - *> (q : d)) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    (negedge clk - *> (q : d)) = 5;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->path.edge, SpecifyEdge::kNegedge);
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNegative);
@@ -553,15 +528,14 @@ TEST(ParserA702, PolarityWithEdgeFullPath) {
 
 // Polarity with conditional path
 TEST(ParserA702, PolarityWithConditionalPath) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    if (sel) (a + => b) = 8;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    if (sel) (a + => b) = 8;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_NE(si->path.condition, nullptr);
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kPositive);
@@ -573,15 +547,14 @@ TEST(ParserA702, PolarityWithConditionalPath) {
 
 // Edge-sensitive path with output-side polarity and data source
 TEST(ParserA702, DataSourceWithOutputPolarity) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (posedge clk => (q + : d)) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    (posedge clk => (q + : d)) = 5;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_NE(si->path.data_source, nullptr);
   EXPECT_EQ(si->path.dst_polarity, SpecifyPolarity::kPositive);
@@ -589,15 +562,14 @@ TEST(ParserA702, DataSourceWithOutputPolarity) {
 
 // Edge-sensitive path with negative output polarity and data source
 TEST(ParserA702, DataSourceWithNegativeOutputPolarity) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (posedge clk => (q - : d)) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    (posedge clk => (q - : d)) = 5;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
+  auto *si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_NE(si->path.data_source, nullptr);
   EXPECT_EQ(si->path.dst_polarity, SpecifyPolarity::kNegative);
@@ -608,23 +580,22 @@ TEST(ParserA702, DataSourceWithNegativeOutputPolarity) {
 // =============================================================================
 
 TEST(ParserA702, MultiplePathDeclarations) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (a => b) = 5;\n"
-      "    (c, d *> e) = 10;\n"
-      "    (posedge clk => q) = 3;\n"
-      "    if (en) (a => b) = 8;\n"
-      "    ifnone (a => b) = 15;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    (a => b) = 5;\n"
+                 "    (c, d *> e) = 10;\n"
+                 "    (posedge clk => q) = 3;\n"
+                 "    if (en) (a => b) = 8;\n"
+                 "    ifnone (a => b) = 15;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  auto *spec = FindSpecifyBlock(r.cu->modules[0]->items);
   ASSERT_NE(spec, nullptr);
   ASSERT_EQ(spec->specify_items.size(), 5u);
   // All should be path declarations
-  for (auto* si : spec->specify_items) {
+  for (auto *si : spec->specify_items) {
     EXPECT_EQ(si->kind, SpecifyItemKind::kPathDecl);
   }
 }

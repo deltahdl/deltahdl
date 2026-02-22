@@ -32,7 +32,8 @@ ParseResult Parse(const std::string &src) {
 
 static Stmt *FirstInitialStmt(ParseResult &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->kind != ModuleItemKind::kInitialBlock)
+      continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
     }
@@ -41,7 +42,7 @@ static Stmt *FirstInitialStmt(ParseResult &r) {
   return nullptr;
 }
 
-}  // namespace
+} // namespace
 
 // =============================================================================
 // A.6.8 Looping statements — loop_statement
@@ -50,10 +51,9 @@ static Stmt *FirstInitialStmt(ParseResult &r) {
 // --- forever statement_or_null ---
 
 TEST(ParserA608, ForeverLoop) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin forever #5 clk = ~clk; end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin forever #5 clk = ~clk; end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -63,10 +63,9 @@ TEST(ParserA608, ForeverLoop) {
 }
 
 TEST(ParserA608, ForeverNullStmt) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin forever ; end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin forever ; end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -77,10 +76,9 @@ TEST(ParserA608, ForeverNullStmt) {
 // --- repeat ( expression ) statement_or_null ---
 
 TEST(ParserA608, RepeatLoop) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin repeat (10) @(posedge clk); end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin repeat (10) @(posedge clk); end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -90,10 +88,9 @@ TEST(ParserA608, RepeatLoop) {
 }
 
 TEST(ParserA608, RepeatNullStmt) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin repeat (5) ; end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin repeat (5) ; end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -104,10 +101,9 @@ TEST(ParserA608, RepeatNullStmt) {
 // --- while ( expression ) statement_or_null ---
 
 TEST(ParserA608, WhileLoop) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin while (x > 0) x = x - 1; end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin while (x > 0) x = x - 1; end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -118,10 +114,9 @@ TEST(ParserA608, WhileLoop) {
 }
 
 TEST(ParserA608, WhileNullStmt) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin while (x > 0) ; end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin while (x > 0) ; end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -132,12 +127,11 @@ TEST(ParserA608, WhileNullStmt) {
 // --- for ( [for_initialization] ; [expression] ; [for_step] ) stmt_or_null ---
 
 TEST(ParserA608, ForLoopParse) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 10; i++) x = i;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    for (int i = 0; i < 10; i++) x = i;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -146,12 +140,11 @@ TEST(ParserA608, ForLoopParse) {
 }
 
 TEST(ParserA608, ForLoopParts) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 10; i++) x = i;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    for (int i = 0; i < 10; i++) x = i;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -162,12 +155,11 @@ TEST(ParserA608, ForLoopParts) {
 }
 
 TEST(ParserA608, ForLoopTypedInit) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 10; i++) x = i;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    for (int i = 0; i < 10; i++) x = i;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -176,12 +168,11 @@ TEST(ParserA608, ForLoopTypedInit) {
 }
 
 TEST(ParserA608, ForLoopUntypedInit) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    for (i = 0; i < 10; i++) x = i;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    for (i = 0; i < 10; i++) x = i;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -191,12 +182,11 @@ TEST(ParserA608, ForLoopUntypedInit) {
 
 // §A.6.8: for_initialization is optional — empty init
 TEST(ParserA608, ForEmptyInit) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    for (; i < 10; i++) x = i;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    for (; i < 10; i++) x = i;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -207,14 +197,13 @@ TEST(ParserA608, ForEmptyInit) {
 
 // §A.6.8: expression in for condition is optional — empty cond
 TEST(ParserA608, ForEmptyCond) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    for (int i = 0; ; i++) begin\n"
-      "      if (i == 10) break;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    for (int i = 0; ; i++) begin\n"
+                 "      if (i == 10) break;\n"
+                 "    end\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -225,14 +214,13 @@ TEST(ParserA608, ForEmptyCond) {
 
 // §A.6.8: for_step is optional — empty step
 TEST(ParserA608, ForEmptyStep) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 10;) begin\n"
-      "      i = i + 1;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    for (int i = 0; i < 10;) begin\n"
+                 "      i = i + 1;\n"
+                 "    end\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -243,12 +231,11 @@ TEST(ParserA608, ForEmptyStep) {
 
 // §A.6.8: all three for parts optional — for (;;)
 TEST(ParserA608, ForAllEmpty) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    for (;;) break;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    for (;;) break;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -260,12 +247,11 @@ TEST(ParserA608, ForAllEmpty) {
 }
 
 TEST(ParserA608, ForNullStmt) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 10; i++) ;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    for (int i = 0; i < 10; i++) ;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -276,12 +262,11 @@ TEST(ParserA608, ForNullStmt) {
 // --- for_variable_declaration: [var] data_type variable_identifier = expr ---
 
 TEST(ParserA608, ForVarKeyword) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    for (var int i = 0; i < 10; i++) x = i;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    for (var int i = 0; i < 10; i++) x = i;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -291,12 +276,11 @@ TEST(ParserA608, ForVarKeyword) {
 }
 
 TEST(ParserA608, ForLogicTypeInit) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    for (logic [7:0] i = 0; i < 10; i++) x = i;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    for (logic [7:0] i = 0; i < 10; i++) x = i;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -307,12 +291,11 @@ TEST(ParserA608, ForLogicTypeInit) {
 // --- for_step_assignment: operator_assignment ---
 
 TEST(ParserA608, ForStepCompoundAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 10; i += 1) x = i;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    for (int i = 0; i < 10; i += 1) x = i;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -324,12 +307,11 @@ TEST(ParserA608, ForStepCompoundAssign) {
 // --- for_step_assignment: inc_or_dec_expression ---
 
 TEST(ParserA608, ForStepPostIncrement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 10; i++) x = i;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    for (int i = 0; i < 10; i++) x = i;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -338,12 +320,11 @@ TEST(ParserA608, ForStepPostIncrement) {
 }
 
 TEST(ParserA608, ForStepPreIncrement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 10; ++i) x = i;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    for (int i = 0; i < 10; ++i) x = i;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -352,12 +333,11 @@ TEST(ParserA608, ForStepPreIncrement) {
 }
 
 TEST(ParserA608, ForStepPostDecrement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    for (int i = 10; i > 0; i--) x = i;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    for (int i = 10; i > 0; i--) x = i;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -368,10 +348,9 @@ TEST(ParserA608, ForStepPostDecrement) {
 // --- do statement_or_null while ( expression ) ; ---
 
 TEST(ParserA608, DoWhileLoop) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin do x = x - 1; while (x > 0); end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin do x = x - 1; while (x > 0); end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -382,10 +361,9 @@ TEST(ParserA608, DoWhileLoop) {
 }
 
 TEST(ParserA608, DoWhileNullStmt) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin do ; while (x > 0); end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin do ; while (x > 0); end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -394,12 +372,11 @@ TEST(ParserA608, DoWhileNullStmt) {
 }
 
 TEST(ParserA608, DoWhileBlockBody) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    do begin x = x + 1; end while (x < 10);\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    do begin x = x + 1; end while (x < 10);\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -411,10 +388,9 @@ TEST(ParserA608, DoWhileBlockBody) {
 // --- foreach ( ps_or_hierarchical_array_identifier [loop_variables] ) stmt ---
 
 TEST(ParserA608, ForeachStmt) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin foreach (arr[i]) $display(arr[i]); end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin foreach (arr[i]) $display(arr[i]); end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -425,10 +401,9 @@ TEST(ParserA608, ForeachStmt) {
 }
 
 TEST(ParserA608, ForeachSingleVar) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin foreach (arr[i]) x = i; end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin foreach (arr[i]) x = i; end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -439,10 +414,9 @@ TEST(ParserA608, ForeachSingleVar) {
 
 // §A.6.8: loop_variables — multiple comma-separated identifiers
 TEST(ParserA608, ForeachMultipleVars) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin foreach (matrix[i, j]) x = i; end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin foreach (matrix[i, j]) x = i; end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -454,10 +428,9 @@ TEST(ParserA608, ForeachMultipleVars) {
 
 // §A.6.8: loop_variables — empty slots (skipped dimensions)
 TEST(ParserA608, ForeachEmptyVarSlot) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin foreach (arr[, j]) x = j; end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin foreach (arr[, j]) x = j; end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -469,10 +442,9 @@ TEST(ParserA608, ForeachEmptyVarSlot) {
 
 // §A.6.8: ps_or_hierarchical_array_identifier — hierarchical name
 TEST(ParserA608, ForeachHierarchicalArray) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin foreach (obj.arr[i]) x = i; end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin foreach (obj.arr[i]) x = i; end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -483,14 +455,13 @@ TEST(ParserA608, ForeachHierarchicalArray) {
 }
 
 TEST(ParserA608, ForeachBlockBody) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    foreach (arr[i]) begin\n"
-      "      x = arr[i];\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    foreach (arr[i]) begin\n"
+                 "      x = arr[i];\n"
+                 "    end\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);

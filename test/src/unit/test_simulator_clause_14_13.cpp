@@ -1,12 +1,12 @@
 // §14.13: Input sampling
 
-#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "simulation/clocking.h"
 #include "simulation/sim_context.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -22,9 +22,9 @@ namespace {
 
 TEST(Clocking, AttachSamplesOnClockEdge) {
   ClockingSimFixture f;
-  auto* clk = f.ctx.CreateVariable("clk", 1);
+  auto *clk = f.ctx.CreateVariable("clk", 1);
   clk->value = MakeLogic4VecVal(f.arena, 1, 0);
-  auto* data_in = f.ctx.CreateVariable("data_in", 8);
+  auto *data_in = f.ctx.CreateVariable("data_in", 8);
   data_in->value = MakeLogic4VecVal(f.arena, 8, 0xAA);
 
   ClockingManager mgr;
@@ -43,7 +43,7 @@ TEST(Clocking, AttachSamplesOnClockEdge) {
   mgr.Attach(f.ctx, f.scheduler);
 
   // Schedule clock posedge at t=10.
-  auto* ev = f.scheduler.GetEventPool().Acquire();
+  auto *ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [&clk, &f]() {
     clk->value = MakeLogic4VecVal(f.arena, 1, 1);
     clk->NotifyWatchers();
@@ -57,4 +57,4 @@ TEST(Clocking, AttachSamplesOnClockEdge) {
   EXPECT_EQ(sampled, 0xAAu);
 }
 
-}  // namespace
+} // namespace

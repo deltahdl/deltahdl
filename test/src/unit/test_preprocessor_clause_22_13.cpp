@@ -11,7 +11,7 @@ struct PreprocFixture {
   DiagEngine diag{mgr};
 };
 
-static std::string Preprocess(const std::string& src, PreprocFixture& f,
+static std::string Preprocess(const std::string &src, PreprocFixture &f,
                               PreprocConfig config = {}) {
   auto fid = f.mgr.AddFile("<test>", src);
   Preprocessor pp(f.mgr, f.diag, std::move(config));
@@ -26,10 +26,9 @@ TEST(Preprocessor, FileExpansion) {
 
 TEST(Preprocessor, LineExpansion) {
   PreprocFixture f;
-  auto result = Preprocess(
-      "line1\n"
-      "`__LINE__\n",
-      f);
+  auto result = Preprocess("line1\n"
+                           "`__LINE__\n",
+                           f);
   EXPECT_NE(result.find('2'), std::string::npos);
 }
 
@@ -37,10 +36,9 @@ TEST(Preprocessor, LineExpansion) {
 
 TEST(Preprocessor, LineDirectiveAffectsLineMacro) {
   PreprocFixture f;
-  auto result = Preprocess(
-      "`line 100 \"test.sv\" 0\n"
-      "`__LINE__\n",
-      f);
+  auto result = Preprocess("`line 100 \"test.sv\" 0\n"
+                           "`__LINE__\n",
+                           f);
   EXPECT_NE(result.find("101"), std::string::npos);
 }
 

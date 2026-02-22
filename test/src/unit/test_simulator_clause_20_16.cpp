@@ -19,9 +19,9 @@ struct SysTaskFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static Expr* MkSysCall(Arena& arena, std::string_view name,
-                       std::vector<Expr*> args) {
-  auto* e = arena.Create<Expr>();
+static Expr *MkSysCall(Arena &arena, std::string_view name,
+                       std::vector<Expr *> args) {
+  auto *e = arena.Create<Expr>();
   e->kind = ExprKind::kSystemCall;
   e->callee = name;
   e->args = std::move(args);
@@ -32,9 +32,9 @@ namespace {
 
 TEST(SysTask, AsyncAndArrayReturnsZero) {
   SysTaskFixture f;
-  auto* expr = MkSysCall(f.arena, "$async$and$array", {});
+  auto *expr = MkSysCall(f.arena, "$async$and$array", {});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-}  // namespace
+} // namespace

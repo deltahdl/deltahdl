@@ -1,11 +1,11 @@
 // §7.3: Unions
 
-#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -23,10 +23,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult Parse(const std::string& src) {
+static ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -37,30 +37,29 @@ static ParseResult Parse(const std::string& src) {
 }
 
 struct StructMemberExpected {
-  const char* name;
+  const char *name;
   DataTypeKind type_kind;
 };
 
 struct ModportPortExpected {
   Direction dir;
-  const char* name;
+  const char *name;
 };
 
 namespace {
 
 TEST(Parser, TypedefUnion) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef union {\n"
-      "    int i;\n"
-      "    real r;\n"
-      "  } my_union_t;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  typedef union {\n"
+                 "    int i;\n"
+                 "    real r;\n"
+                 "  } my_union_t;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
   EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kUnion);
   ASSERT_EQ(item->typedef_type.struct_members.size(), 2);
 }
 
-}  // namespace
+} // namespace

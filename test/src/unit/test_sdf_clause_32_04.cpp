@@ -1,8 +1,8 @@
 // §32.4: Mapping of SDF constructs to SystemVerilog
 
-#include <gtest/gtest.h>
 #include "simulation/sdf_parser.h"
 #include "simulation/specify.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -125,7 +125,7 @@ TEST(SdfParser, ParseTimingCheck_Fields) {
     )
   )";
   ParseSdf(sdf, file);
-  auto& tc = file.cells[0].timing_checks[0];
+  auto &tc = file.cells[0].timing_checks[0];
   EXPECT_EQ(tc.check_type, SdfCheckType::kSetup);
   EXPECT_EQ(tc.data_port, "d");
   EXPECT_EQ(tc.ref_port, "clk");
@@ -169,7 +169,7 @@ TEST(SdfParser, ParseHoldCheck) {
   )";
   bool ok = ParseSdf(sdf, file);
   EXPECT_TRUE(ok);
-  auto& tc = file.cells[0].timing_checks[0];
+  auto &tc = file.cells[0].timing_checks[0];
   EXPECT_EQ(tc.check_type, SdfCheckType::kHold);
   EXPECT_EQ(tc.limit.typ_val, 3u);
 }
@@ -197,4 +197,4 @@ TEST(SdfParser, ParseMultipleCells) {
   EXPECT_EQ(file.cells[1].instance, "u2");
 }
 
-}  // namespace
+} // namespace

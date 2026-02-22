@@ -28,7 +28,7 @@ TEST(SimCh4436, PostObservedRegionExecutesPLICallbacks) {
   Scheduler sched(arena);
   int executed = 0;
 
-  auto* ev = sched.GetEventPool().Acquire();
+  auto *ev = sched.GetEventPool().Acquire();
   ev->callback = [&]() { executed++; };
   sched.ScheduleEvent({0}, Region::kPostObserved, ev);
 
@@ -47,12 +47,12 @@ TEST(SimCh4436, PostObservedCanReadValues) {
   int sampled = -1;
 
   // Active sets value = 42.
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->callback = [&]() { value = 42; };
   sched.ScheduleEvent({0}, Region::kActive, active);
 
   // Post-Observed reads value — should see 42.
-  auto* ev = sched.GetEventPool().Acquire();
+  auto *ev = sched.GetEventPool().Acquire();
   ev->callback = [&]() { sampled = value; };
   sched.ScheduleEvent({0}, Region::kPostObserved, ev);
 
@@ -71,12 +71,12 @@ TEST(SimCh4436, PostObservedReadsAfterObservedRegion) {
   int sampled = -1;
 
   // Observed sets value = 77 (simulating property evaluation side-effect).
-  auto* observed = sched.GetEventPool().Acquire();
+  auto *observed = sched.GetEventPool().Acquire();
   observed->callback = [&]() { value = 77; };
   sched.ScheduleEvent({0}, Region::kObserved, observed);
 
   // Post-Observed should see 77.
-  auto* ev = sched.GetEventPool().Acquire();
+  auto *ev = sched.GetEventPool().Acquire();
   ev->callback = [&]() { sampled = value; };
   sched.ScheduleEvent({0}, Region::kPostObserved, ev);
 
@@ -93,8 +93,8 @@ TEST(SimCh4436, PostObservedExecutesAfterObservedBeforeReactive) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
+  auto schedule = [&](Region r, const std::string &label) {
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, label]() { order.push_back(label); };
     sched.ScheduleEvent({0}, r, ev);
   };
@@ -122,8 +122,8 @@ TEST(SimCh4436, PostObservedExecutesAfterEntireChainThroughObserved) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
+  auto schedule = [&](Region r, const std::string &label) {
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, label]() { order.push_back(label); };
     sched.ScheduleEvent({0}, r, ev);
   };
@@ -163,7 +163,7 @@ TEST(SimCh4436, PostObservedRegionHoldsMultiplePLICallbacks) {
   int count = 0;
 
   for (int i = 0; i < 5; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&]() { count++; };
     sched.ScheduleEvent({0}, Region::kPostObserved, ev);
   }
@@ -182,7 +182,7 @@ TEST(SimCh4436, PostObservedEventsAcrossMultipleTimeSlots) {
   std::vector<uint64_t> times;
 
   for (uint64_t t = 0; t < 3; ++t) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&times, &sched]() {
       times.push_back(sched.CurrentTime().ticks);
     };
@@ -210,19 +210,19 @@ TEST(SimCh4436, PostObservedProvidesReadOnlySnapshotAfterObserved) {
   int sum_in_post_observed = -1;
 
   // Active sets initial values, Observed modifies them (property evaluation).
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->callback = [&]() {
     a = 10;
     b = 20;
   };
   sched.ScheduleEvent({0}, Region::kActive, active);
 
-  auto* observed = sched.GetEventPool().Acquire();
+  auto *observed = sched.GetEventPool().Acquire();
   observed->callback = [&]() { b = 30; };
   sched.ScheduleEvent({0}, Region::kObserved, observed);
 
   // Post-Observed reads both — should see a=10, b=30 (Observed overwrote b).
-  auto* post_obs = sched.GetEventPool().Acquire();
+  auto *post_obs = sched.GetEventPool().Acquire();
   post_obs->callback = [&]() { sum_in_post_observed = a + b; };
   sched.ScheduleEvent({0}, Region::kPostObserved, post_obs);
 
@@ -242,8 +242,8 @@ TEST(SimCh4436, PostObservedInfrastructureWorksEvenIfCurrentlyUnused) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
+  auto schedule = [&](Region r, const std::string &label) {
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, label]() { order.push_back(label); };
     sched.ScheduleEvent({0}, r, ev);
   };

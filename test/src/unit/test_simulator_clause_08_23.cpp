@@ -1,7 +1,5 @@
 // §8.23: Class scope resolution operator ::
 
-#include <gtest/gtest.h>
-#include <string>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -9,6 +7,8 @@
 #include "simulation/class_object.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
+#include <gtest/gtest.h>
+#include <string>
 
 using namespace delta;
 
@@ -24,10 +24,10 @@ struct ClassFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 // Build a simple ClassTypeInfo and register it with the context.
-static ClassTypeInfo* MakeClassType(
-    ClassFixture& f, std::string_view name,
-    const std::vector<std::string_view>& props) {
-  auto* info = f.arena.Create<ClassTypeInfo>();
+static ClassTypeInfo *
+MakeClassType(ClassFixture &f, std::string_view name,
+              const std::vector<std::string_view> &props) {
+  auto *info = f.arena.Create<ClassTypeInfo>();
   info->name = name;
   for (auto p : props) {
     info->properties.push_back({p, 32, false});
@@ -43,7 +43,7 @@ namespace {
 // =============================================================================
 TEST(ClassSim, ScopeResolutionStaticLookup) {
   ClassFixture f;
-  auto* type = MakeClassType(f, "MyClass", {});
+  auto *type = MakeClassType(f, "MyClass", {});
   type->static_properties["MAX_SIZE"] = MakeLogic4VecVal(f.arena, 32, 256);
 
   auto it = type->static_properties.find("MAX_SIZE");
@@ -53,18 +53,18 @@ TEST(ClassSim, ScopeResolutionStaticLookup) {
 
 TEST(ClassSim, ScopeResolutionMethodLookup) {
   ClassFixture f;
-  auto* type = MakeClassType(f, "Utils", {});
-  auto* method = f.arena.Create<ModuleItem>();
+  auto *type = MakeClassType(f, "Utils", {});
+  auto *method = f.arena.Create<ModuleItem>();
   method->kind = ModuleItemKind::kFunctionDecl;
   method->name = "compute";
   method->is_static = true;
   type->methods["compute"] = method;
 
-  auto* found = f.ctx.FindClassType("Utils");
+  auto *found = f.ctx.FindClassType("Utils");
   ASSERT_NE(found, nullptr);
   auto it = found->methods.find("compute");
   ASSERT_NE(it, found->methods.end());
   EXPECT_EQ(it->second->name, "compute");
 }
 
-}  // namespace
+} // namespace

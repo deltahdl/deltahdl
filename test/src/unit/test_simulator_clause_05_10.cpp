@@ -25,26 +25,28 @@ struct SimCh510Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign* ElaborateSrc(const std::string& src, SimCh510Fixture& f) {
+static RtlirDesign *ElaborateSrc(const std::string &src, SimCh510Fixture &f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
+  auto *cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-static uint64_t RunAndGet(const std::string& src, const char* var_name) {
+static uint64_t RunAndGet(const std::string &src, const char *var_name) {
   SimCh510Fixture f;
-  auto* design = ElaborateSrc(src, f);
+  auto *design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
-  if (!design) return 0;
+  if (!design)
+    return 0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* var = f.ctx.FindVariable(var_name);
+  auto *var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
-  if (!var) return 0;
+  if (!var)
+    return 0;
   return var->value.ToUint64();
 }
 
@@ -147,15 +149,14 @@ TEST(SimCh510, StructLitDefaultDiffWidth) {
 // ---------------------------------------------------------------------------
 TEST(SimCh510, StructLitPositionalThree) {
   // §5.10: Positional assignment with 3 fields.
-  auto v = RunAndGet(
-      "module t;\n"
-      "  typedef struct packed {\n"
-      "    logic [7:0] a; logic [7:0] b; logic [7:0] c;\n"
-      "  } abc_t;\n"
-      "  abc_t s;\n"
-      "  initial s = '{8'h11, 8'h22, 8'h33};\n"
-      "endmodule\n",
-      "s");
+  auto v = RunAndGet("module t;\n"
+                     "  typedef struct packed {\n"
+                     "    logic [7:0] a; logic [7:0] b; logic [7:0] c;\n"
+                     "  } abc_t;\n"
+                     "  abc_t s;\n"
+                     "  initial s = '{8'h11, 8'h22, 8'h33};\n"
+                     "endmodule\n",
+                     "s");
   EXPECT_EQ(v, 0x112233u);
 }
 
@@ -165,7 +166,7 @@ TEST(SimCh510, StructLitPositionalThree) {
 TEST(SimCh510, StructLitFieldAccess) {
   // §5.10: After assigning via struct literal, individual fields are readable.
   SimCh510Fixture f;
-  auto* design = ElaborateSrc(
+  auto *design = ElaborateSrc(
       "module t;\n"
       "  typedef struct packed { logic [7:0] x; logic [7:0] y; } pt_t;\n"
       "  pt_t p;\n"
@@ -178,15 +179,17 @@ TEST(SimCh510, StructLitFieldAccess) {
       "endmodule\n",
       f);
   EXPECT_NE(design, nullptr);
-  if (!design) return;
+  if (!design)
+    return;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* vrx = f.ctx.FindVariable("rx");
-  auto* vry = f.ctx.FindVariable("ry");
+  auto *vrx = f.ctx.FindVariable("rx");
+  auto *vry = f.ctx.FindVariable("ry");
   EXPECT_NE(vrx, nullptr);
   EXPECT_NE(vry, nullptr);
-  if (!vrx || !vry) return;
+  if (!vrx || !vry)
+    return;
   EXPECT_EQ(vrx->value.ToUint64(), 0xDEu);
   EXPECT_EQ(vry->value.ToUint64(), 0xADu);
 }

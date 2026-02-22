@@ -1,9 +1,9 @@
 // §19.5.6: Specifying Illegal coverage point values or transitions
 
+#include "simulation/coverage.h"
 #include <gtest/gtest.h>
 #include <string>
 #include <vector>
-#include "simulation/coverage.h"
 
 using namespace delta;
 
@@ -14,8 +14,8 @@ namespace {
 // =============================================================================
 TEST(Coverage, IllegalBinsNotSampled) {
   CoverageDB db;
-  auto* g = db.CreateGroup("cg");
-  auto* cp = CoverageDB::AddCoverPoint(g, "addr");
+  auto *g = db.CreateGroup("cg");
+  auto *cp = CoverageDB::AddCoverPoint(g, "addr");
   CoverBin ib;
   ib.name = "bad_addr";
   ib.kind = CoverBinKind::kIllegal;
@@ -29,8 +29,8 @@ TEST(Coverage, IllegalBinsNotSampled) {
 
 TEST(Coverage, IllegalBinsExcludedFromCoverage) {
   CoverageDB db;
-  auto* g = db.CreateGroup("cg");
-  auto* cp = CoverageDB::AddCoverPoint(g, "x");
+  auto *g = db.CreateGroup("cg");
+  auto *cp = CoverageDB::AddCoverPoint(g, "x");
 
   CoverBin good;
   good.name = "valid";
@@ -48,4 +48,4 @@ TEST(Coverage, IllegalBinsExcludedFromCoverage) {
   EXPECT_DOUBLE_EQ(CoverageDB::GetPointCoverage(cp), 100.0);
 }
 
-}  // namespace
+} // namespace

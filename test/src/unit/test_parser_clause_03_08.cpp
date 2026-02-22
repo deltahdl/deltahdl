@@ -12,11 +12,11 @@ using namespace delta;
 struct ParseResult308 {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult308 Parse(const std::string& src) {
+static ParseResult308 Parse(const std::string &src) {
   ParseResult308 result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
@@ -30,24 +30,27 @@ static ParseResult308 Parse(const std::string& src) {
   return result;
 }
 
-static ModuleItem* FindItemByKind(ParseResult308& r, ModuleItemKind kind) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == kind) return item;
+static ModuleItem *FindItemByKind(ParseResult308 &r, ModuleItemKind kind) {
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == kind)
+      return item;
   }
   return nullptr;
 }
 
-static int CountItemsByKind(const std::vector<ModuleItem*>& items,
+static int CountItemsByKind(const std::vector<ModuleItem *> &items,
                             ModuleItemKind kind) {
   int count = 0;
-  for (const auto* item : items)
-    if (item->kind == kind) ++count;
+  for (const auto *item : items)
+    if (item->kind == kind)
+      ++count;
   return count;
 }
 
-static const ModuleItem* FindFunctionByName(
-    const std::vector<ModuleItem*>& items, const std::string& name) {
-  for (const auto* item : items)
+static const ModuleItem *
+FindFunctionByName(const std::vector<ModuleItem *> &items,
+                   const std::string &name) {
+  for (const auto *item : items)
     if (item->kind == ModuleItemKind::kFunctionDecl && item->name == name)
       return item;
   return nullptr;
@@ -71,7 +74,7 @@ TEST(ParserClause03, Cl3_8_TaskAllDirectionsAndBlocking) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* task = FindItemByKind(r, ModuleItemKind::kTaskDecl);
+  auto *task = FindItemByKind(r, ModuleItemKind::kTaskDecl);
   ASSERT_NE(task, nullptr);
   EXPECT_EQ(task->name, "my_task");
   ASSERT_EQ(task->func_args.size(), 4u);
@@ -85,23 +88,22 @@ TEST(ParserClause03, Cl3_8_TaskAllDirectionsAndBlocking) {
 
 // §3.8: Function returning value, void function, all 4 argument directions.
 TEST(ParserClause03, Cl3_8_FunctionReturnAndVoidAndDirections) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int compute(input int a, output int b,\n"
-      "                       inout int c, ref int d);\n"
-      "    b = a;\n"
-      "    return a + c + d;\n"
-      "  endfunction\n"
-      "  function void show(input int val);\n"
-      "    $display(\"%d\", val);\n"
-      "  endfunction\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  function int compute(input int a, output int b,\n"
+                 "                       inout int c, ref int d);\n"
+                 "    b = a;\n"
+                 "    return a + c + d;\n"
+                 "  endfunction\n"
+                 "  function void show(input int val);\n"
+                 "    $display(\"%d\", val);\n"
+                 "  endfunction\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(
       CountItemsByKind(r.cu->modules[0]->items, ModuleItemKind::kFunctionDecl),
       2);
-  const auto* compute = FindFunctionByName(r.cu->modules[0]->items, "compute");
+  const auto *compute = FindFunctionByName(r.cu->modules[0]->items, "compute");
   ASSERT_NE(compute, nullptr);
   ASSERT_EQ(compute->func_args.size(), 4u);
   EXPECT_EQ(compute->func_args[0].direction, Direction::kInput);

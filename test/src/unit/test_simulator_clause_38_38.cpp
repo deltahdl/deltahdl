@@ -11,7 +11,7 @@ namespace delta {
 namespace {
 
 class VpiClause3838Test : public ::testing::Test {
- protected:
+protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
@@ -26,10 +26,10 @@ class VpiClause3838Test : public ::testing::Test {
 // §38.38: vpi_release_handle (vpi_free_object deprecated per §C.2.4)
 
 TEST_F(VpiClause3838Test, FreeObjectReturnsZero) {
-  auto* mod = vpi_ctx_.CreateModule("tmp", "tmp");
+  auto *mod = vpi_ctx_.CreateModule("tmp", "tmp");
   int result = vpi_free_object(mod);
   EXPECT_EQ(result, 0);
 }
 
-}  // namespace
-}  // namespace delta
+} // namespace
+} // namespace delta

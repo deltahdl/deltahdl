@@ -11,11 +11,11 @@ using namespace delta;
 struct ParseResult9d {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult9d Parse(const std::string& src) {
+static ParseResult9d Parse(const std::string &src) {
   ParseResult9d result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -26,7 +26,7 @@ static ParseResult9d Parse(const std::string& src) {
   return result;
 }
 
-static bool ParseOk(const std::string& src) {
+static bool ParseOk(const std::string &src) {
   SourceManager mgr;
   Arena arena;
   auto fid = mgr.AddFile("<test>", src);
@@ -37,23 +37,24 @@ static bool ParseOk(const std::string& src) {
   return !diag.HasErrors();
 }
 
-static Stmt* FirstInitialBody(ParseResult9d& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) return item->body;
+static Stmt *FirstInitialBody(ParseResult9d &r) {
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock)
+      return item->body;
   }
   return nullptr;
 }
 
-static Stmt* FirstInitialStmt(ParseResult9d& r) {
-  auto* body = FirstInitialBody(r);
+static Stmt *FirstInitialStmt(ParseResult9d &r) {
+  auto *body = FirstInitialBody(r);
   if (body && body->kind == StmtKind::kBlock) {
     return body->stmts.empty() ? nullptr : body->stmts[0];
   }
   return body;
 }
 
-static ModuleItem* FirstAlwaysItem(ParseResult9d& r) {
-  for (auto* item : r.cu->modules[0]->items) {
+static ModuleItem *FirstAlwaysItem(ParseResult9d &r) {
+  for (auto *item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kAlwaysBlock ||
         item->kind == ModuleItemKind::kAlwaysCombBlock ||
         item->kind == ModuleItemKind::kAlwaysFFBlock ||
@@ -70,29 +71,27 @@ static ModuleItem* FirstAlwaysItem(ParseResult9d& r) {
 // =============================================================================
 
 TEST(ParserSection9, Sec9_3_1_EmptyBeginEnd) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
+  auto *body = FirstInitialBody(r);
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->kind, StmtKind::kBlock);
   EXPECT_TRUE(body->stmts.empty());
 }
 
 TEST(ParserSection9, Sec9_3_1_NamedBeginEndMatchingLabel) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin : seq_block\n"
-      "    a = 1;\n"
-      "  end : seq_block\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin : seq_block\n"
+                 "    a = 1;\n"
+                 "  end : seq_block\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
+  auto *body = FirstInitialBody(r);
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->kind, StmtKind::kBlock);
   EXPECT_EQ(body->label, "seq_block");
@@ -100,30 +99,28 @@ TEST(ParserSection9, Sec9_3_1_NamedBeginEndMatchingLabel) {
 }
 
 TEST(ParserSection9, Sec9_3_1_NamedBeginEndNoEndLabel) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin : blk_no_end\n"
-      "    a = 1;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin : blk_no_end\n"
+                 "    a = 1;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
+  auto *body = FirstInitialBody(r);
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->kind, StmtKind::kBlock);
   EXPECT_EQ(body->label, "blk_no_end");
 }
 
 TEST(ParserSection9, Sec9_3_1_SingleStatementInBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    x = 42;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    x = 42;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
+  auto *body = FirstInitialBody(r);
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->kind, StmtKind::kBlock);
   ASSERT_EQ(body->stmts.size(), 1u);
@@ -131,17 +128,16 @@ TEST(ParserSection9, Sec9_3_1_SingleStatementInBlock) {
 }
 
 TEST(ParserSection9, Sec9_3_1_MultipleAssignmentsInBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a = 1;\n"
-      "    b = 2;\n"
-      "    c = 3;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    a = 1;\n"
+                 "    b = 2;\n"
+                 "    c = 3;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
+  auto *body = FirstInitialBody(r);
   ASSERT_NE(body, nullptr);
   ASSERT_EQ(body->stmts.size(), 3u);
   for (size_t i = 0; i < 3; ++i) {
@@ -154,16 +150,15 @@ TEST(ParserSection9, Sec9_3_1_MultipleAssignmentsInBlock) {
 // =============================================================================
 
 TEST(ParserSection9, Sec9_3_1_VarDeclAsFirstStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    int temp;\n"
-      "    temp = 99;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    int temp;\n"
+                 "    temp = 99;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
+  auto *body = FirstInitialBody(r);
   ASSERT_NE(body, nullptr);
   ASSERT_GE(body->stmts.size(), 2u);
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
@@ -172,18 +167,17 @@ TEST(ParserSection9, Sec9_3_1_VarDeclAsFirstStatement) {
 }
 
 TEST(ParserSection9, Sec9_3_1_MultipleDifferentTypeVarDecls) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    int x;\n"
-      "    logic [7:0] y;\n"
-      "    real z;\n"
-      "    x = 1;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    int x;\n"
+                 "    logic [7:0] y;\n"
+                 "    real z;\n"
+                 "    x = 1;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
+  auto *body = FirstInitialBody(r);
   ASSERT_NE(body, nullptr);
   ASSERT_GE(body->stmts.size(), 4u);
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
@@ -193,16 +187,15 @@ TEST(ParserSection9, Sec9_3_1_MultipleDifferentTypeVarDecls) {
 }
 
 TEST(ParserSection9, Sec9_3_1_VarDeclWithInitializer) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    int count = 10;\n"
-      "    $display(\"%0d\", count);\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    int count = 10;\n"
+                 "    $display(\"%0d\", count);\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
+  auto *body = FirstInitialBody(r);
   ASSERT_NE(body, nullptr);
   ASSERT_GE(body->stmts.size(), 1u);
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
@@ -215,20 +208,19 @@ TEST(ParserSection9, Sec9_3_1_VarDeclWithInitializer) {
 // =============================================================================
 
 TEST(ParserSection9, Sec9_3_1_NestedBeginEndTwoLevels) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a = 0;\n"
-      "    begin\n"
-      "      b = 1;\n"
-      "      c = 2;\n"
-      "    end\n"
-      "    d = 3;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    a = 0;\n"
+                 "    begin\n"
+                 "      b = 1;\n"
+                 "      c = 2;\n"
+                 "    end\n"
+                 "    d = 3;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
+  auto *body = FirstInitialBody(r);
   ASSERT_NE(body, nullptr);
   ASSERT_EQ(body->stmts.size(), 3u);
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kBlockingAssign);
@@ -238,44 +230,42 @@ TEST(ParserSection9, Sec9_3_1_NestedBeginEndTwoLevels) {
 }
 
 TEST(ParserSection9, Sec9_3_1_DeeplyNestedBeginEndThreeLevels) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    begin\n"
-      "      begin\n"
-      "        a = 1;\n"
-      "      end\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    begin\n"
+                 "      begin\n"
+                 "        a = 1;\n"
+                 "      end\n"
+                 "    end\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
+  auto *body = FirstInitialBody(r);
   ASSERT_NE(body, nullptr);
   ASSERT_EQ(body->stmts.size(), 1u);
-  auto* mid = body->stmts[0];
+  auto *mid = body->stmts[0];
   EXPECT_EQ(mid->kind, StmtKind::kBlock);
   ASSERT_EQ(mid->stmts.size(), 1u);
-  auto* inner = mid->stmts[0];
+  auto *inner = mid->stmts[0];
   EXPECT_EQ(inner->kind, StmtKind::kBlock);
   ASSERT_EQ(inner->stmts.size(), 1u);
   EXPECT_EQ(inner->stmts[0]->kind, StmtKind::kBlockingAssign);
 }
 
 TEST(ParserSection9, Sec9_3_1_NamedNestedBlocks) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin : outer\n"
-      "    begin : mid\n"
-      "      begin : inner\n"
-      "        x = 1;\n"
-      "      end : inner\n"
-      "    end : mid\n"
-      "  end : outer\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin : outer\n"
+                 "    begin : mid\n"
+                 "      begin : inner\n"
+                 "        x = 1;\n"
+                 "      end : inner\n"
+                 "    end : mid\n"
+                 "  end : outer\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
+  auto *body = FirstInitialBody(r);
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->label, "outer");
   ASSERT_EQ(body->stmts.size(), 1u);
@@ -289,16 +279,15 @@ TEST(ParserSection9, Sec9_3_1_NamedNestedBlocks) {
 // =============================================================================
 
 TEST(ParserSection9, Sec9_3_1_BlockWithDelayControl) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    #5 a = 1;\n"
-      "    #10 b = 2;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    #5 a = 1;\n"
+                 "    #10 b = 2;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
+  auto *body = FirstInitialBody(r);
   ASSERT_NE(body, nullptr);
   ASSERT_EQ(body->stmts.size(), 2u);
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kDelay);
@@ -306,18 +295,17 @@ TEST(ParserSection9, Sec9_3_1_BlockWithDelayControl) {
 }
 
 TEST(ParserSection9, Sec9_3_1_BlockWithEventControl) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(posedge clk);\n"
-      "    a = 1;\n"
-      "    @(posedge clk);\n"
-      "    b = 2;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    @(posedge clk);\n"
+                 "    a = 1;\n"
+                 "    @(posedge clk);\n"
+                 "    b = 2;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
+  auto *body = FirstInitialBody(r);
   ASSERT_NE(body, nullptr);
   ASSERT_EQ(body->stmts.size(), 4u);
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kEventControl);
@@ -331,18 +319,17 @@ TEST(ParserSection9, Sec9_3_1_BlockWithEventControl) {
 // =============================================================================
 
 TEST(ParserSection9, Sec9_3_1_BlockWithIfElse) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    if (sel)\n"
-      "      a = 1;\n"
-      "    else\n"
-      "      a = 0;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    if (sel)\n"
+                 "      a = 1;\n"
+                 "    else\n"
+                 "      a = 0;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_NE(stmt->condition, nullptr);
@@ -351,16 +338,15 @@ TEST(ParserSection9, Sec9_3_1_BlockWithIfElse) {
 }
 
 TEST(ParserSection9, Sec9_3_1_BlockWithForLoop) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 8; i++)\n"
-      "      data[i] = 0;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    for (int i = 0; i < 8; i++)\n"
+                 "      data[i] = 0;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
   EXPECT_NE(stmt->for_cond, nullptr);
@@ -368,19 +354,18 @@ TEST(ParserSection9, Sec9_3_1_BlockWithForLoop) {
 }
 
 TEST(ParserSection9, Sec9_3_1_BlockWithCaseStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    case (mode)\n"
-      "      0: a = 1;\n"
-      "      1: a = 2;\n"
-      "      default: a = 0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    case (mode)\n"
+                 "      0: a = 1;\n"
+                 "      1: a = 2;\n"
+                 "      default: a = 0;\n"
+                 "    endcase\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
   EXPECT_GE(stmt->case_items.size(), 3u);
@@ -391,18 +376,17 @@ TEST(ParserSection9, Sec9_3_1_BlockWithCaseStatement) {
 // =============================================================================
 
 TEST(ParserSection9, Sec9_3_1_BlockWithForkJoinInside) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      #10 a = 1;\n"
-      "      #20 b = 2;\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    fork\n"
+                 "      #10 a = 1;\n"
+                 "      #20 b = 2;\n"
+                 "    join\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFork);
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoin);
@@ -414,17 +398,16 @@ TEST(ParserSection9, Sec9_3_1_BlockWithForkJoinInside) {
 // =============================================================================
 
 TEST(ParserSection9, Sec9_3_1_BlockWithDisableOwnName) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin : my_blk\n"
-      "    a = 1;\n"
-      "    disable my_blk;\n"
-      "    b = 2;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin : my_blk\n"
+                 "    a = 1;\n"
+                 "    disable my_blk;\n"
+                 "    b = 2;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
+  auto *body = FirstInitialBody(r);
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->label, "my_blk");
   ASSERT_GE(body->stmts.size(), 3u);
@@ -438,17 +421,16 @@ TEST(ParserSection9, Sec9_3_1_BlockWithDisableOwnName) {
 // =============================================================================
 
 TEST(ParserSection9, Sec9_3_1_BlockWithSystemCalls) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    $display(\"hello\");\n"
-      "    $write(\"world\");\n"
-      "    $finish;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    $display(\"hello\");\n"
+                 "    $write(\"world\");\n"
+                 "    $finish;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
+  auto *body = FirstInitialBody(r);
   ASSERT_NE(body, nullptr);
   ASSERT_GE(body->stmts.size(), 3u);
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kExprStmt);
@@ -461,17 +443,16 @@ TEST(ParserSection9, Sec9_3_1_BlockWithSystemCalls) {
 // =============================================================================
 
 TEST(ParserSection9, Sec9_3_1_BlockWithNonblockingAssigns) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a <= 1;\n"
-      "    b <= 2;\n"
-      "    c <= 3;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    a <= 1;\n"
+                 "    b <= 2;\n"
+                 "    c <= 3;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
+  auto *body = FirstInitialBody(r);
   ASSERT_NE(body, nullptr);
   ASSERT_EQ(body->stmts.size(), 3u);
   for (size_t i = 0; i < 3; ++i) {
@@ -480,16 +461,15 @@ TEST(ParserSection9, Sec9_3_1_BlockWithNonblockingAssigns) {
 }
 
 TEST(ParserSection9, Sec9_3_1_BlockWithMixedBlockingNonblocking) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    temp = a + b;\n"
-      "    result <= temp;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    temp = a + b;\n"
+                 "    result <= temp;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
+  auto *body = FirstInitialBody(r);
   ASSERT_NE(body, nullptr);
   ASSERT_EQ(body->stmts.size(), 2u);
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kBlockingAssign);
@@ -501,16 +481,15 @@ TEST(ParserSection9, Sec9_3_1_BlockWithMixedBlockingNonblocking) {
 // =============================================================================
 
 TEST(ParserSection9, Sec9_3_1_BlockInAlwaysComb) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_comb begin\n"
-      "    x = a & b;\n"
-      "    y = a | c;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  always_comb begin\n"
+                 "    x = a & b;\n"
+                 "    y = a | c;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
+  auto *item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
   ASSERT_NE(item->body, nullptr);
@@ -519,18 +498,17 @@ TEST(ParserSection9, Sec9_3_1_BlockInAlwaysComb) {
 }
 
 TEST(ParserSection9, Sec9_3_1_BlockInAlwaysFFWithSensitivity) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_ff @(posedge clk or negedge rst_n) begin\n"
-      "    if (!rst_n)\n"
-      "      q <= 0;\n"
-      "    else\n"
-      "      q <= d;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  always_ff @(posedge clk or negedge rst_n) begin\n"
+                 "    if (!rst_n)\n"
+                 "      q <= 0;\n"
+                 "    else\n"
+                 "      q <= d;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
+  auto *item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysFFBlock);
   ASSERT_GE(item->sensitivity.size(), 2u);
@@ -541,17 +519,16 @@ TEST(ParserSection9, Sec9_3_1_BlockInAlwaysFFWithSensitivity) {
 }
 
 TEST(ParserSection9, Sec9_3_1_BlockInFinalBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  final begin\n"
-      "    $display(\"sim done\");\n"
-      "    $display(\"cycles: %0d\", cnt);\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  final begin\n"
+                 "    $display(\"sim done\");\n"
+                 "    $display(\"cycles: %0d\", cnt);\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   bool found = false;
-  for (auto* item : r.cu->modules[0]->items) {
+  for (auto *item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kFinalBlock) {
       found = true;
       ASSERT_NE(item->body, nullptr);
@@ -567,16 +544,15 @@ TEST(ParserSection9, Sec9_3_1_BlockInFinalBlock) {
 // =============================================================================
 
 TEST(ParserSection9, Sec9_3_1_AutomaticVarDeclInBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    automatic int k = 0;\n"
-      "    k = k + 1;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    automatic int k = 0;\n"
+                 "    k = k + 1;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
+  auto *body = FirstInitialBody(r);
   ASSERT_NE(body, nullptr);
   ASSERT_GE(body->stmts.size(), 1u);
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
@@ -587,16 +563,15 @@ TEST(ParserSection9, Sec9_3_1_AutomaticVarDeclInBlock) {
 }
 
 TEST(ParserSection9, Sec9_3_1_StaticVarDeclInBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    static int call_count = 0;\n"
-      "    call_count = call_count + 1;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    static int call_count = 0;\n"
+                 "    call_count = call_count + 1;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
+  auto *body = FirstInitialBody(r);
   ASSERT_NE(body, nullptr);
   ASSERT_GE(body->stmts.size(), 1u);
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
@@ -610,16 +585,15 @@ TEST(ParserSection9, Sec9_3_1_StaticVarDeclInBlock) {
 // =============================================================================
 
 TEST(ParserSection9, Sec9_3_1_BlockWithReturnInFunction) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  function int compute(input int a, input int b);\n"
-              "    begin\n"
-              "      int tmp;\n"
-              "      tmp = a + b;\n"
-              "      return tmp;\n"
-              "    end\n"
-              "  endfunction\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  function int compute(input int a, input int b);\n"
+                      "    begin\n"
+                      "      int tmp;\n"
+                      "      tmp = a + b;\n"
+                      "      return tmp;\n"
+                      "    end\n"
+                      "  endfunction\n"
+                      "endmodule\n"));
 }
 
 // =============================================================================
@@ -627,16 +601,15 @@ TEST(ParserSection9, Sec9_3_1_BlockWithReturnInFunction) {
 // =============================================================================
 
 TEST(ParserSection9, Sec9_3_1_BlockWithAssertImmediate) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a = 1;\n"
-      "    assert (a == 1);\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    a = 1;\n"
+                 "    assert (a == 1);\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
+  auto *body = FirstInitialBody(r);
   ASSERT_NE(body, nullptr);
   ASSERT_GE(body->stmts.size(), 2u);
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kBlockingAssign);
@@ -649,16 +622,15 @@ TEST(ParserSection9, Sec9_3_1_BlockWithAssertImmediate) {
 // =============================================================================
 
 TEST(ParserSection9, Sec9_3_1_BlockWithOnlyVarDecls) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    int a;\n"
-      "    logic [3:0] b;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    int a;\n"
+                 "    logic [3:0] b;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
+  auto *body = FirstInitialBody(r);
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->kind, StmtKind::kBlock);
   ASSERT_EQ(body->stmts.size(), 2u);
@@ -671,23 +643,22 @@ TEST(ParserSection9, Sec9_3_1_BlockWithOnlyVarDecls) {
 // =============================================================================
 
 TEST(ParserSection9, Sec9_3_1_MultipleSequentialBlocksInSameInitial) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    begin : first\n"
-      "      a = 1;\n"
-      "    end : first\n"
-      "    begin : second\n"
-      "      b = 2;\n"
-      "    end : second\n"
-      "    begin : third\n"
-      "      c = 3;\n"
-      "    end : third\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    begin : first\n"
+                 "      a = 1;\n"
+                 "    end : first\n"
+                 "    begin : second\n"
+                 "      b = 2;\n"
+                 "    end : second\n"
+                 "    begin : third\n"
+                 "      c = 3;\n"
+                 "    end : third\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
+  auto *body = FirstInitialBody(r);
   ASSERT_NE(body, nullptr);
   ASSERT_EQ(body->stmts.size(), 3u);
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kBlock);

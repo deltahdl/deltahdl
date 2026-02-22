@@ -1,6 +1,5 @@
 // §11.4.11: Conditional operator
 
-#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -8,6 +7,7 @@
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -21,8 +21,8 @@ struct EvalOpFixture {
 };
 
 // Helper: build a simple integer literal Expr node.
-static Expr* MakeInt(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
+static Expr *MakeInt(Arena &arena, uint64_t val) {
+  auto *e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
   e->int_val = val;
   return e;
@@ -36,7 +36,7 @@ namespace {
 TEST(EvalOp, InsideMatch) {
   EvalOpFixture f;
   // 5 inside {3, 5, 7} = 1
-  auto* inside = f.arena.Create<Expr>();
+  auto *inside = f.arena.Create<Expr>();
   inside->kind = ExprKind::kInside;
   inside->lhs = MakeInt(f.arena, 5);
   inside->elements.push_back(MakeInt(f.arena, 3));
@@ -50,7 +50,7 @@ TEST(EvalOp, InsideMatch) {
 TEST(EvalOp, InsideNoMatch) {
   EvalOpFixture f;
   // 4 inside {3, 5, 7} = 0
-  auto* inside = f.arena.Create<Expr>();
+  auto *inside = f.arena.Create<Expr>();
   inside->kind = ExprKind::kInside;
   inside->lhs = MakeInt(f.arena, 4);
   inside->elements.push_back(MakeInt(f.arena, 3));
@@ -64,12 +64,12 @@ TEST(EvalOp, InsideNoMatch) {
 TEST(EvalOp, InsideRange) {
   EvalOpFixture f;
   // 5 inside {[3:7]} = 1 (range element)
-  auto* range = f.arena.Create<Expr>();
+  auto *range = f.arena.Create<Expr>();
   range->kind = ExprKind::kSelect;
   range->index = MakeInt(f.arena, 3);
   range->index_end = MakeInt(f.arena, 7);
 
-  auto* inside = f.arena.Create<Expr>();
+  auto *inside = f.arena.Create<Expr>();
   inside->kind = ExprKind::kInside;
   inside->lhs = MakeInt(f.arena, 5);
   inside->elements.push_back(range);
@@ -81,12 +81,12 @@ TEST(EvalOp, InsideRange) {
 TEST(EvalOp, InsideRangeNoMatch) {
   EvalOpFixture f;
   // 10 inside {[3:7]} = 0
-  auto* range = f.arena.Create<Expr>();
+  auto *range = f.arena.Create<Expr>();
   range->kind = ExprKind::kSelect;
   range->index = MakeInt(f.arena, 3);
   range->index_end = MakeInt(f.arena, 7);
 
-  auto* inside = f.arena.Create<Expr>();
+  auto *inside = f.arena.Create<Expr>();
   inside->kind = ExprKind::kInside;
   inside->lhs = MakeInt(f.arena, 10);
   inside->elements.push_back(range);
@@ -95,4 +95,4 @@ TEST(EvalOp, InsideRangeNoMatch) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-}  // namespace
+} // namespace

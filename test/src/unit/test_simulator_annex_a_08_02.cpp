@@ -37,7 +37,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA82Fixture &f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-}  // namespace
+} // namespace
 
 // =============================================================================
 // A.8.2 Subroutine calls — Simulation
@@ -47,15 +47,15 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA82Fixture &f) {
 
 TEST(SimA82, TfCallReturnValue) {
   SimA82Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  function logic [7:0] add_one(input logic [7:0] v);\n"
-      "    return v + 8'd1;\n"
-      "  endfunction\n"
-      "  initial x = add_one(8'd9);\n"
-      "endmodule\n",
-      f);
+  auto *design =
+      ElaborateSrc("module t;\n"
+                   "  logic [7:0] x;\n"
+                   "  function logic [7:0] add_one(input logic [7:0] v);\n"
+                   "    return v + 8'd1;\n"
+                   "  endfunction\n"
+                   "  initial x = add_one(8'd9);\n"
+                   "endmodule\n",
+                   f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -69,18 +69,17 @@ TEST(SimA82, TfCallReturnValue) {
 
 TEST(SimA82, TfCallTaskModifiesVar) {
   SimA82Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  task set_x;\n"
-      "    x = 8'd42;\n"
-      "  endtask\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    set_x();\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] x;\n"
+                              "  task set_x;\n"
+                              "    x = 8'd42;\n"
+                              "  endtask\n"
+                              "  initial begin\n"
+                              "    x = 8'd0;\n"
+                              "    set_x();\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -94,18 +93,17 @@ TEST(SimA82, TfCallTaskModifiesVar) {
 
 TEST(SimA82, TfCallTaskWithArgs) {
   SimA82Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  task set_val(input logic [7:0] v);\n"
-      "    x = v;\n"
-      "  endtask\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    set_val(8'd99);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] x;\n"
+                              "  task set_val(input logic [7:0] v);\n"
+                              "    x = v;\n"
+                              "  endtask\n"
+                              "  initial begin\n"
+                              "    x = 8'd0;\n"
+                              "    set_val(8'd99);\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -119,18 +117,17 @@ TEST(SimA82, TfCallTaskWithArgs) {
 
 TEST(SimA82, TfCallTaskOutputArg) {
   SimA82Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  task get_val(output logic [7:0] v);\n"
-      "    v = 8'd33;\n"
-      "  endtask\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    get_val(x);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] x;\n"
+                              "  task get_val(output logic [7:0] v);\n"
+                              "    v = 8'd33;\n"
+                              "  endtask\n"
+                              "  initial begin\n"
+                              "    x = 8'd0;\n"
+                              "    get_val(x);\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -144,12 +141,11 @@ TEST(SimA82, TfCallTaskOutputArg) {
 
 TEST(SimA82, SystemTfCallClog2) {
   SimA82Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  initial x = $clog2(256);\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [31:0] x;\n"
+                              "  initial x = $clog2(256);\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -163,12 +159,11 @@ TEST(SimA82, SystemTfCallClog2) {
 
 TEST(SimA82, SystemTfCallUnsigned) {
   SimA82Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = $unsigned(8'sd5);\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] x;\n"
+                              "  initial x = $unsigned(8'sd5);\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -182,18 +177,18 @@ TEST(SimA82, SystemTfCallUnsigned) {
 
 TEST(SimA82, NestedFunctionCalls) {
   SimA82Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  function logic [7:0] double_val(input logic [7:0] v);\n"
-      "    return v * 8'd2;\n"
-      "  endfunction\n"
-      "  function logic [7:0] quad_val(input logic [7:0] v);\n"
-      "    return double_val(double_val(v));\n"
-      "  endfunction\n"
-      "  initial x = quad_val(8'd3);\n"
-      "endmodule\n",
-      f);
+  auto *design =
+      ElaborateSrc("module t;\n"
+                   "  logic [7:0] x;\n"
+                   "  function logic [7:0] double_val(input logic [7:0] v);\n"
+                   "    return v * 8'd2;\n"
+                   "  endfunction\n"
+                   "  function logic [7:0] quad_val(input logic [7:0] v);\n"
+                   "    return double_val(double_val(v));\n"
+                   "  endfunction\n"
+                   "  initial x = quad_val(8'd3);\n"
+                   "endmodule\n",
+                   f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -275,19 +270,18 @@ TEST(SimA82, FunctionDefaultArg) {
 
 TEST(SimA82, VoidCastFunctionCall) {
   SimA82Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  function int side_effect;\n"
-      "    x = 8'd55;\n"
-      "    return 123;\n"
-      "  endfunction\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    void'(side_effect());\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] x;\n"
+                              "  function int side_effect;\n"
+                              "    x = 8'd55;\n"
+                              "    return 123;\n"
+                              "  endfunction\n"
+                              "  initial begin\n"
+                              "    x = 8'd0;\n"
+                              "    void'(side_effect());\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -301,15 +295,14 @@ TEST(SimA82, VoidCastFunctionCall) {
 
 TEST(SimA82, SystemTaskDisplay) {
   SimA82Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd10;\n"
-      "    $display(\"x=%0d\", x);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] x;\n"
+                              "  initial begin\n"
+                              "    x = 8'd10;\n"
+                              "    $display(\"x=%0d\", x);\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -323,14 +316,14 @@ TEST(SimA82, SystemTaskDisplay) {
 
 TEST(SimA82, FunctionCallInBinaryExpr) {
   SimA82Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  function logic [7:0] five; return 8'd5; endfunction\n"
-      "  function logic [7:0] three; return 8'd3; endfunction\n"
-      "  initial x = five() + three();\n"
-      "endmodule\n",
-      f);
+  auto *design =
+      ElaborateSrc("module t;\n"
+                   "  logic [7:0] x;\n"
+                   "  function logic [7:0] five; return 8'd5; endfunction\n"
+                   "  function logic [7:0] three; return 8'd3; endfunction\n"
+                   "  initial x = five() + three();\n"
+                   "endmodule\n",
+                   f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -344,18 +337,17 @@ TEST(SimA82, FunctionCallInBinaryExpr) {
 
 TEST(SimA82, TaskCallNoParens) {
   SimA82Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  task set_x;\n"
-      "    x = 8'd88;\n"
-      "  endtask\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    set_x;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] x;\n"
+                              "  task set_x;\n"
+                              "    x = 8'd88;\n"
+                              "  endtask\n"
+                              "  initial begin\n"
+                              "    x = 8'd0;\n"
+                              "    set_x;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);

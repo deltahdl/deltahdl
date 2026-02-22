@@ -1,8 +1,5 @@
 // §15.3: Semaphores
 
-#include <gtest/gtest.h>
-#include <cstdint>
-#include <string_view>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -17,6 +14,9 @@
 #include "simulation/stmt_result.h"
 #include "simulation/sync_objects.h"
 #include "simulation/variable.h"
+#include <cstdint>
+#include <gtest/gtest.h>
+#include <string_view>
 
 using namespace delta;
 
@@ -36,14 +36,14 @@ namespace {
 // =============================================================================
 TEST(IpcSync, SemaphoreContextCreateFind) {
   SyncFixture f;
-  auto* sem = f.ctx.CreateSemaphore("sem1", 3);
+  auto *sem = f.ctx.CreateSemaphore("sem1", 3);
   ASSERT_NE(sem, nullptr);
   EXPECT_EQ(sem->key_count, 3);
 
-  auto* found = f.ctx.FindSemaphore("sem1");
+  auto *found = f.ctx.FindSemaphore("sem1");
   EXPECT_EQ(found, sem);
 
-  auto* not_found = f.ctx.FindSemaphore("no_such_sem");
+  auto *not_found = f.ctx.FindSemaphore("no_such_sem");
   EXPECT_EQ(not_found, nullptr);
 }
 
@@ -87,11 +87,11 @@ TEST(IpcSync, SemaphoreLargeKeyCount) {
 // =============================================================================
 TEST(IpcSync, MultipleSemaphoresInContext) {
   SyncFixture f;
-  auto* sem1 = f.ctx.CreateSemaphore("s1", 1);
-  auto* sem2 = f.ctx.CreateSemaphore("s2", 5);
+  auto *sem1 = f.ctx.CreateSemaphore("s1", 1);
+  auto *sem2 = f.ctx.CreateSemaphore("s2", 5);
   EXPECT_EQ(sem1->key_count, 1);
   EXPECT_EQ(sem2->key_count, 5);
   EXPECT_NE(f.ctx.FindSemaphore("s1"), f.ctx.FindSemaphore("s2"));
 }
 
-}  // namespace
+} // namespace

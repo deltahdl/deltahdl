@@ -1,7 +1,7 @@
 // §9.2: Structured procedures
 
-#include <gtest/gtest.h>
 #include "simulation/process.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -24,9 +24,9 @@ TEST(Process, ProcessKindEnum) {
       {ProcessKind::kAlwaysFF, 4},   {ProcessKind::kFinal, 5},
       {ProcessKind::kContAssign, 6},
   };
-  for (const auto& c : kCases) {
+  for (const auto &c : kCases) {
     EXPECT_EQ(static_cast<uint8_t>(c.kind), c.expected);
   }
 }
 
-}  // namespace
+} // namespace

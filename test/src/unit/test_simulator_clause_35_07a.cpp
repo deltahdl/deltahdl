@@ -1,10 +1,10 @@
 // §35.7: Exported functions
 
-#include <gtest/gtest.h>
+#include "simulation/dpi_runtime.h"
 #include <cstdint>
+#include <gtest/gtest.h>
 #include <string>
 #include <vector>
-#include "simulation/dpi_runtime.h"
 
 using namespace delta;
 
@@ -18,7 +18,7 @@ TEST(DpiRuntime, RegisterExportAndCall) {
   DpiRtExport exp;
   exp.c_name = "c_callback";
   exp.sv_name = "sv_callback";
-  exp.impl = [](const std::vector<DpiArgValue>& args) -> DpiArgValue {
+  exp.impl = [](const std::vector<DpiArgValue> &args) -> DpiArgValue {
     return DpiArgValue::FromInt(args[0].AsInt() * 2);
   };
   rt.RegisterExport(exp);
@@ -36,4 +36,4 @@ TEST(DpiRuntime, CallMissingExportReturnsZero) {
   EXPECT_EQ(result.AsInt(), 0);
 }
 
-}  // namespace
+} // namespace

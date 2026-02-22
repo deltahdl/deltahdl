@@ -1,10 +1,5 @@
 // §6.16.6: Compare()
 
-#include <gtest/gtest.h>
-#include <cstring>
-#include <string>
-#include <string_view>
-#include <vector>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -12,6 +7,11 @@
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
+#include <cstring>
+#include <gtest/gtest.h>
+#include <string>
+#include <string_view>
+#include <vector>
 
 using namespace delta;
 
@@ -26,10 +26,11 @@ struct StringFixture {
   SimContext ctx{scheduler, arena, diag};
 
   // Create a string variable and store the given string value.
-  Variable* CreateStringVar(std::string_view var_name, std::string_view value) {
+  Variable *CreateStringVar(std::string_view var_name, std::string_view value) {
     uint32_t width = static_cast<uint32_t>(value.size()) * 8;
-    if (width == 0) width = 8;
-    auto* var = ctx.CreateVariable(var_name, width);
+    if (width == 0)
+      width = 8;
+    auto *var = ctx.CreateVariable(var_name, width);
     var->value = MakeLogic4Vec(arena, width);
     for (size_t i = 0; i < value.size(); ++i) {
       auto byte_idx = static_cast<uint32_t>(value.size() - 1 - i);
@@ -43,39 +44,39 @@ struct StringFixture {
   }
 
   // Build a method call expression: var_name.method_name(args...)
-  Expr* MakeMethodCall(std::string_view var_name, std::string_view method_name,
-                       std::vector<Expr*> args = {}) {
-    auto* id = arena.Create<Expr>();
+  Expr *MakeMethodCall(std::string_view var_name, std::string_view method_name,
+                       std::vector<Expr *> args = {}) {
+    auto *id = arena.Create<Expr>();
     id->kind = ExprKind::kIdentifier;
     id->text = var_name;
 
-    auto* member = arena.Create<Expr>();
+    auto *member = arena.Create<Expr>();
     member->kind = ExprKind::kIdentifier;
     member->text = method_name;
 
-    auto* access = arena.Create<Expr>();
+    auto *access = arena.Create<Expr>();
     access->kind = ExprKind::kMemberAccess;
     access->lhs = id;
     access->rhs = member;
 
-    auto* call = arena.Create<Expr>();
+    auto *call = arena.Create<Expr>();
     call->kind = ExprKind::kCall;
     call->lhs = access;
     call->args = std::move(args);
     return call;
   }
 
-  Expr* MakeIntLiteral(uint64_t val) {
-    auto* lit = arena.Create<Expr>();
+  Expr *MakeIntLiteral(uint64_t val) {
+    auto *lit = arena.Create<Expr>();
     lit->kind = ExprKind::kIntegerLiteral;
     lit->int_val = val;
     return lit;
   }
 
-  Expr* MakeStringLiteral(std::string_view text) {
+  Expr *MakeStringLiteral(std::string_view text) {
     std::string quoted = "\"" + std::string(text) + "\"";
-    char* buf = arena.AllocString(quoted.c_str(), quoted.size());
-    auto* lit = arena.Create<Expr>();
+    char *buf = arena.AllocString(quoted.c_str(), quoted.size());
+    auto *lit = arena.Create<Expr>();
     lit->kind = ExprKind::kStringLiteral;
     lit->text = std::string_view(buf, quoted.size());
     return lit;
@@ -91,10 +92,10 @@ TEST(StringMethods, CompareEqual) {
   f.CreateStringVar("s", "abc");
   f.CreateStringVar("t", "abc");
   // Build: s.compare(t) where t is passed as identifier
-  auto* arg = f.arena.Create<Expr>();
+  auto *arg = f.arena.Create<Expr>();
   arg->kind = ExprKind::kIdentifier;
   arg->text = "t";
-  auto* call = f.MakeMethodCall("s", "compare", {arg});
+  auto *call = f.MakeMethodCall("s", "compare", {arg});
   auto result = EvalExpr(call, f.ctx, f.arena);
   EXPECT_EQ(static_cast<int64_t>(result.ToUint64()), 0);
 }
@@ -103,14 +104,14 @@ TEST(StringMethods, CompareLessThan) {
   StringFixture f;
   f.CreateStringVar("s", "abc");
   f.CreateStringVar("t", "abd");
-  auto* arg = f.arena.Create<Expr>();
+  auto *arg = f.arena.Create<Expr>();
   arg->kind = ExprKind::kIdentifier;
   arg->text = "t";
-  auto* call = f.MakeMethodCall("s", "compare", {arg});
+  auto *call = f.MakeMethodCall("s", "compare", {arg});
   auto result = EvalExpr(call, f.ctx, f.arena);
   // compare returns negative when s < t
   auto signed_val = static_cast<int32_t>(result.ToUint64() & 0xFFFFFFFF);
   EXPECT_LT(signed_val, 0);
 }
 
-}  // namespace
+} // namespace

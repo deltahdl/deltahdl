@@ -1,8 +1,8 @@
 // Non-LRM tests
 
-#include <gtest/gtest.h>
 #include "synthesis/aig.h"
 #include "synthesis/aig_opt.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -147,4 +147,4 @@ TEST(AigOpt, RedundancyRemovalNoChange) {
   EXPECT_EQ(g.NodeCount(), before);
 }
 
-}  // namespace
+} // namespace

@@ -11,7 +11,7 @@ namespace delta {
 namespace {
 
 class VpiClause3806Test : public ::testing::Test {
- protected:
+protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
@@ -26,34 +26,34 @@ class VpiClause3806Test : public ::testing::Test {
 // §38.6: vpi_get
 
 TEST_F(VpiClause3806Test, GetTypeForModule) {
-  auto* mod = vpi_ctx_.CreateModule("m", "m");
+  auto *mod = vpi_ctx_.CreateModule("m", "m");
   EXPECT_EQ(vpi_get(vpiType, mod), vpiModule);
 }
 
 TEST_F(VpiClause3806Test, GetTypeForPort) {
-  auto* mod = vpi_ctx_.CreateModule("m", "m");
-  auto* port = vpi_ctx_.CreatePort("p", kVpiInput, mod);
+  auto *mod = vpi_ctx_.CreateModule("m", "m");
+  auto *port = vpi_ctx_.CreatePort("p", kVpiInput, mod);
   EXPECT_EQ(vpi_get(vpiType, port), vpiPort);
 }
 
 TEST_F(VpiClause3806Test, GetTypeForParameter) {
-  auto* param = vpi_ctx_.CreateParameter("WIDTH", 32);
+  auto *param = vpi_ctx_.CreateParameter("WIDTH", 32);
   EXPECT_EQ(vpi_get(vpiType, param), vpiParameter);
 }
 
 TEST_F(VpiClause3806Test, GetTypeForNet) {
-  auto* net_obj = vpi_ctx_.CreateNetObj("n", nullptr, 4);
+  auto *net_obj = vpi_ctx_.CreateNetObj("n", nullptr, 4);
   EXPECT_EQ(vpi_get(vpiType, net_obj), vpiNet);
 }
 
 TEST_F(VpiClause3806Test, GetDirectionForPort) {
-  auto* mod = vpi_ctx_.CreateModule("m", "m");
-  auto* port = vpi_ctx_.CreatePort("din", kVpiInput, mod);
+  auto *mod = vpi_ctx_.CreateModule("m", "m");
+  auto *port = vpi_ctx_.CreatePort("din", kVpiInput, mod);
   EXPECT_EQ(vpi_get(vpiDirection, port), vpiInput);
 }
 
 TEST_F(VpiClause3806Test, GetSizeForVariable) {
-  auto* var = sim_ctx_.CreateVariable("wide", 32);
+  auto *var = sim_ctx_.CreateVariable("wide", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
@@ -66,5 +66,5 @@ TEST_F(VpiClause3806Test, GetReturnsZeroForNullHandle) {
   EXPECT_EQ(vpi_get(vpiType, nullptr), 0);
 }
 
-}  // namespace
-}  // namespace delta
+} // namespace
+} // namespace delta

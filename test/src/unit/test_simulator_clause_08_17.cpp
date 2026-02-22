@@ -1,7 +1,5 @@
 // §8.17: Chaining constructors
 
-#include <gtest/gtest.h>
-#include <string>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -9,6 +7,8 @@
 #include "simulation/class_object.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
+#include <gtest/gtest.h>
+#include <string>
 
 using namespace delta;
 
@@ -25,16 +25,16 @@ struct ClassFixture {
 };
 
 // AST helper: make an identifier expression.
-static Expr* MkId(Arena& a, std::string_view name) {
-  auto* e = a.Create<Expr>();
+static Expr *MkId(Arena &a, std::string_view name) {
+  auto *e = a.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
   e->text = name;
   return e;
 }
 
 // AST helper: make a blocking assignment statement.
-static Stmt* MkAssign(Arena& a, std::string_view lhs_name, Expr* rhs) {
-  auto* s = a.Create<Stmt>();
+static Stmt *MkAssign(Arena &a, std::string_view lhs_name, Expr *rhs) {
+  auto *s = a.Create<Stmt>();
   s->kind = StmtKind::kBlockingAssign;
   s->lhs = MkId(a, lhs_name);
   s->rhs = rhs;
@@ -42,10 +42,10 @@ static Stmt* MkAssign(Arena& a, std::string_view lhs_name, Expr* rhs) {
 }
 
 // Build a simple ClassTypeInfo and register it with the context.
-static ClassTypeInfo* MakeClassType(
-    ClassFixture& f, std::string_view name,
-    const std::vector<std::string_view>& props) {
-  auto* info = f.arena.Create<ClassTypeInfo>();
+static ClassTypeInfo *
+MakeClassType(ClassFixture &f, std::string_view name,
+              const std::vector<std::string_view> &props) {
+  auto *info = f.arena.Create<ClassTypeInfo>();
   info->name = name;
   for (auto p : props) {
     info->properties.push_back({p, 32, false});
@@ -55,12 +55,12 @@ static ClassTypeInfo* MakeClassType(
 }
 
 // Allocate a ClassObject of the given type, returning (handle_id, object*).
-static std::pair<uint64_t, ClassObject*> MakeObj(ClassFixture& f,
-                                                 ClassTypeInfo* type) {
-  auto* obj = f.arena.Create<ClassObject>();
+static std::pair<uint64_t, ClassObject *> MakeObj(ClassFixture &f,
+                                                  ClassTypeInfo *type) {
+  auto *obj = f.arena.Create<ClassObject>();
   obj->type = type;
   // Initialize properties to 0.
-  for (const auto& p : type->properties) {
+  for (const auto &p : type->properties) {
     obj->properties[std::string(p.name)] =
         MakeLogic4VecVal(f.arena, p.width, 0);
   }
@@ -75,8 +75,8 @@ namespace {
 // =============================================================================
 TEST(ClassSim, SuperNewChaining) {
   ClassFixture f;
-  auto* base = MakeClassType(f, "Base", {"base_val"});
-  auto* derived = MakeClassType(f, "Derived", {"child_val"});
+  auto *base = MakeClassType(f, "Base", {"base_val"});
+  auto *derived = MakeClassType(f, "Derived", {"child_val"});
   derived->parent = base;
 
   // Simulate super.new() chain: first init base, then derived.
@@ -93,8 +93,8 @@ TEST(ClassSim, SuperNewChaining) {
 
 TEST(ClassSim, SuperNewWithArgs) {
   ClassFixture f;
-  auto* base = MakeClassType(f, "Vehicle", {"speed"});
-  auto* ctor = f.arena.Create<ModuleItem>();
+  auto *base = MakeClassType(f, "Vehicle", {"speed"});
+  auto *ctor = f.arena.Create<ModuleItem>();
   ctor->kind = ModuleItemKind::kFunctionDecl;
   ctor->name = "new";
   ctor->return_type.kind = DataTypeKind::kVoid;
@@ -103,15 +103,15 @@ TEST(ClassSim, SuperNewWithArgs) {
       MkAssign(f.arena, "speed", MkId(f.arena, "s")));
   base->methods["new"] = ctor;
 
-  auto* derived = MakeClassType(f, "Car", {"doors"});
+  auto *derived = MakeClassType(f, "Car", {"doors"});
   derived->parent = base;
 
   // Verify base constructor is accessible from derived type chain.
   auto it = derived->parent->methods.find("new");
   ASSERT_NE(it, derived->parent->methods.end());
-  auto* base_ctor = it->second;
+  auto *base_ctor = it->second;
   ASSERT_NE(base_ctor, nullptr);
   EXPECT_EQ(base_ctor->func_args.size(), 1u);
 }
 
-}  // namespace
+} // namespace

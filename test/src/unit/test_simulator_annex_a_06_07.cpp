@@ -35,7 +35,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA607Fixture &f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-}  // namespace
+} // namespace
 
 // =============================================================================
 // Simulation tests — A.6.7 Case statements
@@ -44,19 +44,18 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA607Fixture &f) {
 // §12.5: case statement — first matching item
 TEST(SimA607, CaseFirstMatch) {
   SimA607Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] sel, x;\n"
-      "  initial begin\n"
-      "    sel = 8'd1;\n"
-      "    case(sel)\n"
-      "      8'd0: x = 8'd10;\n"
-      "      8'd1: x = 8'd20;\n"
-      "      8'd2: x = 8'd30;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] sel, x;\n"
+                              "  initial begin\n"
+                              "    sel = 8'd1;\n"
+                              "    case(sel)\n"
+                              "      8'd0: x = 8'd10;\n"
+                              "      8'd1: x = 8'd20;\n"
+                              "      8'd2: x = 8'd30;\n"
+                              "    endcase\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -69,19 +68,18 @@ TEST(SimA607, CaseFirstMatch) {
 // §12.5: case falls to default when no item matches
 TEST(SimA607, CaseDefaultFallthrough) {
   SimA607Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] sel, x;\n"
-      "  initial begin\n"
-      "    sel = 8'd5;\n"
-      "    case(sel)\n"
-      "      8'd0: x = 8'd10;\n"
-      "      8'd1: x = 8'd20;\n"
-      "      default: x = 8'd99;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] sel, x;\n"
+                              "  initial begin\n"
+                              "    sel = 8'd5;\n"
+                              "    case(sel)\n"
+                              "      8'd0: x = 8'd10;\n"
+                              "      8'd1: x = 8'd20;\n"
+                              "      default: x = 8'd99;\n"
+                              "    endcase\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -94,19 +92,18 @@ TEST(SimA607, CaseDefaultFallthrough) {
 // §12.5: no default, no match — no change
 TEST(SimA607, CaseNoDefaultNoMatch) {
   SimA607Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] sel, x;\n"
-      "  initial begin\n"
-      "    x = 8'd42;\n"
-      "    sel = 8'd5;\n"
-      "    case(sel)\n"
-      "      8'd0: x = 8'd10;\n"
-      "      8'd1: x = 8'd20;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] sel, x;\n"
+                              "  initial begin\n"
+                              "    x = 8'd42;\n"
+                              "    sel = 8'd5;\n"
+                              "    case(sel)\n"
+                              "      8'd0: x = 8'd10;\n"
+                              "      8'd1: x = 8'd20;\n"
+                              "    endcase\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -119,19 +116,18 @@ TEST(SimA607, CaseNoDefaultNoMatch) {
 // §12.5: case with multiple case_item_expressions per item
 TEST(SimA607, CaseMultipleExprsPerItem) {
   SimA607Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] sel, x;\n"
-      "  initial begin\n"
-      "    sel = 8'd3;\n"
-      "    case(sel)\n"
-      "      8'd0, 8'd1: x = 8'd10;\n"
-      "      8'd2, 8'd3: x = 8'd20;\n"
-      "      default: x = 8'd30;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] sel, x;\n"
+                              "  initial begin\n"
+                              "    sel = 8'd3;\n"
+                              "    case(sel)\n"
+                              "      8'd0, 8'd1: x = 8'd10;\n"
+                              "      8'd2, 8'd3: x = 8'd20;\n"
+                              "      default: x = 8'd30;\n"
+                              "    endcase\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -144,18 +140,17 @@ TEST(SimA607, CaseMultipleExprsPerItem) {
 // §12.5.2: constant expression as case_expression
 TEST(SimA607, ConstExprAsCaseExpr) {
   SimA607Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, x;\n"
-      "  initial begin\n"
-      "    a = 8'd1;\n"
-      "    case(1)\n"
-      "      a: x = 8'd10;\n"
-      "      default: x = 8'd20;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] a, x;\n"
+                              "  initial begin\n"
+                              "    a = 8'd1;\n"
+                              "    case(1)\n"
+                              "      a: x = 8'd10;\n"
+                              "      default: x = 8'd20;\n"
+                              "    endcase\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -168,18 +163,17 @@ TEST(SimA607, ConstExprAsCaseExpr) {
 // §12.5.3: unique case qualifier stored
 TEST(SimA607, UniqueCaseQualifier) {
   SimA607Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] sel, x;\n"
-      "  initial begin\n"
-      "    sel = 8'd1;\n"
-      "    unique case(sel)\n"
-      "      8'd0: x = 8'd10;\n"
-      "      8'd1: x = 8'd20;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] sel, x;\n"
+                              "  initial begin\n"
+                              "    sel = 8'd1;\n"
+                              "    unique case(sel)\n"
+                              "      8'd0: x = 8'd10;\n"
+                              "      8'd1: x = 8'd20;\n"
+                              "    endcase\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -192,19 +186,18 @@ TEST(SimA607, UniqueCaseQualifier) {
 // §12.5.3: priority case — selects first match
 TEST(SimA607, PriorityCaseFirstMatch) {
   SimA607Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] sel, x;\n"
-      "  initial begin\n"
-      "    sel = 8'd1;\n"
-      "    priority case(sel)\n"
-      "      8'd0: x = 8'd10;\n"
-      "      8'd1: x = 8'd20;\n"
-      "      8'd1: x = 8'd30;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] sel, x;\n"
+                              "  initial begin\n"
+                              "    sel = 8'd1;\n"
+                              "    priority case(sel)\n"
+                              "      8'd0: x = 8'd10;\n"
+                              "      8'd1: x = 8'd20;\n"
+                              "      8'd1: x = 8'd30;\n"
+                              "    endcase\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -217,19 +210,18 @@ TEST(SimA607, PriorityCaseFirstMatch) {
 // §12.5.4: case-inside set membership match
 TEST(SimA607, CaseInsideMatch) {
   SimA607Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] sel, x;\n"
-      "  initial begin\n"
-      "    sel = 8'd5;\n"
-      "    case(sel) inside\n"
-      "      8'd1, 8'd3: x = 8'd10;\n"
-      "      8'd5: x = 8'd20;\n"
-      "      default: x = 8'd30;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] sel, x;\n"
+                              "  initial begin\n"
+                              "    sel = 8'd5;\n"
+                              "    case(sel) inside\n"
+                              "      8'd1, 8'd3: x = 8'd10;\n"
+                              "      8'd5: x = 8'd20;\n"
+                              "      default: x = 8'd30;\n"
+                              "    endcase\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -242,21 +234,20 @@ TEST(SimA607, CaseInsideMatch) {
 // §12.5: case inside for loop
 TEST(SimA607, CaseInsideForLoop) {
   SimA607Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] total;\n"
-      "  initial begin\n"
-      "    total = 8'd0;\n"
-      "    for (int i = 0; i < 3; i = i + 1) begin\n"
-      "      case(i)\n"
-      "        0: total = total + 8'd1;\n"
-      "        1: total = total + 8'd10;\n"
-      "        2: total = total + 8'd100;\n"
-      "      endcase\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] total;\n"
+                              "  initial begin\n"
+                              "    total = 8'd0;\n"
+                              "    for (int i = 0; i < 3; i = i + 1) begin\n"
+                              "      case(i)\n"
+                              "        0: total = total + 8'd1;\n"
+                              "        1: total = total + 8'd10;\n"
+                              "        2: total = total + 8'd100;\n"
+                              "      endcase\n"
+                              "    end\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -269,23 +260,22 @@ TEST(SimA607, CaseInsideForLoop) {
 // §12.5: nested case statements
 TEST(SimA607, NestedCaseExecution) {
   SimA607Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, x;\n"
-      "  initial begin\n"
-      "    a = 8'd0;\n"
-      "    b = 8'd1;\n"
-      "    case(a)\n"
-      "      8'd0: case(b)\n"
-      "              8'd0: x = 8'd10;\n"
-      "              8'd1: x = 8'd20;\n"
-      "              default: x = 8'd30;\n"
-      "            endcase\n"
-      "      default: x = 8'd40;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] a, b, x;\n"
+                              "  initial begin\n"
+                              "    a = 8'd0;\n"
+                              "    b = 8'd1;\n"
+                              "    case(a)\n"
+                              "      8'd0: case(b)\n"
+                              "              8'd0: x = 8'd10;\n"
+                              "              8'd1: x = 8'd20;\n"
+                              "              default: x = 8'd30;\n"
+                              "            endcase\n"
+                              "      default: x = 8'd40;\n"
+                              "    endcase\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -298,21 +288,20 @@ TEST(SimA607, NestedCaseExecution) {
 // §12.5: sequential case statements (both execute)
 TEST(SimA607, SequentialCaseStatements) {
   SimA607Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x, y;\n"
-      "  initial begin\n"
-      "    case(1)\n"
-      "      1: x = 8'd11;\n"
-      "      default: x = 8'd0;\n"
-      "    endcase\n"
-      "    case(0)\n"
-      "      0: y = 8'd22;\n"
-      "      default: y = 8'd0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] x, y;\n"
+                              "  initial begin\n"
+                              "    case(1)\n"
+                              "      1: x = 8'd11;\n"
+                              "      default: x = 8'd0;\n"
+                              "    endcase\n"
+                              "    case(0)\n"
+                              "      0: y = 8'd22;\n"
+                              "      default: y = 8'd0;\n"
+                              "    endcase\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -328,17 +317,16 @@ TEST(SimA607, SequentialCaseStatements) {
 // §12.5: case with block body in item
 TEST(SimA607, CaseWithBlockBody) {
   SimA607Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x, y;\n"
-      "  initial begin\n"
-      "    case(1)\n"
-      "      1: begin x = 8'd5; y = 8'd6; end\n"
-      "      default: begin x = 8'd0; y = 8'd0; end\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module t;\n"
+                              "  logic [7:0] x, y;\n"
+                              "  initial begin\n"
+                              "    case(1)\n"
+                              "      1: begin x = 8'd5; y = 8'd6; end\n"
+                              "      default: begin x = 8'd0; y = 8'd0; end\n"
+                              "    endcase\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);

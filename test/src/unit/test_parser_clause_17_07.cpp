@@ -1,7 +1,5 @@
 // §17.7: Checker variables
 
-#include <gtest/gtest.h>
-#include <string>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -12,6 +10,8 @@
 #include "parser/parser.h"
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
+#include <gtest/gtest.h>
+#include <string>
 
 using namespace delta;
 
@@ -19,8 +19,8 @@ using namespace delta;
 // Parse-level fixture
 // =============================================================================
 struct CheckerParseTest : ::testing::Test {
- protected:
-  CompilationUnit* Parse(const std::string& src) {
+protected:
+  CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
     parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
@@ -50,7 +50,7 @@ namespace {
 // §17.4 Checker variables
 // =============================================================================
 TEST_F(CheckerParseTest, CheckerWithVariables) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     checker var_check;
       logic a, b;
       assign a = b;
@@ -61,7 +61,7 @@ TEST_F(CheckerParseTest, CheckerWithVariables) {
 }
 
 TEST_F(CheckerParseTest, CheckerWithBitVector) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     checker bv_check;
       logic [7:0] counter;
     endchecker
@@ -70,4 +70,4 @@ TEST_F(CheckerParseTest, CheckerWithBitVector) {
   EXPECT_FALSE(unit->checkers[0]->items.empty());
 }
 
-}  // namespace
+} // namespace

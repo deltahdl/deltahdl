@@ -12,12 +12,12 @@ namespace {
 struct UdpBuilder {
   UdpDecl decl;
 
-  UdpBuilder& SetCombinational() {
+  UdpBuilder &SetCombinational() {
     decl.is_sequential = false;
     return *this;
   }
 
-  UdpBuilder& AddRow(std::vector<char> inputs, char output) {
+  UdpBuilder &AddRow(std::vector<char> inputs, char output) {
     UdpTableRow row;
     row.inputs = std::move(inputs);
     row.output = output;
@@ -50,4 +50,4 @@ TEST(UdpCombinational, UnmatchedIsX) {
   EXPECT_EQ(state.Evaluate({'1', '0'}), 'x');
 }
 
-}  // namespace
+} // namespace

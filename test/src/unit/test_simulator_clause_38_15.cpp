@@ -13,7 +13,7 @@ namespace delta {
 namespace {
 
 class VpiClause3815Test : public ::testing::Test {
- protected:
+protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
@@ -28,7 +28,7 @@ class VpiClause3815Test : public ::testing::Test {
 // §38.15: vpi_get_value
 
 TEST_F(VpiClause3815Test, GetValueIntFormat) {
-  auto* var = sim_ctx_.CreateVariable("x", 32);
+  auto *var = sim_ctx_.CreateVariable("x", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 123);
   vpi_ctx_.Attach(sim_ctx_);
 
@@ -42,7 +42,7 @@ TEST_F(VpiClause3815Test, GetValueIntFormat) {
 }
 
 TEST_F(VpiClause3815Test, GetValueRealFormat) {
-  auto* var = sim_ctx_.CreateVariable("r", 32);
+  auto *var = sim_ctx_.CreateVariable("r", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 42);
   vpi_ctx_.Attach(sim_ctx_);
 
@@ -56,7 +56,7 @@ TEST_F(VpiClause3815Test, GetValueRealFormat) {
 }
 
 TEST_F(VpiClause3815Test, GetValueScalarFormatZero) {
-  auto* var = sim_ctx_.CreateVariable("s", 1);
+  auto *var = sim_ctx_.CreateVariable("s", 1);
   var->value = MakeLogic4VecVal(arena_, 1, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
@@ -70,7 +70,7 @@ TEST_F(VpiClause3815Test, GetValueScalarFormatZero) {
 }
 
 TEST_F(VpiClause3815Test, GetValueScalarFormatOne) {
-  auto* var = sim_ctx_.CreateVariable("s1", 1);
+  auto *var = sim_ctx_.CreateVariable("s1", 1);
   var->value = MakeLogic4VecVal(arena_, 1, 1);
   vpi_ctx_.Attach(sim_ctx_);
 
@@ -84,7 +84,7 @@ TEST_F(VpiClause3815Test, GetValueScalarFormatOne) {
 }
 
 TEST_F(VpiClause3815Test, GetValueBinStrFormat) {
-  auto* var = sim_ctx_.CreateVariable("b", 4);
+  auto *var = sim_ctx_.CreateVariable("b", 4);
   var->value = MakeLogic4VecVal(arena_, 4, 0b1010);
   vpi_ctx_.Attach(sim_ctx_);
 
@@ -99,7 +99,7 @@ TEST_F(VpiClause3815Test, GetValueBinStrFormat) {
 }
 
 TEST_F(VpiClause3815Test, GetValueHexStrFormat) {
-  auto* var = sim_ctx_.CreateVariable("hx", 8);
+  auto *var = sim_ctx_.CreateVariable("hx", 8);
   var->value = MakeLogic4VecVal(arena_, 8, 0xAB);
   vpi_ctx_.Attach(sim_ctx_);
 
@@ -114,7 +114,7 @@ TEST_F(VpiClause3815Test, GetValueHexStrFormat) {
 }
 
 TEST_F(VpiClause3815Test, GetValueOctStrFormat) {
-  auto* var = sim_ctx_.CreateVariable("oc", 6);
+  auto *var = sim_ctx_.CreateVariable("oc", 6);
   var->value = MakeLogic4VecVal(arena_, 6, 075);
   vpi_ctx_.Attach(sim_ctx_);
 
@@ -129,7 +129,7 @@ TEST_F(VpiClause3815Test, GetValueOctStrFormat) {
 }
 
 TEST_F(VpiClause3815Test, GetValueStringFormat) {
-  auto* var = sim_ctx_.CreateVariable("sv", 32);
+  auto *var = sim_ctx_.CreateVariable("sv", 32);
   // Encode "AB" as ASCII: 0x4142 = 16706
   var->value = MakeLogic4VecVal(arena_, 32, 0x00004142);
   vpi_ctx_.Attach(sim_ctx_);
@@ -145,7 +145,7 @@ TEST_F(VpiClause3815Test, GetValueStringFormat) {
 }
 
 TEST_F(VpiClause3815Test, GetValueTimeFormat) {
-  auto* var = sim_ctx_.CreateVariable("t", 32);
+  auto *var = sim_ctx_.CreateVariable("t", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 500);
   vpi_ctx_.Attach(sim_ctx_);
 
@@ -158,5 +158,5 @@ TEST_F(VpiClause3815Test, GetValueTimeFormat) {
   EXPECT_EQ(val.value.integer, 500);
 }
 
-}  // namespace
-}  // namespace delta
+} // namespace
+} // namespace delta

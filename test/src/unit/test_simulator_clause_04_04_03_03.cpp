@@ -28,7 +28,7 @@ TEST(SimCh4433, PreNBARegionExecutesPLICallbacks) {
   Scheduler sched(arena);
   int executed = 0;
 
-  auto* ev = sched.GetEventPool().Acquire();
+  auto *ev = sched.GetEventPool().Acquire();
   ev->callback = [&]() { executed++; };
   sched.ScheduleEvent({0}, Region::kPreNBA, ev);
 
@@ -46,7 +46,7 @@ TEST(SimCh4433, PreNBACanReadValues) {
   int value = 42;
   int sampled = -1;
 
-  auto* ev = sched.GetEventPool().Acquire();
+  auto *ev = sched.GetEventPool().Acquire();
   ev->callback = [&]() { sampled = value; };
   sched.ScheduleEvent({0}, Region::kPreNBA, ev);
 
@@ -65,12 +65,12 @@ TEST(SimCh4433, PreNBACanWriteValues) {
   int sampled_in_nba = -1;
 
   // Pre-NBA writes a value.
-  auto* pre_nba = sched.GetEventPool().Acquire();
+  auto *pre_nba = sched.GetEventPool().Acquire();
   pre_nba->callback = [&]() { value = 99; };
   sched.ScheduleEvent({0}, Region::kPreNBA, pre_nba);
 
   // NBA reads the value — should see 99.
-  auto* nba = sched.GetEventPool().Acquire();
+  auto *nba = sched.GetEventPool().Acquire();
   nba->callback = [&]() { sampled_in_nba = value; };
   sched.ScheduleEvent({0}, Region::kNBA, nba);
 
@@ -87,11 +87,11 @@ TEST(SimCh4433, PreNBACanCreateEvents) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto* pre_nba = sched.GetEventPool().Acquire();
+  auto *pre_nba = sched.GetEventPool().Acquire();
   pre_nba->callback = [&]() {
     order.push_back("pre_nba");
     // Create an event in the NBA region from Pre-NBA.
-    auto* new_ev = sched.GetEventPool().Acquire();
+    auto *new_ev = sched.GetEventPool().Acquire();
     new_ev->callback = [&order]() { order.push_back("created_nba"); };
     sched.ScheduleEvent({0}, Region::kNBA, new_ev);
   };
@@ -113,11 +113,11 @@ TEST(SimCh4433, PreNBAExecutesBeforeNBA) {
   std::vector<std::string> order;
 
   // Schedule NBA first, then Pre-NBA — ordering must still hold.
-  auto* nba = sched.GetEventPool().Acquire();
+  auto *nba = sched.GetEventPool().Acquire();
   nba->callback = [&]() { order.push_back("nba"); };
   sched.ScheduleEvent({0}, Region::kNBA, nba);
 
-  auto* pre_nba = sched.GetEventPool().Acquire();
+  auto *pre_nba = sched.GetEventPool().Acquire();
   pre_nba->callback = [&]() { order.push_back("pre_nba"); };
   sched.ScheduleEvent({0}, Region::kPreNBA, pre_nba);
 
@@ -136,8 +136,8 @@ TEST(SimCh4433, PreNBAExecutesAfterInactiveBeforeNBA) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
+  auto schedule = [&](Region r, const std::string &label) {
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, label]() { order.push_back(label); };
     sched.ScheduleEvent({0}, r, ev);
   };
@@ -176,7 +176,7 @@ TEST(SimCh4433, PreNBARegionHoldsMultiplePLICallbacks) {
   int count = 0;
 
   for (int i = 0; i < 5; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&]() { count++; };
     sched.ScheduleEvent({0}, Region::kPreNBA, ev);
   }
@@ -195,7 +195,7 @@ TEST(SimCh4433, PreNBAEventsAcrossMultipleTimeSlots) {
   std::vector<uint64_t> times;
 
   for (uint64_t t = 0; t < 3; ++t) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&times, &sched]() {
       times.push_back(sched.CurrentTime().ticks);
     };
@@ -223,12 +223,12 @@ TEST(SimCh4433, PreNBAReadWriteInActiveRegionSetContext) {
   int nba_sample = -1;
 
   // Active writes value = 10.
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->callback = [&]() { value = 10; };
   sched.ScheduleEvent({0}, Region::kActive, active);
 
   // Pre-NBA reads the Active-set value and overwrites it to 55.
-  auto* pre_nba = sched.GetEventPool().Acquire();
+  auto *pre_nba = sched.GetEventPool().Acquire();
   pre_nba->callback = [&]() {
     active_sample = value;
     value = 55;
@@ -236,7 +236,7 @@ TEST(SimCh4433, PreNBAReadWriteInActiveRegionSetContext) {
   sched.ScheduleEvent({0}, Region::kPreNBA, pre_nba);
 
   // NBA samples value — should see 55 from Pre-NBA.
-  auto* nba = sched.GetEventPool().Acquire();
+  auto *nba = sched.GetEventPool().Acquire();
   nba->callback = [&]() { nba_sample = value; };
   sched.ScheduleEvent({0}, Region::kNBA, nba);
 

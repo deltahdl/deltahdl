@@ -14,8 +14,8 @@ using namespace delta;
 namespace {
 
 struct ApiParseTest : ::testing::Test {
- protected:
-  CompilationUnit* Parse(const std::string& src) {
+protected:
+  CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
     parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
@@ -35,7 +35,7 @@ struct ApiParseTest : ::testing::Test {
 // =============================================================================
 
 TEST_F(ApiParseTest, AssertOnSystemCall) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     module m;
       initial $assertOn;
     endmodule
@@ -44,7 +44,7 @@ TEST_F(ApiParseTest, AssertOnSystemCall) {
 }
 
 TEST_F(ApiParseTest, AssertOffSystemCall) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     module m;
       initial $assertOff;
     endmodule
@@ -53,7 +53,7 @@ TEST_F(ApiParseTest, AssertOffSystemCall) {
 }
 
 TEST_F(ApiParseTest, AssertKillSystemCall) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     module m;
       initial $assertKill;
     endmodule
@@ -66,7 +66,7 @@ TEST_F(ApiParseTest, AssertKillSystemCall) {
 // =============================================================================
 
 TEST_F(ApiParseTest, CoverageControlSystemCall) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     module m;
       initial $coverage_control(1, 2, 3);
     endmodule
@@ -75,7 +75,7 @@ TEST_F(ApiParseTest, CoverageControlSystemCall) {
 }
 
 TEST_F(ApiParseTest, CoverageGetMaxSystemCall) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     module m;
       initial begin
         int x;
@@ -91,7 +91,7 @@ TEST_F(ApiParseTest, CoverageGetMaxSystemCall) {
 // =============================================================================
 
 TEST_F(ApiParseTest, SdfAnnotateSystemCall) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     module m;
       initial $sdf_annotate("timing.sdf");
     endmodule
@@ -100,7 +100,7 @@ TEST_F(ApiParseTest, SdfAnnotateSystemCall) {
 }
 
 TEST_F(ApiParseTest, ReadmemhSystemCall) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     module m;
       logic [7:0] mem [0:255];
       initial $readmemh("data.hex", mem);
@@ -110,7 +110,7 @@ TEST_F(ApiParseTest, ReadmemhSystemCall) {
 }
 
 TEST_F(ApiParseTest, ReadmembSystemCall) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     module m;
       logic [7:0] mem [0:255];
       initial $readmemb("data.bin", mem);
@@ -120,7 +120,7 @@ TEST_F(ApiParseTest, ReadmembSystemCall) {
 }
 
 TEST_F(ApiParseTest, WritememhSystemCall) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     module m;
       logic [7:0] mem [0:255];
       initial $writememh("data.hex", mem);
@@ -130,7 +130,7 @@ TEST_F(ApiParseTest, WritememhSystemCall) {
 }
 
 TEST_F(ApiParseTest, MultipleApiCallsInModule) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     module m;
       initial begin
         $assertOn;
@@ -148,7 +148,7 @@ TEST_F(ApiParseTest, MultipleApiCallsInModule) {
 // =============================================================================
 
 TEST_F(ApiParseTest, BasicConfigDecl) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     config cfg1;
       design rtlLib.top;
       default liblist rtlLib;
@@ -162,7 +162,7 @@ TEST_F(ApiParseTest, BasicConfigDecl) {
 }
 
 TEST_F(ApiParseTest, ConfigWithDefaultLiblist) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     config cfg1;
       design lib1.top;
       default liblist lib1 lib2;
@@ -170,7 +170,7 @@ TEST_F(ApiParseTest, ConfigWithDefaultLiblist) {
   )");
   ASSERT_EQ(unit->configs.size(), 1u);
   ASSERT_GE(unit->configs[0]->rules.size(), 1u);
-  auto* rule = unit->configs[0]->rules[0];
+  auto *rule = unit->configs[0]->rules[0];
   EXPECT_EQ(rule->kind, ConfigRuleKind::kDefault);
   ASSERT_EQ(rule->liblist.size(), 2u);
   EXPECT_EQ(rule->liblist[0], "lib1");
@@ -178,7 +178,7 @@ TEST_F(ApiParseTest, ConfigWithDefaultLiblist) {
 }
 
 TEST_F(ApiParseTest, ConfigWithEndLabel) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     config my_cfg;
       design work.top;
       default liblist work;
@@ -193,7 +193,7 @@ TEST_F(ApiParseTest, ConfigWithEndLabel) {
 // =============================================================================
 
 TEST_F(ApiParseTest, ConfigCellClauseLiblist) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     config cfg1;
       design lib1.top;
       default liblist lib1;
@@ -202,7 +202,7 @@ TEST_F(ApiParseTest, ConfigCellClauseLiblist) {
   )");
   ASSERT_EQ(unit->configs.size(), 1u);
   ASSERT_GE(unit->configs[0]->rules.size(), 2u);
-  auto* cell_rule = unit->configs[0]->rules[1];
+  auto *cell_rule = unit->configs[0]->rules[1];
   EXPECT_EQ(cell_rule->kind, ConfigRuleKind::kCell);
   EXPECT_EQ(cell_rule->cell_name, "adder");
   ASSERT_EQ(cell_rule->liblist.size(), 1u);
@@ -210,7 +210,7 @@ TEST_F(ApiParseTest, ConfigCellClauseLiblist) {
 }
 
 TEST_F(ApiParseTest, ConfigCellClauseWithLib) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     config cfg1;
       design lib1.top;
       default liblist lib1;
@@ -219,7 +219,7 @@ TEST_F(ApiParseTest, ConfigCellClauseWithLib) {
   )");
   ASSERT_EQ(unit->configs.size(), 1u);
   ASSERT_GE(unit->configs[0]->rules.size(), 2u);
-  auto* cell_rule = unit->configs[0]->rules[1];
+  auto *cell_rule = unit->configs[0]->rules[1];
   EXPECT_EQ(cell_rule->kind, ConfigRuleKind::kCell);
   EXPECT_EQ(cell_rule->cell_lib, "gateLib");
   EXPECT_EQ(cell_rule->cell_name, "adder");
@@ -232,7 +232,7 @@ TEST_F(ApiParseTest, ConfigCellClauseWithLib) {
 // =============================================================================
 
 TEST_F(ApiParseTest, ConfigInstanceClauseLiblist) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     config cfg1;
       design rtlLib.top;
       default liblist rtlLib;
@@ -241,7 +241,7 @@ TEST_F(ApiParseTest, ConfigInstanceClauseLiblist) {
   )");
   ASSERT_EQ(unit->configs.size(), 1u);
   ASSERT_GE(unit->configs[0]->rules.size(), 2u);
-  auto* inst_rule = unit->configs[0]->rules[1];
+  auto *inst_rule = unit->configs[0]->rules[1];
   EXPECT_EQ(inst_rule->kind, ConfigRuleKind::kInstance);
   EXPECT_EQ(inst_rule->inst_path, "top.a2");
   ASSERT_EQ(inst_rule->liblist.size(), 1u);
@@ -249,7 +249,7 @@ TEST_F(ApiParseTest, ConfigInstanceClauseLiblist) {
 }
 
 TEST_F(ApiParseTest, ConfigInstanceClauseUse) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     config cfg1;
       design lib1.top;
       default liblist lib1;
@@ -258,7 +258,7 @@ TEST_F(ApiParseTest, ConfigInstanceClauseUse) {
   )");
   ASSERT_EQ(unit->configs.size(), 1u);
   ASSERT_GE(unit->configs[0]->rules.size(), 2u);
-  auto* inst_rule = unit->configs[0]->rules[1];
+  auto *inst_rule = unit->configs[0]->rules[1];
   EXPECT_EQ(inst_rule->kind, ConfigRuleKind::kInstance);
   EXPECT_EQ(inst_rule->inst_path, "top.u1");
   EXPECT_EQ(inst_rule->use_lib, "lib2");
@@ -266,7 +266,7 @@ TEST_F(ApiParseTest, ConfigInstanceClauseUse) {
 }
 
 TEST_F(ApiParseTest, ConfigInstanceClauseUseConfig) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     config cfg1;
       design lib1.top;
       default liblist lib1;
@@ -275,10 +275,10 @@ TEST_F(ApiParseTest, ConfigInstanceClauseUseConfig) {
   )");
   ASSERT_EQ(unit->configs.size(), 1u);
   ASSERT_GE(unit->configs[0]->rules.size(), 2u);
-  auto* inst_rule = unit->configs[0]->rules[1];
+  auto *inst_rule = unit->configs[0]->rules[1];
   EXPECT_EQ(inst_rule->kind, ConfigRuleKind::kInstance);
   EXPECT_EQ(inst_rule->use_cell, "bot");
   EXPECT_TRUE(inst_rule->use_config);
 }
 
-}  // namespace
+} // namespace

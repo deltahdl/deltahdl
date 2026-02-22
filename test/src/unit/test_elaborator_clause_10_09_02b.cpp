@@ -1,7 +1,5 @@
 // §10.9.2: Structure assignment patterns
 
-#include <gtest/gtest.h>
-#include <string>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -11,6 +9,8 @@
 #include "simulation/eval.h"
 #include "simulation/eval_array.h"
 #include "simulation/sim_context.h"
+#include <gtest/gtest.h>
+#include <string>
 
 using namespace delta;
 
@@ -25,9 +25,8 @@ struct AggFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-
-static Expr* MakeIntLit(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
+static Expr *MakeIntLit(Arena &arena, uint64_t val) {
+  auto *e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
   e->int_val = val;
   return e;
@@ -44,7 +43,7 @@ TEST(StructPattern, NamedMemberTwoFields) {
   info.fields.push_back({"x", 8, 8, DataTypeKind::kLogic});
   info.fields.push_back({"y", 0, 8, DataTypeKind::kLogic});
 
-  auto* pat = f.arena.Create<Expr>();
+  auto *pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"x", "y"};
   pat->elements = {MakeIntLit(f.arena, 5), MakeIntLit(f.arena, 10)};
@@ -64,7 +63,7 @@ TEST(StructPattern, NamedMemberReversedOrder) {
   info.fields.push_back({"x", 8, 8, DataTypeKind::kLogic});
   info.fields.push_back({"y", 0, 8, DataTypeKind::kLogic});
 
-  auto* pat = f.arena.Create<Expr>();
+  auto *pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"y", "x"};
   pat->elements = {MakeIntLit(f.arena, 10), MakeIntLit(f.arena, 5)};
@@ -84,7 +83,7 @@ TEST(StructPattern, NamedMemberThreeFields) {
   info.fields.push_back({"g", 8, 8, DataTypeKind::kLogic});
   info.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
 
-  auto* pat = f.arena.Create<Expr>();
+  auto *pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"r", "g", "b"};
   pat->elements = {MakeIntLit(f.arena, 0xFF), MakeIntLit(f.arena, 0x80),
@@ -107,7 +106,7 @@ TEST(StructPattern, DefaultAllFields) {
   info.fields.push_back({"a", 8, 8, DataTypeKind::kLogic});
   info.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
 
-  auto* pat = f.arena.Create<Expr>();
+  auto *pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"default"};
   pat->elements = {MakeIntLit(f.arena, 0xFF)};
@@ -116,4 +115,4 @@ TEST(StructPattern, DefaultAllFields) {
   EXPECT_EQ(result.ToUint64(), 0xFFFFu);
 }
 
-}  // namespace
+} // namespace

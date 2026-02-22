@@ -9,7 +9,7 @@
 
 using namespace delta;
 
-static bool ParseOk(const std::string& src) {
+static bool ParseOk(const std::string &src) {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);
@@ -24,26 +24,23 @@ static bool ParseOk(const std::string& src) {
 }
 
 TEST(ParserSection22, DefineSimpleMacro) {
-  EXPECT_TRUE(
-      ParseOk("`define WIDTH 8\n"
-              "module t;\n"
-              "  logic [`WIDTH-1:0] data;\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("`define WIDTH 8\n"
+                      "module t;\n"
+                      "  logic [`WIDTH-1:0] data;\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserSection22, DefineAndUndef) {
-  EXPECT_TRUE(
-      ParseOk("`define FOO 1\n"
-              "module t;\n"
-              "endmodule\n"
-              "`undef FOO\n"));
+  EXPECT_TRUE(ParseOk("`define FOO 1\n"
+                      "module t;\n"
+                      "endmodule\n"
+                      "`undef FOO\n"));
 }
 
 TEST(ParserSection22, UndefineallDirective) {
-  EXPECT_TRUE(
-      ParseOk("`define A 1\n"
-              "`define B 2\n"
-              "`undefineall\n"
-              "module t;\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("`define A 1\n"
+                      "`define B 2\n"
+                      "`undefineall\n"
+                      "module t;\n"
+                      "endmodule\n"));
 }

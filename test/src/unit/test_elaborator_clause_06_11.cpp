@@ -1,8 +1,8 @@
 // §6.11: Integer data types
 
-#include <gtest/gtest.h>
 #include "elaboration/type_eval.h"
 #include "parser/ast.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -14,7 +14,7 @@ TEST(TypeEval, ImplicitlySignedTypes) {
   struct Case {
     DataTypeKind kind;
     bool expected;
-    const char* label;
+    const char *label;
   };
   const Case kCases[] = {
       {DataTypeKind::kInteger, true, "integer"},
@@ -26,9 +26,9 @@ TEST(TypeEval, ImplicitlySignedTypes) {
       {DataTypeKind::kReg, false, "reg"},
       {DataTypeKind::kBit, false, "bit"},
   };
-  for (const auto& c : kCases) {
+  for (const auto &c : kCases) {
     EXPECT_EQ(IsImplicitlySigned(c.kind), c.expected) << c.label;
   }
 }
 
-}  // namespace
+} // namespace

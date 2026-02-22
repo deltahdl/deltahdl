@@ -14,8 +14,8 @@ using namespace delta;
 namespace {
 
 struct SpecifyParseTest : ::testing::Test {
- protected:
-  CompilationUnit* Parse(const std::string& src) {
+protected:
+  CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
     parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
@@ -31,32 +31,32 @@ struct SpecifyParseTest : ::testing::Test {
 };
 
 TEST_F(SpecifyParseTest, EmptySpecifyBlock) {
-  auto* unit = Parse("module m; specify endspecify endmodule");
+  auto *unit = Parse("module m; specify endspecify endmodule");
   ASSERT_EQ(unit->modules.size(), 1u);
-  auto& items = unit->modules[0]->items;
+  auto &items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kSpecifyBlock);
 }
 
 TEST_F(SpecifyParseTest, SpecifyBlockWithTimingCheck) {
-  auto* unit = Parse(
-      "module m; specify $setup(data, posedge clk, 10); endspecify "
-      "endmodule");
+  auto *unit =
+      Parse("module m; specify $setup(data, posedge clk, 10); endspecify "
+            "endmodule");
   ASSERT_EQ(unit->modules.size(), 1u);
-  auto& items = unit->modules[0]->items;
+  auto &items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kSpecifyBlock);
 }
 
 TEST_F(SpecifyParseTest, SpecifyBlockCoexistsWithOtherItems) {
-  auto* unit =
+  auto *unit =
       Parse("module m; logic a; specify endspecify assign a = 1; endmodule");
   ASSERT_EQ(unit->modules.size(), 1u);
-  auto& items = unit->modules[0]->items;
+  auto &items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 3u);
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(items[1]->kind, ModuleItemKind::kSpecifyBlock);
   EXPECT_EQ(items[2]->kind, ModuleItemKind::kContAssign);
 }
 
-}  // namespace
+} // namespace

@@ -12,23 +12,23 @@ namespace {
 struct UdpBuilder {
   UdpDecl decl;
 
-  UdpBuilder& SetSequential() {
+  UdpBuilder &SetSequential() {
     decl.is_sequential = true;
     return *this;
   }
 
-  UdpBuilder& SetInitial(char val) {
+  UdpBuilder &SetInitial(char val) {
     decl.has_initial = true;
     decl.initial_value = val;
     return *this;
   }
 
-  UdpBuilder& SetCombinational() {
+  UdpBuilder &SetCombinational() {
     decl.is_sequential = false;
     return *this;
   }
 
-  UdpBuilder& AddRow(std::vector<char> inputs, char output) {
+  UdpBuilder &AddRow(std::vector<char> inputs, char output) {
     UdpTableRow row;
     row.inputs = std::move(inputs);
     row.output = output;
@@ -36,7 +36,7 @@ struct UdpBuilder {
     return *this;
   }
 
-  UdpBuilder& AddSeqRow(std::vector<char> inputs, char state, char output) {
+  UdpBuilder &AddSeqRow(std::vector<char> inputs, char state, char output) {
     UdpTableRow row;
     row.inputs = std::move(inputs);
     row.current_state = state;
@@ -102,4 +102,4 @@ TEST(UdpSymbols, StarMatchesAnyChange) {
   EXPECT_EQ(state.GetOutput(), '0');
 }
 
-}  // namespace
+} // namespace

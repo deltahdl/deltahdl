@@ -25,40 +25,44 @@ struct SimCh50702Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign* ElaborateSrc(const std::string& src, SimCh50702Fixture& f) {
+static RtlirDesign *ElaborateSrc(const std::string &src, SimCh50702Fixture &f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
+  auto *cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-static uint64_t RunAndGet(const std::string& src, const char* var_name) {
+static uint64_t RunAndGet(const std::string &src, const char *var_name) {
   SimCh50702Fixture f;
-  auto* design = ElaborateSrc(src, f);
+  auto *design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
-  if (!design) return 0;
+  if (!design)
+    return 0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* var = f.ctx.FindVariable(var_name);
+  auto *var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
-  if (!var) return 0;
+  if (!var)
+    return 0;
   return var->value.ToUint64();
 }
 
-static double RunAndGetReal(const std::string& src, const char* var_name) {
+static double RunAndGetReal(const std::string &src, const char *var_name) {
   SimCh50702Fixture f;
-  auto* design = ElaborateSrc(src, f);
+  auto *design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
-  if (!design) return 0.0;
+  if (!design)
+    return 0.0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* var = f.ctx.FindVariable(var_name);
+  auto *var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
-  if (!var) return 0.0;
+  if (!var)
+    return 0.0;
   double d = 0.0;
   uint64_t bits = var->value.ToUint64();
   std::memcpy(&d, &bits, sizeof(double));
@@ -188,7 +192,7 @@ TEST(SimCh50702, RealIEEE754BitExact) {
   // Verify the 64-bit pattern matches IEEE 754 double for 1.0.
   auto bits =
       RunAndGet("module t;\n  real x;\n  initial x = 1.0;\nendmodule\n", "x");
-  uint64_t expected = 0x3FF0000000000000ULL;  // IEEE 754: 1.0
+  uint64_t expected = 0x3FF0000000000000ULL; // IEEE 754: 1.0
   EXPECT_EQ(bits, expected);
 }
 

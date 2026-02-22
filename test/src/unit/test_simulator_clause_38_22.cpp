@@ -11,7 +11,7 @@ namespace delta {
 namespace {
 
 class VpiClause3822Test : public ::testing::Test {
- protected:
+protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
@@ -26,10 +26,10 @@ class VpiClause3822Test : public ::testing::Test {
 // §38.22: vpi_handle_multi
 
 TEST_F(VpiClause3822Test, HandleMultiCombinesChildren) {
-  auto* mod1 = vpi_ctx_.CreateModule("m1", "m1");
+  auto *mod1 = vpi_ctx_.CreateModule("m1", "m1");
   vpi_ctx_.CreatePort("p1", kVpiInput, mod1);
 
-  auto* mod2 = vpi_ctx_.CreateModule("m2", "m2");
+  auto *mod2 = vpi_ctx_.CreateModule("m2", "m2");
   vpi_ctx_.CreatePort("p2", kVpiOutput, mod2);
 
   vpiHandle h = VpiHandleMultiC(vpiPort, mod1, mod2);
@@ -42,5 +42,5 @@ TEST_F(VpiClause3822Test, HandleMultiBothNullReturnsNull) {
   EXPECT_EQ(h, nullptr);
 }
 
-}  // namespace
-}  // namespace delta
+} // namespace
+} // namespace delta

@@ -29,7 +29,7 @@ TEST(SimCh4428, ReNBARegionExecutesEvents) {
   Scheduler sched(arena);
   int executed = 0;
 
-  auto* ev = sched.GetEventPool().Acquire();
+  auto *ev = sched.GetEventPool().Acquire();
   ev->callback = [&]() { executed++; };
   sched.ScheduleEvent({0}, Region::kReNBA, ev);
 
@@ -46,11 +46,11 @@ TEST(SimCh4428, ReNBAExecutesAfterReInactive) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto* renba = sched.GetEventPool().Acquire();
+  auto *renba = sched.GetEventPool().Acquire();
   renba->callback = [&]() { order.push_back("renba"); };
   sched.ScheduleEvent({0}, Region::kReNBA, renba);
 
-  auto* reinactive = sched.GetEventPool().Acquire();
+  auto *reinactive = sched.GetEventPool().Acquire();
   reinactive->callback = [&]() { order.push_back("reinactive"); };
   sched.ScheduleEvent({0}, Region::kReInactive, reinactive);
 
@@ -70,14 +70,14 @@ TEST(SimCh4428, AllReInactiveEventsCompleteBeforeReNBA) {
   std::vector<std::string> order;
 
   for (int i = 0; i < 3; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, i]() {
       order.push_back("reinactive" + std::to_string(i));
     };
     sched.ScheduleEvent({0}, Region::kReInactive, ev);
   }
 
-  auto* renba = sched.GetEventPool().Acquire();
+  auto *renba = sched.GetEventPool().Acquire();
   renba->callback = [&]() { order.push_back("renba"); };
   sched.ScheduleEvent({0}, Region::kReNBA, renba);
 
@@ -96,11 +96,11 @@ TEST(SimCh4428, NonblockingAssignmentSchedulesReNBACurrentTime) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto* reactive = sched.GetEventPool().Acquire();
+  auto *reactive = sched.GetEventPool().Acquire();
   reactive->callback = [&]() {
     order.push_back("reactive");
     // Nonblocking assignment: schedule Re-NBA at current time.
-    auto* renba = sched.GetEventPool().Acquire();
+    auto *renba = sched.GetEventPool().Acquire();
     renba->callback = [&order]() { order.push_back("renba"); };
     sched.ScheduleEvent({0}, Region::kReNBA, renba);
   };
@@ -121,10 +121,10 @@ TEST(SimCh4428, NonblockingAssignmentSchedulesReNBALaterTime) {
   Scheduler sched(arena);
   std::vector<uint64_t> renba_times;
 
-  auto* reactive = sched.GetEventPool().Acquire();
+  auto *reactive = sched.GetEventPool().Acquire();
   reactive->callback = [&]() {
     // Nonblocking assignment with delay: schedule Re-NBA at a later time.
-    auto* renba = sched.GetEventPool().Acquire();
+    auto *renba = sched.GetEventPool().Acquire();
     renba->callback = [&renba_times, &sched]() {
       renba_times.push_back(sched.CurrentTime().ticks);
     };
@@ -148,14 +148,14 @@ TEST(SimCh4428, ReNBAToReactiveIteration) {
   std::vector<std::string> order;
 
   // Initial Reactive event schedules a Re-NBA.
-  auto* react1 = sched.GetEventPool().Acquire();
+  auto *react1 = sched.GetEventPool().Acquire();
   react1->callback = [&]() {
     order.push_back("reactive1");
-    auto* renba = sched.GetEventPool().Acquire();
+    auto *renba = sched.GetEventPool().Acquire();
     renba->callback = [&]() {
       order.push_back("renba");
       // Re-NBA schedules a new Reactive event -> triggers re-iteration.
-      auto* react2 = sched.GetEventPool().Acquire();
+      auto *react2 = sched.GetEventPool().Acquire();
       react2->callback = [&order]() { order.push_back("reactive2"); };
       sched.ScheduleEvent({0}, Region::kReactive, react2);
     };
@@ -179,8 +179,8 @@ TEST(SimCh4428, ReNBAExecutesAfterReactiveAndReInactiveBeforePostReNBA) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
+  auto schedule = [&](Region r, const std::string &label) {
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, label]() { order.push_back(label); };
     sched.ScheduleEvent({0}, r, ev);
   };
@@ -221,7 +221,7 @@ TEST(SimCh4428, ReNBAEventsAcrossMultipleTimeSlots) {
   std::vector<uint64_t> times;
 
   for (uint64_t t = 0; t < 3; ++t) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&times, &sched]() {
       times.push_back(sched.CurrentTime().ticks);
     };
@@ -244,7 +244,7 @@ TEST(SimCh4428, ReNBARegionHoldsMultipleEvents) {
   int count = 0;
 
   for (int i = 0; i < 5; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&]() { count++; };
     sched.ScheduleEvent({0}, Region::kReNBA, ev);
   }

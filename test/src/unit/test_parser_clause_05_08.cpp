@@ -15,10 +15,10 @@ using namespace delta;
 struct ParseResult508 {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult508 Parse(const std::string& src) {
+static ParseResult508 Parse(const std::string &src) {
   ParseResult508 result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -28,7 +28,7 @@ static ParseResult508 Parse(const std::string& src) {
   return result;
 }
 
-static bool ParseOk(const std::string& src) {
+static bool ParseOk(const std::string &src) {
   SourceManager mgr;
   Arena arena;
   auto fid = mgr.AddFile("<test>", src);
@@ -39,8 +39,8 @@ static bool ParseOk(const std::string& src) {
   return !diag.HasErrors();
 }
 
-static Stmt* FirstInitialStmt(ParseResult508& r) {
-  for (auto* item : r.cu->modules[0]->items) {
+static Stmt *FirstInitialStmt(ParseResult508 &r) {
+  for (auto *item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kInitialBlock) {
       if (item->body && item->body->kind == StmtKind::kBlock) {
         return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
@@ -52,12 +52,11 @@ static Stmt* FirstInitialStmt(ParseResult508& r) {
 }
 
 TEST(ParserCh508, TimeLiteral_IntegerNs) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial #40ns;\n"
-      "endmodule");
+  auto r = Parse("module m;\n"
+                 "  initial #40ns;\n"
+                 "endmodule");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
 }

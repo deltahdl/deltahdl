@@ -1,10 +1,10 @@
 // §41
 
-#include <gtest/gtest.h>
+#include "simulation/dpi_runtime.h"
 #include <cstdint>
+#include <gtest/gtest.h>
 #include <string>
 #include <vector>
-#include "simulation/dpi_runtime.h"
 
 using namespace delta;
 
@@ -87,7 +87,7 @@ TEST(Api, DataReadValueChangeCallback) {
   int cb_new_val = 0;
   api.RegisterValueChangeCb("sig",
                             [&cb_fired, &cb_new_val](std::string_view /*name*/,
-                                                     const DataReadValue& val) {
+                                                     const DataReadValue &val) {
                               cb_fired = true;
                               cb_new_val = val.int_val;
                             });
@@ -109,4 +109,4 @@ TEST(Api, DataReadMissingVariableReturnsDefault) {
   EXPECT_EQ(result.format, DataReadFormat::kInt);
 }
 
-}  // namespace
+} // namespace

@@ -15,11 +15,11 @@ namespace {
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
   bool has_errors = false;
 };
 
-ParseResult Parse(const std::string& src) {
+ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -30,7 +30,7 @@ ParseResult Parse(const std::string& src) {
   return result;
 }
 
-}  // namespace
+} // namespace
 
 // =============================================================================
 // A.2.4 Declaration assignments
@@ -40,13 +40,12 @@ ParseResult Parse(const std::string& src) {
 // hierarchical_parameter_identifier = constant_mintypmax_expression
 
 TEST(ParserA24, DefparamAssignmentHierarchical) {
-  auto r = Parse(
-      "module top;\n"
-      "  defparam u0.sub.WIDTH = 16;\n"
-      "endmodule\n");
+  auto r = Parse("module top;\n"
+                 "  defparam u0.sub.WIDTH = 16;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kDefparam);
   ASSERT_EQ(item->defparam_assigns.size(), 1u);
   // The path expression should be a hierarchical reference
@@ -56,13 +55,12 @@ TEST(ParserA24, DefparamAssignmentHierarchical) {
 
 TEST(ParserA24, DefparamAssignmentMintypmax) {
   // constant_mintypmax_expression: expr : expr : expr
-  auto r = Parse(
-      "module top;\n"
-      "  defparam u0.DELAY = 1:2:3;\n"
-      "endmodule\n");
+  auto r = Parse("module top;\n"
+                 "  defparam u0.DELAY = 1:2:3;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kDefparam);
   ASSERT_EQ(item->defparam_assigns.size(), 1u);
 }
@@ -74,17 +72,17 @@ TEST(ParserA24, NetDeclAssignmentBasic) {
   auto r = Parse("module m; wire w; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_EQ(item->name, "w");
-  EXPECT_EQ(item->init_expr, nullptr);  // No initializer
+  EXPECT_EQ(item->init_expr, nullptr); // No initializer
 }
 
 TEST(ParserA24, NetDeclAssignmentWithUnpackedDims) {
   auto r = Parse("module m; wire w [3:0][7:0]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_EQ(item->name, "w");
   EXPECT_GE(item->unpacked_dims.size(), 1u);
@@ -94,7 +92,7 @@ TEST(ParserA24, NetDeclAssignmentWithInit) {
   auto r = Parse("module m; wire w = 1'b1; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_EQ(item->name, "w");
   EXPECT_NE(item->init_expr, nullptr);
@@ -104,7 +102,7 @@ TEST(ParserA24, NetDeclAssignmentDimsAndInit) {
   auto r = Parse("module m; wire [7:0] mem [0:3] = '{0,1,2,3}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_NE(item->init_expr, nullptr);
   EXPECT_GE(item->unpacked_dims.size(), 1u);
@@ -117,7 +115,7 @@ TEST(ParserA24, ParamAssignmentBasic) {
   auto r = Parse("module m; parameter WIDTH = 8; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
   EXPECT_EQ(item->name, "WIDTH");
   EXPECT_NE(item->init_expr, nullptr);
@@ -127,7 +125,7 @@ TEST(ParserA24, ParamAssignmentWithUnpackedDim) {
   auto r = Parse("module m; parameter int ARR [3:0] = '{1,2,3,4}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
   EXPECT_EQ(item->name, "ARR");
   EXPECT_GE(item->unpacked_dims.size(), 1u);
@@ -144,7 +142,7 @@ TEST(ParserA24, LocalparamAssignment) {
   auto r = Parse("module m; localparam int LP = 42; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
   EXPECT_EQ(item->name, "LP");
 }
@@ -154,23 +152,21 @@ TEST(ParserA24, LocalparamAssignment) {
 // | pulse_control_specparam
 
 TEST(ParserA24, SpecparamAssignmentBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    specparam tRise = 10;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    specparam tRise = 10;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA24, SpecparamAssignmentMintypmax) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    specparam tDelay = 1:2:3;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    specparam tDelay = 1:2:3;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -180,43 +176,39 @@ TEST(ParserA24, SpecparamAssignmentMintypmax) {
 // PATHPULSE$input$output = ( reject_limit_value [ , error_limit_value ] )
 
 TEST(ParserA24, PulseControlSpecparamRejectOnly) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    specparam PATHPULSE$ = (2);\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    specparam PATHPULSE$ = (2);\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA24, PulseControlSpecparamRejectAndError) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    specparam PATHPULSE$ = (2, 5);\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    specparam PATHPULSE$ = (2, 5);\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA24, PulseControlSpecparamPathSpecific) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    specparam PATHPULSE$in1$out1 = (3, 7);\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    specparam PATHPULSE$in1$out1 = (3, 7);\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA24, PulseControlSpecparamModuleLevel) {
-  auto r = Parse(
-      "module m;\n"
-      "  specparam PATHPULSE$ = (2, 5);\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specparam PATHPULSE$ = (2, 5);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -225,12 +217,11 @@ TEST(ParserA24, PulseControlSpecparamModuleLevel) {
 // These are constant_mintypmax_expression, tested through pulse_control above
 
 TEST(ParserA24, LimitValueMintypmax) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    specparam PATHPULSE$ = (1:2:3, 4:5:6);\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  specify\n"
+                 "    specparam PATHPULSE$ = (1:2:3, 4:5:6);\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -242,7 +233,7 @@ TEST(ParserA24, TypeAssignmentWithDefault) {
   auto r = Parse("module m; parameter type T = int; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
   EXPECT_EQ(item->name, "T");
 }
@@ -269,7 +260,7 @@ TEST(ParserA24, VarDeclAssignmentBasic) {
   auto r = Parse("module m; int x; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(item->name, "x");
   EXPECT_EQ(item->init_expr, nullptr);
@@ -279,7 +270,7 @@ TEST(ParserA24, VarDeclAssignmentWithInit) {
   auto r = Parse("module m; int x = 42; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(item->name, "x");
   EXPECT_NE(item->init_expr, nullptr);
@@ -289,7 +280,7 @@ TEST(ParserA24, VarDeclAssignmentWithDims) {
   auto r = Parse("module m; int arr [3:0]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(item->name, "arr");
   EXPECT_GE(item->unpacked_dims.size(), 1u);
@@ -299,7 +290,7 @@ TEST(ParserA24, VarDeclAssignmentQueueDim) {
   auto r = Parse("module m; int q [$]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(item->name, "q");
 }
@@ -308,7 +299,7 @@ TEST(ParserA24, VarDeclAssignmentAssocArray) {
   auto r = Parse("module m; int aa [string]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(item->name, "aa");
 }
@@ -317,31 +308,28 @@ TEST(ParserA24, VarDeclAssignmentAssocArray) {
 // new [ expression ] [ ( expression ) ]
 
 TEST(ParserA24, DynamicArrayNewSize) {
-  auto r = Parse(
-      "module m;\n"
-      "  int d[];\n"
-      "  initial d = new[10];\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  int d[];\n"
+                 "  initial d = new[10];\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA24, DynamicArrayNewSizeAndInit) {
-  auto r = Parse(
-      "module m;\n"
-      "  int d[];\n"
-      "  int src [10];\n"
-      "  initial d = new[10](src);\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  int d[];\n"
+                 "  int src [10];\n"
+                 "  initial d = new[10](src);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA24, DynamicArrayDeclWithNew) {
-  auto r = Parse(
-      "module m;\n"
-      "  int d[] = new[5];\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  int d[] = new[5];\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -351,38 +339,35 @@ TEST(ParserA24, DynamicArrayDeclWithNew) {
 // | new expression
 
 TEST(ParserA24, ClassNewNoArgs) {
-  auto r = Parse(
-      "class C;\n"
-      "endclass\n"
-      "module m;\n"
-      "  C c = new;\n"
-      "endmodule\n");
+  auto r = Parse("class C;\n"
+                 "endclass\n"
+                 "module m;\n"
+                 "  C c = new;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA24, ClassNewWithArgs) {
-  auto r = Parse(
-      "class C;\n"
-      "  function new(int a, int b);\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module m;\n"
-      "  C c = new(1, 2);\n"
-      "endmodule\n");
+  auto r = Parse("class C;\n"
+                 "  function new(int a, int b);\n"
+                 "  endfunction\n"
+                 "endclass\n"
+                 "module m;\n"
+                 "  C c = new(1, 2);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA24, ClassNewCopy) {
   // new expression (shallow copy)
-  auto r = Parse(
-      "class C;\n"
-      "endclass\n"
-      "module m;\n"
-      "  C c1, c2;\n"
-      "  initial c2 = new c1;\n"
-      "endmodule\n");
+  auto r = Parse("class C;\n"
+                 "endclass\n"
+                 "module m;\n"
+                 "  C c1, c2;\n"
+                 "  initial c2 = new c1;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }

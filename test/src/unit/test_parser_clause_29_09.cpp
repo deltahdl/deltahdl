@@ -13,10 +13,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult Parse(const std::string& src) {
+static ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -32,7 +32,7 @@ struct UdpSpotCheck {
   char output;
 };
 
-static void VerifyUdpTableSpotChecks(const UdpDecl* udp,
+static void VerifyUdpTableSpotChecks(const UdpDecl *udp,
                                      const UdpSpotCheck checks[],
                                      size_t count) {
   for (size_t i = 0; i < count; ++i) {
@@ -54,13 +54,13 @@ TEST(ParserSection29, MixedLevelEdgeSensitive) {
       "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->udps.size(), 1);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
   EXPECT_TRUE(udp->is_sequential);
   ASSERT_EQ(udp->table.size(), 5);
   UdpSpotCheck checks[] = {
-      {0, '?', '1'},  // Level-sensitive entry
-      {2, 'r', '1'},  // Edge-sensitive entry
-      {4, 'f', '-'},  // Falling edge with no-change output
+      {0, '?', '1'}, // Level-sensitive entry
+      {2, 'r', '1'}, // Edge-sensitive entry
+      {4, 'f', '-'}, // Falling edge with no-change output
   };
   VerifyUdpTableSpotChecks(udp, checks, std::size(checks));
 }

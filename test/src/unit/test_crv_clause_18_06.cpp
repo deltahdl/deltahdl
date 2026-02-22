@@ -1,13 +1,13 @@
 // §18.6: Randomization methods
 
-#include <gtest/gtest.h>
+#include "simulation/constraint_solver.h"
 #include <algorithm>
 #include <cstdint>
+#include <gtest/gtest.h>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include "simulation/constraint_solver.h"
 
 using namespace delta;
 
@@ -120,7 +120,7 @@ TEST(Constraint, GetValuesMap) {
   solver.AddVariable(vb);
 
   ASSERT_TRUE(solver.Solve());
-  const auto& vals = solver.GetValues();
+  const auto &vals = solver.GetValues();
   EXPECT_EQ(vals.size(), 2u);
   EXPECT_TRUE(vals.count("a"));
   EXPECT_TRUE(vals.count("b"));
@@ -158,4 +158,4 @@ TEST(Constraint, PostRandomizeFailureNoCallback) {
   EXPECT_FALSE(post_called);
 }
 
-}  // namespace
+} // namespace

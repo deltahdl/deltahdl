@@ -1,8 +1,8 @@
 // Non-LRM tests
 
+#include "synthesis/liberty.h"
 #include <gtest/gtest.h>
 #include <string_view>
-#include "synthesis/liberty.h"
 
 using namespace delta;
 
@@ -61,9 +61,9 @@ TEST(Liberty, ParseOneCellOnePin_PinDetails) {
   )lib";
   auto lib = ParseLiberty(kSrc);
   struct {
-    const char* name;
-    const char* direction;
-    const char* function;
+    const char *name;
+    const char *direction;
+    const char *function;
   } const kExpected[] = {
       {"A", "input", ""},
       {"Y", "output", "A"},
@@ -97,7 +97,7 @@ TEST(Liberty, ParseTimingData) {
   ASSERT_EQ(lib.cells.size(), 1);
   ASSERT_EQ(lib.cells[0].timing.size(), 1);
 
-  const auto& t = lib.cells[0].timing[0];
+  const auto &t = lib.cells[0].timing[0];
   EXPECT_EQ(t.related_pin, "A");
   EXPECT_FLOAT_EQ(t.cell_rise, 0.05f);
   EXPECT_FLOAT_EQ(t.cell_fall, 0.03f);
@@ -179,4 +179,4 @@ TEST(Liberty, ParseCellAreaValues) {
   EXPECT_FLOAT_EQ(lib.cells[1].area, 4.0f);
 }
 
-}  // namespace
+} // namespace

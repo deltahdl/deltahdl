@@ -11,7 +11,7 @@ namespace delta {
 namespace {
 
 class VpiClause3834Test : public ::testing::Test {
- protected:
+protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
@@ -26,7 +26,7 @@ class VpiClause3834Test : public ::testing::Test {
 // §38.34: vpi_put_value
 
 TEST_F(VpiClause3834Test, PutValueNoDelay) {
-  auto* var = sim_ctx_.CreateVariable("d", 32);
+  auto *var = sim_ctx_.CreateVariable("d", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
@@ -42,7 +42,7 @@ TEST_F(VpiClause3834Test, PutValueNoDelay) {
 }
 
 TEST_F(VpiClause3834Test, PutValueInertialDelay) {
-  auto* var = sim_ctx_.CreateVariable("di", 32);
+  auto *var = sim_ctx_.CreateVariable("di", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
@@ -59,7 +59,7 @@ TEST_F(VpiClause3834Test, PutValueInertialDelay) {
 }
 
 TEST_F(VpiClause3834Test, PutValueTransportDelay) {
-  auto* var = sim_ctx_.CreateVariable("dt", 32);
+  auto *var = sim_ctx_.CreateVariable("dt", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
@@ -74,7 +74,7 @@ TEST_F(VpiClause3834Test, PutValueTransportDelay) {
 }
 
 TEST_F(VpiClause3834Test, PutValuePureTransportDelay) {
-  auto* var = sim_ctx_.CreateVariable("dpt", 32);
+  auto *var = sim_ctx_.CreateVariable("dpt", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
@@ -87,7 +87,7 @@ TEST_F(VpiClause3834Test, PutValuePureTransportDelay) {
 }
 
 TEST_F(VpiClause3834Test, PutValueRealFormat) {
-  auto* var = sim_ctx_.CreateVariable("rf", 32);
+  auto *var = sim_ctx_.CreateVariable("rf", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
@@ -100,7 +100,7 @@ TEST_F(VpiClause3834Test, PutValueRealFormat) {
 }
 
 TEST_F(VpiClause3834Test, PutValueScalarFormat) {
-  auto* var = sim_ctx_.CreateVariable("sf", 1);
+  auto *var = sim_ctx_.CreateVariable("sf", 1);
   var->value = MakeLogic4VecVal(arena_, 1, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
@@ -113,5 +113,5 @@ TEST_F(VpiClause3834Test, PutValueScalarFormat) {
   EXPECT_EQ(var->value.words[0].bval & 1, 0u);
 }
 
-}  // namespace
-}  // namespace delta
+} // namespace
+} // namespace delta

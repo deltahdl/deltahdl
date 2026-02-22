@@ -25,13 +25,13 @@ TEST(SimCh4095, UnidirectionalEventProcessing) {
 
   // Model: standard gate-level unidirectional flow.
   // Read input, compute result, schedule update — each event independently.
-  auto* eval = sched.GetEventPool().Acquire();
+  auto *eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-    int result = input * 2;  // Read input, compute result.
-    auto* update = sched.GetEventPool().Acquire();
+    int result = input * 2; // Read input, compute result.
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
-    update->callback = [&, result]() { output = result; };  // Schedule update.
+    update->callback = [&, result]() { output = result; }; // Schedule update.
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
   };
   sched.ScheduleEvent({0}, Region::kActive, eval);
@@ -52,13 +52,13 @@ TEST(SimCh4095, BidirectionalSignalFlow) {
 
   // Model: tran(net_a, net_b);
   // Signal flows bidirectionally: driving net_a propagates to net_b.
-  auto* drive_a = sched.GetEventPool().Acquire();
+  auto *drive_a = sched.GetEventPool().Acquire();
   drive_a->kind = EventKind::kEvaluation;
   drive_a->callback = [&]() {
     net_a = 1;
     if (switch_on) {
       // Bidirectional: propagate from a to b.
-      auto* update = sched.GetEventPool().Acquire();
+      auto *update = sched.GetEventPool().Acquire();
       update->kind = EventKind::kUpdate;
       update->callback = [&]() { net_b = net_a; };
       sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
@@ -67,12 +67,12 @@ TEST(SimCh4095, BidirectionalSignalFlow) {
   sched.ScheduleEvent({0}, Region::kActive, drive_a);
 
   // At time 5, drive net_b → propagates to net_a (reverse direction).
-  auto* drive_b = sched.GetEventPool().Acquire();
+  auto *drive_b = sched.GetEventPool().Acquire();
   drive_b->kind = EventKind::kEvaluation;
   drive_b->callback = [&]() {
     net_b = 0;
     if (switch_on) {
-      auto* update = sched.GetEventPool().Acquire();
+      auto *update = sched.GetEventPool().Acquire();
       update->kind = EventKind::kUpdate;
       update->callback = [&]() { net_a = net_b; };
       sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
@@ -102,12 +102,12 @@ TEST(SimCh4095, CoordinatedProcessingOfConnectedNodes) {
   // Coordinated processing: must resolve entire chain before determining
   // any individual node value. n0=1 propagates through sw0 to n1 and
   // through sw1 to n2 in a single coordinated pass.
-  auto* eval = sched.GetEventPool().Acquire();
+  auto *eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
     // Coordinated: resolve all connected nodes together.
     if (sw0_on && sw1_on) {
-      auto* update = sched.GetEventPool().Acquire();
+      auto *update = sched.GetEventPool().Acquire();
       update->kind = EventKind::kUpdate;
       update->callback = [&]() {
         // All nodes resolve to the strongest driver (n0=1).
@@ -149,12 +149,12 @@ TEST(SimCh4095, TransistorSourceElements) {
   int resolved_count = 0;
 
   // Each transistor type participates in switch processing.
-  auto* eval = sched.GetEventPool().Acquire();
+  auto *eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
     for (auto type : transistors) {
       (void)type;
-      auto* update = sched.GetEventPool().Acquire();
+      auto *update = sched.GetEventPool().Acquire();
       update->kind = EventKind::kUpdate;
       update->callback = [&]() { ++resolved_count; };
       sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
@@ -180,11 +180,11 @@ TEST(SimCh4095, InputsAndOutputsInteract) {
 
   // Both nodes are driven and connected by a switch. The resolved value
   // depends on both drivers interacting (not independent processing).
-  auto* eval = sched.GetEventPool().Acquire();
+  auto *eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
     // Both drivers contribute; resolved values reflect interaction.
-    auto* update = sched.GetEventPool().Acquire();
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() {
       // When both drivers agree (both 1), both nodes resolve to 1.
@@ -213,7 +213,7 @@ TEST(SimCh4095, RelaxationTechnique) {
   int n2 = -1;
   int iterations = 0;
 
-  auto* eval = sched.GetEventPool().Acquire();
+  auto *eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
     // Relaxation: iterate until all nodes converge.
@@ -222,11 +222,11 @@ TEST(SimCh4095, RelaxationTechnique) {
     do {
       prev_n1 = n1;
       prev_n2 = n2;
-      n1 = n0;  // Switch propagation: n0 → n1.
-      n2 = n1;  // Switch propagation: n1 → n2.
+      n1 = n0; // Switch propagation: n0 → n1.
+      n2 = n1; // Switch propagation: n1 → n2.
       ++iterations;
     } while (n1 != prev_n1 || n2 != prev_n2);
-    auto* update = sched.GetEventPool().Acquire();
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = []() {};
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
@@ -251,17 +251,17 @@ TEST(SimCh4095, IntermingledWithOtherActiveEvents) {
 
   // Schedule a switch processing event and other active events at the same
   // time. All execute in the Active region, intermingled.
-  auto* switch_proc = sched.GetEventPool().Acquire();
+  auto *switch_proc = sched.GetEventPool().Acquire();
   switch_proc->kind = EventKind::kEvaluation;
   switch_proc->callback = [&]() { order.push_back("switch_process"); };
   sched.ScheduleEvent({0}, Region::kActive, switch_proc);
 
-  auto* gate_eval = sched.GetEventPool().Acquire();
+  auto *gate_eval = sched.GetEventPool().Acquire();
   gate_eval->kind = EventKind::kEvaluation;
   gate_eval->callback = [&]() { order.push_back("gate_eval"); };
   sched.ScheduleEvent({0}, Region::kActive, gate_eval);
 
-  auto* proc_stmt = sched.GetEventPool().Acquire();
+  auto *proc_stmt = sched.GetEventPool().Acquire();
   proc_stmt->kind = EventKind::kEvaluation;
   proc_stmt->callback = [&]() { order.push_back("proc_stmt"); };
   sched.ScheduleEvent({0}, Region::kActive, proc_stmt);
@@ -273,10 +273,13 @@ TEST(SimCh4095, IntermingledWithOtherActiveEvents) {
   bool has_switch = false;
   bool has_gate = false;
   bool has_proc = false;
-  for (const auto& s : order) {
-    if (s == "switch_process") has_switch = true;
-    if (s == "gate_eval") has_gate = true;
-    if (s == "proc_stmt") has_proc = true;
+  for (const auto &s : order) {
+    if (s == "switch_process")
+      has_switch = true;
+    if (s == "gate_eval")
+      has_gate = true;
+    if (s == "proc_stmt")
+      has_proc = true;
   }
   EXPECT_TRUE(has_switch);
   EXPECT_TRUE(has_gate);
@@ -296,21 +299,21 @@ TEST(SimCh4095, SteadyStateUniqueLevel) {
   //   gate=off: node_a=1, node_b=z (or undriven)
   // node_a has unique level (1) in all cases → steady-state = 1.
   int node_a_result = 0;
-  int gate_val = -1;  // x represented as -1.
+  int gate_val = -1; // x represented as -1.
 
-  auto* eval = sched.GetEventPool().Acquire();
+  auto *eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
     // Solve all combinations for gate=x.
-    int result_gate_on = 1;   // node_a when gate conducts.
-    int result_gate_off = 1;  // node_a when gate non-conducting.
+    int result_gate_on = 1;  // node_a when gate conducts.
+    int result_gate_off = 1; // node_a when gate non-conducting.
     // node_a is 1 in both cases → unique → steady-state = 1.
     if (result_gate_on == result_gate_off) {
-      node_a_result = result_gate_on;  // Unique level.
+      node_a_result = result_gate_on; // Unique level.
     } else {
-      node_a_result = gate_val;  // Ambiguous → x.
+      node_a_result = gate_val; // Ambiguous → x.
     }
-    auto* update = sched.GetEventPool().Acquire();
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = []() {};
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
@@ -334,19 +337,19 @@ TEST(SimCh4095, SteadyStateAmbiguousX) {
   //   gate=off: node_b=0  (undriven, resolves to 0/z)
   // node_b has different values → steady-state = x.
   int node_b_result = 0;
-  int x_val = -1;  // Represent 'x' as -1.
+  int x_val = -1; // Represent 'x' as -1.
 
-  auto* eval = sched.GetEventPool().Acquire();
+  auto *eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-    int result_gate_on = 1;   // node_b when gate conducts.
-    int result_gate_off = 0;  // node_b when gate non-conducting.
+    int result_gate_on = 1;  // node_b when gate conducts.
+    int result_gate_off = 0; // node_b when gate non-conducting.
     if (result_gate_on == result_gate_off) {
       node_b_result = result_gate_on;
     } else {
-      node_b_result = x_val;  // Ambiguous → x.
+      node_b_result = x_val; // Ambiguous → x.
     }
-    auto* update = sched.GetEventPool().Acquire();
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = []() {};
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
@@ -354,7 +357,7 @@ TEST(SimCh4095, SteadyStateAmbiguousX) {
   sched.ScheduleEvent({0}, Region::kActive, eval);
 
   sched.Run();
-  EXPECT_EQ(node_b_result, x_val);  // Steady-state is x.
+  EXPECT_EQ(node_b_result, x_val); // Steady-state is x.
 }
 
 // ---------------------------------------------------------------------------
@@ -365,16 +368,16 @@ TEST(SimCh4095, UserDefinedNetTypeSwitchOffForXZ) {
   Scheduler sched(arena);
   int udn_a = 5;
   int udn_b = 10;
-  int control = -1;  // x represented as -1.
+  int control = -1; // x represented as -1.
 
   // Model: bidirectional switch between user-defined nets udn_a and udn_b
   // with control=x. For UDN, x control → switch treated as off.
   // Each net resolved separately (no signal flow between them).
-  auto* eval = sched.GetEventPool().Acquire();
+  auto *eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-    bool switch_off = (control == -1 || control == -2);  // x or z → off.
-    auto* update = sched.GetEventPool().Acquire();
+    bool switch_off = (control == -1 || control == -2); // x or z → off.
+    auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     if (switch_off) {
       // Nets resolved separately — no propagation.
@@ -389,6 +392,6 @@ TEST(SimCh4095, UserDefinedNetTypeSwitchOffForXZ) {
 
   sched.Run();
   // Switch was off (control=x) → nets resolved separately.
-  EXPECT_EQ(udn_a, 5);   // Unchanged.
-  EXPECT_EQ(udn_b, 10);  // Unchanged — no signal flow.
+  EXPECT_EQ(udn_a, 5);  // Unchanged.
+  EXPECT_EQ(udn_b, 10); // Unchanged — no signal flow.
 }

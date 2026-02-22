@@ -1,10 +1,10 @@
 // Annex H.12: Open arrays
 
-#include <gtest/gtest.h>
+#include "simulation/dpi_runtime.h"
 #include <cstdint>
+#include <gtest/gtest.h>
 #include <string>
 #include <vector>
-#include "simulation/dpi_runtime.h"
 
 using namespace delta;
 
@@ -35,4 +35,4 @@ TEST(DpiRuntime, OpenArrayEmptyHandle) {
   EXPECT_EQ(DpiRuntime::SvSize(h), 0u);
 }
 
-}  // namespace
+} // namespace

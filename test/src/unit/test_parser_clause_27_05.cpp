@@ -1,11 +1,11 @@
 // §27.5: Conditional generate constructs
 
-#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -23,10 +23,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult Parse(const std::string& src) {
+static ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -37,11 +37,11 @@ static ParseResult Parse(const std::string& src) {
 }
 
 struct StructMemberExpected {
-  const char* name;
+  const char *name;
   DataTypeKind type_kind;
 };
 
-static void VerifyGenerateCaseItem(const GenerateCaseItem& ci, size_t idx,
+static void VerifyGenerateCaseItem(const GenerateCaseItem &ci, size_t idx,
                                    bool expect_default,
                                    size_t expect_pattern_count) {
   EXPECT_EQ(ci.is_default, expect_default) << "case item " << idx;
@@ -51,20 +51,19 @@ static void VerifyGenerateCaseItem(const GenerateCaseItem& ci, size_t idx,
 
 struct ModportPortExpected {
   Direction dir;
-  const char* name;
+  const char *name;
 };
 
 namespace {
 
 TEST(Parser, GenerateIf) {
-  auto r = Parse(
-      "module t;\n"
-      "  if (WIDTH > 8) begin\n"
-      "    assign a = b;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  if (WIDTH > 8) begin\n"
+                 "    assign a = b;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
+  auto *mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 1);
   EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kGenerateIf);
   EXPECT_NE(mod->items[0]->gen_cond, nullptr);
@@ -72,34 +71,32 @@ TEST(Parser, GenerateIf) {
 }
 
 TEST(Parser, GenerateIfElse) {
-  auto r = Parse(
-      "module t;\n"
-      "  if (WIDTH > 8) begin\n"
-      "    assign a = b;\n"
-      "  end else begin\n"
-      "    assign a = c;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  if (WIDTH > 8) begin\n"
+                 "    assign a = b;\n"
+                 "  end else begin\n"
+                 "    assign a = c;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGenerateIf);
   EXPECT_NE(item->gen_else, nullptr);
 }
 
 TEST(Parser, GenerateCase) {
-  auto r = Parse(
-      "module t;\n"
-      "  case (WIDTH)\n"
-      "    1: begin\n"
-      "      assign a = b;\n"
-      "    end\n"
-      "    2: begin\n"
-      "      assign a = c;\n"
-      "    end\n"
-      "  endcase\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  case (WIDTH)\n"
+                 "    1: begin\n"
+                 "      assign a = b;\n"
+                 "    end\n"
+                 "    2: begin\n"
+                 "      assign a = c;\n"
+                 "    end\n"
+                 "  endcase\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGenerateCase);
   EXPECT_NE(item->gen_cond, nullptr);
   ASSERT_EQ(item->gen_case_items.size(), 2);
@@ -108,52 +105,49 @@ TEST(Parser, GenerateCase) {
 }
 
 TEST(Parser, GenerateCaseDefault) {
-  auto r = Parse(
-      "module t;\n"
-      "  case (WIDTH)\n"
-      "    1: begin\n"
-      "      assign a = b;\n"
-      "    end\n"
-      "    default: begin\n"
-      "      assign a = c;\n"
-      "    end\n"
-      "  endcase\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  case (WIDTH)\n"
+                 "    1: begin\n"
+                 "      assign a = b;\n"
+                 "    end\n"
+                 "    default: begin\n"
+                 "      assign a = c;\n"
+                 "    end\n"
+                 "  endcase\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   ASSERT_EQ(item->gen_case_items.size(), 2);
   EXPECT_TRUE(item->gen_case_items[1].is_default);
 }
 
 TEST(Parser, GenerateCaseMultiPattern) {
-  auto r = Parse(
-      "module t;\n"
-      "  case (WIDTH)\n"
-      "    1, 2: begin\n"
-      "      assign a = b;\n"
-      "    end\n"
-      "  endcase\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  case (WIDTH)\n"
+                 "    1, 2: begin\n"
+                 "      assign a = b;\n"
+                 "    end\n"
+                 "  endcase\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   ASSERT_EQ(item->gen_case_items.size(), 1);
   EXPECT_EQ(item->gen_case_items[0].patterns.size(), 2);
 }
 
 TEST(Parser, GenerateCaseInRegion) {
-  auto r = Parse(
-      "module t;\n"
-      "  generate\n"
-      "    case (WIDTH)\n"
-      "      1: begin\n"
-      "        assign a = b;\n"
-      "      end\n"
-      "    endcase\n"
-      "  endgenerate\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  generate\n"
+                 "    case (WIDTH)\n"
+                 "      1: begin\n"
+                 "        assign a = b;\n"
+                 "      end\n"
+                 "    endcase\n"
+                 "  endgenerate\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   bool found = false;
-  for (auto* item : r.cu->modules[0]->items) {
+  for (auto *item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kGenerateCase) {
       found = true;
     }
@@ -161,4 +155,4 @@ TEST(Parser, GenerateCaseInRegion) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+} // namespace

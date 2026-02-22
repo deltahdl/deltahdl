@@ -1,8 +1,5 @@
 // §15.5.2: Waiting for an event
 
-#include <gtest/gtest.h>
-#include <cstdint>
-#include <string_view>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -17,6 +14,9 @@
 #include "simulation/stmt_result.h"
 #include "simulation/sync_objects.h"
 #include "simulation/variable.h"
+#include <cstdint>
+#include <gtest/gtest.h>
+#include <string_view>
 
 using namespace delta;
 
@@ -58,12 +58,12 @@ TEST(IpcSync, EventTriggeredDifferentNames) {
 TEST(IpcSync, EventTriggerSetsTriggeredState) {
   SyncFixture f;
   // Create named event variable.
-  auto* ev = f.ctx.CreateVariable("my_event", 1);
+  auto *ev = f.ctx.CreateVariable("my_event", 1);
   ev->is_event = true;
   ev->value = MakeLogic4VecVal(f.arena, 1, 0);
 
   // Build event trigger statement: ->my_event
-  auto* trigger_stmt = f.arena.Create<Stmt>();
+  auto *trigger_stmt = f.arena.Create<Stmt>();
   trigger_stmt->kind = StmtKind::kEventTrigger;
   trigger_stmt->expr = f.arena.Create<Expr>();
   trigger_stmt->expr->kind = ExprKind::kIdentifier;
@@ -73,8 +73,8 @@ TEST(IpcSync, EventTriggerSetsTriggeredState) {
   struct DriverResult {
     StmtResult value = StmtResult::kDone;
   };
-  auto driver = [](const Stmt* stmt, SimContext& ctx, Arena& arena,
-                   DriverResult* out) -> SimCoroutine {
+  auto driver = [](const Stmt *stmt, SimContext &ctx, Arena &arena,
+                   DriverResult *out) -> SimCoroutine {
     out->value = co_await ExecStmt(stmt, ctx, arena);
   };
   DriverResult result;
@@ -97,4 +97,4 @@ TEST(IpcSync, EventTriggeredStickyWithinTimeslot) {
   EXPECT_FALSE(f.ctx.IsEventTriggered("ev2"));
 }
 
-}  // namespace
+} // namespace

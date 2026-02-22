@@ -1,7 +1,7 @@
 // §non_lrm
 
-#include <gtest/gtest.h>
 #include "synthesis/aig.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -86,4 +86,4 @@ TEST(Aig, MuxConstruction) {
   EXPECT_GT(AigVar(m), 0);
 }
 
-}  // namespace
+} // namespace

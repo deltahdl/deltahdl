@@ -1,7 +1,7 @@
 // §28.8: Bidirectional pass switches
 
-#include <gtest/gtest.h>
 #include <cstdint>
+#include <gtest/gtest.h>
 
 // --- Local types for MOS/pass switches (§28.7, §28.8, §28.9) ---
 enum class Val4 : uint8_t { kV0 = 0, kV1 = 1, kX = 2, kZ = 3 };
@@ -41,7 +41,8 @@ uint32_t MaxSwitchDelays(SwitchType type);
 // --- Implementations ---
 Val4Ext EvalMosSwitch(SwitchType type, Val4 data, Val4 control) {
   // §28.7 Table 28-6: z data always produces z regardless of control.
-  if (data == Val4::kZ) return Val4Ext::kZ;
+  if (data == Val4::kZ)
+    return Val4Ext::kZ;
 
   // Determine the effective control for NMOS-like behavior.
   // NMOS/RNMOS: conducts when control=1.
@@ -55,97 +56,97 @@ Val4Ext EvalMosSwitch(SwitchType type, Val4 data, Val4 control) {
   if (complementary) {
     // Invert the control signal for PMOS-like switches.
     switch (control) {
-      case Val4::kV0:
-        eff = Val4::kV1;
-        break;
-      case Val4::kV1:
-        eff = Val4::kV0;
-        break;
-      default:
-        eff = control;
-        break;  // x/z stay as-is
+    case Val4::kV0:
+      eff = Val4::kV1;
+      break;
+    case Val4::kV1:
+      eff = Val4::kV0;
+      break;
+    default:
+      eff = control;
+      break; // x/z stay as-is
     }
   }
 
   // Now evaluate with NMOS semantics: conducts when eff=1, blocks when eff=0.
   switch (eff) {
-    case Val4::kV1:
-      // Conducting: data passes through.
-      switch (data) {
-        case Val4::kV0:
-          return Val4Ext::kV0;
-        case Val4::kV1:
-          return Val4Ext::kV1;
-        case Val4::kX:
-          return Val4Ext::kX;
-        case Val4::kZ:
-          return Val4Ext::kZ;
-      }
-      break;
+  case Val4::kV1:
+    // Conducting: data passes through.
+    switch (data) {
     case Val4::kV0:
-      // Blocked: output is z.
-      return Val4Ext::kZ;
+      return Val4Ext::kV0;
+    case Val4::kV1:
+      return Val4Ext::kV1;
     case Val4::kX:
+      return Val4Ext::kX;
     case Val4::kZ:
-      // Unknown control: weaken the output.
-      switch (data) {
-        case Val4::kV0:
-          return Val4Ext::kL;
-        case Val4::kV1:
-          return Val4Ext::kH;
-        case Val4::kX:
-          return Val4Ext::kX;
-        case Val4::kZ:
-          return Val4Ext::kZ;
-      }
-      break;
+      return Val4Ext::kZ;
+    }
+    break;
+  case Val4::kV0:
+    // Blocked: output is z.
+    return Val4Ext::kZ;
+  case Val4::kX:
+  case Val4::kZ:
+    // Unknown control: weaken the output.
+    switch (data) {
+    case Val4::kV0:
+      return Val4Ext::kL;
+    case Val4::kV1:
+      return Val4Ext::kH;
+    case Val4::kX:
+      return Val4Ext::kX;
+    case Val4::kZ:
+      return Val4Ext::kZ;
+    }
+    break;
   }
-  return Val4Ext::kX;  // Unreachable.
+  return Val4Ext::kX; // Unreachable.
 }
 
 bool IsBidirectional(SwitchType type) {
   switch (type) {
-    case SwitchType::kTran:
-    case SwitchType::kRtran:
-    case SwitchType::kTranif0:
-    case SwitchType::kTranif1:
-    case SwitchType::kRtranif0:
-    case SwitchType::kRtranif1:
-      return true;
-    default:
-      return false;
+  case SwitchType::kTran:
+  case SwitchType::kRtran:
+  case SwitchType::kTranif0:
+  case SwitchType::kTranif1:
+  case SwitchType::kRtranif0:
+  case SwitchType::kRtranif1:
+    return true;
+  default:
+    return false;
   }
 }
 
 bool AcceptsDelaySpec(SwitchType type) {
   switch (type) {
-    case SwitchType::kTran:
-    case SwitchType::kRtran:
-      return false;
-    default:
-      return true;
+  case SwitchType::kTran:
+  case SwitchType::kRtran:
+    return false;
+  default:
+    return true;
   }
 }
 
 uint32_t MaxSwitchDelays(SwitchType type) {
   switch (type) {
-    case SwitchType::kTran:
-    case SwitchType::kRtran:
-      return 0;
-    case SwitchType::kTranif0:
-    case SwitchType::kTranif1:
-    case SwitchType::kRtranif0:
-    case SwitchType::kRtranif1:
-      return 2;
-    case SwitchType::kNmos:
-    case SwitchType::kPmos:
-    case SwitchType::kRnmos:
-    case SwitchType::kRpmos:
-    case SwitchType::kCmos:
-    case SwitchType::kRcmos:
-      return 3;
+  case SwitchType::kTran:
+  case SwitchType::kRtran:
+    return 0;
+  case SwitchType::kTranif0:
+  case SwitchType::kTranif1:
+  case SwitchType::kRtranif0:
+  case SwitchType::kRtranif1:
+    return 2;
+  case SwitchType::kNmos:
+  case SwitchType::kPmos:
+  case SwitchType::kRnmos:
+  case SwitchType::kRpmos:
+  case SwitchType::kCmos:
+  case SwitchType::kRcmos:
+    return 3;
   }
-  return 0;  // Unreachable.
+  return 0; // Unreachable.
 }
 
 namespace {
@@ -182,4 +183,4 @@ TEST(BidrectionalSwitches, TranifAcceptsDelays) {
   EXPECT_EQ(MaxSwitchDelays(SwitchType::kTranif1), 2u);
 }
 
-}  // namespace
+} // namespace

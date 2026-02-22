@@ -11,7 +11,7 @@ struct PreprocFixture {
   DiagEngine diag{mgr};
 };
 
-static std::string Preprocess(const std::string& src, PreprocFixture& f,
+static std::string Preprocess(const std::string &src, PreprocFixture &f,
                               PreprocConfig config = {}) {
   auto fid = f.mgr.AddFile("<test>", src);
   Preprocessor pp(f.mgr, f.diag, std::move(config));
@@ -21,11 +21,10 @@ static std::string Preprocess(const std::string& src, PreprocFixture& f,
 // §22.3: `resetall shall not affect text macros
 TEST(Preprocessor, ResetAll_PreservesTextMacros) {
   PreprocFixture f;
-  auto result = Preprocess(
-      "`define FOO bar\n"
-      "`resetall\n"
-      "int x = `FOO;\n",
-      f);
+  auto result = Preprocess("`define FOO bar\n"
+                           "`resetall\n"
+                           "int x = `FOO;\n",
+                           f);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("bar"), std::string::npos);
 }
@@ -75,10 +74,9 @@ TEST(Preprocessor, ResetAll_IllegalInsideConfig) {
 
 TEST(Preprocessor, ResetAll_LegalOutsideDesignElements) {
   PreprocFixture f;
-  Preprocess(
-      "`resetall\n"
-      "module m; endmodule\n"
-      "`resetall\n",
-      f);
+  Preprocess("`resetall\n"
+             "module m; endmodule\n"
+             "`resetall\n",
+             f);
   EXPECT_FALSE(f.diag.HasErrors());
 }

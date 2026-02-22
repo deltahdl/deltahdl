@@ -23,8 +23,7 @@ struct ElabA83Fixture {
   bool has_errors = false;
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src,
-                                 ElabA83Fixture &f) {
+static RtlirDesign *ElaborateSrc(const std::string &src, ElabA83Fixture &f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
@@ -35,7 +34,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src,
   return design;
 }
 
-}  // namespace
+} // namespace
 
 // =============================================================================
 // A.8.3 Expressions — Elaboration
@@ -45,12 +44,11 @@ static RtlirDesign *ElaborateSrc(const std::string &src,
 
 TEST(ElabA83, PrefixIncrementElaborates) {
   ElabA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin x = 8'd5; ++x; end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic [7:0] x;\n"
+                              "  initial begin x = 8'd5; ++x; end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -59,12 +57,11 @@ TEST(ElabA83, PrefixIncrementElaborates) {
 
 TEST(ElabA83, PostfixDecrementElaborates) {
   ElabA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin x = 8'd5; x--; end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic [7:0] x;\n"
+                              "  initial begin x = 8'd5; x--; end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -73,13 +70,12 @@ TEST(ElabA83, PostfixDecrementElaborates) {
 
 TEST(ElabA83, TernaryInContAssignElaborates) {
   ElabA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic sel;\n"
-      "  wire [7:0] a, b, y;\n"
-      "  assign y = sel ? a : b;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic sel;\n"
+                              "  wire [7:0] a, b, y;\n"
+                              "  assign y = sel ? a : b;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -88,11 +84,10 @@ TEST(ElabA83, TernaryInContAssignElaborates) {
 
 TEST(ElabA83, ConstantBinaryExprInParamElaborates) {
   ElabA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  parameter int WIDTH = 4 + 4;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  parameter int WIDTH = 4 + 4;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -101,11 +96,10 @@ TEST(ElabA83, ConstantBinaryExprInParamElaborates) {
 
 TEST(ElabA83, ConstantTernaryInParamElaborates) {
   ElabA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  parameter int P = 1 ? 10 : 20;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  parameter int P = 1 ? 10 : 20;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -114,12 +108,11 @@ TEST(ElabA83, ConstantTernaryInParamElaborates) {
 
 TEST(ElabA83, BinaryExprInInitialElaborates) {
   ElabA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] a, b, c;\n"
-      "  initial c = a + b;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic [7:0] a, b, c;\n"
+                              "  initial c = a + b;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -128,12 +121,11 @@ TEST(ElabA83, BinaryExprInInitialElaborates) {
 
 TEST(ElabA83, UnaryExprInInitialElaborates) {
   ElabA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial b = ~a;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic [7:0] a, b;\n"
+                              "  initial b = ~a;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -142,13 +134,13 @@ TEST(ElabA83, UnaryExprInInitialElaborates) {
 
 TEST(ElabA83, InsideExprElaborates) {
   ElabA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "  logic result;\n"
-      "  initial result = x inside {8'd1, 8'd2, 8'd3};\n"
-      "endmodule\n",
-      f);
+  auto *design =
+      ElaborateSrc("module m;\n"
+                   "  logic [7:0] x;\n"
+                   "  logic result;\n"
+                   "  initial result = x inside {8'd1, 8'd2, 8'd3};\n"
+                   "endmodule\n",
+                   f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -157,14 +149,13 @@ TEST(ElabA83, InsideExprElaborates) {
 
 TEST(ElabA83, TaggedUnionElaborates) {
   ElabA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  initial begin\n"
-      "    automatic int x;\n"
-      "    x = tagged Valid 42;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  initial begin\n"
+                              "    automatic int x;\n"
+                              "    x = tagged Valid 42;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -173,13 +164,12 @@ TEST(ElabA83, TaggedUnionElaborates) {
 
 TEST(ElabA83, IndexedPartSelectElaborates) {
   ElabA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic [15:0] data;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = data[0+:8];\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic [15:0] data;\n"
+                              "  logic [7:0] x;\n"
+                              "  initial x = data[0+:8];\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -188,12 +178,11 @@ TEST(ElabA83, IndexedPartSelectElaborates) {
 
 TEST(ElabA83, GenvarExprElaborates) {
   ElabA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  parameter int N = 4;\n"
-      "  logic [N-1:0] w;\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  parameter int N = 4;\n"
+                              "  logic [N-1:0] w;\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -202,13 +191,12 @@ TEST(ElabA83, GenvarExprElaborates) {
 
 TEST(ElabA83, ConstantRangePackedDimElaborates) {
   ElabA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  logic [31:0] data;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = data[7:0];\n"
-      "endmodule\n",
-      f);
+  auto *design = ElaborateSrc("module m;\n"
+                              "  logic [31:0] data;\n"
+                              "  logic [7:0] x;\n"
+                              "  initial x = data[7:0];\n"
+                              "endmodule\n",
+                              f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }

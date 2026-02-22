@@ -28,7 +28,7 @@ TEST(SimCh44310, PostponedRegionExecutesPLICallbacks) {
   Scheduler sched(arena);
   int executed = 0;
 
-  auto* ev = sched.GetEventPool().Acquire();
+  auto *ev = sched.GetEventPool().Acquire();
   ev->callback = [&]() { executed++; };
   sched.ScheduleEvent({0}, Region::kPostponed, ev);
 
@@ -47,12 +47,12 @@ TEST(SimCh44310, PostponedCanReadValues) {
   int sampled = -1;
 
   // Pre-Postponed sets value = 42.
-  auto* pre_postponed = sched.GetEventPool().Acquire();
+  auto *pre_postponed = sched.GetEventPool().Acquire();
   pre_postponed->callback = [&]() { value = 42; };
   sched.ScheduleEvent({0}, Region::kPrePostponed, pre_postponed);
 
   // Postponed reads value — should see 42.
-  auto* ev = sched.GetEventPool().Acquire();
+  auto *ev = sched.GetEventPool().Acquire();
   ev->callback = [&]() { sampled = value; };
   sched.ScheduleEvent({0}, Region::kPostponed, ev);
 
@@ -71,17 +71,17 @@ TEST(SimCh44310, PostponedReadsStateFromActiveAndReactiveRegions) {
   int sampled = -1;
 
   // Active sets value = 10.
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->callback = [&]() { value = 10; };
   sched.ScheduleEvent({0}, Region::kActive, active);
 
   // Reactive overwrites value = 77.
-  auto* reactive = sched.GetEventPool().Acquire();
+  auto *reactive = sched.GetEventPool().Acquire();
   reactive->callback = [&]() { value = 77; };
   sched.ScheduleEvent({0}, Region::kReactive, reactive);
 
   // Postponed reads — should see 77 (the final state after all regions).
-  auto* ev = sched.GetEventPool().Acquire();
+  auto *ev = sched.GetEventPool().Acquire();
   ev->callback = [&]() { sampled = value; };
   sched.ScheduleEvent({0}, Region::kPostponed, ev);
 
@@ -99,11 +99,11 @@ TEST(SimCh44310, PostponedExecutesAfterPrePostponed) {
   std::vector<std::string> order;
 
   // Schedule Postponed first, then Pre-Postponed — ordering must still hold.
-  auto* postponed = sched.GetEventPool().Acquire();
+  auto *postponed = sched.GetEventPool().Acquire();
   postponed->callback = [&]() { order.push_back("postponed"); };
   sched.ScheduleEvent({0}, Region::kPostponed, postponed);
 
-  auto* pre_postponed = sched.GetEventPool().Acquire();
+  auto *pre_postponed = sched.GetEventPool().Acquire();
   pre_postponed->callback = [&]() { order.push_back("pre_postponed"); };
   sched.ScheduleEvent({0}, Region::kPrePostponed, pre_postponed);
 
@@ -122,8 +122,8 @@ TEST(SimCh44310, PostponedIsLastRegionInTimeSlot) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
+  auto schedule = [&](Region r, const std::string &label) {
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, label]() { order.push_back(label); };
     sched.ScheduleEvent({0}, r, ev);
   };
@@ -166,7 +166,7 @@ TEST(SimCh44310, PostponedRegionHoldsMultiplePLICallbacks) {
   int count = 0;
 
   for (int i = 0; i < 5; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&]() { count++; };
     sched.ScheduleEvent({0}, Region::kPostponed, ev);
   }
@@ -185,7 +185,7 @@ TEST(SimCh44310, PostponedEventsAcrossMultipleTimeSlots) {
   std::vector<uint64_t> times;
 
   for (uint64_t t = 0; t < 3; ++t) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&times, &sched]() {
       times.push_back(sched.CurrentTime().ticks);
     };
@@ -213,7 +213,7 @@ TEST(SimCh44310, PostponedProvidesReadOnlySnapshotAfterAllRegions) {
   int sum_in_postponed = -1;
 
   // Active sets initial values.
-  auto* active = sched.GetEventPool().Acquire();
+  auto *active = sched.GetEventPool().Acquire();
   active->callback = [&]() {
     a = 10;
     b = 20;
@@ -221,12 +221,12 @@ TEST(SimCh44310, PostponedProvidesReadOnlySnapshotAfterAllRegions) {
   sched.ScheduleEvent({0}, Region::kActive, active);
 
   // Pre-Postponed modifies b (last read-write region before Postponed).
-  auto* pre_postponed = sched.GetEventPool().Acquire();
+  auto *pre_postponed = sched.GetEventPool().Acquire();
   pre_postponed->callback = [&]() { b = 30; };
   sched.ScheduleEvent({0}, Region::kPrePostponed, pre_postponed);
 
   // Postponed reads both — should see a=10, b=30 (Pre-Postponed overwrote b).
-  auto* postponed = sched.GetEventPool().Acquire();
+  auto *postponed = sched.GetEventPool().Acquire();
   postponed->callback = [&]() { sum_in_postponed = a + b; };
   sched.ScheduleEvent({0}, Region::kPostponed, postponed);
 
@@ -244,8 +244,8 @@ TEST(SimCh44310, PostponedInfrastructureWithFullRegionChain) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
+  auto schedule = [&](Region r, const std::string &label) {
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, label]() { order.push_back(label); };
     sched.ScheduleEvent({0}, r, ev);
   };

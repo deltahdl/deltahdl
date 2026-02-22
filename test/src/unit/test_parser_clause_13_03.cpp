@@ -1,11 +1,11 @@
 // §13.3: Tasks
 
-#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -23,10 +23,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult Parse(const std::string& src) {
+static ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -37,30 +37,29 @@ static ParseResult Parse(const std::string& src) {
 }
 
 struct StructMemberExpected {
-  const char* name;
+  const char *name;
   DataTypeKind type_kind;
 };
 
 struct ModportPortExpected {
   Direction dir;
-  const char* name;
+  const char *name;
 };
 
 namespace {
 
 TEST(Parser, TaskDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  task my_task(input int x);\n"
-      "    $display(\"%d\", x);\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  task my_task(input int x);\n"
+                 "    $display(\"%d\", x);\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
+  auto *mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 1);
   EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kTaskDecl);
   EXPECT_EQ(mod->items[0]->name, "my_task");
   ASSERT_EQ(mod->items[0]->func_args.size(), 1);
 }
 
-}  // namespace
+} // namespace

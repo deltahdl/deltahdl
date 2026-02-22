@@ -28,7 +28,7 @@ TEST(SimCh4437, PreReNBARegionExecutesPLICallbacks) {
   Scheduler sched(arena);
   int executed = 0;
 
-  auto* ev = sched.GetEventPool().Acquire();
+  auto *ev = sched.GetEventPool().Acquire();
   ev->callback = [&]() { executed++; };
   sched.ScheduleEvent({0}, Region::kPreReNBA, ev);
 
@@ -47,12 +47,12 @@ TEST(SimCh4437, PreReNBACanReadValues) {
   int sampled = -1;
 
   // Reactive sets value = 42.
-  auto* reactive = sched.GetEventPool().Acquire();
+  auto *reactive = sched.GetEventPool().Acquire();
   reactive->callback = [&]() { value = 42; };
   sched.ScheduleEvent({0}, Region::kReactive, reactive);
 
   // Pre-Re-NBA reads value — should see 42.
-  auto* ev = sched.GetEventPool().Acquire();
+  auto *ev = sched.GetEventPool().Acquire();
   ev->callback = [&]() { sampled = value; };
   sched.ScheduleEvent({0}, Region::kPreReNBA, ev);
 
@@ -71,12 +71,12 @@ TEST(SimCh4437, PreReNBACanWriteValues) {
   int sampled_in_re_nba = -1;
 
   // Pre-Re-NBA writes a value.
-  auto* pre_re_nba = sched.GetEventPool().Acquire();
+  auto *pre_re_nba = sched.GetEventPool().Acquire();
   pre_re_nba->callback = [&]() { value = 99; };
   sched.ScheduleEvent({0}, Region::kPreReNBA, pre_re_nba);
 
   // Re-NBA reads the value — should see 99.
-  auto* re_nba = sched.GetEventPool().Acquire();
+  auto *re_nba = sched.GetEventPool().Acquire();
   re_nba->callback = [&]() { sampled_in_re_nba = value; };
   sched.ScheduleEvent({0}, Region::kReNBA, re_nba);
 
@@ -93,11 +93,11 @@ TEST(SimCh4437, PreReNBACanCreateEvents) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto* pre_re_nba = sched.GetEventPool().Acquire();
+  auto *pre_re_nba = sched.GetEventPool().Acquire();
   pre_re_nba->callback = [&]() {
     order.push_back("pre_re_nba");
     // Create an event in the Re-NBA region from Pre-Re-NBA.
-    auto* new_ev = sched.GetEventPool().Acquire();
+    auto *new_ev = sched.GetEventPool().Acquire();
     new_ev->callback = [&order]() { order.push_back("created_re_nba"); };
     sched.ScheduleEvent({0}, Region::kReNBA, new_ev);
   };
@@ -119,11 +119,11 @@ TEST(SimCh4437, PreReNBAExecutesBeforeReNBA) {
   std::vector<std::string> order;
 
   // Schedule Re-NBA first, then Pre-Re-NBA — ordering must still hold.
-  auto* re_nba = sched.GetEventPool().Acquire();
+  auto *re_nba = sched.GetEventPool().Acquire();
   re_nba->callback = [&]() { order.push_back("re_nba"); };
   sched.ScheduleEvent({0}, Region::kReNBA, re_nba);
 
-  auto* pre_re_nba = sched.GetEventPool().Acquire();
+  auto *pre_re_nba = sched.GetEventPool().Acquire();
   pre_re_nba->callback = [&]() { order.push_back("pre_re_nba"); };
   sched.ScheduleEvent({0}, Region::kPreReNBA, pre_re_nba);
 
@@ -142,8 +142,8 @@ TEST(SimCh4437, PreReNBAExecutesAfterReInactiveBeforeReNBA) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
+  auto schedule = [&](Region r, const std::string &label) {
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, label]() { order.push_back(label); };
     sched.ScheduleEvent({0}, r, ev);
   };
@@ -182,7 +182,7 @@ TEST(SimCh4437, PreReNBARegionHoldsMultiplePLICallbacks) {
   int count = 0;
 
   for (int i = 0; i < 5; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&]() { count++; };
     sched.ScheduleEvent({0}, Region::kPreReNBA, ev);
   }
@@ -201,7 +201,7 @@ TEST(SimCh4437, PreReNBAEventsAcrossMultipleTimeSlots) {
   std::vector<uint64_t> times;
 
   for (uint64_t t = 0; t < 3; ++t) {
-    auto* ev = sched.GetEventPool().Acquire();
+    auto *ev = sched.GetEventPool().Acquire();
     ev->callback = [&times, &sched]() {
       times.push_back(sched.CurrentTime().ticks);
     };
@@ -229,12 +229,12 @@ TEST(SimCh4437, PreReNBAReadWriteInReactiveRegionSetContext) {
   int re_nba_sample = -1;
 
   // Reactive writes value = 10.
-  auto* reactive = sched.GetEventPool().Acquire();
+  auto *reactive = sched.GetEventPool().Acquire();
   reactive->callback = [&]() { value = 10; };
   sched.ScheduleEvent({0}, Region::kReactive, reactive);
 
   // Pre-Re-NBA reads the Reactive-set value and overwrites it to 55.
-  auto* pre_re_nba = sched.GetEventPool().Acquire();
+  auto *pre_re_nba = sched.GetEventPool().Acquire();
   pre_re_nba->callback = [&]() {
     reactive_sample = value;
     value = 55;
@@ -242,7 +242,7 @@ TEST(SimCh4437, PreReNBAReadWriteInReactiveRegionSetContext) {
   sched.ScheduleEvent({0}, Region::kPreReNBA, pre_re_nba);
 
   // Re-NBA samples value — should see 55 from Pre-Re-NBA.
-  auto* re_nba = sched.GetEventPool().Acquire();
+  auto *re_nba = sched.GetEventPool().Acquire();
   re_nba->callback = [&]() { re_nba_sample = value; };
   sched.ScheduleEvent({0}, Region::kReNBA, re_nba);
 

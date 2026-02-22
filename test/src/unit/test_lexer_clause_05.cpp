@@ -6,7 +6,7 @@
 
 using namespace delta;
 
-static std::vector<Token> Lex(const std::string& src) {
+static std::vector<Token> Lex(const std::string &src) {
   static SourceManager mgr;
   auto fid = mgr.AddFile("<test>", src);
   DiagEngine diag(mgr);
@@ -28,7 +28,7 @@ TEST(LexerCh5, SourceLocations) {
       {1, 2, 1},
       {2, 2, 3},
   };
-  for (const auto& c : expected) {
+  for (const auto &c : expected) {
     EXPECT_EQ(tokens[c.idx].loc.line, c.line) << "token " << c.idx;
     EXPECT_EQ(tokens[c.idx].loc.column, c.column) << "token " << c.idx;
   }

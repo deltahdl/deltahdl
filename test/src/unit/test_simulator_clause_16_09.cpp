@@ -1,12 +1,12 @@
 // §16.9: Sequence operations
 
-#include <gtest/gtest.h>
-#include <cstdint>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "simulation/assertion.h"
 #include "simulation/sim_context.h"
+#include <cstdint>
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -32,7 +32,7 @@ TEST(Assertion, RoseDetection) {
   // modify the entry cycle count by calling Evaluate after AddProperty.
   // The first Evaluate set prev_value=0, cycle_count was 0.
   // Now "tick" it:
-  auto* entry = const_cast<AssertionEntry*>(monitor.FindEntry("p_rose"));
+  auto *entry = const_cast<AssertionEntry *>(monitor.FindEntry("p_rose"));
   ASSERT_NE(entry, nullptr);
   entry->cycle_count = 1;
 
@@ -56,7 +56,7 @@ TEST(Assertion, FellDetection) {
 
   // Initialize: prev_value = 1.
   monitor.Evaluate("p_fell", 1);
-  auto* entry = const_cast<AssertionEntry*>(monitor.FindEntry("p_fell"));
+  auto *entry = const_cast<AssertionEntry *>(monitor.FindEntry("p_fell"));
   entry->cycle_count = 1;
 
   // 1 -> 0 is a falling edge.
@@ -78,7 +78,7 @@ TEST(Assertion, StableDetection) {
   monitor.AddProperty(prop);
 
   monitor.Evaluate("p_stable", 42);
-  auto* entry = const_cast<AssertionEntry*>(monitor.FindEntry("p_stable"));
+  auto *entry = const_cast<AssertionEntry *>(monitor.FindEntry("p_stable"));
   entry->cycle_count = 1;
 
   auto r1 = monitor.Evaluate("p_stable", 42);
@@ -89,4 +89,4 @@ TEST(Assertion, StableDetection) {
   EXPECT_EQ(r2, AssertionResult::kFail);
 }
 
-}  // namespace
+} // namespace

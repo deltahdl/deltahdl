@@ -1,10 +1,10 @@
 // Annex H.9: Context tasks and functions
 
-#include <gtest/gtest.h>
+#include "simulation/dpi_runtime.h"
 #include <cstdint>
+#include <gtest/gtest.h>
 #include <string>
 #include <vector>
-#include "simulation/dpi_runtime.h"
 
 using namespace delta;
 
@@ -44,7 +44,7 @@ TEST(DpiRuntime, SetAndGetScope) {
   scope.name = "top.mod";
   rt.PushScope(scope);
 
-  const DpiScope* saved = rt.GetScope();
+  const DpiScope *saved = rt.GetScope();
   ASSERT_NE(saved, nullptr);
 
   rt.PopScope();
@@ -57,8 +57,8 @@ TEST(DpiRuntime, SetAndGetScope) {
 
 TEST(DpiRuntime, PopEmptyScopeDoesNotCrash) {
   DpiRuntime rt;
-  rt.PopScope();  // Should not crash.
+  rt.PopScope(); // Should not crash.
   EXPECT_EQ(rt.CurrentScope(), nullptr);
 }
 
-}  // namespace
+} // namespace

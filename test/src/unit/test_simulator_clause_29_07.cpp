@@ -12,12 +12,12 @@ namespace {
 struct UdpBuilder {
   UdpDecl decl;
 
-  UdpBuilder& SetSequential() {
+  UdpBuilder &SetSequential() {
     decl.is_sequential = true;
     return *this;
   }
 
-  UdpBuilder& SetInitial(char val) {
+  UdpBuilder &SetInitial(char val) {
     decl.has_initial = true;
     decl.initial_value = val;
     return *this;
@@ -40,4 +40,4 @@ TEST(UdpInit, InitialValueOne) {
   EXPECT_EQ(state.GetOutput(), '1');
 }
 
-}  // namespace
+} // namespace

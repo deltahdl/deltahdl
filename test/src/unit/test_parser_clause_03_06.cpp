@@ -12,11 +12,11 @@ using namespace delta;
 struct ParseResult306 {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult306 Parse(const std::string& src) {
+static ParseResult306 Parse(const std::string &src) {
   ParseResult306 result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
@@ -30,10 +30,11 @@ static ParseResult306 Parse(const std::string& src) {
   return result;
 }
 
-static bool HasItemOfKind(const std::vector<ModuleItem*>& items,
+static bool HasItemOfKind(const std::vector<ModuleItem *> &items,
                           ModuleItemKind kind) {
-  for (const auto* item : items)
-    if (item->kind == kind) return true;
+  for (const auto *item : items)
+    if (item->kind == kind)
+      return true;
   return false;
 }
 
@@ -44,14 +45,13 @@ static bool HasItemOfKind(const std::vector<ModuleItem*>& items,
 // §3.6: Checker encapsulates assertions (assert property, cover property,
 //        property/sequence declarations) — the primary purpose of checkers.
 TEST(ParserClause03, Cl3_6_AssertionsInChecker) {
-  auto r = Parse(
-      "checker req_ack_chk(logic clk, req, ack);\n"
-      "  property req_followed_by_ack;\n"
-      "    @(posedge clk) req |-> ##[1:3] ack;\n"
-      "  endproperty\n"
-      "  assert property (req_followed_by_ack);\n"
-      "  cover property (req_followed_by_ack);\n"
-      "endchecker : req_ack_chk\n");
+  auto r = Parse("checker req_ack_chk(logic clk, req, ack);\n"
+                 "  property req_followed_by_ack;\n"
+                 "    @(posedge clk) req |-> ##[1:3] ack;\n"
+                 "  endproperty\n"
+                 "  assert property (req_followed_by_ack);\n"
+                 "  cover property (req_followed_by_ack);\n"
+                 "endchecker : req_ack_chk\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->checkers.size(), 1u);
@@ -68,12 +68,11 @@ TEST(ParserClause03, Cl3_6_AssertionsInChecker) {
 // §3.6: Checker also encapsulates "modeling code" — variables, initial blocks,
 //        always blocks used alongside assertions for auxiliary verification.
 TEST(ParserClause03, Cl3_6_ModelingCodeInChecker) {
-  auto r = Parse(
-      "checker model_chk;\n"
-      "  logic flag;\n"
-      "  initial flag = 0;\n"
-      "  always @(flag) flag <= ~flag;\n"
-      "endchecker\n");
+  auto r = Parse("checker model_chk;\n"
+                 "  logic flag;\n"
+                 "  initial flag = 0;\n"
+                 "  always @(flag) flag <= ~flag;\n"
+                 "endchecker\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->checkers.size(), 1u);
@@ -81,5 +80,5 @@ TEST(ParserClause03, Cl3_6_ModelingCodeInChecker) {
       HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kInitialBlock));
   EXPECT_TRUE(
       HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kAlwaysBlock));
-  EXPECT_GE(r.cu->checkers[0]->items.size(), 3u);  // var + initial + always
+  EXPECT_GE(r.cu->checkers[0]->items.size(), 3u); // var + initial + always
 }

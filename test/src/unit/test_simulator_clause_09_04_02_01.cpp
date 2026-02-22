@@ -21,21 +21,21 @@ struct VarRef {
   ExprRole role;
 };
 
-std::vector<std::string> ComputeImplicitSensitivity(
-    const std::vector<VarRef>& refs) {
+std::vector<std::string>
+ComputeImplicitSensitivity(const std::vector<VarRef> &refs) {
   std::vector<std::string> result;
-  for (const auto& ref : refs) {
+  for (const auto &ref : refs) {
     switch (ref.role) {
-      case ExprRole::kRHS:
-      case ExprRole::kSubroutineArg:
-      case ExprRole::kCaseExpr:
-      case ExprRole::kConditionalExpr:
-      case ExprRole::kLHSIndex:
-        result.push_back(ref.name);
-        break;
-      case ExprRole::kPureLHS:
-      case ExprRole::kTimingControl:
-        break;
+    case ExprRole::kRHS:
+    case ExprRole::kSubroutineArg:
+    case ExprRole::kCaseExpr:
+    case ExprRole::kConditionalExpr:
+    case ExprRole::kLHSIndex:
+      result.push_back(ref.name);
+      break;
+    case ExprRole::kPureLHS:
+    case ExprRole::kTimingControl:
+      break;
     }
   }
   return result;
@@ -57,4 +57,4 @@ TEST(TimingControl, CommaSynonymousWithOr) {
   EXPECT_EQ(comma_result, or_result);
 }
 
-}  // namespace
+} // namespace

@@ -19,11 +19,11 @@ using namespace delta;
 struct ParseResult4d {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult4d Parse(const std::string& src) {
+static ParseResult4d Parse(const std::string &src) {
   ParseResult4d result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -34,7 +34,7 @@ static ParseResult4d Parse(const std::string& src) {
   return result;
 }
 
-static bool ParseOk(const std::string& src) {
+static bool ParseOk(const std::string &src) {
   SourceManager mgr;
   Arena arena;
   auto fid = mgr.AddFile("<test>", src);
@@ -46,21 +46,23 @@ static bool ParseOk(const std::string& src) {
 }
 
 // Returns the first module item from the first module.
-static ModuleItem* FirstItem(ParseResult4d& r) {
+static ModuleItem *FirstItem(ParseResult4d &r) {
   if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.empty())
     return nullptr;
   return r.cu->modules[0]->items[0];
 }
 
 // Returns the first function/task body statement from a ModuleItem.
-static Stmt* FirstBodyStmt(ModuleItem* item) {
-  if (!item || item->func_body_stmts.empty()) return nullptr;
+static Stmt *FirstBodyStmt(ModuleItem *item) {
+  if (!item || item->func_body_stmts.empty())
+    return nullptr;
   return item->func_body_stmts[0];
 }
 
-static Stmt* FindStmtByKind(ModuleItem* item, StmtKind kind) {
-  for (auto* stmt : item->func_body_stmts) {
-    if (stmt->kind == kind) return stmt;
+static Stmt *FindStmtByKind(ModuleItem *item, StmtKind kind) {
+  for (auto *stmt : item->func_body_stmts) {
+    if (stmt->kind == kind)
+      return stmt;
   }
   return nullptr;
 }
@@ -70,15 +72,14 @@ static Stmt* FindStmtByKind(ModuleItem* item, StmtKind kind) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_AutomaticFunctionDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int add(int a, int b);\n"
-      "    return a + b;\n"
-      "  endfunction\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  function automatic int add(int a, int b);\n"
+                 "    return a + b;\n"
+                 "  endfunction\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_TRUE(item->is_automatic);
@@ -92,15 +93,14 @@ TEST(ParserSection4, Sec4_9_3_AutomaticFunctionDecl) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_StaticFunctionDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  function static int counter();\n"
-      "    return 0;\n"
-      "  endfunction\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  function static int counter();\n"
+                 "    return 0;\n"
+                 "  endfunction\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_TRUE(item->is_static);
@@ -113,15 +113,14 @@ TEST(ParserSection4, Sec4_9_3_StaticFunctionDecl) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_AutomaticTaskDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  task automatic do_work(input int n);\n"
-      "    $display(\"work %0d\", n);\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task automatic do_work(input int n);\n"
+                 "    $display(\"work %0d\", n);\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
   EXPECT_TRUE(item->is_automatic);
@@ -134,15 +133,14 @@ TEST(ParserSection4, Sec4_9_3_AutomaticTaskDecl) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_StaticTaskDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  task static wait_cycles(input int n);\n"
-      "    repeat (n) #1;\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task static wait_cycles(input int n);\n"
+                 "    repeat (n) #1;\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
   EXPECT_TRUE(item->is_static);
@@ -155,19 +153,18 @@ TEST(ParserSection4, Sec4_9_3_StaticTaskDecl) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_AutomaticFuncWithLocalVars) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int compute(int x);\n"
-      "    int temp;\n"
-      "    int result;\n"
-      "    temp = x * 2;\n"
-      "    result = temp + 1;\n"
-      "    return result;\n"
-      "  endfunction\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  function automatic int compute(int x);\n"
+                 "    int temp;\n"
+                 "    int result;\n"
+                 "    temp = x * 2;\n"
+                 "    result = temp + 1;\n"
+                 "    return result;\n"
+                 "  endfunction\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_TRUE(item->is_automatic);
@@ -181,18 +178,17 @@ TEST(ParserSection4, Sec4_9_3_AutomaticFuncWithLocalVars) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_AutomaticFuncRecursiveCall) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int factorial(int n);\n"
-      "    if (n <= 1)\n"
-      "      return 1;\n"
-      "    else\n"
-      "      return n * factorial(n - 1);\n"
-      "  endfunction\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  function automatic int factorial(int n);\n"
+                 "    if (n <= 1)\n"
+                 "      return 1;\n"
+                 "    else\n"
+                 "      return n * factorial(n - 1);\n"
+                 "  endfunction\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_TRUE(item->is_automatic);
@@ -207,20 +203,19 @@ TEST(ParserSection4, Sec4_9_3_AutomaticFuncRecursiveCall) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_StaticFuncWithStaticLocalVar) {
-  auto r = Parse(
-      "module m;\n"
-      "  function static int call_count();\n"
-      "    static int cnt = 0;\n"
-      "    cnt = cnt + 1;\n"
-      "    return cnt;\n"
-      "  endfunction\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  function static int call_count();\n"
+                 "    static int cnt = 0;\n"
+                 "    cnt = cnt + 1;\n"
+                 "    return cnt;\n"
+                 "  endfunction\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->is_static);
-  auto* var_stmt = FirstBodyStmt(item);
+  auto *var_stmt = FirstBodyStmt(item);
   ASSERT_NE(var_stmt, nullptr);
   EXPECT_EQ(var_stmt->kind, StmtKind::kVarDecl);
   EXPECT_TRUE(var_stmt->var_is_static);
@@ -233,15 +228,14 @@ TEST(ParserSection4, Sec4_9_3_StaticFuncWithStaticLocalVar) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_AutomaticFuncInAutoModule) {
-  auto r = Parse(
-      "module automatic m;\n"
-      "  function int add(int a, int b);\n"
-      "    return a + b;\n"
-      "  endfunction\n"
-      "endmodule\n");
+  auto r = Parse("module automatic m;\n"
+                 "  function int add(int a, int b);\n"
+                 "    return a + b;\n"
+                 "  endfunction\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_EQ(item->name, "add");
@@ -256,20 +250,19 @@ TEST(ParserSection4, Sec4_9_3_AutomaticFuncInAutoModule) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_FunctionInProgramBlock) {
-  auto r = Parse(
-      "program p;\n"
-      "  function int get_value();\n"
-      "    int local_v;\n"
-      "    local_v = 42;\n"
-      "    return local_v;\n"
-      "  endfunction\n"
-      "endprogram\n");
+  auto r = Parse("program p;\n"
+                 "  function int get_value();\n"
+                 "    int local_v;\n"
+                 "    local_v = 42;\n"
+                 "    return local_v;\n"
+                 "  endfunction\n"
+                 "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->programs.size(), 1u);
   EXPECT_EQ(r.cu->programs[0]->decl_kind, ModuleDeclKind::kProgram);
   ASSERT_GE(r.cu->programs[0]->items.size(), 1u);
-  auto* item = r.cu->programs[0]->items[0];
+  auto *item = r.cu->programs[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_EQ(item->name, "get_value");
 }
@@ -279,20 +272,19 @@ TEST(ParserSection4, Sec4_9_3_FunctionInProgramBlock) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_AutoVarInStaticFunc) {
-  auto r = Parse(
-      "module m;\n"
-      "  function static int process(int x);\n"
-      "    automatic int temp;\n"
-      "    temp = x + 1;\n"
-      "    return temp;\n"
-      "  endfunction\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  function static int process(int x);\n"
+                 "    automatic int temp;\n"
+                 "    temp = x + 1;\n"
+                 "    return temp;\n"
+                 "  endfunction\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->is_static);
-  auto* var_stmt = FirstBodyStmt(item);
+  auto *var_stmt = FirstBodyStmt(item);
   ASSERT_NE(var_stmt, nullptr);
   EXPECT_EQ(var_stmt->kind, StmtKind::kVarDecl);
   EXPECT_TRUE(var_stmt->var_is_automatic);
@@ -304,20 +296,19 @@ TEST(ParserSection4, Sec4_9_3_AutoVarInStaticFunc) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_StaticVarInAutoFunc) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int accumulate(int x);\n"
-      "    static int sum = 0;\n"
-      "    sum = sum + x;\n"
-      "    return sum;\n"
-      "  endfunction\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  function automatic int accumulate(int x);\n"
+                 "    static int sum = 0;\n"
+                 "    sum = sum + x;\n"
+                 "    return sum;\n"
+                 "  endfunction\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->is_automatic);
-  auto* var_stmt = FirstBodyStmt(item);
+  auto *var_stmt = FirstBodyStmt(item);
   ASSERT_NE(var_stmt, nullptr);
   EXPECT_EQ(var_stmt->kind, StmtKind::kVarDecl);
   EXPECT_TRUE(var_stmt->var_is_static);
@@ -331,23 +322,22 @@ TEST(ParserSection4, Sec4_9_3_StaticVarInAutoFunc) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_AutomaticTaskWithForkJoin) {
-  auto r = Parse(
-      "module m;\n"
-      "  task automatic parallel_work(input int a, input int b);\n"
-      "    fork\n"
-      "      $display(\"a=%0d\", a);\n"
-      "      $display(\"b=%0d\", b);\n"
-      "    join\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task automatic parallel_work(input int a, input int b);\n"
+                 "    fork\n"
+                 "      $display(\"a=%0d\", a);\n"
+                 "      $display(\"b=%0d\", b);\n"
+                 "    join\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
   EXPECT_TRUE(item->is_automatic);
   ASSERT_GE(item->func_body_stmts.size(), 1u);
-  auto* fork_stmt = item->func_body_stmts[0];
+  auto *fork_stmt = item->func_body_stmts[0];
   EXPECT_EQ(fork_stmt->kind, StmtKind::kFork);
   EXPECT_EQ(fork_stmt->join_kind, TokenKind::kKwJoin);
   EXPECT_GE(fork_stmt->fork_stmts.size(), 2u);
@@ -358,22 +348,21 @@ TEST(ParserSection4, Sec4_9_3_AutomaticTaskWithForkJoin) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_AutomaticFuncWithForLoop) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int sum_to_n(int n);\n"
-      "    int total;\n"
-      "    total = 0;\n"
-      "    for (int i = 0; i < n; i = i + 1)\n"
-      "      total = total + i;\n"
-      "    return total;\n"
-      "  endfunction\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  function automatic int sum_to_n(int n);\n"
+                 "    int total;\n"
+                 "    total = 0;\n"
+                 "    for (int i = 0; i < n; i = i + 1)\n"
+                 "      total = total + i;\n"
+                 "    return total;\n"
+                 "  endfunction\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->is_automatic);
-  auto* for_stmt = FindStmtByKind(item, StmtKind::kFor);
+  auto *for_stmt = FindStmtByKind(item, StmtKind::kFor);
   ASSERT_NE(for_stmt, nullptr);
   EXPECT_NE(for_stmt->for_cond, nullptr);
   EXPECT_NE(for_stmt->for_body, nullptr);
@@ -384,21 +373,20 @@ TEST(ParserSection4, Sec4_9_3_AutomaticFuncWithForLoop) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_AutoFuncMultiTypedLocalVars) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int mixed_locals(int x);\n"
-      "    int a;\n"
-      "    logic [7:0] b;\n"
-      "    real c;\n"
-      "    a = x;\n"
-      "    b = x;\n"
-      "    c = x;\n"
-      "    return a;\n"
-      "  endfunction\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  function automatic int mixed_locals(int x);\n"
+                 "    int a;\n"
+                 "    logic [7:0] b;\n"
+                 "    real c;\n"
+                 "    a = x;\n"
+                 "    b = x;\n"
+                 "    c = x;\n"
+                 "    return a;\n"
+                 "  endfunction\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->is_automatic);
   ASSERT_GE(item->func_body_stmts.size(), 3u);
@@ -415,15 +403,15 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncMultiTypedLocalVars) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_AutoFuncWithOutputArg) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic void compute(input int a, output int b);\n"
-      "    b = a * 3;\n"
-      "  endfunction\n"
-      "endmodule\n");
+  auto r =
+      Parse("module m;\n"
+            "  function automatic void compute(input int a, output int b);\n"
+            "    b = a * 3;\n"
+            "  endfunction\n"
+            "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->is_automatic);
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kVoid);
@@ -439,18 +427,17 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncWithOutputArg) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_AutoFuncWithRefArg) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic void swap(ref int x, ref int y);\n"
-      "    int tmp;\n"
-      "    tmp = x;\n"
-      "    x = y;\n"
-      "    y = tmp;\n"
-      "  endfunction\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  function automatic void swap(ref int x, ref int y);\n"
+                 "    int tmp;\n"
+                 "    tmp = x;\n"
+                 "    x = y;\n"
+                 "    y = tmp;\n"
+                 "  endfunction\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->is_automatic);
   ASSERT_EQ(item->func_args.size(), 2u);
@@ -465,15 +452,14 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncWithRefArg) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_AutoFuncReturningVoid) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic void log_msg(input int code);\n"
-      "    $display(\"code=%0d\", code);\n"
-      "  endfunction\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  function automatic void log_msg(input int code);\n"
+                 "    $display(\"code=%0d\", code);\n"
+                 "  endfunction\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_TRUE(item->is_automatic);
@@ -486,20 +472,19 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncReturningVoid) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_RecursiveAutoFuncFibonacci) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int fibonacci(int n);\n"
-      "    if (n == 0)\n"
-      "      return 0;\n"
-      "    else if (n == 1)\n"
-      "      return 1;\n"
-      "    else\n"
-      "      return fibonacci(n - 1) + fibonacci(n - 2);\n"
-      "  endfunction\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  function automatic int fibonacci(int n);\n"
+                 "    if (n == 0)\n"
+                 "      return 0;\n"
+                 "    else if (n == 1)\n"
+                 "      return 1;\n"
+                 "    else\n"
+                 "      return fibonacci(n - 1) + fibonacci(n - 2);\n"
+                 "  endfunction\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->is_automatic);
   EXPECT_EQ(item->name, "fibonacci");
@@ -513,16 +498,15 @@ TEST(ParserSection4, Sec4_9_3_RecursiveAutoFuncFibonacci) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_AutomaticTaskWithDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  task automatic delayed_write(input int val);\n"
-      "    #10;\n"
-      "    $display(\"val=%0d\", val);\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task automatic delayed_write(input int val);\n"
+                 "    #10;\n"
+                 "    $display(\"val=%0d\", val);\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
   EXPECT_TRUE(item->is_automatic);
@@ -535,12 +519,11 @@ TEST(ParserSection4, Sec4_9_3_AutomaticTaskWithDelay) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_AutoFuncInClass) {
-  EXPECT_TRUE(
-      ParseOk("class my_class;\n"
-              "  function automatic int get_id();\n"
-              "    return 42;\n"
-              "  endfunction\n"
-              "endclass\n"));
+  EXPECT_TRUE(ParseOk("class my_class;\n"
+                      "  function automatic int get_id();\n"
+                      "    return 42;\n"
+                      "  endfunction\n"
+                      "endclass\n"));
 }
 
 // =============================================================================
@@ -548,15 +531,14 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncInClass) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_AutoFuncWithDefaultArgs) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int scale(int x, int factor = 2);\n"
-      "    return x * factor;\n"
-      "  endfunction\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  function automatic int scale(int x, int factor = 2);\n"
+                 "    return x * factor;\n"
+                 "  endfunction\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->is_automatic);
   ASSERT_EQ(item->func_args.size(), 2u);
@@ -571,20 +553,19 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncWithDefaultArgs) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_MixedStaticAutoFuncsInModule) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int auto_fn(int x);\n"
-      "    return x + 1;\n"
-      "  endfunction\n"
-      "  function static int static_fn(int x);\n"
-      "    return x - 1;\n"
-      "  endfunction\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  function automatic int auto_fn(int x);\n"
+                 "    return x + 1;\n"
+                 "  endfunction\n"
+                 "  function static int static_fn(int x);\n"
+                 "    return x - 1;\n"
+                 "  endfunction\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
-  auto* auto_fn = r.cu->modules[0]->items[0];
-  auto* static_fn = r.cu->modules[0]->items[1];
+  auto *auto_fn = r.cu->modules[0]->items[0];
+  auto *static_fn = r.cu->modules[0]->items[1];
   EXPECT_TRUE(auto_fn->is_automatic);
   EXPECT_FALSE(auto_fn->is_static);
   EXPECT_TRUE(static_fn->is_static);
@@ -596,19 +577,18 @@ TEST(ParserSection4, Sec4_9_3_MixedStaticAutoFuncsInModule) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_AutoFuncWithAllPortDirs) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic void multi_dir(\n"
-      "      input int a,\n"
-      "      output int b,\n"
-      "      inout int c);\n"
-      "    b = a + c;\n"
-      "    c = a;\n"
-      "  endfunction\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  function automatic void multi_dir(\n"
+                 "      input int a,\n"
+                 "      output int b,\n"
+                 "      inout int c);\n"
+                 "    b = a + c;\n"
+                 "    c = a;\n"
+                 "  endfunction\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->is_automatic);
   ASSERT_EQ(item->func_args.size(), 3u);
@@ -625,16 +605,15 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncWithAllPortDirs) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_AutoTaskWithEventControl) {
-  auto r = Parse(
-      "module m;\n"
-      "  task automatic wait_clk(input logic clk);\n"
-      "    @(posedge clk);\n"
-      "    $display(\"clock edge\");\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task automatic wait_clk(input logic clk);\n"
+                 "    @(posedge clk);\n"
+                 "    $display(\"clock edge\");\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
   EXPECT_TRUE(item->is_automatic);
@@ -649,15 +628,14 @@ TEST(ParserSection4, Sec4_9_3_AutoTaskWithEventControl) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_FuncNoLifetimeQualifier) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int plain_fn(int x);\n"
-      "    return x;\n"
-      "  endfunction\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  function int plain_fn(int x);\n"
+                 "    return x;\n"
+                 "  endfunction\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_FALSE(item->is_automatic);
@@ -669,15 +647,14 @@ TEST(ParserSection4, Sec4_9_3_FuncNoLifetimeQualifier) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_TaskNoLifetimeQualifier) {
-  auto r = Parse(
-      "module m;\n"
-      "  task plain_task();\n"
-      "    $display(\"hello\");\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task plain_task();\n"
+                 "    $display(\"hello\");\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
   EXPECT_FALSE(item->is_automatic);
@@ -689,12 +666,11 @@ TEST(ParserSection4, Sec4_9_3_TaskNoLifetimeQualifier) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_StaticModuleLifetime) {
-  EXPECT_TRUE(
-      ParseOk("module static m;\n"
-              "  function int fn();\n"
-              "    return 0;\n"
-              "  endfunction\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module static m;\n"
+                      "  function int fn();\n"
+                      "    return 0;\n"
+                      "  endfunction\n"
+                      "endmodule\n"));
 }
 
 // =============================================================================
@@ -702,15 +678,14 @@ TEST(ParserSection4, Sec4_9_3_StaticModuleLifetime) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_AutoFuncReturningLogic) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic logic [7:0] get_byte(int idx);\n"
-      "    return idx;\n"
-      "  endfunction\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  function automatic logic [7:0] get_byte(int idx);\n"
+                 "    return idx;\n"
+                 "  endfunction\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->is_automatic);
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kLogic);
@@ -723,15 +698,14 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncReturningLogic) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_AutoFuncWithConstRefArg) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int read_only(const ref int data);\n"
-      "    return data;\n"
-      "  endfunction\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  function automatic int read_only(const ref int data);\n"
+                 "    return data;\n"
+                 "  endfunction\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->is_automatic);
   ASSERT_EQ(item->func_args.size(), 1u);
@@ -745,12 +719,11 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncWithConstRefArg) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_9_3_TaskInProgramBlock) {
-  EXPECT_TRUE(
-      ParseOk("program test_prog;\n"
-              "  task run_test();\n"
-              "    int x;\n"
-              "    x = 1;\n"
-              "    $display(\"x=%0d\", x);\n"
-              "  endtask\n"
-              "endprogram\n"));
+  EXPECT_TRUE(ParseOk("program test_prog;\n"
+                      "  task run_test();\n"
+                      "    int x;\n"
+                      "    x = 1;\n"
+                      "    $display(\"x=%0d\", x);\n"
+                      "  endtask\n"
+                      "endprogram\n"));
 }

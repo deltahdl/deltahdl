@@ -1,10 +1,10 @@
 // Annex H.7: Data types
 
-#include <gtest/gtest.h>
+#include "simulation/dpi_runtime.h"
 #include <cstdint>
+#include <gtest/gtest.h>
 #include <string>
 #include <vector>
-#include "simulation/dpi_runtime.h"
 
 using namespace delta;
 
@@ -56,4 +56,4 @@ TEST(DpiRuntime, ArgValueLogic) {
   EXPECT_EQ(v.AsLogic(), 0);
 }
 
-}  // namespace
+} // namespace

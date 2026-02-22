@@ -12,18 +12,18 @@ namespace {
 struct UdpBuilder {
   UdpDecl decl;
 
-  UdpBuilder& SetSequential() {
+  UdpBuilder &SetSequential() {
     decl.is_sequential = true;
     return *this;
   }
 
-  UdpBuilder& SetInitial(char val) {
+  UdpBuilder &SetInitial(char val) {
     decl.has_initial = true;
     decl.initial_value = val;
     return *this;
   }
 
-  UdpBuilder& AddSeqRow(std::vector<char> inputs, char state, char output) {
+  UdpBuilder &AddSeqRow(std::vector<char> inputs, char state, char output) {
     UdpTableRow row;
     row.inputs = std::move(inputs);
     row.current_state = state;
@@ -60,4 +60,4 @@ TEST(UdpEdgeSeq, DFlipFlop) {
   EXPECT_EQ(state.GetOutput(), '0');
 }
 
-}  // namespace
+} // namespace

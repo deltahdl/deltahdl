@@ -12,11 +12,11 @@ using namespace delta;
 struct ParseResult31201 {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult31201 Parse(const std::string& src) {
+static ParseResult31201 Parse(const std::string &src) {
   ParseResult31201 result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
@@ -30,7 +30,7 @@ static ParseResult31201 Parse(const std::string& src) {
   return result;
 }
 
-static bool ParseOk(const std::string& src) {
+static bool ParseOk(const std::string &src) {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);
@@ -44,11 +44,12 @@ static bool ParseOk(const std::string& src) {
   return !diag.HasErrors();
 }
 
-static const ModuleItem* FindItemByKindAndName(
-    const std::vector<ModuleItem*>& items, ModuleItemKind kind,
-    const std::string& name) {
-  for (const auto* item : items)
-    if (item->kind == kind && item->name == name) return item;
+static const ModuleItem *
+FindItemByKindAndName(const std::vector<ModuleItem *> &items,
+                      ModuleItemKind kind, const std::string &name) {
+  for (const auto *item : items)
+    if (item->kind == kind && item->name == name)
+      return item;
   return nullptr;
 }
 
@@ -59,9 +60,8 @@ static const ModuleItem* FindItemByKindAndName(
 // 1. Compilation unit definition: a collection of source files compiled
 // together.  A single Parse() call produces one CompilationUnit.
 TEST(ParserClause03, Cl3_12_1_CompilationUnitDefinition) {
-  auto r = Parse(
-      "module a; endmodule\n"
-      "module b; endmodule\n");
+  auto r = Parse("module a; endmodule\n"
+                 "module b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   // Both modules belong to the same compilation unit.
@@ -74,10 +74,9 @@ TEST(ParserClause03, Cl3_12_1_CompilationUnitDefinition) {
 // CU scope can contain anything valid in a package (§26.2) —
 // functions, tasks, typedefs, parameters, classes.
 TEST(ParserClause03, Cl3_12_1_CuScopeContainsPackageItems) {
-  auto r = Parse(
-      "function int helper(int x); return x + 1; endfunction\n"
-      "task auto_task; endtask\n"
-      "module m; endmodule\n");
+  auto r = Parse("function int helper(int x); return x + 1; endfunction\n"
+                 "task auto_task; endtask\n"
+                 "module m; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   // Functions and tasks in CU scope are stored in cu_items.
@@ -90,9 +89,8 @@ TEST(ParserClause03, Cl3_12_1_CuScopeContainsPackageItems) {
 
 // 3. Bind constructs at CU scope (§23.11) — CU scope can also hold bind.
 TEST(ParserClause03, Cl3_12_1_CuScopeBindDirective) {
-  auto r = Parse(
-      "module target; endmodule\n"
-      "bind target target chk_inst();\n");
+  auto r = Parse("module target; endmodule\n"
+                 "bind target target chk_inst();\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->bind_directives.size(), 1u);
@@ -106,11 +104,10 @@ TEST(ParserClause03, Cl3_12_1_IncludeBecomesPartOfCU) {
   // the preprocessor produces a single text blob from `define/`ifdef
   // which are CU-scoped directives.  If an `include were processed,
   // its content would appear in the same preprocessed output.
-  auto r = Parse(
-      "`define MY_CONST 42\n"
-      "module m;\n"
-      "  localparam C = `MY_CONST;\n"
-      "endmodule\n");
+  auto r = Parse("`define MY_CONST 42\n"
+                 "module m;\n"
+                 "  localparam C = `MY_CONST;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   // The macro defined at CU scope is visible inside the module,
@@ -121,19 +118,18 @@ TEST(ParserClause03, Cl3_12_1_IncludeBecomesPartOfCU) {
 // 5. Global visibility: modules, primitives, programs, interfaces, packages
 // are visible in all CUs.  Within a single CU, all are accessible.
 TEST(ParserClause03, Cl3_12_1_GloballyVisibleDesignElements) {
-  auto r = Parse(
-      "package pkg; endpackage\n"
-      "interface intf; endinterface\n"
-      "program prog; endprogram\n"
-      "module mod; endmodule\n"
-      "primitive udp_and(output o, input a, b);\n"
-      "  table\n"
-      "    0 0 : 0;\n"
-      "    0 1 : 0;\n"
-      "    1 0 : 0;\n"
-      "    1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("package pkg; endpackage\n"
+                 "interface intf; endinterface\n"
+                 "program prog; endprogram\n"
+                 "module mod; endmodule\n"
+                 "primitive udp_and(output o, input a, b);\n"
+                 "  table\n"
+                 "    0 0 : 0;\n"
+                 "    0 1 : 0;\n"
+                 "    1 0 : 0;\n"
+                 "    1 1 : 1;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->packages.size(), 1u);
@@ -145,11 +141,10 @@ TEST(ParserClause03, Cl3_12_1_GloballyVisibleDesignElements) {
 
 // 6. CU scope can hold classes (valid in a package per §26.2).
 TEST(ParserClause03, Cl3_12_1_CuScopeClassDecl) {
-  auto r = Parse(
-      "class my_class;\n"
-      "  int x;\n"
-      "endclass\n"
-      "module m; endmodule\n");
+  auto r = Parse("class my_class;\n"
+                 "  int x;\n"
+                 "endclass\n"
+                 "module m; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
@@ -160,18 +155,16 @@ TEST(ParserClause03, Cl3_12_1_CuScopeClassDecl) {
 // A `define in one parse (CU) does not leak into a separate parse (CU).
 TEST(ParserClause03, Cl3_12_1_DirectivesLocalToCU) {
   // First CU: define a macro and use it.
-  auto r1 = Parse(
-      "`define FOO 1\n"
-      "module m1;\n"
-      "  localparam X = `FOO;\n"
-      "endmodule\n");
+  auto r1 = Parse("`define FOO 1\n"
+                  "module m1;\n"
+                  "  localparam X = `FOO;\n"
+                  "endmodule\n");
   EXPECT_FALSE(r1.has_errors);
   // Second CU (separate Parse call): macro should NOT be defined.
   // Using `FOO without defining it should produce a preprocessor error.
-  auto r2 = Parse(
-      "module m2;\n"
-      "  localparam Y = `FOO;\n"
-      "endmodule\n");
+  auto r2 = Parse("module m2;\n"
+                  "  localparam Y = `FOO;\n"
+                  "endmodule\n");
   // The undefined macro should cause an error in the second CU.
   EXPECT_TRUE(r2.has_errors);
 }
@@ -181,11 +174,10 @@ TEST(ParserClause03, Cl3_12_1_DirectivesLocalToCU) {
 TEST(ParserClause03, Cl3_12_1_NameResolutionOrder) {
   // A function at CU scope and a module that also declares 'helper'.
   // The parser accepts both — resolution is elaboration's job.
-  auto r = Parse(
-      "function int helper(int x); return x; endfunction\n"
-      "module m;\n"
-      "  function int helper(int x); return x * 2; endfunction\n"
-      "endmodule\n");
+  auto r = Parse("function int helper(int x); return x; endfunction\n"
+                 "module m;\n"
+                 "  function int helper(int x); return x * 2; endfunction\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   // CU scope has the top-level function.
@@ -226,10 +218,9 @@ TEST(ParserClause03, Cl3_12_1_DollarUnitScopeResolution) {
 TEST(ParserClause03, Cl3_12_1_ForwardRefSyntaxValid) {
   // This is valid syntax even though semantically 'b' is referenced
   // before its declaration at CU scope.
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  wire w;\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  wire w;\n"
+                      "endmodule\n"));
 }
 
 // 11. CU scope has no name — cannot be imported.
@@ -237,13 +228,12 @@ TEST(ParserClause03, Cl3_12_1_ForwardRefSyntaxValid) {
 // works and that CU items remain separate from packages.
 TEST(ParserClause03, Cl3_12_1_CuScopeCannotBeImported) {
   // Normal package import works fine.
-  auto r = Parse(
-      "package pkg;\n"
-      "  typedef int myint;\n"
-      "endpackage\n"
-      "module m;\n"
-      "  import pkg::*;\n"
-      "endmodule\n");
+  auto r = Parse("package pkg;\n"
+                 "  typedef int myint;\n"
+                 "endpackage\n"
+                 "module m;\n"
+                 "  import pkg::*;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   // CU-scope functions are NOT in any package.
@@ -255,13 +245,12 @@ TEST(ParserClause03, Cl3_12_1_CuScopeCannotBeImported) {
 // Hierarchical names start from $root (§23.3.1), not from CU scope.
 // Verify that a hierarchical reference in a module parses correctly.
 TEST(ParserClause03, Cl3_12_1_HierRefFromCUScope) {
-  auto r = Parse(
-      "module top;\n"
-      "  module_a u1();\n"
-      "endmodule\n"
-      "module module_a;\n"
-      "  logic sig;\n"
-      "endmodule\n");
+  auto r = Parse("module top;\n"
+                 "  module_a u1();\n"
+                 "endmodule\n"
+                 "module module_a;\n"
+                 "  logic sig;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 2u);
@@ -273,16 +262,15 @@ TEST(ParserClause03, Cl3_12_1_HierRefFromCUScope) {
 // in current implementation) or could be a class.  Verify CU-scope
 // classes enable type sharing.
 TEST(ParserClause03, Cl3_12_1_TypeSharingViaCUScope) {
-  auto r = Parse(
-      "class shared_type;\n"
-      "  int value;\n"
-      "endclass\n"
-      "module m1;\n"
-      "  shared_type obj;\n"
-      "endmodule\n"
-      "module m2;\n"
-      "  shared_type obj;\n"
-      "endmodule\n");
+  auto r = Parse("class shared_type;\n"
+                 "  int value;\n"
+                 "endclass\n"
+                 "module m1;\n"
+                 "  shared_type obj;\n"
+                 "endmodule\n"
+                 "module m2;\n"
+                 "  shared_type obj;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
@@ -291,12 +279,11 @@ TEST(ParserClause03, Cl3_12_1_TypeSharingViaCUScope) {
 
 // 15. Config declarations at top level (part of CU).
 TEST(ParserClause03, Cl3_12_1_ConfigAtCUScope) {
-  auto r = Parse(
-      "module lib_mod; endmodule\n"
-      "config my_cfg;\n"
-      "  design lib_mod;\n"
-      "  default liblist;\n"
-      "endconfig\n");
+  auto r = Parse("module lib_mod; endmodule\n"
+                 "config my_cfg;\n"
+                 "  design lib_mod;\n"
+                 "  default liblist;\n"
+                 "endconfig\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->configs.size(), 1u);
@@ -305,10 +292,9 @@ TEST(ParserClause03, Cl3_12_1_ConfigAtCUScope) {
 
 // 16. Checker declarations at CU scope.
 TEST(ParserClause03, Cl3_12_1_CheckerAtCUScope) {
-  auto r = Parse(
-      "checker my_chk;\n"
-      "endchecker\n"
-      "module m; endmodule\n");
+  auto r = Parse("checker my_chk;\n"
+                 "endchecker\n"
+                 "module m; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->checkers.size(), 1u);

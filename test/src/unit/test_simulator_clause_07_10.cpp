@@ -1,7 +1,5 @@
 // §7.10: Queues
 
-#include <gtest/gtest.h>
-#include <string>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -11,6 +9,8 @@
 #include "simulation/eval.h"
 #include "simulation/eval_array.h"
 #include "simulation/sim_context.h"
+#include <gtest/gtest.h>
+#include <string>
 
 using namespace delta;
 
@@ -25,15 +25,14 @@ struct AggFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-
-static Expr* MkSelect(Arena& arena, std::string_view name, uint64_t idx) {
-  auto* sel = arena.Create<Expr>();
+static Expr *MkSelect(Arena &arena, std::string_view name, uint64_t idx) {
+  auto *sel = arena.Create<Expr>();
   sel->kind = ExprKind::kSelect;
-  auto* base = arena.Create<Expr>();
+  auto *base = arena.Create<Expr>();
   base->kind = ExprKind::kIdentifier;
   base->text = name;
   sel->base = base;
-  auto* idx_expr = arena.Create<Expr>();
+  auto *idx_expr = arena.Create<Expr>();
   idx_expr->kind = ExprKind::kIntegerLiteral;
   idx_expr->int_val = idx;
   sel->index = idx_expr;
@@ -47,8 +46,8 @@ TEST(ArrayAccess, OutOfBoundsReturnsX) {
   f.ctx.RegisterArray("arr", {0, 4, 8, false, false, false});
   for (uint32_t i = 0; i < 4; ++i) {
     auto tmp = "arr[" + std::to_string(i) + "]";
-    auto* s = f.arena.AllocString(tmp.c_str(), tmp.size());
-    auto* v = f.ctx.CreateVariable(std::string_view(s, tmp.size()), 8);
+    auto *s = f.arena.AllocString(tmp.c_str(), tmp.size());
+    auto *v = f.ctx.CreateVariable(std::string_view(s, tmp.size()), 8);
     v->value = MakeLogic4VecVal(f.arena, 8, static_cast<uint64_t>(i + 1) * 10);
   }
   // In-bounds: arr[2] should return 30.
@@ -62,7 +61,7 @@ TEST(ArrayAccess, OutOfBoundsReturnsX) {
 
 TEST(QueueAccess, OutOfBoundsReturnsX) {
   AggFixture f;
-  auto* q = f.ctx.CreateQueue("q", 16);
+  auto *q = f.ctx.CreateQueue("q", 16);
   q->elements.push_back(MakeLogic4VecVal(f.arena, 16, 100));
   q->elements.push_back(MakeLogic4VecVal(f.arena, 16, 200));
   // In-bounds: q[1] should return 200.
@@ -74,4 +73,4 @@ TEST(QueueAccess, OutOfBoundsReturnsX) {
   EXPECT_FALSE(oob_result.IsKnown());
 }
 
-}  // namespace
+} // namespace

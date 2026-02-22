@@ -1,11 +1,11 @@
 // §11.3: Operators
 
-#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
+#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -23,10 +23,10 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
 };
 
-static ParseResult Parse(const std::string& src) {
+static ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -37,24 +37,23 @@ static ParseResult Parse(const std::string& src) {
 }
 
 struct StructMemberExpected {
-  const char* name;
+  const char *name;
   DataTypeKind type_kind;
 };
 
 struct ModportPortExpected {
   Direction dir;
-  const char* name;
+  const char *name;
 };
 
 namespace {
 
 TEST(Parser, ExpressionPrecedence) {
-  auto r = Parse(
-      "module expr;\n"
-      "  logic a;\n"
-      "  assign a = 1 + 2 * 3;\n"
-      "endmodule\n");
+  auto r = Parse("module expr;\n"
+                 "  logic a;\n"
+                 "  assign a = 1 + 2 * 3;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
 }
 
-}  // namespace
+} // namespace

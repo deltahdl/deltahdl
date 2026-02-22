@@ -15,11 +15,11 @@ namespace {
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit* cu = nullptr;
+  CompilationUnit *cu = nullptr;
   bool has_errors = false;
 };
 
-ParseResult Parse(const std::string& src) {
+ParseResult Parse(const std::string &src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -30,7 +30,7 @@ ParseResult Parse(const std::string& src) {
   return result;
 }
 
-}  // namespace
+} // namespace
 
 // =============================================================================
 // A.2.1.2 Port declarations
@@ -44,7 +44,7 @@ TEST(ParserA212, InoutWireNetType) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules[0]->ports.size(), 1u);
-  auto& port = r.cu->modules[0]->ports[0];
+  auto &port = r.cu->modules[0]->ports[0];
   EXPECT_EQ(port.direction, Direction::kInout);
   EXPECT_EQ(port.name, "a");
 }
@@ -53,7 +53,7 @@ TEST(ParserA212, InoutImplicitType) {
   auto r = Parse("module m(inout a); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
+  auto &port = r.cu->modules[0]->ports[0];
   EXPECT_EQ(port.direction, Direction::kInout);
 }
 
@@ -61,7 +61,7 @@ TEST(ParserA212, InoutPackedDim) {
   auto r = Parse("module m(inout [7:0] a); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
+  auto &port = r.cu->modules[0]->ports[0];
   EXPECT_EQ(port.direction, Direction::kInout);
   EXPECT_NE(port.data_type.packed_dim_left, nullptr);
 }
@@ -70,7 +70,7 @@ TEST(ParserA212, InoutUnpackedDim) {
   auto r = Parse("module m(inout logic a [3:0]); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
+  auto &port = r.cu->modules[0]->ports[0];
   EXPECT_EQ(port.direction, Direction::kInout);
   EXPECT_FALSE(port.unpacked_dims.empty());
 }
@@ -80,7 +80,7 @@ TEST(ParserA212, InoutNonAnsi) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules[0]->ports.size(), 1u);
-  auto& port = r.cu->modules[0]->ports[0];
+  auto &port = r.cu->modules[0]->ports[0];
   EXPECT_EQ(port.direction, Direction::kInout);
 }
 
@@ -92,7 +92,7 @@ TEST(ParserA212, InputNetPortType) {
   auto r = Parse("module m(input wire [7:0] d); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
+  auto &port = r.cu->modules[0]->ports[0];
   EXPECT_EQ(port.direction, Direction::kInput);
   EXPECT_NE(port.data_type.packed_dim_left, nullptr);
 }
@@ -101,7 +101,7 @@ TEST(ParserA212, InputVariablePortTypeLogic) {
   auto r = Parse("module m(input logic [7:0] d); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
+  auto &port = r.cu->modules[0]->ports[0];
   EXPECT_EQ(port.direction, Direction::kInput);
 }
 
@@ -119,7 +119,7 @@ TEST(ParserA212, InputUnpackedDim) {
   auto r = Parse("module m(input logic d [3:0]); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
+  auto &port = r.cu->modules[0]->ports[0];
   EXPECT_EQ(port.direction, Direction::kInput);
   EXPECT_FALSE(port.unpacked_dims.empty());
 }
@@ -129,7 +129,7 @@ TEST(ParserA212, InputNonAnsiMultiple) {
   auto r = Parse("module m(a, b); input wire [7:0] a, b; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  for (auto& port : r.cu->modules[0]->ports) {
+  for (auto &port : r.cu->modules[0]->ports) {
     EXPECT_EQ(port.direction, Direction::kInput);
   }
 }
@@ -157,7 +157,7 @@ TEST(ParserA212, OutputDefaultValue) {
   auto r = Parse("module m(output logic q = 1'b0); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
+  auto &port = r.cu->modules[0]->ports[0];
   EXPECT_EQ(port.direction, Direction::kOutput);
   EXPECT_NE(port.default_value, nullptr);
 }
@@ -166,7 +166,7 @@ TEST(ParserA212, OutputUnpackedDim) {
   auto r = Parse("module m(output logic q [1:0]); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
+  auto &port = r.cu->modules[0]->ports[0];
   EXPECT_FALSE(port.unpacked_dims.empty());
 }
 
@@ -199,7 +199,7 @@ TEST(ParserA212, RefUnpackedDim) {
   auto r = Parse("module m(ref int arr [4]); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
+  auto &port = r.cu->modules[0]->ports[0];
   EXPECT_EQ(port.direction, Direction::kRef);
   EXPECT_FALSE(port.unpacked_dims.empty());
 }

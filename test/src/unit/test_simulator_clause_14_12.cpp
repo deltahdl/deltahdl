@@ -1,8 +1,5 @@
 // §14.12: Default clocking
 
-#include <gtest/gtest.h>
-#include <cstdint>
-#include <string_view>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -12,6 +9,9 @@
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
 #include "simulation/variable.h"
+#include <cstdint>
+#include <gtest/gtest.h>
+#include <string_view>
 
 using namespace delta;
 
@@ -25,8 +25,8 @@ struct ClockingSimFixture {
 };
 
 // Schedule posedge at a given time through the scheduler.
-void SchedulePosedge(ClockingSimFixture& f, Variable* clk, uint64_t time) {
-  auto* ev = f.scheduler.GetEventPool().Acquire();
+void SchedulePosedge(ClockingSimFixture &f, Variable *clk, uint64_t time) {
+  auto *ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [clk, &f]() {
     clk->prev_value = clk->value;
     clk->value = MakeLogic4VecVal(f.arena, 1, 1);
@@ -36,8 +36,8 @@ void SchedulePosedge(ClockingSimFixture& f, Variable* clk, uint64_t time) {
 }
 
 // Schedule negedge at a given time through the scheduler.
-void ScheduleNegedge(ClockingSimFixture& f, Variable* clk, uint64_t time) {
-  auto* ev = f.scheduler.GetEventPool().Acquire();
+void ScheduleNegedge(ClockingSimFixture &f, Variable *clk, uint64_t time) {
+  auto *ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [clk, &f]() {
     clk->prev_value = clk->value;
     clk->value = MakeLogic4VecVal(f.arena, 1, 0);
@@ -66,9 +66,9 @@ TEST(ClockingSim, DefaultClockingBlock) {
   cmgr.SetDefaultClocking("sys_cb");
   EXPECT_EQ(cmgr.GetDefaultClocking(), "sys_cb");
 
-  const auto* found = cmgr.Find("sys_cb");
+  const auto *found = cmgr.Find("sys_cb");
   ASSERT_NE(found, nullptr);
   EXPECT_EQ(found->default_input_skew.ticks, 1u);
 }
 
-}  // namespace
+} // namespace

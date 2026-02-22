@@ -23,29 +23,30 @@ struct SysTaskFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static Expr* MkSysCall(Arena& arena, std::string_view name,
-                       std::vector<Expr*> args) {
-  auto* e = arena.Create<Expr>();
+static Expr *MkSysCall(Arena &arena, std::string_view name,
+                       std::vector<Expr *> args) {
+  auto *e = arena.Create<Expr>();
   e->kind = ExprKind::kSystemCall;
   e->callee = name;
   e->args = std::move(args);
   return e;
 }
 
-static Expr* MkInt(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
+static Expr *MkInt(Arena &arena, uint64_t val) {
+  auto *e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
   e->int_val = val;
   return e;
 }
 
-static Expr* MkStr(Arena& arena, std::string_view text) {
-  auto* e = arena.Create<Expr>();
+static Expr *MkStr(Arena &arena, std::string_view text) {
+  auto *e = arena.Create<Expr>();
   e->kind = ExprKind::kStringLiteral;
   auto len = text.size() + 2;
-  char* buf = static_cast<char*>(arena.Allocate(len + 1, 1));
+  char *buf = static_cast<char *>(arena.Allocate(len + 1, 1));
   buf[0] = '"';
-  for (size_t i = 0; i < text.size(); ++i) buf[i + 1] = text[i];
+  for (size_t i = 0; i < text.size(); ++i)
+    buf[i + 1] = text[i];
   buf[len - 1] = '"';
   buf[len] = '\0';
   e->text = std::string_view(buf, len);
@@ -62,28 +63,28 @@ TEST(SysTask, FeofAtEnd) {
     ofs << "x";
   }
 
-  auto* open_expr =
+  auto *open_expr =
       MkSysCall(f.arena, "$fopen", {MkStr(f.arena, tmp), MkStr(f.arena, "r")});
   auto fd_val = EvalExpr(open_expr, f.ctx, f.arena);
 
-  auto* fgetc_expr =
+  auto *fgetc_expr =
       MkSysCall(f.arena, "$fgetc", {MkInt(f.arena, fd_val.ToUint64())});
   EvalExpr(fgetc_expr, f.ctx, f.arena);
 
-  auto* fgetc2_expr =
+  auto *fgetc2_expr =
       MkSysCall(f.arena, "$fgetc", {MkInt(f.arena, fd_val.ToUint64())});
   auto eof_ch = EvalExpr(fgetc2_expr, f.ctx, f.arena);
   EXPECT_EQ(eof_ch.ToUint64(), 0xFFFFFFFF);
 
-  auto* eof_expr =
+  auto *eof_expr =
       MkSysCall(f.arena, "$feof", {MkInt(f.arena, fd_val.ToUint64())});
   auto result = EvalExpr(eof_expr, f.ctx, f.arena);
   EXPECT_NE(result.ToUint64(), 0u);
 
-  auto* close_expr =
+  auto *close_expr =
       MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd_val.ToUint64())});
   EvalExpr(close_expr, f.ctx, f.arena);
   std::remove(tmp.c_str());
 }
 
-}  // namespace
+} // namespace

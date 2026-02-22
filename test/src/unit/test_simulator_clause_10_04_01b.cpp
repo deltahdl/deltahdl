@@ -1,8 +1,5 @@
 // §10.4.1: Blocking procedural assignments
 
-#include <gtest/gtest.h>
-#include <cstdint>
-#include <string_view>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -16,6 +13,9 @@
 #include "simulation/stmt_exec.h"
 #include "simulation/stmt_result.h"
 #include "simulation/variable.h"
+#include <cstdint>
+#include <gtest/gtest.h>
+#include <string_view>
 
 using namespace delta;
 
@@ -27,15 +27,15 @@ struct StmtFixture {
   SimContext ctx{scheduler, arena, diag, /*seed=*/42};
 };
 
-Expr* MakeIdent(Arena& arena, std::string_view name) {
-  auto* e = arena.Create<Expr>();
+Expr *MakeIdent(Arena &arena, std::string_view name) {
+  auto *e = arena.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
   e->text = name;
   return e;
 }
 
-Expr* MakeIntLit(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
+Expr *MakeIntLit(Arena &arena, uint64_t val) {
+  auto *e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
   e->int_val = val;
   return e;
@@ -45,12 +45,12 @@ struct DriverResult {
   StmtResult value = StmtResult::kDone;
 };
 
-SimCoroutine DriverCoroutine(const Stmt* stmt, SimContext& ctx, Arena& arena,
-                             DriverResult* out) {
+SimCoroutine DriverCoroutine(const Stmt *stmt, SimContext &ctx, Arena &arena,
+                             DriverResult *out) {
   out->value = co_await ExecStmt(stmt, ctx, arena);
 }
 
-StmtResult RunStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+StmtResult RunStmt(const Stmt *stmt, SimContext &ctx, Arena &arena) {
   DriverResult result;
   auto coro = DriverCoroutine(stmt, ctx, arena, &result);
   coro.Resume();
@@ -63,22 +63,22 @@ namespace {
 // =============================================================================
 TEST(StmtExec, BlockingAssignBitSelect) {
   StmtFixture f;
-  auto* var = f.ctx.CreateVariable("bs", 8);
+  auto *var = f.ctx.CreateVariable("bs", 8);
   var->value = MakeLogic4VecVal(f.arena, 8, 0);
 
   // bs[3] = 1;
-  auto* sel = f.arena.Create<Expr>();
+  auto *sel = f.arena.Create<Expr>();
   sel->kind = ExprKind::kSelect;
   sel->base = MakeIdent(f.arena, "bs");
   sel->index = MakeIntLit(f.arena, 3);
 
-  auto* stmt = f.arena.Create<Stmt>();
+  auto *stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kBlockingAssign;
   stmt->lhs = sel;
   stmt->rhs = MakeIntLit(f.arena, 1);
 
   RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_EQ(var->value.ToUint64(), 0x08u);  // bit 3 set
+  EXPECT_EQ(var->value.ToUint64(), 0x08u); // bit 3 set
 }
 
 // =============================================================================
@@ -86,23 +86,23 @@ TEST(StmtExec, BlockingAssignBitSelect) {
 // =============================================================================
 TEST(StmtExec, BlockingAssignPartSelect) {
   StmtFixture f;
-  auto* var = f.ctx.CreateVariable("ps", 8);
+  auto *var = f.ctx.CreateVariable("ps", 8);
   var->value = MakeLogic4VecVal(f.arena, 8, 0x0F);
 
   // ps[7:4] = 4'hA;
-  auto* sel = f.arena.Create<Expr>();
+  auto *sel = f.arena.Create<Expr>();
   sel->kind = ExprKind::kSelect;
   sel->base = MakeIdent(f.arena, "ps");
   sel->index = MakeIntLit(f.arena, 7);
   sel->index_end = MakeIntLit(f.arena, 4);
 
-  auto* stmt = f.arena.Create<Stmt>();
+  auto *stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kBlockingAssign;
   stmt->lhs = sel;
   stmt->rhs = MakeIntLit(f.arena, 0xA);
 
   RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_EQ(var->value.ToUint64(), 0xAFu);  // upper nibble = A, lower = F
+  EXPECT_EQ(var->value.ToUint64(), 0xAFu); // upper nibble = A, lower = F
 }
 
 // =============================================================================
@@ -111,16 +111,16 @@ TEST(StmtExec, BlockingAssignPartSelect) {
 TEST(StmtExec, BlockingAssignMemberAccess) {
   StmtFixture f;
   // Create variable "s.a" to represent a struct member.
-  auto* var = f.ctx.CreateVariable("s.a", 32);
+  auto *var = f.ctx.CreateVariable("s.a", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
   // s.a = 42;
-  auto* mem = f.arena.Create<Expr>();
+  auto *mem = f.arena.Create<Expr>();
   mem->kind = ExprKind::kMemberAccess;
   mem->lhs = MakeIdent(f.arena, "s");
   mem->rhs = MakeIdent(f.arena, "a");
 
-  auto* stmt = f.arena.Create<Stmt>();
+  auto *stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kBlockingAssign;
   stmt->lhs = mem;
   stmt->rhs = MakeIntLit(f.arena, 42);
@@ -129,4 +129,4 @@ TEST(StmtExec, BlockingAssignMemberAccess) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-}  // namespace
+} // namespace

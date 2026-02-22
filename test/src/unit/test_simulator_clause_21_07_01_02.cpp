@@ -8,15 +8,15 @@
 #include <string>
 
 #include "common/arena.h"
-#include "gtest/gtest.h"
 #include "simulation/variable.h"
 #include "simulation/vcd_writer.h"
+#include "gtest/gtest.h"
 
 namespace delta {
 namespace {
 
 class VcdClause21070102Test : public ::testing::Test {
- protected:
+protected:
   void SetUp() override {
     char tmpl[] = "/tmp/test_vcd_XXXXXX";
     int fd = mkstemp(tmpl);
@@ -41,7 +41,7 @@ TEST_F(VcdClause21070102Test, ScalarValueChange) {
   {
     VcdWriter vcd(tmp_path_);
     vcd.WriteHeader("1ns");
-    auto* var = arena_.Create<Variable>();
+    auto *var = arena_.Create<Variable>();
     var->value = MakeLogic4VecVal(arena_, 1, 1);
     vcd.RegisterSignal("clk", 1, var);
     vcd.EndDefinitions();
@@ -57,7 +57,7 @@ TEST_F(VcdClause21070102Test, VectorValueChange) {
   {
     VcdWriter vcd(tmp_path_);
     vcd.WriteHeader("1ns");
-    auto* var = arena_.Create<Variable>();
+    auto *var = arena_.Create<Variable>();
     var->value = MakeLogic4VecVal(arena_, 8, 0xA5);
     vcd.RegisterSignal("data", 8, var);
     vcd.EndDefinitions();
@@ -68,5 +68,5 @@ TEST_F(VcdClause21070102Test, VectorValueChange) {
   EXPECT_NE(content.find("b10100101 !"), std::string::npos);
 }
 
-}  // namespace
-}  // namespace delta
+} // namespace
+} // namespace delta
