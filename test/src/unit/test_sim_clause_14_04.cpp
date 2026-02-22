@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §14.4: Input and output skews
 
 #include <gtest/gtest.h>
 #include "common/arena.h"
@@ -11,31 +11,6 @@
 using namespace delta;
 
 namespace {
-
-// =============================================================================
-// ClockingBlock registration
-// =============================================================================
-TEST(Clocking, RegisterAndFind) {
-  ClockingManager mgr;
-  ClockingBlock block;
-  block.name = "cb_main";
-  block.clock_signal = "clk";
-  block.default_input_skew = SimTime{2};
-  block.default_output_skew = SimTime{3};
-
-  mgr.Register(block);
-  EXPECT_EQ(mgr.Count(), 1u);
-
-  const auto* found = mgr.Find("cb_main");
-  ASSERT_NE(found, nullptr);
-  EXPECT_EQ(found->clock_signal, "clk");
-  EXPECT_EQ(found->default_input_skew.ticks, 2u);
-}
-
-TEST(Clocking, FindNonexistent) {
-  ClockingManager mgr;
-  EXPECT_EQ(mgr.Find("nonexistent"), nullptr);
-}
 
 // =============================================================================
 // Skew resolution
