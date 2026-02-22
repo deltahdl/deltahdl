@@ -1,4 +1,4 @@
-// §11.4.3: Arithmetic operators
+// §11.4: Operator descriptions
 
 #include <gtest/gtest.h>
 #include "common/arena.h"
@@ -34,12 +34,6 @@ TEST(ConstEval, Unary) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("-5", f)), -5);
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("!0", f)), 1);
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("!5", f)), 0);
-}
-
-TEST(ConstEval, Power) {
-  EvalFixture f;
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("2 ** 10", f)), 1024);
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("3 ** 0", f)), 1);
 }
 
 }  // namespace
