@@ -1,14 +1,16 @@
 // §11.4.3: Arithmetic operators
 
+#include <gtest/gtest.h>
+
+#include <cstring>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h" // StructTypeInfo, StructFieldInfo
-#include <cstring>
-#include <gtest/gtest.h>
+#include "simulation/sim_context.h"  // StructTypeInfo, StructFieldInfo
 
 using namespace delta;
 
@@ -91,20 +93,20 @@ TEST(EvalAdv, PowZeroBaseNegExp) {
   EvalAdvFixture f;
   // 0 ** (-1) = X (Table 11-4: zero base, negative exp → X).
   MakeSignedVarAdv(f, "zb", 8, 0);
-  MakeSignedVarAdv(f, "ze", 8, 0xFF); // -1 in 8-bit
+  MakeSignedVarAdv(f, "ze", 8, 0xFF);  // -1 in 8-bit
   auto *expr = f.arena.Create<Expr>();
   expr->kind = ExprKind::kBinary;
   expr->op = TokenKind::kPower;
   expr->lhs = MakeId(f.arena, "zb");
   expr->rhs = MakeId(f.arena, "ze");
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_NE(result.words[0].bval, 0u); // result is X
+  EXPECT_NE(result.words[0].bval, 0u);  // result is X
 }
 
 TEST(EvalAdv, PowNeg1OddExp) {
   EvalAdvFixture f;
   // (-1) ** 3 = -1 (Table 11-4: base -1, odd exp).
-  MakeSignedVarAdv(f, "n1", 8, 0xFF); // -1 in 8-bit
+  MakeSignedVarAdv(f, "n1", 8, 0xFF);  // -1 in 8-bit
   MakeSignedVarAdv(f, "n3", 8, 3);
   auto *expr = f.arena.Create<Expr>();
   expr->kind = ExprKind::kBinary;
@@ -112,14 +114,14 @@ TEST(EvalAdv, PowNeg1OddExp) {
   expr->lhs = MakeId(f.arena, "n1");
   expr->rhs = MakeId(f.arena, "n3");
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64() & 0xFF, 0xFFu); // -1 in 8-bit
+  EXPECT_EQ(result.ToUint64() & 0xFF, 0xFFu);  // -1 in 8-bit
   EXPECT_TRUE(result.is_signed);
 }
 
 TEST(EvalAdv, PowNeg1EvenExp) {
   EvalAdvFixture f;
   // (-1) ** 4 = 1 (Table 11-4: base -1, even exp).
-  MakeSignedVarAdv(f, "n1", 8, 0xFF); // -1 in 8-bit
+  MakeSignedVarAdv(f, "n1", 8, 0xFF);  // -1 in 8-bit
   MakeSignedVarAdv(f, "n4", 8, 4);
   auto *expr = f.arena.Create<Expr>();
   expr->kind = ExprKind::kBinary;
@@ -179,4 +181,4 @@ TEST(EvalAdv, UnsignedDivUnchanged) {
   EXPECT_EQ(result.ToUint64(), 124u);
 }
 
-} // namespace
+}  // namespace

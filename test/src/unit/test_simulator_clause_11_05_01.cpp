@@ -1,14 +1,16 @@
 // §11.5.1: Vector bit-select and part-select addressing
 
+#include <gtest/gtest.h>
+
+#include <cstring>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h" // StructTypeInfo, StructFieldInfo
-#include <cstring>
-#include <gtest/gtest.h>
+#include "simulation/sim_context.h"  // StructTypeInfo, StructFieldInfo
 
 using namespace delta;
 
@@ -92,7 +94,7 @@ TEST(EvalAdv, ArrayXZAddrReturnsX) {
   auto *xvar = f.ctx.CreateVariable("xidx", 8);
   xvar->value = MakeLogic4Vec(f.arena, 8);
   xvar->value.words[0].aval = 1;
-  xvar->value.words[0].bval = 1; // aval=1, bval=1 → X
+  xvar->value.words[0].bval = 1;  // aval=1, bval=1 → X
   sel->index = MakeId(f.arena, "xidx");
 
   auto result = EvalExpr(sel, f.ctx, f.arena);
@@ -101,4 +103,4 @@ TEST(EvalAdv, ArrayXZAddrReturnsX) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-} // namespace
+}  // namespace

@@ -1,5 +1,7 @@
 // §9.4.2: Event control
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -11,7 +13,6 @@
 #include "lexer/lexer.h"
 #include "lexer/token.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -71,4 +72,4 @@ TEST(Sensitivity, NestedSelectUsesLSP) {
   EXPECT_FALSE(reads.count("a"));
 }
 
-} // namespace
+}  // namespace

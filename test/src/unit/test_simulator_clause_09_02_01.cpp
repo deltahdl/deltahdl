@@ -1,5 +1,7 @@
 // §9.2.1: Initial procedures
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -12,7 +14,6 @@
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
 #include "simulation/variable.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -37,10 +38,11 @@ namespace {
 
 TEST(Lowerer, InitialBlockSchedulesEvent) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  initial begin end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  initial begin end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -51,11 +53,12 @@ TEST(Lowerer, InitialBlockSchedulesEvent) {
 
 TEST(Lowerer, InitialBlockExecutes) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] x;\n"
-                              "  initial x = 42;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial x = 42;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -69,11 +72,12 @@ TEST(Lowerer, InitialBlockExecutes) {
 
 TEST(Lowerer, SensitivityMapEmpty) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] x;\n"
-                              "  initial x = 1;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial x = 1;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -84,4 +88,4 @@ TEST(Lowerer, SensitivityMapEmpty) {
   EXPECT_TRUE(procs.empty());
 }
 
-} // namespace
+}  // namespace

@@ -1,5 +1,10 @@
 // §12.7: Loop statements
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <string_view>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -13,9 +18,6 @@
 #include "simulation/stmt_exec.h"
 #include "simulation/stmt_result.h"
 #include "simulation/variable.h"
-#include <cstdint>
-#include <gtest/gtest.h>
-#include <string_view>
 
 using namespace delta;
 
@@ -244,4 +246,4 @@ TEST(StmtExec, ForeachIteratorVariableAccessible) {
   EXPECT_EQ(last->value.ToUint64(), 4u);
 }
 
-} // namespace
+}  // namespace

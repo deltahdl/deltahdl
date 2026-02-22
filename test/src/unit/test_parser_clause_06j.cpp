@@ -38,8 +38,7 @@ static bool ParseOk(const std::string &src) {
 }
 
 static ModuleItem *FirstItem(ParseResult6j &r) {
-  if (!r.cu || r.cu->modules.empty())
-    return nullptr;
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
   auto &items = r.cu->modules[0]->items;
   return items.empty() ? nullptr : items[0];
 }
@@ -50,9 +49,10 @@ static ModuleItem *FirstItem(ParseResult6j &r) {
 
 // 1. wire logic [7:0] w; — explicit data type after net keyword, no errors.
 TEST(ParserSection6, Sec6_7_1_WireExplicitLogicNoErrors) {
-  auto r = Parse("module t;\n"
-                 "  wire logic [7:0] w;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  wire logic [7:0] w;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -66,10 +66,11 @@ TEST(ParserSection6, Sec6_7_1_WireExplicitLogicNoErrors) {
 
 // 2. wire addressT w1; — user-defined type after net keyword (§6.7.1 example).
 TEST(ParserSection6, Sec6_7_1_WireWithUserDefinedType) {
-  auto r = Parse("module t;\n"
-                 "  typedef logic [31:0] addressT;\n"
-                 "  wire addressT w1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  typedef logic [31:0] addressT;\n"
+      "  wire addressT w1;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &items = r.cu->modules[0]->items;
@@ -83,10 +84,10 @@ TEST(ParserSection6, Sec6_7_1_WireWithUserDefinedType) {
 
 // 3. wire struct packed { ... } memsig; — struct type after net keyword.
 TEST(ParserSection6, Sec6_7_1_WireWithPackedStructType) {
-  auto r =
-      Parse("module t;\n"
-            "  wire struct packed { logic ecc; logic [7:0] data; } memsig;\n"
-            "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  wire struct packed { logic ecc; logic [7:0] data; } memsig;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -98,9 +99,10 @@ TEST(ParserSection6, Sec6_7_1_WireWithPackedStructType) {
 
 // 4. trireg (large) logic cap1; — charge strength + explicit type (LRM §6.7.1).
 TEST(ParserSection6, Sec6_7_1_TriregChargeStrengthWithLogic) {
-  auto r = Parse("module t;\n"
-                 "  trireg (large) logic cap1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  trireg (large) logic cap1;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -112,9 +114,10 @@ TEST(ParserSection6, Sec6_7_1_TriregChargeStrengthWithLogic) {
 
 // 5. Multiple nets with explicit type: wire logic a, b, c;
 TEST(ParserSection6, Sec6_7_1_MultipleNetsExplicitType) {
-  auto r = Parse("module t;\n"
-                 "  wire logic a, b, c;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  wire logic a, b, c;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &items = r.cu->modules[0]->items;
@@ -132,9 +135,10 @@ TEST(ParserSection6, Sec6_7_1_MultipleNetsExplicitType) {
 
 // 6. wire vectored logic [7:0] v; — vectored with explicit type.
 TEST(ParserSection6, Sec6_7_1_VectoredWithExplicitType) {
-  auto r = Parse("module t;\n"
-                 "  wire vectored logic [7:0] v;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  wire vectored logic [7:0] v;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -147,9 +151,10 @@ TEST(ParserSection6, Sec6_7_1_VectoredWithExplicitType) {
 
 // 7. wire scalared logic [7:0] s; — scalared with explicit type.
 TEST(ParserSection6, Sec6_7_1_ScalaredWithExplicitType) {
-  auto r = Parse("module t;\n"
-                 "  wire scalared logic [7:0] s;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  wire scalared logic [7:0] s;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -163,9 +168,10 @@ TEST(ParserSection6, Sec6_7_1_ScalaredWithExplicitType) {
 // 8. tri bit [3:0] b; — non-logic 4-state type after net keyword (parser
 // accepts).
 TEST(ParserSection6, Sec6_7_1_NetWithExplicitBitType) {
-  auto r = Parse("module t;\n"
-                 "  tri bit [3:0] b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  tri bit [3:0] b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -177,9 +183,10 @@ TEST(ParserSection6, Sec6_7_1_NetWithExplicitBitType) {
 
 // 9. wire (strong0, weak1) logic [7:0] w; — drive strength + explicit type.
 TEST(ParserSection6, Sec6_7_1_DriveStrengthWithExplicitType) {
-  auto r = Parse("module t;\n"
-                 "  wire (strong0, weak1) logic [7:0] w;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  wire (strong0, weak1) logic [7:0] w;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -192,9 +199,10 @@ TEST(ParserSection6, Sec6_7_1_DriveStrengthWithExplicitType) {
 // 10. wire signed [7:0] w; — implicit type with signing (already works,
 // baseline).
 TEST(ParserSection6, Sec6_7_1_NetImplicitSigned) {
-  auto r = Parse("module t;\n"
-                 "  wire signed [7:0] ws;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  wire signed [7:0] ws;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -221,10 +229,10 @@ TEST(ParserSection6, Sec6_21_LifetimeAutomaticAndStatic) {
   EXPECT_FALSE(fa.has_errors);
   EXPECT_EQ(fa.cu->modules[0]->items[0]->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_TRUE(fa.cu->modules[0]->items[0]->is_automatic);
-  auto fs =
-      Parse("module m;\n"
-            "  function static int mul(int a, int b); return a*b; endfunction\n"
-            "endmodule\n");
+  auto fs = Parse(
+      "module m;\n"
+      "  function static int mul(int a, int b); return a*b; endfunction\n"
+      "endmodule\n");
   ASSERT_NE(fs.cu, nullptr);
   EXPECT_FALSE(fs.has_errors);
   EXPECT_TRUE(fs.cu->modules[0]->items[0]->is_static);
@@ -238,9 +246,10 @@ TEST(ParserSection6, Sec6_21_LifetimeAutomaticAndStatic) {
   EXPECT_FALSE(ts.has_errors);
   EXPECT_TRUE(ts.cu->modules[0]->items[0]->is_static);
   // Top-level function with automatic lifetime
-  auto tl = Parse("function automatic int foo(int x);\n"
-                  "  return x + 1;\n"
-                  "endfunction\n");
+  auto tl = Parse(
+      "function automatic int foo(int x);\n"
+      "  return x + 1;\n"
+      "endfunction\n");
   ASSERT_NE(tl.cu, nullptr);
   EXPECT_FALSE(tl.has_errors);
   ASSERT_GE(tl.cu->cu_items.size(), 1u);
@@ -254,7 +263,8 @@ TEST(ParserSection6, Sec6_21_LifetimeAutomaticAndStatic) {
   ASSERT_GE(tt.cu->cu_items.size(), 1u);
   EXPECT_EQ(tt.cu->cu_items[0]->kind, ModuleItemKind::kTaskDecl);
   // Program with automatic lifetime
-  EXPECT_TRUE(ParseOk("program automatic test_prog;\n"
-                      "  initial begin $display(\"hello\"); end\n"
-                      "endprogram\n"));
+  EXPECT_TRUE(
+      ParseOk("program automatic test_prog;\n"
+              "  initial begin $display(\"hello\"); end\n"
+              "endprogram\n"));
 }

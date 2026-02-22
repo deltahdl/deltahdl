@@ -1,11 +1,12 @@
 // §28.7: MOS switches
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -57,4 +58,4 @@ TEST(Parser, GateNmos) {
   EXPECT_EQ(item->gate_terminals.size(), 3);
 }
 
-} // namespace
+}  // namespace

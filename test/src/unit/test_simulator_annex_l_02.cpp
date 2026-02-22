@@ -41,4 +41,4 @@ TEST(VpiCompatL2, DefaultNoRemapping) {
 #endif
 }
 
-} // namespace
+}  // namespace

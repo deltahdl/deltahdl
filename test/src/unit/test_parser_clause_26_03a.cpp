@@ -1,11 +1,12 @@
 // §26.3: Referencing data in packages
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -49,9 +50,10 @@ struct ModportPortExpected {
 namespace {
 
 TEST(Parser, ImportSpecific) {
-  auto r = Parse("module t;\n"
-                 "  import my_pkg::WIDTH;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  import my_pkg::WIDTH;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kImportDecl);
@@ -61,9 +63,10 @@ TEST(Parser, ImportSpecific) {
 }
 
 TEST(Parser, ImportWildcard) {
-  auto r = Parse("module t;\n"
-                 "  import my_pkg::*;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  import my_pkg::*;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kImportDecl);
@@ -71,4 +74,4 @@ TEST(Parser, ImportWildcard) {
   EXPECT_TRUE(item->import_item.is_wildcard);
 }
 
-} // namespace
+}  // namespace

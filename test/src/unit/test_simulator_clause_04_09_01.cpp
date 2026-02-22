@@ -358,7 +358,7 @@ TEST(SimCh4091, NoUpdateWhenExpressionUnchanged) {
   auto *eval1 = sched.GetEventPool().Acquire();
   eval1->kind = EventKind::kEvaluation;
   eval1->callback = [&]() {
-    int new_val = src; // still 5, no change
+    int new_val = src;  // still 5, no change
     if (new_val != dst) {
       auto *update = sched.GetEventPool().Acquire();
       update->kind = EventKind::kUpdate;

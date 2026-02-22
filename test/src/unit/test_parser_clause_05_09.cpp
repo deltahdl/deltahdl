@@ -52,9 +52,10 @@ static Stmt *FirstInitialStmt(ParseResult509 &r) {
 }
 
 TEST(ParserCh509, StringLiteral_Basic) {
-  auto r = Parse("module m;\n"
-                 "  initial $display(\"hello world\");\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  initial $display(\"hello world\");\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -66,28 +67,32 @@ TEST(ParserCh509, StringLiteral_Basic) {
 
 TEST(ParserCh509, StringLiteral_Assignment) {
   // A string literal can be assigned to an integral type.
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  byte c1;\n"
-                      "  initial c1 = \"A\";\n"
-                      "endmodule"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  byte c1;\n"
+              "  initial c1 = \"A\";\n"
+              "endmodule"));
 }
 
 TEST(ParserCh509, StringLiteral_PackedArray) {
   // Storing a string in a packed array, per LRM Section 5.9.
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  bit [8*12:1] stringvar = \"Hello world\\n\";\n"
-                      "endmodule"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  bit [8*12:1] stringvar = \"Hello world\\n\";\n"
+              "endmodule"));
 }
 
 TEST(ParserCh509, StringLiteral_AsParameter) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  parameter string MSG = \"default message\";\n"
-                      "endmodule"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  parameter string MSG = \"default message\";\n"
+              "endmodule"));
 }
 
 TEST(ParserCh509, StringLiteral_InConcatenation) {
   // String concatenation using system task.
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  initial $display({\"A\", \"B\"});\n"
-                      "endmodule"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial $display({\"A\", \"B\"});\n"
+              "endmodule"));
 }

@@ -1,13 +1,15 @@
 // §11.12: Let construct
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "simulation/assertion.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
-#include <cstdint>
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -113,4 +115,4 @@ TEST(Assertion, LetWithSampledInBody) {
   EXPECT_EQ(result.ToUint64(), 99u);
 }
 
-} // namespace
+}  // namespace

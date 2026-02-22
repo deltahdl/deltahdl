@@ -14,7 +14,7 @@ using namespace delta;
 namespace {
 
 struct VerifyParseTest : ::testing::Test {
-protected:
+ protected:
   CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
@@ -507,4 +507,4 @@ TEST_F(VerifyParseTest, CheckerWithCovergroupAndClocking) {
   EXPECT_FALSE(unit->checkers[0]->items.empty());
 }
 
-} // namespace
+}  // namespace

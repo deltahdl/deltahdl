@@ -1,10 +1,12 @@
 // §19.5.4: Wildcard specification of coverage point bins
 
-#include "simulation/coverage.h"
-#include <cstdint>
 #include <gtest/gtest.h>
+
+#include <cstdint>
 #include <string>
 #include <vector>
+
+#include "simulation/coverage.h"
 
 using namespace delta;
 
@@ -29,4 +31,4 @@ TEST(Coverage, TransitionBinNotMatchedByScalar) {
   EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 0u);
 }
 
-} // namespace
+}  // namespace

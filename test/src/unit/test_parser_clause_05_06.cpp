@@ -40,8 +40,7 @@ static bool ParseOk(const std::string &src) {
 }
 
 static ModuleItem *FirstItem(ParseResult506 &r) {
-  if (!r.cu || r.cu->modules.empty())
-    return nullptr;
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
   auto &items = r.cu->modules[0]->items;
   return items.empty() ? nullptr : items[0];
 }
@@ -60,10 +59,11 @@ TEST(ParserCh506, Ident_SimpleWithDollarSign) {
 
 TEST(ParserCh506, Ident_CaseSensitive) {
   // Identifiers are case sensitive: X and x are different.
-  auto r = Parse("module m;\n"
-                 "  logic X;\n"
-                 "  logic x;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  logic X;\n"
+      "  logic x;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
   EXPECT_EQ(r.cu->modules[0]->items[0]->name, "X");

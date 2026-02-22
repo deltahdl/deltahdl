@@ -1,11 +1,12 @@
 // §28.9: CMOS switches
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -57,4 +58,4 @@ TEST(Parser, GateCmos) {
   EXPECT_EQ(item->gate_terminals.size(), 4);
 }
 
-} // namespace
+}  // namespace

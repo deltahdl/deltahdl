@@ -1,11 +1,12 @@
 // §9.4.2: Event control
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -49,10 +50,11 @@ struct ModportPortExpected {
 namespace {
 
 TEST(Parser, EventWaitWithParens) {
-  auto r = Parse("module t;\n"
-                 "  event ev;\n"
-                 "  initial @(ev) ;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  event ev;\n"
+      "  initial @(ev) ;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[1];
   auto *stmt = item->body;
@@ -63,10 +65,11 @@ TEST(Parser, EventWaitWithParens) {
 }
 
 TEST(Parser, EventWaitBareIdentifier) {
-  auto r = Parse("module t;\n"
-                 "  event ev;\n"
-                 "  initial @ev ;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  event ev;\n"
+      "  initial @ev ;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[1];
   auto *stmt = item->body;
@@ -76,4 +79,4 @@ TEST(Parser, EventWaitBareIdentifier) {
   EXPECT_EQ(stmt->events[0].signal->text, "ev");
 }
 
-} // namespace
+}  // namespace

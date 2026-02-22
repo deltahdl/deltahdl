@@ -1,5 +1,7 @@
 // §7.2.2: Assigning to structures
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -11,7 +13,6 @@
 #include "lexer/lexer.h"
 #include "lexer/token.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -35,11 +36,12 @@ namespace {
 // §7.2.2: Packed struct members shall not have individual default values.
 TEST(Elaboration, PackedStructMemberDefault_Rejected) {
   ElabFixture f;
-  ElaborateSrc("module top;\n"
-               "  struct packed { bit [3:0] lo = 5; bit [3:0] hi; } s;\n"
-               "endmodule\n",
-               f);
+  ElaborateSrc(
+      "module top;\n"
+      "  struct packed { bit [3:0] lo = 5; bit [3:0] hi; } s;\n"
+      "endmodule\n",
+      f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-} // namespace
+}  // namespace

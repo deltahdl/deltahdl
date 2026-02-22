@@ -1,7 +1,8 @@
 // §9.2: Structured procedures
 
-#include "simulation/process.h"
 #include <gtest/gtest.h>
+
+#include "simulation/process.h"
 
 using namespace delta;
 
@@ -29,4 +30,4 @@ TEST(Process, ProcessKindEnum) {
   }
 }
 
-} // namespace
+}  // namespace

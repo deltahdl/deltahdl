@@ -40,16 +40,17 @@ static bool FindModuleInst(const std::vector<ModuleItem *> &items,
 }
 
 TEST(ParserSection29, UdpInstance) {
-  auto r = Parse("primitive inv(output out, input in);\n"
-                 "  table\n"
-                 "    0 : 1;\n"
-                 "    1 : 0;\n"
-                 "  endtable\n"
-                 "endprimitive\n"
-                 "module top;\n"
-                 "  wire a, b;\n"
-                 "  inv u1(a, b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "primitive inv(output out, input in);\n"
+      "  table\n"
+      "    0 : 1;\n"
+      "    1 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module top;\n"
+      "  wire a, b;\n"
+      "  inv u1(a, b);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->udps.size(), 1);
   ASSERT_EQ(r.cu->modules.size(), 1);

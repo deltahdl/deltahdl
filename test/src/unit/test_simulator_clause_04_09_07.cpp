@@ -37,7 +37,7 @@ TEST(SimCh4097, ArgumentPassedByValue) {
   sched.ScheduleEvent({0}, Region::kActive, eval);
 
   sched.Run();
-  EXPECT_EQ(caller_var, 10); // Unchanged — passed by value.
+  EXPECT_EQ(caller_var, 10);  // Unchanged — passed by value.
   EXPECT_EQ(subroutine_local, 99);
 }
 
@@ -181,7 +181,7 @@ TEST(SimCh4097, CopyOutBehavesAsBlockingAssignment) {
   eval->callback = [&]() {
     // Subroutine executes, copy-out on return (blocking).
     int out_arg = 42;
-    result = out_arg; // Copy-out behaves as blocking assignment.
+    result = out_arg;  // Copy-out behaves as blocking assignment.
     // Next sequential statement sees the updated value immediately.
     observed_after_call = result;
   };
@@ -245,7 +245,7 @@ TEST(SimCh4097, CopyOutDoesNotSuspendProcess) {
     order.push_back("before_call");
     // Subroutine call with copy-out (blocking — no suspension).
     int dst = 0;
-    dst = 1; // Copy-out on return.
+    dst = 1;  // Copy-out on return.
     order.push_back("after_call");
     (void)dst;
   };
@@ -305,9 +305,9 @@ TEST(SimCh4097, CopyInAndCopyOutAreIndependent) {
   invoke->kind = EventKind::kEvaluation;
   invoke->callback = [&]() {
     // Copy-in at invocation.
-    int x_local = caller_x; // 10 at invocation time.
+    int x_local = caller_x;  // 10 at invocation time.
     // Subroutine body.
-    int y_local = x_local * 2; // 20.
+    int y_local = x_local * 2;  // 20.
     // Simulate caller_x changing during subroutine execution.
     caller_x = 999;
     // Copy-out on return — writes to caller_y.

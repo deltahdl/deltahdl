@@ -33,7 +33,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA603Fixture &f) {
   return design;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.6.3 Parallel and sequential blocks — Elaboration
@@ -46,14 +46,15 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA603Fixture &f) {
 // §13.4.4: fork/join_none is permitted inside a function
 TEST(ElabA603, ForkJoinNoneAllowedInFunction) {
   ElabA603Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  function void my_func();\n"
-                              "    fork\n"
-                              "      a = 1;\n"
-                              "    join_none\n"
-                              "  endfunction\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  function void my_func();\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "    join_none\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -61,27 +62,29 @@ TEST(ElabA603, ForkJoinNoneAllowedInFunction) {
 // §13.4.4: fork/join is illegal inside a function
 TEST(ElabA603, ForkJoinIllegalInFunction) {
   ElabA603Fixture f;
-  ElaborateSrc("module m;\n"
-               "  function void my_func();\n"
-               "    fork\n"
-               "      a = 1;\n"
-               "    join\n"
-               "  endfunction\n"
-               "endmodule\n",
-               f);
+  ElaborateSrc(
+      "module m;\n"
+      "  function void my_func();\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "    join\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
   EXPECT_TRUE(f.has_errors);
 }
 
 // §13.4.4: fork/join_any is illegal inside a function
 TEST(ElabA603, ForkJoinAnyIllegalInFunction) {
   ElabA603Fixture f;
-  ElaborateSrc("module m;\n"
-               "  function void my_func();\n"
-               "    fork\n"
-               "      a = 1;\n"
-               "    join_any\n"
-               "  endfunction\n"
-               "endmodule\n",
-               f);
+  ElaborateSrc(
+      "module m;\n"
+      "  function void my_func();\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "    join_any\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
   EXPECT_TRUE(f.has_errors);
 }

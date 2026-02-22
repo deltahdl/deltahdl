@@ -53,9 +53,10 @@ static Stmt *FirstInitialStmt(ParseResult50603 &r) {
 
 TEST(ParserCh50603, SystemTask_Display) {
   // $display is a system task call (Section 5.6.3, Section 21.2).
-  auto r = Parse("module m;\n"
-                 "  initial $display(\"hello\");\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  initial $display(\"hello\");\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -71,7 +72,8 @@ TEST(ParserCh50603, SystemTask_FinishNoArgs) {
 
 TEST(ParserCh50603, SystemFunction_InExpression) {
   // A system function like $clog2 used inside an expression.
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  parameter W = $clog2(256);\n"
-                      "endmodule"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  parameter W = $clog2(256);\n"
+              "endmodule"));
 }

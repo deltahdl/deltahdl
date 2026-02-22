@@ -1,12 +1,13 @@
 // §12.4: Conditional if–else statement
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "parser/ast.h"
 #include "simulation/compiled_sim.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -73,4 +74,4 @@ TEST(CompiledSim, ExecuteIfElse) {
   EXPECT_EQ(out->value.ToUint64(), 0u);
 }
 
-} // namespace
+}  // namespace

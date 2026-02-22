@@ -1,5 +1,9 @@
 // §7.4.5: Indexing and slicing of arrays
 
+#include <gtest/gtest.h>
+
+#include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -9,8 +13,6 @@
 #include "simulation/eval.h"
 #include "simulation/eval_array.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
-#include <string>
 
 using namespace delta;
 
@@ -59,4 +61,4 @@ TEST(ArrayAccess, OutOfBoundsReturnsX) {
   EXPECT_FALSE(oob_result.IsKnown());
 }
 
-} // namespace
+}  // namespace

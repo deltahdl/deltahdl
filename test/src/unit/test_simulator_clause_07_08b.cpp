@@ -1,5 +1,9 @@
 // §7.8: Associative arrays
 
+#include <gtest/gtest.h>
+
+#include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -9,8 +13,6 @@
 #include "simulation/eval.h"
 #include "simulation/eval_array.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
-#include <string>
 
 using namespace delta;
 
@@ -81,4 +83,4 @@ TEST(AssocTraversal, ByteIndexFirstReturnsOneForByteRef) {
   EXPECT_EQ(ref->value.ToUint64(), 200u);
 }
 
-} // namespace
+}  // namespace

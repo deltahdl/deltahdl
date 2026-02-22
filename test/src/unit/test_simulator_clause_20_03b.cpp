@@ -1,5 +1,7 @@
 // §20.3: Simulation time system functions
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -12,7 +14,6 @@
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
 #include "simulation/variable.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -37,15 +38,16 @@ namespace {
 
 TEST(Lowerer, RealtimeReturnsTime) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [63:0] t_val;\n"
-                              "  initial begin\n"
-                              "    #10;\n"
-                              "    t_val = $realtime;\n"
-                              "    #1 $finish;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [63:0] t_val;\n"
+      "  initial begin\n"
+      "    #10;\n"
+      "    t_val = $realtime;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -57,4 +59,4 @@ TEST(Lowerer, RealtimeReturnsTime) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-} // namespace
+}  // namespace

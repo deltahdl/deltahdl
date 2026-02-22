@@ -1,12 +1,13 @@
 // §non_lrm
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "parser/ast.h"
 #include "simulation/compiled_sim.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -93,4 +94,4 @@ TEST(CompiledSim, CompileReturnsValidForCombinational) {
   EXPECT_EQ(compiled.Id(), 42u);
 }
 
-} // namespace
+}  // namespace

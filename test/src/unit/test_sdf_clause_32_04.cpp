@@ -1,8 +1,9 @@
 // §32.4: Mapping of SDF constructs to SystemVerilog
 
+#include <gtest/gtest.h>
+
 #include "simulation/sdf_parser.h"
 #include "simulation/specify.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -197,4 +198,4 @@ TEST(SdfParser, ParseMultipleCells) {
   EXPECT_EQ(file.cells[1].instance, "u2");
 }
 
-} // namespace
+}  // namespace

@@ -27,13 +27,14 @@ static ParseResult Parse(const std::string &src) {
 }
 
 TEST(ParserSection28, StrengthSpec) {
-  auto r = Parse("module m;\n"
-                 "  and (strong0, weak1) g1(out, a, b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  and (strong0, weak1) g1(out, a, b);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->gate_kind, GateKind::kAnd);
-  EXPECT_EQ(item->drive_strength0, 4); // strong0 = 4
-  EXPECT_EQ(item->drive_strength1, 2); // weak1 = 2
+  EXPECT_EQ(item->drive_strength0, 4);  // strong0 = 4
+  EXPECT_EQ(item->drive_strength1, 2);  // weak1 = 2
   EXPECT_EQ(item->gate_inst_name, "g1");
 }

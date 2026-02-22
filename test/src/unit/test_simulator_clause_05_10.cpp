@@ -38,15 +38,13 @@ static uint64_t RunAndGet(const std::string &src, const char *var_name) {
   SimCh510Fixture f;
   auto *design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
-  if (!design)
-    return 0;
+  if (!design) return 0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
   auto *var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
-  if (!var)
-    return 0;
+  if (!var) return 0;
   return var->value.ToUint64();
 }
 
@@ -149,14 +147,15 @@ TEST(SimCh510, StructLitDefaultDiffWidth) {
 // ---------------------------------------------------------------------------
 TEST(SimCh510, StructLitPositionalThree) {
   // §5.10: Positional assignment with 3 fields.
-  auto v = RunAndGet("module t;\n"
-                     "  typedef struct packed {\n"
-                     "    logic [7:0] a; logic [7:0] b; logic [7:0] c;\n"
-                     "  } abc_t;\n"
-                     "  abc_t s;\n"
-                     "  initial s = '{8'h11, 8'h22, 8'h33};\n"
-                     "endmodule\n",
-                     "s");
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef struct packed {\n"
+      "    logic [7:0] a; logic [7:0] b; logic [7:0] c;\n"
+      "  } abc_t;\n"
+      "  abc_t s;\n"
+      "  initial s = '{8'h11, 8'h22, 8'h33};\n"
+      "endmodule\n",
+      "s");
   EXPECT_EQ(v, 0x112233u);
 }
 
@@ -179,8 +178,7 @@ TEST(SimCh510, StructLitFieldAccess) {
       "endmodule\n",
       f);
   EXPECT_NE(design, nullptr);
-  if (!design)
-    return;
+  if (!design) return;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
@@ -188,8 +186,7 @@ TEST(SimCh510, StructLitFieldAccess) {
   auto *vry = f.ctx.FindVariable("ry");
   EXPECT_NE(vrx, nullptr);
   EXPECT_NE(vry, nullptr);
-  if (!vrx || !vry)
-    return;
+  if (!vrx || !vry) return;
   EXPECT_EQ(vrx->value.ToUint64(), 0xDEu);
   EXPECT_EQ(vry->value.ToUint64(), 0xADu);
 }

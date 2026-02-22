@@ -1,10 +1,12 @@
 // §non_lrm
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
 #include "synthesis/adv_synth.h"
 #include "synthesis/aig.h"
 #include "synthesis/lut_map.h"
-#include <cstdint>
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -162,4 +164,4 @@ TEST(AdvSynth, IterativeAreaDelayZeroIterationsReturnsMappingForDelay) {
   EXPECT_FALSE(mapping.cells.empty());
 }
 
-} // namespace
+}  // namespace

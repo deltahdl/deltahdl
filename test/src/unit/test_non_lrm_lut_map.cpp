@@ -1,9 +1,11 @@
 // Non-LRM tests
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
 #include "synthesis/aig.h"
 #include "synthesis/lut_map.h"
-#include <cstdint>
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -177,4 +179,4 @@ TEST(LutMap, OrGateTruthTable) {
   EXPECT_EQ(popcount, 3u);
 }
 
-} // namespace
+}  // namespace

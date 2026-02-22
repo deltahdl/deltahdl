@@ -1,9 +1,11 @@
 // §19.7: Specifying coverage options
 
-#include "simulation/coverage.h"
 #include <gtest/gtest.h>
+
 #include <string>
 #include <vector>
+
+#include "simulation/coverage.h"
 
 using namespace delta;
 
@@ -41,7 +43,7 @@ TEST(Coverage, WeightOption) {
   b1.name = "b";
   b1.values = {0};
   CoverageDB::AddBin(cp1, b1);
-  db.Sample(g1, {{"x", 0}}); // 100% coverage, weight=2.
+  db.Sample(g1, {{"x", 0}});  // 100% coverage, weight=2.
 
   auto *g2 = db.CreateGroup("cg2");
   g2->options.weight = 1;
@@ -79,4 +81,4 @@ TEST(Coverage, AutoBinMaxControl) {
   EXPECT_EQ(cp->auto_bin_count, 8u);
 }
 
-} // namespace
+}  // namespace

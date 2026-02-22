@@ -41,16 +41,14 @@ static bool ParseOk(const std::string &src) {
 
 static ModuleItem *FindSpecifyBlock(const std::vector<ModuleItem *> &items) {
   for (auto *item : items) {
-    if (item->kind == ModuleItemKind::kSpecifyBlock)
-      return item;
+    if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
   }
   return nullptr;
 }
 
 static SpecifyItem *GetSoleSpecifyItem(ModuleItem *spec_block) {
   EXPECT_EQ(spec_block->specify_items.size(), 1u);
-  if (spec_block->specify_items.empty())
-    return nullptr;
+  if (spec_block->specify_items.empty()) return nullptr;
   return spec_block->specify_items[0];
 }
 
@@ -63,8 +61,7 @@ struct SpecifyParseResult {
 static SpecifyParseResult ParseSpecifySingle(const std::string &src) {
   SpecifyParseResult result;
   result.pr = Parse(src);
-  if (result.pr.cu == nullptr)
-    return result;
+  if (result.pr.cu == nullptr) return result;
   result.spec_block = FindSpecifyBlock(result.pr.cu->modules[0]->items);
   if (result.spec_block != nullptr) {
     result.sole_item = GetSoleSpecifyItem(result.spec_block);
@@ -84,18 +81,18 @@ static bool HasFullPathDecl(ModuleItem *spec_block) {
 
 static bool HasSpecifyItemKind(ModuleItem *spec_block, SpecifyItemKind kind) {
   for (auto *si : spec_block->specify_items) {
-    if (si->kind == kind)
-      return true;
+    if (si->kind == kind) return true;
   }
   return false;
 }
 
 TEST(ParserSection28, SpecifyBlockSimplePath) {
-  auto r = Parse("module m(input a, output b);\n"
-                 "  specify\n"
-                 "    (a => b) = 10;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input a, output b);\n"
+      "  specify\n"
+      "    (a => b) = 10;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *spec = FindSpecifyBlock(r.cu->modules[0]->items);
   ASSERT_NE(spec, nullptr);
@@ -105,11 +102,12 @@ TEST(ParserSection28, SpecifyBlockSimplePath) {
 }
 
 TEST(ParserSection28, SpecifyBlockFullPath) {
-  auto r = Parse("module m(input a, b, output c);\n"
-                 "  specify\n"
-                 "    (a, b *> c) = (5, 10);\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input a, b, output c);\n"
+      "  specify\n"
+      "    (a, b *> c) = (5, 10);\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *spec = FindSpecifyBlock(r.cu->modules[0]->items);
   ASSERT_NE(spec, nullptr);
@@ -117,12 +115,13 @@ TEST(ParserSection28, SpecifyBlockFullPath) {
 }
 
 TEST(ParserSection28, SpecifyBlockWithSpecparam) {
-  auto r = Parse("module m(input clk, output q);\n"
-                 "  specify\n"
-                 "    specparam tDelay = 10;\n"
-                 "    (clk => q) = tDelay;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input clk, output q);\n"
+      "  specify\n"
+      "    specparam tDelay = 10;\n"
+      "    (clk => q) = tDelay;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *spec = FindSpecifyBlock(r.cu->modules[0]->items);
   ASSERT_NE(spec, nullptr);
@@ -131,11 +130,12 @@ TEST(ParserSection28, SpecifyBlockWithSpecparam) {
 }
 
 TEST(ParserSection28, Sec28_12_ConditionalPath) {
-  auto sp = ParseSpecifySingle("module m(input a, en, output b);\n"
-                               "  specify\n"
-                               "    if (en) (a => b) = 10;\n"
-                               "  endspecify\n"
-                               "endmodule\n");
+  auto sp = ParseSpecifySingle(
+      "module m(input a, en, output b);\n"
+      "  specify\n"
+      "    if (en) (a => b) = 10;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(sp.pr.cu, nullptr);
   EXPECT_FALSE(sp.pr.has_errors);
   ASSERT_NE(sp.sole_item, nullptr);
@@ -152,11 +152,12 @@ TEST(ParserSection28, Sec28_12_ConditionalPath) {
 }
 
 TEST(ParserSection28, Sec28_12_IfnonePath) {
-  auto sp = ParseSpecifySingle("module m(input a, output b);\n"
-                               "  specify\n"
-                               "    ifnone (a => b) = 15;\n"
-                               "  endspecify\n"
-                               "endmodule\n");
+  auto sp = ParseSpecifySingle(
+      "module m(input a, output b);\n"
+      "  specify\n"
+      "    ifnone (a => b) = 15;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(sp.pr.cu, nullptr);
   EXPECT_FALSE(sp.pr.has_errors);
   ASSERT_NE(sp.sole_item, nullptr);
@@ -168,11 +169,12 @@ TEST(ParserSection28, Sec28_12_IfnonePath) {
 }
 
 TEST(ParserSection28, Sec28_12_PosedgeSensitivePath) {
-  auto sp = ParseSpecifySingle("module m(input clk, output q);\n"
-                               "  specify\n"
-                               "    (posedge clk => q) = 5;\n"
-                               "  endspecify\n"
-                               "endmodule\n");
+  auto sp = ParseSpecifySingle(
+      "module m(input clk, output q);\n"
+      "  specify\n"
+      "    (posedge clk => q) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(sp.pr.cu, nullptr);
   EXPECT_FALSE(sp.pr.has_errors);
   ASSERT_NE(sp.sole_item, nullptr);
@@ -187,11 +189,12 @@ TEST(ParserSection28, Sec28_12_PosedgeSensitivePath) {
 }
 
 TEST(ParserSection28, Sec28_12_NegedgeSensitivePath) {
-  auto sp = ParseSpecifySingle("module m(input clk, output q);\n"
-                               "  specify\n"
-                               "    (negedge clk => q) = 8;\n"
-                               "  endspecify\n"
-                               "endmodule\n");
+  auto sp = ParseSpecifySingle(
+      "module m(input clk, output q);\n"
+      "  specify\n"
+      "    (negedge clk => q) = 8;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(sp.pr.cu, nullptr);
   EXPECT_FALSE(sp.pr.has_errors);
   ASSERT_NE(sp.sole_item, nullptr);
@@ -203,11 +206,12 @@ TEST(ParserSection28, Sec28_12_NegedgeSensitivePath) {
 }
 
 TEST(ParserSection28, Sec28_12_MultipleSourceDestPorts) {
-  auto sp = ParseSpecifySingle("module m(input a, b, c, output x, y);\n"
-                               "  specify\n"
-                               "    (a, b, c *> x, y) = 12;\n"
-                               "  endspecify\n"
-                               "endmodule\n");
+  auto sp = ParseSpecifySingle(
+      "module m(input a, b, c, output x, y);\n"
+      "  specify\n"
+      "    (a, b, c *> x, y) = 12;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(sp.pr.cu, nullptr);
   EXPECT_FALSE(sp.pr.has_errors);
   ASSERT_NE(sp.sole_item, nullptr);
@@ -224,17 +228,19 @@ TEST(ParserSection28, Sec28_12_MultipleSourceDestPorts) {
 }
 
 TEST(ParserSection28, Sec28_12_PosedgeFullPath) {
-  EXPECT_TRUE(ParseOk("module m(input clk, output q, qb);\n"
-                      "  specify\n"
-                      "    (posedge clk *> q, qb) = (3, 5);\n"
-                      "  endspecify\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m(input clk, output q, qb);\n"
+              "  specify\n"
+              "    (posedge clk *> q, qb) = (3, 5);\n"
+              "  endspecify\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection28, Sec28_12_ConditionalFullPath) {
-  EXPECT_TRUE(ParseOk("module m(input a, b, en, output y);\n"
-                      "  specify\n"
-                      "    if (en) (a, b *> y) = 10;\n"
-                      "  endspecify\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m(input a, b, en, output y);\n"
+              "  specify\n"
+              "    if (en) (a, b *> y) = 10;\n"
+              "  endspecify\n"
+              "endmodule\n"));
 }

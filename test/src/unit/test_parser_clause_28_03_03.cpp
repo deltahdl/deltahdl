@@ -27,9 +27,10 @@ static ParseResult Parse(const std::string &src) {
 }
 
 TEST(ParserSection28, BasicBufGate) {
-  auto r = Parse("module m;\n"
-                 "  buf b1(out, in);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  buf b1(out, in);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->gate_kind, GateKind::kBuf);
@@ -38,9 +39,10 @@ TEST(ParserSection28, BasicBufGate) {
 }
 
 TEST(ParserSection28, BasicNotGate) {
-  auto r = Parse("module m;\n"
-                 "  not n1(out, in);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  not n1(out, in);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->gate_kind, GateKind::kNot);

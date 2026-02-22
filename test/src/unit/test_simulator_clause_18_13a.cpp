@@ -54,4 +54,4 @@ TEST(SysTask, UrandomRangeInBounds) {
   EXPECT_LE(val, 10u);
 }
 
-} // namespace
+}  // namespace

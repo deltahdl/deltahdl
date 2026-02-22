@@ -35,7 +35,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA608Fixture &f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // Simulation tests — A.6.8 Looping statements
@@ -46,17 +46,18 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA608Fixture &f) {
 // §12.7.7: forever loop — exits via break
 TEST(SimA608, ForeverBreak) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial begin\n"
-                              "    x = 8'd0;\n"
-                              "    forever begin\n"
-                              "      if (x == 8'd5) break;\n"
-                              "      x = x + 8'd1;\n"
-                              "    end\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    forever begin\n"
+      "      if (x == 8'd5) break;\n"
+      "      x = x + 8'd1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -69,20 +70,21 @@ TEST(SimA608, ForeverBreak) {
 // §12.7.7: forever with continue skips to next iteration
 TEST(SimA608, ForeverContinue) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x, count;\n"
-                              "  initial begin\n"
-                              "    x = 8'd0;\n"
-                              "    count = 8'd0;\n"
-                              "    forever begin\n"
-                              "      x = x + 8'd1;\n"
-                              "      if (x == 8'd10) break;\n"
-                              "      if (x[0]) continue;\n"
-                              "      count = count + 8'd1;\n"
-                              "    end\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x, count;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    count = 8'd0;\n"
+      "    forever begin\n"
+      "      x = x + 8'd1;\n"
+      "      if (x == 8'd10) break;\n"
+      "      if (x[0]) continue;\n"
+      "      count = count + 8'd1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -98,14 +100,15 @@ TEST(SimA608, ForeverContinue) {
 // §12.7.6: repeat(N) executes body exactly N times
 TEST(SimA608, RepeatCount) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial begin\n"
-                              "    x = 8'd0;\n"
-                              "    repeat (5) x = x + 8'd1;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    repeat (5) x = x + 8'd1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -118,14 +121,15 @@ TEST(SimA608, RepeatCount) {
 // §12.7.6: repeat(0) executes body zero times
 TEST(SimA608, RepeatZero) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial begin\n"
-                              "    x = 8'd42;\n"
-                              "    repeat (0) x = 8'd99;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd42;\n"
+      "    repeat (0) x = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -138,17 +142,18 @@ TEST(SimA608, RepeatZero) {
 // §12.7.6: repeat with break exits early
 TEST(SimA608, RepeatBreak) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial begin\n"
-                              "    x = 8'd0;\n"
-                              "    repeat (100) begin\n"
-                              "      if (x == 8'd3) break;\n"
-                              "      x = x + 8'd1;\n"
-                              "    end\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    repeat (100) begin\n"
+      "      if (x == 8'd3) break;\n"
+      "      x = x + 8'd1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -161,19 +166,20 @@ TEST(SimA608, RepeatBreak) {
 // §12.7.6: repeat with continue skips remainder
 TEST(SimA608, RepeatContinue) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x, count;\n"
-                              "  initial begin\n"
-                              "    x = 8'd0;\n"
-                              "    count = 8'd0;\n"
-                              "    repeat (5) begin\n"
-                              "      x = x + 8'd1;\n"
-                              "      if (x == 8'd3) continue;\n"
-                              "      count = count + 8'd1;\n"
-                              "    end\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x, count;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    count = 8'd0;\n"
+      "    repeat (5) begin\n"
+      "      x = x + 8'd1;\n"
+      "      if (x == 8'd3) continue;\n"
+      "      count = count + 8'd1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -189,14 +195,15 @@ TEST(SimA608, RepeatContinue) {
 // §12.7.4: while loop — accumulate sum
 TEST(SimA608, WhileBasic) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial begin\n"
-                              "    x = 8'd10;\n"
-                              "    while (x > 0) x = x - 8'd1;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd10;\n"
+      "    while (x > 0) x = x - 8'd1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -209,14 +216,15 @@ TEST(SimA608, WhileBasic) {
 // §12.7.4: while loop — condition false initially, zero iterations
 TEST(SimA608, WhileZeroIter) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial begin\n"
-                              "    x = 8'd42;\n"
-                              "    while (0) x = 8'd99;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd42;\n"
+      "    while (0) x = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -229,17 +237,18 @@ TEST(SimA608, WhileZeroIter) {
 // §12.7.4: while with break exits early
 TEST(SimA608, WhileBreak) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial begin\n"
-                              "    x = 8'd0;\n"
-                              "    while (1) begin\n"
-                              "      if (x == 8'd7) break;\n"
-                              "      x = x + 8'd1;\n"
-                              "    end\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    while (1) begin\n"
+      "      if (x == 8'd7) break;\n"
+      "      x = x + 8'd1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -252,19 +261,20 @@ TEST(SimA608, WhileBreak) {
 // §12.7.4: while with continue
 TEST(SimA608, WhileContinue) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x, count;\n"
-                              "  initial begin\n"
-                              "    x = 8'd0;\n"
-                              "    count = 8'd0;\n"
-                              "    while (x < 8'd6) begin\n"
-                              "      x = x + 8'd1;\n"
-                              "      if (x == 8'd3) continue;\n"
-                              "      count = count + 8'd1;\n"
-                              "    end\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x, count;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    count = 8'd0;\n"
+      "    while (x < 8'd6) begin\n"
+      "      x = x + 8'd1;\n"
+      "      if (x == 8'd3) continue;\n"
+      "      count = count + 8'd1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -280,15 +290,16 @@ TEST(SimA608, WhileContinue) {
 // §12.7.1: for loop — basic accumulation
 TEST(SimA608, ForBasic) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] total;\n"
-                              "  initial begin\n"
-                              "    total = 8'd0;\n"
-                              "    for (int i = 0; i < 5; i = i + 1)\n"
-                              "      total = total + 8'd1;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] total;\n"
+      "  initial begin\n"
+      "    total = 8'd0;\n"
+      "    for (int i = 0; i < 5; i = i + 1)\n"
+      "      total = total + 8'd1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -301,15 +312,16 @@ TEST(SimA608, ForBasic) {
 // §12.7.1: for with typed init — variable used in body
 TEST(SimA608, ForTypedInit) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] sum;\n"
-                              "  initial begin\n"
-                              "    sum = 8'd0;\n"
-                              "    for (int i = 1; i <= 4; i = i + 1)\n"
-                              "      sum = sum + i[7:0];\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sum;\n"
+      "  initial begin\n"
+      "    sum = 8'd0;\n"
+      "    for (int i = 1; i <= 4; i = i + 1)\n"
+      "      sum = sum + i[7:0];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -323,17 +335,18 @@ TEST(SimA608, ForTypedInit) {
 // §12.7.1: for with break exits early
 TEST(SimA608, ForBreak) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial begin\n"
-                              "    x = 8'd0;\n"
-                              "    for (int i = 0; i < 100; i = i + 1) begin\n"
-                              "      if (i == 3) break;\n"
-                              "      x = x + 8'd1;\n"
-                              "    end\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    for (int i = 0; i < 100; i = i + 1) begin\n"
+      "      if (i == 3) break;\n"
+      "      x = x + 8'd1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -346,17 +359,18 @@ TEST(SimA608, ForBreak) {
 // §12.7.1: for with continue skips to step
 TEST(SimA608, ForContinue) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] count;\n"
-                              "  initial begin\n"
-                              "    count = 8'd0;\n"
-                              "    for (int i = 0; i < 6; i = i + 1) begin\n"
-                              "      if (i == 2 || i == 4) continue;\n"
-                              "      count = count + 8'd1;\n"
-                              "    end\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] count;\n"
+      "  initial begin\n"
+      "    count = 8'd0;\n"
+      "    for (int i = 0; i < 6; i = i + 1) begin\n"
+      "      if (i == 2 || i == 4) continue;\n"
+      "      count = count + 8'd1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -370,17 +384,18 @@ TEST(SimA608, ForContinue) {
 // §12.7.1: for with empty init/cond/step — for(;;) with break
 TEST(SimA608, ForAllEmptyWithBreak) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial begin\n"
-                              "    x = 8'd0;\n"
-                              "    for (;;) begin\n"
-                              "      if (x == 8'd4) break;\n"
-                              "      x = x + 8'd1;\n"
-                              "    end\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    for (;;) begin\n"
+      "      if (x == 8'd4) break;\n"
+      "      x = x + 8'd1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -393,15 +408,16 @@ TEST(SimA608, ForAllEmptyWithBreak) {
 // §12.7.1: for_step with inc_or_dec_expression (i++)
 TEST(SimA608, ForStepIncrement) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial begin\n"
-                              "    x = 8'd0;\n"
-                              "    for (int i = 0; i < 3; i++)\n"
-                              "      x = x + 8'd1;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    for (int i = 0; i < 3; i++)\n"
+      "      x = x + 8'd1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -416,14 +432,15 @@ TEST(SimA608, ForStepIncrement) {
 // §12.7.5: do-while executes body at least once
 TEST(SimA608, DoWhileAtLeastOnce) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial begin\n"
-                              "    x = 8'd0;\n"
-                              "    do x = x + 8'd1; while (0);\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    do x = x + 8'd1; while (0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -437,14 +454,15 @@ TEST(SimA608, DoWhileAtLeastOnce) {
 // §12.7.5: do-while iterates until condition becomes false
 TEST(SimA608, DoWhileIterates) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial begin\n"
-                              "    x = 8'd0;\n"
-                              "    do x = x + 8'd1; while (x < 8'd5);\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    do x = x + 8'd1; while (x < 8'd5);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -457,17 +475,18 @@ TEST(SimA608, DoWhileIterates) {
 // §12.7.5: do-while with break
 TEST(SimA608, DoWhileBreak) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial begin\n"
-                              "    x = 8'd0;\n"
-                              "    do begin\n"
-                              "      x = x + 8'd1;\n"
-                              "      if (x == 8'd3) break;\n"
-                              "    end while (1);\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    do begin\n"
+      "      x = x + 8'd1;\n"
+      "      if (x == 8'd3) break;\n"
+      "    end while (1);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -480,19 +499,20 @@ TEST(SimA608, DoWhileBreak) {
 // §12.7.5: do-while with continue
 TEST(SimA608, DoWhileContinue) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x, count;\n"
-                              "  initial begin\n"
-                              "    x = 8'd0;\n"
-                              "    count = 8'd0;\n"
-                              "    do begin\n"
-                              "      x = x + 8'd1;\n"
-                              "      if (x == 8'd3) continue;\n"
-                              "      count = count + 8'd1;\n"
-                              "    end while (x < 8'd5);\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x, count;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    count = 8'd0;\n"
+      "    do begin\n"
+      "      x = x + 8'd1;\n"
+      "      if (x == 8'd3) continue;\n"
+      "      count = count + 8'd1;\n"
+      "    end while (x < 8'd5);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -508,19 +528,20 @@ TEST(SimA608, DoWhileContinue) {
 // §12.7.3: foreach iterates over array elements
 TEST(SimA608, ForeachBasic) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] arr [4];\n"
-                              "  logic [7:0] total;\n"
-                              "  initial begin\n"
-                              "    arr[0] = 8'd1;\n"
-                              "    arr[1] = 8'd2;\n"
-                              "    arr[2] = 8'd3;\n"
-                              "    arr[3] = 8'd4;\n"
-                              "    total = 8'd0;\n"
-                              "    foreach (arr[i]) total = total + arr[i];\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] arr [4];\n"
+      "  logic [7:0] total;\n"
+      "  initial begin\n"
+      "    arr[0] = 8'd1;\n"
+      "    arr[1] = 8'd2;\n"
+      "    arr[2] = 8'd3;\n"
+      "    arr[3] = 8'd4;\n"
+      "    total = 8'd0;\n"
+      "    foreach (arr[i]) total = total + arr[i];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -536,20 +557,20 @@ TEST(SimA608, ForeachBasic) {
 // Nested loops: inner break doesn't affect outer
 TEST(SimA608, NestedLoopInnerBreak) {
   SimA608Fixture f;
-  auto *design =
-      ElaborateSrc("module t;\n"
-                   "  logic [7:0] outer_count;\n"
-                   "  initial begin\n"
-                   "    outer_count = 8'd0;\n"
-                   "    for (int i = 0; i < 3; i = i + 1) begin\n"
-                   "      for (int j = 0; j < 100; j = j + 1) begin\n"
-                   "        if (j == 2) break;\n"
-                   "      end\n"
-                   "      outer_count = outer_count + 8'd1;\n"
-                   "    end\n"
-                   "  end\n"
-                   "endmodule\n",
-                   f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] outer_count;\n"
+      "  initial begin\n"
+      "    outer_count = 8'd0;\n"
+      "    for (int i = 0; i < 3; i = i + 1) begin\n"
+      "      for (int j = 0; j < 100; j = j + 1) begin\n"
+      "        if (j == 2) break;\n"
+      "      end\n"
+      "      outer_count = outer_count + 8'd1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -563,19 +584,20 @@ TEST(SimA608, NestedLoopInnerBreak) {
 // Nested loops: inner continue doesn't affect outer
 TEST(SimA608, NestedLoopInnerContinue) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] total;\n"
-                              "  initial begin\n"
-                              "    total = 8'd0;\n"
-                              "    for (int i = 0; i < 3; i = i + 1) begin\n"
-                              "      for (int j = 0; j < 4; j = j + 1) begin\n"
-                              "        if (j == 1) continue;\n"
-                              "        total = total + 8'd1;\n"
-                              "      end\n"
-                              "    end\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] total;\n"
+      "  initial begin\n"
+      "    total = 8'd0;\n"
+      "    for (int i = 0; i < 3; i = i + 1) begin\n"
+      "      for (int j = 0; j < 4; j = j + 1) begin\n"
+      "        if (j == 1) continue;\n"
+      "        total = total + 8'd1;\n"
+      "      end\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -589,16 +611,17 @@ TEST(SimA608, NestedLoopInnerContinue) {
 // Mixed loop types: repeat inside for
 TEST(SimA608, MixedRepeatInsideFor) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial begin\n"
-                              "    x = 8'd0;\n"
-                              "    for (int i = 0; i < 3; i = i + 1) begin\n"
-                              "      repeat (2) x = x + 8'd1;\n"
-                              "    end\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    for (int i = 0; i < 3; i = i + 1) begin\n"
+      "      repeat (2) x = x + 8'd1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);

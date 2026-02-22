@@ -1,11 +1,12 @@
 // §27.5: Conditional generate constructs
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -57,11 +58,12 @@ struct ModportPortExpected {
 namespace {
 
 TEST(Parser, GenerateIf) {
-  auto r = Parse("module t;\n"
-                 "  if (WIDTH > 8) begin\n"
-                 "    assign a = b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  if (WIDTH > 8) begin\n"
+      "    assign a = b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 1);
@@ -71,13 +73,14 @@ TEST(Parser, GenerateIf) {
 }
 
 TEST(Parser, GenerateIfElse) {
-  auto r = Parse("module t;\n"
-                 "  if (WIDTH > 8) begin\n"
-                 "    assign a = b;\n"
-                 "  end else begin\n"
-                 "    assign a = c;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  if (WIDTH > 8) begin\n"
+      "    assign a = b;\n"
+      "  end else begin\n"
+      "    assign a = c;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGenerateIf);
@@ -85,16 +88,17 @@ TEST(Parser, GenerateIfElse) {
 }
 
 TEST(Parser, GenerateCase) {
-  auto r = Parse("module t;\n"
-                 "  case (WIDTH)\n"
-                 "    1: begin\n"
-                 "      assign a = b;\n"
-                 "    end\n"
-                 "    2: begin\n"
-                 "      assign a = c;\n"
-                 "    end\n"
-                 "  endcase\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  case (WIDTH)\n"
+      "    1: begin\n"
+      "      assign a = b;\n"
+      "    end\n"
+      "    2: begin\n"
+      "      assign a = c;\n"
+      "    end\n"
+      "  endcase\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGenerateCase);
@@ -105,16 +109,17 @@ TEST(Parser, GenerateCase) {
 }
 
 TEST(Parser, GenerateCaseDefault) {
-  auto r = Parse("module t;\n"
-                 "  case (WIDTH)\n"
-                 "    1: begin\n"
-                 "      assign a = b;\n"
-                 "    end\n"
-                 "    default: begin\n"
-                 "      assign a = c;\n"
-                 "    end\n"
-                 "  endcase\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  case (WIDTH)\n"
+      "    1: begin\n"
+      "      assign a = b;\n"
+      "    end\n"
+      "    default: begin\n"
+      "      assign a = c;\n"
+      "    end\n"
+      "  endcase\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   ASSERT_EQ(item->gen_case_items.size(), 2);
@@ -122,13 +127,14 @@ TEST(Parser, GenerateCaseDefault) {
 }
 
 TEST(Parser, GenerateCaseMultiPattern) {
-  auto r = Parse("module t;\n"
-                 "  case (WIDTH)\n"
-                 "    1, 2: begin\n"
-                 "      assign a = b;\n"
-                 "    end\n"
-                 "  endcase\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  case (WIDTH)\n"
+      "    1, 2: begin\n"
+      "      assign a = b;\n"
+      "    end\n"
+      "  endcase\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   ASSERT_EQ(item->gen_case_items.size(), 1);
@@ -136,15 +142,16 @@ TEST(Parser, GenerateCaseMultiPattern) {
 }
 
 TEST(Parser, GenerateCaseInRegion) {
-  auto r = Parse("module t;\n"
-                 "  generate\n"
-                 "    case (WIDTH)\n"
-                 "      1: begin\n"
-                 "        assign a = b;\n"
-                 "      end\n"
-                 "    endcase\n"
-                 "  endgenerate\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  generate\n"
+      "    case (WIDTH)\n"
+      "      1: begin\n"
+      "        assign a = b;\n"
+      "      end\n"
+      "    endcase\n"
+      "  endgenerate\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   bool found = false;
   for (auto *item : r.cu->modules[0]->items) {
@@ -155,4 +162,4 @@ TEST(Parser, GenerateCaseInRegion) {
   EXPECT_TRUE(found);
 }
 
-} // namespace
+}  // namespace

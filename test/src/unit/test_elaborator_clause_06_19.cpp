@@ -1,5 +1,7 @@
 // §6.19: Enumerations
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -11,7 +13,6 @@
 #include "lexer/lexer.h"
 #include "lexer/token.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -35,32 +36,35 @@ namespace {
 // --- §6.19: Enum validation ---
 TEST(Elaboration, EnumSizedLiteralMismatch_Error) {
   ElabFixture f;
-  ElaborateSrc("module top();\n"
-               "  enum logic [2:0] {\n"
-               "    Global = 4'h2,\n"
-               "    Local = 4'h3\n"
-               "  } myenum;\n"
-               "endmodule\n",
-               f);
+  ElaborateSrc(
+      "module top();\n"
+      "  enum logic [2:0] {\n"
+      "    Global = 4'h2,\n"
+      "    Local = 4'h3\n"
+      "  } myenum;\n"
+      "endmodule\n",
+      f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
 TEST(Elaboration, EnumXZin2State_Error) {
   ElabFixture f;
-  ElaborateSrc("module top();\n"
-               "  enum bit [1:0] {a=0, b=2'bxx, c=1} val;\n"
-               "endmodule\n",
-               f);
+  ElaborateSrc(
+      "module top();\n"
+      "  enum bit [1:0] {a=0, b=2'bxx, c=1} val;\n"
+      "endmodule\n",
+      f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
 TEST(Elaboration, EnumUnassignedAfterXZ_Error) {
   ElabFixture f;
-  ElaborateSrc("module top();\n"
-               "  enum integer {a=0, b={32{1'bx}}, c} val;\n"
-               "endmodule\n",
-               f);
+  ElaborateSrc(
+      "module top();\n"
+      "  enum integer {a=0, b={32{1'bx}}, c} val;\n"
+      "endmodule\n",
+      f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-} // namespace
+}  // namespace

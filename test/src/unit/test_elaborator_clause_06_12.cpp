@@ -1,5 +1,7 @@
 // §6.12: Real, shortreal, and realtime data types
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -11,7 +13,6 @@
 #include "lexer/lexer.h"
 #include "lexer/token.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -35,45 +36,49 @@ namespace {
 // --- §6.12: Real type restrictions ---
 TEST(Elaboration, RealBitSelect_Error) {
   ElabFixture f;
-  ElaborateSrc("module top();\n"
-               "  real a = 0.5;\n"
-               "  wire b;\n"
-               "  assign b = a[2];\n"
-               "endmodule\n",
-               f);
+  ElaborateSrc(
+      "module top();\n"
+      "  real a = 0.5;\n"
+      "  wire b;\n"
+      "  assign b = a[2];\n"
+      "endmodule\n",
+      f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
 TEST(Elaboration, RealIndex_Error) {
   ElabFixture f;
-  ElaborateSrc("module top();\n"
-               "  real a = 0.5;\n"
-               "  wire [3:0] b;\n"
-               "  wire c;\n"
-               "  assign c = b[a];\n"
-               "endmodule\n",
-               f);
+  ElaborateSrc(
+      "module top();\n"
+      "  real a = 0.5;\n"
+      "  wire [3:0] b;\n"
+      "  wire c;\n"
+      "  assign c = b[a];\n"
+      "endmodule\n",
+      f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
 TEST(Elaboration, RealEdge_Error) {
   ElabFixture f;
-  ElaborateSrc("module top();\n"
-               "  real a = 0.5;\n"
-               "  always @(posedge a)\n"
-               "    $display(\"posedge\");\n"
-               "endmodule\n",
-               f);
+  ElaborateSrc(
+      "module top();\n"
+      "  real a = 0.5;\n"
+      "  always @(posedge a)\n"
+      "    $display(\"posedge\");\n"
+      "endmodule\n",
+      f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
 TEST(Elaboration, RealAssign_Ok) {
   ElabFixture f;
-  ElaborateSrc("module top();\n"
-               "  real a = 0.5;\n"
-               "endmodule\n",
-               f);
+  ElaborateSrc(
+      "module top();\n"
+      "  real a = 0.5;\n"
+      "endmodule\n",
+      f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-} // namespace
+}  // namespace

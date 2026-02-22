@@ -1,5 +1,10 @@
 // §35.6: Calling imported functions
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <vector>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -7,9 +12,6 @@
 #include "simulation/dpi.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
-#include <cstdint>
-#include <gtest/gtest.h>
-#include <vector>
 
 using namespace delta;
 
@@ -106,4 +108,4 @@ TEST(Dpi, EvalExprDpiMultipleArgs) {
   EXPECT_EQ(result.ToUint64(), 42u);
 }
 
-} // namespace
+}  // namespace

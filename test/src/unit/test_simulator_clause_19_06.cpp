@@ -1,9 +1,11 @@
 // §19.6: Defining cross coverage
 
-#include "simulation/coverage.h"
 #include <gtest/gtest.h>
+
 #include <string>
 #include <vector>
+
+#include "simulation/coverage.h"
 
 using namespace delta;
 
@@ -65,4 +67,4 @@ TEST(Coverage, CrossCoverageSampling) {
   EXPECT_EQ(g->crosses[0].bins[1].hit_count, 1u);
 }
 
-} // namespace
+}  // namespace

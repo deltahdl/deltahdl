@@ -21,11 +21,12 @@ static std::string Preprocess(const std::string &src, PreprocFixture &f,
 // §22 Table 22-2: SV_COV_* predefined coverage macros
 TEST(Preprocessor, SvCovPredefinedMacros) {
   PreprocFixture f;
-  auto result = Preprocess("`ifdef SV_COV_START\n"
-                           "cov_start_defined\n"
-                           "`endif\n"
-                           "val=`SV_COV_START\n",
-                           f);
+  auto result = Preprocess(
+      "`ifdef SV_COV_START\n"
+      "cov_start_defined\n"
+      "`endif\n"
+      "val=`SV_COV_START\n",
+      f);
   EXPECT_NE(result.find("cov_start_defined"), std::string::npos);
   EXPECT_NE(result.find("val=0"), std::string::npos);
 }

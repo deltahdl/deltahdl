@@ -1,5 +1,10 @@
 // §15.5.2: Waiting for an event
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <string_view>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -14,9 +19,6 @@
 #include "simulation/stmt_result.h"
 #include "simulation/sync_objects.h"
 #include "simulation/variable.h"
-#include <cstdint>
-#include <gtest/gtest.h>
-#include <string_view>
 
 using namespace delta;
 
@@ -97,4 +99,4 @@ TEST(IpcSync, EventTriggeredStickyWithinTimeslot) {
   EXPECT_FALSE(f.ctx.IsEventTriggered("ev2"));
 }
 
-} // namespace
+}  // namespace

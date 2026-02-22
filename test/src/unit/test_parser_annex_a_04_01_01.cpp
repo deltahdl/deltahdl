@@ -32,13 +32,12 @@ ParseResult Parse(const std::string &src) {
 
 ModuleItem *FindModuleInst(const std::vector<ModuleItem *> &items) {
   for (auto *item : items) {
-    if (item->kind == ModuleItemKind::kModuleInst)
-      return item;
+    if (item->kind == ModuleItemKind::kModuleInst) return item;
   }
   return nullptr;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.4.1.1 -- Module instantiation
@@ -226,9 +225,9 @@ TEST(ParserAnnexA0411, OrderedPortBlankPosition) {
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->inst_ports.size(), 3u);
-  EXPECT_NE(item->inst_ports[0].second, nullptr); // a
-  EXPECT_EQ(item->inst_ports[1].second, nullptr); // blank
-  EXPECT_NE(item->inst_ports[2].second, nullptr); // c
+  EXPECT_NE(item->inst_ports[0].second, nullptr);  // a
+  EXPECT_EQ(item->inst_ports[1].second, nullptr);  // blank
+  EXPECT_NE(item->inst_ports[2].second, nullptr);  // c
 }
 
 TEST(ParserAnnexA0411, NamedPortConnections) {
@@ -288,9 +287,10 @@ TEST(ParserAnnexA0411, WildcardWithNamedPorts) {
 // =============================================================================
 
 TEST(ParserAnnexA0411, NamedParamsAndNamedPorts) {
-  auto r = Parse("module m;\n"
-                 "  sub #(.W(8), .D(4)) u0(.clk(clk), .data(d));\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  sub #(.W(8), .D(4)) u0(.clk(clk), .data(d));\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -313,9 +313,10 @@ TEST(ParserAnnexA0411, OrderedParamsNamedPorts) {
 
 TEST(ParserAnnexA0411, FullCombination) {
   // Named params, instance array, named ports, wildcard
-  auto r = Parse("module m;\n"
-                 "  sub #(.W(8)) u0[3:0](.clk(clk), .*);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  sub #(.W(8)) u0[3:0](.clk(clk), .*);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -334,13 +335,14 @@ TEST(ParserAnnexA0411, FullCombination) {
 // =============================================================================
 
 TEST(ParserAnnexA0411, ElaborationModuleInstPortBinding) {
-  auto r = Parse("module child(input a, output b);\n"
-                 "  assign b = a;\n"
-                 "endmodule\n"
-                 "module parent;\n"
-                 "  wire x, y;\n"
-                 "  child u0(.a(x), .b(y));\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module child(input a, output b);\n"
+      "  assign b = a;\n"
+      "endmodule\n"
+      "module parent;\n"
+      "  wire x, y;\n"
+      "  child u0(.a(x), .b(y));\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_GE(r.cu->modules.size(), 2u);
@@ -352,11 +354,12 @@ TEST(ParserAnnexA0411, ElaborationModuleInstPortBinding) {
 }
 
 TEST(ParserAnnexA0411, ElaborationParamOverrideOrdered) {
-  auto r = Parse("module sub #(parameter W = 1)(input [W-1:0] d);\n"
-                 "endmodule\n"
-                 "module top;\n"
-                 "  sub #(8) u0(.d(8'd0));\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module sub #(parameter W = 1)(input [W-1:0] d);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  sub #(8) u0(.d(8'd0));\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *inst = FindModuleInst(r.cu->modules[1]->items);
@@ -367,11 +370,12 @@ TEST(ParserAnnexA0411, ElaborationParamOverrideOrdered) {
 }
 
 TEST(ParserAnnexA0411, ElaborationParamOverrideNamed) {
-  auto r = Parse("module sub #(parameter W = 1)(input [W-1:0] d);\n"
-                 "endmodule\n"
-                 "module top;\n"
-                 "  sub #(.W(16)) u0(.d(16'd0));\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module sub #(parameter W = 1)(input [W-1:0] d);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  sub #(.W(16)) u0(.d(16'd0));\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *inst = FindModuleInst(r.cu->modules[1]->items);
@@ -382,13 +386,14 @@ TEST(ParserAnnexA0411, ElaborationParamOverrideNamed) {
 }
 
 TEST(ParserAnnexA0411, ElaborationInstanceArray) {
-  auto r = Parse("module sub(input a, output b);\n"
-                 "  assign b = a;\n"
-                 "endmodule\n"
-                 "module top;\n"
-                 "  wire [3:0] x, y;\n"
-                 "  sub u0[3:0](.a(x), .b(y));\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module sub(input a, output b);\n"
+      "  assign b = a;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire [3:0] x, y;\n"
+      "  sub u0[3:0](.a(x), .b(y));\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *inst = FindModuleInst(r.cu->modules[1]->items);
@@ -399,13 +404,14 @@ TEST(ParserAnnexA0411, ElaborationInstanceArray) {
 }
 
 TEST(ParserAnnexA0411, ElaborationWildcardPortConnection) {
-  auto r = Parse("module sub(input a, output b);\n"
-                 "  assign b = a;\n"
-                 "endmodule\n"
-                 "module top;\n"
-                 "  wire a, b;\n"
-                 "  sub u0(.*);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module sub(input a, output b);\n"
+      "  assign b = a;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire a, b;\n"
+      "  sub u0(.*);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *inst = FindModuleInst(r.cu->modules[1]->items);
@@ -415,11 +421,12 @@ TEST(ParserAnnexA0411, ElaborationWildcardPortConnection) {
 }
 
 TEST(ParserAnnexA0411, MultipleInstancesSharedParams) {
-  auto r = Parse("module sub #(parameter W = 1)(input [W-1:0] d);\n"
-                 "endmodule\n"
-                 "module top;\n"
-                 "  sub #(.W(8)) u0(.d(8'd0)), u1(.d(8'd1));\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module sub #(parameter W = 1)(input [W-1:0] d);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  sub #(.W(8)) u0(.d(8'd0)), u1(.d(8'd1));\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_GE(r.cu->modules[1]->items.size(), 2u);

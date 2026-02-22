@@ -1,5 +1,7 @@
 // §13.5: Subroutine calls and argument passing
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -7,7 +9,6 @@
 #include "parser/parser.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -224,4 +225,4 @@ TEST(Eval, NestedFunctionOutputArgs) {
   EXPECT_EQ(result_var->value.ToUint64(), 105u);
 }
 
-} // namespace
+}  // namespace

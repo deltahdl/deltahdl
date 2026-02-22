@@ -1,5 +1,10 @@
 // §12.5.1: Case statement with do-not-cares
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <string_view>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -13,9 +18,6 @@
 #include "simulation/stmt_exec.h"
 #include "simulation/stmt_result.h"
 #include "simulation/variable.h"
-#include <cstdint>
-#include <gtest/gtest.h>
-#include <string_view>
 
 using namespace delta;
 
@@ -93,7 +95,7 @@ TEST(StmtExec, CasexMatchesIgnoringXZ) {
   stmt->condition = MakeIntLit(f.arena, 2);
 
   CaseItem item1;
-  item1.patterns.push_back(MakeIntLit(f.arena, 2)); // matches 2 (0b10)
+  item1.patterns.push_back(MakeIntLit(f.arena, 2));  // matches 2 (0b10)
   item1.body = MakeBlockAssign(f.arena, "cx", 1);
   stmt->case_items.push_back(item1);
 
@@ -192,8 +194,8 @@ TEST(StmtExec, CasexWithXZInSelector) {
   // Create a variable with X bits (bval != 0).
   auto *sel_var = f.ctx.CreateVariable("sel_xz", 8);
   sel_var->value = MakeLogic4Vec(f.arena, 8);
-  sel_var->value.words[0].aval = 0x02; // Pattern: 0b10 in lower bits
-  sel_var->value.words[0].bval = 0x01; // LSB is X
+  sel_var->value.words[0].aval = 0x02;  // Pattern: 0b10 in lower bits
+  sel_var->value.words[0].bval = 0x01;  // LSB is X
 
   auto *stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kCase;
@@ -226,8 +228,8 @@ TEST(StmtExec, CasezWithZInSelector) {
   // Create a variable with Z bit: aval=1,bval=1 => Z.
   auto *sel_var = f.ctx.CreateVariable("sel_z", 8);
   sel_var->value = MakeLogic4Vec(f.arena, 8);
-  sel_var->value.words[0].aval = 0x03; // 0b11
-  sel_var->value.words[0].bval = 0x01; // LSB is Z (aval=1,bval=1)
+  sel_var->value.words[0].aval = 0x03;  // 0b11
+  sel_var->value.words[0].bval = 0x01;  // LSB is Z (aval=1,bval=1)
 
   auto *stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kCase;
@@ -249,4 +251,4 @@ TEST(StmtExec, CasezWithZInSelector) {
   EXPECT_EQ(result_var->value.ToUint64(), 55u);
 }
 
-} // namespace
+}  // namespace

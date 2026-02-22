@@ -1,12 +1,14 @@
 // Annex A.1.2: SystemVerilog source text
 
+#include <gtest/gtest.h>
+
+#include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
-#include <string>
 
 using namespace delta;
 
@@ -31,7 +33,7 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-} // namespace
+}  // namespace
 
 namespace {
 
@@ -48,10 +50,11 @@ TEST(SourceText, EmptySourceText) {
 
 // Multiple descriptions in source text.
 TEST(SourceText, MultipleDescriptions) {
-  auto r = Parse("module m1; endmodule\n"
-                 "interface ifc; endinterface\n"
-                 "program prg; endprogram\n"
-                 "package pkg; endpackage\n");
+  auto r = Parse(
+      "module m1; endmodule\n"
+      "interface ifc; endinterface\n"
+      "program prg; endprogram\n"
+      "package pkg; endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules.size(), 1u);
@@ -74,12 +77,13 @@ TEST(SourceText, DescriptionModule) {
 
 // description: udp_declaration
 TEST(SourceText, DescriptionUdp) {
-  auto r = Parse("primitive my_udp(output y, input a, input b);\n"
-                 "  table\n"
-                 "    0 0 : 0 ;\n"
-                 "    1 1 : 1 ;\n"
-                 "  endtable\n"
-                 "endprimitive\n");
+  auto r = Parse(
+      "primitive my_udp(output y, input a, input b);\n"
+      "  table\n"
+      "    0 0 : 0 ;\n"
+      "    1 1 : 1 ;\n"
+      "  endtable\n"
+      "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);
@@ -115,10 +119,11 @@ TEST(SourceText, DescriptionPackage) {
 
 // description: config_declaration
 TEST(SourceText, DescriptionConfig) {
-  auto r = Parse("config cfg;\n"
-                 "  design work.top;\n"
-                 "  default liblist work;\n"
-                 "endconfig\n");
+  auto r = Parse(
+      "config cfg;\n"
+      "  design work.top;\n"
+      "  default liblist work;\n"
+      "endconfig\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->configs.size(), 1u);
@@ -203,8 +208,9 @@ TEST(SourceText, BindDirectiveHasSourceLoc) {
 
 // Multiple bind directives.
 TEST(SourceText, MultipleBindDirectives) {
-  auto r = Parse("bind mod1 chk1 c1(.a(s));\n"
-                 "bind mod2 chk2 c2(.a(s));\n");
+  auto r = Parse(
+      "bind mod1 chk1 c1(.a(s));\n"
+      "bind mod2 chk2 c2(.a(s));\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->bind_directives.size(), 2u);
@@ -214,9 +220,10 @@ TEST(SourceText, MultipleBindDirectives) {
 
 // Bind mixed with other top-level descriptions.
 TEST(SourceText, BindMixedWithOtherDescriptions) {
-  auto r = Parse("module m; endmodule\n"
-                 "bind m checker_mod chk_i(.a(sig));\n"
-                 "package p; endpackage\n");
+  auto r = Parse(
+      "module m; endmodule\n"
+      "bind m checker_mod chk_i(.a(sig));\n"
+      "package p; endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules.size(), 1u);
@@ -328,10 +335,11 @@ TEST(SourceText, PackageEndLabel) {
 
 // Package with items and lifetime.
 TEST(SourceText, PackageLifetimeWithItems) {
-  auto r = Parse("package automatic pkg;\n"
-                 "  parameter int W = 8;\n"
-                 "  typedef logic [W-1:0] word_t;\n"
-                 "endpackage\n");
+  auto r = Parse(
+      "package automatic pkg;\n"
+      "  parameter int W = 8;\n"
+      "  typedef logic [W-1:0] word_t;\n"
+      "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->packages[0]->name, "pkg");
@@ -424,10 +432,11 @@ TEST(SourceText, TimeunitWithSlash) {
 
 // Form 4: both timeunit and timeprecision separately.
 TEST(SourceText, TimeunitAndTimeprecisionSeparate) {
-  auto r = Parse("module m;\n"
-                 "  timeunit 1ns;\n"
-                 "  timeprecision 1ps;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
@@ -501,4 +510,4 @@ TEST(SourceText, InterfaceClassDecl) {
   EXPECT_EQ(r.cu->classes[0]->name, "IC");
 }
 
-} // namespace
+}  // namespace

@@ -1,5 +1,12 @@
 // §6.16.2: Putc()
 
+#include <gtest/gtest.h>
+
+#include <cstring>
+#include <string>
+#include <string_view>
+#include <vector>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -7,11 +14,6 @@
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
-#include <cstring>
-#include <gtest/gtest.h>
-#include <string>
-#include <string_view>
-#include <vector>
 
 using namespace delta;
 
@@ -24,8 +26,7 @@ static std::string VecToString(const Logic4Vec &vec) {
   uint32_t nbytes = (vec.width + 7) / 8;
   for (uint32_t i = nbytes; i > 0; --i) {
     auto ch = static_cast<char>((v >> ((i - 1) * 8)) & 0xFF);
-    if (ch != 0)
-      result += ch;
+    if (ch != 0) result += ch;
   }
   return result;
 }
@@ -43,8 +44,7 @@ struct StringFixture {
   // Create a string variable and store the given string value.
   Variable *CreateStringVar(std::string_view var_name, std::string_view value) {
     uint32_t width = static_cast<uint32_t>(value.size()) * 8;
-    if (width == 0)
-      width = 8;
+    if (width == 0) width = 8;
     auto *var = ctx.CreateVariable(var_name, width);
     var->value = MakeLogic4Vec(arena, width);
     for (size_t i = 0; i < value.size(); ++i) {
@@ -111,4 +111,4 @@ TEST(StringMethods, Putc) {
   EXPECT_EQ(VecToString(var->value), "Hello");
 }
 
-} // namespace
+}  // namespace

@@ -1,5 +1,10 @@
 // §14.4: Input and output skews
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <string_view>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -9,9 +14,6 @@
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
 #include "simulation/variable.h"
-#include <cstdint>
-#include <gtest/gtest.h>
-#include <string_view>
 
 using namespace delta;
 
@@ -190,4 +192,4 @@ TEST(ClockingSim, PerSignalOutputSkewOverride) {
   EXPECT_EQ(cmgr.GetOutputSkew("cb", "other").ticks, 10u);
 }
 
-} // namespace
+}  // namespace

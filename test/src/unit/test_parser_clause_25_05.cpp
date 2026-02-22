@@ -1,11 +1,12 @@
 // §25.5: Modports
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -59,10 +60,11 @@ static void VerifyModportPorts(const std::vector<ModportPort> &ports,
 namespace {
 
 TEST(Parser, InterfaceWithModport) {
-  auto r = Parse("interface bus;\n"
-                 "  logic [7:0] data;\n"
-                 "  modport master(output data);\n"
-                 "endinterface\n");
+  auto r = Parse(
+      "interface bus;\n"
+      "  logic [7:0] data;\n"
+      "  modport master(output data);\n"
+      "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->interfaces[0]->modports.size(), 1);
   auto *mp = r.cu->interfaces[0]->modports[0];
@@ -72,11 +74,12 @@ TEST(Parser, InterfaceWithModport) {
 }
 
 TEST(Parser, ModportMultipleGroups) {
-  auto r = Parse("interface bus;\n"
-                 "  logic addr;\n"
-                 "  logic data;\n"
-                 "  modport slave(input addr, input data);\n"
-                 "endinterface\n");
+  auto r = Parse(
+      "interface bus;\n"
+      "  logic addr;\n"
+      "  logic data;\n"
+      "  modport slave(input addr, input data);\n"
+      "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   auto *mp = r.cu->interfaces[0]->modports[0];
   EXPECT_EQ(mp->name, "slave");
@@ -85,4 +88,4 @@ TEST(Parser, ModportMultipleGroups) {
   EXPECT_EQ(mp->ports[1].direction, Direction::kInput);
 }
 
-} // namespace
+}  // namespace

@@ -1,5 +1,7 @@
 // §31.7: Enabling timing checks with conditioned events
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -7,7 +9,6 @@
 #include "parser/ast.h"
 #include "parser/parser.h"
 #include "simulation/specify.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -15,7 +16,7 @@ using namespace delta;
 // Parser test fixture
 // =============================================================================
 struct SpecifyTest : ::testing::Test {
-protected:
+ protected:
   CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
@@ -26,8 +27,7 @@ protected:
   // Helper: get first specify block from first module.
   ModuleItem *FirstSpecifyBlock(CompilationUnit *cu) {
     for (auto *item : cu->modules[0]->items) {
-      if (item->kind == ModuleItemKind::kSpecifyBlock)
-        return item;
+      if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
     }
     return nullptr;
   }
@@ -46,11 +46,12 @@ namespace {
 // §31.7 Conditioned events
 // =============================================================================
 TEST_F(SpecifyTest, ConditionedSetup) {
-  auto *cu = Parse("module m;\n"
-                   "specify\n"
-                   "  $setup(data &&& clr, posedge clk, 10);\n"
-                   "endspecify\n"
-                   "endmodule\n");
+  auto *cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(data &&& clr, posedge clk, 10);\n"
+      "endspecify\n"
+      "endmodule\n");
   auto *spec = FirstSpecifyBlock(cu);
   ASSERT_NE(spec, nullptr);
   auto &tc = spec->specify_items[0]->timing_check;
@@ -60,11 +61,12 @@ TEST_F(SpecifyTest, ConditionedSetup) {
 }
 
 TEST_F(SpecifyTest, ConditionedHoldBothSignals) {
-  auto *cu = Parse("module m;\n"
-                   "specify\n"
-                   "  $hold(posedge clk &&& en, data &&& reset, 5);\n"
-                   "endspecify\n"
-                   "endmodule\n");
+  auto *cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $hold(posedge clk &&& en, data &&& reset, 5);\n"
+      "endspecify\n"
+      "endmodule\n");
   auto *spec = FirstSpecifyBlock(cu);
   ASSERT_NE(spec, nullptr);
   auto &tc = spec->specify_items[0]->timing_check;
@@ -73,4 +75,4 @@ TEST_F(SpecifyTest, ConditionedHoldBothSignals) {
   EXPECT_NE(tc.data_condition, nullptr);
 }
 
-} // namespace
+}  // namespace

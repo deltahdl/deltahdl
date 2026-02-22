@@ -1,11 +1,13 @@
 // §6.7.3: Initialization of nets with user-defined nettypes
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <functional>
+
 #include "common/arena.h"
 #include "simulation/net.h"
 #include "simulation/variable.h"
-#include <cstdint>
-#include <functional>
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -49,14 +51,10 @@ void InitializeNet(Net &net, NetType type, Arena &arena);
 void InitializeTriregNet(Net &net, LocalChargeStrength str, Arena &arena);
 
 static bool ValidateInterconnectDecl(const NetDeclInfo &info) {
-  if (info.has_data_type)
-    return false;
-  if (info.has_drive_strength)
-    return false;
-  if (info.has_charge_strength)
-    return false;
-  if (info.has_assignment)
-    return false;
+  if (info.has_data_type) return false;
+  if (info.has_drive_strength) return false;
+  if (info.has_charge_strength) return false;
+  if (info.has_assignment) return false;
   return info.delay_count <= 1;
 }
 
@@ -69,21 +67,20 @@ bool ValidateNetDecl(const NetDeclInfo &info) {
   if ((info.is_vectored || info.is_scalared) && info.packed_dim_count == 0)
     return false;
   // Interconnect constraints.
-  if (info.is_interconnect)
-    return ValidateInterconnectDecl(info);
+  if (info.is_interconnect) return ValidateInterconnectDecl(info);
   return true;
 }
 
 bool ValidateNetDataType(NetDataTypeKind kind) {
   switch (kind) {
-  case NetDataTypeKind::k4StateIntegral:
-  case NetDataTypeKind::kFixedUnpackedValid:
-    return true;
-  case NetDataTypeKind::k2StateIntegral:
-  case NetDataTypeKind::kReal:
-  case NetDataTypeKind::kDynamicArray:
-  case NetDataTypeKind::kString:
-    return false;
+    case NetDataTypeKind::k4StateIntegral:
+    case NetDataTypeKind::kFixedUnpackedValid:
+      return true;
+    case NetDataTypeKind::k2StateIntegral:
+    case NetDataTypeKind::kReal:
+    case NetDataTypeKind::kDynamicArray:
+    case NetDataTypeKind::kString:
+      return false;
   }
   return false;
 }
@@ -210,4 +207,4 @@ TEST(NetDecl, UserDefinedNettypeDefaultIsDataTypeDefault) {
   EXPECT_EQ(ValOf(*var), kValX);
 }
 
-} // namespace
+}  // namespace

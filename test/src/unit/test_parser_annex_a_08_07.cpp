@@ -34,8 +34,7 @@ ParseResult Parse(const std::string &src) {
 
 static Expr *FirstInitialRHS(ParseResult &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock)
-      continue;
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0]->rhs;
     }
@@ -44,7 +43,7 @@ static Expr *FirstInitialRHS(ParseResult &r) {
   return nullptr;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.8.7 Numbers — Parser

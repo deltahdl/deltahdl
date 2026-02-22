@@ -1,5 +1,10 @@
 // §14.6: Signals in multiple clocking blocks
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <string_view>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -9,9 +14,6 @@
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
 #include "simulation/variable.h"
-#include <cstdint>
-#include <gtest/gtest.h>
-#include <string_view>
 
 using namespace delta;
 
@@ -77,4 +79,4 @@ TEST(ClockingSim, MultipleClockingBlocks) {
   EXPECT_EQ(cmgr.Find("cb_slow")->clock_edge, Edge::kNegedge);
 }
 
-} // namespace
+}  // namespace

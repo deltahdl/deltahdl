@@ -1,5 +1,9 @@
 // §21.2: Display system tasks
 
+#include <gtest/gtest.h>
+
+#include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -9,8 +13,6 @@
 #include "simulation/eval.h"
 #include "simulation/eval_array.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
-#include <string>
 
 using namespace delta;
 
@@ -34,4 +36,4 @@ TEST(FormatArg, StringFromAscii) {
   EXPECT_EQ(FormatValueAsString(val), "A");
 }
 
-} // namespace
+}  // namespace

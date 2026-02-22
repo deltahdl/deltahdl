@@ -1,5 +1,7 @@
 // §6.20.5: Specify parameters
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -11,7 +13,6 @@
 #include "lexer/lexer.h"
 #include "lexer/token.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -35,12 +36,13 @@ namespace {
 // --- §6.20.5: Specparam restriction ---
 TEST(Elaboration, SpecparamInParam_Error) {
   ElabFixture f;
-  ElaborateSrc("module top();\n"
-               "  specparam delay = 50;\n"
-               "  parameter p = delay + 2;\n"
-               "endmodule\n",
-               f);
+  ElaborateSrc(
+      "module top();\n"
+      "  specparam delay = 50;\n"
+      "  parameter p = delay + 2;\n"
+      "endmodule\n",
+      f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-} // namespace
+}  // namespace

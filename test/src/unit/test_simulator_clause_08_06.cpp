@@ -1,5 +1,9 @@
 // §8.6: Object methods
 
+#include <gtest/gtest.h>
+
+#include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -7,8 +11,6 @@
 #include "simulation/class_object.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
-#include <string>
 
 using namespace delta;
 
@@ -60,9 +62,9 @@ static Stmt *MkReturn(Arena &a, Expr *expr) {
 }
 
 // Build a simple ClassTypeInfo and register it with the context.
-static ClassTypeInfo *
-MakeClassType(ClassFixture &f, std::string_view name,
-              const std::vector<std::string_view> &props) {
+static ClassTypeInfo *MakeClassType(
+    ClassFixture &f, std::string_view name,
+    const std::vector<std::string_view> &props) {
   auto *info = f.arena.Create<ClassTypeInfo>();
   info->name = name;
   for (auto p : props) {
@@ -139,4 +141,4 @@ TEST(ClassSim, MethodNotFound) {
   EXPECT_EQ(resolved, nullptr);
 }
 
-} // namespace
+}  // namespace

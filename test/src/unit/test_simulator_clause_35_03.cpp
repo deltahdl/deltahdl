@@ -1,10 +1,12 @@
 // §35.3: Two layers of DPI
 
-#include "simulation/dpi_runtime.h"
-#include <cstdint>
 #include <gtest/gtest.h>
+
+#include <cstdint>
 #include <string>
 #include <vector>
+
+#include "simulation/dpi_runtime.h"
 
 using namespace delta;
 
@@ -49,4 +51,4 @@ TEST(DpiRuntime, ContextFunctionFlag) {
   EXPECT_TRUE(found->is_context);
 }
 
-} // namespace
+}  // namespace

@@ -1,12 +1,13 @@
 // §11.4.11: Conditional operator
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "elaboration/const_eval.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -45,4 +46,4 @@ TEST(ConstEval, ScopedTernary) {
       ConstEvalInt(ParseExprFrom("WIDTH > 8 ? WIDTH : 8", f), scope_small), 8);
 }
 
-} // namespace
+}  // namespace

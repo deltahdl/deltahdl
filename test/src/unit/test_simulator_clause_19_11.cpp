@@ -1,10 +1,12 @@
 // §19.11: Coverage computation
 
-#include "simulation/coverage.h"
-#include <cstdint>
 #include <gtest/gtest.h>
+
+#include <cstdint>
 #include <string>
 #include <vector>
+
+#include "simulation/coverage.h"
 
 using namespace delta;
 
@@ -66,4 +68,4 @@ TEST(Coverage, MultipleCoverpointsAveraged) {
   EXPECT_DOUBLE_EQ(CoverageDB::GetCoverage(g), 50.0);
 }
 
-} // namespace
+}  // namespace

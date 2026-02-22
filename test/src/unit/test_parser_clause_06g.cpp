@@ -49,9 +49,10 @@ static ModuleItem *FirstItem(ParseResult6g &r) {
 
 // 1. Packed dimensions on logic type.
 TEST(ParserSection6, Sec6_11_LogicPackedDims) {
-  auto r = Parse("module t;\n"
-                 "  logic [7:0] data;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  logic [7:0] data;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -66,9 +67,10 @@ TEST(ParserSection6, Sec6_11_LogicPackedDims) {
 
 // 1b. Packed dimensions on bit type.
 TEST(ParserSection6, Sec6_11_BitPackedDims) {
-  auto r = Parse("module t;\n"
-                 "  bit [31:0] word;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  bit [31:0] word;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -82,9 +84,10 @@ TEST(ParserSection6, Sec6_11_BitPackedDims) {
 
 // 1c. Packed dimensions on reg type.
 TEST(ParserSection6, Sec6_11_RegPackedDims) {
-  auto r = Parse("module t;\n"
-                 "  reg [3:0] nibble;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  reg [3:0] nibble;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -98,9 +101,10 @@ TEST(ParserSection6, Sec6_11_RegPackedDims) {
 
 // 2. Multiple packed dimensions on logic type.
 TEST(ParserSection6, Sec6_11_MultiplePackedDims) {
-  auto r = Parse("module t;\n"
-                 "  logic [3:0][7:0] data;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  logic [3:0][7:0] data;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -113,9 +117,10 @@ TEST(ParserSection6, Sec6_11_MultiplePackedDims) {
 
 // 3. Unpacked dimensions on int type (fixed-size array).
 TEST(ParserSection6, Sec6_11_IntUnpackedDim) {
-  auto r = Parse("module t;\n"
-                 "  int arr[5];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[5];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -127,9 +132,10 @@ TEST(ParserSection6, Sec6_11_IntUnpackedDim) {
 
 // 3b. Unpacked dimensions on logic with packed dims (memory array).
 TEST(ParserSection6, Sec6_11_LogicPackedAndUnpackedDims) {
-  auto r = Parse("module t;\n"
-                 "  logic [7:0] mem[256];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  logic [7:0] mem[256];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -142,9 +148,10 @@ TEST(ParserSection6, Sec6_11_LogicPackedAndUnpackedDims) {
 
 // 4. Combined packed + unpacked dims with range notation.
 TEST(ParserSection6, Sec6_11_PackedAndUnpackedWithRange) {
-  auto r = Parse("module t;\n"
-                 "  logic [7:0] mem [0:3];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  logic [7:0] mem [0:3];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -158,9 +165,10 @@ TEST(ParserSection6, Sec6_11_PackedAndUnpackedWithRange) {
 
 // 5. Signed with packed dims: logic signed [15:0].
 TEST(ParserSection6, Sec6_11_LogicSignedWithPackedDims) {
-  auto r = Parse("module t;\n"
-                 "  logic signed [15:0] sv;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  logic signed [15:0] sv;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -175,9 +183,10 @@ TEST(ParserSection6, Sec6_11_LogicSignedWithPackedDims) {
 
 // 5b. Unsigned with packed dims: bit unsigned [7:0].
 TEST(ParserSection6, Sec6_11_BitUnsignedWithPackedDims) {
-  auto r = Parse("module t;\n"
-                 "  bit unsigned [7:0] uv;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  bit unsigned [7:0] uv;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -190,9 +199,10 @@ TEST(ParserSection6, Sec6_11_BitUnsignedWithPackedDims) {
 
 // 6. byte signed explicitly (redundant but valid).
 TEST(ParserSection6, Sec6_11_ByteSignedExplicit) {
-  auto r = Parse("module t;\n"
-                 "  byte signed bs;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  byte signed bs;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -204,9 +214,10 @@ TEST(ParserSection6, Sec6_11_ByteSignedExplicit) {
 
 // 7. byte unsigned override.
 TEST(ParserSection6, Sec6_11_ByteUnsignedOverride) {
-  auto r = Parse("module t;\n"
-                 "  byte unsigned bu;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  byte unsigned bu;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -218,9 +229,10 @@ TEST(ParserSection6, Sec6_11_ByteUnsignedOverride) {
 
 // 8. shortint unsigned override.
 TEST(ParserSection6, Sec6_11_ShortintUnsignedOverride) {
-  auto r = Parse("module t;\n"
-                 "  shortint unsigned su;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  shortint unsigned su;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -232,9 +244,10 @@ TEST(ParserSection6, Sec6_11_ShortintUnsignedOverride) {
 
 // 9. longint unsigned override.
 TEST(ParserSection6, Sec6_11_LongintUnsignedOverride) {
-  auto r = Parse("module t;\n"
-                 "  longint unsigned lu;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  longint unsigned lu;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -246,9 +259,10 @@ TEST(ParserSection6, Sec6_11_LongintUnsignedOverride) {
 
 // 10. integer unsigned override.
 TEST(ParserSection6, Sec6_11_IntegerUnsignedOverride) {
-  auto r = Parse("module t;\n"
-                 "  integer unsigned iu;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  integer unsigned iu;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -260,9 +274,10 @@ TEST(ParserSection6, Sec6_11_IntegerUnsignedOverride) {
 
 // 11. time signed override.
 TEST(ParserSection6, Sec6_11_TimeSignedOverride) {
-  auto r = Parse("module t;\n"
-                 "  time signed ts;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  time signed ts;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -274,9 +289,10 @@ TEST(ParserSection6, Sec6_11_TimeSignedOverride) {
 
 // 12. bit signed override.
 TEST(ParserSection6, Sec6_11_BitSignedOverride) {
-  auto r = Parse("module t;\n"
-                 "  bit signed bs;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  bit signed bs;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -288,9 +304,10 @@ TEST(ParserSection6, Sec6_11_BitSignedOverride) {
 
 // 13. Multiple variables with packed dims share the same type.
 TEST(ParserSection6, Sec6_11_MultipleVarsWithPackedDims) {
-  auto r = Parse("module t;\n"
-                 "  logic [7:0] a, b, c;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  logic [7:0] a, b, c;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &items = r.cu->modules[0]->items;
@@ -307,9 +324,10 @@ TEST(ParserSection6, Sec6_11_MultipleVarsWithPackedDims) {
 
 // 14. Integer types with initializer expressions.
 TEST(ParserSection6, Sec6_11_ByteWithInitializer) {
-  auto r = Parse("module t;\n"
-                 "  byte b = 8'hFF;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  byte b = 8'hFF;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -321,9 +339,10 @@ TEST(ParserSection6, Sec6_11_ByteWithInitializer) {
 
 // 14b. shortint with negative initializer.
 TEST(ParserSection6, Sec6_11_ShortintWithNegativeInit) {
-  auto r = Parse("module t;\n"
-                 "  shortint s = -1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  shortint s = -1;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -334,10 +353,11 @@ TEST(ParserSection6, Sec6_11_ShortintWithNegativeInit) {
 
 // 15. Integer types as function parameters.
 TEST(ParserSection6, Sec6_11_IntegerTypesAsFunctionParams) {
-  auto r = Parse("module t;\n"
-                 "  function void f(int a, byte b);\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  function void f(int a, byte b);\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -352,11 +372,12 @@ TEST(ParserSection6, Sec6_11_IntegerTypesAsFunctionParams) {
 
 // 16. Integer types as function return types.
 TEST(ParserSection6, Sec6_11_ByteFunctionReturnType) {
-  auto r = Parse("module t;\n"
-                 "  function byte get_byte();\n"
-                 "    return 8'hAB;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  function byte get_byte();\n"
+      "    return 8'hAB;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -367,11 +388,12 @@ TEST(ParserSection6, Sec6_11_ByteFunctionReturnType) {
 
 // 16b. shortint as function return type.
 TEST(ParserSection6, Sec6_11_ShortintFunctionReturnType) {
-  auto r = Parse("module t;\n"
-                 "  function shortint get_short();\n"
-                 "    return 16'd100;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  function shortint get_short();\n"
+      "    return 16'd100;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -381,10 +403,11 @@ TEST(ParserSection6, Sec6_11_ShortintFunctionReturnType) {
 
 // 17. Integer types in task ports.
 TEST(ParserSection6, Sec6_11_IntegerTypesInTaskPorts) {
-  auto r = Parse("module t;\n"
-                 "  task t1(input int x, output longint y);\n"
-                 "  endtask\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  task t1(input int x, output longint y);\n"
+      "  endtask\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -399,9 +422,10 @@ TEST(ParserSection6, Sec6_11_IntegerTypesInTaskPorts) {
 
 // 18. Integer types with 2D unpacked arrays.
 TEST(ParserSection6, Sec6_11_Int2DUnpackedArray) {
-  auto r = Parse("module t;\n"
-                 "  int matrix[3][4];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int matrix[3][4];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -413,9 +437,10 @@ TEST(ParserSection6, Sec6_11_Int2DUnpackedArray) {
 
 // 19. Integer var with complex initializer expression.
 TEST(ParserSection6, Sec6_11_IntWithComplexInit) {
-  auto r = Parse("module t;\n"
-                 "  int x = 1 + 2 * 3;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int x = 1 + 2 * 3;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -428,25 +453,27 @@ TEST(ParserSection6, Sec6_11_IntWithComplexInit) {
 
 // 20. Static lifetime qualifier with integer type.
 TEST(ParserSection6, Sec6_11_StaticLifetimeInt) {
-  auto r = Parse("module t;\n"
-                 "  function automatic int count();\n"
-                 "    static int counter = 0;\n"
-                 "    counter = counter + 1;\n"
-                 "    return counter;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  function automatic int count();\n"
+      "    static int counter = 0;\n"
+      "    counter = counter + 1;\n"
+      "    return counter;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 // 21. Automatic lifetime qualifier with integer type.
 TEST(ParserSection6, Sec6_11_AutomaticLifetimeInt) {
-  auto r = Parse("module t;\n"
-                 "  function static int get_temp();\n"
-                 "    automatic int temp = 42;\n"
-                 "    return temp;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  function static int get_temp();\n"
+      "    automatic int temp = 42;\n"
+      "    return temp;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -457,10 +484,11 @@ TEST(ParserSection6, Sec6_11_AutomaticLifetimeInt) {
 
 // 22. reg and logic both parse to their respective DataTypeKind.
 TEST(ParserSection6, Sec6_11_2_RegAndLogicDistinctKinds) {
-  auto r = Parse("module t;\n"
-                 "  reg r;\n"
-                 "  logic l;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  reg r;\n"
+      "  logic l;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &items = r.cu->modules[0]->items;
@@ -473,9 +501,10 @@ TEST(ParserSection6, Sec6_11_2_RegAndLogicDistinctKinds) {
 
 // 23. reg with packed dimensions.
 TEST(ParserSection6, Sec6_11_2_RegWithPackedDims) {
-  auto r = Parse("module t;\n"
-                 "  reg [15:0] wide_reg;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  reg [15:0] wide_reg;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -490,9 +519,10 @@ TEST(ParserSection6, Sec6_11_2_RegWithPackedDims) {
 
 // 24. reg with signed qualifier.
 TEST(ParserSection6, Sec6_11_2_RegSignedQualifier) {
-  auto r = Parse("module t;\n"
-                 "  reg signed [7:0] sr;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  reg signed [7:0] sr;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -509,12 +539,13 @@ TEST(ParserSection6, Sec6_11_2_RegSignedQualifier) {
 
 // 25. Integer types coexisting with real types in the same module.
 TEST(ParserSection6, Sec6_11_IntegerAndRealCoexist) {
-  auto r = Parse("module t;\n"
-                 "  int count;\n"
-                 "  real voltage;\n"
-                 "  byte flags;\n"
-                 "  shortreal gain;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int count;\n"
+      "  real voltage;\n"
+      "  byte flags;\n"
+      "  shortreal gain;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &items = r.cu->modules[0]->items;
@@ -531,11 +562,12 @@ TEST(ParserSection6, Sec6_11_IntegerAndRealCoexist) {
 
 // 26. Integer types in package scope.
 TEST(ParserSection6, Sec6_11_IntegerTypesInPackage) {
-  auto r = Parse("package pkg;\n"
-                 "  int pkg_count;\n"
-                 "  byte pkg_flags;\n"
-                 "  longint pkg_id;\n"
-                 "endpackage\n");
+  auto r = Parse(
+      "package pkg;\n"
+      "  int pkg_count;\n"
+      "  byte pkg_flags;\n"
+      "  longint pkg_id;\n"
+      "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -555,11 +587,12 @@ TEST(ParserSection6, Sec6_11_IntegerTypesInPackage) {
 
 // 27. Integer types in class members.
 TEST(ParserSection6, Sec6_11_IntegerTypesInClassMembers) {
-  auto r = Parse("class Counter;\n"
-                 "  int value;\n"
-                 "  byte status;\n"
-                 "  longint timestamp;\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class Counter;\n"
+      "  int value;\n"
+      "  byte status;\n"
+      "  longint timestamp;\n"
+      "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
@@ -579,14 +612,15 @@ TEST(ParserSection6, Sec6_11_IntegerTypesInClassMembers) {
 
 // 28. Integer types in generate blocks.
 TEST(ParserSection6, Sec6_11_IntegerTypesInGenerateBlock) {
-  EXPECT_TRUE(ParseOk("module t;\n"
-                      "  generate\n"
-                      "    genvar i;\n"
-                      "    for (i = 0; i < 4; i = i + 1) begin : gen_blk\n"
-                      "      int local_count;\n"
-                      "    end\n"
-                      "  endgenerate\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  generate\n"
+              "    genvar i;\n"
+              "    for (i = 0; i < 4; i = i + 1) begin : gen_blk\n"
+              "      int local_count;\n"
+              "    end\n"
+              "  endgenerate\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -595,26 +629,27 @@ TEST(ParserSection6, Sec6_11_IntegerTypesInGenerateBlock) {
 
 // 29. All integer types with explicit signed/unsigned qualifiers.
 TEST(ParserSection6, Sec6_11_AllTypesExplicitSignedness) {
-  auto r = Parse("module t;\n"
-                 "  byte signed bs;\n"
-                 "  byte unsigned bu;\n"
-                 "  shortint signed ss;\n"
-                 "  shortint unsigned su;\n"
-                 "  int signed is_;\n"
-                 "  int unsigned iu;\n"
-                 "  longint signed ls;\n"
-                 "  longint unsigned lu;\n"
-                 "  integer signed igs;\n"
-                 "  integer unsigned igu;\n"
-                 "  time signed ts;\n"
-                 "  time unsigned tu;\n"
-                 "  logic signed lgs;\n"
-                 "  logic unsigned lgu;\n"
-                 "  bit signed bts;\n"
-                 "  bit unsigned btu;\n"
-                 "  reg signed rs;\n"
-                 "  reg unsigned ru;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  byte signed bs;\n"
+      "  byte unsigned bu;\n"
+      "  shortint signed ss;\n"
+      "  shortint unsigned su;\n"
+      "  int signed is_;\n"
+      "  int unsigned iu;\n"
+      "  longint signed ls;\n"
+      "  longint unsigned lu;\n"
+      "  integer signed igs;\n"
+      "  integer unsigned igu;\n"
+      "  time signed ts;\n"
+      "  time unsigned tu;\n"
+      "  logic signed lgs;\n"
+      "  logic unsigned lgu;\n"
+      "  bit signed bts;\n"
+      "  bit unsigned btu;\n"
+      "  reg signed rs;\n"
+      "  reg unsigned ru;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &items = r.cu->modules[0]->items;
@@ -654,8 +689,9 @@ TEST(ParserSection6, Sec6_11_AllTypesExplicitSignedness) {
 
 // 30. Integer types as module port declarations.
 TEST(ParserSection6, Sec6_11_IntegerTypesAsPortDecls) {
-  auto r = Parse("module m(input int a, output byte b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input int a, output byte b);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 1u);
@@ -671,8 +707,9 @@ TEST(ParserSection6, Sec6_11_IntegerTypesAsPortDecls) {
 
 // 30b. More integer types as ports: longint and shortint.
 TEST(ParserSection6, Sec6_11_LongintShortintAsPorts) {
-  auto r = Parse("module m(input longint addr, output shortint result);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input longint addr, output shortint result);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &ports = r.cu->modules[0]->ports;
@@ -685,8 +722,9 @@ TEST(ParserSection6, Sec6_11_LongintShortintAsPorts) {
 
 // 30c. Integer type port with packed dimensions.
 TEST(ParserSection6, Sec6_11_LogicPackedDimsAsPort) {
-  auto r = Parse("module m(input logic [7:0] data, output logic [15:0] addr);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input logic [7:0] data, output logic [15:0] addr);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &ports = r.cu->modules[0]->ports;
@@ -705,9 +743,10 @@ TEST(ParserSection6, Sec6_11_LogicPackedDimsAsPort) {
 
 // Longint with initializer.
 TEST(ParserSection6, Sec6_11_LongintWithInit) {
-  auto r = Parse("module t;\n"
-                 "  longint big = 64'hDEAD_BEEF_CAFE_BABE;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  longint big = 64'hDEAD_BEEF_CAFE_BABE;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -718,9 +757,10 @@ TEST(ParserSection6, Sec6_11_LongintWithInit) {
 
 // Integer (4-state) with initializer.
 TEST(ParserSection6, Sec6_11_IntegerWithInit) {
-  auto r = Parse("module t;\n"
-                 "  integer idx = 0;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  integer idx = 0;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -731,11 +771,12 @@ TEST(ParserSection6, Sec6_11_IntegerWithInit) {
 
 // Longint function return type.
 TEST(ParserSection6, Sec6_11_LongintFunctionReturnType) {
-  auto r = Parse("module t;\n"
-                 "  function longint get_id();\n"
-                 "    return 64'd1;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  function longint get_id();\n"
+      "    return 64'd1;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -745,11 +786,12 @@ TEST(ParserSection6, Sec6_11_LongintFunctionReturnType) {
 
 // Integer function return type.
 TEST(ParserSection6, Sec6_11_IntegerFunctionReturnType) {
-  auto r = Parse("module t;\n"
-                 "  function integer get_count();\n"
-                 "    return 42;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  function integer get_count();\n"
+      "    return 42;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -759,9 +801,10 @@ TEST(ParserSection6, Sec6_11_IntegerFunctionReturnType) {
 
 // reg unsigned override.
 TEST(ParserSection6, Sec6_11_2_RegUnsignedExplicit) {
-  auto r = Parse("module t;\n"
-                 "  reg unsigned [7:0] ru;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  reg unsigned [7:0] ru;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -773,11 +816,12 @@ TEST(ParserSection6, Sec6_11_2_RegUnsignedExplicit) {
 
 // Multiple integer types as function parameters with directions.
 TEST(ParserSection6, Sec6_11_MixedIntegerFuncParams) {
-  auto r = Parse("module t;\n"
-                 "  function void process(input byte cmd, input int data,\n"
-                 "                        output longint result);\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  function void process(input byte cmd, input int data,\n"
+      "                        output longint result);\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -792,9 +836,10 @@ TEST(ParserSection6, Sec6_11_MixedIntegerFuncParams) {
 
 // Integer type with unpacked dimension using range notation.
 TEST(ParserSection6, Sec6_11_IntUnpackedRangeNotation) {
-  auto r = Parse("module t;\n"
-                 "  int data [0:7];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int data [0:7];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -805,9 +850,10 @@ TEST(ParserSection6, Sec6_11_IntUnpackedRangeNotation) {
 
 // time type with unpacked dimensions.
 TEST(ParserSection6, Sec6_11_TimeUnpackedArray) {
-  auto r = Parse("module t;\n"
-                 "  time timestamps[10];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  time timestamps[10];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -819,8 +865,9 @@ TEST(ParserSection6, Sec6_11_TimeUnpackedArray) {
 
 // integer (4-state) as port declaration.
 TEST(ParserSection6, Sec6_11_IntegerAsPort) {
-  auto r = Parse("module m(input integer idx);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input integer idx);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &ports = r.cu->modules[0]->ports;

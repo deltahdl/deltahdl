@@ -39,8 +39,7 @@ static bool ParseOk(const std::string &src) {
 
 static Stmt *FirstInitialStmt(ParseResult9e &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock)
-      continue;
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
     }
@@ -62,14 +61,15 @@ static Stmt *FirstInitialStmt(ParseResult9e &r) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_ForkJoinTwoDelayedStmts) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      #5 a = 1;\n"
-                 "      #10 b = 2;\n"
-                 "    join\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      #5 a = 1;\n"
+      "      #10 b = 2;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -86,15 +86,16 @@ TEST(ParserSection9, Sec9_3_2_ForkJoinTwoDelayedStmts) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_ForkJoinThreeThreads) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      #5 a = 1;\n"
-                 "      #10 b = 2;\n"
-                 "      #15 c = 3;\n"
-                 "    join\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      #5 a = 1;\n"
+      "      #10 b = 2;\n"
+      "      #15 c = 3;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -108,14 +109,15 @@ TEST(ParserSection9, Sec9_3_2_ForkJoinThreeThreads) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_ForkJoinAnyTwoThreads) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      #5 a = 1;\n"
-                 "      #100 b = 2;\n"
-                 "    join_any\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      #5 a = 1;\n"
+      "      #100 b = 2;\n"
+      "    join_any\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -130,13 +132,14 @@ TEST(ParserSection9, Sec9_3_2_ForkJoinAnyTwoThreads) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_ForkJoinNoneSingleThread) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      #50 a = 1;\n"
-                 "    join_none\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      #50 a = 1;\n"
+      "    join_none\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -151,14 +154,15 @@ TEST(ParserSection9, Sec9_3_2_ForkJoinNoneSingleThread) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_NamedForkJoinMatchingLabels) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork : thread_group\n"
-                 "      #10 a = 1;\n"
-                 "      #20 b = 2;\n"
-                 "    join : thread_group\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork : thread_group\n"
+      "      #10 a = 1;\n"
+      "      #20 b = 2;\n"
+      "    join : thread_group\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -173,14 +177,15 @@ TEST(ParserSection9, Sec9_3_2_NamedForkJoinMatchingLabels) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_NamedForkJoinAny) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork : race_threads\n"
-                 "      #10 a = 1;\n"
-                 "      #20 b = 2;\n"
-                 "    join_any : race_threads\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork : race_threads\n"
+      "      #10 a = 1;\n"
+      "      #20 b = 2;\n"
+      "    join_any : race_threads\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -195,13 +200,14 @@ TEST(ParserSection9, Sec9_3_2_NamedForkJoinAny) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_NamedForkJoinNone) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork : bg_threads\n"
-                 "      #100 a = 1;\n"
-                 "    join_none : bg_threads\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork : bg_threads\n"
+      "      #100 a = 1;\n"
+      "    join_none : bg_threads\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -216,19 +222,20 @@ TEST(ParserSection9, Sec9_3_2_NamedForkJoinNone) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_ForkWithBeginEndThreads) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      begin\n"
-                 "        #10 a = 1;\n"
-                 "        #20 a = 2;\n"
-                 "      end\n"
-                 "      begin\n"
-                 "        #15 b = 3;\n"
-                 "      end\n"
-                 "    join\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      begin\n"
+      "        #10 a = 1;\n"
+      "        #20 a = 2;\n"
+      "      end\n"
+      "      begin\n"
+      "        #15 b = 3;\n"
+      "      end\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -246,18 +253,19 @@ TEST(ParserSection9, Sec9_3_2_ForkWithBeginEndThreads) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_ForkMixedStmtsAndBlocks) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      #10 a = 1;\n"
-                 "      begin\n"
-                 "        #20 b = 2;\n"
-                 "        #30 c = 3;\n"
-                 "      end\n"
-                 "      #40 d = 4;\n"
-                 "    join\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      #10 a = 1;\n"
+      "      begin\n"
+      "        #20 b = 2;\n"
+      "        #30 c = 3;\n"
+      "      end\n"
+      "      #40 d = 4;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -274,14 +282,15 @@ TEST(ParserSection9, Sec9_3_2_ForkMixedStmtsAndBlocks) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_ForkDelayControlsInThreads) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      begin #5; #10 a = 1; end\n"
-                 "      begin #20 b = 2; end\n"
-                 "    join\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      begin #5; #10 a = 1; end\n"
+      "      begin #20 b = 2; end\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -298,14 +307,15 @@ TEST(ParserSection9, Sec9_3_2_ForkDelayControlsInThreads) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_ForkEventControlsInThreads) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      @(posedge clk) a = 1;\n"
-                 "      @(negedge rst) b = 0;\n"
-                 "    join_any\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      @(posedge clk) a = 1;\n"
+      "      @(negedge rst) b = 0;\n"
+      "    join_any\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -322,19 +332,20 @@ TEST(ParserSection9, Sec9_3_2_ForkEventControlsInThreads) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_NestedForkInsideFork) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      begin\n"
-                 "        fork\n"
-                 "          #5 a = 1;\n"
-                 "          #10 b = 2;\n"
-                 "        join\n"
-                 "      end\n"
-                 "      #20 c = 3;\n"
-                 "    join\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      begin\n"
+      "        fork\n"
+      "          #5 a = 1;\n"
+      "          #10 b = 2;\n"
+      "        join\n"
+      "      end\n"
+      "      #20 c = 3;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -354,19 +365,20 @@ TEST(ParserSection9, Sec9_3_2_NestedForkInsideFork) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_ForkInBeginInFork) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      begin\n"
-                 "        a = 0;\n"
-                 "        fork\n"
-                 "          #5 b = 1;\n"
-                 "          #10 c = 2;\n"
-                 "        join_none\n"
-                 "      end\n"
-                 "    join\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      begin\n"
+      "        a = 0;\n"
+      "        fork\n"
+      "          #5 b = 1;\n"
+      "          #10 c = 2;\n"
+      "        join_none\n"
+      "      end\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -385,14 +397,15 @@ TEST(ParserSection9, Sec9_3_2_ForkInBeginInFork) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_VarDeclInFork) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      int x;\n"
-                 "      begin x = 1; end\n"
-                 "    join\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      int x;\n"
+      "      begin x = 1; end\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -407,15 +420,16 @@ TEST(ParserSection9, Sec9_3_2_VarDeclInFork) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_MultipleVarDeclsInFork) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      int x;\n"
-                 "      int y;\n"
-                 "      begin x = 1; y = 2; end\n"
-                 "    join\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      int x;\n"
+      "      int y;\n"
+      "      begin x = 1; y = 2; end\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -431,16 +445,17 @@ TEST(ParserSection9, Sec9_3_2_MultipleVarDeclsInFork) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_AutomaticVarInForkBlock) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      automatic int k = 0;\n"
-                 "      begin\n"
-                 "        k = k + 1;\n"
-                 "      end\n"
-                 "    join_none\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      automatic int k = 0;\n"
+      "      begin\n"
+      "        k = k + 1;\n"
+      "      end\n"
+      "    join_none\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -456,15 +471,16 @@ TEST(ParserSection9, Sec9_3_2_AutomaticVarInForkBlock) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_ForkJoinNoneThenWaitFork) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      begin #10 a = 1; end\n"
-                 "      begin #20 b = 2; end\n"
-                 "    join_none\n"
-                 "    wait fork;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      begin #10 a = 1; end\n"
+      "      begin #20 b = 2; end\n"
+      "    join_none\n"
+      "    wait fork;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *body = r.cu->modules[0]->items[0]->body;
@@ -480,16 +496,17 @@ TEST(ParserSection9, Sec9_3_2_ForkJoinNoneThenWaitFork) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_ForkJoinNoneThenDisableFork) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      #100 a = 1;\n"
-                 "      #200 b = 2;\n"
-                 "    join_none\n"
-                 "    #50;\n"
-                 "    disable fork;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      #100 a = 1;\n"
+      "      #200 b = 2;\n"
+      "    join_none\n"
+      "    #50;\n"
+      "    disable fork;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *body = r.cu->modules[0]->items[0]->body;
@@ -504,12 +521,13 @@ TEST(ParserSection9, Sec9_3_2_ForkJoinNoneThenDisableFork) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_EmptyForkJoin) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "    join\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -524,15 +542,16 @@ TEST(ParserSection9, Sec9_3_2_EmptyForkJoin) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_ForkInTaskBody) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  task automatic run_parallel;\n"
-                      "    fork\n"
-                      "      #10 a = 1;\n"
-                      "      #20 b = 2;\n"
-                      "    join\n"
-                      "  endtask\n"
-                      "  initial run_parallel;\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  task automatic run_parallel;\n"
+              "    fork\n"
+              "      #10 a = 1;\n"
+              "      #20 b = 2;\n"
+              "    join\n"
+              "  endtask\n"
+              "  initial run_parallel;\n"
+              "endmodule\n"));
 }
 
 // ---------------------------------------------------------------------------
@@ -540,14 +559,15 @@ TEST(ParserSection9, Sec9_3_2_ForkInTaskBody) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_ForkInAlwaysBlock) {
-  auto r = Parse("module m;\n"
-                 "  always @(posedge clk) begin\n"
-                 "    fork\n"
-                 "      #1 a = 1;\n"
-                 "      #2 b = 2;\n"
-                 "    join_none\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk) begin\n"
+      "    fork\n"
+      "      #1 a = 1;\n"
+      "      #2 b = 2;\n"
+      "    join_none\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -564,14 +584,15 @@ TEST(ParserSection9, Sec9_3_2_ForkInAlwaysBlock) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_ForkWithNonblockingAssigns) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      a <= 1;\n"
-                 "      b <= 2;\n"
-                 "    join\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      a <= 1;\n"
+      "      b <= 2;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -587,19 +608,20 @@ TEST(ParserSection9, Sec9_3_2_ForkWithNonblockingAssigns) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_MultipleSequentialForks) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      #5 a = 1;\n"
-                 "    join\n"
-                 "    fork\n"
-                 "      #10 b = 2;\n"
-                 "    join\n"
-                 "    fork\n"
-                 "      #15 c = 3;\n"
-                 "    join_any\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      #5 a = 1;\n"
+      "    join\n"
+      "    fork\n"
+      "      #10 b = 2;\n"
+      "    join\n"
+      "    fork\n"
+      "      #15 c = 3;\n"
+      "    join_any\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *body = r.cu->modules[0]->items[0]->body;
@@ -618,14 +640,15 @@ TEST(ParserSection9, Sec9_3_2_MultipleSequentialForks) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_ForkWithSystemCalls) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  initial begin\n"
-                      "    fork\n"
-                      "      $display(\"thread 1\");\n"
-                      "      $display(\"thread 2\");\n"
-                      "    join\n"
-                      "  end\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    fork\n"
+              "      $display(\"thread 1\");\n"
+              "      $display(\"thread 2\");\n"
+              "    join\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // ---------------------------------------------------------------------------
@@ -633,17 +656,18 @@ TEST(ParserSection9, Sec9_3_2_ForkWithSystemCalls) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_ForkJoinSingleBeginEnd) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      begin\n"
-                 "        a = 1;\n"
-                 "        b = 2;\n"
-                 "        c = 3;\n"
-                 "      end\n"
-                 "    join\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      begin\n"
+      "        a = 1;\n"
+      "        b = 2;\n"
+      "        c = 3;\n"
+      "      end\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -659,15 +683,16 @@ TEST(ParserSection9, Sec9_3_2_ForkJoinSingleBeginEnd) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_ForkWithForLoop) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  initial begin\n"
-                      "    fork\n"
-                      "      for (int i = 0; i < 4; i++) begin\n"
-                      "        #10 a[i] = i;\n"
-                      "      end\n"
-                      "    join\n"
-                      "  end\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    fork\n"
+              "      for (int i = 0; i < 4; i++) begin\n"
+              "        #10 a[i] = i;\n"
+              "      end\n"
+              "    join\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // ---------------------------------------------------------------------------
@@ -675,14 +700,15 @@ TEST(ParserSection9, Sec9_3_2_ForkWithForLoop) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_ForkJoinInProgramBlock) {
-  EXPECT_TRUE(ParseOk("program p;\n"
-                      "  initial begin\n"
-                      "    fork\n"
-                      "      #10 a = 1;\n"
-                      "      #20 b = 2;\n"
-                      "    join\n"
-                      "  end\n"
-                      "endprogram\n"));
+  EXPECT_TRUE(
+      ParseOk("program p;\n"
+              "  initial begin\n"
+              "    fork\n"
+              "      #10 a = 1;\n"
+              "      #20 b = 2;\n"
+              "    join\n"
+              "  end\n"
+              "endprogram\n"));
 }
 
 // ---------------------------------------------------------------------------
@@ -690,14 +716,15 @@ TEST(ParserSection9, Sec9_3_2_ForkJoinInProgramBlock) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_ForkWithIfElseThread) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      if (cond) a = 1; else a = 0;\n"
-                 "      #10 b = 2;\n"
-                 "    join\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      if (cond) a = 1; else a = 0;\n"
+      "      #10 b = 2;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -713,15 +740,16 @@ TEST(ParserSection9, Sec9_3_2_ForkWithIfElseThread) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_NamedForkDisabledByName) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork : my_fork\n"
-                 "      #100 a = 1;\n"
-                 "    join_none\n"
-                 "    #50;\n"
-                 "    disable my_fork;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork : my_fork\n"
+      "      #100 a = 1;\n"
+      "    join_none\n"
+      "    #50;\n"
+      "    disable my_fork;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *body = r.cu->modules[0]->items[0]->body;
@@ -738,22 +766,23 @@ TEST(ParserSection9, Sec9_3_2_NamedForkDisabledByName) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_3_2_ForkThreadWithDelayedAssign) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      begin\n"
-                 "        a = 0;\n"
-                 "        #10;\n"
-                 "        a = 1;\n"
-                 "      end\n"
-                 "      begin\n"
-                 "        b = 0;\n"
-                 "        #20;\n"
-                 "        b = 1;\n"
-                 "      end\n"
-                 "    join\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      begin\n"
+      "        a = 0;\n"
+      "        #10;\n"
+      "        a = 1;\n"
+      "      end\n"
+      "      begin\n"
+      "        b = 0;\n"
+      "        #20;\n"
+      "        b = 1;\n"
+      "      end\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);

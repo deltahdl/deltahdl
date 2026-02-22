@@ -1,12 +1,14 @@
 // §16.14: Concurrent assertions
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "simulation/assertion.h"
 #include "simulation/sim_context.h"
-#include <cstdint>
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -100,4 +102,4 @@ TEST(Assertion, AttachDetectsFailure) {
   EXPECT_GE(monitor.FailCount(), 1u);
 }
 
-} // namespace
+}  // namespace

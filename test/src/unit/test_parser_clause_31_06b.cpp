@@ -1,5 +1,7 @@
 // §31.6: Notifiers: user-defined responses to timing violations
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -7,7 +9,6 @@
 #include "parser/ast.h"
 #include "parser/parser.h"
 #include "simulation/specify.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -15,7 +16,7 @@ using namespace delta;
 // Parser test fixture
 // =============================================================================
 struct SpecifyTest : ::testing::Test {
-protected:
+ protected:
   CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
@@ -26,8 +27,7 @@ protected:
   // Helper: get first specify block from first module.
   ModuleItem *FirstSpecifyBlock(CompilationUnit *cu) {
     for (auto *item : cu->modules[0]->items) {
-      if (item->kind == ModuleItemKind::kSpecifyBlock)
-        return item;
+      if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
     }
     return nullptr;
   }
@@ -43,22 +43,24 @@ protected:
 namespace {
 
 TEST_F(SpecifyTest, TimingCheckWithNotifier) {
-  auto *cu = Parse("module m;\n"
-                   "specify\n"
-                   "  $setup(data, posedge clk, 10, ntfr);\n"
-                   "endspecify\n"
-                   "endmodule\n");
+  auto *cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(data, posedge clk, 10, ntfr);\n"
+      "endspecify\n"
+      "endmodule\n");
   auto *spec = FirstSpecifyBlock(cu);
   ASSERT_NE(spec, nullptr);
   EXPECT_EQ(spec->specify_items[0]->timing_check.notifier, "ntfr");
 }
 
 TEST_F(SpecifyTest, TimeskewWithNotifier) {
-  auto *cu = Parse("module m;\n"
-                   "specify\n"
-                   "  $timeskew(posedge clk1, posedge clk2, 5, ntfr);\n"
-                   "endspecify\n"
-                   "endmodule\n");
+  auto *cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $timeskew(posedge clk1, posedge clk2, 5, ntfr);\n"
+      "endspecify\n"
+      "endmodule\n");
   auto *spec = FirstSpecifyBlock(cu);
   ASSERT_NE(spec, nullptr);
   auto &tc = spec->specify_items[0]->timing_check;
@@ -66,4 +68,4 @@ TEST_F(SpecifyTest, TimeskewWithNotifier) {
   EXPECT_EQ(tc.notifier, "ntfr");
 }
 
-} // namespace
+}  // namespace

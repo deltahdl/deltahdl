@@ -37,7 +37,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA702Fixture &f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // Simulation tests — A.7.2 Specify path declarations
@@ -46,14 +46,15 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA702Fixture &f) {
 // Module with simple parallel path simulates correctly
 TEST(SimA702, SimpleParallelPathSimulates) {
   SimA702Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  specify\n"
-                              "    (a => b) = 5;\n"
-                              "  endspecify\n"
-                              "  initial x = 8'd42;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  specify\n"
+      "    (a => b) = 5;\n"
+      "  endspecify\n"
+      "  initial x = 8'd42;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -66,14 +67,15 @@ TEST(SimA702, SimpleParallelPathSimulates) {
 // Module with full path simulates correctly
 TEST(SimA702, SimpleFullPathSimulates) {
   SimA702Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  specify\n"
-                              "    (a, b *> c) = 10;\n"
-                              "  endspecify\n"
-                              "  initial x = 8'd55;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  specify\n"
+      "    (a, b *> c) = 10;\n"
+      "  endspecify\n"
+      "  initial x = 8'd55;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -86,14 +88,15 @@ TEST(SimA702, SimpleFullPathSimulates) {
 // Module with edge-sensitive path simulates correctly
 TEST(SimA702, EdgeSensitivePathSimulates) {
   SimA702Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  specify\n"
-                              "    (posedge clk => q) = 5;\n"
-                              "  endspecify\n"
-                              "  initial x = 8'd33;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  specify\n"
+      "    (posedge clk => q) = 5;\n"
+      "  endspecify\n"
+      "  initial x = 8'd33;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -106,15 +109,16 @@ TEST(SimA702, EdgeSensitivePathSimulates) {
 // Module with state-dependent path simulates correctly
 TEST(SimA702, StateDependentPathSimulates) {
   SimA702Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  specify\n"
-                              "    if (en) (a => b) = 10;\n"
-                              "    ifnone (a => b) = 15;\n"
-                              "  endspecify\n"
-                              "  initial x = 8'd77;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  specify\n"
+      "    if (en) (a => b) = 10;\n"
+      "    ifnone (a => b) = 15;\n"
+      "  endspecify\n"
+      "  initial x = 8'd77;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -127,15 +131,16 @@ TEST(SimA702, StateDependentPathSimulates) {
 // Module with polarity path simulates correctly
 TEST(SimA702, PolarityPathSimulates) {
   SimA702Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  specify\n"
-                              "    (a + => b) = 5;\n"
-                              "    (c - *> d) = 10;\n"
-                              "  endspecify\n"
-                              "  initial x = 8'd88;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  specify\n"
+      "    (a + => b) = 5;\n"
+      "    (c - *> d) = 10;\n"
+      "  endspecify\n"
+      "  initial x = 8'd88;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -148,20 +153,21 @@ TEST(SimA702, PolarityPathSimulates) {
 // Path declarations do not interfere with behavioral initial block
 TEST(SimA702, PathDeclsDoNotInterfereBehavioral) {
   SimA702Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] a, b;\n"
-                              "  specify\n"
-                              "    (x => y) = 5;\n"
-                              "    (posedge clk *> q, qb) = (3, 5);\n"
-                              "    if (en) (x => y) = 10;\n"
-                              "    ifnone (x => y) = 15;\n"
-                              "  endspecify\n"
-                              "  initial begin\n"
-                              "    a = 8'd11;\n"
-                              "    b = 8'd22;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  specify\n"
+      "    (x => y) = 5;\n"
+      "    (posedge clk *> q, qb) = (3, 5);\n"
+      "    if (en) (x => y) = 10;\n"
+      "    ifnone (x => y) = 15;\n"
+      "  endspecify\n"
+      "  initial begin\n"
+      "    a = 8'd11;\n"
+      "    b = 8'd22;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);

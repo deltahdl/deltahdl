@@ -1,10 +1,11 @@
 // §6.6.6: Supply nets
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "simulation/net.h"
 #include "simulation/scheduler.h"
 #include "simulation/variable.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -50,4 +51,4 @@ TEST(NetResolution, Supply0OverridesMultipleDrivers) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-} // namespace
+}  // namespace

@@ -1,5 +1,11 @@
 // §16.4: Deferred assertions
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <string_view>
+#include <vector>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -7,10 +13,6 @@
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
 #include "simulation/sva_engine.h"
-#include <cstdint>
-#include <gtest/gtest.h>
-#include <string_view>
-#include <vector>
 
 using namespace delta;
 
@@ -37,7 +39,7 @@ TEST(SvaEngine, PassActionBlockInvoked) {
   bool fail_called = false;
 
   DeferredAssertion da;
-  da.condition_val = 1; // Passes.
+  da.condition_val = 1;  // Passes.
   da.pass_action = [&pass_called]() { pass_called = true; };
   da.fail_action = [&fail_called]() { fail_called = true; };
 
@@ -52,7 +54,7 @@ TEST(SvaEngine, FailActionBlockInvoked) {
   bool fail_called = false;
 
   DeferredAssertion da;
-  da.condition_val = 0; // Fails.
+  da.condition_val = 0;  // Fails.
   da.pass_action = [&pass_called]() { pass_called = true; };
   da.fail_action = [&fail_called]() { fail_called = true; };
 
@@ -117,4 +119,4 @@ TEST(SvaEngine, MultipleDeferredAssertionsQueued) {
   EXPECT_EQ(count, 5);
 }
 
-} // namespace
+}  // namespace

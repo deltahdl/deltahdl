@@ -49,9 +49,10 @@ static ModuleItem *FirstItem(ParseResult6h &r) {
 
 // 1. Wire net declaration produces kNetDecl with is_net=true.
 TEST(ParserSection6, Sec6_5_WireNetDeclKind) {
-  auto r = Parse("module t;\n"
-                 "  wire w;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  wire w;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -64,9 +65,10 @@ TEST(ParserSection6, Sec6_5_WireNetDeclKind) {
 
 // 2. Logic variable declaration produces kVarDecl with is_net=false.
 TEST(ParserSection6, Sec6_5_LogicVarDeclKind) {
-  auto r = Parse("module t;\n"
-                 "  logic v;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  logic v;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -79,9 +81,10 @@ TEST(ParserSection6, Sec6_5_LogicVarDeclKind) {
 
 // 3. Reg variable declaration produces kVarDecl.
 TEST(ParserSection6, Sec6_5_RegVarDeclKind) {
-  auto r = Parse("module t;\n"
-                 "  reg r;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  reg r;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -93,9 +96,10 @@ TEST(ParserSection6, Sec6_5_RegVarDeclKind) {
 
 // 4. Int variable declaration.
 TEST(ParserSection6, Sec6_5_IntVarDeclKind) {
-  auto r = Parse("module t;\n"
-                 "  int count;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int count;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -108,9 +112,10 @@ TEST(ParserSection6, Sec6_5_IntVarDeclKind) {
 
 // 5. Real variable declaration.
 TEST(ParserSection6, Sec6_5_RealVarDeclKind) {
-  auto r = Parse("module t;\n"
-                 "  real voltage;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  real voltage;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -122,9 +127,10 @@ TEST(ParserSection6, Sec6_5_RealVarDeclKind) {
 
 // 6. Wire with packed dimensions [7:0].
 TEST(ParserSection6, Sec6_5_WirePackedDims) {
-  auto r = Parse("module t;\n"
-                 "  wire [7:0] bus;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  wire [7:0] bus;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -139,9 +145,10 @@ TEST(ParserSection6, Sec6_5_WirePackedDims) {
 
 // 7. Logic with packed dimensions [15:0].
 TEST(ParserSection6, Sec6_5_LogicPackedDims) {
-  auto r = Parse("module t;\n"
-                 "  logic [15:0] addr;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  logic [15:0] addr;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -156,9 +163,10 @@ TEST(ParserSection6, Sec6_5_LogicPackedDims) {
 
 // 8. Wire with unpacked dimensions [0:3].
 TEST(ParserSection6, Sec6_5_WireUnpackedDims) {
-  auto r = Parse("module t;\n"
-                 "  wire w [0:3];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  wire w [0:3];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -170,9 +178,10 @@ TEST(ParserSection6, Sec6_5_WireUnpackedDims) {
 
 // 9. Logic with unpacked dimension [4].
 TEST(ParserSection6, Sec6_5_LogicUnpackedDim) {
-  auto r = Parse("module t;\n"
-                 "  logic arr [4];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  logic arr [4];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -185,9 +194,10 @@ TEST(ParserSection6, Sec6_5_LogicUnpackedDim) {
 
 // 10. Wire with implicit continuous assignment (wire w = 1).
 TEST(ParserSection6, Sec6_5_WireImplicitContAssign) {
-  auto r = Parse("module t;\n"
-                 "  wire w = 1'b1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  wire w = 1'b1;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -199,9 +209,10 @@ TEST(ParserSection6, Sec6_5_WireImplicitContAssign) {
 
 // 11. Variable with initialization (logic v = 0).
 TEST(ParserSection6, Sec6_5_LogicVarInit) {
-  auto r = Parse("module t;\n"
-                 "  logic v = 1'b0;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  logic v = 1'b0;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -213,10 +224,11 @@ TEST(ParserSection6, Sec6_5_LogicVarInit) {
 
 // 12. Net driven by assign statement produces kContAssign.
 TEST(ParserSection6, Sec6_5_NetDrivenByContAssign) {
-  auto r = Parse("module t;\n"
-                 "  wire out;\n"
-                 "  assign out = 1'b0;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  wire out;\n"
+      "  assign out = 1'b0;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &items = r.cu->modules[0]->items;
@@ -229,10 +241,11 @@ TEST(ParserSection6, Sec6_5_NetDrivenByContAssign) {
 
 // 13. Variable driven by initial block (procedural assignment).
 TEST(ParserSection6, Sec6_5_VarDrivenByInitialBlock) {
-  auto r = Parse("module t;\n"
-                 "  logic q;\n"
-                 "  initial q = 1'b1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  logic q;\n"
+      "  initial q = 1'b1;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &items = r.cu->modules[0]->items;
@@ -244,10 +257,11 @@ TEST(ParserSection6, Sec6_5_VarDrivenByInitialBlock) {
 
 // 14. Variable driven by always_comb.
 TEST(ParserSection6, Sec6_5_VarDrivenByAlwaysComb) {
-  auto r = Parse("module t;\n"
-                 "  logic a, y;\n"
-                 "  always_comb y = a;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  logic a, y;\n"
+      "  always_comb y = a;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &items = r.cu->modules[0]->items;
@@ -263,10 +277,11 @@ TEST(ParserSection6, Sec6_5_VarDrivenByAlwaysComb) {
 
 // 15. Variable driven by always_ff with clock sensitivity.
 TEST(ParserSection6, Sec6_5_VarDrivenByAlwaysFF) {
-  auto r = Parse("module t;\n"
-                 "  logic clk, q, d;\n"
-                 "  always_ff @(posedge clk) q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  logic clk, q, d;\n"
+      "  always_ff @(posedge clk) q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &items = r.cu->modules[0]->items;
@@ -282,10 +297,11 @@ TEST(ParserSection6, Sec6_5_VarDrivenByAlwaysFF) {
 
 // 16. Variable with continuous assignment (assign logic_var = expr).
 TEST(ParserSection6, Sec6_5_VarWithContAssign) {
-  auto r = Parse("module t;\n"
-                 "  logic y;\n"
-                 "  assign y = 1'b1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  logic y;\n"
+      "  assign y = 1'b1;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &items = r.cu->modules[0]->items;
@@ -297,9 +313,10 @@ TEST(ParserSection6, Sec6_5_VarWithContAssign) {
 
 // 17. Multiple wire declarations on one line.
 TEST(ParserSection6, Sec6_5_MultipleWireDecls) {
-  auto r = Parse("module t;\n"
-                 "  wire a, b, c;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  wire a, b, c;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &items = r.cu->modules[0]->items;
@@ -315,9 +332,10 @@ TEST(ParserSection6, Sec6_5_MultipleWireDecls) {
 
 // 18. Multiple logic declarations on one line.
 TEST(ParserSection6, Sec6_5_MultipleLogicDecls) {
-  auto r = Parse("module t;\n"
-                 "  logic x, y, z;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  logic x, y, z;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &items = r.cu->modules[0]->items;
@@ -334,9 +352,10 @@ TEST(ParserSection6, Sec6_5_MultipleLogicDecls) {
 
 // 19. Tri net type declaration.
 TEST(ParserSection6, Sec6_5_TriNetDecl) {
-  auto r = Parse("module t;\n"
-                 "  tri [3:0] bus;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  tri [3:0] bus;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -349,10 +368,11 @@ TEST(ParserSection6, Sec6_5_TriNetDecl) {
 
 // 20. Supply0 and supply1 net declarations.
 TEST(ParserSection6, Sec6_5_Supply0AndSupply1) {
-  auto r = Parse("module t;\n"
-                 "  supply0 gnd;\n"
-                 "  supply1 vdd;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  supply0 gnd;\n"
+      "  supply1 vdd;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &items = r.cu->modules[0]->items;
@@ -369,9 +389,10 @@ TEST(ParserSection6, Sec6_5_Supply0AndSupply1) {
 
 // 21. Trireg net declaration.
 TEST(ParserSection6, Sec6_5_TriregDecl) {
-  auto r = Parse("module t;\n"
-                 "  trireg cap;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  trireg cap;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -384,9 +405,10 @@ TEST(ParserSection6, Sec6_5_TriregDecl) {
 
 // 22. Uwire net declaration.
 TEST(ParserSection6, Sec6_5_UwireDecl) {
-  auto r = Parse("module t;\n"
-                 "  uwire single;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  uwire single;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -399,9 +421,10 @@ TEST(ParserSection6, Sec6_5_UwireDecl) {
 
 // 23. String variable declaration.
 TEST(ParserSection6, Sec6_5_StringVarDecl) {
-  auto r = Parse("module t;\n"
-                 "  string msg;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  string msg;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -414,9 +437,10 @@ TEST(ParserSection6, Sec6_5_StringVarDecl) {
 
 // 24. Event variable declaration.
 TEST(ParserSection6, Sec6_5_EventVarDecl) {
-  auto r = Parse("module t;\n"
-                 "  event done;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  event done;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -429,9 +453,10 @@ TEST(ParserSection6, Sec6_5_EventVarDecl) {
 
 // 25. Chandle variable declaration.
 TEST(ParserSection6, Sec6_5_ChandleVarDecl) {
-  auto r = Parse("module t;\n"
-                 "  chandle handle;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  chandle handle;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -444,13 +469,14 @@ TEST(ParserSection6, Sec6_5_ChandleVarDecl) {
 
 // 26. Mixed net and variable declarations coexist in same module.
 TEST(ParserSection6, Sec6_5_MixedNetAndVarDecls) {
-  auto r = Parse("module t;\n"
-                 "  wire [7:0] net_a;\n"
-                 "  logic [7:0] var_b;\n"
-                 "  tri net_c;\n"
-                 "  int var_d;\n"
-                 "  reg var_e;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  wire [7:0] net_a;\n"
+      "  logic [7:0] var_b;\n"
+      "  tri net_c;\n"
+      "  int var_d;\n"
+      "  reg var_e;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &items = r.cu->modules[0]->items;
@@ -471,8 +497,9 @@ TEST(ParserSection6, Sec6_5_MixedNetAndVarDecls) {
 
 // 27. Net as input port.
 TEST(ParserSection6, Sec6_5_NetAsInputPort) {
-  auto r = Parse("module t(input wire [7:0] data_in);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t(input wire [7:0] data_in);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &ports = r.cu->modules[0]->ports;
@@ -487,8 +514,9 @@ TEST(ParserSection6, Sec6_5_NetAsInputPort) {
 
 // 28. Variable as output port.
 TEST(ParserSection6, Sec6_5_VarAsOutputPort) {
-  auto r = Parse("module t(output logic [15:0] result);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t(output logic [15:0] result);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &ports = r.cu->modules[0]->ports;
@@ -502,10 +530,11 @@ TEST(ParserSection6, Sec6_5_VarAsOutputPort) {
 
 // 29. Net and variable with same-width packed vectors.
 TEST(ParserSection6, Sec6_5_NetAndVarSameWidthVectors) {
-  auto r = Parse("module t;\n"
-                 "  wire [31:0] net_data;\n"
-                 "  logic [31:0] var_data;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  wire [31:0] net_data;\n"
+      "  logic [31:0] var_data;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &items = r.cu->modules[0]->items;
@@ -524,10 +553,11 @@ TEST(ParserSection6, Sec6_5_NetAndVarSameWidthVectors) {
 
 // 30. Reg used in always block (procedural context).
 TEST(ParserSection6, Sec6_5_RegInAlwaysBlock) {
-  auto r = Parse("module t;\n"
-                 "  reg clk;\n"
-                 "  always #5 clk = ~clk;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  reg clk;\n"
+      "  always #5 clk = ~clk;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &items = r.cu->modules[0]->items;

@@ -48,11 +48,12 @@ static void VerifyBlockVarDecls(const Stmt *blk,
 }
 
 TEST(ParserCh90301, BlockVarDecl_BuiltinType_Block) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    int x;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int x;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   ASSERT_EQ(item->kind, ModuleItemKind::kInitialBlock);
@@ -63,11 +64,12 @@ TEST(ParserCh90301, BlockVarDecl_BuiltinType_Block) {
 }
 
 TEST(ParserCh90301, BlockVarDecl_BuiltinType_Stmt) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    int x;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int x;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *blk = r.cu->modules[0]->items[0]->body;
   ASSERT_NE(blk, nullptr);
@@ -78,20 +80,22 @@ TEST(ParserCh90301, BlockVarDecl_BuiltinType_Stmt) {
 }
 
 TEST(ParserCh90301, BlockVarDecl_UserDefinedType) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  typedef struct {int a, b[4];} ab_t;\n"
-                      "  initial begin\n"
-                      "    ab_t v1[1:0] [2:0];\n"
-                      "  end\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef struct {int a, b[4];} ab_t;\n"
+              "  initial begin\n"
+              "    ab_t v1[1:0] [2:0];\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(ParserCh90301, BlockVarDecl_CommaSeparated) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    int a, b, c;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int a, b, c;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *blk = r.cu->modules[0]->items[0]->body;
   ASSERT_NE(blk, nullptr);
@@ -100,11 +104,12 @@ TEST(ParserCh90301, BlockVarDecl_CommaSeparated) {
 }
 
 TEST(ParserCh90301, BlockVarDecl_WithInit) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    int x = 42;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int x = 42;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *blk = r.cu->modules[0]->items[0]->body;
   ASSERT_NE(blk, nullptr);
@@ -114,13 +119,14 @@ TEST(ParserCh90301, BlockVarDecl_WithInit) {
 }
 
 TEST(ParserCh90301, BlockVarDecl_FullStructReplication) {
-  EXPECT_TRUE(ParseOk("module top();\n"
-                      "  struct {int X,Y,Z;} XYZ = '{3{1}};\n"
-                      "  typedef struct {int a,b[4];} ab_t;\n"
-                      "  int a,b,c;\n"
-                      "  initial begin\n"
-                      "    ab_t v1[1:0] [2:0];\n"
-                      "    v1 = '{2{'{3{'{a,'{2{b,c}}}}}}};\n"
-                      "  end\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module top();\n"
+              "  struct {int X,Y,Z;} XYZ = '{3{1}};\n"
+              "  typedef struct {int a,b[4];} ab_t;\n"
+              "  int a,b,c;\n"
+              "  initial begin\n"
+              "    ab_t v1[1:0] [2:0];\n"
+              "    v1 = '{2{'{3{'{a,'{2{b,c}}}}}}};\n"
+              "  end\n"
+              "endmodule\n"));
 }

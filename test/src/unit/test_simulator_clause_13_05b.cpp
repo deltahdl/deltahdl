@@ -1,12 +1,13 @@
 // §13.5: Subroutine calls and argument passing
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -81,4 +82,4 @@ TEST(Functions, VoidFunctionSideEffect) {
   EXPECT_EQ(g_var->value.ToUint64(), 99u);
 }
 
-} // namespace
+}  // namespace

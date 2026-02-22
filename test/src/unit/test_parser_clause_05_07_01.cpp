@@ -69,33 +69,37 @@ static ParseDiag50701 ParseWithDiag(const std::string &src) {
 // From test_parser_clause_05.cpp
 
 TEST(ParserCh50701, SizedLiteral_NoOverflow) {
-  auto r = ParseWithDiag("module t;\n"
-                         "  initial x = 4'hF;\n"
-                         "endmodule\n");
+  auto r = ParseWithDiag(
+      "module t;\n"
+      "  initial x = 4'hF;\n"
+      "endmodule\n");
   EXPECT_EQ(r.diag->WarningCount(), 0u);
   delete r.diag;
 }
 
 TEST(ParserCh50701, SizedLiteral_Overflow_Warning) {
-  auto r = ParseWithDiag("module t;\n"
-                         "  initial x = 4'hFF;\n"
-                         "endmodule\n");
+  auto r = ParseWithDiag(
+      "module t;\n"
+      "  initial x = 4'hFF;\n"
+      "endmodule\n");
   EXPECT_GE(r.diag->WarningCount(), 1u);
   delete r.diag;
 }
 
 TEST(ParserCh50701, SizedLiteral_ExactFit) {
-  auto r = ParseWithDiag("module t;\n"
-                         "  initial x = 8'hFF;\n"
-                         "endmodule\n");
+  auto r = ParseWithDiag(
+      "module t;\n"
+      "  initial x = 8'hFF;\n"
+      "endmodule\n");
   EXPECT_EQ(r.diag->WarningCount(), 0u);
   delete r.diag;
 }
 
 TEST(ParserCh50701, SizedLiteral_OneBitOverflow) {
-  auto r = ParseWithDiag("module t;\n"
-                         "  initial x = 3'b1111;\n"
-                         "endmodule\n");
+  auto r = ParseWithDiag(
+      "module t;\n"
+      "  initial x = 3'b1111;\n"
+      "endmodule\n");
   EXPECT_GE(r.diag->WarningCount(), 1u);
   delete r.diag;
 }
@@ -103,9 +107,10 @@ TEST(ParserCh50701, SizedLiteral_OneBitOverflow) {
 // From test_parser_clause_05b.cpp
 
 TEST(ParserCh50701, IntLiteral_UnsizedDecimal) {
-  auto r = Parse("module m;\n"
-                 "  initial x = 659;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = 659;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -117,9 +122,10 @@ TEST(ParserCh50701, IntLiteral_UnsizedDecimal) {
 
 TEST(ParserCh50701, IntLiteral_SizedBinary) {
   // 4'b1001 is a 4-bit binary number.
-  auto r = Parse("module m;\n"
-                 "  initial x = 4'b1001;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = 4'b1001;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -130,9 +136,10 @@ TEST(ParserCh50701, IntLiteral_SizedBinary) {
 }
 
 TEST(ParserCh50701, IntLiteral_SizedHex) {
-  auto r = Parse("module m;\n"
-                 "  initial x = 8'hFF;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = 8'hFF;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -158,9 +165,10 @@ TEST(ParserCh50701, IntLiteral_SignedLiteral) {
 
 TEST(ParserCh50701, IntLiteral_UnbasedUnsized_One) {
   // '1 sets all bits to 1.
-  auto r = Parse("module m;\n"
-                 "  initial x = '1;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = '1;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -212,8 +220,9 @@ TEST(ParserCh50701, IntLiteral_SpaceBetweenBaseAndDigits) {
 
 TEST(ParserCh50701, IntLiteral_LargeUnsized) {
   // 'h7_0000_0000 requires at least 35 bits.
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  logic [63:0] big;\n"
-                      "  initial big = 'h7_0000_0000;\n"
-                      "endmodule"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic [63:0] big;\n"
+              "  initial big = 'h7_0000_0000;\n"
+              "endmodule"));
 }

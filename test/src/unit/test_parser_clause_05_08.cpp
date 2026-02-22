@@ -52,9 +52,10 @@ static Stmt *FirstInitialStmt(ParseResult508 &r) {
 }
 
 TEST(ParserCh508, TimeLiteral_IntegerNs) {
-  auto r = Parse("module m;\n"
-                 "  initial #40ns;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  initial #40ns;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);

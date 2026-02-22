@@ -1,8 +1,9 @@
 // §32.3: The SDF annotator
 
+#include <gtest/gtest.h>
+
 #include "simulation/sdf_parser.h"
 #include "simulation/specify.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -79,4 +80,4 @@ TEST(SdfParser, AnnotateTimingChecks) {
   EXPECT_EQ(checks[0].limit, 50u);
 }
 
-} // namespace
+}  // namespace

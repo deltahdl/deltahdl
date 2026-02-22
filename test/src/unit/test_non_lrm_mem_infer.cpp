@@ -1,5 +1,7 @@
 // Non-LRM tests
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -8,7 +10,6 @@
 #include "lexer/lexer.h"
 #include "parser/parser.h"
 #include "synthesis/mem_infer.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -25,12 +26,10 @@ static const RtlirModule *ElaborateSrc(MemInferFixture &f,
   Lexer lexer(f.src_mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
   auto *cu = parser.Parse();
-  if (!cu || cu->modules.empty())
-    return nullptr;
+  if (!cu || cu->modules.empty()) return nullptr;
   Elaborator elab(f.arena, f.diag, cu);
   auto *design = elab.Elaborate(cu->modules.back()->name);
-  if (!design || design->top_modules.empty())
-    return nullptr;
+  if (!design || design->top_modules.empty()) return nullptr;
   return design->top_modules[0];
 }
 
@@ -41,13 +40,14 @@ namespace {
 // =============================================================================
 TEST(MemInfer, DetectSinglePortWrite) {
   MemInferFixture f;
-  auto *mod = ElaborateSrc(f, "module m(input clk, input logic [3:0] addr,\n"
-                              "         input logic [7:0] wdata, input we);\n"
-                              "  logic [7:0] mem;\n"
-                              "  always_ff @(posedge clk) begin\n"
-                              "    if (we) mem[addr] <= wdata;\n"
-                              "  end\n"
-                              "endmodule");
+  auto *mod = ElaborateSrc(f,
+                           "module m(input clk, input logic [3:0] addr,\n"
+                           "         input logic [7:0] wdata, input we);\n"
+                           "  logic [7:0] mem;\n"
+                           "  always_ff @(posedge clk) begin\n"
+                           "    if (we) mem[addr] <= wdata;\n"
+                           "  end\n"
+                           "endmodule");
   ASSERT_NE(mod, nullptr);
 
   auto memories = InferMemories(mod);
@@ -57,13 +57,14 @@ TEST(MemInfer, DetectSinglePortWrite) {
 
 TEST(MemInfer, DetectSinglePortWrite_PortDetails) {
   MemInferFixture f;
-  auto *mod = ElaborateSrc(f, "module m(input clk, input logic [3:0] addr,\n"
-                              "         input logic [7:0] wdata, input we);\n"
-                              "  logic [7:0] mem;\n"
-                              "  always_ff @(posedge clk) begin\n"
-                              "    if (we) mem[addr] <= wdata;\n"
-                              "  end\n"
-                              "endmodule");
+  auto *mod = ElaborateSrc(f,
+                           "module m(input clk, input logic [3:0] addr,\n"
+                           "         input logic [7:0] wdata, input we);\n"
+                           "  logic [7:0] mem;\n"
+                           "  always_ff @(posedge clk) begin\n"
+                           "    if (we) mem[addr] <= wdata;\n"
+                           "  end\n"
+                           "endmodule");
   ASSERT_NE(mod, nullptr);
 
   auto memories = InferMemories(mod);
@@ -78,13 +79,14 @@ TEST(MemInfer, DetectSinglePortWrite_PortDetails) {
 // =============================================================================
 TEST(MemInfer, DetectSinglePortRead) {
   MemInferFixture f;
-  auto *mod = ElaborateSrc(f, "module m(input clk, input logic [3:0] addr,\n"
-                              "         output logic [7:0] rdata);\n"
-                              "  logic [7:0] mem;\n"
-                              "  always_ff @(posedge clk) begin\n"
-                              "    rdata <= mem[addr];\n"
-                              "  end\n"
-                              "endmodule");
+  auto *mod = ElaborateSrc(f,
+                           "module m(input clk, input logic [3:0] addr,\n"
+                           "         output logic [7:0] rdata);\n"
+                           "  logic [7:0] mem;\n"
+                           "  always_ff @(posedge clk) begin\n"
+                           "    rdata <= mem[addr];\n"
+                           "  end\n"
+                           "endmodule");
   ASSERT_NE(mod, nullptr);
 
   auto memories = InferMemories(mod);
@@ -94,13 +96,14 @@ TEST(MemInfer, DetectSinglePortRead) {
 
 TEST(MemInfer, DetectSinglePortRead_PortDetails) {
   MemInferFixture f;
-  auto *mod = ElaborateSrc(f, "module m(input clk, input logic [3:0] addr,\n"
-                              "         output logic [7:0] rdata);\n"
-                              "  logic [7:0] mem;\n"
-                              "  always_ff @(posedge clk) begin\n"
-                              "    rdata <= mem[addr];\n"
-                              "  end\n"
-                              "endmodule");
+  auto *mod = ElaborateSrc(f,
+                           "module m(input clk, input logic [3:0] addr,\n"
+                           "         output logic [7:0] rdata);\n"
+                           "  logic [7:0] mem;\n"
+                           "  always_ff @(posedge clk) begin\n"
+                           "    rdata <= mem[addr];\n"
+                           "  end\n"
+                           "endmodule");
   ASSERT_NE(mod, nullptr);
 
   auto memories = InferMemories(mod);
@@ -115,16 +118,17 @@ TEST(MemInfer, DetectSinglePortRead_PortDetails) {
 // =============================================================================
 TEST(MemInfer, DetectDualPort) {
   MemInferFixture f;
-  auto *mod = ElaborateSrc(f, "module m(input clk, input logic [3:0] raddr,\n"
-                              "         input logic [3:0] waddr,\n"
-                              "         input logic [7:0] wdata, input we,\n"
-                              "         output logic [7:0] rdata);\n"
-                              "  logic [7:0] mem;\n"
-                              "  always_ff @(posedge clk) begin\n"
-                              "    rdata <= mem[raddr];\n"
-                              "    if (we) mem[waddr] <= wdata;\n"
-                              "  end\n"
-                              "endmodule");
+  auto *mod = ElaborateSrc(f,
+                           "module m(input clk, input logic [3:0] raddr,\n"
+                           "         input logic [3:0] waddr,\n"
+                           "         input logic [7:0] wdata, input we,\n"
+                           "         output logic [7:0] rdata);\n"
+                           "  logic [7:0] mem;\n"
+                           "  always_ff @(posedge clk) begin\n"
+                           "    rdata <= mem[raddr];\n"
+                           "    if (we) mem[waddr] <= wdata;\n"
+                           "  end\n"
+                           "endmodule");
   ASSERT_NE(mod, nullptr);
 
   auto memories = InferMemories(mod);
@@ -139,11 +143,12 @@ TEST(MemInfer, DetectDualPort) {
 // =============================================================================
 TEST(MemInfer, NoMemoryForScalarAssign) {
   MemInferFixture f;
-  auto *mod = ElaborateSrc(f, "module m(input clk, input d, output reg q);\n"
-                              "  always_ff @(posedge clk) begin\n"
-                              "    q <= d;\n"
-                              "  end\n"
-                              "endmodule");
+  auto *mod = ElaborateSrc(f,
+                           "module m(input clk, input d, output reg q);\n"
+                           "  always_ff @(posedge clk) begin\n"
+                           "    q <= d;\n"
+                           "  end\n"
+                           "endmodule");
   ASSERT_NE(mod, nullptr);
 
   auto memories = InferMemories(mod);
@@ -155,13 +160,14 @@ TEST(MemInfer, NoMemoryForScalarAssign) {
 // =============================================================================
 TEST(MemInfer, RomInference) {
   MemInferFixture f;
-  auto *mod = ElaborateSrc(f, "module m(input clk, input logic [3:0] addr,\n"
-                              "         output logic [7:0] rdata);\n"
-                              "  logic [7:0] rom;\n"
-                              "  always_ff @(posedge clk) begin\n"
-                              "    rdata <= rom[addr];\n"
-                              "  end\n"
-                              "endmodule");
+  auto *mod = ElaborateSrc(f,
+                           "module m(input clk, input logic [3:0] addr,\n"
+                           "         output logic [7:0] rdata);\n"
+                           "  logic [7:0] rom;\n"
+                           "  always_ff @(posedge clk) begin\n"
+                           "    rdata <= rom[addr];\n"
+                           "  end\n"
+                           "endmodule");
   ASSERT_NE(mod, nullptr);
 
   auto memories = InferMemories(mod);
@@ -171,4 +177,4 @@ TEST(MemInfer, RomInference) {
   EXPECT_TRUE(memories[0].write_ports.empty());
 }
 
-} // namespace
+}  // namespace

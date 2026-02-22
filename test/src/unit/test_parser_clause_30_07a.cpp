@@ -41,16 +41,14 @@ static bool ParseOk(const std::string &src) {
 
 static ModuleItem *FindSpecifyBlock(const std::vector<ModuleItem *> &items) {
   for (auto *item : items) {
-    if (item->kind == ModuleItemKind::kSpecifyBlock)
-      return item;
+    if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
   }
   return nullptr;
 }
 
 static SpecifyItem *GetSoleSpecifyItem(ModuleItem *spec_block) {
   EXPECT_EQ(spec_block->specify_items.size(), 1u);
-  if (spec_block->specify_items.empty())
-    return nullptr;
+  if (spec_block->specify_items.empty()) return nullptr;
   return spec_block->specify_items[0];
 }
 
@@ -63,8 +61,7 @@ struct SpecifyParseResult {
 static SpecifyParseResult ParseSpecifySingle(const std::string &src) {
   SpecifyParseResult result;
   result.pr = Parse(src);
-  if (result.pr.cu == nullptr)
-    return result;
+  if (result.pr.cu == nullptr) return result;
   result.spec_block = FindSpecifyBlock(result.pr.cu->modules[0]->items);
   if (result.spec_block != nullptr) {
     result.sole_item = GetSoleSpecifyItem(result.spec_block);
@@ -73,11 +70,12 @@ static SpecifyParseResult ParseSpecifySingle(const std::string &src) {
 }
 
 TEST(ParserSection28, Sec28_12_PulsestyleOnevent) {
-  auto sp = ParseSpecifySingle("module m(input a, output b);\n"
-                               "  specify\n"
-                               "    pulsestyle_onevent b;\n"
-                               "  endspecify\n"
-                               "endmodule\n");
+  auto sp = ParseSpecifySingle(
+      "module m(input a, output b);\n"
+      "  specify\n"
+      "    pulsestyle_onevent b;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(sp.pr.cu, nullptr);
   EXPECT_FALSE(sp.pr.has_errors);
   ASSERT_NE(sp.sole_item, nullptr);
@@ -89,11 +87,12 @@ TEST(ParserSection28, Sec28_12_PulsestyleOnevent) {
 }
 
 TEST(ParserSection28, Sec28_12_PulsestyleOndetect) {
-  auto sp = ParseSpecifySingle("module m(input a, output b, c);\n"
-                               "  specify\n"
-                               "    pulsestyle_ondetect b, c;\n"
-                               "  endspecify\n"
-                               "endmodule\n");
+  auto sp = ParseSpecifySingle(
+      "module m(input a, output b, c);\n"
+      "  specify\n"
+      "    pulsestyle_ondetect b, c;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(sp.pr.cu, nullptr);
   EXPECT_FALSE(sp.pr.has_errors);
   ASSERT_NE(sp.sole_item, nullptr);
@@ -106,11 +105,12 @@ TEST(ParserSection28, Sec28_12_PulsestyleOndetect) {
 }
 
 TEST(ParserSection28, Sec28_12_Showcancelled) {
-  auto sp = ParseSpecifySingle("module m(input a, output b);\n"
-                               "  specify\n"
-                               "    showcancelled b;\n"
-                               "  endspecify\n"
-                               "endmodule\n");
+  auto sp = ParseSpecifySingle(
+      "module m(input a, output b);\n"
+      "  specify\n"
+      "    showcancelled b;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(sp.pr.cu, nullptr);
   EXPECT_FALSE(sp.pr.has_errors);
   ASSERT_NE(sp.sole_item, nullptr);
@@ -122,11 +122,12 @@ TEST(ParserSection28, Sec28_12_Showcancelled) {
 }
 
 TEST(ParserSection28, Sec28_12_Noshowcancelled) {
-  auto sp = ParseSpecifySingle("module m(input a, output b, c);\n"
-                               "  specify\n"
-                               "    noshowcancelled b, c;\n"
-                               "  endspecify\n"
-                               "endmodule\n");
+  auto sp = ParseSpecifySingle(
+      "module m(input a, output b, c);\n"
+      "  specify\n"
+      "    noshowcancelled b, c;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(sp.pr.cu, nullptr);
   EXPECT_FALSE(sp.pr.has_errors);
   ASSERT_NE(sp.sole_item, nullptr);
@@ -137,14 +138,15 @@ TEST(ParserSection28, Sec28_12_Noshowcancelled) {
 }
 
 TEST(ParserSection28, Sec28_12_MixedPathsAndTimingChecks) {
-  EXPECT_TRUE(ParseOk("module m(input a, d, clk, output b);\n"
-                      "  specify\n"
-                      "    specparam tPD = 10;\n"
-                      "    (a => b) = tPD;\n"
-                      "    $setup(d, posedge clk, 5);\n"
-                      "    $hold(posedge clk, d, 3);\n"
-                      "    showcancelled b;\n"
-                      "    pulsestyle_onevent b;\n"
-                      "  endspecify\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m(input a, d, clk, output b);\n"
+              "  specify\n"
+              "    specparam tPD = 10;\n"
+              "    (a => b) = tPD;\n"
+              "    $setup(d, posedge clk, 5);\n"
+              "    $hold(posedge clk, d, 3);\n"
+              "    showcancelled b;\n"
+              "    pulsestyle_onevent b;\n"
+              "  endspecify\n"
+              "endmodule\n"));
 }

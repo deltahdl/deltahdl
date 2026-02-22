@@ -29,11 +29,12 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabFixture &f) {
 
 TEST(ParserSection28, ElaborateAndGate) {
   ElabFixture f;
-  auto *design = ElaborateSrc("module top;\n"
-                              "  wire out, a, b;\n"
-                              "  and g1(out, a, b);\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module top;\n"
+      "  wire out, a, b;\n"
+      "  and g1(out, a, b);\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   auto *mod = design->top_modules[0];
   // Gate should produce a continuous assign.
@@ -47,11 +48,12 @@ TEST(ParserSection28, ElaborateAndGate) {
 
 TEST(ParserSection28, ElaborateOrGate) {
   ElabFixture f;
-  auto *design = ElaborateSrc("module top;\n"
-                              "  wire out, a, b;\n"
-                              "  or g1(out, a, b);\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module top;\n"
+      "  wire out, a, b;\n"
+      "  or g1(out, a, b);\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   auto *mod = design->top_modules[0];
   ASSERT_GE(mod->assigns.size(), 1);
@@ -60,11 +62,12 @@ TEST(ParserSection28, ElaborateOrGate) {
 
 TEST(ParserSection28, ElaborateNandGate) {
   ElabFixture f;
-  auto *design = ElaborateSrc("module top;\n"
-                              "  wire out, a, b;\n"
-                              "  nand g1(out, a, b);\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module top;\n"
+      "  wire out, a, b;\n"
+      "  nand g1(out, a, b);\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   auto *mod = design->top_modules[0];
   ASSERT_GE(mod->assigns.size(), 1);
@@ -77,11 +80,12 @@ TEST(ParserSection28, ElaborateNandGate) {
 
 TEST(ParserSection28, ElaborateXorGate) {
   ElabFixture f;
-  auto *design = ElaborateSrc("module top;\n"
-                              "  wire out, a, b;\n"
-                              "  xor g1(out, a, b);\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module top;\n"
+      "  wire out, a, b;\n"
+      "  xor g1(out, a, b);\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   auto *mod = design->top_modules[0];
   ASSERT_GE(mod->assigns.size(), 1);
@@ -90,11 +94,12 @@ TEST(ParserSection28, ElaborateXorGate) {
 
 TEST(ParserSection28, ElaborateBufGate) {
   ElabFixture f;
-  auto *design = ElaborateSrc("module top;\n"
-                              "  wire out, in;\n"
-                              "  buf b1(out, in);\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module top;\n"
+      "  wire out, in;\n"
+      "  buf b1(out, in);\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   auto *mod = design->top_modules[0];
   ASSERT_GE(mod->assigns.size(), 1);
@@ -104,11 +109,12 @@ TEST(ParserSection28, ElaborateBufGate) {
 
 TEST(ParserSection28, ElaborateNotGate) {
   ElabFixture f;
-  auto *design = ElaborateSrc("module top;\n"
-                              "  wire out, in;\n"
-                              "  not n1(out, in);\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module top;\n"
+      "  wire out, in;\n"
+      "  not n1(out, in);\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   auto *mod = design->top_modules[0];
   ASSERT_GE(mod->assigns.size(), 1);
@@ -118,11 +124,12 @@ TEST(ParserSection28, ElaborateNotGate) {
 
 TEST(ParserSection28, ElaborateMultiInputAnd) {
   ElabFixture f;
-  auto *design = ElaborateSrc("module top;\n"
-                              "  wire out, a, b, c;\n"
-                              "  and g1(out, a, b, c);\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module top;\n"
+      "  wire out, a, b, c;\n"
+      "  and g1(out, a, b, c);\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   auto *mod = design->top_modules[0];
   ASSERT_GE(mod->assigns.size(), 1);
@@ -133,11 +140,12 @@ TEST(ParserSection28, ElaborateMultiInputAnd) {
 
 TEST(ParserSection28, ElaboratePullupGate) {
   ElabFixture f;
-  auto *design = ElaborateSrc("module top;\n"
-                              "  wire out;\n"
-                              "  pullup (out);\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module top;\n"
+      "  wire out;\n"
+      "  pullup (out);\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   auto *mod = design->top_modules[0];
   ASSERT_GE(mod->assigns.size(), 1);

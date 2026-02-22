@@ -1,11 +1,12 @@
 // §9.2.2: Always procedures
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -49,12 +50,13 @@ struct ModportPortExpected {
 namespace {
 
 TEST(Parser, AlwaysFFBlock) {
-  auto r = Parse("module counter(input logic clk, rst);\n"
-                 "  logic [7:0] count;\n"
-                 "  always_ff @(posedge clk or posedge rst)\n"
-                 "    if (rst) count <= '0;\n"
-                 "    else count <= count + 1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module counter(input logic clk, rst);\n"
+      "  logic [7:0] count;\n"
+      "  always_ff @(posedge clk or posedge rst)\n"
+      "    if (rst) count <= '0;\n"
+      "    else count <= count + 1;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *mod = r.cu->modules[0];
   bool found_ff = false;
@@ -67,4 +69,4 @@ TEST(Parser, AlwaysFFBlock) {
   EXPECT_TRUE(found_ff);
 }
 
-} // namespace
+}  // namespace

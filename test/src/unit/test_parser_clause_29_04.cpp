@@ -51,12 +51,13 @@ static void VerifySeqUdpTable(const UdpDecl *udp, const SeqUdpRow expected[],
 }
 
 TEST(ParserSection29, SequentialUdp) {
-  auto r = Parse("primitive dff(output reg q, input d, clk);\n"
-                 "  table\n"
-                 "    0 r : ? : 0;\n"
-                 "    1 r : ? : 1;\n"
-                 "  endtable\n"
-                 "endprimitive\n");
+  auto r = Parse(
+      "primitive dff(output reg q, input d, clk);\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "    1 r : ? : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->udps.size(), 1);
   auto *udp = r.cu->udps[0];

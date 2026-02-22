@@ -1,5 +1,7 @@
 // §9.2.3: Final procedures
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -12,7 +14,6 @@
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
 #include "simulation/variable.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -37,11 +38,12 @@ namespace {
 
 TEST(Lowerer, FinalBlockExecutesAfterRun) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] x;\n"
-                              "  final x = 77;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  final x = 77;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -59,12 +61,13 @@ TEST(Lowerer, FinalBlockExecutesAfterRun) {
 
 TEST(Lowerer, FinalBlockNotScheduledAtTimeZero) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] x;\n"
-                              "  initial x = 10;\n"
-                              "  final x = 77;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial x = 10;\n"
+      "  final x = 77;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -79,12 +82,13 @@ TEST(Lowerer, FinalBlockNotScheduledAtTimeZero) {
 
 TEST(Lowerer, FinalBlocksFIFOOrder) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] x;\n"
-                              "  final x = 10;\n"
-                              "  final x = 20;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  final x = 10;\n"
+      "  final x = 20;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -98,4 +102,4 @@ TEST(Lowerer, FinalBlocksFIFOOrder) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-} // namespace
+}  // namespace

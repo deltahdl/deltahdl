@@ -1,12 +1,13 @@
 // §14.16: Synchronous drives
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "simulation/clocking.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -55,4 +56,4 @@ TEST(Clocking, ScheduleOutputDrive) {
   EXPECT_EQ(data_out->value.ToUint64(), 0x55u);
 }
 
-} // namespace
+}  // namespace

@@ -16,7 +16,7 @@ using namespace delta;
 namespace {
 
 struct AnnexHParseTest : ::testing::Test {
-protected:
+ protected:
   CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
@@ -37,9 +37,10 @@ protected:
 // =============================================================================
 
 TEST_F(AnnexHParseTest, AnnexHDpiImportFunction) {
-  auto *unit = Parse("module m;\n"
-                     "  import \"DPI-C\" function int c_add(int a, int b);\n"
-                     "endmodule\n");
+  auto *unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function int c_add(int a, int b);\n"
+      "endmodule\n");
   ASSERT_EQ(unit->modules.size(), 1u);
   auto &items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
@@ -51,10 +52,10 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportFunction) {
 }
 
 TEST_F(AnnexHParseTest, AnnexHDpiImportPure) {
-  auto *unit =
-      Parse("module m;\n"
-            "  import \"DPI-C\" pure function real sin_approx(real x);\n"
-            "endmodule\n");
+  auto *unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" pure function real sin_approx(real x);\n"
+      "endmodule\n");
   ASSERT_EQ(unit->modules.size(), 1u);
   auto &items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
@@ -66,10 +67,10 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportPure) {
 }
 
 TEST_F(AnnexHParseTest, AnnexHDpiImportContext) {
-  auto *unit =
-      Parse("module m;\n"
-            "  import \"DPI-C\" context function void set_callback();\n"
-            "endmodule\n");
+  auto *unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" context function void set_callback();\n"
+      "endmodule\n");
   ASSERT_EQ(unit->modules.size(), 1u);
   auto &items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
@@ -81,9 +82,10 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportContext) {
 }
 
 TEST_F(AnnexHParseTest, AnnexHDpiExportFunction) {
-  auto *unit = Parse("module m;\n"
-                     "  export \"DPI-C\" function sv_func;\n"
-                     "endmodule\n");
+  auto *unit = Parse(
+      "module m;\n"
+      "  export \"DPI-C\" function sv_func;\n"
+      "endmodule\n");
   ASSERT_EQ(unit->modules.size(), 1u);
   auto &items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
@@ -93,9 +95,10 @@ TEST_F(AnnexHParseTest, AnnexHDpiExportFunction) {
 }
 
 TEST_F(AnnexHParseTest, AnnexHDpiExportTask) {
-  auto *unit = Parse("module m;\n"
-                     "  export \"DPI-C\" task sv_task;\n"
-                     "endmodule\n");
+  auto *unit = Parse(
+      "module m;\n"
+      "  export \"DPI-C\" task sv_task;\n"
+      "endmodule\n");
   ASSERT_EQ(unit->modules.size(), 1u);
   auto &items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
@@ -105,9 +108,10 @@ TEST_F(AnnexHParseTest, AnnexHDpiExportTask) {
 }
 
 TEST_F(AnnexHParseTest, AnnexHDpiImportWithCName) {
-  auto *unit = Parse("module m;\n"
-                     "  import \"DPI-C\" c_name = function void my_func();\n"
-                     "endmodule\n");
+  auto *unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" c_name = function void my_func();\n"
+      "endmodule\n");
   ASSERT_EQ(unit->modules.size(), 1u);
   auto &items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
@@ -123,15 +127,16 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportWithCName) {
 
 TEST_F(AnnexHParseTest, AnnexGProcessMethodCalls) {
   // Process method calls (.status, .kill, etc.) parse as member-access calls.
-  auto *unit = Parse("module m;\n"
-                     "  initial begin\n"
-                     "    p.status();\n"
-                     "    p.kill();\n"
-                     "    p.await();\n"
-                     "    p.suspend();\n"
-                     "    p.resume();\n"
-                     "  end\n"
-                     "endmodule\n");
+  auto *unit = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    p.status();\n"
+      "    p.kill();\n"
+      "    p.await();\n"
+      "    p.suspend();\n"
+      "    p.resume();\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_EQ(unit->modules.size(), 1u);
   EXPECT_FALSE(diag_.HasErrors());
   auto &items = unit->modules[0]->items;
@@ -142,9 +147,10 @@ TEST_F(AnnexHParseTest, AnnexGProcessMethodCalls) {
 TEST_F(AnnexHParseTest, AnnexGProcessScopeResolution) {
   // process::self() uses scope-resolution syntax at the module-item level.
   // The parser handles pkg::type as a named type with scope prefix.
-  auto *unit = Parse("module m;\n"
-                     "  process::state_e st;\n"
-                     "endmodule\n");
+  auto *unit = Parse(
+      "module m;\n"
+      "  process::state_e st;\n"
+      "endmodule\n");
   ASSERT_EQ(unit->modules.size(), 1u);
   EXPECT_FALSE(diag_.HasErrors());
   auto &items = unit->modules[0]->items;
@@ -160,15 +166,16 @@ TEST_F(AnnexHParseTest, AnnexGProcessScopeResolution) {
 
 TEST_F(AnnexHParseTest, AnnexGSemaphoreAllMethods) {
   // Semaphore method calls (get, put, try_get) as member-access expressions.
-  auto *unit = Parse("module m;\n"
-                     "  initial begin\n"
-                     "    sem.get(1);\n"
-                     "    sem.put(1);\n"
-                     "    if (sem.try_get(1)) begin\n"
-                     "      $display(\"acquired\");\n"
-                     "    end\n"
-                     "  end\n"
-                     "endmodule\n");
+  auto *unit = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    sem.get(1);\n"
+      "    sem.put(1);\n"
+      "    if (sem.try_get(1)) begin\n"
+      "      $display(\"acquired\");\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_EQ(unit->modules.size(), 1u);
   EXPECT_FALSE(diag_.HasErrors());
 }
@@ -180,18 +187,19 @@ TEST_F(AnnexHParseTest, AnnexGSemaphoreAllMethods) {
 TEST_F(AnnexHParseTest, AnnexGMailboxAllMethods) {
   // Mailbox method calls (put, get, peek, try_get, try_peek, try_put, num)
   // as member-access call expressions inside an initial block.
-  auto *unit = Parse("module m;\n"
-                     "  int val;\n"
-                     "  initial begin\n"
-                     "    mb.put(42);\n"
-                     "    mb.get(val);\n"
-                     "    mb.peek(val);\n"
-                     "    val = mb.num();\n"
-                     "    val = mb.try_get(val);\n"
-                     "    val = mb.try_peek(val);\n"
-                     "    val = mb.try_put(99);\n"
-                     "  end\n"
-                     "endmodule\n");
+  auto *unit = Parse(
+      "module m;\n"
+      "  int val;\n"
+      "  initial begin\n"
+      "    mb.put(42);\n"
+      "    mb.get(val);\n"
+      "    mb.peek(val);\n"
+      "    val = mb.num();\n"
+      "    val = mb.try_get(val);\n"
+      "    val = mb.try_peek(val);\n"
+      "    val = mb.try_put(99);\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_EQ(unit->modules.size(), 1u);
   EXPECT_FALSE(diag_.HasErrors());
 }
@@ -202,14 +210,15 @@ TEST_F(AnnexHParseTest, AnnexGMailboxAllMethods) {
 
 TEST_F(AnnexHParseTest, AnnexGRandomizeCall) {
   // $urandom and simple randomize() call inside initial block.
-  auto *unit = Parse("module m;\n"
-                     "  int x;\n"
-                     "  initial begin\n"
-                     "    x = $urandom;\n"
-                     "    x = $urandom();\n"
-                     "    x = $urandom_range(0, 100);\n"
-                     "  end\n"
-                     "endmodule\n");
+  auto *unit = Parse(
+      "module m;\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    x = $urandom;\n"
+      "    x = $urandom();\n"
+      "    x = $urandom_range(0, 100);\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_EQ(unit->modules.size(), 1u);
   EXPECT_FALSE(diag_.HasErrors());
 }
@@ -217,14 +226,15 @@ TEST_F(AnnexHParseTest, AnnexGRandomizeCall) {
 TEST_F(AnnexHParseTest, AnnexGStdRandomizePackageImport) {
   // std::randomize usage via package import at module level.
   // The parser handles import std_pkg::* for scope-qualified access.
-  auto *unit = Parse("module m;\n"
-                     "  import std_pkg::*;\n"
-                     "  int a, b;\n"
-                     "  initial begin\n"
-                     "    a = $urandom_range(0, 255);\n"
-                     "    b = $urandom;\n"
-                     "  end\n"
-                     "endmodule\n");
+  auto *unit = Parse(
+      "module m;\n"
+      "  import std_pkg::*;\n"
+      "  int a, b;\n"
+      "  initial begin\n"
+      "    a = $urandom_range(0, 255);\n"
+      "    b = $urandom;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_EQ(unit->modules.size(), 1u);
   EXPECT_FALSE(diag_.HasErrors());
   auto &items = unit->modules[0]->items;
@@ -237,9 +247,10 @@ TEST_F(AnnexHParseTest, AnnexGStdRandomizePackageImport) {
 // =============================================================================
 
 TEST_F(AnnexHParseTest, AnnexHDpiImportTask) {
-  auto *unit = Parse("module m;\n"
-                     "  import \"DPI-C\" task c_wait(int cycles);\n"
-                     "endmodule\n");
+  auto *unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" task c_wait(int cycles);\n"
+      "endmodule\n");
   ASSERT_EQ(unit->modules.size(), 1u);
   auto &items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
@@ -256,11 +267,11 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportTask) {
 
 TEST_F(AnnexHParseTest, AnnexHDpiImportChandle) {
   // chandle is the opaque pointer type used for DPI handles.
-  auto *unit =
-      Parse("module m;\n"
-            "  import \"DPI-C\" function chandle create_handle();\n"
-            "  import \"DPI-C\" function void destroy_handle(chandle h);\n"
-            "endmodule\n");
+  auto *unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function chandle create_handle();\n"
+      "  import \"DPI-C\" function void destroy_handle(chandle h);\n"
+      "endmodule\n");
   ASSERT_EQ(unit->modules.size(), 1u);
   auto &items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 2u);
@@ -278,9 +289,10 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportChandle) {
 // =============================================================================
 
 TEST_F(AnnexHParseTest, AnnexHDpiImportStringReturn) {
-  auto *unit = Parse("module m;\n"
-                     "  import \"DPI-C\" pure function string get_version();\n"
-                     "endmodule\n");
+  auto *unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" pure function string get_version();\n"
+      "endmodule\n");
   ASSERT_EQ(unit->modules.size(), 1u);
   auto &items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
@@ -295,9 +307,10 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportStringReturn) {
 // =============================================================================
 
 TEST_F(AnnexHParseTest, AnnexHDpiExportWithCName) {
-  auto *unit = Parse("module m;\n"
-                     "  export \"DPI-C\" my_c_func = function sv_compute;\n"
-                     "endmodule\n");
+  auto *unit = Parse(
+      "module m;\n"
+      "  export \"DPI-C\" my_c_func = function sv_compute;\n"
+      "endmodule\n");
   ASSERT_EQ(unit->modules.size(), 1u);
   auto &items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
@@ -312,13 +325,14 @@ TEST_F(AnnexHParseTest, AnnexHDpiExportWithCName) {
 // =============================================================================
 
 TEST_F(AnnexHParseTest, AnnexHDpiImportOutputArgs) {
-  auto *unit = Parse("module m;\n"
-                     "  import \"DPI-C\" function void get_data(\n"
-                     "    input int addr,\n"
-                     "    output int data,\n"
-                     "    inout int status\n"
-                     "  );\n"
-                     "endmodule\n");
+  auto *unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function void get_data(\n"
+      "    input int addr,\n"
+      "    output int data,\n"
+      "    inout int status\n"
+      "  );\n"
+      "endmodule\n");
   ASSERT_EQ(unit->modules.size(), 1u);
   auto &items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
@@ -338,13 +352,14 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportOutputArgs) {
 // =============================================================================
 
 TEST_F(AnnexHParseTest, AnnexHDpiImportDefaultArgs) {
-  auto *unit = Parse("module m;\n"
-                     "  import \"DPI-C\" function int compute(\n"
-                     "    int a,\n"
-                     "    int b = 0,\n"
-                     "    int c = 42\n"
-                     "  );\n"
-                     "endmodule\n");
+  auto *unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function int compute(\n"
+      "    int a,\n"
+      "    int b = 0,\n"
+      "    int c = 42\n"
+      "  );\n"
+      "endmodule\n");
   ASSERT_EQ(unit->modules.size(), 1u);
   auto &items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
@@ -362,12 +377,13 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportDefaultArgs) {
 TEST_F(AnnexHParseTest, AnnexHDpiImportBitLogicArgs) {
   // DPI functions can take bit and logic vector arguments corresponding to
   // SvBitVecVal and SvLogicVecVal on the C side.
-  auto *unit = Parse("module m;\n"
-                     "  import \"DPI-C\" function void send_bits(\n"
-                     "    input bit [31:0] data,\n"
-                     "    input logic [7:0] ctrl\n"
-                     "  );\n"
-                     "endmodule\n");
+  auto *unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function void send_bits(\n"
+      "    input bit [31:0] data,\n"
+      "    input logic [7:0] ctrl\n"
+      "  );\n"
+      "endmodule\n");
   ASSERT_EQ(unit->modules.size(), 1u);
   auto &items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
@@ -405,9 +421,10 @@ TEST_F(AnnexHParseTest, AnnexHDpiContextTaskWithCName) {
 
 TEST_F(AnnexHParseTest, AnnexHDpiImportNoArgs) {
   // A DPI import with no argument list at all (valid per LRM).
-  auto *unit = Parse("module m;\n"
-                     "  import \"DPI-C\" function int get_seed;\n"
-                     "endmodule\n");
+  auto *unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function int get_seed;\n"
+      "endmodule\n");
   ASSERT_EQ(unit->modules.size(), 1u);
   auto &items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
@@ -421,11 +438,12 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportNoArgs) {
 // =============================================================================
 
 TEST_F(AnnexHParseTest, AnnexJDpiImportCoexistence) {
-  auto *unit = Parse("module m;\n"
-                     "  import \"DPI-C\" function int c_func();\n"
-                     "  logic [7:0] data;\n"
-                     "  assign data = 8'hFF;\n"
-                     "endmodule\n");
+  auto *unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function int c_func();\n"
+      "  logic [7:0] data;\n"
+      "  assign data = 8'hFF;\n"
+      "endmodule\n");
   ASSERT_EQ(unit->modules.size(), 1u);
   auto &items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 3u);
@@ -439,11 +457,12 @@ TEST_F(AnnexHParseTest, AnnexJDpiImportCoexistence) {
 // =============================================================================
 
 TEST_F(AnnexHParseTest, AnnexKVpiSystemCalls) {
-  auto *unit = Parse("module m;\n"
-                     "  initial begin\n"
-                     "    $vpi_get_time;\n"
-                     "  end\n"
-                     "endmodule\n");
+  auto *unit = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    $vpi_get_time;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_EQ(unit->modules.size(), 1u);
   auto &items = unit->modules[0]->items;
   ASSERT_GE(items.size(), 1u);
@@ -451,9 +470,10 @@ TEST_F(AnnexHParseTest, AnnexKVpiSystemCalls) {
 }
 
 TEST_F(AnnexHParseTest, AnnexKVpiSysGetValue) {
-  auto *unit = Parse("module m;\n"
-                     "  initial $display($time);\n"
-                     "endmodule\n");
+  auto *unit = Parse(
+      "module m;\n"
+      "  initial $display($time);\n"
+      "endmodule\n");
   ASSERT_EQ(unit->modules.size(), 1u);
   auto &items = unit->modules[0]->items;
   ASSERT_GE(items.size(), 1u);
@@ -461,11 +481,12 @@ TEST_F(AnnexHParseTest, AnnexKVpiSysGetValue) {
 }
 
 TEST_F(AnnexHParseTest, AnnexMSvVpiCalls) {
-  auto *unit = Parse("module m;\n"
-                     "  initial begin\n"
-                     "    $vpi_iterate;\n"
-                     "  end\n"
-                     "endmodule\n");
+  auto *unit = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    $vpi_iterate;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_EQ(unit->modules.size(), 1u);
   auto &items = unit->modules[0]->items;
   ASSERT_GE(items.size(), 1u);
@@ -479,9 +500,10 @@ TEST_F(AnnexHParseTest, AnnexMSvVpiCalls) {
 TEST_F(AnnexHParseTest, AnnexOPragmaProtect) {
   // pragma protect directives are preprocessor-level and stripped before
   // parsing. This test confirms the module around them parses correctly.
-  auto *unit = Parse("module m;\n"
-                     "  logic x;\n"
-                     "endmodule\n");
+  auto *unit = Parse(
+      "module m;\n"
+      "  logic x;\n"
+      "endmodule\n");
   ASSERT_EQ(unit->modules.size(), 1u);
   auto &items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
@@ -490,12 +512,13 @@ TEST_F(AnnexHParseTest, AnnexOPragmaProtect) {
 }
 
 TEST_F(AnnexHParseTest, AnnexOMultipleDpiDecls) {
-  auto *unit = Parse("module m;\n"
-                     "  import \"DPI-C\" function int c_add(int a, int b);\n"
-                     "  import \"DPI-C\" pure function real c_sin(real x);\n"
-                     "  export \"DPI-C\" function sv_compute;\n"
-                     "  export \"DPI-C\" task sv_run;\n"
-                     "endmodule\n");
+  auto *unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function int c_add(int a, int b);\n"
+      "  import \"DPI-C\" pure function real c_sin(real x);\n"
+      "  export \"DPI-C\" function sv_compute;\n"
+      "  export \"DPI-C\" task sv_run;\n"
+      "endmodule\n");
   ASSERT_EQ(unit->modules.size(), 1u);
   auto &items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 4u);
@@ -512,4 +535,4 @@ TEST_F(AnnexHParseTest, AnnexOMultipleDpiDecls) {
   EXPECT_TRUE(items[3]->dpi_is_task);
 }
 
-} // namespace
+}  // namespace

@@ -1,11 +1,12 @@
 // §23.10.1: defparam statement
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -50,9 +51,10 @@ namespace {
 
 // --- Defparam tests ---
 TEST(Parser, DefparamSingle) {
-  auto r = Parse("module top;\n"
-                 "  defparam u0.WIDTH = 8;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module top;\n"
+      "  defparam u0.WIDTH = 8;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kDefparam);
@@ -62,13 +64,14 @@ TEST(Parser, DefparamSingle) {
 }
 
 TEST(Parser, DefparamMultiple) {
-  auto r = Parse("module top;\n"
-                 "  defparam u0.WIDTH = 8, u1.DEPTH = 16;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module top;\n"
+      "  defparam u0.WIDTH = 8, u1.DEPTH = 16;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kDefparam);
   EXPECT_EQ(item->defparam_assigns.size(), 2);
 }
 
-} // namespace
+}  // namespace

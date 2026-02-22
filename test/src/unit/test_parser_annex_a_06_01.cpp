@@ -30,25 +30,23 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-static std::vector<ModuleItem *>
-FindContAssigns(const std::vector<ModuleItem *> &items) {
+static std::vector<ModuleItem *> FindContAssigns(
+    const std::vector<ModuleItem *> &items) {
   std::vector<ModuleItem *> result;
   for (auto *item : items) {
-    if (item->kind == ModuleItemKind::kContAssign)
-      result.push_back(item);
+    if (item->kind == ModuleItemKind::kContAssign) result.push_back(item);
   }
   return result;
 }
 
 static ModuleItem *FindAlias(const std::vector<ModuleItem *> &items) {
   for (auto *item : items) {
-    if (item->kind == ModuleItemKind::kAlias)
-      return item;
+    if (item->kind == ModuleItemKind::kAlias) return item;
   }
   return nullptr;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.6.1 Production: continuous_assign (parsing)
@@ -58,10 +56,11 @@ static ModuleItem *FindAlias(const std::vector<ModuleItem *> &items) {
 // =============================================================================
 
 TEST(ParserA601, ContinuousAssign_Basic) {
-  auto r = Parse("module m;\n"
-                 "  wire a, b;\n"
-                 "  assign a = b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  wire a, b;\n"
+      "  assign a = b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto cas = FindContAssigns(r.cu->modules[0]->items);
@@ -71,10 +70,11 @@ TEST(ParserA601, ContinuousAssign_Basic) {
 }
 
 TEST(ParserA601, ContinuousAssign_DriveStrength) {
-  auto r = Parse("module m;\n"
-                 "  wire w;\n"
-                 "  assign (strong0, weak1) w = 1'b1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign (strong0, weak1) w = 1'b1;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto cas = FindContAssigns(r.cu->modules[0]->items);
@@ -84,10 +84,11 @@ TEST(ParserA601, ContinuousAssign_DriveStrength) {
 }
 
 TEST(ParserA601, ContinuousAssign_DriveStrengthReversed) {
-  auto r = Parse("module m;\n"
-                 "  wire w;\n"
-                 "  assign (pull1, supply0) w = 1'b0;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign (pull1, supply0) w = 1'b0;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto cas = FindContAssigns(r.cu->modules[0]->items);
@@ -97,10 +98,11 @@ TEST(ParserA601, ContinuousAssign_DriveStrengthReversed) {
 }
 
 TEST(ParserA601, ContinuousAssign_DelaySingle) {
-  auto r = Parse("module m;\n"
-                 "  wire a, b;\n"
-                 "  assign #10 a = b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  wire a, b;\n"
+      "  assign #10 a = b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto cas = FindContAssigns(r.cu->modules[0]->items);
@@ -111,10 +113,11 @@ TEST(ParserA601, ContinuousAssign_DelaySingle) {
 }
 
 TEST(ParserA601, ContinuousAssign_DelayRiseFall) {
-  auto r = Parse("module m;\n"
-                 "  wire a, b;\n"
-                 "  assign #(5, 10) a = b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  wire a, b;\n"
+      "  assign #(5, 10) a = b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto cas = FindContAssigns(r.cu->modules[0]->items);
@@ -125,10 +128,11 @@ TEST(ParserA601, ContinuousAssign_DelayRiseFall) {
 }
 
 TEST(ParserA601, ContinuousAssign_DelayRiseFallDecay) {
-  auto r = Parse("module m;\n"
-                 "  wire a, b;\n"
-                 "  assign #(5, 10, 15) a = b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  wire a, b;\n"
+      "  assign #(5, 10, 15) a = b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto cas = FindContAssigns(r.cu->modules[0]->items);
@@ -139,10 +143,11 @@ TEST(ParserA601, ContinuousAssign_DelayRiseFallDecay) {
 }
 
 TEST(ParserA601, ContinuousAssign_StrengthAndDelay) {
-  auto r = Parse("module m;\n"
-                 "  wire a, b;\n"
-                 "  assign (pull0, pull1) #5 a = b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  wire a, b;\n"
+      "  assign (pull0, pull1) #5 a = b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto cas = FindContAssigns(r.cu->modules[0]->items);
@@ -158,10 +163,11 @@ TEST(ParserA601, ContinuousAssign_StrengthAndDelay) {
 // =============================================================================
 
 TEST(ParserA601, ListOfNetAssignments_Two) {
-  auto r = Parse("module m;\n"
-                 "  wire a, b, c, d;\n"
-                 "  assign a = b, c = d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  wire a, b, c, d;\n"
+      "  assign a = b, c = d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto cas = FindContAssigns(r.cu->modules[0]->items);
@@ -171,10 +177,11 @@ TEST(ParserA601, ListOfNetAssignments_Two) {
 }
 
 TEST(ParserA601, ListOfNetAssignments_Three) {
-  auto r = Parse("module m;\n"
-                 "  wire a, b, c, d, e, f;\n"
-                 "  assign a = b, c = d, e = f;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  wire a, b, c, d, e, f;\n"
+      "  assign a = b, c = d, e = f;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto cas = FindContAssigns(r.cu->modules[0]->items);
@@ -185,10 +192,11 @@ TEST(ParserA601, ListOfNetAssignments_Three) {
 }
 
 TEST(ParserA601, ListOfNetAssignments_SharedStrengthAndDelay) {
-  auto r = Parse("module m;\n"
-                 "  wire a, b, c, d;\n"
-                 "  assign (strong0, strong1) #10 a = b, c = d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  wire a, b, c, d;\n"
+      "  assign (strong0, strong1) #10 a = b, c = d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto cas = FindContAssigns(r.cu->modules[0]->items);
@@ -207,11 +215,12 @@ TEST(ParserA601, ListOfNetAssignments_SharedStrengthAndDelay) {
 // =============================================================================
 
 TEST(ParserA601, NetAssignment_ConcatLhs) {
-  auto r = Parse("module m;\n"
-                 "  wire [3:0] sum;\n"
-                 "  wire carry;\n"
-                 "  assign {carry, sum} = 5'b10101;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  wire [3:0] sum;\n"
+      "  wire carry;\n"
+      "  assign {carry, sum} = 5'b10101;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto cas = FindContAssigns(r.cu->modules[0]->items);
@@ -220,10 +229,11 @@ TEST(ParserA601, NetAssignment_ConcatLhs) {
 }
 
 TEST(ParserA601, NetAssignment_ExprRhs) {
-  auto r = Parse("module m;\n"
-                 "  wire [3:0] a, b, sum;\n"
-                 "  assign sum = a + b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  wire [3:0] a, b, sum;\n"
+      "  assign sum = a + b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto cas = FindContAssigns(r.cu->modules[0]->items);
@@ -232,10 +242,11 @@ TEST(ParserA601, NetAssignment_ExprRhs) {
 }
 
 TEST(ParserA601, NetAssignment_TernaryRhs) {
-  auto r = Parse("module m;\n"
-                 "  wire a, b, sel, y;\n"
-                 "  assign y = sel ? a : b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  wire a, b, sel, y;\n"
+      "  assign y = sel ? a : b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto cas = FindContAssigns(r.cu->modules[0]->items);
@@ -249,10 +260,11 @@ TEST(ParserA601, NetAssignment_TernaryRhs) {
 // =============================================================================
 
 TEST(ParserA601, NetAlias_TwoNets) {
-  auto r = Parse("module m;\n"
-                 "  wire a, b;\n"
-                 "  alias a = b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  wire a, b;\n"
+      "  alias a = b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *alias = FindAlias(r.cu->modules[0]->items);
@@ -261,10 +273,11 @@ TEST(ParserA601, NetAlias_TwoNets) {
 }
 
 TEST(ParserA601, NetAlias_ThreeNets) {
-  auto r = Parse("module m;\n"
-                 "  wire a, b, c;\n"
-                 "  alias a = b = c;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  wire a, b, c;\n"
+      "  alias a = b = c;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *alias = FindAlias(r.cu->modules[0]->items);
@@ -273,10 +286,11 @@ TEST(ParserA601, NetAlias_ThreeNets) {
 }
 
 TEST(ParserA601, NetAlias_FourNets) {
-  auto r = Parse("module m;\n"
-                 "  wire a, b, c, d;\n"
-                 "  alias a = b = c = d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  wire a, b, c, d;\n"
+      "  alias a = b = c = d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *alias = FindAlias(r.cu->modules[0]->items);
@@ -286,10 +300,11 @@ TEST(ParserA601, NetAlias_FourNets) {
 
 TEST(ParserA601, NetAlias_BitSelect) {
   // §10.11: alias with bit-selects for byte-swapping
-  auto r = Parse("module m;\n"
-                 "  wire [31:0] A, B;\n"
-                 "  alias {A[7:0],A[15:8],A[23:16],A[31:24]} = B;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  wire [31:0] A, B;\n"
+      "  alias {A[7:0],A[15:8],A[23:16],A[31:24]} = B;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *alias = FindAlias(r.cu->modules[0]->items);

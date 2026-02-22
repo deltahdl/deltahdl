@@ -27,9 +27,10 @@ static ParseResult Parse(const std::string &src) {
 }
 
 TEST(ParserSection28, GateArrayRange) {
-  auto r = Parse("module m;\n"
-                 "  nand n[0:3](out, a, b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  nand n[0:3](out, a, b);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
@@ -37,9 +38,10 @@ TEST(ParserSection28, GateArrayRange) {
 }
 
 TEST(ParserSection28, GateArrayWithDelay) {
-  auto r = Parse("module m;\n"
-                 "  and #5 g[0:7](out, a, b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  and #5 g[0:7](out, a, b);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->gate_kind, GateKind::kAnd);

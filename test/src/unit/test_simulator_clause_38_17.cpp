@@ -11,7 +11,7 @@ namespace delta {
 namespace {
 
 class VpiClause3817Test : public ::testing::Test {
-protected:
+ protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
@@ -40,5 +40,5 @@ TEST_F(VpiClause3817Test, GetVlogInfoNullDoesNotCrash) {
   // Should not crash.
 }
 
-} // namespace
-} // namespace delta
+}  // namespace
+}  // namespace delta

@@ -1,12 +1,13 @@
 // §6.20: Constants
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "elaboration/const_eval.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -48,4 +49,4 @@ TEST(ConstEval, ScopedUnresolved) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("UNKNOWN", f), scope), std::nullopt);
 }
 
-} // namespace
+}  // namespace

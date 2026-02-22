@@ -1,5 +1,7 @@
 // §15.5: Named events
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -12,7 +14,6 @@
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
 #include "simulation/variable.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -37,19 +38,20 @@ namespace {
 
 TEST(Lowerer, NamedEventTriggerAndWait) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  event ev;\n"
-                              "  logic [31:0] result;\n"
-                              "  initial begin\n"
-                              "    @(ev);\n"
-                              "    result = 42;\n"
-                              "  end\n"
-                              "  initial begin\n"
-                              "    #5 ->ev;\n"
-                              "    #1 $finish;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  event ev;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    @(ev);\n"
+      "    result = 42;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #5 ->ev;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -63,19 +65,20 @@ TEST(Lowerer, NamedEventTriggerAndWait) {
 
 TEST(Lowerer, NamedEventBareWaitSyntax) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  event ev;\n"
-                              "  logic [31:0] result;\n"
-                              "  initial begin\n"
-                              "    @ev;\n"
-                              "    result = 99;\n"
-                              "  end\n"
-                              "  initial begin\n"
-                              "    #3 ->ev;\n"
-                              "    #1 $finish;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  event ev;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    @ev;\n"
+      "    result = 99;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #3 ->ev;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -87,4 +90,4 @@ TEST(Lowerer, NamedEventBareWaitSyntax) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-} // namespace
+}  // namespace

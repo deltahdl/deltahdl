@@ -30,9 +30,8 @@ static ParseResult312 Parse(const std::string &src) {
   return result;
 }
 
-static const ModuleItem *
-FindInstByModule(const std::vector<ModuleItem *> &items,
-                 const std::string &module_name) {
+static const ModuleItem *FindInstByModule(
+    const std::vector<ModuleItem *> &items, const std::string &module_name) {
   for (const auto *item : items)
     if (item->kind == ModuleItemKind::kModuleInst &&
         item->inst_module == module_name)
@@ -46,15 +45,16 @@ FindInstByModule(const std::vector<ModuleItem *> &items,
 
 // §3.12 Compilation and elaboration with parameterized instantiation
 TEST(ParserClause03, Cl3_12_CompilationAndElaboration) {
-  auto r = Parse("package pkg; typedef logic [7:0] byte_t; endpackage\n"
-                 "module adder #(parameter W = 8) (\n"
-                 "    input [W-1:0] a, b, output [W-1:0] s);\n"
-                 "  assign s = a + b;\n"
-                 "endmodule\n"
-                 "module top; import pkg::*;\n"
-                 "  wire [15:0] x, y, z;\n"
-                 "  adder #(16) u0 (.a(x), .b(y), .s(z));\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "package pkg; typedef logic [7:0] byte_t; endpackage\n"
+      "module adder #(parameter W = 8) (\n"
+      "    input [W-1:0] a, b, output [W-1:0] s);\n"
+      "  assign s = a + b;\n"
+      "endmodule\n"
+      "module top; import pkg::*;\n"
+      "  wire [15:0] x, y, z;\n"
+      "  adder #(16) u0 (.a(x), .b(y), .s(z));\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   // Package compiled before module references it

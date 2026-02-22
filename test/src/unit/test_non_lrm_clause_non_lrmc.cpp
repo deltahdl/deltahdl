@@ -1,9 +1,10 @@
 // §non_lrm
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/types.h"
 #include "simulation/driver_update.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -60,7 +61,7 @@ TEST(DriverUpdatePool, ReleaseAndReuse_SamePointer) {
   EXPECT_EQ(pool.FreeCount(), 1);
 
   DriverUpdate *reused = pool.Acquire();
-  EXPECT_EQ(reused, du); // Same pointer returned.
+  EXPECT_EQ(reused, du);  // Same pointer returned.
   EXPECT_EQ(pool.FreeCount(), 0);
 }
 
@@ -149,4 +150,4 @@ TEST(DriverUpdatePool, AcquireAfterPartialRelease) {
   (void)du3;
 }
 
-} // namespace
+}  // namespace

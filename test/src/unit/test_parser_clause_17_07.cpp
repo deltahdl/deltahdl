@@ -1,5 +1,9 @@
 // §17.7: Checker variables
 
+#include <gtest/gtest.h>
+
+#include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -10,8 +14,6 @@
 #include "parser/parser.h"
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
-#include <string>
 
 using namespace delta;
 
@@ -19,7 +21,7 @@ using namespace delta;
 // Parse-level fixture
 // =============================================================================
 struct CheckerParseTest : ::testing::Test {
-protected:
+ protected:
   CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
@@ -70,4 +72,4 @@ TEST_F(CheckerParseTest, CheckerWithBitVector) {
   EXPECT_FALSE(unit->checkers[0]->items.empty());
 }
 
-} // namespace
+}  // namespace

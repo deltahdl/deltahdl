@@ -33,9 +33,10 @@ TEST(Preprocessor, BeginKeywords_EmitsMarker) {
 
 TEST(Preprocessor, EndKeywords_EmitsRestoreMarker) {
   PreprocFixture f;
-  auto result = Preprocess("`begin_keywords \"1364-2001\"\n"
-                           "`end_keywords\n",
-                           f);
+  auto result = Preprocess(
+      "`begin_keywords \"1364-2001\"\n"
+      "`end_keywords\n",
+      f);
   EXPECT_FALSE(f.diag.HasErrors());
   // After end_keywords with empty stack, restores to kVer18002023 (8).
   std::string restore = {kKeywordMarker, '\x08', '\n'};
@@ -56,11 +57,12 @@ TEST(Preprocessor, EndKeywords_WithoutBegin) {
 
 TEST(Preprocessor, BeginKeywords_NestedRestoresVersion) {
   PreprocFixture f;
-  auto result = Preprocess("`begin_keywords \"1364-2001\"\n"
-                           "`begin_keywords \"1800-2005\"\n"
-                           "`end_keywords\n"
-                           "`end_keywords\n",
-                           f);
+  auto result = Preprocess(
+      "`begin_keywords \"1364-2001\"\n"
+      "`begin_keywords \"1800-2005\"\n"
+      "`end_keywords\n"
+      "`end_keywords\n",
+      f);
   EXPECT_FALSE(f.diag.HasErrors());
   // First begin: version 1 (1364-2001)
   std::string m1 = {kKeywordMarker, '\x01', '\n'};
@@ -78,10 +80,11 @@ TEST(Preprocessor, BeginKeywords_NestedRestoresVersion) {
 
 TEST(Preprocessor, BeginKeywords_LogicAsIdentifier) {
   PreprocFixture f;
-  auto preprocessed = Preprocess("`begin_keywords \"1364-2001\"\n"
-                                 "module m; reg logic; endmodule\n"
-                                 "`end_keywords\n",
-                                 f);
+  auto preprocessed = Preprocess(
+      "`begin_keywords \"1364-2001\"\n"
+      "module m; reg logic; endmodule\n"
+      "`end_keywords\n",
+      f);
   EXPECT_FALSE(f.diag.HasErrors());
   DiagEngine diag2(f.mgr);
   Lexer lexer(preprocessed, 0, diag2);
@@ -99,11 +102,12 @@ TEST(Preprocessor, BeginKeywords_LogicAsIdentifier) {
 
 TEST(Preprocessor, BeginKeywords_RestoresAfterEnd) {
   PreprocFixture f;
-  auto preprocessed = Preprocess("`begin_keywords \"1364-2001\"\n"
-                                 "logic\n"
-                                 "`end_keywords\n"
-                                 "logic\n",
-                                 f);
+  auto preprocessed = Preprocess(
+      "`begin_keywords \"1364-2001\"\n"
+      "logic\n"
+      "`end_keywords\n"
+      "logic\n",
+      f);
   EXPECT_FALSE(f.diag.HasErrors());
   DiagEngine diag2(f.mgr);
   Lexer lexer(preprocessed, 0, diag2);

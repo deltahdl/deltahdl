@@ -45,4 +45,4 @@ TEST(SysTask, CountbitsMatchingPattern) {
   EXPECT_EQ(result.ToUint64(), 4u);
 }
 
-} // namespace
+}  // namespace

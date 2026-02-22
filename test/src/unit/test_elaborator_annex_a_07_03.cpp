@@ -34,7 +34,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA703Fixture &f) {
   return design;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.7.3 Specify block terminals — Elaboration
@@ -43,12 +43,13 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA703Fixture &f) {
 // Terminal with bit-select elaborates
 TEST(ElabA703, TerminalBitSelectElaborates) {
   ElabA703Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  specify\n"
-                              "    (a[3] => b[0]) = 5;\n"
-                              "  endspecify\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    (a[3] => b[0]) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -56,12 +57,13 @@ TEST(ElabA703, TerminalBitSelectElaborates) {
 // Terminal with part-select range elaborates
 TEST(ElabA703, TerminalPartSelectElaborates) {
   ElabA703Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  specify\n"
-                              "    (a[7:0] => b[7:0]) = 5;\n"
-                              "  endspecify\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    (a[7:0] => b[7:0]) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -69,12 +71,13 @@ TEST(ElabA703, TerminalPartSelectElaborates) {
 // Terminal with indexed part-select elaborates
 TEST(ElabA703, TerminalIndexedPartSelectElaborates) {
   ElabA703Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  specify\n"
-                              "    (a[0+:4] => b[7-:4]) = 5;\n"
-                              "  endspecify\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    (a[0+:4] => b[7-:4]) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -82,12 +85,13 @@ TEST(ElabA703, TerminalIndexedPartSelectElaborates) {
 // Terminal with dotted interface.port elaborates
 TEST(ElabA703, TerminalDottedElaborates) {
   ElabA703Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  specify\n"
-                              "    (intf.sig => intf.out) = 5;\n"
-                              "  endspecify\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    (intf.sig => intf.out) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -95,12 +99,13 @@ TEST(ElabA703, TerminalDottedElaborates) {
 // Dotted terminal with range elaborates
 TEST(ElabA703, DottedTerminalWithRangeElaborates) {
   ElabA703Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  specify\n"
-                              "    (intf.sig[3:0] => intf.out[7:0]) = 5;\n"
-                              "  endspecify\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    (intf.sig[3:0] => intf.out[7:0]) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -108,13 +113,13 @@ TEST(ElabA703, DottedTerminalWithRangeElaborates) {
 // Mixed terminal forms together elaborate
 TEST(ElabA703, MixedTerminalFormsElaborate) {
   ElabA703Fixture f;
-  auto *design =
-      ElaborateSrc("module m;\n"
-                   "  specify\n"
-                   "    (a, b[3], intf.sig[7:0] *> x[0], y, intf2.out) = 5;\n"
-                   "  endspecify\n"
-                   "endmodule\n",
-                   f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    (a, b[3], intf.sig[7:0] *> x[0], y, intf2.out) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }

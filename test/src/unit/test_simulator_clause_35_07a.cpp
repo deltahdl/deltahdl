@@ -1,10 +1,12 @@
 // §35.7: Exported functions
 
-#include "simulation/dpi_runtime.h"
-#include <cstdint>
 #include <gtest/gtest.h>
+
+#include <cstdint>
 #include <string>
 #include <vector>
+
+#include "simulation/dpi_runtime.h"
 
 using namespace delta;
 
@@ -36,4 +38,4 @@ TEST(DpiRuntime, CallMissingExportReturnsZero) {
   EXPECT_EQ(result.AsInt(), 0);
 }
 
-} // namespace
+}  // namespace

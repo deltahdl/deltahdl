@@ -34,7 +34,7 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // Annex E.2 -- `default_decay_time

@@ -49,7 +49,7 @@ RtlirDesign *Elaborate(const std::string &src, ElabFixture &f,
   return elab.Elaborate(name);
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.4.1.2 -- Interface instantiation
@@ -171,9 +171,10 @@ TEST(ParserAnnexA0412, InterfaceInstOrderedPorts) {
 // --- interface_instantiation: interface instantiated inside interface ---
 
 TEST(ParserAnnexA0412, InterfaceInstInsideInterface) {
-  auto r = Parse("interface outer_if;\n"
-                 "  inner_if u0(.clk(clk));\n"
-                 "endinterface\n");
+  auto r = Parse(
+      "interface outer_if;\n"
+      "  inner_if u0(.clk(clk));\n"
+      "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->interfaces.size(), 1u);
@@ -215,14 +216,14 @@ TEST(ParserAnnexA0412, InterfaceInstNamedPortNoParens) {
 
 TEST(ParserAnnexA0412, ElaborationInterfaceInstInModule) {
   ElabFixture f;
-  auto *design =
-      Elaborate("interface my_bus(input logic clk, input logic rst);\n"
-                "endinterface\n"
-                "module top;\n"
-                "  logic clk, rst;\n"
-                "  my_bus bus0(.clk(clk), .rst(rst));\n"
-                "endmodule\n",
-                f);
+  auto *design = Elaborate(
+      "interface my_bus(input logic clk, input logic rst);\n"
+      "endinterface\n"
+      "module top;\n"
+      "  logic clk, rst;\n"
+      "  my_bus bus0(.clk(clk), .rst(rst));\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   ASSERT_EQ(design->top_modules.size(), 1u);
   auto *top = design->top_modules[0];
@@ -236,13 +237,14 @@ TEST(ParserAnnexA0412, ElaborationInterfaceInstInModule) {
 
 TEST(ParserAnnexA0412, ElaborationInterfaceInstPortBindings) {
   ElabFixture f;
-  auto *design = Elaborate("interface simple_if(input logic data);\n"
-                           "endinterface\n"
-                           "module top;\n"
-                           "  logic d;\n"
-                           "  simple_if u0(.data(d));\n"
-                           "endmodule\n",
-                           f);
+  auto *design = Elaborate(
+      "interface simple_if(input logic data);\n"
+      "endinterface\n"
+      "module top;\n"
+      "  logic d;\n"
+      "  simple_if u0(.data(d));\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   auto *top = design->top_modules[0];
   ASSERT_GE(top->children.size(), 1u);
@@ -254,16 +256,17 @@ TEST(ParserAnnexA0412, ElaborationInterfaceInstPortBindings) {
 
 TEST(ParserAnnexA0412, ElaborationInterfaceInsideInterface) {
   ElabFixture f;
-  auto *design = Elaborate("interface inner_if(input logic sig);\n"
-                           "endinterface\n"
-                           "interface outer_if;\n"
-                           "  logic sig;\n"
-                           "  inner_if u0(.sig(sig));\n"
-                           "endinterface\n"
-                           "module top;\n"
-                           "  outer_if oi();\n"
-                           "endmodule\n",
-                           f);
+  auto *design = Elaborate(
+      "interface inner_if(input logic sig);\n"
+      "endinterface\n"
+      "interface outer_if;\n"
+      "  logic sig;\n"
+      "  inner_if u0(.sig(sig));\n"
+      "endinterface\n"
+      "module top;\n"
+      "  outer_if oi();\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   auto *top = design->top_modules[0];
   ASSERT_GE(top->children.size(), 1u);

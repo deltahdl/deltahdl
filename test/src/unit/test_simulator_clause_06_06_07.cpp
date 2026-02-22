@@ -38,16 +38,16 @@ bool CheckUnresolvedMultipleDrivers(const Net &net, const UserNettype &nt);
 
 bool ValidateNettypeDataKind(NettypeDataKind kind) {
   switch (kind) {
-  case NettypeDataKind::k4StateIntegral:
-  case NettypeDataKind::k2StateIntegral:
-  case NettypeDataKind::kReal:
-  case NettypeDataKind::kShortreal:
-  case NettypeDataKind::kFixedUnpackedArray:
-    return true;
-  case NettypeDataKind::kDynamicArray:
-  case NettypeDataKind::kString:
-  case NettypeDataKind::kClass:
-    return false;
+    case NettypeDataKind::k4StateIntegral:
+    case NettypeDataKind::k2StateIntegral:
+    case NettypeDataKind::kReal:
+    case NettypeDataKind::kShortreal:
+    case NettypeDataKind::kFixedUnpackedArray:
+      return true;
+    case NettypeDataKind::kDynamicArray:
+    case NettypeDataKind::kString:
+    case NettypeDataKind::kClass:
+      return false;
   }
   return false;
 }
@@ -189,8 +189,7 @@ TEST(UserDefinedNettype, SameDataTypeDifferentResolution) {
   nt_or.resolution = [](Arena &a,
                         const std::vector<Logic4Vec> &drivers) -> Logic4Vec {
     uint64_t r = 0;
-    for (const auto &d : drivers)
-      r |= (d.words[0].aval & 1);
+    for (const auto &d : drivers) r |= (d.words[0].aval & 1);
     return MakeLogic4VecVal(a, 1, r);
   };
 
@@ -198,8 +197,7 @@ TEST(UserDefinedNettype, SameDataTypeDifferentResolution) {
   nt_and.resolution = [](Arena &a,
                          const std::vector<Logic4Vec> &drivers) -> Logic4Vec {
     uint64_t r = 1;
-    for (const auto &d : drivers)
-      r &= (d.words[0].aval & 1);
+    for (const auto &d : drivers) r &= (d.words[0].aval & 1);
     return MakeLogic4VecVal(a, 1, r);
   };
 

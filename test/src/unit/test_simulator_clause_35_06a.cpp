@@ -1,10 +1,12 @@
 // §35.6: Calling imported functions
 
-#include "simulation/dpi_runtime.h"
-#include <cstdint>
 #include <gtest/gtest.h>
+
+#include <cstdint>
 #include <string>
 #include <vector>
+
+#include "simulation/dpi_runtime.h"
 
 using namespace delta;
 
@@ -88,4 +90,4 @@ TEST(DpiRuntime, ImportWithChandleArg) {
   EXPECT_EQ(result.AsChandle(), &dummy);
 }
 
-} // namespace
+}  // namespace

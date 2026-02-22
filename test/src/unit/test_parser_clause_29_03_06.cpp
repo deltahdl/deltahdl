@@ -44,14 +44,15 @@ static bool ParseOk(const std::string &src) {
 // --- Combinational UDP table symbols ---
 
 TEST(ParserSection29, TableSymbol0And1) {
-  auto r = Parse("primitive and_gate(output out, input a, b);\n"
-                 "  table\n"
-                 "    0 0 : 0;\n"
-                 "    0 1 : 0;\n"
-                 "    1 0 : 0;\n"
-                 "    1 1 : 1;\n"
-                 "  endtable\n"
-                 "endprimitive\n");
+  auto r = Parse(
+      "primitive and_gate(output out, input a, b);\n"
+      "  table\n"
+      "    0 0 : 0;\n"
+      "    0 1 : 0;\n"
+      "    1 0 : 0;\n"
+      "    1 1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->udps.size(), 1);
   auto *udp = r.cu->udps[0];
@@ -68,13 +69,14 @@ TEST(ParserSection29, TableSymbol0And1) {
 }
 
 TEST(ParserSection29, TableSymbolQuestionMark) {
-  auto r = Parse("primitive buf_udp(output out, input in);\n"
-                 "  table\n"
-                 "    0 : 0;\n"
-                 "    1 : 1;\n"
-                 "    ? : x;\n"
-                 "  endtable\n"
-                 "endprimitive\n");
+  auto r = Parse(
+      "primitive buf_udp(output out, input in);\n"
+      "  table\n"
+      "    0 : 0;\n"
+      "    1 : 1;\n"
+      "    ? : x;\n"
+      "  endtable\n"
+      "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->udps.size(), 1);
   ASSERT_EQ(r.cu->udps[0]->table.size(), 3);
@@ -84,16 +86,17 @@ TEST(ParserSection29, TableSymbolQuestionMark) {
 }
 
 TEST(ParserSection29, TableSymbolX) {
-  auto r = Parse("primitive xor_udp(output out, input a, b);\n"
-                 "  table\n"
-                 "    0 0 : 0;\n"
-                 "    0 1 : 1;\n"
-                 "    1 0 : 1;\n"
-                 "    1 1 : 0;\n"
-                 "    x ? : x;\n"
-                 "    ? x : x;\n"
-                 "  endtable\n"
-                 "endprimitive\n");
+  auto r = Parse(
+      "primitive xor_udp(output out, input a, b);\n"
+      "  table\n"
+      "    0 0 : 0;\n"
+      "    0 1 : 1;\n"
+      "    1 0 : 1;\n"
+      "    1 1 : 0;\n"
+      "    x ? : x;\n"
+      "    ? x : x;\n"
+      "  endtable\n"
+      "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   auto *udp = r.cu->udps[0];
   ASSERT_EQ(udp->table.size(), 6);
@@ -104,14 +107,15 @@ TEST(ParserSection29, TableSymbolX) {
 }
 
 TEST(ParserSection29, TableSymbolB) {
-  auto r = Parse("primitive or_udp(output out, input a, b);\n"
-                 "  table\n"
-                 "    b 0 : 0;\n"
-                 "    0 b : 0;\n"
-                 "    1 ? : 1;\n"
-                 "    ? 1 : 1;\n"
-                 "  endtable\n"
-                 "endprimitive\n");
+  auto r = Parse(
+      "primitive or_udp(output out, input a, b);\n"
+      "  table\n"
+      "    b 0 : 0;\n"
+      "    0 b : 0;\n"
+      "    1 ? : 1;\n"
+      "    ? 1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   auto *udp = r.cu->udps[0];
   ASSERT_EQ(udp->table.size(), 4);
@@ -122,13 +126,14 @@ TEST(ParserSection29, TableSymbolB) {
 // --- Sequential UDP table symbols ---
 
 TEST(ParserSection29, TableSymbolDashNoChange) {
-  auto r = Parse("primitive latch(output reg q, input d, en);\n"
-                 "  table\n"
-                 "    0 1 : ? : 0;\n"
-                 "    1 1 : ? : 1;\n"
-                 "    ? 0 : ? : -;\n"
-                 "  endtable\n"
-                 "endprimitive\n");
+  auto r = Parse(
+      "primitive latch(output reg q, input d, en);\n"
+      "  table\n"
+      "    0 1 : ? : 0;\n"
+      "    1 1 : ? : 1;\n"
+      "    ? 0 : ? : -;\n"
+      "  endtable\n"
+      "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   auto *udp = r.cu->udps[0];
   EXPECT_TRUE(udp->is_sequential);
@@ -140,13 +145,14 @@ TEST(ParserSection29, TableSymbolDashNoChange) {
 }
 
 TEST(ParserSection29, TableEdgeSymbolsRAndF) {
-  auto r = Parse("primitive dff(output reg q, input d, clk);\n"
-                 "  table\n"
-                 "    0 r : ? : 0;\n"
-                 "    1 r : ? : 1;\n"
-                 "    ? f : ? : -;\n"
-                 "  endtable\n"
-                 "endprimitive\n");
+  auto r = Parse(
+      "primitive dff(output reg q, input d, clk);\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "    1 r : ? : 1;\n"
+      "    ? f : ? : -;\n"
+      "  endtable\n"
+      "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   auto *udp = r.cu->udps[0];
   EXPECT_TRUE(udp->is_sequential);
@@ -158,13 +164,14 @@ TEST(ParserSection29, TableEdgeSymbolsRAndF) {
 }
 
 TEST(ParserSection29, TableEdgeSymbolStar) {
-  auto r = Parse("primitive any_change(output reg q, input d, clk);\n"
-                 "  table\n"
-                 "    0 r : ? : 0;\n"
-                 "    1 r : ? : 1;\n"
-                 "    * ? : ? : -;\n"
-                 "  endtable\n"
-                 "endprimitive\n");
+  auto r = Parse(
+      "primitive any_change(output reg q, input d, clk);\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "    1 r : ? : 1;\n"
+      "    * ? : ? : -;\n"
+      "  endtable\n"
+      "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   auto *udp = r.cu->udps[0];
   ASSERT_EQ(udp->table.size(), 3);
@@ -173,36 +180,39 @@ TEST(ParserSection29, TableEdgeSymbolStar) {
 }
 
 TEST(ParserSection29, TableEdgeSymbolsPAndN) {
-  EXPECT_TRUE(ParseOk("primitive pos_neg(output reg q, input d, clk);\n"
-                      "  table\n"
-                      "    0 p : ? : 0;\n"
-                      "    1 p : ? : 1;\n"
-                      "    ? n : ? : -;\n"
-                      "  endtable\n"
-                      "endprimitive\n"));
+  EXPECT_TRUE(
+      ParseOk("primitive pos_neg(output reg q, input d, clk);\n"
+              "  table\n"
+              "    0 p : ? : 0;\n"
+              "    1 p : ? : 1;\n"
+              "    ? n : ? : -;\n"
+              "  endtable\n"
+              "endprimitive\n"));
 }
 
 TEST(ParserSection29, TableEdgeNotationParenthesized) {
-  EXPECT_TRUE(ParseOk("primitive edge_udp(output reg q, input d, clk);\n"
-                      "  table\n"
-                      "    0 (01) : ? : 0;\n"
-                      "    1 (01) : ? : 1;\n"
-                      "    ? (10) : ? : -;\n"
-                      "    ? (0x) : ? : -;\n"
-                      "    ? (x1) : ? : -;\n"
-                      "  endtable\n"
-                      "endprimitive\n"));
+  EXPECT_TRUE(
+      ParseOk("primitive edge_udp(output reg q, input d, clk);\n"
+              "  table\n"
+              "    0 (01) : ? : 0;\n"
+              "    1 (01) : ? : 1;\n"
+              "    ? (10) : ? : -;\n"
+              "    ? (0x) : ? : -;\n"
+              "    ? (x1) : ? : -;\n"
+              "  endtable\n"
+              "endprimitive\n"));
 }
 
 TEST(ParserSection29, SequentialCurrentStateField) {
-  auto r = Parse("primitive srff(output reg q, input s, r);\n"
-                 "  table\n"
-                 "    1 0 : 0 : 1;\n"
-                 "    1 0 : 1 : 1;\n"
-                 "    0 1 : ? : 0;\n"
-                 "    0 0 : ? : -;\n"
-                 "  endtable\n"
-                 "endprimitive\n");
+  auto r = Parse(
+      "primitive srff(output reg q, input s, r);\n"
+      "  table\n"
+      "    1 0 : 0 : 1;\n"
+      "    1 0 : 1 : 1;\n"
+      "    0 1 : ? : 0;\n"
+      "    0 0 : ? : -;\n"
+      "  endtable\n"
+      "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   auto *udp = r.cu->udps[0];
   EXPECT_TRUE(udp->is_sequential);

@@ -1,7 +1,8 @@
 // §non_lrm
 
-#include "simulation/process.h"
 #include <gtest/gtest.h>
+
+#include "simulation/process.h"
 
 using namespace delta;
 
@@ -17,7 +18,7 @@ TEST(Process, MoveSemantics) {
   SimCoroutine *pa = &a;
   SimCoroutine b = std::move(a);
   EXPECT_FALSE(b.Done());
-  EXPECT_TRUE(pa->Done()); // Moved-from state check via pre-move pointer.
+  EXPECT_TRUE(pa->Done());  // Moved-from state check via pre-move pointer.
 }
 
 TEST(Process, ProcessResumeNullSafe) {
@@ -51,4 +52,4 @@ TEST(Process, CoroutineDestroyOnScopeExit) {
   // Immediately destroyed — no leak if sanitizer passes.
 }
 
-} // namespace
+}  // namespace

@@ -51,8 +51,7 @@ static ModuleItem *FirstAlwaysItem(ParseResult9k &r) {
 
 static Stmt *FirstInitialStmt(ParseResult9k &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock)
-      continue;
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
     }
@@ -75,9 +74,10 @@ static Stmt *FirstInitialStmt(ParseResult9k &r) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_4_2_4_IffGuardPosedgeBasic) {
-  auto r = Parse("module m;\n"
-                 "  always @(posedge clk iff reset == 0) q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff reset == 0) q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -93,9 +93,10 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardPosedgeBasic) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_4_2_4_IffGuardPosedgeEnable) {
-  auto r = Parse("module m;\n"
-                 "  always @(posedge clk iff en) q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff en) q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -110,9 +111,10 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardPosedgeEnable) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_4_2_4_IffGuardNegedge) {
-  auto r = Parse("module m;\n"
-                 "  always @(negedge clk iff !rst) q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @(negedge clk iff !rst) q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -127,9 +129,10 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardNegedge) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_4_2_4_IffGuardEdgeKeyword) {
-  auto r = Parse("module m;\n"
-                 "  always @(edge sig iff guard) q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @(edge sig iff guard) q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -144,9 +147,10 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardEdgeKeyword) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_4_2_4_IffGuardNoEdge) {
-  auto r = Parse("module m;\n"
-                 "  always @(sig iff en) q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @(sig iff en) q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -162,9 +166,10 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardNoEdge) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_4_2_4_IffGuardComplexCondition) {
-  auto r = Parse("module m;\n"
-                 "  always @(posedge clk iff (a && b)) q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff (a && b)) q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -179,9 +184,10 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardComplexCondition) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_4_2_4_IffGuardMultipleOrFirst) {
-  auto r = Parse("module m;\n"
-                 "  always @(posedge clk iff en or negedge rst) q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff en or negedge rst) q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -198,9 +204,10 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardMultipleOrFirst) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_4_2_4_IffGuardMultipleOrSecond) {
-  auto r = Parse("module m;\n"
-                 "  always @(posedge clk or negedge rst iff !en) q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk or negedge rst iff !en) q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -217,10 +224,10 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardMultipleOrSecond) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_4_2_4_IffGuardBothComma) {
-  auto r =
-      Parse("module m;\n"
-            "  always @(posedge clk iff en, negedge rst iff !mode) q <= d;\n"
-            "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff en, negedge rst iff !mode) q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -235,9 +242,10 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardBothComma) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_4_2_4_IffGuardComparison) {
-  auto r = Parse("module m;\n"
-                 "  always @(posedge clk iff state == 2'b01) q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff state == 2'b01) q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -251,12 +259,12 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardComparison) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_4_2_4_IffGuardAlwaysSensitivity) {
-  auto r =
-      Parse("module m;\n"
-            "  always @(posedge clk iff reset == 0 or posedge reset) begin\n"
-            "    q <= d;\n"
-            "  end\n"
-            "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff reset == 0 or posedge reset) begin\n"
+      "    q <= d;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -275,11 +283,12 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardAlwaysSensitivity) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_4_2_4_IffGuardStmtLevel) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @(posedge clk iff en) q <= d;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge clk iff en) q <= d;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -295,11 +304,12 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardStmtLevel) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_4_2_4_IffGuardCommaStmtLevel) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @(posedge clk iff en, negedge rst) q <= d;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge clk iff en, negedge rst) q <= d;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -315,11 +325,12 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardCommaStmtLevel) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_4_2_4_IffGuardOrStmtLevel) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @(posedge clk iff en or negedge rst) q <= d;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge clk iff en or negedge rst) q <= d;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -359,12 +370,13 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardAlwaysFF) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_4_2_4_IffGuardBeginEnd) {
-  auto r = Parse("module m;\n"
-                 "  always @(posedge clk iff en) begin\n"
-                 "    a <= b;\n"
-                 "    c <= d;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff en) begin\n"
+      "    a <= b;\n"
+      "    c <= d;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -381,9 +393,10 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardBeginEnd) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_4_2_4_IffConditionFieldPosedge) {
-  auto r = Parse("module m;\n"
-                 "  always @(posedge clk iff reset == 0) q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff reset == 0) q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -400,9 +413,10 @@ TEST(ParserSection9, Sec9_4_2_4_IffConditionFieldPosedge) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_4_2_4_SignalFieldPopulated) {
-  auto r = Parse("module m;\n"
-                 "  always @(posedge clk iff en) q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff en) q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -419,9 +433,10 @@ TEST(ParserSection9, Sec9_4_2_4_SignalFieldPopulated) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_4_2_4_EdgeFieldNegedge) {
-  auto r = Parse("module m;\n"
-                 "  always @(negedge rst_n iff mode) q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @(negedge rst_n iff mode) q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -437,11 +452,11 @@ TEST(ParserSection9, Sec9_4_2_4_EdgeFieldNegedge) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_4_2_4_MixedIffPresence) {
-  auto r =
-      Parse("module m;\n"
-            "  always @(posedge clk iff en, negedge rst, edge sig iff guard)\n"
-            "    q <= d;\n"
-            "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff en, negedge rst, edge sig iff guard)\n"
+      "    q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -463,9 +478,10 @@ TEST(ParserSection9, Sec9_4_2_4_MixedIffPresence) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_4_2_4_IffGuardLogicalOr) {
-  auto r = Parse("module m;\n"
-                 "  always @(posedge clk iff (a || b)) q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff (a || b)) q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -479,9 +495,10 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardLogicalOr) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_4_2_4_IffGuardNotEqual) {
-  auto r = Parse("module m;\n"
-                 "  always @(posedge clk iff state != 0) q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff state != 0) q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -496,10 +513,11 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardNotEqual) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_4_2_4_IffGuardAlwaysFFSingleEdge) {
-  auto r = Parse("module m;\n"
-                 "  always_ff @(posedge clk iff en)\n"
-                 "    q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always_ff @(posedge clk iff en)\n"
+      "    q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -515,11 +533,12 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardAlwaysFFSingleEdge) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_4_2_4_IffGuardNoEdgeStmtComparison) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @(data iff enable == 1) y = data;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(data iff enable == 1) y = data;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -535,9 +554,10 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardNoEdgeStmtComparison) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_4_2_4_IffGuardUnaryNegation) {
-  auto r = Parse("module m;\n"
-                 "  always @(posedge clk iff !bypass) q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff !bypass) q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -552,9 +572,10 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardUnaryNegation) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_4_2_4_IffGuardBitwiseAnd) {
-  auto r = Parse("module m;\n"
-                 "  always @(posedge clk iff (mask & enable)) q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff (mask & enable)) q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -580,10 +601,11 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardThreeEventsOr) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_4_2_4_IffGuardNonblockingAssign) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  always @(posedge clk iff valid)\n"
-                      "    data_out <= data_in;\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  always @(posedge clk iff valid)\n"
+              "    data_out <= data_in;\n"
+              "endmodule\n"));
 }
 
 // ---------------------------------------------------------------------------
@@ -591,9 +613,10 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardNonblockingAssign) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_4_2_4_NoIffConditionWhenAbsent) {
-  auto r = Parse("module m;\n"
-                 "  always @(posedge clk) q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk) q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -608,14 +631,15 @@ TEST(ParserSection9, Sec9_4_2_4_NoIffConditionWhenAbsent) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection9, Sec9_4_2_4_IffGuardStmtLevelBody) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @(negedge clk iff active) begin\n"
-                 "      a = 1;\n"
-                 "      b = 2;\n"
-                 "    end\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(negedge clk iff active) begin\n"
+      "      a = 1;\n"
+      "      b = 2;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);

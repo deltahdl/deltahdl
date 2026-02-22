@@ -1,11 +1,12 @@
 // §6.6.7: User-defined nettypes
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -28,9 +29,10 @@ static ParseResult Parse(const std::string &src) {
 namespace {
 
 TEST(Parser, NettypeDeclaration) {
-  auto r = Parse("module t;\n"
-                 "  nettype logic [7:0] mynet;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  nettype logic [7:0] mynet;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
@@ -38,9 +40,10 @@ TEST(Parser, NettypeDeclaration) {
 }
 
 TEST(Parser, NettypeWithResolutionFunction) {
-  auto r = Parse("module t;\n"
-                 "  nettype logic [7:0] mynet with resolve_fn;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  nettype logic [7:0] mynet with resolve_fn;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
@@ -49,10 +52,11 @@ TEST(Parser, NettypeWithResolutionFunction) {
 }
 
 TEST(Parser, NettypeUsedInDecl) {
-  auto r = Parse("module t;\n"
-                 "  nettype logic [7:0] mynet;\n"
-                 "  mynet x;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  nettype logic [7:0] mynet;\n"
+      "  mynet x;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
   auto *item = r.cu->modules[0]->items[1];
@@ -60,4 +64,4 @@ TEST(Parser, NettypeUsedInDecl) {
   EXPECT_EQ(item->name, "x");
 }
 
-} // namespace
+}  // namespace

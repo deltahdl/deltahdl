@@ -1,11 +1,12 @@
 // §27.3: Generate construct syntax
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -49,13 +50,14 @@ struct ModportPortExpected {
 namespace {
 
 TEST(Parser, GenerateRegion) {
-  auto r = Parse("module t;\n"
-                 "  generate\n"
-                 "    if (WIDTH > 8) begin\n"
-                 "      assign a = b;\n"
-                 "    end\n"
-                 "  endgenerate\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  generate\n"
+      "    if (WIDTH > 8) begin\n"
+      "      assign a = b;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *mod = r.cu->modules[0];
   bool found_gen = false;
@@ -67,4 +69,4 @@ TEST(Parser, GenerateRegion) {
   EXPECT_TRUE(found_gen);
 }
 
-} // namespace
+}  // namespace

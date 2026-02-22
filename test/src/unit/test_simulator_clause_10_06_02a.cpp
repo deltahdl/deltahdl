@@ -1,10 +1,12 @@
 // §10.6.2: The force and release procedural statements
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
 #include "common/arena.h"
 #include "simulation/net.h"
 #include "simulation/variable.h"
-#include <cstdint>
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -37,19 +39,18 @@ void ForceNet(Net &net, const Logic4Vec &value, Arena &arena);
 void ReleaseNet(Net &net, Arena &arena);
 
 bool ValidateForceTarget(const ForceInfo &info) {
-  if (info.has_mixed_assignments)
-    return false;
+  if (info.has_mixed_assignments) return false;
   switch (info.target) {
-  case ForceTarget::kSingularVariable:
-  case ForceTarget::kNet:
-  case ForceTarget::kConstBitSelectNet:
-  case ForceTarget::kConstPartSelectNet:
-  case ForceTarget::kConcatenation:
-    return true;
-  case ForceTarget::kBitSelectVariable:
-  case ForceTarget::kPartSelectVariable:
-  case ForceTarget::kUserDefinedNettypePartSelect:
-    return false;
+    case ForceTarget::kSingularVariable:
+    case ForceTarget::kNet:
+    case ForceTarget::kConstBitSelectNet:
+    case ForceTarget::kConstPartSelectNet:
+    case ForceTarget::kConcatenation:
+      return true;
+    case ForceTarget::kBitSelectVariable:
+    case ForceTarget::kPartSelectVariable:
+    case ForceTarget::kUserDefinedNettypePartSelect:
+      return false;
   }
   return false;
 }
@@ -299,4 +300,4 @@ TEST(ForceRelease, NormativeExampleForceAndRelease_ForceAndRelease) {
   EXPECT_EQ(ValOf(*ve), kVal0);
 }
 
-} // namespace
+}  // namespace

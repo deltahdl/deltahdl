@@ -30,7 +30,7 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.9 -- General (attributes, identifiers)
@@ -54,8 +54,7 @@ TEST(ParserAnnexA, A9DefparamDecl) {
   EXPECT_FALSE(r.has_errors);
   bool found = false;
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kDefparam)
-      found = true;
+    if (item->kind == ModuleItemKind::kDefparam) found = true;
   }
   EXPECT_TRUE(found);
 }

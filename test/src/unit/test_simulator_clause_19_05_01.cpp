@@ -1,9 +1,11 @@
 // §19.5.1: Specifying bins for values
 
-#include "simulation/coverage.h"
 #include <gtest/gtest.h>
+
 #include <string>
 #include <vector>
+
+#include "simulation/coverage.h"
 
 using namespace delta;
 
@@ -42,7 +44,7 @@ TEST(Coverage, SampleHitsExplicitBin) {
   EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 1u);
 
   db.Sample(g, {{"val", 2}});
-  EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 1u); // No change.
+  EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 1u);  // No change.
 
   db.Sample(g, {{"val", 1}});
   EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 2u);
@@ -88,4 +90,4 @@ TEST(Coverage, AutoBinSmallRange) {
   EXPECT_EQ(cp->bins[0].values[0], 0);
 }
 
-} // namespace
+}  // namespace

@@ -1,11 +1,12 @@
 // §6.19: Enumerations
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -57,9 +58,10 @@ struct ModportPortExpected {
 namespace {
 
 TEST(Parser, TypedefEnum) {
-  auto r = Parse("module t;\n"
-                 "  typedef enum { A, B, C } state_t;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  typedef enum { A, B, C } state_t;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
@@ -71,9 +73,10 @@ TEST(Parser, TypedefEnum) {
 }
 
 TEST(Parser, EnumWithValues) {
-  auto r = Parse("module t;\n"
-                 "  typedef enum { IDLE=0, RUN=1, STOP=2 } cmd_t;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  typedef enum { IDLE=0, RUN=1, STOP=2 } cmd_t;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto &members = r.cu->modules[0]->items[0]->typedef_type.enum_members;
   std::string expected[] = {"IDLE", "RUN", "STOP"};
@@ -85,9 +88,10 @@ TEST(Parser, EnumWithValues) {
 }
 
 TEST(Parser, InlineEnumVar) {
-  auto r = Parse("module t;\n"
-                 "  enum { X, Y } my_var;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  enum { X, Y } my_var;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
@@ -96,4 +100,4 @@ TEST(Parser, InlineEnumVar) {
   ASSERT_EQ(item->data_type.enum_members.size(), 2);
 }
 
-} // namespace
+}  // namespace

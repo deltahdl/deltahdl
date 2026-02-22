@@ -1,8 +1,9 @@
 // §11.4.8: Bitwise operators
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/types.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -81,15 +82,15 @@ TEST(Types, Logic4WordNot) {
   Logic4Word x_val = {0, 1};
 
   auto r1 = Logic4Not(zero);
-  EXPECT_EQ(r1.aval, ~uint64_t(0)); // all 64 bits flip: 0->1
+  EXPECT_EQ(r1.aval, ~uint64_t(0));  // all 64 bits flip: 0->1
   EXPECT_EQ(r1.bval, 0);
 
   auto r2 = Logic4Not(one);
-  EXPECT_EQ(r2.aval, ~uint64_t(1)); // bit 0: 1->0, bits 1-63: 0->1
+  EXPECT_EQ(r2.aval, ~uint64_t(1));  // bit 0: 1->0, bits 1-63: 0->1
   EXPECT_EQ(r2.bval, 0);
 
   auto r3 = Logic4Not(x_val);
   EXPECT_NE(r3.bval, 0);
 }
 
-} // namespace
+}  // namespace

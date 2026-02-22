@@ -6,12 +6,9 @@
 
 uint64_t EvaluateRepeatCount(int64_t count, bool is_signed, bool is_unknown,
                              bool is_highz) {
-  if (is_unknown || is_highz)
-    return 0;
-  if (is_signed && count <= 0)
-    return 0;
-  if (!is_signed && count < 0)
-    return static_cast<uint64_t>(count);
+  if (is_unknown || is_highz) return 0;
+  if (is_signed && count <= 0) return 0;
+  if (!is_signed && count < 0) return static_cast<uint64_t>(count);
   return static_cast<uint64_t>(count);
 }
 
@@ -42,4 +39,4 @@ TEST(TimingControl, RepeatCountNegativeUnsignedExecutes) {
   EXPECT_GT(result, 0u);
 }
 
-} // namespace
+}  // namespace

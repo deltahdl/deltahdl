@@ -1,11 +1,13 @@
 // §non_lrm
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <string>
+
 #include "common/arena.h"
 #include "common/types.h"
 #include "simulation/adv_sim.h"
-#include <cstdint>
-#include <gtest/gtest.h>
-#include <string>
 
 using namespace delta;
 
@@ -70,4 +72,4 @@ TEST(AdvSim, EventCoalescerDrainClearsState) {
   EXPECT_TRUE(second.empty());
 }
 
-} // namespace
+}  // namespace

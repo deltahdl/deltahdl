@@ -32,8 +32,7 @@ ParseResult Parse(const std::string &src) {
 
 static Stmt *FirstInitialStmt(ParseResult &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock)
-      continue;
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
     }
@@ -42,7 +41,7 @@ static Stmt *FirstInitialStmt(ParseResult &r) {
   return nullptr;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.6.6 Conditional statements
@@ -57,9 +56,10 @@ static Stmt *FirstInitialStmt(ParseResult &r) {
 
 // §12.4: basic if statement — true branch only, no else
 TEST(ParserA606, IfOnly) {
-  auto r = Parse("module m;\n"
-                 "  initial begin if (a) x = 1; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin if (a) x = 1; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -72,9 +72,10 @@ TEST(ParserA606, IfOnly) {
 
 // §12.4: if-else statement
 TEST(ParserA606, IfElse) {
-  auto r = Parse("module m;\n"
-                 "  initial begin if (a) x = 1; else x = 0; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin if (a) x = 1; else x = 0; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -88,13 +89,14 @@ TEST(ParserA606, IfElse) {
 
 // §12.4.1: if-else-if chain with final else
 TEST(ParserA606, IfElseIfElse) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    if (a) x = 1;\n"
-                 "    else if (b) x = 2;\n"
-                 "    else x = 3;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (a) x = 1;\n"
+      "    else if (b) x = 2;\n"
+      "    else x = 3;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -110,13 +112,14 @@ TEST(ParserA606, IfElseIfElse) {
 
 // §12.4.1: multi-way if-else-if chain without final else
 TEST(ParserA606, IfElseIfNoFinalElse) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    if (a) x = 1;\n"
-                 "    else if (b) x = 2;\n"
-                 "    else if (c) x = 3;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (a) x = 1;\n"
+      "    else if (b) x = 2;\n"
+      "    else if (c) x = 3;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -132,9 +135,10 @@ TEST(ParserA606, IfElseIfNoFinalElse) {
 
 // §12.4: if with null statement_or_null (semicolon) for then branch
 TEST(ParserA606, IfNullThen) {
-  auto r = Parse("module m;\n"
-                 "  initial begin if (a) ; else x = 0; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin if (a) ; else x = 0; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -147,9 +151,10 @@ TEST(ParserA606, IfNullThen) {
 
 // §12.4: if with null else branch
 TEST(ParserA606, IfNullElse) {
-  auto r = Parse("module m;\n"
-                 "  initial begin if (a) x = 1; else ; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin if (a) x = 1; else ; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -161,17 +166,18 @@ TEST(ParserA606, IfNullElse) {
 
 // §12.4: if with begin-end block in both branches
 TEST(ParserA606, IfElseWithBlocks) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    if (cond) begin\n"
-                 "      x = 1;\n"
-                 "      y = 2;\n"
-                 "    end else begin\n"
-                 "      x = 3;\n"
-                 "      y = 4;\n"
-                 "    end\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (cond) begin\n"
+      "      x = 1;\n"
+      "      y = 2;\n"
+      "    end else begin\n"
+      "      x = 3;\n"
+      "      y = 4;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -185,13 +191,14 @@ TEST(ParserA606, IfElseWithBlocks) {
 
 // §12.4: dangling else associates with closest if
 TEST(ParserA606, DanglingElse) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    if (a)\n"
-                 "      if (b) x = 1;\n"
-                 "      else x = 2;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (a)\n"
+      "      if (b) x = 1;\n"
+      "      else x = 2;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -207,14 +214,15 @@ TEST(ParserA606, DanglingElse) {
 
 // §12.4: forced else association with begin-end
 TEST(ParserA606, ForcedElseWithBeginEnd) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    if (a) begin\n"
-                 "      if (b) x = 1;\n"
-                 "    end\n"
-                 "    else x = 2;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (a) begin\n"
+      "      if (b) x = 1;\n"
+      "    end\n"
+      "    else x = 2;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -234,12 +242,13 @@ TEST(ParserA606, ForcedElseWithBeginEnd) {
 
 // §12.4.2: unique if
 TEST(ParserA606, UniqueIf) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    unique if (a == 0) x = 1;\n"
-                 "    else if (a == 1) x = 2;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique if (a == 0) x = 1;\n"
+      "    else if (a == 1) x = 2;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -250,12 +259,13 @@ TEST(ParserA606, UniqueIf) {
 
 // §12.4.2: unique0 if
 TEST(ParserA606, Unique0If) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    unique0 if (a == 0) x = 1;\n"
-                 "    else if (a == 1) x = 2;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique0 if (a == 0) x = 1;\n"
+      "    else if (a == 1) x = 2;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -266,13 +276,14 @@ TEST(ParserA606, Unique0If) {
 
 // §12.4.2: priority if
 TEST(ParserA606, PriorityIf) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    priority if (a == 0) x = 1;\n"
-                 "    else if (a == 1) x = 2;\n"
-                 "    else x = 3;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    priority if (a == 0) x = 1;\n"
+      "    else if (a == 1) x = 2;\n"
+      "    else x = 3;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -283,14 +294,15 @@ TEST(ParserA606, PriorityIf) {
 
 // §12.4.2: unique if with else-if chain and final else
 TEST(ParserA606, UniqueIfElseIfElse) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    unique if (a == 0) x = 1;\n"
-                 "    else if (a == 1) x = 2;\n"
-                 "    else if (a == 2) x = 3;\n"
-                 "    else x = 4;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique if (a == 0) x = 1;\n"
+      "    else if (a == 1) x = 2;\n"
+      "    else if (a == 2) x = 3;\n"
+      "    else x = 4;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -310,11 +322,12 @@ TEST(ParserA606, UniqueIfElseIfElse) {
 
 // §12.6: cond_predicate with &&& operator
 TEST(ParserA606, CondPredicateTripleAnd) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    if (a &&& b) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (a &&& b) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -330,11 +343,12 @@ TEST(ParserA606, CondPredicateTripleAnd) {
 
 // §12.6: cond_pattern in if condition — expr matches constant
 TEST(ParserA606, CondPatternMatchesConstant) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    if (x matches 3) y = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (x matches 3) y = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -348,11 +362,12 @@ TEST(ParserA606, CondPatternMatchesConstant) {
 
 // §12.6: matches with &&& in cond_predicate
 TEST(ParserA606, CondPatternMatchesWithTripleAnd) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    if (x matches 5 &&& en) y = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (x matches 5 &&& en) y = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -367,16 +382,17 @@ TEST(ParserA606, CondPatternMatchesWithTripleAnd) {
 
 // §12.4: nested if inside begin-end
 TEST(ParserA606, NestedIfInBlock) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    if (a) begin\n"
-                 "      if (b) x = 1;\n"
-                 "      else x = 2;\n"
-                 "    end else begin\n"
-                 "      if (c) x = 3;\n"
-                 "    end\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (a) begin\n"
+      "      if (b) x = 1;\n"
+      "      else x = 2;\n"
+      "    end else begin\n"
+      "      if (c) x = 3;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -389,11 +405,12 @@ TEST(ParserA606, NestedIfInBlock) {
 
 // §12.4: complex condition expression
 TEST(ParserA606, ComplexCondExpression) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    if ((a > 0) && (b < 10) || c) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if ((a > 0) && (b < 10) || c) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -404,11 +421,12 @@ TEST(ParserA606, ComplexCondExpression) {
 
 // §12.4: if condition with function call
 TEST(ParserA606, IfCondFunctionCall) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    if ($unsigned(a) > 0) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if ($unsigned(a) > 0) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);

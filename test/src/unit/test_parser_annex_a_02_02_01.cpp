@@ -30,7 +30,7 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.2.2.1 Net and variable types
@@ -41,36 +41,40 @@ ParseResult Parse(const std::string &src) {
 
 TEST(ParserA221, CastingTypeSimpleInt) {
   // simple_type: integer_type cast
-  auto r = Parse("module m;\n"
-                 "  initial begin int x; x = int'(3.14); end\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin int x; x = int'(3.14); end\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA221, CastingTypeSigning) {
   // signing: signed'(val)
-  auto r = Parse("module m;\n"
-                 "  initial begin int x; x = signed'(8'hFF); end\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin int x; x = signed'(8'hFF); end\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA221, CastingTypeString) {
   // string: string'(val)
-  auto r = Parse("module m;\n"
-                 "  initial begin string s; s = string'(65); end\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin string s; s = string'(65); end\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA221, CastingTypeConst) {
   // const: const'(expr)
-  auto r = Parse("module m;\n"
-                 "  initial begin int x; x = const'(42); end\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin int x; x = const'(42); end\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -79,10 +83,11 @@ TEST(ParserA221, CastingTypeUserDefined) {
   // casting_type with user-defined type (simple_type: ps_type_identifier)
   // Note: constant_primary'(expr) cast (e.g., N'(val)) requires semantic
   // analysis to distinguish from sized literals — tested via type casts.
-  auto r = Parse("module m;\n"
-                 "  typedef logic [7:0] byte_t;\n"
-                 "  initial begin byte_t x; x = byte_t'(16'hFF); end\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  typedef logic [7:0] byte_t;\n"
+      "  initial begin byte_t x; x = byte_t'(16'hFF); end\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -123,10 +128,10 @@ TEST(ParserA221, DataTypeNonInteger) {
 // struct_union [packed [signing]] { ... } {packed_dimension}
 
 TEST(ParserA221, DataTypeStructPacked) {
-  auto r =
-      Parse("module m;\n"
-            "  struct packed signed { logic [7:0] a; logic [7:0] b; } pair;\n"
-            "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  struct packed signed { logic [7:0] a; logic [7:0] b; } pair;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -167,8 +172,9 @@ TEST(ParserA221, DataTypeChandle) {
 //   [. modport_identifier]
 
 TEST(ParserA221, DataTypeVirtualInterface) {
-  auto r = Parse("interface my_ifc; endinterface\n"
-                 "module m; virtual interface my_ifc vif; endmodule");
+  auto r = Parse(
+      "interface my_ifc; endinterface\n"
+      "module m; virtual interface my_ifc vif; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -179,13 +185,14 @@ TEST(ParserA221, DataTypeVirtualInterface) {
 // [class_scope | package_scope] type_identifier {packed_dimension}
 
 TEST(ParserA221, DataTypeScopedType) {
-  auto r = Parse("package pkg;\n"
-                 "  typedef int my_int_t;\n"
-                 "endpackage\n"
-                 "module m;\n"
-                 "  import pkg::*;\n"
-                 "  pkg::my_int_t x;\n"
-                 "endmodule");
+  auto r = Parse(
+      "package pkg;\n"
+      "  typedef int my_int_t;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import pkg::*;\n"
+      "  pkg::my_int_t x;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -193,10 +200,11 @@ TEST(ParserA221, DataTypeScopedType) {
 // class_type (ps_class_identifier [param] { :: class_identifier [param] })
 
 TEST(ParserA221, DataTypeClassType) {
-  auto r = Parse("class my_cls;\n"
-                 "  typedef int my_type;\n"
-                 "endclass\n"
-                 "module m; my_cls::my_type x; endmodule");
+  auto r = Parse(
+      "class my_cls;\n"
+      "  typedef int my_type;\n"
+      "endclass\n"
+      "module m; my_cls::my_type x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -215,10 +223,11 @@ TEST(ParserA221, DataTypeEvent) {
 TEST(ParserA221, DataTypeTypeReference) {
   // A.2.2.1: data_type ::= ... | type_reference
   // type(expr) used as data_type in a declaration (without 'var' prefix)
-  auto r = Parse("module m;\n"
-                 "  int a;\n"
-                 "  type(a) b;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  int a;\n"
+      "  type(a) b;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
@@ -272,10 +281,11 @@ TEST(ParserA221, EnumBaseVectorWithDim) {
 
 TEST(ParserA221, EnumBaseTypeIdentifier) {
   // enum type_identifier { ... }
-  auto r = Parse("module m;\n"
-                 "  typedef logic [3:0] nibble_t;\n"
-                 "  enum nibble_t {A, B} x;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  typedef logic [3:0] nibble_t;\n"
+      "  enum nibble_t {A, B} x;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -314,10 +324,11 @@ TEST(ParserA221, EnumNameWithRangeColon) {
 // class_type ::
 
 TEST(ParserA221, ClassScope) {
-  auto r = Parse("class base_cls;\n"
-                 "  typedef int inner_t;\n"
-                 "endclass\n"
-                 "module m; base_cls::inner_t x; endmodule");
+  auto r = Parse(
+      "class base_cls;\n"
+      "  typedef int inner_t;\n"
+      "endclass\n"
+      "module m; base_cls::inner_t x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -326,10 +337,11 @@ TEST(ParserA221, ClassScope) {
 // ps_class_identifier [param] { :: class_identifier [param] }
 
 TEST(ParserA221, ClassTypeParameterized) {
-  auto r = Parse("class param_cls #(type T = int);\n"
-                 "  typedef T value_t;\n"
-                 "endclass\n"
-                 "module m; param_cls#(int)::value_t x; endmodule");
+  auto r = Parse(
+      "class param_cls #(type T = int);\n"
+      "  typedef T value_t;\n"
+      "endclass\n"
+      "module m; param_cls#(int)::value_t x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -345,14 +357,15 @@ TEST(ParserA221, ClassTypeParameterized) {
 // byte | shortint | int | longint | integer | time
 
 TEST(ParserA221, IntegerAtomTypes) {
-  auto r = Parse("module m;\n"
-                 "  byte a;\n"
-                 "  shortint b;\n"
-                 "  int c;\n"
-                 "  longint d;\n"
-                 "  integer e;\n"
-                 "  time f;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  byte a;\n"
+      "  shortint b;\n"
+      "  int c;\n"
+      "  longint d;\n"
+      "  integer e;\n"
+      "  time f;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kByte);
@@ -368,11 +381,12 @@ TEST(ParserA221, IntegerAtomTypes) {
 // bit | logic | reg
 
 TEST(ParserA221, IntegerVectorTypes) {
-  auto r = Parse("module m;\n"
-                 "  bit a;\n"
-                 "  logic b;\n"
-                 "  reg c;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  bit a;\n"
+      "  logic b;\n"
+      "  reg c;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kBit);
@@ -384,11 +398,12 @@ TEST(ParserA221, IntegerVectorTypes) {
 // shortreal | real | realtime
 
 TEST(ParserA221, NonIntegerTypes) {
-  auto r = Parse("module m;\n"
-                 "  shortreal a;\n"
-                 "  real b;\n"
-                 "  realtime c;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  shortreal a;\n"
+      "  real b;\n"
+      "  realtime c;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind,
@@ -402,20 +417,21 @@ TEST(ParserA221, NonIntegerTypes) {
 // supply0|supply1|tri|triand|trior|trireg|tri0|tri1|uwire|wire|wand|wor
 
 TEST(ParserA221, NetTypeVariants) {
-  auto r = Parse("module m;\n"
-                 "  supply0 s0;\n"
-                 "  supply1 s1;\n"
-                 "  tri t;\n"
-                 "  triand ta;\n"
-                 "  trior to2;\n"
-                 "  trireg tr;\n"
-                 "  tri0 t0;\n"
-                 "  tri1 t1;\n"
-                 "  uwire uw;\n"
-                 "  wire w;\n"
-                 "  wand wa;\n"
-                 "  wor wo;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  supply0 s0;\n"
+      "  supply1 s1;\n"
+      "  tri t;\n"
+      "  triand ta;\n"
+      "  trior to2;\n"
+      "  trireg tr;\n"
+      "  tri0 t0;\n"
+      "  tri1 t1;\n"
+      "  uwire uw;\n"
+      "  wire w;\n"
+      "  wand wa;\n"
+      "  wor wo;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &items = r.cu->modules[0]->items;
@@ -497,18 +513,20 @@ TEST(ParserA221, SigningUnsigned) {
 // struct | union [soft | tagged]
 
 TEST(ParserA221, StructUnionStruct) {
-  auto r = Parse("module m;\n"
-                 "  struct { int a; int b; } s;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  struct { int a; int b; } s;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kStruct);
 }
 
 TEST(ParserA221, StructUnionUnionTagged) {
-  auto r = Parse("module m;\n"
-                 "  union tagged { int a; real b; } u;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  union tagged { int a; real b; } u;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -517,9 +535,10 @@ TEST(ParserA221, StructUnionUnionTagged) {
 }
 
 TEST(ParserA221, StructUnionUnionSoft) {
-  auto r = Parse("module m;\n"
-                 "  union soft { int a; real b; } u;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  union soft { int a; real b; } u;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -532,9 +551,10 @@ TEST(ParserA221, StructUnionUnionSoft) {
 //   list_of_variable_decl_assignments ;
 
 TEST(ParserA221, StructMemberBasic) {
-  auto r = Parse("module m;\n"
-                 "  struct { logic [7:0] data; int count; } s;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  struct { logic [7:0] data; int count; } s;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &members = r.cu->modules[0]->items[0]->data_type.struct_members;
@@ -545,9 +565,10 @@ TEST(ParserA221, StructMemberBasic) {
 
 TEST(ParserA221, StructMemberRand) {
   // random_qualifier: rand
-  auto r = Parse("module m;\n"
-                 "  struct { rand int a; int b; } s;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  struct { rand int a; int b; } s;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &members = r.cu->modules[0]->items[0]->data_type.struct_members;
@@ -558,9 +579,10 @@ TEST(ParserA221, StructMemberRand) {
 
 TEST(ParserA221, StructMemberRandc) {
   // random_qualifier: randc
-  auto r = Parse("module m;\n"
-                 "  struct { randc bit [7:0] x; } s;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  struct { randc bit [7:0] x; } s;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &members = r.cu->modules[0]->items[0]->data_type.struct_members;
@@ -570,9 +592,10 @@ TEST(ParserA221, StructMemberRandc) {
 
 TEST(ParserA221, StructMemberAttr) {
   // {attribute_instance} before struct member
-  auto r = Parse("module m;\n"
-                 "  struct { (* mark *) int a; int b; } s;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  struct { (* mark *) int a; int b; } s;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &members = r.cu->modules[0]->items[0]->data_type.struct_members;
@@ -586,9 +609,10 @@ TEST(ParserA221, StructMemberAttr) {
 
 TEST(ParserA221, DataTypeOrVoidReturn) {
   // void as function return type (data_type_or_void)
-  auto r = Parse("module m;\n"
-                 "  function void do_nothing; endfunction\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  function void do_nothing; endfunction\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -600,10 +624,11 @@ TEST(ParserA221, DataTypeOrVoidReturn) {
 
 TEST(ParserA221, TypeRefExpression) {
   // type(expression) in expression context
-  auto r = Parse("module m;\n"
-                 "  int a;\n"
-                 "  initial begin $display(\"%s\", $typename(type(a))); end\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  int a;\n"
+      "  initial begin $display(\"%s\", $typename(type(a))); end\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }

@@ -1,5 +1,7 @@
 // §7.2: Structures
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -11,7 +13,6 @@
 #include "lexer/lexer.h"
 #include "lexer/token.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -34,11 +35,12 @@ namespace {
 
 TEST(Elaboration, UnpackedStructMemberDefault_Allowed) {
   ElabFixture f;
-  ElaborateSrc("module top;\n"
-               "  struct { int a = 1; int b = 2; } s;\n"
-               "endmodule\n",
-               f);
+  ElaborateSrc(
+      "module top;\n"
+      "  struct { int a = 1; int b = 2; } s;\n"
+      "endmodule\n",
+      f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-} // namespace
+}  // namespace

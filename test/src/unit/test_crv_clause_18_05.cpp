@@ -1,13 +1,15 @@
 // §18.5: Constraint blocks
 
-#include "simulation/constraint_solver.h"
+#include <gtest/gtest.h>
+
 #include <algorithm>
 #include <cstdint>
-#include <gtest/gtest.h>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+
+#include "simulation/constraint_solver.h"
 
 using namespace delta;
 
@@ -141,8 +143,7 @@ TEST(Constraint, CustomConstraintCallback) {
   c.eval_fn = [](const std::unordered_map<std::string, int64_t> &vals) {
     auto ita = vals.find("a");
     auto itb = vals.find("b");
-    if (ita == vals.end() || itb == vals.end())
-      return true;
+    if (ita == vals.end() || itb == vals.end()) return true;
     return ita->second + itb->second <= 30;
   };
   block.constraints.push_back(c);
@@ -200,4 +201,4 @@ TEST(Constraint, LessThanConstraint) {
   EXPECT_LT(solver.GetValue("x"), 10);
 }
 
-} // namespace
+}  // namespace

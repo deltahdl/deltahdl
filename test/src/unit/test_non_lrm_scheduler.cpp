@@ -1,9 +1,10 @@
 // Non-LRM tests
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/types.h"
 #include "simulation/scheduler.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -30,8 +31,8 @@ TEST(EventPool, ReleaseAndReuse) {
   EXPECT_EQ(pool.FreeCount(), 1);
 
   Event *reused = pool.Acquire();
-  EXPECT_EQ(reused, ev);              // Same pointer returned
-  EXPECT_EQ(reused->target, nullptr); // Fields cleared
+  EXPECT_EQ(reused, ev);               // Same pointer returned
+  EXPECT_EQ(reused->target, nullptr);  // Fields cleared
   EXPECT_EQ(pool.FreeCount(), 0);
 }
 
@@ -67,4 +68,4 @@ TEST(Scheduler, EventPoolIntegration) {
   EXPECT_EQ(pool.FreeCount(), 1);
 }
 
-} // namespace
+}  // namespace

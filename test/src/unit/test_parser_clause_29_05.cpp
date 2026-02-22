@@ -27,18 +27,19 @@ static ParseResult Parse(const std::string &src) {
 }
 
 TEST(ParserSection29, UdpMultiple) {
-  auto r = Parse("primitive inv(output out, input in);\n"
-                 "  table\n"
-                 "    0 : 1;\n"
-                 "    1 : 0;\n"
-                 "  endtable\n"
-                 "endprimitive\n"
-                 "primitive buf2(output out, input in);\n"
-                 "  table\n"
-                 "    0 : 0;\n"
-                 "    1 : 1;\n"
-                 "  endtable\n"
-                 "endprimitive\n");
+  auto r = Parse(
+      "primitive inv(output out, input in);\n"
+      "  table\n"
+      "    0 : 1;\n"
+      "    1 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "primitive buf2(output out, input in);\n"
+      "  table\n"
+      "    0 : 0;\n"
+      "    1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->udps.size(), 2);
   EXPECT_EQ(r.cu->udps[0]->name, "inv");
@@ -46,14 +47,15 @@ TEST(ParserSection29, UdpMultiple) {
 }
 
 TEST(ParserSection29, UdpCoexistsWithModule) {
-  auto r = Parse("primitive inv(output out, input in);\n"
-                 "  table\n"
-                 "    0 : 1;\n"
-                 "    1 : 0;\n"
-                 "  endtable\n"
-                 "endprimitive\n"
-                 "module top;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "primitive inv(output out, input in);\n"
+      "  table\n"
+      "    0 : 1;\n"
+      "    1 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module top;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->udps.size(), 1);
   ASSERT_EQ(r.cu->modules.size(), 1);

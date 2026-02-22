@@ -1,13 +1,15 @@
 // §18.7: Inline constraints—randomize() with
 
-#include "simulation/constraint_solver.h"
+#include <gtest/gtest.h>
+
 #include <algorithm>
 #include <cstdint>
-#include <gtest/gtest.h>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+
+#include "simulation/constraint_solver.h"
 
 using namespace delta;
 
@@ -61,4 +63,4 @@ TEST(Constraint, InlineConstraintWithBlock) {
   EXPECT_LE(val, 60);
 }
 
-} // namespace
+}  // namespace

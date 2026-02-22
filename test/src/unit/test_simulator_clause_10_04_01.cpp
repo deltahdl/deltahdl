@@ -1,12 +1,13 @@
 // §10.4.1: Blocking procedural assignments
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "parser/ast.h"
 #include "simulation/compiled_sim.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -46,4 +47,4 @@ TEST(CompiledSim, ExecuteBlockingAssign) {
   EXPECT_EQ(x_var->value.ToUint64(), 42u);
 }
 
-} // namespace
+}  // namespace

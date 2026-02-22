@@ -28,10 +28,10 @@ TEST(SimCh4095, UnidirectionalEventProcessing) {
   auto *eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-    int result = input * 2; // Read input, compute result.
+    int result = input * 2;  // Read input, compute result.
     auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
-    update->callback = [&, result]() { output = result; }; // Schedule update.
+    update->callback = [&, result]() { output = result; };  // Schedule update.
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
   };
   sched.ScheduleEvent({0}, Region::kActive, eval);
@@ -222,8 +222,8 @@ TEST(SimCh4095, RelaxationTechnique) {
     do {
       prev_n1 = n1;
       prev_n2 = n2;
-      n1 = n0; // Switch propagation: n0 → n1.
-      n2 = n1; // Switch propagation: n1 → n2.
+      n1 = n0;  // Switch propagation: n0 → n1.
+      n2 = n1;  // Switch propagation: n1 → n2.
       ++iterations;
     } while (n1 != prev_n1 || n2 != prev_n2);
     auto *update = sched.GetEventPool().Acquire();
@@ -274,12 +274,9 @@ TEST(SimCh4095, IntermingledWithOtherActiveEvents) {
   bool has_gate = false;
   bool has_proc = false;
   for (const auto &s : order) {
-    if (s == "switch_process")
-      has_switch = true;
-    if (s == "gate_eval")
-      has_gate = true;
-    if (s == "proc_stmt")
-      has_proc = true;
+    if (s == "switch_process") has_switch = true;
+    if (s == "gate_eval") has_gate = true;
+    if (s == "proc_stmt") has_proc = true;
   }
   EXPECT_TRUE(has_switch);
   EXPECT_TRUE(has_gate);
@@ -299,19 +296,19 @@ TEST(SimCh4095, SteadyStateUniqueLevel) {
   //   gate=off: node_a=1, node_b=z (or undriven)
   // node_a has unique level (1) in all cases → steady-state = 1.
   int node_a_result = 0;
-  int gate_val = -1; // x represented as -1.
+  int gate_val = -1;  // x represented as -1.
 
   auto *eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
     // Solve all combinations for gate=x.
-    int result_gate_on = 1;  // node_a when gate conducts.
-    int result_gate_off = 1; // node_a when gate non-conducting.
+    int result_gate_on = 1;   // node_a when gate conducts.
+    int result_gate_off = 1;  // node_a when gate non-conducting.
     // node_a is 1 in both cases → unique → steady-state = 1.
     if (result_gate_on == result_gate_off) {
-      node_a_result = result_gate_on; // Unique level.
+      node_a_result = result_gate_on;  // Unique level.
     } else {
-      node_a_result = gate_val; // Ambiguous → x.
+      node_a_result = gate_val;  // Ambiguous → x.
     }
     auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
@@ -337,17 +334,17 @@ TEST(SimCh4095, SteadyStateAmbiguousX) {
   //   gate=off: node_b=0  (undriven, resolves to 0/z)
   // node_b has different values → steady-state = x.
   int node_b_result = 0;
-  int x_val = -1; // Represent 'x' as -1.
+  int x_val = -1;  // Represent 'x' as -1.
 
   auto *eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-    int result_gate_on = 1;  // node_b when gate conducts.
-    int result_gate_off = 0; // node_b when gate non-conducting.
+    int result_gate_on = 1;   // node_b when gate conducts.
+    int result_gate_off = 0;  // node_b when gate non-conducting.
     if (result_gate_on == result_gate_off) {
       node_b_result = result_gate_on;
     } else {
-      node_b_result = x_val; // Ambiguous → x.
+      node_b_result = x_val;  // Ambiguous → x.
     }
     auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
@@ -357,7 +354,7 @@ TEST(SimCh4095, SteadyStateAmbiguousX) {
   sched.ScheduleEvent({0}, Region::kActive, eval);
 
   sched.Run();
-  EXPECT_EQ(node_b_result, x_val); // Steady-state is x.
+  EXPECT_EQ(node_b_result, x_val);  // Steady-state is x.
 }
 
 // ---------------------------------------------------------------------------
@@ -368,7 +365,7 @@ TEST(SimCh4095, UserDefinedNetTypeSwitchOffForXZ) {
   Scheduler sched(arena);
   int udn_a = 5;
   int udn_b = 10;
-  int control = -1; // x represented as -1.
+  int control = -1;  // x represented as -1.
 
   // Model: bidirectional switch between user-defined nets udn_a and udn_b
   // with control=x. For UDN, x control → switch treated as off.
@@ -376,7 +373,7 @@ TEST(SimCh4095, UserDefinedNetTypeSwitchOffForXZ) {
   auto *eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-    bool switch_off = (control == -1 || control == -2); // x or z → off.
+    bool switch_off = (control == -1 || control == -2);  // x or z → off.
     auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     if (switch_off) {
@@ -392,6 +389,6 @@ TEST(SimCh4095, UserDefinedNetTypeSwitchOffForXZ) {
 
   sched.Run();
   // Switch was off (control=x) → nets resolved separately.
-  EXPECT_EQ(udn_a, 5);  // Unchanged.
-  EXPECT_EQ(udn_b, 10); // Unchanged — no signal flow.
+  EXPECT_EQ(udn_a, 5);   // Unchanged.
+  EXPECT_EQ(udn_b, 10);  // Unchanged — no signal flow.
 }

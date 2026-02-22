@@ -14,7 +14,7 @@ using namespace delta;
 namespace {
 
 struct SpecifyParseTest : ::testing::Test {
-protected:
+ protected:
   CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
@@ -39,9 +39,9 @@ TEST_F(SpecifyParseTest, EmptySpecifyBlock) {
 }
 
 TEST_F(SpecifyParseTest, SpecifyBlockWithTimingCheck) {
-  auto *unit =
-      Parse("module m; specify $setup(data, posedge clk, 10); endspecify "
-            "endmodule");
+  auto *unit = Parse(
+      "module m; specify $setup(data, posedge clk, 10); endspecify "
+      "endmodule");
   ASSERT_EQ(unit->modules.size(), 1u);
   auto &items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
@@ -59,4 +59,4 @@ TEST_F(SpecifyParseTest, SpecifyBlockCoexistsWithOtherItems) {
   EXPECT_EQ(items[2]->kind, ModuleItemKind::kContAssign);
 }
 
-} // namespace
+}  // namespace

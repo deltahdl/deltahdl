@@ -1,5 +1,9 @@
 // §7.2: Structures
 
+#include <gtest/gtest.h>
+
+#include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -9,8 +13,6 @@
 #include "simulation/eval.h"
 #include "simulation/eval_array.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
-#include <string>
 
 using namespace delta;
 
@@ -45,8 +47,8 @@ TEST(StructType, RegisterAndFind_Metadata) {
   info.type_name = "point_t";
   info.is_packed = true;
   info.total_width = 16;
-  info.fields.push_back({"x", 8, 8}); // MSB field: bits [15:8]
-  info.fields.push_back({"y", 0, 8}); // LSB field: bits [7:0]
+  info.fields.push_back({"x", 8, 8});  // MSB field: bits [15:8]
+  info.fields.push_back({"y", 0, 8});  // LSB field: bits [7:0]
 
   f.ctx.RegisterStructType("point_t", info);
   auto *found = f.ctx.FindStructType("point_t");
@@ -120,4 +122,4 @@ TEST(StructType, FieldTypeKindPreserved) {
   EXPECT_EQ(found->fields[1].type_kind, DataTypeKind::kByte);
 }
 
-} // namespace
+}  // namespace

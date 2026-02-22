@@ -1,10 +1,11 @@
 // §6.6.2: Unresolved nets
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "simulation/net.h"
 #include "simulation/scheduler.h"
 #include "simulation/variable.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -127,4 +128,4 @@ TEST(NetResolution, ResolveEmptyDrivers) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-} // namespace
+}  // namespace

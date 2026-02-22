@@ -1,5 +1,7 @@
 // §13.4: Functions
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -12,7 +14,6 @@
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
 #include "simulation/variable.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -37,14 +38,15 @@ namespace {
 
 TEST(Lowerer, FunctionCallReturnsValue) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  function int add(input int a, input int b);\n"
-                              "    return a + b;\n"
-                              "  endfunction\n"
-                              "  logic [31:0] x;\n"
-                              "  initial x = add(10, 32);\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  function int add(input int a, input int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "  logic [31:0] x;\n"
+      "  initial x = add(10, 32);\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -56,4 +58,4 @@ TEST(Lowerer, FunctionCallReturnsValue) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-} // namespace
+}  // namespace

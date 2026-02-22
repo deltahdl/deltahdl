@@ -27,13 +27,14 @@ static ParseResult Parse(const std::string &src) {
 }
 
 TEST(ParserSection29, SequentialUdpInitial) {
-  auto r = Parse("primitive srff(output reg q, input s, r);\n"
-                 "  initial q = 1'b1;\n"
-                 "  table\n"
-                 "    1 0 : ? : 1;\n"
-                 "    0 1 : ? : 0;\n"
-                 "  endtable\n"
-                 "endprimitive\n");
+  auto r = Parse(
+      "primitive srff(output reg q, input s, r);\n"
+      "  initial q = 1'b1;\n"
+      "  table\n"
+      "    1 0 : ? : 1;\n"
+      "    0 1 : ? : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->udps.size(), 1);
   auto *udp = r.cu->udps[0];

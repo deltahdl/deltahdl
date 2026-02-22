@@ -1,11 +1,12 @@
 // §26.2: Package declarations
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -57,9 +58,10 @@ TEST(Parser, EmptyPackage) {
 }
 
 TEST(Parser, PackageWithParam) {
-  auto r = Parse("package my_pkg;\n"
-                 "  parameter int WIDTH = 8;\n"
-                 "endpackage\n");
+  auto r = Parse(
+      "package my_pkg;\n"
+      "  parameter int WIDTH = 8;\n"
+      "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->packages.size(), 1);
   ASSERT_EQ(r.cu->packages[0]->items.size(), 1);
@@ -67,8 +69,9 @@ TEST(Parser, PackageWithParam) {
 }
 
 TEST(Parser, PackageAndModule) {
-  auto r = Parse("package pkg; endpackage\n"
-                 "module top; endmodule\n");
+  auto r = Parse(
+      "package pkg; endpackage\n"
+      "module top; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->packages.size(), 1);
   ASSERT_EQ(r.cu->modules.size(), 1);
@@ -76,4 +79,4 @@ TEST(Parser, PackageAndModule) {
   EXPECT_EQ(r.cu->modules[0]->name, "top");
 }
 
-} // namespace
+}  // namespace

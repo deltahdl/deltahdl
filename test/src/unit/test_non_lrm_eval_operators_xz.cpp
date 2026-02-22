@@ -1,5 +1,9 @@
 // Non-LRM tests
 
+#include <gtest/gtest.h>
+
+#include <cstring>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -7,8 +11,6 @@
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
-#include <cstring>
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -95,8 +97,7 @@ static std::string VecToStr(const Logic4Vec &vec) {
 static Variable *MakeStringVar(EvalOpXZFixture &f, std::string_view name,
                                std::string_view value) {
   uint32_t width = static_cast<uint32_t>(value.size()) * 8;
-  if (width == 0)
-    width = 8;
+  if (width == 0) width = 8;
   auto *var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4Vec(f.arena, width);
   for (size_t i = 0; i < value.size(); ++i) {
@@ -117,7 +118,7 @@ namespace {
 TEST(EvalOpXZ, InsideXOperand) {
   EvalOpXZFixture f;
   // x inside {3, 5, 7} → x (unknown operand, no definite match)
-  MakeVar4(f, "ix", 4, 0b0000, 0b0100); // 4'b0x00
+  MakeVar4(f, "ix", 4, 0b0000, 0b0100);  // 4'b0x00
 
   auto *inside = f.arena.Create<Expr>();
   inside->kind = ExprKind::kInside;
@@ -148,13 +149,13 @@ TEST(EvalOpXZ, RelationalLtX) {
 TEST(EvalOpXZ, RelationalGtZ) {
   EvalOpXZFixture f;
   // 4'b10z0 > 4'b1000 → x (Z operand)
-  MakeVar4(f, "gz", 4, 0b1000, 0b0010); // bit1=z
+  MakeVar4(f, "gz", 4, 0b1000, 0b0010);  // bit1=z
   auto *b = f.ctx.CreateVariable("g8", 4);
   b->value = MakeLogic4VecVal(f.arena, 4, 0b1000);
   auto *expr = MakeBinary(f.arena, TokenKind::kGt, MakeId(f.arena, "gz"),
                           MakeId(f.arena, "g8"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_NE(result.words[0].bval, 0u); // result is X
+  EXPECT_NE(result.words[0].bval, 0u);  // result is X
 }
 
 TEST(EvalOpXZ, RelationalKnownStillWorks) {
@@ -197,13 +198,13 @@ TEST(EvalOpXZ, LogicalNeqX) {
 TEST(EvalOpXZ, WildcardEqLeftX) {
   EvalOpXZFixture f;
   // §11.4.6: 4'bx001 ==? 4'b0001 → x (left X in non-wildcard position)
-  MakeVar4(f, "wl", 4, 0b0001, 0b1000); // bit3=x
+  MakeVar4(f, "wl", 4, 0b0001, 0b1000);  // bit3=x
   auto *b = f.ctx.CreateVariable("wr", 4);
   b->value = MakeLogic4VecVal(f.arena, 4, 0b0001);
   auto *expr = MakeBinary(f.arena, TokenKind::kEqEqQuestion,
                           MakeId(f.arena, "wl"), MakeId(f.arena, "wr"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_NE(result.words[0].bval, 0u); // result is X
+  EXPECT_NE(result.words[0].bval, 0u);  // result is X
 }
 
 TEST(EvalOpXZ, CaseEqStillExact) {
@@ -298,7 +299,7 @@ TEST(EvalOpXZ, LogicalOrXX) {
 TEST(EvalOpXZ, ShiftXAmount) {
   EvalOpXZFixture f;
   // 4'b1100 << x → all-X
-  MakeVar4(f, "sa", 4, 0b0000, 0b0100); // x shift amount
+  MakeVar4(f, "sa", 4, 0b0000, 0b0100);  // x shift amount
   auto *a = f.ctx.CreateVariable("sv", 4);
   a->value = MakeLogic4VecVal(f.arena, 4, 0b1100);
   auto *expr = MakeBinary(f.arena, TokenKind::kLtLt, MakeId(f.arena, "sv"),
@@ -310,7 +311,7 @@ TEST(EvalOpXZ, ShiftXAmount) {
 TEST(EvalOpXZ, ShiftLeftXOperand) {
   EvalOpXZFixture f;
   // 4'b1x00 << 1 → 4'bx000 (bval should shift with aval)
-  MakeVar4(f, "so", 4, 0b1000, 0b0100); // 4'b1x00
+  MakeVar4(f, "so", 4, 0b1000, 0b0100);  // 4'b1x00
   auto *expr = MakeBinary(f.arena, TokenKind::kLtLt, MakeId(f.arena, "so"),
                           MakeInt(f.arena, 1));
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -325,7 +326,7 @@ TEST(EvalOpXZ, ShiftLeftXOperand) {
 TEST(EvalOpXZ, TernaryZCond) {
   EvalOpXZFixture f;
   // z ? 4'b1100 : 4'b1010 → same as x condition (bit-by-bit combine)
-  MakeVar4(f, "tz", 1, 0, 1); // 1'bz (aval=0, bval=1)
+  MakeVar4(f, "tz", 1, 0, 1);  // 1'bz (aval=0, bval=1)
   auto *tv = f.ctx.CreateVariable("zt", 4);
   tv->value = MakeLogic4VecVal(f.arena, 4, 0b1100);
   auto *fv = f.ctx.CreateVariable("zf", 4);
@@ -344,7 +345,7 @@ TEST(EvalOpXZ, TernaryZCond) {
 TEST(EvalOpXZ, TernaryXCondSame) {
   EvalOpXZFixture f;
   // x ? 5 : 5 → 5 (both branches same → known result)
-  MakeVar4(f, "tc", 1, 0, 1); // 1'bx
+  MakeVar4(f, "tc", 1, 0, 1);  // 1'bx
   auto *ternary = f.arena.Create<Expr>();
   ternary->kind = ExprKind::kTernary;
   ternary->condition = MakeId(f.arena, "tc");
@@ -358,7 +359,7 @@ TEST(EvalOpXZ, TernaryXCondSame) {
 TEST(EvalOpXZ, TernaryXCondDiff) {
   EvalOpXZFixture f;
   // x ? 4'b1100 : 4'b1010 → 4'b1x0x (matching bits kept, differing → X)
-  MakeVar4(f, "td", 1, 0, 1); // 1'bx
+  MakeVar4(f, "td", 1, 0, 1);  // 1'bx
   auto *tv = f.ctx.CreateVariable("tt", 4);
   tv->value = MakeLogic4VecVal(f.arena, 4, 0b1100);
   auto *fv = f.ctx.CreateVariable("tf", 4);
@@ -385,48 +386,48 @@ TEST(EvalOpXZ, TernaryXCondDiff) {
 TEST(EvalOpXZ, ReductionAndWithX) {
   EvalOpXZFixture f;
   // &4'b1x11 → x (not all bits known-1)
-  MakeVar4(f, "ra", 4, 0b1011, 0b0100); // bit2=x
+  MakeVar4(f, "ra", 4, 0b1011, 0b0100);  // bit2=x
   auto *expr = MakeUnary(f.arena, TokenKind::kAmp, MakeId(f.arena, "ra"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_NE(result.words[0].bval, 0u); // result is X
+  EXPECT_NE(result.words[0].bval, 0u);  // result is X
 }
 
 TEST(EvalOpXZ, ReductionAndWithKnown0) {
   EvalOpXZFixture f;
   // &4'b0x11 → 0 (known-0 bit forces result to 0)
-  MakeVar4(f, "rb", 4, 0b0011, 0b0100); // bit3=0, bit2=x
+  MakeVar4(f, "rb", 4, 0b0011, 0b0100);  // bit3=0, bit2=x
   auto *expr = MakeUnary(f.arena, TokenKind::kAmp, MakeId(f.arena, "rb"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.words[0].aval, 0u);
-  EXPECT_EQ(result.words[0].bval, 0u); // known-0
+  EXPECT_EQ(result.words[0].bval, 0u);  // known-0
 }
 
 TEST(EvalOpXZ, ReductionOrWithKnown1) {
   EvalOpXZFixture f;
   // |4'b1x00 → 1 (known-1 bit forces result to 1)
-  MakeVar4(f, "rc", 4, 0b1000, 0b0100); // bit3=1, bit2=x
+  MakeVar4(f, "rc", 4, 0b1000, 0b0100);  // bit3=1, bit2=x
   auto *expr = MakeUnary(f.arena, TokenKind::kPipe, MakeId(f.arena, "rc"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.words[0].aval, 1u);
-  EXPECT_EQ(result.words[0].bval, 0u); // known-1
+  EXPECT_EQ(result.words[0].bval, 0u);  // known-1
 }
 
 TEST(EvalOpXZ, ReductionOrWithX) {
   EvalOpXZFixture f;
   // |4'b0x00 → x (no known-1, but X could be 1)
-  MakeVar4(f, "rd", 4, 0b0000, 0b0100); // all 0 except bit2=x
+  MakeVar4(f, "rd", 4, 0b0000, 0b0100);  // all 0 except bit2=x
   auto *expr = MakeUnary(f.arena, TokenKind::kPipe, MakeId(f.arena, "rd"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_NE(result.words[0].bval, 0u); // result is X
+  EXPECT_NE(result.words[0].bval, 0u);  // result is X
 }
 
 TEST(EvalOpXZ, ReductionXorWithX) {
   EvalOpXZFixture f;
   // ^4'b1x10 → x (any X/Z in XOR → X)
-  MakeVar4(f, "re", 4, 0b1010, 0b0100); // bit2=x
+  MakeVar4(f, "re", 4, 0b1010, 0b0100);  // bit2=x
   auto *expr = MakeUnary(f.arena, TokenKind::kCaret, MakeId(f.arena, "re"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_NE(result.words[0].bval, 0u); // result is X
+  EXPECT_NE(result.words[0].bval, 0u);  // result is X
 }
 
 // ==========================================================================
@@ -435,7 +436,7 @@ TEST(EvalOpXZ, ReductionXorWithX) {
 TEST(EvalOpXZ, ArithAddX) {
   EvalOpXZFixture f;
   // 4'b1x00 + 4'b0001 → all-X (any X/Z operand)
-  MakeVar4(f, "ax", 4, 0b1000, 0b0100); // 4'b1x00
+  MakeVar4(f, "ax", 4, 0b1000, 0b0100);  // 4'b1x00
   auto *b = f.ctx.CreateVariable("a1", 4);
   b->value = MakeLogic4VecVal(f.arena, 4, 1);
 
@@ -568,7 +569,7 @@ TEST(EvalOpXZ, ImplFF) {
 TEST(EvalOpXZ, ImplXT) {
   EvalOpXZFixture f;
   // x -> 1 = 1 (since !x || 1 = 1 regardless of x)
-  MakeVar4(f, "ix1", 1, 0, 1); // 1'bx
+  MakeVar4(f, "ix1", 1, 0, 1);  // 1'bx
   MakeVar4(f, "ix2", 1, 1, 0);
   auto *expr = MakeBinary(f.arena, TokenKind::kArrow, MakeId(f.arena, "ix1"),
                           MakeId(f.arena, "ix2"));
@@ -580,12 +581,12 @@ TEST(EvalOpXZ, ImplXT) {
 TEST(EvalOpXZ, ImplXF) {
   EvalOpXZFixture f;
   // x -> 0 = x (since !x || 0 = !x, and !x is x when x is unknown)
-  MakeVar4(f, "ix1", 1, 0, 1); // 1'bx
+  MakeVar4(f, "ix1", 1, 0, 1);  // 1'bx
   MakeVar4(f, "ix2", 1, 0, 0);
   auto *expr = MakeBinary(f.arena, TokenKind::kArrow, MakeId(f.arena, "ix1"),
                           MakeId(f.arena, "ix2"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_NE(result.words[0].bval, 0u); // result is x
+  EXPECT_NE(result.words[0].bval, 0u);  // result is x
 }
 
 TEST(EvalOpXZ, EquivSame) {
@@ -613,12 +614,12 @@ TEST(EvalOpXZ, EquivDiff) {
 TEST(EvalOpXZ, EquivX) {
   EvalOpXZFixture f;
   // x <-> 1 = x
-  MakeVar4(f, "ex1", 1, 0, 1); // 1'bx
+  MakeVar4(f, "ex1", 1, 0, 1);  // 1'bx
   MakeVar4(f, "ex2", 1, 1, 0);
   auto *expr = MakeBinary(f.arena, TokenKind::kLtDashGt, MakeId(f.arena, "ex1"),
                           MakeId(f.arena, "ex2"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_NE(result.words[0].bval, 0u); // result is x
+  EXPECT_NE(result.words[0].bval, 0u);  // result is x
 }
 
 // ==========================================================================
@@ -629,9 +630,9 @@ TEST(EvalOpXZ, MinTypMaxDefaultTyp) {
   // Default delay mode is typ — should return middle expression.
   auto *mtm = f.arena.Create<Expr>();
   mtm->kind = ExprKind::kMinTypMax;
-  mtm->lhs = MakeInt(f.arena, 10);       // min
-  mtm->condition = MakeInt(f.arena, 20); // typ
-  mtm->rhs = MakeInt(f.arena, 30);       // max
+  mtm->lhs = MakeInt(f.arena, 10);        // min
+  mtm->condition = MakeInt(f.arena, 20);  // typ
+  mtm->rhs = MakeInt(f.arena, 30);        // max
   auto result = EvalExpr(mtm, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 20u);
 }
@@ -668,14 +669,14 @@ TEST(EvalOpXZ, BitSelectXAddr) {
   // v[x] should return 1'bx when index is unknown.
   auto *v = f.ctx.CreateVariable("bsv", 8);
   v->value = MakeLogic4VecVal(f.arena, 8, 0xAB);
-  MakeVar4(f, "bsi", 4, 0, 1); // 4'bx (unknown index)
+  MakeVar4(f, "bsi", 4, 0, 1);  // 4'bx (unknown index)
   auto *sel = f.arena.Create<Expr>();
   sel->kind = ExprKind::kSelect;
   sel->base = MakeId(f.arena, "bsv");
   sel->index = MakeId(f.arena, "bsi");
   auto result = EvalExpr(sel, f.ctx, f.arena);
   EXPECT_EQ(result.width, 1u);
-  EXPECT_NE(result.words[0].bval, 0u); // result is x
+  EXPECT_NE(result.words[0].bval, 0u);  // result is x
 }
 
 TEST(EvalOpXZ, PartSelectXAddr) {
@@ -683,7 +684,7 @@ TEST(EvalOpXZ, PartSelectXAddr) {
   // v[x +: 4] should return all-x when base index is unknown.
   auto *v = f.ctx.CreateVariable("psv", 8);
   v->value = MakeLogic4VecVal(f.arena, 8, 0xAB);
-  MakeVar4(f, "psi", 4, 0, 1); // unknown index
+  MakeVar4(f, "psi", 4, 0, 1);  // unknown index
   auto *sel = f.arena.Create<Expr>();
   sel->kind = ExprKind::kSelect;
   sel->base = MakeId(f.arena, "psv");
@@ -692,7 +693,7 @@ TEST(EvalOpXZ, PartSelectXAddr) {
   sel->is_part_select_plus = true;
   auto result = EvalExpr(sel, f.ctx, f.arena);
   EXPECT_EQ(result.width, 4u);
-  EXPECT_NE(result.words[0].bval, 0u); // result has x bits
+  EXPECT_NE(result.words[0].bval, 0u);  // result has x bits
 }
 
 // ==========================================================================
@@ -812,7 +813,7 @@ TEST(EvalOpXZ, ArithSubX) {
 TEST(EvalOpXZ, ArithMulZ) {
   EvalOpXZFixture f;
   // 4'b10z0 * 3 → all-X (Z operand in multiply)
-  MakeVar4(f, "mz", 4, 0b1000, 0b0010); // bit1=z (aval=0,bval=1)
+  MakeVar4(f, "mz", 4, 0b1000, 0b0010);  // bit1=z (aval=0,bval=1)
   auto *b = f.ctx.CreateVariable("m3", 4);
   b->value = MakeLogic4VecVal(f.arena, 4, 3);
   auto *expr = MakeBinary(f.arena, TokenKind::kStar, MakeId(f.arena, "mz"),
@@ -878,4 +879,4 @@ TEST(EvalOpXZ, IdentifierStringPropagation) {
   EXPECT_TRUE(result.is_string);
 }
 
-} // namespace
+}  // namespace

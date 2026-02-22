@@ -32,8 +32,7 @@ ParseResult Parse(const std::string &src) {
 
 static Stmt *FirstInitialStmt(ParseResult &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock)
-      continue;
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
     }
@@ -44,8 +43,7 @@ static Stmt *FirstInitialStmt(ParseResult &r) {
 
 static Stmt *InitialBody(ParseResult &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock)
-      continue;
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
     return item->body;
   }
   return nullptr;
@@ -53,13 +51,12 @@ static Stmt *InitialBody(ParseResult &r) {
 
 static ModuleItem *FirstFunctionDecl(ParseResult &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kFunctionDecl)
-      return item;
+    if (item->kind == ModuleItemKind::kFunctionDecl) return item;
   }
   return nullptr;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.6.4 Statements
@@ -71,11 +68,12 @@ static ModuleItem *FirstFunctionDecl(ParseResult &r) {
 
 // §12.3: null statement (just semicolon)
 TEST(ParserA604, NullStatement) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    ;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    ;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *body = InitialBody(r);
@@ -87,11 +85,12 @@ TEST(ParserA604, NullStatement) {
 
 // §12.3: null statement with attribute instance
 TEST(ParserA604, NullStatementWithAttribute) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    (* synthesis *) ;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    (* synthesis *) ;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *body = InitialBody(r);
@@ -105,13 +104,14 @@ TEST(ParserA604, NullStatementWithAttribute) {
 
 // §12.3: multiple null statements
 TEST(ParserA604, MultipleNullStatements) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    ;\n"
-                 "    ;\n"
-                 "    ;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    ;\n"
+      "    ;\n"
+      "    ;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *body = InitialBody(r);
@@ -128,11 +128,12 @@ TEST(ParserA604, MultipleNullStatements) {
 
 // §9.3.5: statement with block_identifier label
 TEST(ParserA604, StatementWithLabel) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    my_label: a = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    my_label: a = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -143,11 +144,12 @@ TEST(ParserA604, StatementWithLabel) {
 
 // §12.3: statement with attribute instance
 TEST(ParserA604, StatementWithAttribute) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    (* full_case *) a = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    (* full_case *) a = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -159,11 +161,12 @@ TEST(ParserA604, StatementWithAttribute) {
 
 // §12.3: statement with attribute having value
 TEST(ParserA604, StatementWithAttributeValue) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    (* weight = 10 *) a = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    (* weight = 10 *) a = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -175,11 +178,12 @@ TEST(ParserA604, StatementWithAttributeValue) {
 
 // §12.3: statement with multiple attributes
 TEST(ParserA604, StatementWithMultipleAttributes) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    (* foo, bar *) a = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    (* foo, bar *) a = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -191,11 +195,12 @@ TEST(ParserA604, StatementWithMultipleAttributes) {
 
 // §12.3: statement with label AND attribute
 TEST(ParserA604, StatementWithLabelAndAttribute) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    lbl: (* mark *) a = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    lbl: (* mark *) a = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -214,11 +219,12 @@ TEST(ParserA604, StatementWithLabelAndAttribute) {
 
 // §10.4.1: blocking_assignment ;
 TEST(ParserA604, StmtItemBlockingAssignment) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -228,11 +234,12 @@ TEST(ParserA604, StmtItemBlockingAssignment) {
 
 // §10.4.2: nonblocking_assignment ;
 TEST(ParserA604, StmtItemNonblockingAssignment) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    x <= 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    x <= 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -242,11 +249,12 @@ TEST(ParserA604, StmtItemNonblockingAssignment) {
 
 // §10.6.1: procedural_continuous_assignment (assign)
 TEST(ParserA604, StmtItemProceduralContinuousAssignment) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    assign x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    assign x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -256,14 +264,15 @@ TEST(ParserA604, StmtItemProceduralContinuousAssignment) {
 
 // §12.5: case_statement
 TEST(ParserA604, StmtItemCaseStatement) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    case (x)\n"
-                 "      1: a = 1;\n"
-                 "      default: a = 0;\n"
-                 "    endcase\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case (x)\n"
+      "      1: a = 1;\n"
+      "      default: a = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -273,11 +282,12 @@ TEST(ParserA604, StmtItemCaseStatement) {
 
 // §12.4: conditional_statement (if-else)
 TEST(ParserA604, StmtItemConditionalStatement) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    if (x) a = 1; else a = 0;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (x) a = 1; else a = 0;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -287,11 +297,12 @@ TEST(ParserA604, StmtItemConditionalStatement) {
 
 // §13: subroutine_call_statement
 TEST(ParserA604, StmtItemSubroutineCallStatement) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    $display(\"hello\");\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    $display(\"hello\");\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -301,11 +312,12 @@ TEST(ParserA604, StmtItemSubroutineCallStatement) {
 
 // §9.6.2: disable_statement
 TEST(ParserA604, StmtItemDisableStatement) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    disable my_block;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    disable my_block;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -315,11 +327,12 @@ TEST(ParserA604, StmtItemDisableStatement) {
 
 // §15.5.1: event_trigger (->)
 TEST(ParserA604, StmtItemEventTrigger) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    -> my_event;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    -> my_event;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -329,11 +342,12 @@ TEST(ParserA604, StmtItemEventTrigger) {
 
 // §12.7: loop_statement (for)
 TEST(ParserA604, StmtItemLoopStatement) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    for (int i = 0; i < 10; i++) a = i;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 10; i++) a = i;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -343,13 +357,14 @@ TEST(ParserA604, StmtItemLoopStatement) {
 
 // §12.8: jump_statement (break)
 TEST(ParserA604, StmtItemJumpStatementBreak) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    forever begin\n"
-                 "      break;\n"
-                 "    end\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    forever begin\n"
+      "      break;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *body = InitialBody(r);
@@ -364,13 +379,14 @@ TEST(ParserA604, StmtItemJumpStatementBreak) {
 
 // §12.8: jump_statement (continue)
 TEST(ParserA604, StmtItemJumpStatementContinue) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    forever begin\n"
-                 "      continue;\n"
-                 "    end\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    forever begin\n"
+      "      continue;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *body = InitialBody(r);
@@ -383,11 +399,12 @@ TEST(ParserA604, StmtItemJumpStatementContinue) {
 
 // §12.8: jump_statement (return)
 TEST(ParserA604, StmtItemJumpStatementReturn) {
-  auto r = Parse("module m;\n"
-                 "  function void f();\n"
-                 "    return;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function void f();\n"
+      "    return;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *func = FirstFunctionDecl(r);
@@ -398,13 +415,14 @@ TEST(ParserA604, StmtItemJumpStatementReturn) {
 
 // §9.3.2: par_block (fork-join)
 TEST(ParserA604, StmtItemParBlock) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      a = 1;\n"
-                 "    join\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -414,11 +432,12 @@ TEST(ParserA604, StmtItemParBlock) {
 
 // §9.4: procedural_timing_control_statement (delay)
 TEST(ParserA604, StmtItemProceduralTimingControlDelay) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    #10 a = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    #10 a = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -428,11 +447,12 @@ TEST(ParserA604, StmtItemProceduralTimingControlDelay) {
 
 // §9.4.2: procedural_timing_control_statement (event control)
 TEST(ParserA604, StmtItemProceduralTimingControlEvent) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @(posedge clk) a = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge clk) a = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -442,13 +462,14 @@ TEST(ParserA604, StmtItemProceduralTimingControlEvent) {
 
 // §9.3.1: seq_block (begin-end)
 TEST(ParserA604, StmtItemSeqBlock) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    begin\n"
-                 "      a = 1;\n"
-                 "    end\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    begin\n"
+      "      a = 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -458,11 +479,12 @@ TEST(ParserA604, StmtItemSeqBlock) {
 
 // §9.4.3: wait_statement
 TEST(ParserA604, StmtItemWaitStatement) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    wait (done) a = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    wait (done) a = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -472,11 +494,12 @@ TEST(ParserA604, StmtItemWaitStatement) {
 
 // §16.3: procedural_assertion_statement (assert)
 TEST(ParserA604, StmtItemProceduralAssertionStatement) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    assert (x == 1);\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    assert (x == 1);\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -486,14 +509,15 @@ TEST(ParserA604, StmtItemProceduralAssertionStatement) {
 
 // §18.16: randcase_statement
 TEST(ParserA604, StmtItemRandcaseStatement) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    randcase\n"
-                 "      1: a = 1;\n"
-                 "      1: a = 2;\n"
-                 "    endcase\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    randcase\n"
+      "      1: a = 1;\n"
+      "      1: a = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -503,11 +527,12 @@ TEST(ParserA604, StmtItemRandcaseStatement) {
 
 // §15.5.1: nonblocking event trigger (->>)
 TEST(ParserA604, StmtItemNonblockingEventTrigger) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    ->> my_event;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    ->> my_event;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -517,11 +542,12 @@ TEST(ParserA604, StmtItemNonblockingEventTrigger) {
 
 // §10.6.1: procedural deassign
 TEST(ParserA604, StmtItemProceduralDeassign) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    deassign x;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    deassign x;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -531,11 +557,12 @@ TEST(ParserA604, StmtItemProceduralDeassign) {
 
 // §10.6.2: force statement
 TEST(ParserA604, StmtItemForceStatement) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    force x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    force x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -545,11 +572,12 @@ TEST(ParserA604, StmtItemForceStatement) {
 
 // §10.6.2: release statement
 TEST(ParserA604, StmtItemReleaseStatement) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    release x;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    release x;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -564,11 +592,12 @@ TEST(ParserA604, StmtItemReleaseStatement) {
 
 // §13: function_statement — regular statement in function body
 TEST(ParserA604, FunctionStatement) {
-  auto r = Parse("module m;\n"
-                 "  function void f();\n"
-                 "    a = 1;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function void f();\n"
+      "    a = 1;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *func = FirstFunctionDecl(r);
@@ -579,11 +608,12 @@ TEST(ParserA604, FunctionStatement) {
 
 // §13: function_statement_or_null — null statement in function body
 TEST(ParserA604, FunctionStatementOrNullWithNull) {
-  auto r = Parse("module m;\n"
-                 "  function void f();\n"
-                 "    ;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function void f();\n"
+      "    ;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *func = FirstFunctionDecl(r);
@@ -594,11 +624,12 @@ TEST(ParserA604, FunctionStatementOrNullWithNull) {
 
 // §13: function_statement with label
 TEST(ParserA604, FunctionStatementWithLabel) {
-  auto r = Parse("module m;\n"
-                 "  function void f();\n"
-                 "    step1: a = 1;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function void f();\n"
+      "    step1: a = 1;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *func = FirstFunctionDecl(r);
@@ -609,11 +640,12 @@ TEST(ParserA604, FunctionStatementWithLabel) {
 
 // §13: function_statement with attribute
 TEST(ParserA604, FunctionStatementWithAttribute) {
-  auto r = Parse("module m;\n"
-                 "  function void f();\n"
-                 "    (* inline *) a = 1;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function void f();\n"
+      "    (* inline *) a = 1;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *func = FirstFunctionDecl(r);
@@ -625,13 +657,14 @@ TEST(ParserA604, FunctionStatementWithAttribute) {
 
 // §13: multiple function statements including null
 TEST(ParserA604, FunctionBodyMultipleStatements) {
-  auto r = Parse("module m;\n"
-                 "  function void f();\n"
-                 "    a = 1;\n"
-                 "    ;\n"
-                 "    b = 2;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function void f();\n"
+      "    a = 1;\n"
+      "    ;\n"
+      "    b = 2;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *func = FirstFunctionDecl(r);

@@ -20,4 +20,4 @@ TEST(TimingControl, WaitConditionNonzeroIsTrue) {
   EXPECT_TRUE(EvaluateWaitCondition(42));
 }
 
-} // namespace
+}  // namespace

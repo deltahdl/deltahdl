@@ -38,15 +38,13 @@ static uint64_t RunAndGet(const std::string &src, const char *var_name) {
   SimCh50901Fixture f;
   auto *design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
-  if (!design)
-    return 0;
+  if (!design) return 0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
   auto *var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
-  if (!var)
-    return 0;
+  if (!var) return 0;
   return var->value.ToUint64();
 }
 

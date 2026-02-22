@@ -1,11 +1,13 @@
 // §39.5: Control functions
 
-#include "simulation/dpi_runtime.h"
-#include "vpi/sv_vpi_user.h"
-#include <cstdint>
 #include <gtest/gtest.h>
+
+#include <cstdint>
 #include <string>
 #include <vector>
+
+#include "simulation/dpi_runtime.h"
+#include "vpi/sv_vpi_user.h"
 
 using namespace delta;
 
@@ -55,4 +57,4 @@ TEST(SvVpiUser, RegisterAssertionCbReturnsNull) {
   EXPECT_EQ(result, nullptr);
 }
 
-} // namespace
+}  // namespace

@@ -44,9 +44,10 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabFixture &f) {
 }
 
 TEST(ParserSection28, PassGateTran) {
-  auto r = Parse("module m;\n"
-                 "  tran (a, b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  tran (a, b);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
@@ -55,9 +56,10 @@ TEST(ParserSection28, PassGateTran) {
 }
 
 TEST(ParserSection28, MosSwitchNmos) {
-  auto r = Parse("module m;\n"
-                 "  nmos n1(out, data, control);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  nmos n1(out, data, control);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->gate_kind, GateKind::kNmos);
@@ -66,9 +68,10 @@ TEST(ParserSection28, MosSwitchNmos) {
 }
 
 TEST(ParserSection28, CmosSwitchCmos) {
-  auto r = Parse("module m;\n"
-                 "  cmos c1(out, data, ncontrol, pcontrol);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  cmos c1(out, data, ncontrol, pcontrol);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->gate_kind, GateKind::kCmos);
@@ -78,11 +81,12 @@ TEST(ParserSection28, CmosSwitchCmos) {
 
 TEST(ParserSection28, ElaboratePulldownGate) {
   ElabFixture f;
-  auto *design = ElaborateSrc("module top;\n"
-                              "  wire out;\n"
-                              "  pulldown (out);\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module top;\n"
+      "  wire out;\n"
+      "  pulldown (out);\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   auto *mod = design->top_modules[0];
   ASSERT_GE(mod->assigns.size(), 1);

@@ -36,13 +36,14 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimCh10Fixture &f) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, SimpleBlockingAssign) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  int a;\n"
-                              "  initial begin\n"
-                              "    a = 5;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  int a;\n"
+      "  initial begin\n"
+      "    a = 5;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -59,14 +60,15 @@ TEST(SimCh10, SimpleBlockingAssign) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, SequentialBlockingImmediate) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  int a, b;\n"
-                              "  initial begin\n"
-                              "    a = 1;\n"
-                              "    b = a + 1;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  int a, b;\n"
+      "  initial begin\n"
+      "    a = 1;\n"
+      "    b = a + 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -83,13 +85,14 @@ TEST(SimCh10, SequentialBlockingImmediate) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignExpression) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  int a;\n"
-                              "  initial begin\n"
-                              "    a = 3 * 4 + 1;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  int a;\n"
+      "  initial begin\n"
+      "    a = 3 * 4 + 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -106,14 +109,15 @@ TEST(SimCh10, BlockingAssignExpression) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignBitSelect) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] a;\n"
-                              "  initial begin\n"
-                              "    a = 8'h00;\n"
-                              "    a[0] = 1;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  initial begin\n"
+      "    a = 8'h00;\n"
+      "    a[0] = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -130,14 +134,15 @@ TEST(SimCh10, BlockingAssignBitSelect) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignPartSelect) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] a;\n"
-                              "  initial begin\n"
-                              "    a = 8'h00;\n"
-                              "    a[3:0] = 4'hF;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  initial begin\n"
+      "    a = 8'h00;\n"
+      "    a[3:0] = 4'hF;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -154,16 +159,17 @@ TEST(SimCh10, BlockingAssignPartSelect) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignSplitPacked) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [15:0] packed_val;\n"
-                              "  logic [7:0] hi, lo;\n"
-                              "  initial begin\n"
-                              "    packed_val = 16'hDEAD;\n"
-                              "    hi = packed_val[15:8];\n"
-                              "    lo = packed_val[7:0];\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] packed_val;\n"
+      "  logic [7:0] hi, lo;\n"
+      "  initial begin\n"
+      "    packed_val = 16'hDEAD;\n"
+      "    hi = packed_val[15:8];\n"
+      "    lo = packed_val[7:0];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -183,16 +189,17 @@ TEST(SimCh10, BlockingAssignSplitPacked) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignConcatRHS) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] a, b;\n"
-                              "  logic [15:0] c;\n"
-                              "  initial begin\n"
-                              "    a = 8'hCA;\n"
-                              "    b = 8'hFE;\n"
-                              "    c = {a, b};\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  logic [15:0] c;\n"
+      "  initial begin\n"
+      "    a = 8'hCA;\n"
+      "    b = 8'hFE;\n"
+      "    c = {a, b};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -209,14 +216,15 @@ TEST(SimCh10, BlockingAssignConcatRHS) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignTernary) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  int sel, result;\n"
-                              "  initial begin\n"
-                              "    sel = 1;\n"
-                              "    result = sel ? 42 : 99;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  int sel, result;\n"
+      "  initial begin\n"
+      "    sel = 1;\n"
+      "    result = sel ? 42 : 99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -233,17 +241,18 @@ TEST(SimCh10, BlockingAssignTernary) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignIfElse) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  int x, y;\n"
-                              "  initial begin\n"
-                              "    x = 10;\n"
-                              "    if (x == 10)\n"
-                              "      y = 1;\n"
-                              "    else\n"
-                              "      y = 0;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  int x, y;\n"
+      "  initial begin\n"
+      "    x = 10;\n"
+      "    if (x == 10)\n"
+      "      y = 1;\n"
+      "    else\n"
+      "      y = 0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -260,20 +269,21 @@ TEST(SimCh10, BlockingAssignIfElse) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignCase) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [1:0] sel;\n"
-                              "  int result;\n"
-                              "  initial begin\n"
-                              "    sel = 2;\n"
-                              "    case (sel)\n"
-                              "      0: result = 10;\n"
-                              "      1: result = 20;\n"
-                              "      2: result = 30;\n"
-                              "      default: result = 0;\n"
-                              "    endcase\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [1:0] sel;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    sel = 2;\n"
+      "    case (sel)\n"
+      "      0: result = 10;\n"
+      "      1: result = 20;\n"
+      "      2: result = 30;\n"
+      "      default: result = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -290,17 +300,18 @@ TEST(SimCh10, BlockingAssignCase) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignForLoop) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  int sum;\n"
-                              "  int i;\n"
-                              "  initial begin\n"
-                              "    sum = 0;\n"
-                              "    for (i = 1; i <= 5; i = i + 1) begin\n"
-                              "      sum = sum + i;\n"
-                              "    end\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  int sum;\n"
+      "  int i;\n"
+      "  initial begin\n"
+      "    sum = 0;\n"
+      "    for (i = 1; i <= 5; i = i + 1) begin\n"
+      "      sum = sum + i;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -318,17 +329,18 @@ TEST(SimCh10, BlockingAssignForLoop) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignBeginEnd) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  int a, b, c;\n"
-                              "  initial begin\n"
-                              "    begin\n"
-                              "      a = 10;\n"
-                              "      b = 20;\n"
-                              "      c = a + b;\n"
-                              "    end\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  int a, b, c;\n"
+      "  initial begin\n"
+      "    begin\n"
+      "      a = 10;\n"
+      "      b = 20;\n"
+      "      c = a + b;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -345,16 +357,17 @@ TEST(SimCh10, BlockingAssignBeginEnd) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignFunctionCall) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  function integer add(integer a, integer b);\n"
-                              "    return a + b;\n"
-                              "  endfunction\n"
-                              "  int result;\n"
-                              "  initial begin\n"
-                              "    result = add(7, 3);\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  function integer add(integer a, integer b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    result = add(7, 3);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -371,13 +384,14 @@ TEST(SimCh10, BlockingAssignFunctionCall) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignSysClog2) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  int result;\n"
-                              "  initial begin\n"
-                              "    result = $clog2(256);\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    result = $clog2(256);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -395,16 +409,17 @@ TEST(SimCh10, BlockingAssignSysClog2) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignUnaryOps) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  int a;\n"
-                              "  int r_not, r_bang;\n"
-                              "  initial begin\n"
-                              "    a = 0;\n"
-                              "    r_not = !a;\n"
-                              "    r_bang = !5;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  int a;\n"
+      "  int r_not, r_bang;\n"
+      "  initial begin\n"
+      "    a = 0;\n"
+      "    r_not = !a;\n"
+      "    r_bang = !5;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -426,15 +441,16 @@ TEST(SimCh10, BlockingAssignUnaryOps) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignUnaryLogicalNotAndMinus) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  int a, neg_result, not_result;\n"
-                              "  initial begin\n"
-                              "    a = 5;\n"
-                              "    neg_result = -a;\n"
-                              "    not_result = !a;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  int a, neg_result, not_result;\n"
+      "  initial begin\n"
+      "    a = 5;\n"
+      "    neg_result = -a;\n"
+      "    not_result = !a;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -458,16 +474,17 @@ TEST(SimCh10, BlockingAssignUnaryLogicalNotAndMinus) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignArithmeticOps) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  int r_add, r_sub, r_mul, r_div;\n"
-                              "  initial begin\n"
-                              "    r_add = 10 + 3;\n"
-                              "    r_sub = 10 - 3;\n"
-                              "    r_mul = 10 * 3;\n"
-                              "    r_div = 10 / 3;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  int r_add, r_sub, r_mul, r_div;\n"
+      "  initial begin\n"
+      "    r_add = 10 + 3;\n"
+      "    r_sub = 10 - 3;\n"
+      "    r_mul = 10 * 3;\n"
+      "    r_div = 10 / 3;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -493,18 +510,19 @@ TEST(SimCh10, BlockingAssignArithmeticOps) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignBitwiseOps) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  int a, b;\n"
-                              "  int r_and, r_or, r_xor;\n"
-                              "  initial begin\n"
-                              "    a = 240;\n"
-                              "    b = 60;\n"
-                              "    r_and = a & b;\n"
-                              "    r_or  = a | b;\n"
-                              "    r_xor = a ^ b;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  int a, b;\n"
+      "  int r_and, r_or, r_xor;\n"
+      "  initial begin\n"
+      "    a = 240;\n"
+      "    b = 60;\n"
+      "    r_and = a & b;\n"
+      "    r_or  = a | b;\n"
+      "    r_xor = a ^ b;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -530,16 +548,17 @@ TEST(SimCh10, BlockingAssignBitwiseOps) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignShiftOps) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] a;\n"
-                              "  logic [7:0] r_shl, r_shr;\n"
-                              "  initial begin\n"
-                              "    a = 8'h0F;\n"
-                              "    r_shl = a << 2;\n"
-                              "    r_shr = a >> 2;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic [7:0] r_shl, r_shr;\n"
+      "  initial begin\n"
+      "    a = 8'h0F;\n"
+      "    r_shl = a << 2;\n"
+      "    r_shr = a >> 2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -561,21 +580,22 @@ TEST(SimCh10, BlockingAssignShiftOps) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignComparisonOps) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  int a, b;\n"
-                              "  int r_eq, r_ne, r_lt, r_gt, r_le, r_ge;\n"
-                              "  initial begin\n"
-                              "    a = 10;\n"
-                              "    b = 20;\n"
-                              "    r_eq = (a == b);\n"
-                              "    r_ne = (a != b);\n"
-                              "    r_lt = (a < b);\n"
-                              "    r_gt = (a > b);\n"
-                              "    r_le = (a <= b);\n"
-                              "    r_ge = (a >= b);\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  int a, b;\n"
+      "  int r_eq, r_ne, r_lt, r_gt, r_le, r_ge;\n"
+      "  initial begin\n"
+      "    a = 10;\n"
+      "    b = 20;\n"
+      "    r_eq = (a == b);\n"
+      "    r_ne = (a != b);\n"
+      "    r_lt = (a < b);\n"
+      "    r_gt = (a > b);\n"
+      "    r_le = (a <= b);\n"
+      "    r_ge = (a >= b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -594,12 +614,12 @@ TEST(SimCh10, BlockingAssignComparisonOps) {
   ASSERT_NE(r_gt, nullptr);
   ASSERT_NE(r_le, nullptr);
   ASSERT_NE(r_ge, nullptr);
-  EXPECT_EQ(r_eq->value.ToUint64(), 0u); // 10 == 20 -> false
-  EXPECT_EQ(r_ne->value.ToUint64(), 1u); // 10 != 20 -> true
-  EXPECT_EQ(r_lt->value.ToUint64(), 1u); // 10 < 20  -> true
-  EXPECT_EQ(r_gt->value.ToUint64(), 0u); // 10 > 20  -> false
-  EXPECT_EQ(r_le->value.ToUint64(), 1u); // 10 <= 20 -> true
-  EXPECT_EQ(r_ge->value.ToUint64(), 0u); // 10 >= 20 -> false
+  EXPECT_EQ(r_eq->value.ToUint64(), 0u);  // 10 == 20 -> false
+  EXPECT_EQ(r_ne->value.ToUint64(), 1u);  // 10 != 20 -> true
+  EXPECT_EQ(r_lt->value.ToUint64(), 1u);  // 10 < 20  -> true
+  EXPECT_EQ(r_gt->value.ToUint64(), 0u);  // 10 > 20  -> false
+  EXPECT_EQ(r_le->value.ToUint64(), 1u);  // 10 <= 20 -> true
+  EXPECT_EQ(r_ge->value.ToUint64(), 0u);  // 10 >= 20 -> false
 }
 
 // ---------------------------------------------------------------------------
@@ -607,17 +627,18 @@ TEST(SimCh10, BlockingAssignComparisonOps) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignLogicalOps) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  int a, b;\n"
-                              "  int r_and, r_or;\n"
-                              "  initial begin\n"
-                              "    a = 1;\n"
-                              "    b = 0;\n"
-                              "    r_and = a && b;\n"
-                              "    r_or  = a || b;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  int a, b;\n"
+      "  int r_and, r_or;\n"
+      "  initial begin\n"
+      "    a = 1;\n"
+      "    b = 0;\n"
+      "    r_and = a && b;\n"
+      "    r_or  = a || b;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -628,8 +649,8 @@ TEST(SimCh10, BlockingAssignLogicalOps) {
   auto *r_or = f.ctx.FindVariable("r_or");
   ASSERT_NE(r_and, nullptr);
   ASSERT_NE(r_or, nullptr);
-  EXPECT_EQ(r_and->value.ToUint64(), 0u); // 1 && 0 = 0
-  EXPECT_EQ(r_or->value.ToUint64(), 1u);  // 1 || 0 = 1
+  EXPECT_EQ(r_and->value.ToUint64(), 0u);  // 1 && 0 = 0
+  EXPECT_EQ(r_or->value.ToUint64(), 1u);   // 1 || 0 = 1
 }
 
 // ---------------------------------------------------------------------------
@@ -637,15 +658,16 @@ TEST(SimCh10, BlockingAssignLogicalOps) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignLastWins) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  int x;\n"
-                              "  initial begin\n"
-                              "    x = 1;\n"
-                              "    x = 2;\n"
-                              "    x = 3;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    x = 1;\n"
+      "    x = 2;\n"
+      "    x = 3;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -662,15 +684,16 @@ TEST(SimCh10, BlockingAssignLastWins) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignChain) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  int a, b, c;\n"
-                              "  initial begin\n"
-                              "    a = 1;\n"
-                              "    b = a;\n"
-                              "    c = b;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  int a, b, c;\n"
+      "  initial begin\n"
+      "    a = 1;\n"
+      "    b = a;\n"
+      "    c = b;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -693,15 +716,16 @@ TEST(SimCh10, BlockingAssignChain) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignTypeCast) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  int result;\n"
-                              "  initial begin\n"
-                              "    x = 8'hFF;\n"
-                              "    result = signed'(x);\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    x = 8'hFF;\n"
+      "    result = signed'(x);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -719,13 +743,14 @@ TEST(SimCh10, BlockingAssignTypeCast) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignTruncation) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [3:0] narrow;\n"
-                              "  initial begin\n"
-                              "    narrow = 8'hFF;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] narrow;\n"
+      "  initial begin\n"
+      "    narrow = 8'hFF;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -744,13 +769,14 @@ TEST(SimCh10, BlockingAssignTruncation) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, VerifyWidthAndToUint64_8bit) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] val;\n"
-                              "  initial begin\n"
-                              "    val = 8'hAB;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] val;\n"
+      "  initial begin\n"
+      "    val = 8'hAB;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -768,13 +794,14 @@ TEST(SimCh10, VerifyWidthAndToUint64_8bit) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, VerifyWidthAndToUint64_32bit) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  int val;\n"
-                              "  initial begin\n"
-                              "    val = 32'hDEADBEEF;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  int val;\n"
+      "  initial begin\n"
+      "    val = 32'hDEADBEEF;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -792,14 +819,15 @@ TEST(SimCh10, VerifyWidthAndToUint64_32bit) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignTernaryFalse) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  int sel, result;\n"
-                              "  initial begin\n"
-                              "    sel = 0;\n"
-                              "    result = sel ? 42 : 99;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  int sel, result;\n"
+      "  initial begin\n"
+      "    sel = 0;\n"
+      "    result = sel ? 42 : 99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -816,13 +844,14 @@ TEST(SimCh10, BlockingAssignTernaryFalse) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignModulo) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  int result;\n"
-                              "  initial begin\n"
-                              "    result = 17 % 5;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    result = 17 % 5;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -840,14 +869,15 @@ TEST(SimCh10, BlockingAssignModulo) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignUnaryPlus) {
   SimCh10Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  int a, result;\n"
-                              "  initial begin\n"
-                              "    a = 42;\n"
-                              "    result = +a;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  int a, result;\n"
+      "  initial begin\n"
+      "    a = 42;\n"
+      "    result = +a;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);

@@ -34,8 +34,7 @@ static ModuleItem *FirstItem(ParseResult4b &r) {
 
 static Stmt *FirstInitialStmt(ParseResult4b &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock)
-      continue;
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
     }
@@ -58,8 +57,7 @@ static ModuleItem *FirstAlwaysItem(ParseResult4b &r) {
 
 static ModuleItem *FindItemByKind(ParseResult4b &r, ModuleItemKind kind) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind == kind)
-      return item;
+    if (item->kind == kind) return item;
   }
   return nullptr;
 }
@@ -85,10 +83,11 @@ static ModuleItem *FindInitialBlock(ParseResult4b &r) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_BlockingAssignInAlways) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b;\n"
-                 "  always @(b) a = b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  always @(b) a = b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -105,10 +104,11 @@ TEST(ParserSection4, Sec4_5_BlockingAssignInAlways) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_NonblockingAssignInAlways) {
-  auto r = Parse("module m;\n"
-                 "  reg q, d, clk;\n"
-                 "  always @(posedge clk) q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg q, d, clk;\n"
+      "  always @(posedge clk) q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -124,11 +124,12 @@ TEST(ParserSection4, Sec4_5_NonblockingAssignInAlways) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_ContinuousAssign) {
-  auto r = Parse("module m;\n"
-                 "  wire y;\n"
-                 "  wire a, b;\n"
-                 "  assign y = a & b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  wire y;\n"
+      "  wire a, b;\n"
+      "  assign y = a & b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *ca = FindContAssign(r);
@@ -142,12 +143,13 @@ TEST(ParserSection4, Sec4_5_ContinuousAssign) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_ZeroDelayControl) {
-  auto r = Parse("module m;\n"
-                 "  reg a;\n"
-                 "  initial begin\n"
-                 "    #0 a = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a;\n"
+      "  initial begin\n"
+      "    #0 a = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -162,12 +164,13 @@ TEST(ParserSection4, Sec4_5_ZeroDelayControl) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_UnitDelayControl) {
-  auto r = Parse("module m;\n"
-                 "  reg a;\n"
-                 "  initial begin\n"
-                 "    #1 a = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a;\n"
+      "  initial begin\n"
+      "    #1 a = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -182,13 +185,14 @@ TEST(ParserSection4, Sec4_5_UnitDelayControl) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_MultipleNonblockingAssigns) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b, c, d;\n"
-                 "  initial begin\n"
-                 "    a <= b;\n"
-                 "    c <= d;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b, c, d;\n"
+      "  initial begin\n"
+      "    a <= b;\n"
+      "    c <= d;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *init_item = FindInitialBlock(r);
@@ -205,13 +209,14 @@ TEST(ParserSection4, Sec4_5_MultipleNonblockingAssigns) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_MixBlockingNonblocking) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b, c, d;\n"
-                 "  initial begin\n"
-                 "    a = b;\n"
-                 "    c <= d;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b, c, d;\n"
+      "  initial begin\n"
+      "    a = b;\n"
+      "    c <= d;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *init_item = FindInitialBlock(r);
@@ -228,11 +233,12 @@ TEST(ParserSection4, Sec4_5_MixBlockingNonblocking) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_DisplaySystemCall) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    $display(\"hello\");\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    $display(\"hello\");\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -248,12 +254,13 @@ TEST(ParserSection4, Sec4_5_DisplaySystemCall) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_MonitorSystemCall) {
-  auto r = Parse("module m;\n"
-                 "  reg a;\n"
-                 "  initial begin\n"
-                 "    $monitor(\"a=%b\", a);\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a;\n"
+      "  initial begin\n"
+      "    $monitor(\"a=%b\", a);\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -269,12 +276,13 @@ TEST(ParserSection4, Sec4_5_MonitorSystemCall) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_StrobeSystemCall) {
-  auto r = Parse("module m;\n"
-                 "  reg a;\n"
-                 "  initial begin\n"
-                 "    $strobe(\"a=%b\", a);\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a;\n"
+      "  initial begin\n"
+      "    $strobe(\"a=%b\", a);\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -290,12 +298,13 @@ TEST(ParserSection4, Sec4_5_StrobeSystemCall) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_PosedgeEventControl) {
-  auto r = Parse("module m;\n"
-                 "  reg clk, a;\n"
-                 "  initial begin\n"
-                 "    @(posedge clk) a = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, a;\n"
+      "  initial begin\n"
+      "    @(posedge clk) a = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -311,12 +320,13 @@ TEST(ParserSection4, Sec4_5_PosedgeEventControl) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_NegedgeEventControl) {
-  auto r = Parse("module m;\n"
-                 "  reg clk, a;\n"
-                 "  initial begin\n"
-                 "    @(negedge clk) a = 0;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, a;\n"
+      "  initial begin\n"
+      "    @(negedge clk) a = 0;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -332,12 +342,13 @@ TEST(ParserSection4, Sec4_5_NegedgeEventControl) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_StarEventControl) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b;\n"
-                 "  initial begin\n"
-                 "    @* a = b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial begin\n"
+      "    @* a = b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -352,12 +363,13 @@ TEST(ParserSection4, Sec4_5_StarEventControl) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_ParenStarEventControl) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b;\n"
-                 "  initial begin\n"
-                 "    @(*) a = b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial begin\n"
+      "    @(*) a = b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -372,12 +384,13 @@ TEST(ParserSection4, Sec4_5_ParenStarEventControl) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_WaitStatement) {
-  auto r = Parse("module m;\n"
-                 "  reg done, a;\n"
-                 "  initial begin\n"
-                 "    wait (done) a = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg done, a;\n"
+      "  initial begin\n"
+      "    wait (done) a = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -392,15 +405,16 @@ TEST(ParserSection4, Sec4_5_WaitStatement) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_ForkJoin) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      #10 a = 1;\n"
-                 "      #20 b = 1;\n"
-                 "    join\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      #10 a = 1;\n"
+      "      #20 b = 1;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -415,15 +429,16 @@ TEST(ParserSection4, Sec4_5_ForkJoin) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_ForkJoinAny) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      #10 a = 1;\n"
-                 "      #20 b = 1;\n"
-                 "    join_any\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      #10 a = 1;\n"
+      "      #20 b = 1;\n"
+      "    join_any\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -437,15 +452,16 @@ TEST(ParserSection4, Sec4_5_ForkJoinAny) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_ForkJoinNone) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b;\n"
-                 "  initial begin\n"
-                 "    fork\n"
-                 "      #10 a = 1;\n"
-                 "      #20 b = 1;\n"
-                 "    join_none\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      #10 a = 1;\n"
+      "      #20 b = 1;\n"
+      "    join_none\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -459,10 +475,11 @@ TEST(ParserSection4, Sec4_5_ForkJoinNone) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_AlwaysComb) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b, c;\n"
-                 "  always_comb a = b & c;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b, c;\n"
+      "  always_comb a = b & c;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -477,10 +494,11 @@ TEST(ParserSection4, Sec4_5_AlwaysComb) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_AlwaysFF) {
-  auto r = Parse("module m;\n"
-                 "  reg q, d, clk;\n"
-                 "  always_ff @(posedge clk) q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg q, d, clk;\n"
+      "  always_ff @(posedge clk) q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -496,11 +514,12 @@ TEST(ParserSection4, Sec4_5_AlwaysFF) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_AlwaysLatch) {
-  auto r = Parse("module m;\n"
-                 "  reg q, d, en;\n"
-                 "  always_latch\n"
-                 "    if (en) q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg q, d, en;\n"
+      "  always_latch\n"
+      "    if (en) q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -515,13 +534,14 @@ TEST(ParserSection4, Sec4_5_AlwaysLatch) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_InitialBlockWithDelays) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b;\n"
-                 "  initial begin\n"
-                 "    #5 a = 1;\n"
-                 "    #10 b = 0;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial begin\n"
+      "    #5 a = 1;\n"
+      "    #10 b = 0;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *init_item = FindInitialBlock(r);
@@ -538,11 +558,12 @@ TEST(ParserSection4, Sec4_5_InitialBlockWithDelays) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_FinalBlock) {
-  auto r = Parse("module m;\n"
-                 "  final begin\n"
-                 "    $display(\"simulation done\");\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  final begin\n"
+      "    $display(\"simulation done\");\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -556,11 +577,12 @@ TEST(ParserSection4, Sec4_5_FinalBlock) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_ProgramBlock) {
-  auto r = Parse("program test_prog;\n"
-                 "  initial begin\n"
-                 "    $display(\"reactive region\");\n"
-                 "  end\n"
-                 "endprogram\n");
+  auto r = Parse(
+      "program test_prog;\n"
+      "  initial begin\n"
+      "    $display(\"reactive region\");\n"
+      "  end\n"
+      "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->programs.size(), 1u);
@@ -575,12 +597,13 @@ TEST(ParserSection4, Sec4_5_ProgramBlock) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_AssertImmediate) {
-  auto r = Parse("module m;\n"
-                 "  reg a;\n"
-                 "  initial begin\n"
-                 "    assert (a == 1);\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a;\n"
+      "  initial begin\n"
+      "    assert (a == 1);\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -594,11 +617,12 @@ TEST(ParserSection4, Sec4_5_AssertImmediate) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_ContinuousAssignWithDelay) {
-  auto r = Parse("module m;\n"
-                 "  wire y;\n"
-                 "  wire a, b;\n"
-                 "  assign #5 y = a & b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  wire y;\n"
+      "  wire a, b;\n"
+      "  assign #5 y = a & b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *ca = FindContAssign(r);
@@ -615,12 +639,13 @@ TEST(ParserSection4, Sec4_5_ContinuousAssignWithDelay) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_NonblockingAssignWithDelay) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b;\n"
-                 "  initial begin\n"
-                 "    a <= #2 b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial begin\n"
+      "    a <= #2 b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -636,12 +661,13 @@ TEST(ParserSection4, Sec4_5_NonblockingAssignWithDelay) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_BlockingIntraAssignDelay) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b;\n"
-                 "  initial begin\n"
-                 "    a = #5 b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial begin\n"
+      "    a = #5 b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -657,15 +683,16 @@ TEST(ParserSection4, Sec4_5_BlockingIntraAssignDelay) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_MultipleEventControlInAlways) {
-  auto r = Parse("module m;\n"
-                 "  reg clk, rst, a;\n"
-                 "  always @(posedge clk or negedge rst) begin\n"
-                 "    if (!rst)\n"
-                 "      a <= 0;\n"
-                 "    else\n"
-                 "      a <= 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, rst, a;\n"
+      "  always @(posedge clk or negedge rst) begin\n"
+      "    if (!rst)\n"
+      "      a <= 0;\n"
+      "    else\n"
+      "      a <= 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -680,11 +707,12 @@ TEST(ParserSection4, Sec4_5_MultipleEventControlInAlways) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserSection4, Sec4_5_DisableStatement) {
-  auto r = Parse("module m;\n"
-                 "  initial begin : blk\n"
-                 "    disable blk;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : blk\n"
+      "    disable blk;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);

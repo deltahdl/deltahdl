@@ -1,5 +1,7 @@
 // §9.2.2: Always procedures
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -12,7 +14,6 @@
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
 #include "simulation/variable.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -37,13 +38,14 @@ namespace {
 
 TEST(Lowerer, AlwaysLoopWithDelay) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] clk;\n"
-                              "  initial clk = 0;\n"
-                              "  always #5 clk = clk + 1;\n"
-                              "  initial #20 $finish;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] clk;\n"
+      "  initial clk = 0;\n"
+      "  always #5 clk = clk + 1;\n"
+      "  initial #20 $finish;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -58,4 +60,4 @@ TEST(Lowerer, AlwaysLoopWithDelay) {
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
-} // namespace
+}  // namespace

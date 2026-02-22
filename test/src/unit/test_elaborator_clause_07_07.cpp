@@ -1,5 +1,7 @@
 // §7.7: Arrays as arguments to subroutines
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -11,7 +13,6 @@
 #include "lexer/lexer.h"
 #include "lexer/token.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -35,10 +36,11 @@ namespace {
 // §7.9.8: Assoc array index width propagated to RtlirVariable.
 TEST(Elaboration, AssocArrayByteIndexWidth) {
   ElabFixture f;
-  auto *design = ElaborateSrc("module top;\n"
-                              "  int map[byte];\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module top;\n"
+      "  int map[byte];\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   ASSERT_FALSE(design->top_modules.empty());
   auto &vars = design->top_modules[0]->variables;
@@ -49,10 +51,11 @@ TEST(Elaboration, AssocArrayByteIndexWidth) {
 
 TEST(Elaboration, AssocArrayIntIndexWidth) {
   ElabFixture f;
-  auto *design = ElaborateSrc("module top;\n"
-                              "  int map[int];\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module top;\n"
+      "  int map[int];\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   ASSERT_FALSE(design->top_modules.empty());
   auto &vars = design->top_modules[0]->variables;
@@ -61,4 +64,4 @@ TEST(Elaboration, AssocArrayIntIndexWidth) {
   EXPECT_EQ(vars[0].assoc_index_width, 32u);
 }
 
-} // namespace
+}  // namespace

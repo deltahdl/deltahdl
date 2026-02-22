@@ -1,11 +1,12 @@
 // §24.3: The program construct
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -58,13 +59,14 @@ TEST(Parser, EmptyProgram) {
 }
 
 TEST(Parser, ProgramWithInitial) {
-  auto r = Parse("program test_prog;\n"
-                 "  initial $display(\"hello\");\n"
-                 "endprogram\n");
+  auto r = Parse(
+      "program test_prog;\n"
+      "  initial $display(\"hello\");\n"
+      "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->programs.size(), 1);
   EXPECT_EQ(r.cu->programs[0]->items.size(), 1);
   EXPECT_EQ(r.cu->programs[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
 }
 
-} // namespace
+}  // namespace

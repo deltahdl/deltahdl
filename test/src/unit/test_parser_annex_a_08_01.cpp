@@ -34,8 +34,7 @@ ParseResult Parse(const std::string &src) {
 
 Stmt *FirstInitialStmt(ParseResult &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock)
-      continue;
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
     }
@@ -44,7 +43,7 @@ Stmt *FirstInitialStmt(ParseResult &r) {
   return nullptr;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.8.1 Concatenations — Parser
@@ -98,9 +97,10 @@ TEST(ParserA81, ConcatenationNested) {
 // }
 
 TEST(ParserA81, ConstantConcatenation) {
-  auto r = Parse("module m;\n"
-                 "  parameter P = {8'hAB, 8'hCD};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  parameter P = {8'hAB, 8'hCD};\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -109,9 +109,10 @@ TEST(ParserA81, ConstantConcatenation) {
 //     { constant_expression constant_concatenation }
 
 TEST(ParserA81, ConstantMultipleConcatenation) {
-  auto r = Parse("module m;\n"
-                 "  parameter P = {4{8'hFF}};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  parameter P = {4{8'hFF}};\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -284,11 +285,12 @@ TEST(ParserA81, ConcatenationPostfixPartSelect) {
 // § module_path_concatenation (in specify context)
 
 TEST(ParserA81, ModulePathConcatenation) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    ({a, b} => c) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    ({a, b} => c) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }

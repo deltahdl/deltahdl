@@ -34,7 +34,7 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // Annex E.7 -- `delay_mode_zero

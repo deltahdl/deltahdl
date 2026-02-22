@@ -1,14 +1,16 @@
 // §non_lrm
 
+#include <gtest/gtest.h>
+
+#include <atomic>
+#include <vector>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "simulation/compiled_sim.h"
 #include "simulation/mt_sim.h"
 #include "simulation/sim_context.h"
-#include <atomic>
-#include <gtest/gtest.h>
-#include <vector>
 
 using namespace delta;
 
@@ -97,13 +99,11 @@ TEST(MtSim, RunTimestepExecutesProcesses) {
   std::vector<CompiledProcess> processes;
   processes.emplace_back(0, [](SimContext &ctx) {
     auto *var = ctx.FindVariable("a");
-    if (var)
-      var->value.words[0].aval = 42;
+    if (var) var->value.words[0].aval = 42;
   });
   processes.emplace_back(1, [](SimContext &ctx) {
     auto *var = ctx.FindVariable("b");
-    if (var)
-      var->value.words[0].aval = 99;
+    if (var) var->value.words[0].aval = 99;
   });
 
   // Two independent partitions.
@@ -143,8 +143,7 @@ TEST(MtSim, RunTimestepMultipleThreads) {
   for (uint32_t i = 0; i < 4; ++i) {
     processes.emplace_back(i, [i, &names](SimContext &ctx) {
       auto *var = ctx.FindVariable(names[i]);
-      if (var)
-        var->value.words[0].aval += 1;
+      if (var) var->value.words[0].aval += 1;
     });
   }
 
@@ -164,4 +163,4 @@ TEST(MtSim, RunTimestepMultipleThreads) {
   }
 }
 
-} // namespace
+}  // namespace

@@ -93,4 +93,4 @@ TEST(SysTask, RealtobitsReinterpretsRealAsBits) {
   EXPECT_EQ(result.ToUint64(), expected_bits);
 }
 
-} // namespace
+}  // namespace

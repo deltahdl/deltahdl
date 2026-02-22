@@ -1,10 +1,12 @@
 // Non-LRM tests
 
+#include <gtest/gtest.h>
+
+#include <string>
+
 #include "synthesis/aig.h"
 #include "synthesis/cell_map.h"
 #include "synthesis/liberty.h"
-#include <gtest/gtest.h>
-#include <string>
 
 using namespace delta;
 
@@ -170,4 +172,4 @@ TEST(CellMap, MultiOutputDesign) {
   EXPECT_EQ(mapping.instances[1].cell_name, "INV");
 }
 
-} // namespace
+}  // namespace

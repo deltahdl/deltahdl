@@ -34,7 +34,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA702Fixture &f) {
   return design;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.7.2 Specify path declarations — Elaboration
@@ -43,12 +43,13 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA702Fixture &f) {
 // Simple parallel path elaborates without errors
 TEST(ElabA702, SimpleParallelPathElaborates) {
   ElabA702Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  specify\n"
-                              "    (a => b) = 5;\n"
-                              "  endspecify\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -56,12 +57,13 @@ TEST(ElabA702, SimpleParallelPathElaborates) {
 // Simple full path elaborates
 TEST(ElabA702, SimpleFullPathElaborates) {
   ElabA702Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  specify\n"
-                              "    (a, b *> c) = 10;\n"
-                              "  endspecify\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    (a, b *> c) = 10;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -69,12 +71,13 @@ TEST(ElabA702, SimpleFullPathElaborates) {
 // Edge-sensitive path elaborates
 TEST(ElabA702, EdgeSensitivePathElaborates) {
   ElabA702Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  specify\n"
-                              "    (posedge clk => q) = 5;\n"
-                              "  endspecify\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    (posedge clk => q) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -82,12 +85,13 @@ TEST(ElabA702, EdgeSensitivePathElaborates) {
 // State-dependent path (if) elaborates
 TEST(ElabA702, StateDependentIfPathElaborates) {
   ElabA702Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  specify\n"
-                              "    if (en) (a => b) = 10;\n"
-                              "  endspecify\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    if (en) (a => b) = 10;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -95,12 +99,13 @@ TEST(ElabA702, StateDependentIfPathElaborates) {
 // State-dependent path (ifnone) elaborates
 TEST(ElabA702, StateDependentIfnonePathElaborates) {
   ElabA702Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  specify\n"
-                              "    ifnone (a => b) = 15;\n"
-                              "  endspecify\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    ifnone (a => b) = 15;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -108,12 +113,13 @@ TEST(ElabA702, StateDependentIfnonePathElaborates) {
 // Path with polarity operator elaborates
 TEST(ElabA702, PathWithPolarityElaborates) {
   ElabA702Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  specify\n"
-                              "    (a + => b) = 5;\n"
-                              "  endspecify\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    (a + => b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -121,12 +127,13 @@ TEST(ElabA702, PathWithPolarityElaborates) {
 // Edge-sensitive path with data source elaborates
 TEST(ElabA702, EdgeSensitiveWithDataSourceElaborates) {
   ElabA702Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  specify\n"
-                              "    (posedge clk => (q : d)) = 5;\n"
-                              "  endspecify\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    (posedge clk => (q : d)) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -134,16 +141,17 @@ TEST(ElabA702, EdgeSensitiveWithDataSourceElaborates) {
 // All path types together elaborate
 TEST(ElabA702, AllPathTypesElaborate) {
   ElabA702Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  specify\n"
-                              "    (a => b) = 5;\n"
-                              "    (c, d *> e) = 10;\n"
-                              "    (posedge clk => q) = 3;\n"
-                              "    if (en) (a => b) = 8;\n"
-                              "    ifnone (a => b) = 15;\n"
-                              "  endspecify\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b) = 5;\n"
+      "    (c, d *> e) = 10;\n"
+      "    (posedge clk => q) = 3;\n"
+      "    if (en) (a => b) = 8;\n"
+      "    ifnone (a => b) = 15;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }

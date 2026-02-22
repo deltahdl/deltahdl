@@ -1,5 +1,7 @@
 // §6.17: Event data type
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -12,7 +14,6 @@
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
 #include "simulation/variable.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -37,10 +38,11 @@ namespace {
 
 TEST(Lowerer, EventVariableCreated) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  event ev;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  event ev;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -51,4 +53,4 @@ TEST(Lowerer, EventVariableCreated) {
   EXPECT_TRUE(var->is_event);
 }
 
-} // namespace
+}  // namespace

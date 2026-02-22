@@ -25,12 +25,10 @@ static const RtlirModule *ElaborateSrc(SynthFixture &f,
   Lexer lexer(f.src_mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
   auto *cu = parser.Parse();
-  if (!cu || cu->modules.empty())
-    return nullptr;
+  if (!cu || cu->modules.empty()) return nullptr;
   Elaborator elab(f.arena, f.diag, cu);
   auto *design = elab.Elaborate(cu->modules.back()->name);
-  if (!design || design->top_modules.empty())
-    return nullptr;
+  if (!design || design->top_modules.empty()) return nullptr;
   return design->top_modules[0];
 }
 
@@ -38,9 +36,10 @@ namespace {
 
 TEST(SynthLower, PortInputsMappedToAigInputs) {
   SynthFixture f;
-  auto *mod = ElaborateSrc(f, "module m(input a, input b, output y);\n"
-                              "  assign y = a;\n"
-                              "endmodule");
+  auto *mod = ElaborateSrc(f,
+                           "module m(input a, input b, output y);\n"
+                           "  assign y = a;\n"
+                           "endmodule");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto *aig = synth.Lower(mod);
@@ -52,9 +51,10 @@ TEST(SynthLower, PortInputsMappedToAigInputs) {
 TEST(SynthLower, MultiBitPortMapping) {
   SynthFixture f;
   auto *mod =
-      ElaborateSrc(f, "module m(input logic [3:0] a, output logic [3:0] y);\n"
-                      "  assign y = a;\n"
-                      "endmodule");
+      ElaborateSrc(f,
+                   "module m(input logic [3:0] a, output logic [3:0] y);\n"
+                   "  assign y = a;\n"
+                   "endmodule");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto *aig = synth.Lower(mod);
@@ -63,4 +63,4 @@ TEST(SynthLower, MultiBitPortMapping) {
   EXPECT_EQ(aig->outputs.size(), 4);
 }
 
-} // namespace
+}  // namespace

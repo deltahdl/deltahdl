@@ -1,6 +1,8 @@
 // §32: (MSB) is reserved to represent a file descriptor (fd) returned from the
 // SystemVerilog $fopen system
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -8,7 +10,6 @@
 #include "parser/ast.h"
 #include "parser/parser.h"
 #include "simulation/specify.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -16,7 +17,7 @@ using namespace delta;
 // Parser test fixture
 // =============================================================================
 struct SpecifyTest : ::testing::Test {
-protected:
+ protected:
   CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
@@ -27,8 +28,7 @@ protected:
   // Helper: get first specify block from first module.
   ModuleItem *FirstSpecifyBlock(CompilationUnit *cu) {
     for (auto *item : cu->modules[0]->items) {
-      if (item->kind == ModuleItemKind::kSpecifyBlock)
-        return item;
+      if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
     }
     return nullptr;
   }
@@ -55,4 +55,4 @@ TEST_F(SpecifyTest, SdfAnnotateModel) {
   EXPECT_EQ(mgr.GetSdfAnnotations()[0].scope, "top.dut");
 }
 
-} // namespace
+}  // namespace

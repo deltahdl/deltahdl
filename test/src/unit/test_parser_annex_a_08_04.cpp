@@ -34,8 +34,7 @@ ParseResult Parse(const std::string &src) {
 
 static Stmt *FirstInitialStmt(ParseResult &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock)
-      continue;
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
     }
@@ -51,13 +50,12 @@ static Expr *FirstInitialRHS(ParseResult &r) {
 
 static Expr *FirstContAssignRHS(ParseResult &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kContAssign)
-      return item->assign_rhs;
+    if (item->kind == ModuleItemKind::kContAssign) return item->assign_rhs;
   }
   return nullptr;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.8.4 Primaries — constant_primary
@@ -100,10 +98,11 @@ TEST(ParserA84, ConstantPrimaryStringLiteral) {
 // § constant_primary — ps_parameter_identifier constant_select
 
 TEST(ParserA84, ConstantPrimaryParameterIdentifier) {
-  auto r = Parse("module m;\n"
-                 "  parameter int A = 5;\n"
-                 "  parameter int B = A;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  parameter int A = 5;\n"
+      "  parameter int B = A;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *param = r.cu->modules[0]->items[1];
@@ -114,10 +113,11 @@ TEST(ParserA84, ConstantPrimaryParameterIdentifier) {
 // § constant_primary — enum_identifier
 
 TEST(ParserA84, ConstantPrimaryEnumIdentifier) {
-  auto r = Parse("module m;\n"
-                 "  typedef enum {RED, GREEN, BLUE} color_t;\n"
-                 "  parameter color_t C = RED;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  typedef enum {RED, GREEN, BLUE} color_t;\n"
+      "  parameter color_t C = RED;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -158,9 +158,10 @@ TEST(ParserA84, ConstantPrimaryParenthesized) {
 // § constant_primary — constant_cast
 
 TEST(ParserA84, ConstantPrimaryCast) {
-  auto r = Parse("module m;\n"
-                 "  parameter int P = int'(3.14);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  parameter int P = int'(3.14);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *param = r.cu->modules[0]->items[0];
@@ -171,10 +172,11 @@ TEST(ParserA84, ConstantPrimaryCast) {
 // § constant_primary — type_reference
 
 TEST(ParserA84, ConstantPrimaryTypeReference) {
-  auto r = Parse("module m;\n"
-                 "  logic [7:0] x;\n"
-                 "  parameter int W = $bits(x);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  parameter int W = $bits(x);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -194,11 +196,12 @@ TEST(ParserA84, ConstantPrimaryNull) {
 // § constant_primary — constant_assignment_pattern_expression
 
 TEST(ParserA84, ConstantPrimaryAssignmentPattern) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    automatic int arr [3] = '{1, 2, 3};\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    automatic int arr [3] = '{1, 2, 3};\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -206,10 +209,11 @@ TEST(ParserA84, ConstantPrimaryAssignmentPattern) {
 // § constant_primary — unbased_unsized_literal
 
 TEST(ParserA84, ConstantPrimaryUnbasedUnsizedLiteral) {
-  auto r = Parse("module m;\n"
-                 "  logic [7:0] x;\n"
-                 "  assign x = '1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  assign x = '1;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstContAssignRHS(r);
@@ -224,11 +228,12 @@ TEST(ParserA84, ConstantPrimaryUnbasedUnsizedLiteral) {
 // § module_path_primary — number in specify
 
 TEST(ParserA84, ModulePathPrimaryNumber) {
-  auto r = Parse("module m(input a, output b);\n"
-                 "  specify\n"
-                 "    (a => b) = 10;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input a, output b);\n"
+      "  specify\n"
+      "    (a => b) = 10;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -236,11 +241,12 @@ TEST(ParserA84, ModulePathPrimaryNumber) {
 // § module_path_primary — identifier in specify
 
 TEST(ParserA84, ModulePathPrimaryIdentifier) {
-  auto r = Parse("module m(input a, input en, output b);\n"
-                 "  specify\n"
-                 "    if (en) (a => b) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input a, input en, output b);\n"
+      "  specify\n"
+      "    if (en) (a => b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -285,11 +291,12 @@ TEST(ParserA84, PrimaryStringLiteral) {
 // § primary — hierarchical_identifier select
 
 TEST(ParserA84, PrimaryHierarchicalIdentifier) {
-  auto r = Parse("module m;\n"
-                 "  logic [7:0] data;\n"
-                 "  logic x;\n"
-                 "  initial x = data[3];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] data;\n"
+      "  logic x;\n"
+      "  initial x = data[3];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -300,11 +307,12 @@ TEST(ParserA84, PrimaryHierarchicalIdentifier) {
 // § primary — concatenation
 
 TEST(ParserA84, PrimaryConcatenation) {
-  auto r = Parse("module m;\n"
-                 "  logic [7:0] a, b;\n"
-                 "  logic [15:0] c;\n"
-                 "  initial c = {a, b};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] a, b;\n"
+      "  logic [15:0] c;\n"
+      "  initial c = {a, b};\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -315,11 +323,12 @@ TEST(ParserA84, PrimaryConcatenation) {
 // § primary — multiple_concatenation
 
 TEST(ParserA84, PrimaryMultipleConcatenation) {
-  auto r = Parse("module m;\n"
-                 "  logic [7:0] a;\n"
-                 "  logic [31:0] b;\n"
-                 "  initial b = {4{a}};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  logic [31:0] b;\n"
+      "  initial b = {4{a}};\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -330,10 +339,11 @@ TEST(ParserA84, PrimaryMultipleConcatenation) {
 // § primary — function_subroutine_call
 
 TEST(ParserA84, PrimaryFunctionCall) {
-  auto r = Parse("module m;\n"
-                 "  function int foo(int a); return a + 1; endfunction\n"
-                 "  initial x = foo(5);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function int foo(int a); return a + 1; endfunction\n"
+      "  initial x = foo(5);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -355,10 +365,11 @@ TEST(ParserA84, PrimaryParenthesizedExpr) {
 // § primary — cast
 
 TEST(ParserA84, PrimaryCast) {
-  auto r = Parse("module m;\n"
-                 "  logic [7:0] a;\n"
-                 "  initial a = int'(3.14);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  initial a = int'(3.14);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -369,11 +380,12 @@ TEST(ParserA84, PrimaryCast) {
 // § primary — assignment_pattern_expression
 
 TEST(ParserA84, PrimaryAssignmentPattern) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    automatic int arr [3] = '{0, 1, 2};\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    automatic int arr [3] = '{0, 1, 2};\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -381,11 +393,12 @@ TEST(ParserA84, PrimaryAssignmentPattern) {
 // § primary — streaming_concatenation
 
 TEST(ParserA84, PrimaryStreamingConcat) {
-  auto r = Parse("module m;\n"
-                 "  logic [31:0] a;\n"
-                 "  logic [31:0] b;\n"
-                 "  initial b = {<< 8 {a}};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic [31:0] a;\n"
+      "  logic [31:0] b;\n"
+      "  initial b = {<< 8 {a}};\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -404,9 +417,10 @@ TEST(ParserA84, PrimaryThis) {
 // § primary — $
 
 TEST(ParserA84, PrimaryDollar) {
-  auto r = Parse("module m;\n"
-                 "  logic [7:0] q [$];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] q [$];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -445,11 +459,12 @@ TEST(ParserA84, ClassQualifierScope) {
 // § range_expression — expression (simple index)
 
 TEST(ParserA84, RangeExpressionSimpleIndex) {
-  auto r = Parse("module m;\n"
-                 "  logic [7:0] data;\n"
-                 "  logic x;\n"
-                 "  initial x = data[0];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] data;\n"
+      "  logic x;\n"
+      "  initial x = data[0];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -460,11 +475,12 @@ TEST(ParserA84, RangeExpressionSimpleIndex) {
 // § range_expression — part_select_range
 
 TEST(ParserA84, RangeExpressionPartSelect) {
-  auto r = Parse("module m;\n"
-                 "  logic [15:0] data;\n"
-                 "  logic [7:0] x;\n"
-                 "  initial x = data[7:0];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic [15:0] data;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = data[7:0];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -646,11 +662,12 @@ TEST(ParserA84, ImplicitClassHandleThisMember) {
 // § bit_select — single dimension
 
 TEST(ParserA84, BitSelectSingleDim) {
-  auto r = Parse("module m;\n"
-                 "  logic [7:0] data;\n"
-                 "  logic x;\n"
-                 "  initial x = data[5];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] data;\n"
+      "  logic x;\n"
+      "  initial x = data[5];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -663,11 +680,12 @@ TEST(ParserA84, BitSelectSingleDim) {
 // § bit_select — multi-dimensional
 
 TEST(ParserA84, BitSelectMultiDim) {
-  auto r = Parse("module m;\n"
-                 "  logic [7:0] mem [0:3];\n"
-                 "  logic [7:0] x;\n"
-                 "  initial x = mem[2];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] mem [0:3];\n"
+      "  logic [7:0] x;\n"
+      "  initial x = mem[2];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -682,11 +700,12 @@ TEST(ParserA84, BitSelectMultiDim) {
 // § select — bit_select with part_select_range
 
 TEST(ParserA84, SelectBitWithPartSelect) {
-  auto r = Parse("module m;\n"
-                 "  logic [31:0] data;\n"
-                 "  logic [7:0] x;\n"
-                 "  initial x = data[15:8];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic [31:0] data;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = data[15:8];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -717,10 +736,11 @@ TEST(ParserA84, SelectMemberBitSelect) {
 // § nonrange_select — simple bit_select
 
 TEST(ParserA84, NonrangeSelectBitSelect) {
-  auto r = Parse("module m;\n"
-                 "  logic [7:0] data;\n"
-                 "  initial data[3] = 1'b1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] data;\n"
+      "  initial data[3] = 1'b1;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -740,10 +760,11 @@ TEST(ParserA84, ConstantBitSelectPackedDim) {
 // § constant_select — in parameter expression
 
 TEST(ParserA84, ConstantSelectParameterExpr) {
-  auto r = Parse("module m;\n"
-                 "  parameter int A [4] = '{1, 2, 3, 4};\n"
-                 "  parameter int B = A[2];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  parameter int A [4] = '{1, 2, 3, 4};\n"
+      "  parameter int B = A[2];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -755,11 +776,12 @@ TEST(ParserA84, ConstantSelectParameterExpr) {
 // § cast — type cast in expression
 
 TEST(ParserA84, CastInExpression) {
-  auto r = Parse("module m;\n"
-                 "  logic [7:0] a;\n"
-                 "  int b;\n"
-                 "  initial b = int'(a);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  int b;\n"
+      "  initial b = int'(a);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -770,10 +792,11 @@ TEST(ParserA84, CastInExpression) {
 // § cast — signed cast
 
 TEST(ParserA84, CastSigned) {
-  auto r = Parse("module m;\n"
-                 "  logic [7:0] a;\n"
-                 "  initial a = signed'(a);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  initial a = signed'(a);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstInitialRHS(r);
@@ -799,9 +822,10 @@ TEST(ParserA84, ConstantCastInParam) {
 // § constant_let_expression — let declaration usage
 
 TEST(ParserA84, ConstantLetExpression) {
-  auto r = Parse("module m;\n"
-                 "  let my_let(a) = a + 1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  let my_let(a) = a + 1;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -824,13 +848,14 @@ TEST(ParserA84, PrimarySystemCall) {
 // § primary — type_reference
 
 TEST(ParserA84, PrimaryTypeRef) {
-  auto r = Parse("module m;\n"
-                 "  logic [7:0] x;\n"
-                 "  initial begin\n"
-                 "    automatic int w;\n"
-                 "    w = $bits(x);\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    automatic int w;\n"
+      "    w = $bits(x);\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -842,10 +867,11 @@ TEST(ParserA84, PrimaryTypeRef) {
 // § primary — escaped identifier
 
 TEST(ParserA84, PrimaryEscapedIdentifier) {
-  auto r = Parse("module m;\n"
-                 "  logic \\my-signal ;\n"
-                 "  initial \\my-signal = 1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic \\my-signal ;\n"
+      "  initial \\my-signal = 1;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }

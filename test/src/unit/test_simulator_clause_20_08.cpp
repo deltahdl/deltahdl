@@ -1,5 +1,11 @@
 // §20.8: Math functions
 
+#include <gtest/gtest.h>
+
+#include <cmath>
+#include <cstring>
+#include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -7,10 +13,6 @@
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
-#include <cmath>
-#include <cstring>
-#include <gtest/gtest.h>
-#include <string>
 
 using namespace delta;
 
@@ -84,4 +86,4 @@ TEST(RealTypes, MathLnReal) {
   EXPECT_NEAR(VecToDouble(result), 0.0, 1e-10);
 }
 
-} // namespace
+}  // namespace

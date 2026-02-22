@@ -1,14 +1,16 @@
 // §10.3: Continuous assignments
 
+#include <gtest/gtest.h>
+
+#include <string>
+#include <vector>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
-#include <string>
-#include <vector>
 
 using namespace delta;
 
@@ -34,8 +36,7 @@ static ParseResult Parse(const std::string &src) {
 static ModuleItem *FindItemByKind(const std::vector<ModuleItem *> &items,
                                   ModuleItemKind kind) {
   for (auto *item : items) {
-    if (item->kind == kind)
-      return item;
+    if (item->kind == kind) return item;
   }
   return nullptr;
 }
@@ -43,10 +44,11 @@ static ModuleItem *FindItemByKind(const std::vector<ModuleItem *> &items,
 namespace {
 
 TEST(Lexical, ContAssign_WithDelay) {
-  auto r = Parse("module top;\n"
-                 "  wire out, in;\n"
-                 "  assign #5 out = in;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module top;\n"
+      "  wire out, in;\n"
+      "  assign #5 out = in;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1);
   const auto *assign_item =
@@ -58,15 +60,15 @@ TEST(Lexical, ContAssign_WithDelay) {
 }
 
 TEST(Lexical, ContAssign_WithParenDelay) {
-  auto r = Parse("module top;\n"
-                 "  wire out, in;\n"
-                 "  assign #(10) out = in;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module top;\n"
+      "  wire out, in;\n"
+      "  assign #(10) out = in;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   bool found = false;
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kContAssign)
-      continue;
+    if (item->kind != ModuleItemKind::kContAssign) continue;
     found = true;
     ASSERT_NE(item->assign_delay, nullptr);
     EXPECT_EQ(item->assign_delay->int_val, 10);
@@ -75,16 +77,16 @@ TEST(Lexical, ContAssign_WithParenDelay) {
 }
 
 TEST(Lexical, ContAssign_NoDelay) {
-  auto r = Parse("module top;\n"
-                 "  wire a, b;\n"
-                 "  assign a = b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module top;\n"
+      "  wire a, b;\n"
+      "  assign a = b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kContAssign)
-      continue;
+    if (item->kind != ModuleItemKind::kContAssign) continue;
     EXPECT_EQ(item->assign_delay, nullptr);
   }
 }
 
-} // namespace
+}  // namespace

@@ -14,7 +14,7 @@ using namespace delta;
 namespace {
 
 struct ApiParseTest : ::testing::Test {
-protected:
+ protected:
   CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
@@ -281,4 +281,4 @@ TEST_F(ApiParseTest, ConfigInstanceClauseUseConfig) {
   EXPECT_TRUE(inst_rule->use_config);
 }
 
-} // namespace
+}  // namespace

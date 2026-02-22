@@ -24,9 +24,10 @@ static bool ParseOk(const std::string &src) {
 }
 
 TEST(ParserSection22, CelldefineEndcelldefine) {
-  EXPECT_TRUE(ParseOk("`celldefine\n"
-                      "module inv(output y, input a);\n"
-                      "  assign y = ~a;\n"
-                      "endmodule\n"
-                      "`endcelldefine\n"));
+  EXPECT_TRUE(
+      ParseOk("`celldefine\n"
+              "module inv(output y, input a);\n"
+              "  assign y = ~a;\n"
+              "endmodule\n"
+              "`endcelldefine\n"));
 }

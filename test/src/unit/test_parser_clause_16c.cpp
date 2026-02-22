@@ -40,8 +40,7 @@ static bool ParseOk(const std::string &src) {
 static ModuleItem *FindItemByKind(const std::vector<ModuleItem *> &items,
                                   ModuleItemKind kind) {
   for (auto *item : items) {
-    if (item->kind == kind)
-      return item;
+    if (item->kind == kind) return item;
   }
   return nullptr;
 }
@@ -50,8 +49,7 @@ static size_t CountItemsByKind(const std::vector<ModuleItem *> &items,
                                ModuleItemKind kind) {
   size_t count = 0;
   for (auto *item : items) {
-    if (item->kind == kind)
-      ++count;
+    if (item->kind == kind) ++count;
   }
   return count;
 }
@@ -62,9 +60,10 @@ static size_t CountItemsByKind(const std::vector<ModuleItem *> &items,
 
 // Assert property with a simple property expression (no clock, no implication).
 TEST(ParserSection16, Sec16_5_1_AssertPropertySimple) {
-  auto r = Parse("module m;\n"
-                 "  assert property (a && b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (a && b);\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   auto *ap =
@@ -75,9 +74,10 @@ TEST(ParserSection16, Sec16_5_1_AssertPropertySimple) {
 
 // Assert property with a posedge-clocked property.
 TEST(ParserSection16, Sec16_5_1_AssertPropertyClockedPosedge) {
-  auto r = Parse("module m;\n"
-                 "  assert property (@(posedge clk) a);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) a);\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   auto *ap =
@@ -88,9 +88,10 @@ TEST(ParserSection16, Sec16_5_1_AssertPropertyClockedPosedge) {
 
 // Assert property with overlapped implication (|->).
 TEST(ParserSection16, Sec16_5_1_AssertPropertyOverlappedImplication) {
-  auto r = Parse("module m;\n"
-                 "  assert property (@(posedge clk) req |-> ack);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) req |-> ack);\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   auto *ap =
@@ -101,9 +102,10 @@ TEST(ParserSection16, Sec16_5_1_AssertPropertyOverlappedImplication) {
 
 // Assert property with non-overlapped implication (|=>).
 TEST(ParserSection16, Sec16_5_1_AssertPropertyNonOverlappedImplication) {
-  auto r = Parse("module m;\n"
-                 "  assert property (@(posedge clk) req |=> gnt);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) req |=> gnt);\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   auto *ap =
@@ -114,10 +116,11 @@ TEST(ParserSection16, Sec16_5_1_AssertPropertyNonOverlappedImplication) {
 
 // Assert property with both pass and fail action blocks.
 TEST(ParserSection16, Sec16_5_1_AssertPropertyPassAndFailActions) {
-  auto r = Parse("module m;\n"
-                 "  assert property (@(posedge clk) req |-> ack)\n"
-                 "    $display(\"pass\"); else $error(\"fail\");\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) req |-> ack)\n"
+      "    $display(\"pass\"); else $error(\"fail\");\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   auto *ap =
@@ -129,10 +132,11 @@ TEST(ParserSection16, Sec16_5_1_AssertPropertyPassAndFailActions) {
 
 // Assert property with only a pass action (no else).
 TEST(ParserSection16, Sec16_5_1_AssertPropertyPassOnly) {
-  auto r = Parse("module m;\n"
-                 "  assert property (@(posedge clk) valid)\n"
-                 "    $display(\"passed\");\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) valid)\n"
+      "    $display(\"passed\");\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   auto *ap =
@@ -144,10 +148,11 @@ TEST(ParserSection16, Sec16_5_1_AssertPropertyPassOnly) {
 
 // Assert property with only an else (fail) action.
 TEST(ParserSection16, Sec16_5_1_AssertPropertyFailOnly) {
-  auto r = Parse("module m;\n"
-                 "  assert property (@(posedge clk) a |-> b)\n"
-                 "    else $error(\"failed\");\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) a |-> b)\n"
+      "    else $error(\"failed\");\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   auto *ap =
@@ -163,9 +168,10 @@ TEST(ParserSection16, Sec16_5_1_AssertPropertyFailOnly) {
 
 // Assume property with a simple property expression.
 TEST(ParserSection16, Sec16_5_1_AssumePropertySimple) {
-  auto r = Parse("module m;\n"
-                 "  assume property (@(posedge clk) valid);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assume property (@(posedge clk) valid);\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   auto *ap =
@@ -176,9 +182,10 @@ TEST(ParserSection16, Sec16_5_1_AssumePropertySimple) {
 
 // Assume property with a clocked implication.
 TEST(ParserSection16, Sec16_5_1_AssumePropertyClocked) {
-  auto r = Parse("module m;\n"
-                 "  assume property (@(posedge clk) req |-> gnt);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assume property (@(posedge clk) req |-> gnt);\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   auto *ap =
@@ -189,10 +196,11 @@ TEST(ParserSection16, Sec16_5_1_AssumePropertyClocked) {
 
 // Assume property with else action.
 TEST(ParserSection16, Sec16_5_1_AssumePropertyElseAction) {
-  auto r = Parse("module m;\n"
-                 "  assume property (@(posedge clk) en |-> ready)\n"
-                 "    else $error(\"assumption violated\");\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assume property (@(posedge clk) en |-> ready)\n"
+      "    else $error(\"assumption violated\");\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   auto *ap =
@@ -208,9 +216,10 @@ TEST(ParserSection16, Sec16_5_1_AssumePropertyElseAction) {
 
 // Cover property with a simple clocked property.
 TEST(ParserSection16, Sec16_5_1_CoverPropertySimple) {
-  auto r = Parse("module m;\n"
-                 "  cover property (@(posedge clk) a && b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  cover property (@(posedge clk) a && b);\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   auto *cp =
@@ -221,9 +230,10 @@ TEST(ParserSection16, Sec16_5_1_CoverPropertySimple) {
 
 // Cover property with a clocked sequence delay.
 TEST(ParserSection16, Sec16_5_1_CoverPropertyClocked) {
-  auto r = Parse("module m;\n"
-                 "  cover property (@(posedge clk) a ##1 b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  cover property (@(posedge clk) a ##1 b);\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   auto *cp =
@@ -234,10 +244,11 @@ TEST(ParserSection16, Sec16_5_1_CoverPropertyClocked) {
 
 // Cover property with a pass action (cover has no else branch per LRM).
 TEST(ParserSection16, Sec16_5_1_CoverPropertyPassAction) {
-  auto r = Parse("module m;\n"
-                 "  cover property (@(posedge clk) a ##1 b)\n"
-                 "    $display(\"covered\");\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  cover property (@(posedge clk) a ##1 b)\n"
+      "    $display(\"covered\");\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   auto *cp =
@@ -253,10 +264,11 @@ TEST(ParserSection16, Sec16_5_1_CoverPropertyPassAction) {
 
 // Cover sequence-like pattern with pass action via cover property.
 TEST(ParserSection16, Sec16_5_1_CoverSequenceWithPassAction) {
-  auto r = Parse("module m;\n"
-                 "  cover property (@(posedge clk) a ##2 b ##1 c)\n"
-                 "    $display(\"seq covered\");\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  cover property (@(posedge clk) a ##2 b ##1 c)\n"
+      "    $display(\"seq covered\");\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   auto *cp =
@@ -272,11 +284,12 @@ TEST(ParserSection16, Sec16_5_1_CoverSequenceWithPassAction) {
 
 // Named assert property inside an always block.
 TEST(ParserSection16, Sec16_5_1_NamedAssertInAlways) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  always @(posedge clk) begin\n"
-                      "    check_req: assert property (req |-> ack);\n"
-                      "  end\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  always @(posedge clk) begin\n"
+              "    check_req: assert property (req |-> ack);\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -285,10 +298,11 @@ TEST(ParserSection16, Sec16_5_1_NamedAssertInAlways) {
 
 // Assert property with disable iff.
 TEST(ParserSection16, Sec16_5_1_AssertPropertyDisableIff) {
-  auto r = Parse("module m;\n"
-                 "  assert property (\n"
-                 "    @(posedge clk) disable iff (rst) req |-> ack);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (\n"
+      "    @(posedge clk) disable iff (rst) req |-> ack);\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   auto *ap =
@@ -311,24 +325,27 @@ TEST(ParserSection16, Sec16_5_1_SequenceDelayOperator) {
 
 // Assert property with [*N] consecutive repetition.
 TEST(ParserSection16, Sec16_5_1_SequenceConsecutiveRepetition) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) a[*3] |-> b);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) a[*3] |-> b);\n"
+              "endmodule\n"));
 }
 
 // Assert property with [->N] goto repetition.
 TEST(ParserSection16, Sec16_5_1_SequenceGotoRepetition) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) req |-> ack[->1]);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) req |-> ack[->1]);\n"
+              "endmodule\n"));
 }
 
 // Assert property with throughout operator.
 TEST(ParserSection16, Sec16_5_1_SequenceThroughout) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (\n"
-                      "    @(posedge clk) !burst throughout (##2 trdy[*7]));\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (\n"
+              "    @(posedge clk) !burst throughout (##2 trdy[*7]));\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -337,27 +354,30 @@ TEST(ParserSection16, Sec16_5_1_SequenceThroughout) {
 
 // Assert property with not (property negation).
 TEST(ParserSection16, Sec16_5_1_PropertyNot) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) not (a ##1 b));\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) not (a ##1 b));\n"
+              "endmodule\n"));
 }
 
 // Assert property with or (disjunction).
 TEST(ParserSection16, Sec16_5_1_PropertyOr) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (\n"
-                      "    @(posedge clk) (a |-> b) or (c |-> d));\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (\n"
+              "    @(posedge clk) (a |-> b) or (c |-> d));\n"
+              "endmodule\n"));
 }
 
 // Assert property with if-else inside property expression.
 TEST(ParserSection16, Sec16_5_1_PropertyIfElse) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (\n"
-                      "    @(posedge clk)\n"
-                      "    if (mode) a |-> b\n"
-                      "    else a |-> c);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (\n"
+              "    @(posedge clk)\n"
+              "    if (mode) a |-> b\n"
+              "    else a |-> c);\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -374,9 +394,10 @@ TEST(ParserSection16, Sec16_5_1_StrongSequence) {
 
 // Assert property with weak sequence.
 TEST(ParserSection16, Sec16_5_1_WeakSequence) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) weak(a ##1 b));\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) weak(a ##1 b));\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -385,11 +406,12 @@ TEST(ParserSection16, Sec16_5_1_WeakSequence) {
 
 // Multiple assert/assume/cover property items in one module.
 TEST(ParserSection16, Sec16_5_1_MultipleConcurrentAssertions) {
-  auto r = Parse("module m;\n"
-                 "  assert property (@(posedge clk) a |-> b);\n"
-                 "  assume property (@(posedge clk) en);\n"
-                 "  cover property (@(posedge clk) a ##1 b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) a |-> b);\n"
+      "  assume property (@(posedge clk) en);\n"
+      "  cover property (@(posedge clk) a ##1 b);\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   EXPECT_EQ(CountItemsByKind(r.cu->modules[0]->items,
@@ -409,11 +431,12 @@ TEST(ParserSection16, Sec16_5_1_MultipleConcurrentAssertions) {
 
 // Assert property inside an always block (procedural concurrent assertion).
 TEST(ParserSection16, Sec16_5_1_AssertPropertyInAlwaysBlock) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  always @(posedge clk) begin\n"
-                      "    assert property (req |-> ack);\n"
-                      "  end\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  always @(posedge clk) begin\n"
+              "    assert property (req |-> ack);\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -422,12 +445,13 @@ TEST(ParserSection16, Sec16_5_1_AssertPropertyInAlwaysBlock) {
 
 // Assert property referencing a previously declared named property.
 TEST(ParserSection16, Sec16_5_1_AssertWithNamedPropertyInstance) {
-  auto r = Parse("module m;\n"
-                 "  property p_handshake;\n"
-                 "    @(posedge clk) req |-> ##[1:3] ack;\n"
-                 "  endproperty\n"
-                 "  assert property (p_handshake);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  property p_handshake;\n"
+      "    @(posedge clk) req |-> ##[1:3] ack;\n"
+      "  endproperty\n"
+      "  assert property (p_handshake);\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   auto *pd =
@@ -446,24 +470,26 @@ TEST(ParserSection16, Sec16_5_1_AssertWithNamedPropertyInstance) {
 
 // Sequence .triggered method used in a sequence declaration.
 TEST(ParserSection16, Sec16_5_1_SequenceTriggeredMethod) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  sequence s1;\n"
-                      "    @(posedge clk) a ##1 b;\n"
-                      "  endsequence\n"
-                      "  sequence s2;\n"
-                      "    @(posedge clk) c ##1 s1.triggered ##1 d;\n"
-                      "  endsequence\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  sequence s1;\n"
+              "    @(posedge clk) a ##1 b;\n"
+              "  endsequence\n"
+              "  sequence s2;\n"
+              "    @(posedge clk) c ##1 s1.triggered ##1 d;\n"
+              "  endsequence\n"
+              "endmodule\n"));
 }
 
 // Sequence .matched method used across clock domains.
 TEST(ParserSection16, Sec16_5_1_SequenceMatchedMethod) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  sequence e1;\n"
-                      "    @(posedge clk1) a ##1 b;\n"
-                      "  endsequence\n"
-                      "  sequence e2;\n"
-                      "    @(posedge clk2) c ##1 e1.matched ##1 d;\n"
-                      "  endsequence\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  sequence e1;\n"
+              "    @(posedge clk1) a ##1 b;\n"
+              "  endsequence\n"
+              "  sequence e2;\n"
+              "    @(posedge clk2) c ##1 e1.matched ##1 d;\n"
+              "  endsequence\n"
+              "endmodule\n"));
 }

@@ -34,7 +34,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA87Fixture &f) {
   return design;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.8.7 Numbers — Elaboration
@@ -44,11 +44,12 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA87Fixture &f) {
 
 TEST(ElabA87, NumberIntegralElaborates) {
   ElabA87Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial x = 42;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 42;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -57,11 +58,12 @@ TEST(ElabA87, NumberIntegralElaborates) {
 
 TEST(ElabA87, NumberRealElaborates) {
   ElabA87Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  real x;\n"
-                              "  initial x = 3.14;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  real x;\n"
+      "  initial x = 3.14;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -70,10 +72,11 @@ TEST(ElabA87, NumberRealElaborates) {
 
 TEST(ElabA87, DecimalUnsizedElaborates) {
   ElabA87Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  parameter int P = 255;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  parameter int P = 255;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -82,11 +85,12 @@ TEST(ElabA87, DecimalUnsizedElaborates) {
 
 TEST(ElabA87, BinaryNumberElaborates) {
   ElabA87Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial x = 8'b10101010;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 8'b10101010;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -95,11 +99,12 @@ TEST(ElabA87, BinaryNumberElaborates) {
 
 TEST(ElabA87, OctalNumberElaborates) {
   ElabA87Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial x = 8'o77;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 8'o77;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -108,11 +113,12 @@ TEST(ElabA87, OctalNumberElaborates) {
 
 TEST(ElabA87, HexNumberElaborates) {
   ElabA87Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial x = 8'hFF;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 8'hFF;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -121,11 +127,12 @@ TEST(ElabA87, HexNumberElaborates) {
 
 TEST(ElabA87, DecimalSizedBaseElaborates) {
   ElabA87Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial x = 8'd200;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 8'd200;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -134,11 +141,12 @@ TEST(ElabA87, DecimalSizedBaseElaborates) {
 
 TEST(ElabA87, DecimalXDigitElaborates) {
   ElabA87Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial x = 8'dx;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 8'dx;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -147,11 +155,12 @@ TEST(ElabA87, DecimalXDigitElaborates) {
 
 TEST(ElabA87, DecimalZDigitElaborates) {
   ElabA87Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial x = 8'dz;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 8'dz;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -160,44 +169,48 @@ TEST(ElabA87, DecimalZDigitElaborates) {
 
 TEST(ElabA87, SignedDecimalElaborates) {
   ElabA87Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial x = 8'sd99;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 8'sd99;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ElabA87, SignedBinaryElaborates) {
   ElabA87Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  logic [3:0] x;\n"
-                              "  initial x = 4'sb1010;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  logic [3:0] x;\n"
+      "  initial x = 4'sb1010;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ElabA87, SignedOctalElaborates) {
   ElabA87Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial x = 8'so77;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 8'so77;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ElabA87, SignedHexElaborates) {
   ElabA87Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial x = 8'shAB;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 8'shAB;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -206,11 +219,12 @@ TEST(ElabA87, SignedHexElaborates) {
 
 TEST(ElabA87, FixedPointElaborates) {
   ElabA87Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  real x;\n"
-                              "  initial x = 2.718;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  real x;\n"
+      "  initial x = 2.718;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -219,11 +233,12 @@ TEST(ElabA87, FixedPointElaborates) {
 
 TEST(ElabA87, ScientificNotationElaborates) {
   ElabA87Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  real x;\n"
-                              "  initial x = 1.5e+3;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  real x;\n"
+      "  initial x = 1.5e+3;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -232,11 +247,12 @@ TEST(ElabA87, ScientificNotationElaborates) {
 
 TEST(ElabA87, UnderscoredDecimalElaborates) {
   ElabA87Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  int x;\n"
-                              "  initial x = 1_000;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  int x;\n"
+      "  initial x = 1_000;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -245,44 +261,48 @@ TEST(ElabA87, UnderscoredDecimalElaborates) {
 
 TEST(ElabA87, UnbasedUnsizedZeroElaborates) {
   ElabA87Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  logic x;\n"
-                              "  initial x = '0;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  logic x;\n"
+      "  initial x = '0;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ElabA87, UnbasedUnsizedOneElaborates) {
   ElabA87Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  logic x;\n"
-                              "  initial x = '1;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  logic x;\n"
+      "  initial x = '1;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ElabA87, UnbasedUnsizedXElaborates) {
   ElabA87Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  logic x;\n"
-                              "  initial x = 'x;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  logic x;\n"
+      "  initial x = 'x;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ElabA87, UnbasedUnsizedZElaborates) {
   ElabA87Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  logic x;\n"
-                              "  initial x = 'z;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  logic x;\n"
+      "  initial x = 'z;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }

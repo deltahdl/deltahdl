@@ -30,7 +30,7 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.2.1.1 Module parameter declarations
@@ -164,9 +164,10 @@ TEST(ParserA211, TypeParamForwardClass) {
 }
 
 TEST(ParserA211, TypeParamForwardInterfaceClass) {
-  auto r = Parse("module m;\n"
-                 "  parameter type interface class IC = my_ifc_t;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  parameter type interface class IC = my_ifc_t;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->name, "IC");
@@ -180,8 +181,7 @@ TEST(ParserA211, ListOfParamAssignments) {
   EXPECT_FALSE(r.has_errors);
   int param_count = 0;
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kParamDecl)
-      param_count++;
+    if (item->kind == ModuleItemKind::kParamDecl) param_count++;
   }
   EXPECT_GE(param_count, 3);
 }
@@ -192,8 +192,7 @@ TEST(ParserA211, ListOfLocalparamAssignments) {
   EXPECT_FALSE(r.has_errors);
   int param_count = 0;
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kParamDecl)
-      param_count++;
+    if (item->kind == ModuleItemKind::kParamDecl) param_count++;
   }
   EXPECT_GE(param_count, 2);
 }
@@ -206,8 +205,7 @@ TEST(ParserA211, ListOfTypeAssignments) {
   EXPECT_FALSE(r.has_errors);
   int param_count = 0;
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kParamDecl)
-      param_count++;
+    if (item->kind == ModuleItemKind::kParamDecl) param_count++;
   }
   EXPECT_GE(param_count, 2);
 }
@@ -216,25 +214,28 @@ TEST(ParserA211, ListOfTypeAssignments) {
 // specparam [ packed_dimension ] list_of_specparam_assignments ;
 
 TEST(ParserA211, SpecparamBasic) {
-  auto r = Parse("module m;\n"
-                 "  specify specparam tRISE = 100; endspecify\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  specify specparam tRISE = 100; endspecify\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA211, SpecparamPackedDim) {
-  auto r = Parse("module m;\n"
-                 "  specify specparam [31:0] tDELAY = 50; endspecify\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  specify specparam [31:0] tDELAY = 50; endspecify\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA211, SpecparamMultipleAssignments) {
-  auto r = Parse("module m;\n"
-                 "  specify specparam tRISE = 100, tFALL = 50; endspecify\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  specify specparam tRISE = 100, tFALL = 50; endspecify\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }

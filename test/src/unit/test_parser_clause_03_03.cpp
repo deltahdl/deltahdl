@@ -46,8 +46,7 @@ static bool ParseOk(const std::string &src) {
 
 static ModuleItem *FindItemByKind(ParseResult303 &r, ModuleItemKind kind) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind == kind)
-      return item;
+    if (item->kind == kind) return item;
   }
   return nullptr;
 }
@@ -55,8 +54,7 @@ static ModuleItem *FindItemByKind(ParseResult303 &r, ModuleItemKind kind) {
 static bool HasItemOfKind(const std::vector<ModuleItem *> &items,
                           ModuleItemKind kind) {
   for (const auto *item : items)
-    if (item->kind == kind)
-      return true;
+    if (item->kind == kind) return true;
   return false;
 }
 
@@ -74,8 +72,9 @@ static bool HasAlwaysOfKind(const std::vector<ModuleItem *> &items,
 
 // §3.3 Module with end label
 TEST(ParserClause03, Cl3_3_ModuleEndLabel) {
-  auto r = Parse("module m;\n"
-                 "endmodule : m\n");
+  auto r = Parse(
+      "module m;\n"
+      "endmodule : m\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 1u);
@@ -84,13 +83,14 @@ TEST(ParserClause03, Cl3_3_ModuleEndLabel) {
 
 // §3.3 LRM mux2to1 example (verbatim, with always_comb procedural block).
 TEST(ParserClause03, Cl3_3_Mux2to1LrmExample) {
-  auto r = Parse("module mux2to1 (input wire a, b, sel,\n"
-                 "                output logic y);\n"
-                 "  always_comb begin\n"
-                 "    if (sel) y = a;\n"
-                 "    else     y = b;\n"
-                 "  end\n"
-                 "endmodule: mux2to1\n");
+  auto r = Parse(
+      "module mux2to1 (input wire a, b, sel,\n"
+      "                output logic y);\n"
+      "  always_comb begin\n"
+      "    if (sel) y = a;\n"
+      "    else     y = b;\n"
+      "  end\n"
+      "endmodule: mux2to1\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 1u);
@@ -105,16 +105,17 @@ TEST(ParserClause03, Cl3_3_Mux2to1LrmExample) {
 
 // §3.3 Data declarations, constants, user-defined types, class definitions
 TEST(ParserClause03, Cl3_3_ModuleDeclarations) {
-  auto r = Parse("module m;\n"
-                 "  wire [7:0] w;\n"
-                 "  logic [15:0] v;\n"
-                 "  struct packed { logic [3:0] a; logic [3:0] b; } s;\n"
-                 "  union packed { logic [7:0] x; logic [7:0] y; } u;\n"
-                 "  parameter WIDTH = 8;\n"
-                 "  localparam DEPTH = 16;\n"
-                 "  typedef logic [7:0] byte_t;\n"
-                 "  class my_class; int val; endclass\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  wire [7:0] w;\n"
+      "  logic [15:0] v;\n"
+      "  struct packed { logic [3:0] a; logic [3:0] b; } s;\n"
+      "  union packed { logic [7:0] x; logic [7:0] y; } u;\n"
+      "  parameter WIDTH = 8;\n"
+      "  localparam DEPTH = 16;\n"
+      "  typedef logic [7:0] byte_t;\n"
+      "  class my_class; int val; endclass\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(
@@ -127,16 +128,16 @@ TEST(ParserClause03, Cl3_3_ModuleDeclarations) {
 
 // §3.3 Subroutine definitions and procedural blocks
 TEST(ParserClause03, Cl3_3_SubroutinesAndProceduralBlocks) {
-  auto r =
-      Parse("module m;\n"
-            "  logic clk, a, b;\n"
-            "  function int add(int a, int b); return a + b; endfunction\n"
-            "  task display_val(input int x); $display(\"%d\", x); endtask\n"
-            "  initial a = 0;\n"
-            "  final $display(\"done\");\n"
-            "  always @(posedge clk) a <= b;\n"
-            "  always_comb b = a;\n"
-            "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic clk, a, b;\n"
+      "  function int add(int a, int b); return a + b; endfunction\n"
+      "  task display_val(input int x); $display(\"%d\", x); endtask\n"
+      "  initial a = 0;\n"
+      "  final $display(\"done\");\n"
+      "  always @(posedge clk) a <= b;\n"
+      "  always_comb b = a;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(
@@ -154,32 +155,35 @@ TEST(ParserClause03, Cl3_3_SubroutinesAndProceduralBlocks) {
 
 // §3.3 Generate blocks
 TEST(ParserClause03, Cl3_3_GenerateBlocks) {
-  EXPECT_TRUE(ParseOk("module m #(parameter N = 4) ();\n"
-                      "  genvar i;\n"
-                      "  generate\n"
-                      "    for (i = 0; i < N; i = i + 1) begin : gen_loop\n"
-                      "      logic [7:0] data;\n"
-                      "    end\n"
-                      "  endgenerate\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m #(parameter N = 4) ();\n"
+              "  genvar i;\n"
+              "  generate\n"
+              "    for (i = 0; i < N; i = i + 1) begin : gen_loop\n"
+              "      logic [7:0] data;\n"
+              "    end\n"
+              "  endgenerate\n"
+              "endmodule\n"));
 }
 
 // §3.3 Specify blocks
 TEST(ParserClause03, Cl3_3_SpecifyBlock) {
-  EXPECT_TRUE(ParseOk("module m (input a, output y);\n"
-                      "  assign y = a;\n"
-                      "  specify\n"
-                      "    (a => y) = 1.5;\n"
-                      "  endspecify\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m (input a, output y);\n"
+              "  assign y = a;\n"
+              "  specify\n"
+              "    (a => y) = 1.5;\n"
+              "  endspecify\n"
+              "endmodule\n"));
 }
 
 // §3.3 Continuous assignments
 TEST(ParserClause03, Cl3_3_ContinuousAssignment) {
-  auto r = Parse("module m;\n"
-                 "  logic a, b, y;\n"
-                 "  assign y = a & b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic a, b, y;\n"
+      "  assign y = a & b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *ca = FindItemByKind(r, ModuleItemKind::kContAssign);
@@ -188,11 +192,12 @@ TEST(ParserClause03, Cl3_3_ContinuousAssignment) {
 
 // §3.3 Design element instantiations
 TEST(ParserClause03, Cl3_3_DesignElementInstantiations) {
-  auto r = Parse("module child; endmodule\n"
-                 "module top;\n"
-                 "  logic sig;\n"
-                 "  child c0();\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module child; endmodule\n"
+      "module top;\n"
+      "  logic sig;\n"
+      "  child c0();\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 2u);

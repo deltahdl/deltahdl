@@ -14,7 +14,7 @@ using namespace delta;
 namespace {
 
 struct DpiParseTest : ::testing::Test {
-protected:
+ protected:
   CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
@@ -262,4 +262,4 @@ TEST_F(DpiParseTest, AttributeWithAndWithoutValue) {
   EXPECT_NE(items[0]->attrs[1].value, nullptr);
 }
 
-} // namespace
+}  // namespace

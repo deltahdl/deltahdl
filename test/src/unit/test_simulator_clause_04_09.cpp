@@ -103,7 +103,7 @@ TEST(SimCh49, BlockingAssignmentAsProcessAndEvent) {
   auto *proc = sched.GetEventPool().Acquire();
   proc->kind = EventKind::kEvaluation;
   proc->callback = [&]() {
-    int rhs = 99; // Compute RHS with current values.
+    int rhs = 99;  // Compute RHS with current values.
     // Suspend: schedule future event at current_time + 2.
     auto *resume = sched.GetEventPool().Acquire();
     resume->kind = EventKind::kEvaluation;
@@ -291,13 +291,13 @@ TEST(SimCh49, AllAssignmentTypesUseSchedulerInfrastructure) {
     sched.ScheduleEvent({0}, region, ev);
   };
 
-  schedule("continuous", Region::kActive);      // §4.9.1
-  schedule("proc_continuous", Region::kActive); // §4.9.2
-  schedule("blocking", Region::kInactive);      // §4.9.3 (zero delay)
-  schedule("nonblocking", Region::kNBA);        // §4.9.4
-  schedule("switch", Region::kActive);          // §4.9.5
-  schedule("port", Region::kActive);            // §4.9.6
-  schedule("subroutine", Region::kActive);      // §4.9.7
+  schedule("continuous", Region::kActive);       // §4.9.1
+  schedule("proc_continuous", Region::kActive);  // §4.9.2
+  schedule("blocking", Region::kInactive);       // §4.9.3 (zero delay)
+  schedule("nonblocking", Region::kNBA);         // §4.9.4
+  schedule("switch", Region::kActive);           // §4.9.5
+  schedule("port", Region::kActive);             // §4.9.6
+  schedule("subroutine", Region::kActive);       // §4.9.7
 
   sched.Run();
   EXPECT_EQ(executed.size(), 7u);

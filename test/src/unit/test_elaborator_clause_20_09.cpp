@@ -1,12 +1,13 @@
 // §20.9: Bit vector system functions
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "elaboration/const_eval.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -64,4 +65,4 @@ TEST(ConstEval, Clog2) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$clog2(5)", f)), 3);
 }
 
-} // namespace
+}  // namespace

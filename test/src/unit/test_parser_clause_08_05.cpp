@@ -1,11 +1,12 @@
 // §8.5: Object properties and object parameter data
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -58,4 +59,4 @@ TEST(Parser, ClassWithProperty) {
   EXPECT_EQ(cls->members[0]->data_type.kind, DataTypeKind::kInt);
 }
 
-} // namespace
+}  // namespace

@@ -1,5 +1,7 @@
 // §20.10: Severity system tasks
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -12,7 +14,6 @@
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
 #include "simulation/variable.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -37,14 +38,15 @@ namespace {
 
 TEST(Lowerer, FatalStopsSim) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] x;\n"
-                              "  initial begin\n"
-                              "    $fatal(1, \"test fatal\");\n"
-                              "    x = 99;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    $fatal(1, \"test fatal\");\n"
+      "    x = 99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -56,14 +58,15 @@ TEST(Lowerer, FatalStopsSim) {
 
 TEST(Lowerer, ErrorDoesNotStop) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] x;\n"
-                              "  initial begin\n"
-                              "    $error(\"test error\");\n"
-                              "    x = 42;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    $error(\"test error\");\n"
+      "    x = 42;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -78,14 +81,15 @@ TEST(Lowerer, ErrorDoesNotStop) {
 
 TEST(Lowerer, WarningContinues) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] x;\n"
-                              "  initial begin\n"
-                              "    $warning(\"test warning\");\n"
-                              "    x = 7;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    $warning(\"test warning\");\n"
+      "    x = 7;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -97,4 +101,4 @@ TEST(Lowerer, WarningContinues) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-} // namespace
+}  // namespace

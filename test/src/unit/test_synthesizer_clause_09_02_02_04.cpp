@@ -25,12 +25,10 @@ static const RtlirModule *ElaborateSrc(SynthFixture &f,
   Lexer lexer(f.src_mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
   auto *cu = parser.Parse();
-  if (!cu || cu->modules.empty())
-    return nullptr;
+  if (!cu || cu->modules.empty()) return nullptr;
   Elaborator elab(f.arena, f.diag, cu);
   auto *design = elab.Elaborate(cu->modules.back()->name);
-  if (!design || design->top_modules.empty())
-    return nullptr;
+  if (!design || design->top_modules.empty()) return nullptr;
   return design->top_modules[0];
 }
 
@@ -38,11 +36,12 @@ namespace {
 
 TEST(SynthLower, AlwaysFFRegistersLatch) {
   SynthFixture f;
-  auto *mod = ElaborateSrc(f, "module m(input clk, input d, output reg q);\n"
-                              "  always_ff @(posedge clk) begin\n"
-                              "    q <= d;\n"
-                              "  end\n"
-                              "endmodule");
+  auto *mod = ElaborateSrc(f,
+                           "module m(input clk, input d, output reg q);\n"
+                           "  always_ff @(posedge clk) begin\n"
+                           "    q <= d;\n"
+                           "  end\n"
+                           "endmodule");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto *aig = synth.Lower(mod);
@@ -51,4 +50,4 @@ TEST(SynthLower, AlwaysFFRegistersLatch) {
   EXPECT_FALSE(aig->latches.empty());
 }
 
-} // namespace
+}  // namespace

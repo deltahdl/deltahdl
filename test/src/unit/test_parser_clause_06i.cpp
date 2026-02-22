@@ -44,8 +44,7 @@ static ModuleItem *FirstItem(ParseResult6i &r) {
 }
 
 static Stmt *FirstInitialStmt(ParseResult6i &r) {
-  if (!r.cu || r.cu->modules.empty())
-    return nullptr;
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
   for (auto *item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kInitialBlock && item->body != nullptr)
       return item->body;
@@ -59,9 +58,10 @@ static Stmt *FirstInitialStmt(ParseResult6i &r) {
 
 // 1. type(expr) used as expression produces kTypeRef node.
 TEST(ParserSection6, Sec6_11_1_TypeRefExprKind) {
-  auto r = Parse("module t;\n"
-                 "  initial x = type(y);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = type(y);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -73,9 +73,10 @@ TEST(ParserSection6, Sec6_11_1_TypeRefExprKind) {
 
 // 2. type(expr) inner expression is stored in lhs for identifiers.
 TEST(ParserSection6, Sec6_11_1_TypeRefInnerIdent) {
-  auto r = Parse("module t;\n"
-                 "  initial x = type(y);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = type(y);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -90,9 +91,10 @@ TEST(ParserSection6, Sec6_11_1_TypeRefInnerIdent) {
 
 // 3. type(data_type) stores the data type name in text field.
 TEST(ParserSection6, Sec6_11_1_TypeRefDataTypeText) {
-  auto r = Parse("module t;\n"
-                 "  initial x = type(int);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = type(int);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -104,10 +106,11 @@ TEST(ParserSection6, Sec6_11_1_TypeRefDataTypeText) {
 
 // 4. var type(expr) declaration produces kVarDecl with type_ref_expr.
 TEST(ParserSection6, Sec6_11_1_VarTypeRefDeclKind) {
-  auto r = Parse("module t;\n"
-                 "  int a;\n"
-                 "  var type(a) b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int a;\n"
+      "  var type(a) b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &items = r.cu->modules[0]->items;
@@ -119,10 +122,11 @@ TEST(ParserSection6, Sec6_11_1_VarTypeRefDeclKind) {
 
 // 5. var type(expr) stores the reference expression as an identifier.
 TEST(ParserSection6, Sec6_11_1_VarTypeRefExprIdent) {
-  auto r = Parse("module t;\n"
-                 "  logic [7:0] x;\n"
-                 "  var type(x) y;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  var type(x) y;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &items = r.cu->modules[0]->items;
@@ -135,10 +139,11 @@ TEST(ParserSection6, Sec6_11_1_VarTypeRefExprIdent) {
 
 // 6. var type(binary_expr) stores a binary expression reference.
 TEST(ParserSection6, Sec6_11_1_VarTypeRefBinaryExpr) {
-  auto r = Parse("module t;\n"
-                 "  real a, b;\n"
-                 "  var type(a + b) c;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  real a, b;\n"
+      "  var type(a + b) c;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &items = r.cu->modules[0]->items;
@@ -159,46 +164,51 @@ TEST(ParserSection6, Sec6_11_1_VarTypeRefBinaryExpr) {
 
 // 7. type() used in parameter type default: parameter type T = type(logic).
 TEST(ParserSection6, Sec6_11_1_TypeRefParamDefault) {
-  auto r = Parse("module t #(parameter type T = type(logic));\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t #(parameter type T = type(logic));\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 // 8. type() used in parameter default with packed dimension.
 TEST(ParserSection6, Sec6_11_1_TypeRefParamPackedDim) {
-  EXPECT_TRUE(ParseOk("module t #(parameter type T = type(logic [7:0]));\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t #(parameter type T = type(logic [7:0]));\n"
+              "endmodule\n"));
 }
 
 // 9. type() comparison with == in expression context.
 TEST(ParserSection6, Sec6_11_1_TypeRefEqComparison) {
-  EXPECT_TRUE(ParseOk("module t #(parameter type T = int)\n"
-                      "  ();\n"
-                      "  initial begin\n"
-                      "    if (type(T) == type(int)) $display(\"match\");\n"
-                      "  end\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t #(parameter type T = int)\n"
+              "  ();\n"
+              "  initial begin\n"
+              "    if (type(T) == type(int)) $display(\"match\");\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // 10. type() comparison with != in expression context.
 TEST(ParserSection6, Sec6_11_1_TypeRefNeqComparison) {
-  EXPECT_TRUE(ParseOk("module t #(parameter type T = int)\n"
-                      "  ();\n"
-                      "  initial begin\n"
-                      "    if (type(T) != type(real)) $display(\"differ\");\n"
-                      "  end\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t #(parameter type T = int)\n"
+              "  ();\n"
+              "  initial begin\n"
+              "    if (type(T) != type(real)) $display(\"differ\");\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // 11. type() comparison with === (case equality).
 TEST(ParserSection6, Sec6_11_1_TypeRefCaseEq) {
-  EXPECT_TRUE(ParseOk("module t #(parameter type T = int)\n"
-                      "  ();\n"
-                      "  initial begin\n"
-                      "    if (type(T) === type(int)) $display(\"exact\");\n"
-                      "  end\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t #(parameter type T = int)\n"
+              "  ();\n"
+              "  initial begin\n"
+              "    if (type(T) === type(int)) $display(\"exact\");\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // 12. type() comparison with !== (case inequality).
@@ -214,23 +224,25 @@ TEST(ParserSection6, Sec6_11_1_TypeRefCaseNeq) {
 
 // 13. type() used in case statement as matching expression.
 TEST(ParserSection6, Sec6_11_1_TypeRefInCaseExpr) {
-  EXPECT_TRUE(ParseOk("module t #(parameter type T = int)\n"
-                      "  ();\n"
-                      "  initial begin\n"
-                      "    case (type(T))\n"
-                      "      type(int) : $display(\"int\");\n"
-                      "      type(real) : $display(\"real\");\n"
-                      "      default : $display(\"other\");\n"
-                      "    endcase\n"
-                      "  end\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t #(parameter type T = int)\n"
+              "  ();\n"
+              "  initial begin\n"
+              "    case (type(T))\n"
+              "      type(int) : $display(\"int\");\n"
+              "      type(real) : $display(\"real\");\n"
+              "      default : $display(\"other\");\n"
+              "    endcase\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // 14. type() on logic data type produces kTypeRef expression.
 TEST(ParserSection6, Sec6_11_1_TypeRefOnLogic) {
-  auto r = Parse("module t;\n"
-                 "  initial x = type(logic);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = type(logic);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -241,60 +253,68 @@ TEST(ParserSection6, Sec6_11_1_TypeRefOnLogic) {
 
 // 15. type() on bit data type.
 TEST(ParserSection6, Sec6_11_1_TypeRefOnBit) {
-  EXPECT_TRUE(ParseOk("module t;\n"
-                      "  initial x = type(bit);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial x = type(bit);\n"
+              "endmodule\n"));
 }
 
 // 16. type() on byte data type.
 TEST(ParserSection6, Sec6_11_1_TypeRefOnByte) {
-  EXPECT_TRUE(ParseOk("module t;\n"
-                      "  initial x = type(byte);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial x = type(byte);\n"
+              "endmodule\n"));
 }
 
 // 17. type() on shortint data type.
 TEST(ParserSection6, Sec6_11_1_TypeRefOnShortint) {
-  EXPECT_TRUE(ParseOk("module t;\n"
-                      "  initial x = type(shortint);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial x = type(shortint);\n"
+              "endmodule\n"));
 }
 
 // 18. type() on longint data type.
 TEST(ParserSection6, Sec6_11_1_TypeRefOnLongint) {
-  EXPECT_TRUE(ParseOk("module t;\n"
-                      "  initial x = type(longint);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial x = type(longint);\n"
+              "endmodule\n"));
 }
 
 // 19. type() on real data type.
 TEST(ParserSection6, Sec6_11_1_TypeRefOnReal) {
-  EXPECT_TRUE(ParseOk("module t;\n"
-                      "  initial x = type(real);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial x = type(real);\n"
+              "endmodule\n"));
 }
 
 // 20. type() on string data type.
 TEST(ParserSection6, Sec6_11_1_TypeRefOnString) {
-  EXPECT_TRUE(ParseOk("module t;\n"
-                      "  initial x = type(string);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial x = type(string);\n"
+              "endmodule\n"));
 }
 
 // 21. type() with packed array dimension: type(logic [15:0]).
 TEST(ParserSection6, Sec6_11_1_TypeRefPackedArray) {
-  EXPECT_TRUE(ParseOk("module t;\n"
-                      "  initial x = type(logic [15:0]);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial x = type(logic [15:0]);\n"
+              "endmodule\n"));
 }
 
 // 22. var type(expr) with ternary expression.
 TEST(ParserSection6, Sec6_11_1_VarTypeRefTernary) {
-  auto r = Parse("module t;\n"
-                 "  int a;\n"
-                 "  real b;\n"
-                 "  var type(1 ? a : b) c;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int a;\n"
+      "  real b;\n"
+      "  var type(1 ? a : b) c;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ModuleItem *c_item = nullptr;
@@ -313,25 +333,27 @@ TEST(ParserSection6, Sec6_11_1_VarTypeRefTernary) {
 
 // 23. type() used in case pattern with logic packed dimension.
 TEST(ParserSection6, Sec6_11_1_TypeRefCaseLogicPacked) {
-  EXPECT_TRUE(ParseOk("module t #(parameter type T = type(logic [11:0]))\n"
-                      "  ();\n"
-                      "  initial begin\n"
-                      "    case (type(T))\n"
-                      "      type(logic [11:0]) : $display(\"12-bit\");\n"
-                      "      default : $stop;\n"
-                      "    endcase\n"
-                      "  end\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t #(parameter type T = type(logic [11:0]))\n"
+              "  ();\n"
+              "  initial begin\n"
+              "    case (type(T))\n"
+              "      type(logic [11:0]) : $display(\"12-bit\");\n"
+              "      default : $stop;\n"
+              "    endcase\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // 24. Multiple var type() declarations in one module.
 TEST(ParserSection6, Sec6_11_1_MultipleVarTypeRefDecls) {
-  auto r = Parse("module t;\n"
-                 "  int x;\n"
-                 "  real y;\n"
-                 "  var type(x) a;\n"
-                 "  var type(y) b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int x;\n"
+      "  real y;\n"
+      "  var type(x) a;\n"
+      "  var type(y) b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &items = r.cu->modules[0]->items;
@@ -346,9 +368,10 @@ TEST(ParserSection6, Sec6_11_1_MultipleVarTypeRefDecls) {
 
 // 25. type() on integer literal expression in expression context.
 TEST(ParserSection6, Sec6_11_1_TypeRefOnLiteral) {
-  auto r = Parse("module t;\n"
-                 "  initial x = type(42);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = type(42);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -362,10 +385,11 @@ TEST(ParserSection6, Sec6_11_1_TypeRefOnLiteral) {
 
 // 26. var type(concatenation) declaration.
 TEST(ParserSection6, Sec6_11_1_VarTypeRefConcat) {
-  auto r = Parse("module t;\n"
-                 "  logic [3:0] a, b;\n"
-                 "  var type({a, b}) c;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  logic [3:0] a, b;\n"
+      "  var type({a, b}) c;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ModuleItem *c_item = nullptr;
@@ -384,24 +408,27 @@ TEST(ParserSection6, Sec6_11_1_VarTypeRefConcat) {
 
 // 27. type() on shortreal data type.
 TEST(ParserSection6, Sec6_11_1_TypeRefOnShortreal) {
-  EXPECT_TRUE(ParseOk("module t;\n"
-                      "  initial x = type(shortreal);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial x = type(shortreal);\n"
+              "endmodule\n"));
 }
 
 // 28. type() in parameter type default with type(int).
 TEST(ParserSection6, Sec6_11_1_ParamTypeDefaultInt) {
-  auto r = Parse("module t #(parameter type T = type(int));\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t #(parameter type T = type(int));\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 // 29. var type() where inner is member access expression.
 TEST(ParserSection6, Sec6_11_1_VarTypeRefMemberAccess) {
-  auto r = Parse("module t;\n"
-                 "  var type(pkg.field) x;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  var type(pkg.field) x;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -412,7 +439,8 @@ TEST(ParserSection6, Sec6_11_1_VarTypeRefMemberAccess) {
 
 // 30. type() on time data type.
 TEST(ParserSection6, Sec6_11_1_TypeRefOnTime) {
-  EXPECT_TRUE(ParseOk("module t;\n"
-                      "  initial x = type(time);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial x = type(time);\n"
+              "endmodule\n"));
 }

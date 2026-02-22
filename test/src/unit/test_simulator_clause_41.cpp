@@ -1,10 +1,12 @@
 // §41
 
-#include "simulation/dpi_runtime.h"
-#include <cstdint>
 #include <gtest/gtest.h>
+
+#include <cstdint>
 #include <string>
 #include <vector>
+
+#include "simulation/dpi_runtime.h"
 
 using namespace delta;
 
@@ -109,4 +111,4 @@ TEST(Api, DataReadMissingVariableReturnsDefault) {
   EXPECT_EQ(result.format, DataReadFormat::kInt);
 }
 
-} // namespace
+}  // namespace

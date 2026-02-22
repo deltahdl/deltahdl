@@ -1,11 +1,12 @@
 // §25.3: Interface syntax
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -58,11 +59,12 @@ TEST(Parser, EmptyInterface) {
 }
 
 TEST(Parser, InterfaceAndModule) {
-  auto r = Parse("interface bus; endinterface\n"
-                 "module top; endmodule\n");
+  auto r = Parse(
+      "interface bus; endinterface\n"
+      "module top; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_EQ(r.cu->interfaces.size(), 1);
   EXPECT_EQ(r.cu->modules.size(), 1);
 }
 
-} // namespace
+}  // namespace

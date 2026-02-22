@@ -1,12 +1,13 @@
 // §13.4.3: Constant functions
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -98,4 +99,4 @@ TEST(Functions, ConstantFunctionEvalAtElaboration) {
   EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 42u);
 }
 
-} // namespace
+}  // namespace

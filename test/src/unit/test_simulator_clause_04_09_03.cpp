@@ -357,10 +357,8 @@ TEST(SimCh4093, ContinuesWithOtherActiveEvents) {
   bool has_blocking = false;
   bool has_other = false;
   for (const auto &s : order) {
-    if (s == "blocking_resume")
-      has_blocking = true;
-    if (s == "other_active")
-      has_other = true;
+    if (s == "blocking_resume") has_blocking = true;
+    if (s == "other_active") has_other = true;
   }
   EXPECT_TRUE(has_blocking);
   EXPECT_TRUE(has_other);

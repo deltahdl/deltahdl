@@ -79,4 +79,4 @@ TEST(SysTask, ChangedReturnsZeroOrOne) {
   EXPECT_LE(result.ToUint64(), 1u);
 }
 
-} // namespace
+}  // namespace

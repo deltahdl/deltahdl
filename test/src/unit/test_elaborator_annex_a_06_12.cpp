@@ -32,7 +32,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA612Fixture &f) {
   return design;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.6.12 Randsequence — Elaboration
@@ -41,16 +41,17 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA612Fixture &f) {
 // Basic randsequence elaborates without errors
 TEST(ElabA612, BasicRandsequenceElaborates) {
   ElabA612Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  initial begin\n"
-                              "    randsequence(main)\n"
-                              "      main : first second;\n"
-                              "      first : { ; };\n"
-                              "      second : { ; };\n"
-                              "    endsequence\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : first second;\n"
+      "      first : { ; };\n"
+      "      second : { ; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -58,16 +59,17 @@ TEST(ElabA612, BasicRandsequenceElaborates) {
 // Randsequence with weighted alternatives elaborates
 TEST(ElabA612, WeightedAlternativesElaborate) {
   ElabA612Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  initial begin\n"
-                              "    randsequence(main)\n"
-                              "      main : a := 3 | b := 7;\n"
-                              "      a : { ; };\n"
-                              "      b : { ; };\n"
-                              "    endsequence\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : a := 3 | b := 7;\n"
+      "      a : { ; };\n"
+      "      b : { ; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -75,17 +77,18 @@ TEST(ElabA612, WeightedAlternativesElaborate) {
 // Randsequence with if-else, repeat, case elaborates
 TEST(ElabA612, ControlFlowProdsElaborate) {
   ElabA612Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  initial begin\n"
-                              "    randsequence(main)\n"
-                              "      main : if (1) a else b;\n"
-                              "      a : repeat(3) c;\n"
-                              "      b : case (0) 0: c; default: c; endcase;\n"
-                              "      c : { ; };\n"
-                              "    endsequence\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : if (1) a else b;\n"
+      "      a : repeat(3) c;\n"
+      "      b : case (0) 0: c; default: c; endcase;\n"
+      "      c : { ; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -93,16 +96,17 @@ TEST(ElabA612, ControlFlowProdsElaborate) {
 // Randsequence with rand join elaborates
 TEST(ElabA612, RandJoinElaborates) {
   ElabA612Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  initial begin\n"
-                              "    randsequence(main)\n"
-                              "      main : rand join a b;\n"
-                              "      a : { ; };\n"
-                              "      b : { ; };\n"
-                              "    endsequence\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : rand join a b;\n"
+      "      a : { ; };\n"
+      "      b : { ; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -110,15 +114,16 @@ TEST(ElabA612, RandJoinElaborates) {
 // Randsequence with production ports and return types elaborates
 TEST(ElabA612, ProductionPortsElaborate) {
   ElabA612Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  initial begin\n"
-                              "    randsequence(main)\n"
-                              "      main : gen(5);\n"
-                              "      void gen(int x) : { $display(x); };\n"
-                              "    endsequence\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : gen(5);\n"
+      "      void gen(int x) : { $display(x); };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }

@@ -36,13 +36,14 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimCh10bFixture &f) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, SimpleNBA) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] a;\n"
-                              "  initial begin\n"
-                              "    a <= 5;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a;\n"
+      "  initial begin\n"
+      "    a <= 5;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -60,16 +61,17 @@ TEST(SimCh10b, SimpleNBA) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBADeferredUpdate) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] a;\n"
-                              "  logic [31:0] b;\n"
-                              "  initial begin\n"
-                              "    a = 10;\n"
-                              "    a <= 20;\n"
-                              "    b = a;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a;\n"
+      "  logic [31:0] b;\n"
+      "  initial begin\n"
+      "    a = 10;\n"
+      "    a <= 20;\n"
+      "    b = a;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -91,15 +93,16 @@ TEST(SimCh10b, NBADeferredUpdate) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, MultipleNBASameVarLastWins) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] a;\n"
-                              "  initial begin\n"
-                              "    a <= 1;\n"
-                              "    a <= 2;\n"
-                              "    a <= 3;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a;\n"
+      "  initial begin\n"
+      "    a <= 1;\n"
+      "    a <= 2;\n"
+      "    a <= 3;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -116,17 +119,18 @@ TEST(SimCh10b, MultipleNBASameVarLastWins) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBASwapPattern) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] a;\n"
-                              "  logic [31:0] b;\n"
-                              "  initial begin\n"
-                              "    a = 10;\n"
-                              "    b = 20;\n"
-                              "    a <= b;\n"
-                              "    b <= a;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a;\n"
+      "  logic [31:0] b;\n"
+      "  initial begin\n"
+      "    a = 10;\n"
+      "    b = 20;\n"
+      "    a <= b;\n"
+      "    b <= a;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -147,15 +151,16 @@ TEST(SimCh10b, NBASwapPattern) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAExpressionRHS) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] a;\n"
-                              "  logic [31:0] b;\n"
-                              "  initial begin\n"
-                              "    a = 7;\n"
-                              "    b <= a + 3;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a;\n"
+      "  logic [31:0] b;\n"
+      "  initial begin\n"
+      "    a = 7;\n"
+      "    b <= a + 3;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -172,14 +177,15 @@ TEST(SimCh10b, NBAExpressionRHS) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBABitSelectLHS) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] a;\n"
-                              "  initial begin\n"
-                              "    a = 8'b0000_0000;\n"
-                              "    a[3] <= 1'b1;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  initial begin\n"
+      "    a = 8'b0000_0000;\n"
+      "    a[3] <= 1'b1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -197,14 +203,15 @@ TEST(SimCh10b, NBABitSelectLHS) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAPartSelectLHS) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] a;\n"
-                              "  initial begin\n"
-                              "    a = 8'h00;\n"
-                              "    a[3:0] <= 4'hF;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  initial begin\n"
+      "    a = 8'h00;\n"
+      "    a[3:0] <= 4'hF;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -222,17 +229,18 @@ TEST(SimCh10b, NBAPartSelectLHS) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAConcatenationRHS) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [3:0] hi;\n"
-                              "  logic [3:0] lo;\n"
-                              "  logic [7:0] result;\n"
-                              "  initial begin\n"
-                              "    hi = 4'hA;\n"
-                              "    lo = 4'h5;\n"
-                              "    result <= {hi, lo};\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] hi;\n"
+      "  logic [3:0] lo;\n"
+      "  logic [7:0] result;\n"
+      "  initial begin\n"
+      "    hi = 4'hA;\n"
+      "    lo = 4'h5;\n"
+      "    result <= {hi, lo};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -249,15 +257,16 @@ TEST(SimCh10b, NBAConcatenationRHS) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBATernaryRHS) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] sel;\n"
-                              "  logic [31:0] result;\n"
-                              "  initial begin\n"
-                              "    sel = 1;\n"
-                              "    result <= sel ? 42 : 99;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] sel;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    sel = 1;\n"
+      "    result <= sel ? 42 : 99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -274,20 +283,21 @@ TEST(SimCh10b, NBATernaryRHS) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAInAlwaysFF) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic clk;\n"
-                              "  logic [31:0] q;\n"
-                              "  logic [31:0] d;\n"
-                              "  initial begin\n"
-                              "    d = 77;\n"
-                              "    clk = 0;\n"
-                              "    #1 clk = 1;\n"
-                              "  end\n"
-                              "  always_ff @(posedge clk) begin\n"
-                              "    q <= d;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk;\n"
+      "  logic [31:0] q;\n"
+      "  logic [31:0] d;\n"
+      "  initial begin\n"
+      "    d = 77;\n"
+      "    clk = 0;\n"
+      "    #1 clk = 1;\n"
+      "  end\n"
+      "  always_ff @(posedge clk) begin\n"
+      "    q <= d;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -304,13 +314,14 @@ TEST(SimCh10b, NBAInAlwaysFF) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAInInitialBlock) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] x;\n"
-                              "  initial begin\n"
-                              "    x <= 123;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    x <= 123;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -327,24 +338,25 @@ TEST(SimCh10b, NBAInInitialBlock) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAWithIfElse) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] a;\n"
-                              "  logic [31:0] b;\n"
-                              "  logic cond;\n"
-                              "  initial begin\n"
-                              "    cond = 0;\n"
-                              "    if (cond)\n"
-                              "      a <= 100;\n"
-                              "    else\n"
-                              "      a <= 200;\n"
-                              "    cond = 1;\n"
-                              "    if (cond)\n"
-                              "      b <= 300;\n"
-                              "    else\n"
-                              "      b <= 400;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a;\n"
+      "  logic [31:0] b;\n"
+      "  logic cond;\n"
+      "  initial begin\n"
+      "    cond = 0;\n"
+      "    if (cond)\n"
+      "      a <= 100;\n"
+      "    else\n"
+      "      a <= 200;\n"
+      "    cond = 1;\n"
+      "    if (cond)\n"
+      "      b <= 300;\n"
+      "    else\n"
+      "      b <= 400;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -366,20 +378,21 @@ TEST(SimCh10b, NBAWithIfElse) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAWithCase) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] sel;\n"
-                              "  logic [31:0] result;\n"
-                              "  initial begin\n"
-                              "    sel = 2;\n"
-                              "    case (sel)\n"
-                              "      0: result <= 10;\n"
-                              "      1: result <= 20;\n"
-                              "      2: result <= 30;\n"
-                              "      default: result <= 40;\n"
-                              "    endcase\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] sel;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    sel = 2;\n"
+      "    case (sel)\n"
+      "      0: result <= 10;\n"
+      "      1: result <= 20;\n"
+      "      2: result <= 30;\n"
+      "      default: result <= 40;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -396,16 +409,17 @@ TEST(SimCh10b, NBAWithCase) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAInForLoop) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] acc;\n"
-                              "  initial begin\n"
-                              "    acc = 0;\n"
-                              "    for (int i = 0; i < 5; i = i + 1) begin\n"
-                              "      acc <= acc + 1;\n"
-                              "    end\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] acc;\n"
+      "  initial begin\n"
+      "    acc = 0;\n"
+      "    for (int i = 0; i < 5; i = i + 1) begin\n"
+      "      acc <= acc + 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -424,16 +438,17 @@ TEST(SimCh10b, NBAInForLoop) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAFunctionCallRHS) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] result;\n"
-                              "  function int double_val(int x);\n"
-                              "    return x * 2;\n"
-                              "  endfunction\n"
-                              "  initial begin\n"
-                              "    result <= double_val(21);\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] result;\n"
+      "  function int double_val(int x);\n"
+      "    return x * 2;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    result <= double_val(21);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -451,19 +466,20 @@ TEST(SimCh10b, NBAFunctionCallRHS) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAPipelinePattern) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] in_val;\n"
-                              "  logic [31:0] stage1;\n"
-                              "  logic [31:0] stage2;\n"
-                              "  initial begin\n"
-                              "    in_val = 99;\n"
-                              "    stage1 = 55;\n"
-                              "    stage2 = 0;\n"
-                              "    stage2 <= stage1;\n"
-                              "    stage1 <= in_val;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] in_val;\n"
+      "  logic [31:0] stage1;\n"
+      "  logic [31:0] stage2;\n"
+      "  initial begin\n"
+      "    in_val = 99;\n"
+      "    stage1 = 55;\n"
+      "    stage2 = 0;\n"
+      "    stage2 <= stage1;\n"
+      "    stage1 <= in_val;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -475,8 +491,8 @@ TEST(SimCh10b, NBAPipelinePattern) {
   ASSERT_NE(s1, nullptr);
   ASSERT_NE(s2, nullptr);
   // Both RHS values are sampled from old values.
-  EXPECT_EQ(s2->value.ToUint64(), 55u); // Old stage1.
-  EXPECT_EQ(s1->value.ToUint64(), 99u); // Old in_val.
+  EXPECT_EQ(s2->value.ToUint64(), 55u);  // Old stage1.
+  EXPECT_EQ(s1->value.ToUint64(), 99u);  // Old in_val.
 }
 
 // ---------------------------------------------------------------------------
@@ -484,13 +500,14 @@ TEST(SimCh10b, NBAPipelinePattern) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAWidthTruncation) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] narrow;\n"
-                              "  initial begin\n"
-                              "    narrow <= 32'hABCD;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] narrow;\n"
+      "  initial begin\n"
+      "    narrow <= 32'hABCD;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -508,13 +525,14 @@ TEST(SimCh10b, NBAWidthTruncation) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAWidthExtension) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] wide;\n"
-                              "  initial begin\n"
-                              "    wide <= 8'hFF;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] wide;\n"
+      "  initial begin\n"
+      "    wide <= 8'hFF;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -533,17 +551,18 @@ TEST(SimCh10b, NBAWidthExtension) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAArithmeticExpression) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] a;\n"
-                              "  logic [31:0] b;\n"
-                              "  logic [31:0] result;\n"
-                              "  initial begin\n"
-                              "    a = 15;\n"
-                              "    b = 27;\n"
-                              "    result <= a + b;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a;\n"
+      "  logic [31:0] b;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    a = 15;\n"
+      "    b = 27;\n"
+      "    result <= a + b;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -560,21 +579,22 @@ TEST(SimCh10b, NBAArithmeticExpression) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBABitwiseOperators) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] a;\n"
-                              "  logic [7:0] b;\n"
-                              "  logic [7:0] r_and;\n"
-                              "  logic [7:0] r_or;\n"
-                              "  logic [7:0] r_xor;\n"
-                              "  initial begin\n"
-                              "    a = 8'hF0;\n"
-                              "    b = 8'h3C;\n"
-                              "    r_and <= a & b;\n"
-                              "    r_or  <= a | b;\n"
-                              "    r_xor <= a ^ b;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic [7:0] b;\n"
+      "  logic [7:0] r_and;\n"
+      "  logic [7:0] r_or;\n"
+      "  logic [7:0] r_xor;\n"
+      "  initial begin\n"
+      "    a = 8'hF0;\n"
+      "    b = 8'h3C;\n"
+      "    r_and <= a & b;\n"
+      "    r_or  <= a | b;\n"
+      "    r_xor <= a ^ b;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -587,9 +607,9 @@ TEST(SimCh10b, NBABitwiseOperators) {
   ASSERT_NE(r_and, nullptr);
   ASSERT_NE(r_or, nullptr);
   ASSERT_NE(r_xor, nullptr);
-  EXPECT_EQ(r_and->value.ToUint64(), 0x30u); // 0xF0 & 0x3C = 0x30.
-  EXPECT_EQ(r_or->value.ToUint64(), 0xFCu);  // 0xF0 | 0x3C = 0xFC.
-  EXPECT_EQ(r_xor->value.ToUint64(), 0xCCu); // 0xF0 ^ 0x3C = 0xCC.
+  EXPECT_EQ(r_and->value.ToUint64(), 0x30u);  // 0xF0 & 0x3C = 0x30.
+  EXPECT_EQ(r_or->value.ToUint64(), 0xFCu);   // 0xF0 | 0x3C = 0xFC.
+  EXPECT_EQ(r_xor->value.ToUint64(), 0xCCu);  // 0xF0 ^ 0x3C = 0xCC.
 }
 
 // ---------------------------------------------------------------------------
@@ -597,17 +617,18 @@ TEST(SimCh10b, NBABitwiseOperators) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAShiftOperators) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] val;\n"
-                              "  logic [7:0] r_shl;\n"
-                              "  logic [7:0] r_shr;\n"
-                              "  initial begin\n"
-                              "    val = 8'h0F;\n"
-                              "    r_shl <= val << 2;\n"
-                              "    r_shr <= val >> 1;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] val;\n"
+      "  logic [7:0] r_shl;\n"
+      "  logic [7:0] r_shr;\n"
+      "  initial begin\n"
+      "    val = 8'h0F;\n"
+      "    r_shl <= val << 2;\n"
+      "    r_shr <= val >> 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -629,21 +650,22 @@ TEST(SimCh10b, NBAShiftOperators) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAComparisonResult) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] a;\n"
-                              "  logic [31:0] b;\n"
-                              "  logic r_eq;\n"
-                              "  logic r_lt;\n"
-                              "  logic r_gt;\n"
-                              "  initial begin\n"
-                              "    a = 10;\n"
-                              "    b = 20;\n"
-                              "    r_eq <= (a == b);\n"
-                              "    r_lt <= (a < b);\n"
-                              "    r_gt <= (a > b);\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a;\n"
+      "  logic [31:0] b;\n"
+      "  logic r_eq;\n"
+      "  logic r_lt;\n"
+      "  logic r_gt;\n"
+      "  initial begin\n"
+      "    a = 10;\n"
+      "    b = 20;\n"
+      "    r_eq <= (a == b);\n"
+      "    r_lt <= (a < b);\n"
+      "    r_gt <= (a > b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -666,16 +688,17 @@ TEST(SimCh10b, NBAComparisonResult) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, MixedBlockingAndNBA) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] a;\n"
-                              "  logic [31:0] b;\n"
-                              "  initial begin\n"
-                              "    a = 5;\n"
-                              "    b <= a + 1;\n"
-                              "    a = 10;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a;\n"
+      "  logic [31:0] b;\n"
+      "  initial begin\n"
+      "    a = 5;\n"
+      "    b <= a + 1;\n"
+      "    a = 10;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -696,18 +719,19 @@ TEST(SimCh10b, MixedBlockingAndNBA) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, MultipleNBAsInSequence) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] a;\n"
-                              "  logic [31:0] b;\n"
-                              "  logic [31:0] c;\n"
-                              "  initial begin\n"
-                              "    a = 1;\n"
-                              "    b <= a;\n"
-                              "    a = 2;\n"
-                              "    c <= a;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a;\n"
+      "  logic [31:0] b;\n"
+      "  logic [31:0] c;\n"
+      "  initial begin\n"
+      "    a = 1;\n"
+      "    b <= a;\n"
+      "    a = 2;\n"
+      "    c <= a;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -728,15 +752,16 @@ TEST(SimCh10b, MultipleNBAsInSequence) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAPreservesWidth) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [15:0] a;\n"
-                              "  logic [7:0] b;\n"
-                              "  initial begin\n"
-                              "    a <= 16'hCAFE;\n"
-                              "    b <= 8'hBE;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] a;\n"
+      "  logic [7:0] b;\n"
+      "  initial begin\n"
+      "    a <= 16'hCAFE;\n"
+      "    b <= 8'hBE;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -758,16 +783,17 @@ TEST(SimCh10b, NBAPreservesWidth) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBARegisterFilePattern) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] regfile [0:3];\n"
-                              "  initial begin\n"
-                              "    regfile[0] <= 100;\n"
-                              "    regfile[1] <= 200;\n"
-                              "    regfile[2] <= 300;\n"
-                              "    regfile[3] <= 400;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] regfile [0:3];\n"
+      "  initial begin\n"
+      "    regfile[0] <= 100;\n"
+      "    regfile[1] <= 200;\n"
+      "    regfile[2] <= 300;\n"
+      "    regfile[3] <= 400;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -793,17 +819,18 @@ TEST(SimCh10b, NBARegisterFilePattern) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAWidthAndToUint64) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [3:0] nibble;\n"
-                              "  logic [15:0] half;\n"
-                              "  logic [31:0] word;\n"
-                              "  initial begin\n"
-                              "    nibble <= 4'hA;\n"
-                              "    half   <= 16'hBEEF;\n"
-                              "    word   <= 32'hDEADCAFE;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] nibble;\n"
+      "  logic [15:0] half;\n"
+      "  logic [31:0] word;\n"
+      "  initial begin\n"
+      "    nibble <= 4'hA;\n"
+      "    half   <= 16'hBEEF;\n"
+      "    word   <= 32'hDEADCAFE;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -829,19 +856,20 @@ TEST(SimCh10b, NBAWidthAndToUint64) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBACaseDefaultBranch) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] sel;\n"
-                              "  logic [31:0] result;\n"
-                              "  initial begin\n"
-                              "    sel = 99;\n"
-                              "    case (sel)\n"
-                              "      0: result <= 10;\n"
-                              "      1: result <= 20;\n"
-                              "      default: result <= 77;\n"
-                              "    endcase\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] sel;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    sel = 99;\n"
+      "    case (sel)\n"
+      "      0: result <= 10;\n"
+      "      1: result <= 20;\n"
+      "      default: result <= 77;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -858,15 +886,16 @@ TEST(SimCh10b, NBACaseDefaultBranch) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBABitwiseNot) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] a;\n"
-                              "  logic [7:0] result;\n"
-                              "  initial begin\n"
-                              "    a = 8'hF0;\n"
-                              "    result <= ~a;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic [7:0] result;\n"
+      "  initial begin\n"
+      "    a = 8'hF0;\n"
+      "    result <= ~a;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -884,13 +913,14 @@ TEST(SimCh10b, NBABitwiseNot) {
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAReplicationRHS) {
   SimCh10bFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] result;\n"
-                              "  initial begin\n"
-                              "    result <= {4{2'b10}};\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial begin\n"
+      "    result <= {4{2'b10}};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);

@@ -1,11 +1,12 @@
 // §7.2: Structures
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -59,12 +60,13 @@ struct ModportPortExpected {
 namespace {
 
 TEST(Parser, TypedefStruct) {
-  auto r = Parse("module t;\n"
-                 "  typedef struct {\n"
-                 "    logic [7:0] a;\n"
-                 "    int b;\n"
-                 "  } my_struct_t;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct {\n"
+      "    logic [7:0] a;\n"
+      "    int b;\n"
+      "  } my_struct_t;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
@@ -79,12 +81,13 @@ TEST(Parser, TypedefStruct) {
 }
 
 TEST(Parser, TypedefStructPacked) {
-  auto r = Parse("module t;\n"
-                 "  typedef struct packed {\n"
-                 "    logic [3:0] hi;\n"
-                 "    logic [3:0] lo;\n"
-                 "  } byte_t;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct packed {\n"
+      "    logic [3:0] hi;\n"
+      "    logic [3:0] lo;\n"
+      "  } byte_t;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kStruct);
@@ -93,9 +96,10 @@ TEST(Parser, TypedefStructPacked) {
 }
 
 TEST(Parser, InlineStructVar) {
-  auto r = Parse("module t;\n"
-                 "  struct { int x; int y; } point;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  struct { int x; int y; } point;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
@@ -104,4 +108,4 @@ TEST(Parser, InlineStructVar) {
   ASSERT_EQ(item->data_type.struct_members.size(), 2);
 }
 
-} // namespace
+}  // namespace

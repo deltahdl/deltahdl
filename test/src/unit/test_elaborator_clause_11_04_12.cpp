@@ -1,12 +1,13 @@
 // §11.4.12: Concatenation operators
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "elaboration/const_eval.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -41,4 +42,4 @@ TEST(ConstEval, Replication) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("{4{1'b1}}", f)), 15);
 }
 
-} // namespace
+}  // namespace

@@ -83,8 +83,7 @@ TEST(SimCh4092, AssignStatementOverridesProceduralAssignment) {
     auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() {
-      if (assign_active)
-        reg_val = assign_src;
+      if (assign_active) reg_val = assign_src;
     };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
   };
@@ -114,8 +113,7 @@ TEST(SimCh4092, ForceStatementOverridesAllDrivers) {
     auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() {
-      if (!force_active)
-        net_val = 10;
+      if (!force_active) net_val = 10;
     };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
   };
@@ -290,8 +288,7 @@ TEST(SimCh4092, DeassignDeactivatesAssign) {
     auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() {
-      if (assign_active)
-        reg_val = src;
+      if (assign_active) reg_val = src;
     };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
   };
@@ -311,8 +308,7 @@ TEST(SimCh4092, DeassignDeactivatesAssign) {
     auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() {
-      if (assign_active)
-        reg_val = src;
+      if (assign_active) reg_val = src;
     };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
   };
@@ -345,8 +341,7 @@ TEST(SimCh4092, ReleaseDeactivatesForce) {
     auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() {
-      if (!force_active)
-        net_val = normal_driver;
+      if (!force_active) net_val = normal_driver;
     };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
   };
@@ -402,8 +397,7 @@ TEST(SimCh4092, DeassignAllowsSubsequentProceduralAssignment) {
     auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() {
-      if (assign_active)
-        reg_val = 30;
+      if (assign_active) reg_val = 30;
     };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
   };

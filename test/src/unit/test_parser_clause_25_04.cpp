@@ -1,11 +1,12 @@
 // §25.4: Ports in interfaces
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -49,11 +50,12 @@ struct ModportPortExpected {
 namespace {
 
 TEST(Parser, InterfaceWithPorts) {
-  auto r = Parse("interface bus(input logic clk, input logic rst);\n"
-                 "endinterface\n");
+  auto r = Parse(
+      "interface bus(input logic clk, input logic rst);\n"
+      "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->interfaces.size(), 1);
   EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 2);
 }
 
-} // namespace
+}  // namespace

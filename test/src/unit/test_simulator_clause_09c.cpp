@@ -39,13 +39,14 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimCh9cFixture &f) {
 // 1. always_latch body executes at time 0 with default variable values.
 TEST(SimCh9c, ExecutesAtTimeZero) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic en;\n"
-                              "  logic [7:0] d, q;\n"
-                              "  always_latch\n"
-                              "    if (en) q = d;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic en;\n"
+      "  logic [7:0] d, q;\n"
+      "  always_latch\n"
+      "    if (en) q = d;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -62,12 +63,13 @@ TEST(SimCh9c, ExecutesAtTimeZero) {
 // 2. always_latch with unconditional assignment sets output at time 0.
 TEST(SimCh9c, UnconditionalAssignAtTimeZero) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] q;\n"
-                              "  always_latch\n"
-                              "    q = 8'hAB;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] q;\n"
+      "  always_latch\n"
+      "    q = 8'hAB;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -87,17 +89,18 @@ TEST(SimCh9c, UnconditionalAssignAtTimeZero) {
 // 3. if-without-else: enable low retains default (zero) value.
 TEST(SimCh9c, IfWithoutElseRetainsDefault) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic en;\n"
-                              "  logic [7:0] d, q;\n"
-                              "  initial begin\n"
-                              "    en = 0;\n"
-                              "    d = 8'hFF;\n"
-                              "  end\n"
-                              "  always_latch\n"
-                              "    if (en) q = d;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic en;\n"
+      "  logic [7:0] d, q;\n"
+      "  initial begin\n"
+      "    en = 0;\n"
+      "    d = 8'hFF;\n"
+      "  end\n"
+      "  always_latch\n"
+      "    if (en) q = d;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -113,17 +116,18 @@ TEST(SimCh9c, IfWithoutElseRetainsDefault) {
 // 4. if-without-else: enable high passes data through.
 TEST(SimCh9c, EnableHighPassesData) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic en;\n"
-                              "  logic [7:0] d, q;\n"
-                              "  initial begin\n"
-                              "    en = 1;\n"
-                              "    d = 8'h42;\n"
-                              "  end\n"
-                              "  always_latch\n"
-                              "    if (en) q = d;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic en;\n"
+      "  logic [7:0] d, q;\n"
+      "  initial begin\n"
+      "    en = 1;\n"
+      "    d = 8'h42;\n"
+      "  end\n"
+      "  always_latch\n"
+      "    if (en) q = d;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -138,17 +142,18 @@ TEST(SimCh9c, EnableHighPassesData) {
 // 5. Enable low retains previous value set by initial block ordering.
 TEST(SimCh9c, EnableLowRetainsPreviousValue) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic en;\n"
-                              "  logic [7:0] d, q;\n"
-                              "  initial begin\n"
-                              "    d = 8'hBB;\n"
-                              "    en = 1;\n"
-                              "  end\n"
-                              "  always_latch\n"
-                              "    if (en) q = d;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic en;\n"
+      "  logic [7:0] d, q;\n"
+      "  initial begin\n"
+      "    d = 8'hBB;\n"
+      "    en = 1;\n"
+      "  end\n"
+      "  always_latch\n"
+      "    if (en) q = d;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -168,20 +173,21 @@ TEST(SimCh9c, EnableLowRetainsPreviousValue) {
 // 6. Two independent latches in one always_latch begin/end block.
 TEST(SimCh9c, MultipleLatchesInOneBlock) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic en;\n"
-                              "  logic [7:0] d1, d2, q1, q2;\n"
-                              "  initial begin\n"
-                              "    en = 1;\n"
-                              "    d1 = 8'hAA;\n"
-                              "    d2 = 8'h55;\n"
-                              "  end\n"
-                              "  always_latch begin\n"
-                              "    if (en) q1 = d1;\n"
-                              "    if (en) q2 = d2;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic en;\n"
+      "  logic [7:0] d1, d2, q1, q2;\n"
+      "  initial begin\n"
+      "    en = 1;\n"
+      "    d1 = 8'hAA;\n"
+      "    d2 = 8'h55;\n"
+      "  end\n"
+      "  always_latch begin\n"
+      "    if (en) q1 = d1;\n"
+      "    if (en) q2 = d2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -199,20 +205,21 @@ TEST(SimCh9c, MultipleLatchesInOneBlock) {
 // 7. Multiple latches with enable low: both retain default 0.
 TEST(SimCh9c, MultipleLatchesEnableLow) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic en;\n"
-                              "  logic [7:0] d1, d2, q1, q2;\n"
-                              "  initial begin\n"
-                              "    en = 0;\n"
-                              "    d1 = 8'hAA;\n"
-                              "    d2 = 8'h55;\n"
-                              "  end\n"
-                              "  always_latch begin\n"
-                              "    if (en) q1 = d1;\n"
-                              "    if (en) q2 = d2;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic en;\n"
+      "  logic [7:0] d1, d2, q1, q2;\n"
+      "  initial begin\n"
+      "    en = 0;\n"
+      "    d1 = 8'hAA;\n"
+      "    d2 = 8'h55;\n"
+      "  end\n"
+      "  always_latch begin\n"
+      "    if (en) q1 = d1;\n"
+      "    if (en) q2 = d2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -234,17 +241,18 @@ TEST(SimCh9c, MultipleLatchesEnableLow) {
 // 8. Incomplete case (no default) retains value for unmatched selectors.
 TEST(SimCh9c, IncompleteCaseRetainsValue) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [1:0] sel;\n"
-                              "  logic [7:0] q;\n"
-                              "  initial sel = 2'b00;\n"
-                              "  always_latch\n"
-                              "    case (sel)\n"
-                              "      2'b01: q = 8'hAA;\n"
-                              "      2'b10: q = 8'hBB;\n"
-                              "    endcase\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [1:0] sel;\n"
+      "  logic [7:0] q;\n"
+      "  initial sel = 2'b00;\n"
+      "  always_latch\n"
+      "    case (sel)\n"
+      "      2'b01: q = 8'hAA;\n"
+      "      2'b10: q = 8'hBB;\n"
+      "    endcase\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -260,17 +268,18 @@ TEST(SimCh9c, IncompleteCaseRetainsValue) {
 // 9. Incomplete case with matching selector assigns value.
 TEST(SimCh9c, IncompleteCaseMatchAssigns) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [1:0] sel;\n"
-                              "  logic [7:0] q;\n"
-                              "  initial sel = 2'b01;\n"
-                              "  always_latch\n"
-                              "    case (sel)\n"
-                              "      2'b01: q = 8'hAA;\n"
-                              "      2'b10: q = 8'hBB;\n"
-                              "    endcase\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [1:0] sel;\n"
+      "  logic [7:0] q;\n"
+      "  initial sel = 2'b01;\n"
+      "  always_latch\n"
+      "    case (sel)\n"
+      "      2'b01: q = 8'hAA;\n"
+      "      2'b10: q = 8'hBB;\n"
+      "    endcase\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -285,17 +294,18 @@ TEST(SimCh9c, IncompleteCaseMatchAssigns) {
 // 10. Incomplete case matching second arm.
 TEST(SimCh9c, IncompleteCaseSecondArm) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [1:0] sel;\n"
-                              "  logic [7:0] q;\n"
-                              "  initial sel = 2'b10;\n"
-                              "  always_latch\n"
-                              "    case (sel)\n"
-                              "      2'b01: q = 8'hAA;\n"
-                              "      2'b10: q = 8'hBB;\n"
-                              "    endcase\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [1:0] sel;\n"
+      "  logic [7:0] q;\n"
+      "  initial sel = 2'b10;\n"
+      "  always_latch\n"
+      "    case (sel)\n"
+      "      2'b01: q = 8'hAA;\n"
+      "      2'b10: q = 8'hBB;\n"
+      "    endcase\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -314,17 +324,18 @@ TEST(SimCh9c, IncompleteCaseSecondArm) {
 // 11. always_latch with logic type.
 TEST(SimCh9c, LatchLogicType) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic en;\n"
-                              "  logic [3:0] d, q;\n"
-                              "  initial begin\n"
-                              "    en = 1;\n"
-                              "    d = 4'hC;\n"
-                              "  end\n"
-                              "  always_latch\n"
-                              "    if (en) q = d;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic en;\n"
+      "  logic [3:0] d, q;\n"
+      "  initial begin\n"
+      "    en = 1;\n"
+      "    d = 4'hC;\n"
+      "  end\n"
+      "  always_latch\n"
+      "    if (en) q = d;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -340,17 +351,18 @@ TEST(SimCh9c, LatchLogicType) {
 // 12. always_latch with int type (32-bit).
 TEST(SimCh9c, LatchIntType) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic en;\n"
-                              "  int d, q;\n"
-                              "  initial begin\n"
-                              "    en = 1;\n"
-                              "    d = 12345;\n"
-                              "  end\n"
-                              "  always_latch\n"
-                              "    if (en) q = d;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic en;\n"
+      "  int d, q;\n"
+      "  initial begin\n"
+      "    en = 1;\n"
+      "    d = 12345;\n"
+      "  end\n"
+      "  always_latch\n"
+      "    if (en) q = d;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -366,17 +378,18 @@ TEST(SimCh9c, LatchIntType) {
 // 13. always_latch with byte type (8-bit).
 TEST(SimCh9c, LatchByteType) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic en;\n"
-                              "  byte d, q;\n"
-                              "  initial begin\n"
-                              "    en = 1;\n"
-                              "    d = 8'hFE;\n"
-                              "  end\n"
-                              "  always_latch\n"
-                              "    if (en) q = d;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic en;\n"
+      "  byte d, q;\n"
+      "  initial begin\n"
+      "    en = 1;\n"
+      "    d = 8'hFE;\n"
+      "  end\n"
+      "  always_latch\n"
+      "    if (en) q = d;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -396,18 +409,19 @@ TEST(SimCh9c, LatchByteType) {
 // 14. Bit-select on RHS within always_latch.
 TEST(SimCh9c, BitSelectRHS) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic en;\n"
-                              "  logic [7:0] d;\n"
-                              "  logic q;\n"
-                              "  initial begin\n"
-                              "    en = 1;\n"
-                              "    d = 8'b1010_0101;\n"
-                              "  end\n"
-                              "  always_latch\n"
-                              "    if (en) q = d[0];\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic en;\n"
+      "  logic [7:0] d;\n"
+      "  logic q;\n"
+      "  initial begin\n"
+      "    en = 1;\n"
+      "    d = 8'b1010_0101;\n"
+      "  end\n"
+      "  always_latch\n"
+      "    if (en) q = d[0];\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -423,18 +437,19 @@ TEST(SimCh9c, BitSelectRHS) {
 // 15. Bit-select on a different bit position.
 TEST(SimCh9c, BitSelectHighBit) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic en;\n"
-                              "  logic [7:0] d;\n"
-                              "  logic q;\n"
-                              "  initial begin\n"
-                              "    en = 1;\n"
-                              "    d = 8'b1010_0101;\n"
-                              "  end\n"
-                              "  always_latch\n"
-                              "    if (en) q = d[7];\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic en;\n"
+      "  logic [7:0] d;\n"
+      "  logic q;\n"
+      "  initial begin\n"
+      "    en = 1;\n"
+      "    d = 8'b1010_0101;\n"
+      "  end\n"
+      "  always_latch\n"
+      "    if (en) q = d[7];\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -454,18 +469,19 @@ TEST(SimCh9c, BitSelectHighBit) {
 // 16. Part-select extracting lower nibble.
 TEST(SimCh9c, PartSelectLowerNibble) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic en;\n"
-                              "  logic [7:0] d;\n"
-                              "  logic [3:0] q;\n"
-                              "  initial begin\n"
-                              "    en = 1;\n"
-                              "    d = 8'hAB;\n"
-                              "  end\n"
-                              "  always_latch\n"
-                              "    if (en) q = d[3:0];\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic en;\n"
+      "  logic [7:0] d;\n"
+      "  logic [3:0] q;\n"
+      "  initial begin\n"
+      "    en = 1;\n"
+      "    d = 8'hAB;\n"
+      "  end\n"
+      "  always_latch\n"
+      "    if (en) q = d[3:0];\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -482,18 +498,19 @@ TEST(SimCh9c, PartSelectLowerNibble) {
 // 17. Part-select extracting upper nibble.
 TEST(SimCh9c, PartSelectUpperNibble) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic en;\n"
-                              "  logic [7:0] d;\n"
-                              "  logic [3:0] q;\n"
-                              "  initial begin\n"
-                              "    en = 1;\n"
-                              "    d = 8'hAB;\n"
-                              "  end\n"
-                              "  always_latch\n"
-                              "    if (en) q = d[7:4];\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic en;\n"
+      "  logic [7:0] d;\n"
+      "  logic [3:0] q;\n"
+      "  initial begin\n"
+      "    en = 1;\n"
+      "    d = 8'hAB;\n"
+      "  end\n"
+      "  always_latch\n"
+      "    if (en) q = d[7:4];\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -514,19 +531,20 @@ TEST(SimCh9c, PartSelectUpperNibble) {
 // 18. Concatenation on RHS within always_latch.
 TEST(SimCh9c, ConcatenationRHS) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic en;\n"
-                              "  logic [3:0] a, b;\n"
-                              "  logic [7:0] q;\n"
-                              "  initial begin\n"
-                              "    en = 1;\n"
-                              "    a = 4'hA;\n"
-                              "    b = 4'h5;\n"
-                              "  end\n"
-                              "  always_latch\n"
-                              "    if (en) q = {a, b};\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic en;\n"
+      "  logic [3:0] a, b;\n"
+      "  logic [7:0] q;\n"
+      "  initial begin\n"
+      "    en = 1;\n"
+      "    a = 4'hA;\n"
+      "    b = 4'h5;\n"
+      "  end\n"
+      "  always_latch\n"
+      "    if (en) q = {a, b};\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -542,19 +560,20 @@ TEST(SimCh9c, ConcatenationRHS) {
 // 19. Concatenation retained when enable is low.
 TEST(SimCh9c, ConcatenationRetainedWhenLow) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic en;\n"
-                              "  logic [3:0] a, b;\n"
-                              "  logic [7:0] q;\n"
-                              "  initial begin\n"
-                              "    en = 0;\n"
-                              "    a = 4'hA;\n"
-                              "    b = 4'h5;\n"
-                              "  end\n"
-                              "  always_latch\n"
-                              "    if (en) q = {a, b};\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic en;\n"
+      "  logic [3:0] a, b;\n"
+      "  logic [7:0] q;\n"
+      "  initial begin\n"
+      "    en = 0;\n"
+      "    a = 4'hA;\n"
+      "    b = 4'h5;\n"
+      "  end\n"
+      "  always_latch\n"
+      "    if (en) q = {a, b};\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -574,18 +593,19 @@ TEST(SimCh9c, ConcatenationRetainedWhenLow) {
 // 20. Ternary operator in always_latch selects first operand.
 TEST(SimCh9c, TernarySelectsFirst) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic sel;\n"
-                              "  logic [7:0] a, b, q;\n"
-                              "  initial begin\n"
-                              "    sel = 1;\n"
-                              "    a = 8'hCA;\n"
-                              "    b = 8'hFE;\n"
-                              "  end\n"
-                              "  always_latch\n"
-                              "    q = sel ? a : b;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic sel;\n"
+      "  logic [7:0] a, b, q;\n"
+      "  initial begin\n"
+      "    sel = 1;\n"
+      "    a = 8'hCA;\n"
+      "    b = 8'hFE;\n"
+      "  end\n"
+      "  always_latch\n"
+      "    q = sel ? a : b;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -600,18 +620,19 @@ TEST(SimCh9c, TernarySelectsFirst) {
 // 21. Ternary operator in always_latch selects second operand.
 TEST(SimCh9c, TernarySelectsSecond) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic sel;\n"
-                              "  logic [7:0] a, b, q;\n"
-                              "  initial begin\n"
-                              "    sel = 0;\n"
-                              "    a = 8'hCA;\n"
-                              "    b = 8'hFE;\n"
-                              "  end\n"
-                              "  always_latch\n"
-                              "    q = sel ? a : b;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic sel;\n"
+      "  logic [7:0] a, b, q;\n"
+      "  initial begin\n"
+      "    sel = 0;\n"
+      "    a = 8'hCA;\n"
+      "    b = 8'hFE;\n"
+      "  end\n"
+      "  always_latch\n"
+      "    q = sel ? a : b;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -630,22 +651,23 @@ TEST(SimCh9c, TernarySelectsSecond) {
 // 22. Nested if-else: outer condition true, inner condition true.
 TEST(SimCh9c, NestedIfElseBothTrue) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic en, sel;\n"
-                              "  logic [7:0] a, b, q;\n"
-                              "  initial begin\n"
-                              "    en = 1;\n"
-                              "    sel = 1;\n"
-                              "    a = 8'h11;\n"
-                              "    b = 8'h22;\n"
-                              "  end\n"
-                              "  always_latch\n"
-                              "    if (en) begin\n"
-                              "      if (sel) q = a;\n"
-                              "      else q = b;\n"
-                              "    end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic en, sel;\n"
+      "  logic [7:0] a, b, q;\n"
+      "  initial begin\n"
+      "    en = 1;\n"
+      "    sel = 1;\n"
+      "    a = 8'h11;\n"
+      "    b = 8'h22;\n"
+      "  end\n"
+      "  always_latch\n"
+      "    if (en) begin\n"
+      "      if (sel) q = a;\n"
+      "      else q = b;\n"
+      "    end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -660,22 +682,23 @@ TEST(SimCh9c, NestedIfElseBothTrue) {
 // 23. Nested if-else: outer condition true, inner condition false.
 TEST(SimCh9c, NestedIfElseInnerFalse) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic en, sel;\n"
-                              "  logic [7:0] a, b, q;\n"
-                              "  initial begin\n"
-                              "    en = 1;\n"
-                              "    sel = 0;\n"
-                              "    a = 8'h11;\n"
-                              "    b = 8'h22;\n"
-                              "  end\n"
-                              "  always_latch\n"
-                              "    if (en) begin\n"
-                              "      if (sel) q = a;\n"
-                              "      else q = b;\n"
-                              "    end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic en, sel;\n"
+      "  logic [7:0] a, b, q;\n"
+      "  initial begin\n"
+      "    en = 1;\n"
+      "    sel = 0;\n"
+      "    a = 8'h11;\n"
+      "    b = 8'h22;\n"
+      "  end\n"
+      "  always_latch\n"
+      "    if (en) begin\n"
+      "      if (sel) q = a;\n"
+      "      else q = b;\n"
+      "    end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -690,22 +713,23 @@ TEST(SimCh9c, NestedIfElseInnerFalse) {
 // 24. Nested if-else: outer condition false, output retains value.
 TEST(SimCh9c, NestedIfElseOuterFalse) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic en, sel;\n"
-                              "  logic [7:0] a, b, q;\n"
-                              "  initial begin\n"
-                              "    en = 0;\n"
-                              "    sel = 1;\n"
-                              "    a = 8'h11;\n"
-                              "    b = 8'h22;\n"
-                              "  end\n"
-                              "  always_latch\n"
-                              "    if (en) begin\n"
-                              "      if (sel) q = a;\n"
-                              "      else q = b;\n"
-                              "    end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic en, sel;\n"
+      "  logic [7:0] a, b, q;\n"
+      "  initial begin\n"
+      "    en = 0;\n"
+      "    sel = 1;\n"
+      "    a = 8'h11;\n"
+      "    b = 8'h22;\n"
+      "  end\n"
+      "  always_latch\n"
+      "    if (en) begin\n"
+      "      if (sel) q = a;\n"
+      "      else q = b;\n"
+      "    end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -725,24 +749,25 @@ TEST(SimCh9c, NestedIfElseOuterFalse) {
 // 25. Multiple outputs assigned from different data sources.
 TEST(SimCh9c, MultipleOutputsDifferentSources) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic en;\n"
-                              "  logic [7:0] d1, d2, d3, q1, q2, q3;\n"
-                              "  initial begin\n"
-                              "    en = 1;\n"
-                              "    d1 = 8'h10;\n"
-                              "    d2 = 8'h20;\n"
-                              "    d3 = 8'h30;\n"
-                              "  end\n"
-                              "  always_latch begin\n"
-                              "    if (en) begin\n"
-                              "      q1 = d1;\n"
-                              "      q2 = d2;\n"
-                              "      q3 = d3;\n"
-                              "    end\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic en;\n"
+      "  logic [7:0] d1, d2, d3, q1, q2, q3;\n"
+      "  initial begin\n"
+      "    en = 1;\n"
+      "    d1 = 8'h10;\n"
+      "    d2 = 8'h20;\n"
+      "    d3 = 8'h30;\n"
+      "  end\n"
+      "  always_latch begin\n"
+      "    if (en) begin\n"
+      "      q1 = d1;\n"
+      "      q2 = d2;\n"
+      "      q3 = d3;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -763,21 +788,22 @@ TEST(SimCh9c, MultipleOutputsDifferentSources) {
 // 26. Multiple outputs with independent enable conditions.
 TEST(SimCh9c, MultipleOutputsIndependentEnables) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic en1, en2;\n"
-                              "  logic [7:0] d1, d2, q1, q2;\n"
-                              "  initial begin\n"
-                              "    en1 = 1;\n"
-                              "    en2 = 0;\n"
-                              "    d1 = 8'hDE;\n"
-                              "    d2 = 8'hAD;\n"
-                              "  end\n"
-                              "  always_latch begin\n"
-                              "    if (en1) q1 = d1;\n"
-                              "    if (en2) q2 = d2;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic en1, en2;\n"
+      "  logic [7:0] d1, d2, q1, q2;\n"
+      "  initial begin\n"
+      "    en1 = 1;\n"
+      "    en2 = 0;\n"
+      "    d1 = 8'hDE;\n"
+      "    d2 = 8'hAD;\n"
+      "  end\n"
+      "  always_latch begin\n"
+      "    if (en1) q1 = d1;\n"
+      "    if (en2) q2 = d2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -800,17 +826,18 @@ TEST(SimCh9c, MultipleOutputsIndependentEnables) {
 // 27. Output is available after scheduler.Run() completes.
 TEST(SimCh9c, OutputAvailableAfterRun) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic en;\n"
-                              "  logic [15:0] d, q;\n"
-                              "  initial begin\n"
-                              "    en = 1;\n"
-                              "    d = 16'hBEEF;\n"
-                              "  end\n"
-                              "  always_latch\n"
-                              "    if (en) q = d;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic en;\n"
+      "  logic [15:0] d, q;\n"
+      "  initial begin\n"
+      "    en = 1;\n"
+      "    d = 16'hBEEF;\n"
+      "  end\n"
+      "  always_latch\n"
+      "    if (en) q = d;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -826,17 +853,18 @@ TEST(SimCh9c, OutputAvailableAfterRun) {
 // 28. Verify .width on always_latch output with 1-bit result.
 TEST(SimCh9c, WidthVerificationSingleBit) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic en;\n"
-                              "  logic d, q;\n"
-                              "  initial begin\n"
-                              "    en = 1;\n"
-                              "    d = 1;\n"
-                              "  end\n"
-                              "  always_latch\n"
-                              "    if (en) q = d;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic en;\n"
+      "  logic d, q;\n"
+      "  initial begin\n"
+      "    en = 1;\n"
+      "    d = 1;\n"
+      "  end\n"
+      "  always_latch\n"
+      "    if (en) q = d;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -856,17 +884,18 @@ TEST(SimCh9c, WidthVerificationSingleBit) {
 // 29. 32-bit always_latch output verifies width and value.
 TEST(SimCh9c, Width32BitAndToUint64) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic en;\n"
-                              "  logic [31:0] d, q;\n"
-                              "  initial begin\n"
-                              "    en = 1;\n"
-                              "    d = 32'hDEADBEEF;\n"
-                              "  end\n"
-                              "  always_latch\n"
-                              "    if (en) q = d;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic en;\n"
+      "  logic [31:0] d, q;\n"
+      "  initial begin\n"
+      "    en = 1;\n"
+      "    d = 32'hDEADBEEF;\n"
+      "  end\n"
+      "  always_latch\n"
+      "    if (en) q = d;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -882,19 +911,20 @@ TEST(SimCh9c, Width32BitAndToUint64) {
 // 30. always_latch with begin/end block and arithmetic on RHS.
 TEST(SimCh9c, BeginEndBlockWithArithmetic) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic en;\n"
-                              "  logic [7:0] a, b, q;\n"
-                              "  initial begin\n"
-                              "    en = 1;\n"
-                              "    a = 8'h10;\n"
-                              "    b = 8'h20;\n"
-                              "  end\n"
-                              "  always_latch begin\n"
-                              "    if (en) q = a + b;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic en;\n"
+      "  logic [7:0] a, b, q;\n"
+      "  initial begin\n"
+      "    en = 1;\n"
+      "    a = 8'h10;\n"
+      "    b = 8'h20;\n"
+      "  end\n"
+      "  always_latch begin\n"
+      "    if (en) q = a + b;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);

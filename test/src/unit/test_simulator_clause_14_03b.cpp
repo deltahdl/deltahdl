@@ -1,12 +1,13 @@
 // §14.3: Clocking block declaration
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "simulation/clocking.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -37,4 +38,4 @@ TEST(Clocking, FindNonexistent) {
   EXPECT_EQ(mgr.Find("nonexistent"), nullptr);
 }
 
-} // namespace
+}  // namespace

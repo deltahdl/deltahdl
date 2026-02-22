@@ -1,12 +1,13 @@
 // Non-LRM tests
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -353,4 +354,4 @@ TEST(QueueRef, WidthMismatchFallsBackToValue) {
   EXPECT_EQ(q->elements[1].ToUint64(), 20u);
 }
 
-} // namespace
+}  // namespace

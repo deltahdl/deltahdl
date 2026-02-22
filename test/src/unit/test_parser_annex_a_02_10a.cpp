@@ -44,8 +44,7 @@ static bool ParseOk(const std::string &src) {
 static ModuleItem *FindItemByKind(const std::vector<ModuleItem *> &items,
                                   ModuleItemKind kind) {
   for (auto *item : items) {
-    if (item->kind == kind)
-      return item;
+    if (item->kind == kind) return item;
   }
   return nullptr;
 }
@@ -58,9 +57,10 @@ static ModuleItem *FindItemByKind(const std::vector<ModuleItem *> &items,
 // =============================================================================
 
 TEST(ParserA210, ConcurrentAssertionItem_AssertProperty) {
-  auto r = Parse("module m;\n"
-                 "  assert property (@(posedge clk) a |-> b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) a |-> b);\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty);
@@ -69,9 +69,10 @@ TEST(ParserA210, ConcurrentAssertionItem_AssertProperty) {
 }
 
 TEST(ParserA210, ConcurrentAssertionItem_AssumeProperty) {
-  auto r = Parse("module m;\n"
-                 "  assume property (@(posedge clk) req |-> ack);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assume property (@(posedge clk) req |-> ack);\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssumeProperty);
@@ -79,9 +80,10 @@ TEST(ParserA210, ConcurrentAssertionItem_AssumeProperty) {
 }
 
 TEST(ParserA210, ConcurrentAssertionItem_CoverProperty) {
-  auto r = Parse("module m;\n"
-                 "  cover property (@(posedge clk) a ##1 b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  cover property (@(posedge clk) a ##1 b);\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kCoverProperty);
@@ -113,11 +115,12 @@ TEST(ParserA210, ExpectPropertyStatement) {
 }
 
 TEST(ParserA210, ExpectPropertyStatement_NoActions) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  initial begin\n"
-                      "    expect (req |-> ack);\n"
-                      "  end\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    expect (req |-> ack);\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -128,9 +131,10 @@ TEST(ParserA210, ExpectPropertyStatement_NoActions) {
 // =============================================================================
 
 TEST(ParserA210, CoverSequence_Basic) {
-  auto r = Parse("module m;\n"
-                 "  cover sequence (@(posedge clk) a ##1 b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  cover sequence (@(posedge clk) a ##1 b);\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kCoverSequence);
@@ -138,10 +142,11 @@ TEST(ParserA210, CoverSequence_Basic) {
 }
 
 TEST(ParserA210, CoverSequence_WithPassAction) {
-  auto r = Parse("module m;\n"
-                 "  cover sequence (@(posedge clk) a ##2 b ##1 c)\n"
-                 "    $display(\"seq covered\");\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  cover sequence (@(posedge clk) a ##2 b ##1 c)\n"
+      "    $display(\"seq covered\");\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kCoverSequence);
@@ -157,9 +162,10 @@ TEST(ParserA210, CoverSequence_WithDisableIff) {
 }
 
 TEST(ParserA210, CoverSequence_Kind) {
-  auto r = Parse("module m;\n"
-                 "  cover sequence (a ##1 b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  cover sequence (a ##1 b);\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kCoverSequence);
@@ -173,9 +179,10 @@ TEST(ParserA210, CoverSequence_Kind) {
 // =============================================================================
 
 TEST(ParserA210, RestrictProperty_Basic) {
-  auto r = Parse("module m;\n"
-                 "  restrict property (@(posedge clk) a |-> b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  restrict property (@(posedge clk) a |-> b);\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *item = FindItemByKind(r.cu->modules[0]->items,
                               ModuleItemKind::kRestrictProperty);
@@ -183,9 +190,10 @@ TEST(ParserA210, RestrictProperty_Basic) {
 }
 
 TEST(ParserA210, RestrictProperty_Kind) {
-  auto r = Parse("module m;\n"
-                 "  restrict property (@(posedge clk) req |-> ##[1:3] ack);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  restrict property (@(posedge clk) req |-> ##[1:3] ack);\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *item = FindItemByKind(r.cu->modules[0]->items,
                               ModuleItemKind::kRestrictProperty);
@@ -195,10 +203,11 @@ TEST(ParserA210, RestrictProperty_Kind) {
 }
 
 TEST(ParserA210, RestrictProperty_WithDisableIff) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  restrict property (\n"
-                      "    @(posedge clk) disable iff (rst) a |-> b);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  restrict property (\n"
+              "    @(posedge clk) disable iff (rst) a |-> b);\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -207,10 +216,11 @@ TEST(ParserA210, RestrictProperty_WithDisableIff) {
 // =============================================================================
 
 TEST(ParserA210, AssertProperty_WithActionBlock) {
-  auto r = Parse("module m;\n"
-                 "  assert property (@(posedge clk) a |-> b)\n"
-                 "    $display(\"pass\"); else $display(\"fail\");\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) a |-> b)\n"
+      "    $display(\"pass\"); else $display(\"fail\");\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty);
@@ -220,9 +230,10 @@ TEST(ParserA210, AssertProperty_WithActionBlock) {
 }
 
 TEST(ParserA210, AssertProperty_PassOnly) {
-  auto r = Parse("module m;\n"
-                 "  assert property (a) $display(\"ok\");\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (a) $display(\"ok\");\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty);
@@ -232,9 +243,10 @@ TEST(ParserA210, AssertProperty_PassOnly) {
 }
 
 TEST(ParserA210, AssertProperty_FailOnly) {
-  auto r = Parse("module m;\n"
-                 "  assert property (a |-> b) else $error(\"fail\");\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (a |-> b) else $error(\"fail\");\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty);
@@ -248,10 +260,11 @@ TEST(ParserA210, AssertProperty_FailOnly) {
 // =============================================================================
 
 TEST(ParserA210, AssumeProperty_WithElseAction) {
-  auto r = Parse("module m;\n"
-                 "  assume property (@(posedge clk) req)\n"
-                 "    $display(\"ok\"); else $error(\"bad\");\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assume property (@(posedge clk) req)\n"
+      "    $display(\"ok\"); else $error(\"bad\");\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssumeProperty);
@@ -265,10 +278,11 @@ TEST(ParserA210, AssumeProperty_WithElseAction) {
 // =============================================================================
 
 TEST(ParserA210, CoverProperty_WithPassStmt) {
-  auto r = Parse("module m;\n"
-                 "  cover property (@(posedge clk) a ##1 b)\n"
-                 "    $display(\"covered\");\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  cover property (@(posedge clk) a ##1 b)\n"
+      "    $display(\"covered\");\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kCoverProperty);
@@ -284,17 +298,19 @@ TEST(ParserA210, CoverProperty_WithPassStmt) {
 // =============================================================================
 
 TEST(ParserA210, PropertyInstance_InAssert) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  property p; a |-> b; endproperty\n"
-                      "  assert property (p);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  property p; a |-> b; endproperty\n"
+              "  assert property (p);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA210, PropertyInstance_WithArgs) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  property p(x, y); x |-> y; endproperty\n"
-                      "  assert property (p(a, b));\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  property p(x, y); x |-> y; endproperty\n"
+              "  assert property (p(a, b));\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -307,17 +323,19 @@ TEST(ParserA210, PropertyInstance_WithArgs) {
 // =============================================================================
 
 TEST(ParserA210, PropertyListOfArguments_Positional) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  property p(x, y, z); x |-> y ##1 z; endproperty\n"
-                      "  assert property (p(a, b, c));\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  property p(x, y, z); x |-> y ##1 z; endproperty\n"
+              "  assert property (p(a, b, c));\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA210, PropertyListOfArguments_Named) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  property p(x, y); x |-> y; endproperty\n"
-                      "  assert property (p(.x(a), .y(b)));\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  property p(x, y); x |-> y; endproperty\n"
+              "  assert property (p(.x(a), .y(b)));\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -326,10 +344,11 @@ TEST(ParserA210, PropertyListOfArguments_Named) {
 // =============================================================================
 
 TEST(ParserA210, PropertyActualArg_Expr) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  property p(x); x; endproperty\n"
-                      "  assert property (p(a && b));\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  property p(x); x; endproperty\n"
+              "  assert property (p(a && b));\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -339,11 +358,12 @@ TEST(ParserA210, PropertyActualArg_Expr) {
 // =============================================================================
 
 TEST(ParserA210, AssertionItemDecl_PropertyDecl) {
-  auto r = Parse("module m;\n"
-                 "  property p_req;\n"
-                 "    @(posedge clk) req |-> ack;\n"
-                 "  endproperty\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  property p_req;\n"
+      "    @(posedge clk) req |-> ack;\n"
+      "  endproperty\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kPropertyDecl);
@@ -352,11 +372,12 @@ TEST(ParserA210, AssertionItemDecl_PropertyDecl) {
 }
 
 TEST(ParserA210, AssertionItemDecl_SequenceDecl) {
-  auto r = Parse("module m;\n"
-                 "  sequence s_handshake;\n"
-                 "    req ##[1:3] ack;\n"
-                 "  endsequence\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s_handshake;\n"
+      "    req ##[1:3] ack;\n"
+      "  endsequence\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kSequenceDecl);
@@ -365,9 +386,10 @@ TEST(ParserA210, AssertionItemDecl_SequenceDecl) {
 }
 
 TEST(ParserA210, AssertionItemDecl_LetDecl) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  let max(a, b) = (a > b) ? a : b;\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  let max(a, b) = (a > b) ? a : b;\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -380,11 +402,12 @@ TEST(ParserA210, AssertionItemDecl_LetDecl) {
 // =============================================================================
 
 TEST(ParserA210, PropertyDecl_WithEndLabel) {
-  auto r = Parse("module m;\n"
-                 "  property p_req;\n"
-                 "    @(posedge clk) req |-> ##[1:3] ack;\n"
-                 "  endproperty : p_req\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  property p_req;\n"
+      "    @(posedge clk) req |-> ##[1:3] ack;\n"
+      "  endproperty : p_req\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kPropertyDecl);
@@ -393,19 +416,21 @@ TEST(ParserA210, PropertyDecl_WithEndLabel) {
 }
 
 TEST(ParserA210, PropertyDecl_WithPortList) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  property p(a, b);\n"
-                      "    a |-> b;\n"
-                      "  endproperty\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  property p(a, b);\n"
+              "    a |-> b;\n"
+              "  endproperty\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA210, PropertyDecl_SourceLoc) {
-  auto r = Parse("module m;\n"
-                 "  property my_prop;\n"
-                 "    a;\n"
-                 "  endproperty\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  property my_prop;\n"
+      "    a;\n"
+      "  endproperty\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kPropertyDecl);
@@ -424,19 +449,21 @@ TEST(ParserA210, PropertyDecl_SourceLoc) {
 // =============================================================================
 
 TEST(ParserA210, PropertyPortItem_LocalInput) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  property p(local input int x);\n"
-                      "    x > 0;\n"
-                      "  endproperty\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  property p(local input int x);\n"
+              "    x > 0;\n"
+              "  endproperty\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA210, PropertyPortItem_DefaultValue) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  property p(x, y = 1'b1);\n"
-                      "    x |-> y;\n"
-                      "  endproperty\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  property p(x, y = 1'b1);\n"
+              "    x |-> y;\n"
+              "  endproperty\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -445,19 +472,21 @@ TEST(ParserA210, PropertyPortItem_DefaultValue) {
 // =============================================================================
 
 TEST(ParserA210, PropertyFormalType_Property) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  property p(property q);\n"
-                      "    q;\n"
-                      "  endproperty\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  property p(property q);\n"
+              "    q;\n"
+              "  endproperty\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA210, PropertyFormalType_Sequence) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  property p(sequence s);\n"
-                      "    s |-> 1;\n"
-                      "  endproperty\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  property p(sequence s);\n"
+              "    s |-> 1;\n"
+              "  endproperty\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -467,16 +496,18 @@ TEST(ParserA210, PropertyFormalType_Sequence) {
 // =============================================================================
 
 TEST(ParserA210, PropertySpec_ClockingEvent) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) a);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) a);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA210, PropertySpec_DisableIff) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (\n"
-                      "    @(posedge clk) disable iff (rst) a |-> b);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (\n"
+              "    @(posedge clk) disable iff (rst) a |-> b);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA210, PropertySpec_DisableIff_ComplexExpr) {
@@ -488,9 +519,10 @@ TEST(ParserA210, PropertySpec_DisableIff_ComplexExpr) {
 }
 
 TEST(ParserA210, PropertySpec_NoClockNoDisable) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (a |-> b);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (a |-> b);\n"
+              "endmodule\n"));
 }
 
 // =============================================================================
@@ -499,162 +531,184 @@ TEST(ParserA210, PropertySpec_NoClockNoDisable) {
 
 // property_expr ::= sequence_expr
 TEST(ParserA210, PropertyExpr_SequenceExpr) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) a ##1 b);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) a ##1 b);\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= strong ( sequence_expr )
 TEST(ParserA210, PropertyExpr_Strong) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) strong(a ##1 b));\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) strong(a ##1 b));\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= weak ( sequence_expr )
 TEST(ParserA210, PropertyExpr_Weak) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) weak(a ##1 b));\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) weak(a ##1 b));\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= ( property_expr )
 TEST(ParserA210, PropertyExpr_Parenthesized) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) (a |-> b));\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) (a |-> b));\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= not property_expr
 TEST(ParserA210, PropertyExpr_Not) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) not a);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) not a);\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= property_expr or property_expr
 TEST(ParserA210, PropertyExpr_Or) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) a or b);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) a or b);\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= property_expr and property_expr
 TEST(ParserA210, PropertyExpr_And) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) a and b);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) a and b);\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= sequence_expr |-> property_expr
 TEST(ParserA210, PropertyExpr_OverlappedImplication) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) req |-> ack);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) req |-> ack);\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= sequence_expr |=> property_expr
 TEST(ParserA210, PropertyExpr_NonOverlappedImplication) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) req |=> ack);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) req |=> ack);\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= if (...) property_expr [else property_expr]
 TEST(ParserA210, PropertyExpr_IfElse) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk)\n"
-                      "    if (mode) a |-> b else c |-> d);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk)\n"
+              "    if (mode) a |-> b else c |-> d);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserA210, PropertyExpr_IfNoElse) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk)\n"
-                      "    if (mode) a |-> b);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk)\n"
+              "    if (mode) a |-> b);\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= case (...) property_case_item ... endcase
 TEST(ParserA210, PropertyExpr_Case) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk)\n"
-                      "    case (sel)\n"
-                      "      2'b00: a |-> b;\n"
-                      "      2'b01: c |-> d;\n"
-                      "      default: 1;\n"
-                      "    endcase);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk)\n"
+              "    case (sel)\n"
+              "      2'b00: a |-> b;\n"
+              "      2'b01: c |-> d;\n"
+              "      default: 1;\n"
+              "    endcase);\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= sequence_expr #-# property_expr
 TEST(ParserA210, PropertyExpr_FollowedByOverlapped) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) a #-# b);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) a #-# b);\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= sequence_expr #=# property_expr
 TEST(ParserA210, PropertyExpr_FollowedByNonOverlapped) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) a #=# b);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) a #=# b);\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= nexttime property_expr
 TEST(ParserA210, PropertyExpr_Nexttime) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) nexttime a);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) nexttime a);\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= nexttime [ constant_expression ] property_expr
 TEST(ParserA210, PropertyExpr_NexttimeWithCount) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) nexttime [3] a);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) nexttime [3] a);\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= s_nexttime property_expr
 TEST(ParserA210, PropertyExpr_SNexttime) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) s_nexttime a);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) s_nexttime a);\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= s_nexttime [ constant_expression ] property_expr
 TEST(ParserA210, PropertyExpr_SNexttimeWithCount) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) s_nexttime [2] a);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) s_nexttime [2] a);\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= always property_expr
 TEST(ParserA210, PropertyExpr_Always) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) always a);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) always a);\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= always [ cycle_delay_const_range_expression ] property_expr
 TEST(ParserA210, PropertyExpr_AlwaysRange) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) always [0:5] a);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) always [0:5] a);\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= s_always [ constant_range ] property_expr
 TEST(ParserA210, PropertyExpr_SAlways) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) s_always [0:$] a);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) s_always [0:$] a);\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= s_eventually property_expr
 TEST(ParserA210, PropertyExpr_SEventually) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) s_eventually a);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) s_eventually a);\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= s_eventually [ cycle_delay_const_range_expression ]
@@ -668,51 +722,58 @@ TEST(ParserA210, PropertyExpr_SEventuallyRange) {
 
 // property_expr ::= eventually [ constant_range ] property_expr
 TEST(ParserA210, PropertyExpr_Eventually) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) eventually [1:5] a);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) eventually [1:5] a);\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= property_expr until property_expr
 TEST(ParserA210, PropertyExpr_Until) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) a until b);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) a until b);\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= property_expr s_until property_expr
 TEST(ParserA210, PropertyExpr_SUntil) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) a s_until b);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) a s_until b);\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= property_expr until_with property_expr
 TEST(ParserA210, PropertyExpr_UntilWith) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) a until_with b);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) a until_with b);\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= property_expr s_until_with property_expr
 TEST(ParserA210, PropertyExpr_SUntilWith) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) a s_until_with b);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) a s_until_with b);\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= property_expr implies property_expr
 TEST(ParserA210, PropertyExpr_Implies) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) a implies b);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) a implies b);\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= property_expr iff property_expr
 TEST(ParserA210, PropertyExpr_Iff) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) a iff b);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) a iff b);\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= accept_on ( expression_or_dist ) property_expr
@@ -733,34 +794,38 @@ TEST(ParserA210, PropertyExpr_RejectOn) {
 
 // property_expr ::= sync_accept_on ( expression_or_dist ) property_expr
 TEST(ParserA210, PropertyExpr_SyncAcceptOn) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (\n"
-                      "    @(posedge clk) sync_accept_on(done) req |-> ack);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (\n"
+              "    @(posedge clk) sync_accept_on(done) req |-> ack);\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= sync_reject_on ( expression_or_dist ) property_expr
 TEST(ParserA210, PropertyExpr_SyncRejectOn) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (\n"
-                      "    @(posedge clk) sync_reject_on(err) req |-> ack);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (\n"
+              "    @(posedge clk) sync_reject_on(err) req |-> ack);\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= property_instance
 TEST(ParserA210, PropertyExpr_PropertyInstance) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  property p; a; endproperty\n"
-                      "  assert property (@(posedge clk) p);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  property p; a; endproperty\n"
+              "  assert property (@(posedge clk) p);\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= clocking_event property_expr
 TEST(ParserA210, PropertyExpr_ClockingEventPropertyExpr) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (\n"
-                      "    @(posedge clk) a |-> @(posedge clk2) b);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (\n"
+              "    @(posedge clk) a |-> @(posedge clk2) b);\n"
+              "endmodule\n"));
 }
 
-} // namespace
+}  // namespace

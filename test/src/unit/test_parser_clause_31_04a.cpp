@@ -30,16 +30,14 @@ static ParseResult31 Parse(const std::string &src) {
 
 static ModuleItem *FindSpecifyBlock(const std::vector<ModuleItem *> &items) {
   for (auto *item : items) {
-    if (item->kind == ModuleItemKind::kSpecifyBlock)
-      return item;
+    if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
   }
   return nullptr;
 }
 
 static SpecifyItem *GetSoleSpecifyItem(ModuleItem *spec_block) {
   EXPECT_EQ(spec_block->specify_items.size(), 1u);
-  if (spec_block->specify_items.empty())
-    return nullptr;
+  if (spec_block->specify_items.empty()) return nullptr;
   return spec_block->specify_items[0];
 }
 
@@ -52,8 +50,7 @@ struct SpecifyParseResult {
 static SpecifyParseResult ParseSpecifySingle(const std::string &src) {
   SpecifyParseResult result;
   result.pr = Parse(src);
-  if (result.pr.cu == nullptr)
-    return result;
+  if (result.pr.cu == nullptr) return result;
   result.spec_block = FindSpecifyBlock(result.pr.cu->modules[0]->items);
   if (result.spec_block != nullptr) {
     result.sole_item = GetSoleSpecifyItem(result.spec_block);
@@ -62,11 +59,12 @@ static SpecifyParseResult ParseSpecifySingle(const std::string &src) {
 }
 
 TEST(ParserSection28, Sec28_12_TimingCheckWidth) {
-  auto sp = ParseSpecifySingle("module m(input clk);\n"
-                               "  specify\n"
-                               "    $width(posedge clk, 50);\n"
-                               "  endspecify\n"
-                               "endmodule\n");
+  auto sp = ParseSpecifySingle(
+      "module m(input clk);\n"
+      "  specify\n"
+      "    $width(posedge clk, 50);\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(sp.pr.cu, nullptr);
   EXPECT_FALSE(sp.pr.has_errors);
   ASSERT_NE(sp.sole_item, nullptr);
@@ -78,11 +76,12 @@ TEST(ParserSection28, Sec28_12_TimingCheckWidth) {
 }
 
 TEST(ParserSection28, Sec28_12_TimingCheckPeriod) {
-  auto sp = ParseSpecifySingle("module m(input clk);\n"
-                               "  specify\n"
-                               "    $period(posedge clk, 100);\n"
-                               "  endspecify\n"
-                               "endmodule\n");
+  auto sp = ParseSpecifySingle(
+      "module m(input clk);\n"
+      "  specify\n"
+      "    $period(posedge clk, 100);\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(sp.pr.cu, nullptr);
   EXPECT_FALSE(sp.pr.has_errors);
   ASSERT_NE(sp.sole_item, nullptr);
@@ -93,11 +92,12 @@ TEST(ParserSection28, Sec28_12_TimingCheckPeriod) {
 }
 
 TEST(ParserSection28, Sec28_12_TimingCheckSkew) {
-  auto sp = ParseSpecifySingle("module m(input clk1, clk2);\n"
-                               "  specify\n"
-                               "    $skew(posedge clk1, posedge clk2, 20);\n"
-                               "  endspecify\n"
-                               "endmodule\n");
+  auto sp = ParseSpecifySingle(
+      "module m(input clk1, clk2);\n"
+      "  specify\n"
+      "    $skew(posedge clk1, posedge clk2, 20);\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(sp.pr.cu, nullptr);
   EXPECT_FALSE(sp.pr.has_errors);
   ASSERT_NE(sp.sole_item, nullptr);

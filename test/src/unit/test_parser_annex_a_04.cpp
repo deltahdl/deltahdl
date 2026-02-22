@@ -30,7 +30,7 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.4 -- Instantiations
@@ -65,30 +65,31 @@ TEST(ParserAnnexA, A4ModuleInstWithParams) {
 }
 
 TEST(ParserAnnexA, A4GenerateForBlock) {
-  auto r = Parse("module m;\n"
-                 "  genvar i;\n"
-                 "  for (i = 0; i < 4; i = i + 1) begin\n"
-                 "    wire w;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  genvar i;\n"
+      "  for (i = 0; i < 4; i = i + 1) begin\n"
+      "    wire w;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   bool found = false;
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kGenerateFor)
-      found = true;
+    if (item->kind == ModuleItemKind::kGenerateFor) found = true;
   }
   EXPECT_TRUE(found);
 }
 
 TEST(ParserAnnexA, A4GenerateIfElse) {
-  auto r = Parse("module m;\n"
-                 "  if (WIDTH > 8) begin\n"
-                 "    wire [15:0] bus;\n"
-                 "  end else begin\n"
-                 "    wire [7:0] bus;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  if (WIDTH > 8) begin\n"
+      "    wire [15:0] bus;\n"
+      "  end else begin\n"
+      "    wire [7:0] bus;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   bool found = false;
@@ -102,16 +103,17 @@ TEST(ParserAnnexA, A4GenerateIfElse) {
 }
 
 TEST(ParserAnnexA, A4GenerateCase) {
-  auto r = Parse("module m;\n"
-                 "  case (WIDTH)\n"
-                 "    8: begin\n"
-                 "      wire [7:0] d;\n"
-                 "    end\n"
-                 "    default: begin\n"
-                 "      wire [31:0] d;\n"
-                 "    end\n"
-                 "  endcase\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  case (WIDTH)\n"
+      "    8: begin\n"
+      "      wire [7:0] d;\n"
+      "    end\n"
+      "    default: begin\n"
+      "      wire [31:0] d;\n"
+      "    end\n"
+      "  endcase\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -120,11 +122,12 @@ TEST(ParserAnnexA, A4GenerateCase) {
 }
 
 TEST(ParserAnnexA, A4GenerateRegion) {
-  auto r = Parse("module m;\n"
-                 "  generate\n"
-                 "    wire w;\n"
-                 "  endgenerate\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  generate\n"
+      "    wire w;\n"
+      "  endgenerate\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }

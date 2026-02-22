@@ -1,5 +1,7 @@
 // §6.20: Constants
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -12,7 +14,6 @@
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
 #include "simulation/variable.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -38,12 +39,13 @@ namespace {
 // §6.20.5: Specparam values accessible during simulation.
 TEST(Lowerer, SpecparamValue) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  specparam DELAY = 42;\n"
-                              "  int result;\n"
-                              "  initial result = DELAY;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  specparam DELAY = 42;\n"
+      "  int result;\n"
+      "  initial result = DELAY;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -55,4 +57,4 @@ TEST(Lowerer, SpecparamValue) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-} // namespace
+}  // namespace

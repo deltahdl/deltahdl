@@ -27,30 +27,33 @@ static ParseResult Parse(const std::string &src) {
 }
 
 TEST(ParserSection28, GateWithParenDelay) {
-  auto r = Parse("module m;\n"
-                 "  or #(10) g1(out, a, b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  or #(10) g1(out, a, b);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_NE(item->gate_delay, nullptr);
 }
 
 TEST(ParserSection28, StrengthSpecSupply) {
-  auto r = Parse("module m;\n"
-                 "  nand (supply0, supply1) g1(out, a, b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  nand (supply0, supply1) g1(out, a, b);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->drive_strength0, 5); // supply0 = 5
-  EXPECT_EQ(item->drive_strength1, 5); // supply1 = 5
+  EXPECT_EQ(item->drive_strength0, 5);  // supply0 = 5
+  EXPECT_EQ(item->drive_strength1, 5);  // supply1 = 5
 }
 
 TEST(ParserSection28, StrengthSpecHighz) {
-  auto r = Parse("module m;\n"
-                 "  or (highz0, pull1) g1(out, a, b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  or (highz0, pull1) g1(out, a, b);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->drive_strength0, 1); // highz0 = 1
-  EXPECT_EQ(item->drive_strength1, 3); // pull1 = 3
+  EXPECT_EQ(item->drive_strength0, 1);  // highz0 = 1
+  EXPECT_EQ(item->drive_strength1, 3);  // pull1 = 3
 }

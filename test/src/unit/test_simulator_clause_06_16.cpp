@@ -1,11 +1,13 @@
 // §6.16: String data type
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <string>
+
 #include "common/arena.h"
 #include "common/types.h"
 #include "simulation/adv_sim.h"
-#include <cstdint>
-#include <gtest/gtest.h>
-#include <string>
 
 using namespace delta;
 
@@ -37,4 +39,4 @@ TEST(AdvSim, SvStringCompare) {
   EXPECT_FALSE(a == b);
 }
 
-} // namespace
+}  // namespace

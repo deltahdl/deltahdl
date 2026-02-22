@@ -1,12 +1,13 @@
 // §11.4.3: Arithmetic operators
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "parser/ast.h"
 #include "simulation/compiled_sim.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -57,4 +58,4 @@ TEST(CompiledSim, ExecuteExpressionEval) {
   EXPECT_EQ(c_var->value.ToUint64(), 30u);
 }
 
-} // namespace
+}  // namespace

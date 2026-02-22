@@ -1,5 +1,9 @@
 // §17.3: Checker instantiation
 
+#include <gtest/gtest.h>
+
+#include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -8,8 +12,6 @@
 #include "lexer/lexer.h"
 #include "parser/ast.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
-#include <string>
 
 using namespace delta;
 
@@ -34,13 +36,14 @@ namespace {
 
 TEST(CheckerElab, CheckerInstantiatedFromModule) {
   CheckerElabFixture f;
-  auto *design = ElaborateSource("checker sub_chk(input logic a);\n"
-                                 "endchecker\n"
-                                 "module top;\n"
-                                 "  logic sig;\n"
-                                 "  sub_chk u0(.a(sig));\n"
-                                 "endmodule\n",
-                                 f, "top");
+  auto *design = ElaborateSource(
+      "checker sub_chk(input logic a);\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic sig;\n"
+      "  sub_chk u0(.a(sig));\n"
+      "endmodule\n",
+      f, "top");
   ASSERT_NE(design, nullptr);
   auto *mod = design->top_modules[0];
   ASSERT_EQ(mod->children.size(), 1u);
@@ -48,4 +51,4 @@ TEST(CheckerElab, CheckerInstantiatedFromModule) {
   EXPECT_EQ(mod->children[0].resolved->name, "sub_chk");
 }
 
-} // namespace
+}  // namespace

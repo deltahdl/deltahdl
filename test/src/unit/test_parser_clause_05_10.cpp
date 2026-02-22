@@ -60,9 +60,10 @@ static void VerifyPatternKeys(const Expr *rhs,
 // From test_parser_clause_05.cpp
 
 TEST(ParserCh510, AssignmentPatternPositional_Parse) {
-  auto r = Parse("module t;\n"
-                 "  initial x = '{1, 2, 3};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = '{1, 2, 3};\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -73,9 +74,10 @@ TEST(ParserCh510, AssignmentPatternPositional_Parse) {
 }
 
 TEST(ParserCh510, AssignmentPatternPositional_Elements) {
-  auto r = Parse("module t;\n"
-                 "  initial x = '{1, 2, 3};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = '{1, 2, 3};\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -86,9 +88,10 @@ TEST(ParserCh510, AssignmentPatternPositional_Elements) {
 }
 
 TEST(ParserCh510, AssignmentPatternNamed) {
-  auto r = Parse("module t;\n"
-                 "  initial x = '{a: 0, b: 1};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = '{a: 0, b: 1};\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -101,9 +104,10 @@ TEST(ParserCh510, AssignmentPatternNamed) {
 }
 
 TEST(ParserCh510, AssignmentPatternDefault) {
-  auto r = Parse("module t;\n"
-                 "  initial x = '{default: 0};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = '{default: 0};\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -115,62 +119,70 @@ TEST(ParserCh510, AssignmentPatternDefault) {
 }
 
 TEST(ParserCh510, AssignmentPattern_TypeKey) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  typedef struct { int x; int y; } ms_t;\n"
-                      "  ms_t ms = '{int:0, int:1};\n"
-                      "endmodule"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef struct { int x; int y; } ms_t;\n"
+              "  ms_t ms = '{int:0, int:1};\n"
+              "endmodule"));
 }
 
 TEST(ParserCh510, AssignmentPattern_DefaultKey) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  typedef struct { int x; int y; } ms_t;\n"
-                      "  ms_t ms = '{default:1};\n"
-                      "endmodule"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef struct { int x; int y; } ms_t;\n"
+              "  ms_t ms = '{default:1};\n"
+              "endmodule"));
 }
 
 TEST(ParserCh510, AssignmentPattern_IntKey) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  typedef int triple[1:3];\n"
-                      "  triple t = '{1:1, default:0};\n"
-                      "endmodule"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef int triple[1:3];\n"
+              "  triple t = '{1:1, default:0};\n"
+              "endmodule"));
 }
 
 TEST(ParserCh510, AssignmentPattern_Replication) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  int a[1:3] = '{3{1}};\n"
-                      "endmodule"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int a[1:3] = '{3{1}};\n"
+              "endmodule"));
 }
 
 TEST(ParserCh510, AssignmentPattern_NestedReplication) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  int n[1:2][1:6] = '{2{'{3{4, 5}}}};\n"
-                      "endmodule"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int n[1:2][1:6] = '{2{'{3{4, 5}}}};\n"
+              "endmodule"));
 }
 
 // From test_parser_clause_05b.cpp
 
 TEST(ParserCh510, StructLiteral_Positional) {
   // c = '{0, 0.0}; -- positional structure literal.
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  typedef struct {int a; shortreal b;} ab;\n"
-                      "  ab c;\n"
-                      "  initial c = '{0, 0.0};\n"
-                      "endmodule"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef struct {int a; shortreal b;} ab;\n"
+              "  ab c;\n"
+              "  initial c = '{0, 0.0};\n"
+              "endmodule"));
 }
 
 TEST(ParserCh510, StructLiteral_NestedBraces) {
   // ab abarr[1:0] = '{'{1, 1.0}, '{2, 2.0}};
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  typedef struct {int a; shortreal b;} ab;\n"
-                      "  ab abarr[1:0] = '{'{1, 1.0}, '{2, 2.0}};\n"
-                      "endmodule"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef struct {int a; shortreal b;} ab;\n"
+              "  ab abarr[1:0] = '{'{1, 1.0}, '{2, 2.0}};\n"
+              "endmodule"));
 }
 
 TEST(ParserCh510, StructLiteral_MemberNameAndValue) {
   // c = '{a:0, b:0.0}; -- member name and value.
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  typedef struct {int a; shortreal b;} ab;\n"
-                      "  ab c;\n"
-                      "  initial c = '{a:0, b:0.0};\n"
-                      "endmodule"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef struct {int a; shortreal b;} ab;\n"
+              "  ab c;\n"
+              "  initial c = '{a:0, b:0.0};\n"
+              "endmodule"));
 }

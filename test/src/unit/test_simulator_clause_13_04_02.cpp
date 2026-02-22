@@ -1,12 +1,13 @@
 // §13.4.2: Static and automatic functions
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -149,4 +150,4 @@ TEST(Functions, StaticFunctionWithArgs) {
   EXPECT_EQ(EvalExpr(c3, f.ctx, f.arena).ToUint64(), 10u);
 }
 
-} // namespace
+}  // namespace

@@ -52,8 +52,7 @@ static ModuleItem *FirstItem(ParseResult4c &r) {
 
 // Returns the first always_* item from the first module.
 static ModuleItem *FirstAlwaysItem(ParseResult4c &r) {
-  if (!r.cu || r.cu->modules.empty())
-    return nullptr;
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
   for (auto *item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kAlwaysCombBlock ||
         item->kind == ModuleItemKind::kAlwaysFFBlock ||
@@ -66,11 +65,9 @@ static ModuleItem *FirstAlwaysItem(ParseResult4c &r) {
 
 // Returns the first statement inside the first initial block's begin-end.
 static Stmt *FirstInitialStmt(ParseResult4c &r) {
-  if (!r.cu || r.cu->modules.empty())
-    return nullptr;
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock)
-      continue;
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
     }
@@ -81,19 +78,16 @@ static Stmt *FirstInitialStmt(ParseResult4c &r) {
 
 // Returns the body of the first initial block.
 static Stmt *InitialBody(ParseResult4c &r) {
-  if (!r.cu || r.cu->modules.empty())
-    return nullptr;
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock)
-      return item->body;
+    if (item->kind == ModuleItemKind::kInitialBlock) return item->body;
   }
   return nullptr;
 }
 
 static bool HasDefaultCaseItem(const Stmt *case_stmt) {
   for (const auto &ci : case_stmt->case_items) {
-    if (ci.is_default)
-      return true;
+    if (ci.is_default) return true;
   }
   return false;
 }
@@ -103,12 +97,13 @@ static bool HasDefaultCaseItem(const Stmt *case_stmt) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_AlwaysCombCombinational) {
-  auto r = Parse("module m;\n"
-                 "  logic a, b, y;\n"
-                 "  always_comb begin\n"
-                 "    y = a & b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic a, b, y;\n"
+      "  always_comb begin\n"
+      "    y = a & b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -124,12 +119,13 @@ TEST(ParserSection4, Sec4_6_AlwaysCombCombinational) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_AlwaysFfFlipFlop) {
-  auto r = Parse("module m;\n"
-                 "  logic clk, d, q;\n"
-                 "  always_ff @(posedge clk) begin\n"
-                 "    q <= d;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic clk, d, q;\n"
+      "  always_ff @(posedge clk) begin\n"
+      "    q <= d;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -145,12 +141,13 @@ TEST(ParserSection4, Sec4_6_AlwaysFfFlipFlop) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_AlwaysLatchLatch) {
-  auto r = Parse("module m;\n"
-                 "  logic en, d, q;\n"
-                 "  always_latch begin\n"
-                 "    if (en) q <= d;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic en, d, q;\n"
+      "  always_latch begin\n"
+      "    if (en) q <= d;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -165,16 +162,17 @@ TEST(ParserSection4, Sec4_6_AlwaysLatchLatch) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_UniqueCaseOneMatch) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    unique case (sel)\n"
-                 "      2'b00: y = 0;\n"
-                 "      2'b01: y = 1;\n"
-                 "      2'b10: y = 2;\n"
-                 "      2'b11: y = 3;\n"
-                 "    endcase\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique case (sel)\n"
+      "      2'b00: y = 0;\n"
+      "      2'b01: y = 1;\n"
+      "      2'b10: y = 2;\n"
+      "      2'b11: y = 3;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -188,14 +186,15 @@ TEST(ParserSection4, Sec4_6_UniqueCaseOneMatch) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_Unique0CaseAtMostOneMatch) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    unique0 case (sel)\n"
-                 "      0: x = 1;\n"
-                 "      1: x = 2;\n"
-                 "    endcase\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique0 case (sel)\n"
+      "      0: x = 1;\n"
+      "      1: x = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -209,15 +208,16 @@ TEST(ParserSection4, Sec4_6_Unique0CaseAtMostOneMatch) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_PriorityCaseFirstMatch) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    priority case (sel)\n"
-                 "      0: x = 1;\n"
-                 "      1: x = 2;\n"
-                 "      default: x = 0;\n"
-                 "    endcase\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    priority case (sel)\n"
+      "      0: x = 1;\n"
+      "      1: x = 2;\n"
+      "      default: x = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -231,13 +231,14 @@ TEST(ParserSection4, Sec4_6_PriorityCaseFirstMatch) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_UniqueIf) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    unique if (a) x = 1;\n"
-                 "    else if (b) x = 2;\n"
-                 "    else x = 3;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique if (a) x = 1;\n"
+      "    else if (b) x = 2;\n"
+      "    else x = 3;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -251,12 +252,13 @@ TEST(ParserSection4, Sec4_6_UniqueIf) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_Unique0If) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    unique0 if (a) x = 1;\n"
-                 "    else if (b) x = 2;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique0 if (a) x = 1;\n"
+      "    else if (b) x = 2;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -270,13 +272,14 @@ TEST(ParserSection4, Sec4_6_Unique0If) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_PriorityIf) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    priority if (a) x = 1;\n"
-                 "    else if (b) x = 2;\n"
-                 "    else x = 0;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    priority if (a) x = 1;\n"
+      "    else if (b) x = 2;\n"
+      "    else x = 0;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -290,8 +293,9 @@ TEST(ParserSection4, Sec4_6_PriorityIf) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_ProgramBlockDeterministicScheduling) {
-  auto r = Parse("program p;\n"
-                 "endprogram\n");
+  auto r = Parse(
+      "program p;\n"
+      "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->programs.size(), 1u);
@@ -304,11 +308,12 @@ TEST(ParserSection4, Sec4_6_ProgramBlockDeterministicScheduling) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_ProgramWithInitialBlock) {
-  auto r = Parse("program p;\n"
-                 "  initial begin\n"
-                 "    $display(\"test\");\n"
-                 "  end\n"
-                 "endprogram\n");
+  auto r = Parse(
+      "program p;\n"
+      "  initial begin\n"
+      "    $display(\"test\");\n"
+      "  end\n"
+      "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->programs.size(), 1u);
@@ -321,11 +326,12 @@ TEST(ParserSection4, Sec4_6_ProgramWithInitialBlock) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_ProgramWithFinalBlock) {
-  auto r = Parse("program p;\n"
-                 "  final begin\n"
-                 "    $display(\"done\");\n"
-                 "  end\n"
-                 "endprogram\n");
+  auto r = Parse(
+      "program p;\n"
+      "  final begin\n"
+      "    $display(\"done\");\n"
+      "  end\n"
+      "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->programs.size(), 1u);
@@ -338,13 +344,14 @@ TEST(ParserSection4, Sec4_6_ProgramWithFinalBlock) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_BlockingAssignOrdering) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    a = 1;\n"
-                 "    b = a;\n"
-                 "    c = b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a = 1;\n"
+      "    b = a;\n"
+      "    c = b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *body = InitialBody(r);
@@ -361,12 +368,13 @@ TEST(ParserSection4, Sec4_6_BlockingAssignOrdering) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_NonblockingAssignOrdering) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    a <= 1;\n"
-                 "    b <= 2;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a <= 1;\n"
+      "    b <= 2;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *body = InitialBody(r);
@@ -382,12 +390,13 @@ TEST(ParserSection4, Sec4_6_NonblockingAssignOrdering) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_NamedBeginEndScope) {
-  auto r = Parse("module m;\n"
-                 "  initial begin : seq_blk\n"
-                 "    x = 1;\n"
-                 "    y = 2;\n"
-                 "  end : seq_blk\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : seq_blk\n"
+      "    x = 1;\n"
+      "    y = 2;\n"
+      "  end : seq_blk\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *body = InitialBody(r);
@@ -401,9 +410,10 @@ TEST(ParserSection4, Sec4_6_NamedBeginEndScope) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_OrderedPortConnections) {
-  auto r = Parse("module top;\n"
-                 "  sub u1 (a, b, c);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module top;\n"
+      "  sub u1 (a, b, c);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -424,9 +434,10 @@ TEST(ParserSection4, Sec4_6_OrderedPortConnections) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_NamedPortConnections) {
-  auto r = Parse("module top;\n"
-                 "  sub u1 (.clk(clk), .rst(rst), .d(data));\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module top;\n"
+      "  sub u1 (.clk(clk), .rst(rst), .d(data));\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -443,9 +454,10 @@ TEST(ParserSection4, Sec4_6_NamedPortConnections) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_VarInitAtDeclaration) {
-  auto r = Parse("module m;\n"
-                 "  int x = 42;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  int x = 42;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -459,11 +471,12 @@ TEST(ParserSection4, Sec4_6_VarInitAtDeclaration) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_AutomaticVarInitPerEntry) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    automatic int count = 0;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    automatic int count = 0;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -478,18 +491,19 @@ TEST(ParserSection4, Sec4_6_AutomaticVarInitPerEntry) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_AlwaysCombWithCaseInside) {
-  auto r = Parse("module m;\n"
-                 "  logic [1:0] sel;\n"
-                 "  logic [3:0] y;\n"
-                 "  always_comb begin\n"
-                 "    case (sel)\n"
-                 "      2'b00: y = 4'h0;\n"
-                 "      2'b01: y = 4'h1;\n"
-                 "      2'b10: y = 4'h2;\n"
-                 "      default: y = 4'hf;\n"
-                 "    endcase\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic [1:0] sel;\n"
+      "  logic [3:0] y;\n"
+      "  always_comb begin\n"
+      "    case (sel)\n"
+      "      2'b00: y = 4'h0;\n"
+      "      2'b01: y = 4'h1;\n"
+      "      2'b10: y = 4'h2;\n"
+      "      default: y = 4'hf;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -506,13 +520,14 @@ TEST(ParserSection4, Sec4_6_AlwaysCombWithCaseInside) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_AlwaysFfWithIfElseChain) {
-  auto r = Parse("module m;\n"
-                 "  logic clk, rst, d, q;\n"
-                 "  always_ff @(posedge clk or posedge rst) begin\n"
-                 "    if (rst) q <= 0;\n"
-                 "    else q <= d;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic clk, rst, d, q;\n"
+      "  always_ff @(posedge clk or posedge rst) begin\n"
+      "    if (rst) q <= 0;\n"
+      "    else q <= d;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -529,11 +544,12 @@ TEST(ParserSection4, Sec4_6_AlwaysFfWithIfElseChain) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_AlwaysLatchIfNoElse) {
-  auto r = Parse("module m;\n"
-                 "  logic en, d, q;\n"
-                 "  always_latch\n"
-                 "    if (en) q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic en, d, q;\n"
+      "  always_latch\n"
+      "    if (en) q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -549,12 +565,13 @@ TEST(ParserSection4, Sec4_6_AlwaysLatchIfNoElse) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_ForkJoinAllComplete) {
-  auto r = Parse("module m;\n"
-                 "  initial fork\n"
-                 "    a = 1;\n"
-                 "    b = 2;\n"
-                 "  join\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial fork\n"
+      "    a = 1;\n"
+      "    b = 2;\n"
+      "  join\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *body = InitialBody(r);
@@ -568,12 +585,13 @@ TEST(ParserSection4, Sec4_6_ForkJoinAllComplete) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_ForkJoinAnyFirstComplete) {
-  auto r = Parse("module m;\n"
-                 "  initial fork\n"
-                 "    a = 1;\n"
-                 "    b = 2;\n"
-                 "  join_any\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial fork\n"
+      "    a = 1;\n"
+      "    b = 2;\n"
+      "  join_any\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *body = InitialBody(r);
@@ -587,12 +605,13 @@ TEST(ParserSection4, Sec4_6_ForkJoinAnyFirstComplete) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_ForkJoinNoneConcurrent) {
-  auto r = Parse("module m;\n"
-                 "  initial fork\n"
-                 "    a = 1;\n"
-                 "    b = 2;\n"
-                 "  join_none\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial fork\n"
+      "    a = 1;\n"
+      "    b = 2;\n"
+      "  join_none\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *body = InitialBody(r);
@@ -606,16 +625,17 @@ TEST(ParserSection4, Sec4_6_ForkJoinNoneConcurrent) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_PriorityCaseWithDefault) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    priority case (opcode)\n"
-                 "      4'h0: result = a + b;\n"
-                 "      4'h1: result = a - b;\n"
-                 "      4'h2: result = a & b;\n"
-                 "      default: result = 0;\n"
-                 "    endcase\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    priority case (opcode)\n"
+      "      4'h0: result = a + b;\n"
+      "      4'h1: result = a - b;\n"
+      "      4'h2: result = a & b;\n"
+      "      default: result = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -630,16 +650,17 @@ TEST(ParserSection4, Sec4_6_PriorityCaseWithDefault) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_UniqueCaseMultipleItems) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    unique case (state)\n"
-                 "      IDLE: x = 0;\n"
-                 "      RUN: x = 1;\n"
-                 "      DONE: x = 2;\n"
-                 "      ERR: x = 3;\n"
-                 "    endcase\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique case (state)\n"
+      "      IDLE: x = 0;\n"
+      "      RUN: x = 1;\n"
+      "      DONE: x = 2;\n"
+      "      ERR: x = 3;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -654,13 +675,14 @@ TEST(ParserSection4, Sec4_6_UniqueCaseMultipleItems) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_AlwaysCombMultipleOutputs) {
-  auto r = Parse("module m;\n"
-                 "  logic a, b, sum, carry;\n"
-                 "  always_comb begin\n"
-                 "    sum = a ^ b;\n"
-                 "    carry = a & b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic a, b, sum, carry;\n"
+      "  always_comb begin\n"
+      "    sum = a ^ b;\n"
+      "    carry = a & b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -676,16 +698,17 @@ TEST(ParserSection4, Sec4_6_AlwaysCombMultipleOutputs) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_ProgramWithClockingBlock) {
-  EXPECT_TRUE(ParseOk("program p(input logic clk);\n"
-                      "  clocking cb @(posedge clk);\n"
-                      "    input data;\n"
-                      "    output valid;\n"
-                      "  endclocking\n"
-                      "  initial begin\n"
-                      "    @(cb);\n"
-                      "    $display(\"synced\");\n"
-                      "  end\n"
-                      "endprogram\n"));
+  EXPECT_TRUE(
+      ParseOk("program p(input logic clk);\n"
+              "  clocking cb @(posedge clk);\n"
+              "    input data;\n"
+              "    output valid;\n"
+              "  endclocking\n"
+              "  initial begin\n"
+              "    @(cb);\n"
+              "    $display(\"synced\");\n"
+              "  end\n"
+              "endprogram\n"));
 }
 
 // =============================================================================
@@ -693,14 +716,15 @@ TEST(ParserSection4, Sec4_6_ProgramWithClockingBlock) {
 // =============================================================================
 
 TEST(ParserSection4, Sec4_6_StaticVsAutomaticFunctionLifetime) {
-  auto r = Parse("module m;\n"
-                 "  function automatic int auto_fn();\n"
-                 "    return 1;\n"
-                 "  endfunction\n"
-                 "  function static int static_fn();\n"
-                 "    return 2;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int auto_fn();\n"
+      "    return 1;\n"
+      "  endfunction\n"
+      "  function static int static_fn();\n"
+      "    return 2;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_GE(r.cu->modules[0]->items.size(), 2u);

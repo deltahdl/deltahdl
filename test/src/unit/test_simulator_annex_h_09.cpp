@@ -1,10 +1,12 @@
 // Annex H.9: Context tasks and functions
 
-#include "simulation/dpi_runtime.h"
-#include <cstdint>
 #include <gtest/gtest.h>
+
+#include <cstdint>
 #include <string>
 #include <vector>
+
+#include "simulation/dpi_runtime.h"
 
 using namespace delta;
 
@@ -57,8 +59,8 @@ TEST(DpiRuntime, SetAndGetScope) {
 
 TEST(DpiRuntime, PopEmptyScopeDoesNotCrash) {
   DpiRuntime rt;
-  rt.PopScope(); // Should not crash.
+  rt.PopScope();  // Should not crash.
   EXPECT_EQ(rt.CurrentScope(), nullptr);
 }
 
-} // namespace
+}  // namespace

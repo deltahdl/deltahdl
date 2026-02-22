@@ -1,5 +1,9 @@
 // §17.7: Checker variables
 
+#include <gtest/gtest.h>
+
+#include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -8,8 +12,6 @@
 #include "lexer/lexer.h"
 #include "parser/ast.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
-#include <string>
 
 using namespace delta;
 
@@ -34,11 +36,12 @@ namespace {
 
 TEST(CheckerElab, ElaborateCheckerWithVars) {
   CheckerElabFixture f;
-  auto *design = ElaborateSource("checker my_chk;\n"
-                                 "  logic [7:0] count;\n"
-                                 "  assign count = 8'hFF;\n"
-                                 "endchecker\n",
-                                 f, "my_chk");
+  auto *design = ElaborateSource(
+      "checker my_chk;\n"
+      "  logic [7:0] count;\n"
+      "  assign count = 8'hFF;\n"
+      "endchecker\n",
+      f, "my_chk");
   ASSERT_NE(design, nullptr);
   auto *mod = design->top_modules[0];
   EXPECT_EQ(mod->name, "my_chk");
@@ -46,4 +49,4 @@ TEST(CheckerElab, ElaborateCheckerWithVars) {
   EXPECT_FALSE(mod->assigns.empty());
 }
 
-} // namespace
+}  // namespace

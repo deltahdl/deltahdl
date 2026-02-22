@@ -1,5 +1,7 @@
 // §23.3: Module instances (hierarchy)
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -11,7 +13,6 @@
 #include "lexer/lexer.h"
 #include "lexer/token.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -35,14 +36,15 @@ namespace {
 // --- Port binding tests ---
 TEST(Elaboration, PortBinding_ResolvesChild) {
   ElabFixture f;
-  auto *design = ElaborateSrc("module child(input logic a, output logic b);\n"
-                              "  assign b = a;\n"
-                              "endmodule\n"
-                              "module top;\n"
-                              "  logic x, y;\n"
-                              "  child u0(.a(x), .b(y));\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module child(input logic a, output logic b);\n"
+      "  assign b = a;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic x, y;\n"
+      "  child u0(.a(x), .b(y));\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   auto *mod = design->top_modules[0];
   ASSERT_EQ(mod->children.size(), 1);
@@ -53,14 +55,15 @@ TEST(Elaboration, PortBinding_ResolvesChild) {
 
 TEST(Elaboration, PortBinding_Direction) {
   ElabFixture f;
-  auto *design = ElaborateSrc("module child(input logic a, output logic b);\n"
-                              "  assign b = a;\n"
-                              "endmodule\n"
-                              "module top;\n"
-                              "  logic x, y;\n"
-                              "  child u0(.a(x), .b(y));\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module child(input logic a, output logic b);\n"
+      "  assign b = a;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic x, y;\n"
+      "  child u0(.a(x), .b(y));\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   auto *mod = design->top_modules[0];
   ASSERT_EQ(mod->children.size(), 1);
@@ -82,11 +85,12 @@ TEST(Elaboration, PortBinding_Direction) {
 
 TEST(Elaboration, PortBinding_UnknownModule) {
   ElabFixture f;
-  auto *design = ElaborateSrc("module top;\n"
-                              "  logic x;\n"
-                              "  nonexistent u0(.a(x));\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module top;\n"
+      "  logic x;\n"
+      "  nonexistent u0(.a(x));\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   auto *mod = design->top_modules[0];
   ASSERT_EQ(mod->children.size(), 1);
@@ -95,13 +99,14 @@ TEST(Elaboration, PortBinding_UnknownModule) {
 
 TEST(Elaboration, PortBinding_PortMismatch) {
   ElabFixture f;
-  auto *design = ElaborateSrc("module child(input logic a);\n"
-                              "endmodule\n"
-                              "module top;\n"
-                              "  logic x;\n"
-                              "  child u0(.bogus(x));\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module child(input logic a);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic x;\n"
+      "  child u0(.bogus(x));\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   auto *mod = design->top_modules[0];
   ASSERT_EQ(mod->children.size(), 1);
@@ -110,4 +115,4 @@ TEST(Elaboration, PortBinding_PortMismatch) {
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
-} // namespace
+}  // namespace

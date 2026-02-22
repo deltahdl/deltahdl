@@ -30,12 +30,11 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-static std::vector<ModuleItem *>
-FindUdpInsts(const std::vector<ModuleItem *> &items) {
+static std::vector<ModuleItem *> FindUdpInsts(
+    const std::vector<ModuleItem *> &items) {
   std::vector<ModuleItem *> insts;
   for (auto *item : items) {
-    if (item->kind == ModuleItemKind::kUdpInst)
-      insts.push_back(item);
+    if (item->kind == ModuleItemKind::kUdpInst) insts.push_back(item);
   }
   return insts;
 }
@@ -55,15 +54,16 @@ FindUdpInsts(const std::vector<ModuleItem *> &items) {
 // --- Basic named UDP instance ---
 
 TEST(ParserA504, UdpInst_BasicNamed) {
-  auto r = Parse("primitive my_udp(output y, input a, input b);\n"
-                 "  table\n"
-                 "    0 0 : 0 ;\n"
-                 "    1 1 : 1 ;\n"
-                 "  endtable\n"
-                 "endprimitive\n"
-                 "module m;\n"
-                 "  my_udp u1(out, in1, in2);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "primitive my_udp(output y, input a, input b);\n"
+      "  table\n"
+      "    0 0 : 0 ;\n"
+      "    1 1 : 1 ;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  my_udp u1(out, in1, in2);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto insts = FindUdpInsts(r.cu->modules[0]->items);
@@ -76,15 +76,16 @@ TEST(ParserA504, UdpInst_BasicNamed) {
 // --- Unnamed UDP instance ---
 
 TEST(ParserA504, UdpInst_Unnamed) {
-  auto r = Parse("primitive my_udp(output y, input a, input b);\n"
-                 "  table\n"
-                 "    0 0 : 0 ;\n"
-                 "    1 1 : 1 ;\n"
-                 "  endtable\n"
-                 "endprimitive\n"
-                 "module m;\n"
-                 "  my_udp (out, in1, in2);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "primitive my_udp(output y, input a, input b);\n"
+      "  table\n"
+      "    0 0 : 0 ;\n"
+      "    1 1 : 1 ;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  my_udp (out, in1, in2);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto insts = FindUdpInsts(r.cu->modules[0]->items);
@@ -97,15 +98,16 @@ TEST(ParserA504, UdpInst_Unnamed) {
 // --- Drive strength ---
 
 TEST(ParserA504, UdpInst_DriveStrength) {
-  auto r = Parse("primitive my_udp(output y, input a, input b);\n"
-                 "  table\n"
-                 "    0 0 : 0 ;\n"
-                 "    1 1 : 1 ;\n"
-                 "  endtable\n"
-                 "endprimitive\n"
-                 "module m;\n"
-                 "  my_udp (strong0, pull1) u1(out, in1, in2);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "primitive my_udp(output y, input a, input b);\n"
+      "  table\n"
+      "    0 0 : 0 ;\n"
+      "    1 1 : 1 ;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  my_udp (strong0, pull1) u1(out, in1, in2);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto insts = FindUdpInsts(r.cu->modules[0]->items);
@@ -115,15 +117,16 @@ TEST(ParserA504, UdpInst_DriveStrength) {
 }
 
 TEST(ParserA504, UdpInst_DriveStrengthReversed) {
-  auto r = Parse("primitive my_udp(output y, input a, input b);\n"
-                 "  table\n"
-                 "    0 0 : 0 ;\n"
-                 "    1 1 : 1 ;\n"
-                 "  endtable\n"
-                 "endprimitive\n"
-                 "module m;\n"
-                 "  my_udp (pull1, strong0) u1(out, in1, in2);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "primitive my_udp(output y, input a, input b);\n"
+      "  table\n"
+      "    0 0 : 0 ;\n"
+      "    1 1 : 1 ;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  my_udp (pull1, strong0) u1(out, in1, in2);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto insts = FindUdpInsts(r.cu->modules[0]->items);
@@ -135,15 +138,16 @@ TEST(ParserA504, UdpInst_DriveStrengthReversed) {
 // --- Delay2 ---
 
 TEST(ParserA504, UdpInst_DelaySingle) {
-  auto r = Parse("primitive my_udp(output y, input a, input b);\n"
-                 "  table\n"
-                 "    0 0 : 0 ;\n"
-                 "    1 1 : 1 ;\n"
-                 "  endtable\n"
-                 "endprimitive\n"
-                 "module m;\n"
-                 "  my_udp #5 u1(out, in1, in2);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "primitive my_udp(output y, input a, input b);\n"
+      "  table\n"
+      "    0 0 : 0 ;\n"
+      "    1 1 : 1 ;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  my_udp #5 u1(out, in1, in2);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto insts = FindUdpInsts(r.cu->modules[0]->items);
@@ -154,15 +158,16 @@ TEST(ParserA504, UdpInst_DelaySingle) {
 }
 
 TEST(ParserA504, UdpInst_DelayRiseFall) {
-  auto r = Parse("primitive my_udp(output y, input a, input b);\n"
-                 "  table\n"
-                 "    0 0 : 0 ;\n"
-                 "    1 1 : 1 ;\n"
-                 "  endtable\n"
-                 "endprimitive\n"
-                 "module m;\n"
-                 "  my_udp #(3, 5) u1(out, in1, in2);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "primitive my_udp(output y, input a, input b);\n"
+      "  table\n"
+      "    0 0 : 0 ;\n"
+      "    1 1 : 1 ;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  my_udp #(3, 5) u1(out, in1, in2);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto insts = FindUdpInsts(r.cu->modules[0]->items);
@@ -175,15 +180,16 @@ TEST(ParserA504, UdpInst_DelayRiseFall) {
 // --- Drive strength AND delay2 ---
 
 TEST(ParserA504, UdpInst_StrengthAndDelay) {
-  auto r = Parse("primitive my_udp(output y, input a, input b);\n"
-                 "  table\n"
-                 "    0 0 : 0 ;\n"
-                 "    1 1 : 1 ;\n"
-                 "  endtable\n"
-                 "endprimitive\n"
-                 "module m;\n"
-                 "  my_udp (weak0, weak1) #7 u1(out, in1, in2);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "primitive my_udp(output y, input a, input b);\n"
+      "  table\n"
+      "    0 0 : 0 ;\n"
+      "    1 1 : 1 ;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  my_udp (weak0, weak1) #7 u1(out, in1, in2);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto insts = FindUdpInsts(r.cu->modules[0]->items);
@@ -196,15 +202,16 @@ TEST(ParserA504, UdpInst_StrengthAndDelay) {
 // --- Multiple instances per statement ---
 
 TEST(ParserA504, UdpInst_MultipleInstances) {
-  auto r = Parse("primitive my_udp(output y, input a, input b);\n"
-                 "  table\n"
-                 "    0 0 : 0 ;\n"
-                 "    1 1 : 1 ;\n"
-                 "  endtable\n"
-                 "endprimitive\n"
-                 "module m;\n"
-                 "  my_udp u1(o1, i1, i2), u2(o2, i3, i4);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "primitive my_udp(output y, input a, input b);\n"
+      "  table\n"
+      "    0 0 : 0 ;\n"
+      "    1 1 : 1 ;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  my_udp u1(o1, i1, i2), u2(o2, i3, i4);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto insts = FindUdpInsts(r.cu->modules[0]->items);
@@ -214,16 +221,16 @@ TEST(ParserA504, UdpInst_MultipleInstances) {
 }
 
 TEST(ParserA504, UdpInst_MultipleWithStrengthDelay) {
-  auto r =
-      Parse("primitive my_udp(output y, input a, input b);\n"
-            "  table\n"
-            "    0 0 : 0 ;\n"
-            "    1 1 : 1 ;\n"
-            "  endtable\n"
-            "endprimitive\n"
-            "module m;\n"
-            "  my_udp (strong0, strong1) #10 u1(o1, i1, i2), u2(o2, i3, i4);\n"
-            "endmodule\n");
+  auto r = Parse(
+      "primitive my_udp(output y, input a, input b);\n"
+      "  table\n"
+      "    0 0 : 0 ;\n"
+      "    1 1 : 1 ;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  my_udp (strong0, strong1) #10 u1(o1, i1, i2), u2(o2, i3, i4);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto insts = FindUdpInsts(r.cu->modules[0]->items);
@@ -238,15 +245,16 @@ TEST(ParserA504, UdpInst_MultipleWithStrengthDelay) {
 // --- Instance arrays ---
 
 TEST(ParserA504, UdpInst_InstanceArray) {
-  auto r = Parse("primitive my_udp(output y, input a, input b);\n"
-                 "  table\n"
-                 "    0 0 : 0 ;\n"
-                 "    1 1 : 1 ;\n"
-                 "  endtable\n"
-                 "endprimitive\n"
-                 "module m;\n"
-                 "  my_udp u1[3:0](out, in1, in2);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "primitive my_udp(output y, input a, input b);\n"
+      "  table\n"
+      "    0 0 : 0 ;\n"
+      "    1 1 : 1 ;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  my_udp u1[3:0](out, in1, in2);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto insts = FindUdpInsts(r.cu->modules[0]->items);
@@ -259,15 +267,16 @@ TEST(ParserA504, UdpInst_InstanceArray) {
 // --- Multiple input terminals ---
 
 TEST(ParserA504, UdpInst_SingleInput) {
-  auto r = Parse("primitive my_buf(output y, input a);\n"
-                 "  table\n"
-                 "    0 : 0 ;\n"
-                 "    1 : 1 ;\n"
-                 "  endtable\n"
-                 "endprimitive\n"
-                 "module m;\n"
-                 "  my_buf u1(out, in1);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "primitive my_buf(output y, input a);\n"
+      "  table\n"
+      "    0 : 0 ;\n"
+      "    1 : 1 ;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  my_buf u1(out, in1);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto insts = FindUdpInsts(r.cu->modules[0]->items);
@@ -276,16 +285,16 @@ TEST(ParserA504, UdpInst_SingleInput) {
 }
 
 TEST(ParserA504, UdpInst_ManyInputs) {
-  auto r =
-      Parse("primitive my_gate(output y, input a, input b, input c, input d);\n"
-            "  table\n"
-            "    0 0 0 0 : 0 ;\n"
-            "    1 1 1 1 : 1 ;\n"
-            "  endtable\n"
-            "endprimitive\n"
-            "module m;\n"
-            "  my_gate u1(out, in1, in2, in3, in4);\n"
-            "endmodule\n");
+  auto r = Parse(
+      "primitive my_gate(output y, input a, input b, input c, input d);\n"
+      "  table\n"
+      "    0 0 0 0 : 0 ;\n"
+      "    1 1 1 1 : 1 ;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  my_gate u1(out, in1, in2, in3, in4);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto insts = FindUdpInsts(r.cu->modules[0]->items);
@@ -296,15 +305,16 @@ TEST(ParserA504, UdpInst_ManyInputs) {
 // --- Attributes ---
 
 TEST(ParserA504, UdpInst_WithAttributes) {
-  auto r = Parse("primitive my_udp(output y, input a, input b);\n"
-                 "  table\n"
-                 "    0 0 : 0 ;\n"
-                 "    1 1 : 1 ;\n"
-                 "  endtable\n"
-                 "endprimitive\n"
-                 "module m;\n"
-                 "  (* synthesis *) my_udp u1(out, in1, in2);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "primitive my_udp(output y, input a, input b);\n"
+      "  table\n"
+      "    0 0 : 0 ;\n"
+      "    1 1 : 1 ;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  (* synthesis *) my_udp u1(out, in1, in2);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto insts = FindUdpInsts(r.cu->modules[0]->items);
@@ -315,10 +325,11 @@ TEST(ParserA504, UdpInst_WithAttributes) {
 // --- Extern UDP declaration used for instantiation ---
 
 TEST(ParserA504, UdpInst_ExternUdp) {
-  auto r = Parse("extern primitive my_udp(output y, input a, input b);\n"
-                 "module m;\n"
-                 "  my_udp u1(out, in1, in2);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "extern primitive my_udp(output y, input a, input b);\n"
+      "module m;\n"
+      "  my_udp u1(out, in1, in2);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto insts = FindUdpInsts(r.cu->modules[0]->items);
@@ -326,4 +337,4 @@ TEST(ParserA504, UdpInst_ExternUdp) {
   EXPECT_EQ(insts[0]->inst_module, "my_udp");
 }
 
-} // namespace
+}  // namespace

@@ -54,9 +54,10 @@ TEST(ParserCh5, UnpackedDim_Typedef) {
 // --- Comma-separated struct members ---
 
 TEST(ParserCh5, StructMembers_CommaSeparated) {
-  auto r = Parse("module m;\n"
-                 "  struct { int X, Y, Z; } s;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  struct { int X, Y, Z; } s;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->data_type.struct_members.size(), 3u);

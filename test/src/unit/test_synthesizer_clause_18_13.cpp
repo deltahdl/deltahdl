@@ -24,12 +24,10 @@ static const RtlirModule *ElaborateSrc(SynthFixture &f,
   Lexer lexer(f.src_mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
   auto *cu = parser.Parse();
-  if (!cu || cu->modules.empty())
-    return nullptr;
+  if (!cu || cu->modules.empty()) return nullptr;
   Elaborator elab(f.arena, f.diag, cu);
   auto *design = elab.Elaborate(cu->modules.back()->name);
-  if (!design || design->top_modules.empty())
-    return nullptr;
+  if (!design || design->top_modules.empty()) return nullptr;
   return design->top_modules[0];
 }
 
@@ -37,10 +35,11 @@ namespace {
 
 TEST(SynthLower, RejectSystemCall) {
   SynthFixture f;
-  auto *mod = ElaborateSrc(f, "module m;\n"
-                              "  reg x;\n"
-                              "  always_comb begin x = $random; end\n"
-                              "endmodule");
+  auto *mod = ElaborateSrc(f,
+                           "module m;\n"
+                           "  reg x;\n"
+                           "  always_comb begin x = $random; end\n"
+                           "endmodule");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto *aig = synth.Lower(mod);
@@ -48,4 +47,4 @@ TEST(SynthLower, RejectSystemCall) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-} // namespace
+}  // namespace

@@ -268,8 +268,8 @@ TEST(SimCh46, NBAOrderingAcrossTimeSlots) {
 
   sched.Run();
   ASSERT_EQ(values.size(), 2u);
-  EXPECT_EQ(values[0], 20); // Last NBA at time 0 wins.
-  EXPECT_EQ(values[1], 40); // Last NBA at time 5 wins.
+  EXPECT_EQ(values[0], 20);  // Last NBA at time 0 wins.
+  EXPECT_EQ(values[1], 40);  // Last NBA at time 5 wins.
 }
 
 // ---------------------------------------------------------------------------

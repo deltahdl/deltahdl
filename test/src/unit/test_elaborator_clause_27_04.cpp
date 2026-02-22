@@ -1,5 +1,7 @@
 // §27.4: Loop generate constructs
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -11,7 +13,6 @@
 #include "lexer/lexer.h"
 #include "lexer/token.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -35,14 +36,15 @@ namespace {
 // --- Generate tests ---
 TEST(Elaborator, GenerateForCreatesVars) {
   ElabFixture f;
-  auto *design = ElaborateSrc("module t #(parameter N = 3) ();\n"
-                              "  generate\n"
-                              "    for (i = 0; i < N; i = i + 1) begin\n"
-                              "      logic [31:0] x;\n"
-                              "    end\n"
-                              "  endgenerate\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t #(parameter N = 3) ();\n"
+      "  generate\n"
+      "    for (i = 0; i < N; i = i + 1) begin\n"
+      "      logic [31:0] x;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   auto *mod = design->top_modules[0];
@@ -54,14 +56,15 @@ TEST(Elaborator, GenerateForCreatesVars) {
 
 TEST(Elaborator, GenerateForZeroIterations) {
   ElabFixture f;
-  auto *design = ElaborateSrc("module t #(parameter N = 0) ();\n"
-                              "  generate\n"
-                              "    for (i = 0; i < N; i = i + 1) begin\n"
-                              "      logic [31:0] x;\n"
-                              "    end\n"
-                              "  endgenerate\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t #(parameter N = 0) ();\n"
+      "  generate\n"
+      "    for (i = 0; i < N; i = i + 1) begin\n"
+      "      logic [31:0] x;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   auto *mod = design->top_modules[0];
@@ -70,15 +73,16 @@ TEST(Elaborator, GenerateForZeroIterations) {
 
 TEST(Elaborator, GenerateForWithAssign) {
   ElabFixture f;
-  auto *design = ElaborateSrc("module t #(parameter N = 2) ();\n"
-                              "  generate\n"
-                              "    for (i = 0; i < N; i = i + 1) begin\n"
-                              "      logic [31:0] w;\n"
-                              "      assign w = 100;\n"
-                              "    end\n"
-                              "  endgenerate\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t #(parameter N = 2) ();\n"
+      "  generate\n"
+      "    for (i = 0; i < N; i = i + 1) begin\n"
+      "      logic [31:0] w;\n"
+      "      assign w = 100;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   auto *mod = design->top_modules[0];
@@ -88,4 +92,4 @@ TEST(Elaborator, GenerateForWithAssign) {
   EXPECT_EQ(mod->variables[1].name, "i_1_w");
 }
 
-} // namespace
+}  // namespace

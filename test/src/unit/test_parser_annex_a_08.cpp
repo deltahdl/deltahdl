@@ -32,8 +32,7 @@ ParseResult Parse(const std::string &src) {
 
 Stmt *FirstInitialStmt(ParseResult &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock)
-      continue;
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
     }
@@ -42,7 +41,7 @@ Stmt *FirstInitialStmt(ParseResult &r) {
   return nullptr;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.8 -- Expressions
@@ -75,8 +74,9 @@ TEST(ParserAnnexA, A8Replication) {
 }
 
 TEST(ParserAnnexA, A8SystemFunctionCall) {
-  auto r = Parse("module m; initial begin $display(\"v=%0d\", x); $finish; end "
-                 "endmodule\n");
+  auto r = Parse(
+      "module m; initial begin $display(\"v=%0d\", x); $finish; end "
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -90,9 +90,10 @@ TEST(ParserAnnexA, A8MemberAccess) {
 }
 
 TEST(ParserAnnexA, A8BitAndPartSelect) {
-  auto r = Parse("module m;\n"
-                 "  initial begin x = data[3]; y = data[7:4]; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin x = data[3]; y = data[7:4]; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -106,9 +107,10 @@ TEST(ParserAnnexA, A8FunctionCallExpr) {
 }
 
 TEST(ParserAnnexA, A8IntegerLiterals) {
-  auto r = Parse("module m;\n"
-                 "  initial begin a = 42; b = 8'hFF; c = 4'b1010; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin a = 42; b = 8'hFF; c = 4'b1010; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }

@@ -38,7 +38,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA70501Fixture &f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.7.5.1 Runtime — $setuphold dual limits stored in TimingCheckEntry
@@ -113,7 +113,7 @@ TEST(SimA70501, WidthThresholdAsLimit2) {
   tc.ref_signal = "clk";
   tc.ref_edge = SpecifyEdge::kPosedge;
   tc.limit = 20;
-  tc.limit2 = 1; // threshold
+  tc.limit2 = 1;  // threshold
   mgr.AddTimingCheck(tc);
   auto &stored = mgr.GetTimingChecks()[0];
   EXPECT_EQ(stored.kind, TimingCheckKind::kWidth);
@@ -132,8 +132,8 @@ TEST(SimA70501, NochangeOffsetsStored) {
   tc.ref_signal = "clk";
   tc.ref_edge = SpecifyEdge::kPosedge;
   tc.data_signal = "data";
-  tc.limit = 0;  // start_edge_offset
-  tc.limit2 = 0; // end_edge_offset
+  tc.limit = 0;   // start_edge_offset
+  tc.limit2 = 0;  // end_edge_offset
   mgr.AddTimingCheck(tc);
   auto &stored = mgr.GetTimingChecks()[0];
   EXPECT_EQ(stored.kind, TimingCheckKind::kNochange);
@@ -169,15 +169,15 @@ TEST(SimA70501, SetupholdFullArgsSimulates) {
 
 TEST(SimA70501, TimeskewWithFlagsSimulates) {
   SimA70501Fixture f;
-  auto *design =
-      ElaborateSrc("module t;\n"
-                   "  logic [7:0] x;\n"
-                   "  specify\n"
-                   "    $timeskew(posedge clk1, posedge clk2, 5, ntfr, 1, 0);\n"
-                   "  endspecify\n"
-                   "  initial x = 8'd77;\n"
-                   "endmodule\n",
-                   f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  specify\n"
+      "    $timeskew(posedge clk1, posedge clk2, 5, ntfr, 1, 0);\n"
+      "  endspecify\n"
+      "  initial x = 8'd77;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);

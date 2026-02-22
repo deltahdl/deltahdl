@@ -1,5 +1,9 @@
 // §24.3: The program construct
 
+#include <gtest/gtest.h>
+
+#include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -11,8 +15,6 @@
 #include "simulation/process.h"
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
-#include <string>
 
 using namespace delta;
 
@@ -20,7 +22,7 @@ using namespace delta;
 // Parse-level fixture
 // =============================================================================
 struct ProgramTestParse : ::testing::Test {
-protected:
+ protected:
   CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
@@ -60,10 +62,10 @@ namespace {
 
 TEST(ProgramElab, ElaborateProgramWithPorts) {
   ProgramElabFixture f;
-  auto *design =
-      ElaborateSource("program prog_ports(input logic clk, input logic rst);\n"
-                      "endprogram\n",
-                      f, "prog_ports");
+  auto *design = ElaborateSource(
+      "program prog_ports(input logic clk, input logic rst);\n"
+      "endprogram\n",
+      f, "prog_ports");
   ASSERT_NE(design, nullptr);
   auto *mod = design->top_modules[0];
   ASSERT_GE(mod->ports.size(), 2u);
@@ -73,12 +75,13 @@ TEST(ProgramElab, ElaborateProgramWithPorts) {
 
 TEST(ProgramElab, ElaborateProgramWithInitialBlock) {
   ProgramElabFixture f;
-  auto *design = ElaborateSource("program prog_init;\n"
-                                 "  initial begin\n"
-                                 "    $display(\"hello\");\n"
-                                 "  end\n"
-                                 "endprogram\n",
-                                 f, "prog_init");
+  auto *design = ElaborateSource(
+      "program prog_init;\n"
+      "  initial begin\n"
+      "    $display(\"hello\");\n"
+      "  end\n"
+      "endprogram\n",
+      f, "prog_init");
   ASSERT_NE(design, nullptr);
   auto *mod = design->top_modules[0];
   EXPECT_FALSE(mod->processes.empty());
@@ -90,13 +93,14 @@ TEST(ProgramElab, ElaborateProgramWithInitialBlock) {
 // =============================================================================
 TEST(ProgramElab, ProgramInstantiatedFromModule) {
   ProgramElabFixture f;
-  auto *design = ElaborateSource("program sub_prog(input logic a);\n"
-                                 "endprogram\n"
-                                 "module top;\n"
-                                 "  logic sig;\n"
-                                 "  sub_prog u0(.a(sig));\n"
-                                 "endmodule\n",
-                                 f, "top");
+  auto *design = ElaborateSource(
+      "program sub_prog(input logic a);\n"
+      "endprogram\n"
+      "module top;\n"
+      "  logic sig;\n"
+      "  sub_prog u0(.a(sig));\n"
+      "endmodule\n",
+      f, "top");
   ASSERT_NE(design, nullptr);
   auto *mod = design->top_modules[0];
   ASSERT_EQ(mod->children.size(), 1u);
@@ -104,4 +108,4 @@ TEST(ProgramElab, ProgramInstantiatedFromModule) {
   EXPECT_EQ(mod->children[0].resolved->name, "sub_prog");
 }
 
-} // namespace
+}  // namespace

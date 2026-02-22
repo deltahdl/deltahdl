@@ -78,8 +78,9 @@ TEST(ParserClause03, Cl3_14_2_1_DefaultForFollowingElements) {
 // directive is read."
 TEST(ParserClause03, Cl3_14_2_1_PersistsUntilReplaced) {
   // Two directives: second replaces first.
-  auto r = Preprocess("`timescale 1ns / 1ps\n"
-                      "`timescale 1us / 1ns\n");
+  auto r = Preprocess(
+      "`timescale 1ns / 1ps\n"
+      "`timescale 1us / 1ns\n");
   EXPECT_FALSE(r.has_errors);
   // Final state reflects the second directive.
   EXPECT_EQ(r.timescale.unit, TimeUnit::kUs);
@@ -106,11 +107,12 @@ TEST(ParserClause03, Cl3_14_2_1_CuScoped) {
 // `timescale 1ns / 10ps → modules A and B
 // `timescale 1ps / 1ps  → module C
 TEST(ParserClause03, Cl3_14_2_1_LrmExampleThreeModules) {
-  auto r = Parse("`timescale 1ns / 10ps\n"
-                 "module A; endmodule\n"
-                 "module B; endmodule\n"
-                 "`timescale 1ps / 1ps\n"
-                 "module C; endmodule\n");
+  auto r = Parse(
+      "`timescale 1ns / 10ps\n"
+      "module A; endmodule\n"
+      "module B; endmodule\n"
+      "`timescale 1ps / 1ps\n"
+      "module C; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 3u);
@@ -126,14 +128,16 @@ TEST(ParserClause03, Cl3_14_2_1_LrmExampleThreeModules) {
 // problems."
 TEST(ParserClause03, Cl3_14_2_1_FileOrderDependency) {
   // Order 1: 1ns/10ps then module B then 1ps/1ps.
-  auto r1 = Preprocess("`timescale 1ns / 10ps\n"
-                       "module B; endmodule\n"
-                       "`timescale 1ps / 1ps\n");
+  auto r1 = Preprocess(
+      "`timescale 1ns / 10ps\n"
+      "module B; endmodule\n"
+      "`timescale 1ps / 1ps\n");
   EXPECT_EQ(r1.timescale.unit, TimeUnit::kPs);
   // Order 2: 1ps/1ps then module B then 1ns/10ps.
-  auto r2 = Preprocess("`timescale 1ps / 1ps\n"
-                       "module B; endmodule\n"
-                       "`timescale 1ns / 10ps\n");
+  auto r2 = Preprocess(
+      "`timescale 1ps / 1ps\n"
+      "module B; endmodule\n"
+      "`timescale 1ns / 10ps\n");
   EXPECT_EQ(r2.timescale.unit, TimeUnit::kNs);
   // Same module B in different orders sees different timescales.
   EXPECT_NE(r1.timescale.unit, r2.timescale.unit);
@@ -143,11 +147,12 @@ TEST(ParserClause03, Cl3_14_2_1_FileOrderDependency) {
 // affected by `timescale.  §3.14.2.1: "that do not have timeunit and
 // timeprecision constructs specified within the design element."
 TEST(ParserClause03, Cl3_14_2_1_KeywordsOverrideTimescale) {
-  auto r = Parse("`timescale 1ns / 1ps\n"
-                 "module m;\n"
-                 "  timeunit 1us;\n"
-                 "  timeprecision 1ns;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "`timescale 1ns / 1ps\n"
+      "module m;\n"
+      "  timeunit 1us;\n"
+      "  timeprecision 1ns;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *mod = r.cu->modules[0];
@@ -163,8 +168,9 @@ TEST(ParserClause03, Cl3_14_2_1_KeywordsOverrideTimescale) {
 TEST(ParserClause03, Cl3_14_2_1_GlobalPrecisionTracking) {
   // Two directives: 1ns/1ps then 1us/1ns.
   // Global precision should be the finer one: 1ps.
-  auto r = Preprocess("`timescale 1ns / 1ps\n"
-                      "`timescale 1us / 1ns\n");
+  auto r = Preprocess(
+      "`timescale 1ns / 1ps\n"
+      "`timescale 1us / 1ns\n");
   EXPECT_FALSE(r.has_errors);
   // Current timescale is the last one.
   EXPECT_EQ(r.timescale.precision, TimeUnit::kNs);

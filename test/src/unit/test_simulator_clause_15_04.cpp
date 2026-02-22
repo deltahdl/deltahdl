@@ -1,5 +1,10 @@
 // §15.4: Mailboxes
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <string_view>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -14,9 +19,6 @@
 #include "simulation/stmt_result.h"
 #include "simulation/sync_objects.h"
 #include "simulation/variable.h"
-#include <cstdint>
-#include <gtest/gtest.h>
-#include <string_view>
 
 using namespace delta;
 
@@ -97,7 +99,7 @@ TEST(IpcSync, MailboxIsFullUnbounded) {
   for (int i = 0; i < 1000; ++i) {
     mb.TryPut(static_cast<uint64_t>(i));
   }
-  EXPECT_FALSE(mb.IsFull()); // Unbounded never full.
+  EXPECT_FALSE(mb.IsFull());  // Unbounded never full.
 }
 
 // =============================================================================
@@ -131,4 +133,4 @@ TEST(IpcSync, MultipleMailboxesInContext) {
   EXPECT_EQ(msg, 200u);
 }
 
-} // namespace
+}  // namespace

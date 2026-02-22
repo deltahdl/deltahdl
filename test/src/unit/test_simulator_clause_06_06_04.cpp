@@ -1,10 +1,11 @@
 // §6.6.4: Trireg net
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "simulation/net.h"
 #include "simulation/scheduler.h"
 #include "simulation/variable.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -200,7 +201,7 @@ TEST(CapacitiveNetwork, OnlyWhenBothCapacitive) {
   a.type = NetType::kTrireg;
   a.resolved = var_a;
   a.charge_strength = Strength::kLarge;
-  a.drivers.push_back(MakeAllZ(arena, 8)); // Capacitive.
+  a.drivers.push_back(MakeAllZ(arena, 8));  // Capacitive.
 
   auto *var_b = arena.Create<Variable>();
   var_b->value = MakeLogic4VecVal(arena, 8, 0);
@@ -208,7 +209,7 @@ TEST(CapacitiveNetwork, OnlyWhenBothCapacitive) {
   b.type = NetType::kTrireg;
   b.resolved = var_b;
   b.charge_strength = Strength::kSmall;
-  b.drivers.push_back(MakeLogic4VecVal(arena, 8, 77)); // Actively driven.
+  b.drivers.push_back(MakeLogic4VecVal(arena, 8, 77));  // Actively driven.
 
   PropagateCharge(a, b);
   // B is actively driven, no propagation should occur.
@@ -216,4 +217,4 @@ TEST(CapacitiveNetwork, OnlyWhenBothCapacitive) {
   EXPECT_EQ(var_b->value.ToUint64(), 0u);
 }
 
-} // namespace
+}  // namespace

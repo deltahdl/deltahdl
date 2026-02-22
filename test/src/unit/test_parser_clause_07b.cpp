@@ -25,8 +25,7 @@ static ParseResult7b Parse(const std::string &src) {
 }
 
 static ModuleItem *FirstItem(ParseResult7b &r) {
-  if (!r.cu || r.cu->modules.empty())
-    return nullptr;
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
   auto &items = r.cu->modules[0]->items;
   return items.empty() ? nullptr : items[0];
 }
@@ -48,9 +47,10 @@ static Stmt *FirstInitialStmt(ParseResult7b &r) {
 // =========================================================================
 
 TEST(ParserSection7, StructVariableDecl) {
-  auto r = Parse("module t;\n"
-                 "  struct { int a; int b; } my_var;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  struct { int a; int b; } my_var;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -63,11 +63,12 @@ TEST(ParserSection7, StructVariableDecl) {
 // =========================================================================
 
 TEST(ParserSection7, ArrayLocatorUnique) {
-  auto r = Parse("module t;\n"
-                 "  int s[] = '{10, 10, 3, 20, 20, 10};\n"
-                 "  int qi[$];\n"
-                 "  initial qi = s.unique;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int s[] = '{10, 10, 3, 20, 20, 10};\n"
+      "  int qi[$];\n"
+      "  initial qi = s.unique;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -80,10 +81,11 @@ TEST(ParserSection7, ArrayLocatorUnique) {
 // =========================================================================
 
 TEST(ParserSection7, ArrayReductionAnd) {
-  auto r = Parse("module t;\n"
-                 "  byte b[] = '{1, 3, 5, 7};\n"
-                 "  initial y = b.and;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  byte b[] = '{1, 3, 5, 7};\n"
+      "  initial y = b.and;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -92,10 +94,11 @@ TEST(ParserSection7, ArrayReductionAnd) {
 }
 
 TEST(ParserSection7, ArrayReductionOr) {
-  auto r = Parse("module t;\n"
-                 "  byte b[] = '{1, 2, 3, 4};\n"
-                 "  initial y = b.or;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  byte b[] = '{1, 2, 3, 4};\n"
+      "  initial y = b.or;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -104,10 +107,11 @@ TEST(ParserSection7, ArrayReductionOr) {
 }
 
 TEST(ParserSection7, ArrayReductionXor) {
-  auto r = Parse("module t;\n"
-                 "  byte b[] = '{1, 2, 3, 4};\n"
-                 "  initial y = b.xor;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  byte b[] = '{1, 2, 3, 4};\n"
+      "  initial y = b.xor;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -120,10 +124,11 @@ TEST(ParserSection7, ArrayReductionXor) {
 // =========================================================================
 
 TEST(ParserSection7, EmptyConcatClearQueue_Parse) {
-  auto r = Parse("module t;\n"
-                 "  int q[$];\n"
-                 "  initial q = {};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int q[$];\n"
+      "  initial q = {};\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -132,10 +137,11 @@ TEST(ParserSection7, EmptyConcatClearQueue_Parse) {
 }
 
 TEST(ParserSection7, EmptyConcatClearQueue_Rhs) {
-  auto r = Parse("module t;\n"
-                 "  int q[$];\n"
-                 "  initial q = {};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int q[$];\n"
+      "  initial q = {};\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -145,14 +151,15 @@ TEST(ParserSection7, EmptyConcatClearQueue_Rhs) {
 }
 
 TEST(ParserSection7, UnionWithNestedStruct) {
-  auto r = Parse("module t;\n"
-                 "  typedef union tagged {\n"
-                 "    struct {\n"
-                 "      bit [4:0] reg1, reg2;\n"
-                 "    } Add;\n"
-                 "    bit [9:0] Jmp;\n"
-                 "  } Instr;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  typedef union tagged {\n"
+      "    struct {\n"
+      "      bit [4:0] reg1, reg2;\n"
+      "    } Add;\n"
+      "    bit [9:0] Jmp;\n"
+      "  } Instr;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -166,11 +173,12 @@ TEST(ParserSection7, UnionWithNestedStruct) {
 // =========================================================================
 
 TEST(ParserSection7, ArrayLocatorFindWithClause) {
-  auto r = Parse("module t;\n"
-                 "  int arr[] = '{1, 2, 3, 4, 5};\n"
-                 "  int found[$];\n"
-                 "  initial found = arr.find with (item > 3);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[] = '{1, 2, 3, 4, 5};\n"
+      "  int found[$];\n"
+      "  initial found = arr.find with (item > 3);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -179,11 +187,12 @@ TEST(ParserSection7, ArrayLocatorFindWithClause) {
 }
 
 TEST(ParserSection7, ArrayLocatorFindIndex) {
-  auto r = Parse("module t;\n"
-                 "  int arr[] = '{10, 20, 30};\n"
-                 "  int idx[$];\n"
-                 "  initial idx = arr.find_index with (item == 20);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[] = '{10, 20, 30};\n"
+      "  int idx[$];\n"
+      "  initial idx = arr.find_index with (item == 20);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -191,10 +200,11 @@ TEST(ParserSection7, ArrayLocatorFindIndex) {
 }
 
 TEST(ParserSection7, ArrayMethodSort) {
-  auto r = Parse("module t;\n"
-                 "  int arr[] = '{5, 3, 1, 4, 2};\n"
-                 "  initial arr.sort;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[] = '{5, 3, 1, 4, 2};\n"
+      "  initial arr.sort;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -202,10 +212,11 @@ TEST(ParserSection7, ArrayMethodSort) {
 }
 
 TEST(ParserSection7, ArrayMethodRsort) {
-  auto r = Parse("module t;\n"
-                 "  int arr[] = '{1, 2, 3, 4, 5};\n"
-                 "  initial arr.rsort;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[] = '{1, 2, 3, 4, 5};\n"
+      "  initial arr.rsort;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -213,10 +224,11 @@ TEST(ParserSection7, ArrayMethodRsort) {
 }
 
 TEST(ParserSection7, ArrayMethodShuffle) {
-  auto r = Parse("module t;\n"
-                 "  int arr[] = '{1, 2, 3};\n"
-                 "  initial arr.shuffle;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[] = '{1, 2, 3};\n"
+      "  initial arr.shuffle;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -224,10 +236,11 @@ TEST(ParserSection7, ArrayMethodShuffle) {
 }
 
 TEST(ParserSection7, ArrayReductionSum) {
-  auto r = Parse("module t;\n"
-                 "  int arr[] = '{1, 2, 3};\n"
-                 "  initial y = arr.sum;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[] = '{1, 2, 3};\n"
+      "  initial y = arr.sum;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -240,9 +253,10 @@ TEST(ParserSection7, ArrayReductionSum) {
 // =========================================================================
 
 TEST(ParserSection7, QueueDeclaration) {
-  auto r = Parse("module t;\n"
-                 "  int q[$];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int q[$];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -250,9 +264,10 @@ TEST(ParserSection7, QueueDeclaration) {
 }
 
 TEST(ParserSection7, QueueWithBound) {
-  auto r = Parse("module t;\n"
-                 "  bit q2[$:255];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  bit q2[$:255];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -260,9 +275,10 @@ TEST(ParserSection7, QueueWithBound) {
 }
 
 TEST(ParserSection7, QueueWithInitializer) {
-  auto r = Parse("module t;\n"
-                 "  integer Q[$] = '{3, 2, 7};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  integer Q[$] = '{3, 2, 7};\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -271,10 +287,11 @@ TEST(ParserSection7, QueueWithInitializer) {
 }
 
 TEST(ParserSection7, QueueMethodPushBack) {
-  auto r = Parse("module t;\n"
-                 "  int q[$];\n"
-                 "  initial q.push_back(42);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int q[$];\n"
+      "  initial q.push_back(42);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -282,10 +299,11 @@ TEST(ParserSection7, QueueMethodPushBack) {
 }
 
 TEST(ParserSection7, QueueMethodSize) {
-  auto r = Parse("module t;\n"
-                 "  int q[$];\n"
-                 "  initial y = q.size;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int q[$];\n"
+      "  initial y = q.size;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -298,9 +316,10 @@ TEST(ParserSection7, QueueMethodSize) {
 // =========================================================================
 
 TEST(ParserSection7, AssociativeArrayWildcardIndex) {
-  auto r = Parse("module t;\n"
-                 "  int aa[*];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int aa[*];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -308,9 +327,10 @@ TEST(ParserSection7, AssociativeArrayWildcardIndex) {
 }
 
 TEST(ParserSection7, AssociativeArrayTypedIndex) {
-  auto r = Parse("module t;\n"
-                 "  int aa[string];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int aa[string];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -318,9 +338,10 @@ TEST(ParserSection7, AssociativeArrayTypedIndex) {
 }
 
 TEST(ParserSection7, AssociativeArrayIntIndex) {
-  auto r = Parse("module t;\n"
-                 "  string names[int];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  string names[int];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -332,9 +353,10 @@ TEST(ParserSection7, AssociativeArrayIntIndex) {
 // =========================================================================
 
 TEST(ParserSection7, PackedArrayMultiDim) {
-  auto r = Parse("module t;\n"
-                 "  bit [3:0][7:0] packed_2d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  bit [3:0][7:0] packed_2d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -343,9 +365,10 @@ TEST(ParserSection7, PackedArrayMultiDim) {
 }
 
 TEST(ParserSection7, PackedArrayWithUnpacked) {
-  auto r = Parse("module t;\n"
-                 "  logic [7:0] mem [0:255];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  logic [7:0] mem [0:255];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -354,9 +377,10 @@ TEST(ParserSection7, PackedArrayWithUnpacked) {
 }
 
 TEST(ParserSection7, UnpackedArrayFixedSize) {
-  auto r = Parse("module t;\n"
-                 "  int arr [3];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int arr [3];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -369,9 +393,10 @@ TEST(ParserSection7, UnpackedArrayFixedSize) {
 // =========================================================================
 
 TEST(ParserSection7, DynamicArrayDecl) {
-  auto r = Parse("module t;\n"
-                 "  bit [3:0] nibble[];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  bit [3:0] nibble[];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -379,10 +404,11 @@ TEST(ParserSection7, DynamicArrayDecl) {
 }
 
 TEST(ParserSection7, DynamicArrayNew) {
-  auto r = Parse("module t;\n"
-                 "  int dyn[];\n"
-                 "  initial dyn = new[10];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int dyn[];\n"
+      "  initial dyn = new[10];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -390,9 +416,10 @@ TEST(ParserSection7, DynamicArrayNew) {
 }
 
 TEST(ParserSection7, DynamicArrayMultiDim) {
-  auto r = Parse("module t;\n"
-                 "  integer mem[2][];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  integer mem[2][];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -404,9 +431,10 @@ TEST(ParserSection7, DynamicArrayMultiDim) {
 // =========================================================================
 
 TEST(ParserSection7, QueueOfStrings) {
-  auto r = Parse("module t;\n"
-                 "  string names[$] = '{\"Bob\"};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  string names[$] = '{\"Bob\"};\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -415,10 +443,11 @@ TEST(ParserSection7, QueueOfStrings) {
 }
 
 TEST(ParserSection7, QueuePushFront) {
-  auto r = Parse("module t;\n"
-                 "  int q[$];\n"
-                 "  initial q.push_front(99);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int q[$];\n"
+      "  initial q.push_front(99);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -426,10 +455,11 @@ TEST(ParserSection7, QueuePushFront) {
 }
 
 TEST(ParserSection7, QueuePopBack) {
-  auto r = Parse("module t;\n"
-                 "  int q[$] = '{1, 2, 3};\n"
-                 "  initial y = q.pop_back();\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int q[$] = '{1, 2, 3};\n"
+      "  initial y = q.pop_back();\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -442,11 +472,12 @@ TEST(ParserSection7, QueuePopBack) {
 // =========================================================================
 
 TEST(ParserSection7, ArrayMethodMin) {
-  auto r = Parse("module t;\n"
-                 "  int arr[] = '{5, 1, 3};\n"
-                 "  int res[$];\n"
-                 "  initial res = arr.min;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[] = '{5, 1, 3};\n"
+      "  int res[$];\n"
+      "  initial res = arr.min;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -455,11 +486,12 @@ TEST(ParserSection7, ArrayMethodMin) {
 }
 
 TEST(ParserSection7, ArrayMethodMax) {
-  auto r = Parse("module t;\n"
-                 "  int arr[] = '{5, 1, 3};\n"
-                 "  int res[$];\n"
-                 "  initial res = arr.max;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[] = '{5, 1, 3};\n"
+      "  int res[$];\n"
+      "  initial res = arr.max;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -468,11 +500,12 @@ TEST(ParserSection7, ArrayMethodMax) {
 }
 
 TEST(ParserSection7, ArrayMethodUniqueIndex) {
-  auto r = Parse("module t;\n"
-                 "  int arr[] = '{1, 2, 1, 3};\n"
-                 "  int idx[$];\n"
-                 "  initial idx = arr.unique_index;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[] = '{1, 2, 1, 3};\n"
+      "  int idx[$];\n"
+      "  initial idx = arr.unique_index;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -485,10 +518,11 @@ TEST(ParserSection7, ArrayMethodUniqueIndex) {
 // =========================================================================
 
 TEST(ParserSection7, ArrayMethodReverse) {
-  auto r = Parse("module t;\n"
-                 "  int arr[] = '{1, 2, 3};\n"
-                 "  initial arr.reverse;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[] = '{1, 2, 3};\n"
+      "  initial arr.reverse;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -496,11 +530,12 @@ TEST(ParserSection7, ArrayMethodReverse) {
 }
 
 TEST(ParserSection7, ArraySortWithClause) {
-  auto r = Parse("module t;\n"
-                 "  typedef struct { int x; int y; } point_t;\n"
-                 "  point_t pts[];\n"
-                 "  initial pts.sort with (item.x);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct { int x; int y; } point_t;\n"
+      "  point_t pts[];\n"
+      "  initial pts.sort with (item.x);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -512,9 +547,10 @@ TEST(ParserSection7, ArraySortWithClause) {
 // =========================================================================
 
 TEST(ParserSection7, AssignmentPatternReplication) {
-  auto r = Parse("module t;\n"
-                 "  int A[8] = '{2{1, 2, 3, 4}};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int A[8] = '{2{1, 2, 3, 4}};\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -522,9 +558,10 @@ TEST(ParserSection7, AssignmentPatternReplication) {
 }
 
 TEST(ParserSection7, AssignmentPatternDefault) {
-  auto r = Parse("module t;\n"
-                 "  int B[4] = '{default:0};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int B[4] = '{default:0};\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -532,9 +569,10 @@ TEST(ParserSection7, AssignmentPatternDefault) {
 }
 
 TEST(ParserSection7, AssignmentPatternPositional) {
-  auto r = Parse("module t;\n"
-                 "  int C[3] = '{10, 20, 30};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int C[3] = '{10, 20, 30};\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -547,14 +585,15 @@ TEST(ParserSection7, AssignmentPatternPositional) {
 // =========================================================================
 
 TEST(ParserSection7, PackedStructSigned2State) {
-  auto r = Parse("module t;\n"
-                 "  struct packed signed {\n"
-                 "    int a;\n"
-                 "    shortint b;\n"
-                 "    byte c;\n"
-                 "    bit [7:0] d;\n"
-                 "  } pack1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  struct packed signed {\n"
+      "    int a;\n"
+      "    shortint b;\n"
+      "    byte c;\n"
+      "    bit [7:0] d;\n"
+      "  } pack1;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -564,13 +603,14 @@ TEST(ParserSection7, PackedStructSigned2State) {
 }
 
 TEST(ParserSection7, PackedStructUnsigned4State) {
-  auto r = Parse("module t;\n"
-                 "  struct packed unsigned {\n"
-                 "    time a;\n"
-                 "    integer b;\n"
-                 "    logic [31:0] c;\n"
-                 "  } pack2;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  struct packed unsigned {\n"
+      "    time a;\n"
+      "    integer b;\n"
+      "    logic [31:0] c;\n"
+      "  } pack2;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -580,11 +620,12 @@ TEST(ParserSection7, PackedStructUnsigned4State) {
 }
 
 TEST(ParserSection7, PackedStructDefaultUnsigned) {
-  auto r = Parse("module t;\n"
-                 "  struct packed {\n"
-                 "    bit [3:0] x;\n"
-                 "  } ps;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  struct packed {\n"
+      "    bit [3:0] x;\n"
+      "  } ps;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -593,16 +634,17 @@ TEST(ParserSection7, PackedStructDefaultUnsigned) {
 }
 
 TEST(ParserSection7, PackedStructWithTypedef) {
-  auto r = Parse("module t;\n"
-                 "  typedef struct packed {\n"
-                 "    bit [3:0] GFC;\n"
-                 "    bit [7:0] VPI;\n"
-                 "    bit [11:0] VCI;\n"
-                 "    bit CLP;\n"
-                 "    bit [3:0] PT;\n"
-                 "    bit [7:0] HEC;\n"
-                 "  } s_atmcell;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct packed {\n"
+      "    bit [3:0] GFC;\n"
+      "    bit [7:0] VPI;\n"
+      "    bit [11:0] VCI;\n"
+      "    bit CLP;\n"
+      "    bit [3:0] PT;\n"
+      "    bit [7:0] HEC;\n"
+      "  } s_atmcell;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -612,13 +654,14 @@ TEST(ParserSection7, PackedStructWithTypedef) {
 }
 
 TEST(ParserSection7, PackedStructPartSelect) {
-  auto r = Parse("module t;\n"
-                 "  struct packed {\n"
-                 "    bit [7:0] a;\n"
-                 "    bit [7:0] b;\n"
-                 "  } s;\n"
-                 "  initial x = s[15:8];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  struct packed {\n"
+      "    bit [7:0] a;\n"
+      "    bit [7:0] b;\n"
+      "  } s;\n"
+      "  initial x = s[15:8];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -631,11 +674,12 @@ TEST(ParserSection7, PackedStructPartSelect) {
 // =========================================================================
 
 TEST(ParserSection7, StructWholeAssignment) {
-  auto r = Parse("module t;\n"
-                 "  typedef struct { int a; int b; } pair_t;\n"
-                 "  pair_t p1, p2;\n"
-                 "  initial p2 = p1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct { int a; int b; } pair_t;\n"
+      "  pair_t p1, p2;\n"
+      "  initial p2 = p1;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -643,13 +687,14 @@ TEST(ParserSection7, StructWholeAssignment) {
 }
 
 TEST(ParserSection7, StructMemberDefaultInit) {
-  auto r = Parse("module t;\n"
-                 "  typedef struct {\n"
-                 "    int addr = 100;\n"
-                 "    int crc;\n"
-                 "    byte data [4] = '{4{1}};\n"
-                 "  } packet1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct {\n"
+      "    int addr = 100;\n"
+      "    int crc;\n"
+      "    byte data [4] = '{4{1}};\n"
+      "  } packet1;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -660,11 +705,12 @@ TEST(ParserSection7, StructMemberDefaultInit) {
 }
 
 TEST(ParserSection7, StructAssignmentPattern) {
-  auto r = Parse("module t;\n"
-                 "  typedef struct { int a; int b; } pair_t;\n"
-                 "  pair_t p;\n"
-                 "  initial p = '{10, 20};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct { int a; int b; } pair_t;\n"
+      "  pair_t p;\n"
+      "  initial p = '{10, 20};\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -674,13 +720,14 @@ TEST(ParserSection7, StructAssignmentPattern) {
 }
 
 TEST(ParserSection7, UnpackedStructDecl) {
-  auto r = Parse("module t;\n"
-                 "  struct {\n"
-                 "    int x;\n"
-                 "    real y;\n"
-                 "    string s;\n"
-                 "  } my_unpacked;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  struct {\n"
+      "    int x;\n"
+      "    real y;\n"
+      "    string s;\n"
+      "  } my_unpacked;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -690,14 +737,15 @@ TEST(ParserSection7, UnpackedStructDecl) {
 }
 
 TEST(ParserSection7, UnpackedStructTypedefDecl) {
-  auto r = Parse("module t;\n"
-                 "  typedef struct {\n"
-                 "    int addr;\n"
-                 "    int crc;\n"
-                 "    byte data [4];\n"
-                 "  } packet;\n"
-                 "  packet p;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct {\n"
+      "    int addr;\n"
+      "    int crc;\n"
+      "    byte data [4];\n"
+      "  } packet;\n"
+      "  packet p;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
@@ -706,10 +754,11 @@ TEST(ParserSection7, UnpackedStructTypedefDecl) {
 }
 
 TEST(ParserSection7, StructMemberAccess) {
-  auto r = Parse("module t;\n"
-                 "  struct { int x; int y; } s;\n"
-                 "  initial s.x = 42;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  struct { int x; int y; } s;\n"
+      "  initial s.x = 42;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);

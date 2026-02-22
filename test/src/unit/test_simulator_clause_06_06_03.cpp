@@ -1,10 +1,11 @@
 // §6.6.3: Wired nets
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "simulation/net.h"
 #include "simulation/scheduler.h"
 #include "simulation/variable.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -114,4 +115,4 @@ TEST(NetResolution, ResolveWorNet) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-} // namespace
+}  // namespace

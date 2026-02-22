@@ -1,9 +1,11 @@
 // §19.5.7: Value resolution
 
-#include "simulation/coverage.h"
 #include <gtest/gtest.h>
+
 #include <string>
 #include <vector>
+
+#include "simulation/coverage.h"
 
 using namespace delta;
 
@@ -46,4 +48,4 @@ TEST(Coverage, IgnoreBinsExcludedFromCoverage) {
   EXPECT_DOUBLE_EQ(CoverageDB::GetPointCoverage(cp), 100.0);
 }
 
-} // namespace
+}  // namespace

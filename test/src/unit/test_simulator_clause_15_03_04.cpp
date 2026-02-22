@@ -1,5 +1,10 @@
 // §15.3.4: Try_get()
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <string_view>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -14,9 +19,6 @@
 #include "simulation/stmt_result.h"
 #include "simulation/sync_objects.h"
 #include "simulation/variable.h"
-#include <cstdint>
-#include <gtest/gtest.h>
-#include <string_view>
 
 using namespace delta;
 
@@ -45,7 +47,7 @@ TEST(IpcSync, SemaphoreTryGetFails) {
   SemaphoreObject sem(1);
   int32_t result = sem.TryGet(2);
   EXPECT_EQ(result, 0);
-  EXPECT_EQ(sem.key_count, 1); // Keys unchanged on failure.
+  EXPECT_EQ(sem.key_count, 1);  // Keys unchanged on failure.
 }
 
 TEST(IpcSync, SemaphoreTryGetDefaultOne) {
@@ -59,7 +61,7 @@ TEST(IpcSync, SemaphoreTryGetExactKeys) {
   SemaphoreObject sem(5);
   EXPECT_EQ(sem.TryGet(5), 1);
   EXPECT_EQ(sem.key_count, 0);
-  EXPECT_EQ(sem.TryGet(1), 0); // Empty now.
+  EXPECT_EQ(sem.TryGet(1), 0);  // Empty now.
 }
 
 // =============================================================================
@@ -72,4 +74,4 @@ TEST(IpcSync, SemaphoreTryGetZeroCount) {
   EXPECT_EQ(sem.key_count, 0);
 }
 
-} // namespace
+}  // namespace

@@ -1,5 +1,10 @@
 // §10.6.2: The force and release procedural statements
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <string_view>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -13,9 +18,6 @@
 #include "simulation/stmt_exec.h"
 #include "simulation/stmt_result.h"
 #include "simulation/variable.h"
-#include <cstdint>
-#include <gtest/gtest.h>
-#include <string_view>
 
 using namespace delta;
 
@@ -186,4 +188,4 @@ TEST(StmtExec, ForceReleaseThenAssign) {
   EXPECT_EQ(var->value.ToUint64(), 75u);
 }
 
-} // namespace
+}  // namespace

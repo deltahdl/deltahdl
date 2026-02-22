@@ -51,15 +51,16 @@ static bool ParseOk(const std::string &src) {
 TEST(ParserClause03, AllSevenDesignElements) {
   // §3.2: A design element is a module, program, interface, checker,
   //       package, primitive, or configuration.
-  auto r = Parse("module m; endmodule\n"
-                 "program p; endprogram\n"
-                 "interface ifc; endinterface\n"
-                 "checker chk; endchecker\n"
-                 "package pkg; endpackage\n"
-                 "primitive udp_and (output out, input a, b);\n"
-                 "  table 0 0 : 0; 0 1 : 0; 1 0 : 0; 1 1 : 1; endtable\n"
-                 "endprimitive\n"
-                 "config cfg; design m; endconfig\n");
+  auto r = Parse(
+      "module m; endmodule\n"
+      "program p; endprogram\n"
+      "interface ifc; endinterface\n"
+      "checker chk; endchecker\n"
+      "package pkg; endpackage\n"
+      "primitive udp_and (output out, input a, b);\n"
+      "  table 0 0 : 0; 0 1 : 0; 1 0 : 0; 1 1 : 1; endtable\n"
+      "endprimitive\n"
+      "config cfg; design m; endconfig\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 1u);
@@ -83,6 +84,7 @@ TEST(ParserClause03, AllSevenDesignElements) {
   // Multiple design elements of same type in one compilation unit
   EXPECT_TRUE(ParseOk("module a; endmodule\nmodule b; endmodule\n"));
   // Module + package coexist in same unit with import
-  EXPECT_TRUE(ParseOk("package p; typedef int myint; endpackage\n"
-                      "module m; import p::*; endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("package p; typedef int myint; endpackage\n"
+              "module m; import p::*; endmodule\n"));
 }

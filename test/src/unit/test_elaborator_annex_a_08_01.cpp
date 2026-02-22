@@ -34,7 +34,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA81Fixture &f) {
   return design;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.8.1 Concatenations — Elaboration
@@ -44,12 +44,13 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA81Fixture &f) {
 
 TEST(ElabA81, ConcatenationInContAssign) {
   ElabA81Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  logic [7:0] a;\n"
-                              "  logic [3:0] x, y;\n"
-                              "  assign a = {x, y};\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  logic [3:0] x, y;\n"
+      "  assign a = {x, y};\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -58,10 +59,11 @@ TEST(ElabA81, ConcatenationInContAssign) {
 
 TEST(ElabA81, ConstantConcatenationInParam) {
   ElabA81Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  parameter [15:0] P = {8'hAB, 8'hCD};\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  parameter [15:0] P = {8'hAB, 8'hCD};\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -70,10 +72,11 @@ TEST(ElabA81, ConstantConcatenationInParam) {
 
 TEST(ElabA81, ConstantMultipleConcatInParam) {
   ElabA81Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  parameter [31:0] P = {4{8'hFF}};\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  parameter [31:0] P = {4{8'hFF}};\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -82,12 +85,13 @@ TEST(ElabA81, ConstantMultipleConcatInParam) {
 
 TEST(ElabA81, ReplicationInContAssign) {
   ElabA81Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  logic [7:0] a;\n"
-                              "  logic [1:0] x;\n"
-                              "  assign a = {4{x}};\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  logic [1:0] x;\n"
+      "  assign a = {4{x}};\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -96,22 +100,24 @@ TEST(ElabA81, ReplicationInContAssign) {
 
 TEST(ElabA81, StreamingConcatLeftShiftElab) {
   ElabA81Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  logic [7:0] a, b;\n"
-                              "  initial a = {<< {b}};\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial a = {<< {b}};\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ElabA81, StreamingConcatRightShiftElab) {
   ElabA81Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  logic [7:0] a, b;\n"
-                              "  initial a = {>> {b}};\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial a = {>> {b}};\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -120,11 +126,12 @@ TEST(ElabA81, StreamingConcatRightShiftElab) {
 
 TEST(ElabA81, StreamingWithSliceSizeElab) {
   ElabA81Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  logic [7:0] a, b;\n"
-                              "  initial a = {<< byte {b}};\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial a = {<< byte {b}};\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -133,11 +140,12 @@ TEST(ElabA81, StreamingWithSliceSizeElab) {
 
 TEST(ElabA81, EmptyUnpackedArrayConcatElab) {
   ElabA81Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  logic [7:0] a;\n"
-                              "  initial a = {};\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  initial a = {};\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -146,12 +154,13 @@ TEST(ElabA81, EmptyUnpackedArrayConcatElab) {
 
 TEST(ElabA81, ConcatInInitialBlock) {
   ElabA81Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  logic [7:0] a;\n"
-                              "  logic [3:0] x, y;\n"
-                              "  initial a = {x, y};\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  logic [3:0] x, y;\n"
+      "  initial a = {x, y};\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -160,12 +169,13 @@ TEST(ElabA81, ConcatInInitialBlock) {
 
 TEST(ElabA81, ReplicateInInitialBlock) {
   ElabA81Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  logic [7:0] a;\n"
-                              "  logic [1:0] x;\n"
-                              "  initial a = {4{x}};\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  logic [1:0] x;\n"
+      "  initial a = {4{x}};\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }

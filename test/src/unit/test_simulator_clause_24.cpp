@@ -1,7 +1,8 @@
 // §24
 
-#include "simulation/process.h"
 #include <gtest/gtest.h>
+
+#include "simulation/process.h"
 
 using namespace delta;
 
@@ -18,4 +19,4 @@ TEST(Process, ProcessReactiveFlag) {
   EXPECT_TRUE(p.is_reactive);
 }
 
-} // namespace
+}  // namespace

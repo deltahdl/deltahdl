@@ -43,79 +43,86 @@ static bool ParseOk(const std::string &src) {
 }
 
 TEST(ParserSection22, IfdefDefined) {
-  EXPECT_TRUE(ParseOk("`define FEATURE_A\n"
-                      "`ifdef FEATURE_A\n"
-                      "module t;\n"
-                      "endmodule\n"
-                      "`endif\n"));
+  EXPECT_TRUE(
+      ParseOk("`define FEATURE_A\n"
+              "`ifdef FEATURE_A\n"
+              "module t;\n"
+              "endmodule\n"
+              "`endif\n"));
 }
 
 TEST(ParserSection22, IfdefWithElse) {
-  EXPECT_TRUE(ParseOk("`ifdef UNDEFINED_MACRO\n"
-                      "module alt;\n"
-                      "endmodule\n"
-                      "`else\n"
-                      "module t;\n"
-                      "endmodule\n"
-                      "`endif\n"));
+  EXPECT_TRUE(
+      ParseOk("`ifdef UNDEFINED_MACRO\n"
+              "module alt;\n"
+              "endmodule\n"
+              "`else\n"
+              "module t;\n"
+              "endmodule\n"
+              "`endif\n"));
 }
 
 TEST(ParserSection22, IfndefUndefined) {
-  EXPECT_TRUE(ParseOk("`ifndef GUARD\n"
-                      "`define GUARD\n"
-                      "module t;\n"
-                      "endmodule\n"
-                      "`endif\n"));
+  EXPECT_TRUE(
+      ParseOk("`ifndef GUARD\n"
+              "`define GUARD\n"
+              "module t;\n"
+              "endmodule\n"
+              "`endif\n"));
 }
 
 TEST(ParserSection22, IfdefElsifChain) {
-  EXPECT_TRUE(ParseOk("`define OPT_B\n"
-                      "`ifdef OPT_A\n"
-                      "module ma;\n"
-                      "endmodule\n"
-                      "`elsif OPT_B\n"
-                      "module mb;\n"
-                      "endmodule\n"
-                      "`else\n"
-                      "module mc;\n"
-                      "endmodule\n"
-                      "`endif\n"));
+  EXPECT_TRUE(
+      ParseOk("`define OPT_B\n"
+              "`ifdef OPT_A\n"
+              "module ma;\n"
+              "endmodule\n"
+              "`elsif OPT_B\n"
+              "module mb;\n"
+              "endmodule\n"
+              "`else\n"
+              "module mc;\n"
+              "endmodule\n"
+              "`endif\n"));
 }
 
 TEST(ParserSection22, NestedIfdef) {
-  EXPECT_TRUE(ParseOk("`define OUTER\n"
-                      "`define INNER\n"
-                      "`ifdef OUTER\n"
-                      "`ifdef INNER\n"
-                      "module t;\n"
-                      "endmodule\n"
-                      "`endif\n"
-                      "`endif\n"));
+  EXPECT_TRUE(
+      ParseOk("`define OUTER\n"
+              "`define INNER\n"
+              "`ifdef OUTER\n"
+              "`ifdef INNER\n"
+              "module t;\n"
+              "endmodule\n"
+              "`endif\n"
+              "`endif\n"));
 }
 
 TEST(ParserSection22, IfdefSelectsCorrectModule) {
-  auto r = Parse("`define USE_A\n"
-                 "`ifdef USE_A\n"
-                 "module a;\n"
-                 "endmodule\n"
-                 "`else\n"
-                 "module b;\n"
-                 "endmodule\n"
-                 "`endif\n");
+  auto r = Parse(
+      "`define USE_A\n"
+      "`ifdef USE_A\n"
+      "module a;\n"
+      "endmodule\n"
+      "`else\n"
+      "module b;\n"
+      "endmodule\n"
+      "`endif\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
   EXPECT_EQ(r.cu->modules[0]->name, "a");
 }
 
 TEST(ParserSection22, IfndefSelectsElseBranch) {
-  auto r = Parse("`define GUARD\n"
-                 "`ifndef GUARD\n"
-                 "module unreachable;\n"
-                 "endmodule\n"
-                 "`else\n"
-                 "module reached;\n"
-                 "endmodule\n"
-                 "`endif\n");
+  auto r = Parse(
+      "`define GUARD\n"
+      "`ifndef GUARD\n"
+      "module unreachable;\n"
+      "endmodule\n"
+      "`else\n"
+      "module reached;\n"
+      "endmodule\n"
+      "`endif\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
   EXPECT_EQ(r.cu->modules[0]->name, "reached");

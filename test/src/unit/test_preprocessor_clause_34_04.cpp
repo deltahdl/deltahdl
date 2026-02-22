@@ -1,14 +1,15 @@
 // §34.4: Protect pragma directives
 
+#include <gtest/gtest.h>
+
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "preprocessor/preprocessor.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
 struct ProtectedTest : ::testing::Test {
-protected:
+ protected:
   std::string Preprocess(const std::string &src) {
     auto fid = mgr_.AddFile("<test>", src);
     Preprocessor pp(mgr_, diag_, config_);
@@ -42,11 +43,12 @@ TEST_F(ProtectedTest, PragmaProtectEndConsumed) {
 // §34.5.1/2 Protected envelope begin/end parsing
 // =============================================================================
 TEST_F(ProtectedTest, BeginEndEnvelope) {
-  auto result = Preprocess("module m;\n"
-                           "`pragma protect begin\n"
-                           "  logic secret_wire;\n"
-                           "`pragma protect end\n"
-                           "endmodule\n");
+  auto result = Preprocess(
+      "module m;\n"
+      "`pragma protect begin\n"
+      "  logic secret_wire;\n"
+      "`pragma protect end\n"
+      "endmodule\n");
   EXPECT_FALSE(diag_.HasErrors());
   // Non-pragma lines should pass through.
   EXPECT_NE(result.find("module m;"), std::string::npos);
@@ -60,16 +62,17 @@ TEST_F(ProtectedTest, BeginEndEnvelope) {
 // §34.5 Reset directive
 // =============================================================================
 TEST_F(ProtectedTest, ResetDirective) {
-  auto result = Preprocess("`pragma protect begin\n"
-                           "  wire secret;\n"
-                           "`pragma protect end\n"
-                           "`pragma reset protect\n"
-                           "module m;\n"
-                           "endmodule\n");
+  auto result = Preprocess(
+      "`pragma protect begin\n"
+      "  wire secret;\n"
+      "`pragma protect end\n"
+      "`pragma reset protect\n"
+      "module m;\n"
+      "endmodule\n");
   EXPECT_FALSE(diag_.HasErrors());
   // All pragma lines consumed. `pragma reset protect is also consumed.
   EXPECT_EQ(result.find("pragma"), std::string::npos);
   EXPECT_NE(result.find("module m;"), std::string::npos);
 }
 
-} // namespace
+}  // namespace

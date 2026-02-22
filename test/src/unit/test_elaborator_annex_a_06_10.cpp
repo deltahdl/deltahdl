@@ -32,7 +32,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA610Fixture &f) {
   return design;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.6.10 Assertion statements — Elaboration
@@ -53,10 +53,11 @@ TEST(ElabA610, SimpleAssertElaborates) {
 // simple_immediate_assume_statement elaborates
 TEST(ElabA610, SimpleAssumeElaborates) {
   ElabA610Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  initial assume(1);\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  initial assume(1);\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -64,10 +65,11 @@ TEST(ElabA610, SimpleAssumeElaborates) {
 // simple_immediate_cover_statement elaborates
 TEST(ElabA610, SimpleCoverElaborates) {
   ElabA610Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  initial cover(1) $display(\"covered\");\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  initial cover(1) $display(\"covered\");\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -75,10 +77,11 @@ TEST(ElabA610, SimpleCoverElaborates) {
 // deferred_immediate_assert_statement elaborates
 TEST(ElabA610, DeferredAssertElaborates) {
   ElabA610Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  initial assert #0 (1);\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  initial assert #0 (1);\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -86,10 +89,11 @@ TEST(ElabA610, DeferredAssertElaborates) {
 // concurrent assert property at module level elaborates
 TEST(ElabA610, AssertPropertyElaborates) {
   ElabA610Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  assert property (1);\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  assert property (1);\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -97,14 +101,15 @@ TEST(ElabA610, AssertPropertyElaborates) {
 // multiple assertion types in same module elaborate
 TEST(ElabA610, MixedAssertionsElaborate) {
   ElabA610Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  initial begin\n"
-                              "    assert(1);\n"
-                              "    assume(1);\n"
-                              "    cover(1);\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    assert(1);\n"
+      "    assume(1);\n"
+      "    cover(1);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }

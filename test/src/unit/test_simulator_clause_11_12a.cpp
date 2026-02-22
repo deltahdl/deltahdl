@@ -1,14 +1,16 @@
 // §11.12: Let construct
 
+#include <gtest/gtest.h>
+
+#include <cstring>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h" // StructTypeInfo, StructFieldInfo
-#include <cstring>
-#include <gtest/gtest.h>
+#include "simulation/sim_context.h"  // StructTypeInfo, StructFieldInfo
 
 using namespace delta;
 
@@ -140,4 +142,4 @@ TEST(EvalAdv, LetDeclarativeScope) {
   EXPECT_EQ(result.ToUint64(), 42u);
 }
 
-} // namespace
+}  // namespace

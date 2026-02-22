@@ -27,9 +27,10 @@ static ParseResult Parse(const std::string &src) {
 }
 
 TEST(ParserSection23, MacromoduleDefinition) {
-  auto r = Parse("macromodule top;\n"
-                 "  wire a;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "macromodule top;\n"
+      "  wire a;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1);
   EXPECT_EQ(r.cu->modules[0]->name, "top");

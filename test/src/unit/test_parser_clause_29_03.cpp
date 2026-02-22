@@ -57,14 +57,15 @@ static void VerifyUdpInputNames(const UdpDecl *udp,
 }
 
 TEST(ParserSection29, CombinationalUdp) {
-  auto r = Parse("primitive mux(output out, input a, b, sel);\n"
-                 "  table\n"
-                 "    0 ? 0 : 0;\n"
-                 "    1 ? 0 : 1;\n"
-                 "    ? 0 1 : 0;\n"
-                 "    ? 1 1 : 1;\n"
-                 "  endtable\n"
-                 "endprimitive\n");
+  auto r = Parse(
+      "primitive mux(output out, input a, b, sel);\n"
+      "  table\n"
+      "    0 ? 0 : 0;\n"
+      "    1 ? 0 : 1;\n"
+      "    ? 0 1 : 0;\n"
+      "    ? 1 1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->udps.size(), 1);
   auto *udp = r.cu->udps[0];
@@ -80,13 +81,14 @@ TEST(ParserSection29, CombinationalUdp) {
 }
 
 TEST(ParserSection29, UdpTableSpecialChars) {
-  auto r = Parse("primitive edge_detect(output reg q, input d, clk);\n"
-                 "  table\n"
-                 "    ? f : ? : 1;\n"
-                 "    ? p : ? : 0;\n"
-                 "    * ? : ? : -;\n"
-                 "  endtable\n"
-                 "endprimitive\n");
+  auto r = Parse(
+      "primitive edge_detect(output reg q, input d, clk);\n"
+      "  table\n"
+      "    ? f : ? : 1;\n"
+      "    ? p : ? : 0;\n"
+      "    * ? : ? : -;\n"
+      "  endtable\n"
+      "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   auto *udp = r.cu->udps[0];
   ASSERT_EQ(udp->table.size(), 3);

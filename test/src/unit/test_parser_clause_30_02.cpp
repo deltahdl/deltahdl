@@ -14,7 +14,7 @@ using namespace delta;
 namespace {
 
 struct SpecifyParseTest : ::testing::Test {
-protected:
+ protected:
   CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
@@ -60,4 +60,4 @@ TEST_F(SpecifyParseTest, MultipleSpecparams) {
   EXPECT_EQ(items[1]->name, "tFALL");
 }
 
-} // namespace
+}  // namespace

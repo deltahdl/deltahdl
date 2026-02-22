@@ -47,8 +47,7 @@ static bool ParseOk(const std::string &src) {
 static bool HasItemOfKind(const std::vector<ModuleItem *> &items,
                           ModuleItemKind kind) {
   for (const auto *item : items)
-    if (item->kind == kind)
-      return true;
+    if (item->kind == kind) return true;
   return false;
 }
 
@@ -61,11 +60,11 @@ static bool HasItemOfKind(const std::vector<ModuleItem *> &items,
 //   initial begin ... end
 //   endprogram : test
 TEST(ParserClause03, Cl3_4_LrmExample) {
-  auto r =
-      Parse("program test (input clk, input [16:1] addr, inout [7:0] data);\n"
-            "  initial begin\n"
-            "  end\n"
-            "endprogram : test\n");
+  auto r = Parse(
+      "program test (input clk, input [16:1] addr, inout [7:0] data);\n"
+      "  initial begin\n"
+      "  end\n"
+      "endprogram : test\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->programs.size(), 1u);
@@ -81,30 +80,33 @@ TEST(ParserClause03, Cl3_4_LrmExample) {
 
 // §3.4: "A program block can contain data declarations, class definitions"
 TEST(ParserClause03, Cl3_4_DataAndClassDeclarations) {
-  auto r = Parse("program p;\n"
-                 "  logic [7:0] count;\n"
-                 "  int status;\n"
-                 "  class my_trans; int data; endclass\n"
-                 "endprogram\n");
+  auto r = Parse(
+      "program p;\n"
+      "  logic [7:0] count;\n"
+      "  int status;\n"
+      "  class my_trans; int data; endclass\n"
+      "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_GE(r.cu->programs[0]->items.size(), 3u);
   EXPECT_TRUE(
       HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kClassDecl));
   // §3.4: Multiple programs each create separate scopes
-  EXPECT_TRUE(ParseOk("program p1; logic a; endprogram\n"
-                      "program p2; logic b; endprogram\n"));
+  EXPECT_TRUE(
+      ParseOk("program p1; logic a; endprogram\n"
+              "program p2; logic b; endprogram\n"));
 }
 
 // §3.4: "A program block can contain ... subroutine definitions ...
 //        initial ... final procedures"
 TEST(ParserClause03, Cl3_4_SubroutinesAndProcedures) {
-  auto r = Parse("program p;\n"
-                 "  function int get_val; return 42; endfunction\n"
-                 "  task run_test; endtask\n"
-                 "  initial $display(\"test\");\n"
-                 "  final $display(\"done\");\n"
-                 "endprogram\n");
+  auto r = Parse(
+      "program p;\n"
+      "  function int get_val; return 42; endfunction\n"
+      "  task run_test; endtask\n"
+      "  initial $display(\"test\");\n"
+      "  final $display(\"done\");\n"
+      "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(

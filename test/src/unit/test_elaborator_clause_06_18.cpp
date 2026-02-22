@@ -1,5 +1,7 @@
 // §6.18: User-defined types
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -11,7 +13,6 @@
 #include "lexer/lexer.h"
 #include "lexer/token.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -34,12 +35,13 @@ namespace {
 
 TEST(Elaborator, TypedefNamedResolution) {
   ElabFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  typedef logic [15:0] word_t;\n"
-                              "  word_t data;\n"
-                              "  initial data = 1234;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  typedef logic [15:0] word_t;\n"
+      "  word_t data;\n"
+      "  initial data = 1234;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   auto *mod = design->top_modules[0];
@@ -55,13 +57,14 @@ TEST(Elaborator, TypedefNamedResolution) {
 
 TEST(Elaborator, TypedefChain) {
   ElabFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  typedef logic [7:0] byte_t;\n"
-                              "  typedef byte_t octet_t;\n"
-                              "  octet_t val;\n"
-                              "  initial val = 255;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  typedef logic [7:0] byte_t;\n"
+      "  typedef byte_t octet_t;\n"
+      "  octet_t val;\n"
+      "  initial val = 255;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   auto *mod = design->top_modules[0];
@@ -75,4 +78,4 @@ TEST(Elaborator, TypedefChain) {
   EXPECT_TRUE(found);
 }
 
-} // namespace
+}  // namespace

@@ -47,9 +47,10 @@ static void VerifyStrengthDelayInstances(const std::vector<ModuleItem *> &items,
 }
 
 TEST(ParserSection28, MultipleInstances) {
-  auto r = Parse("module m;\n"
-                 "  and g1(a, b, c), g2(d, e, f);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  and g1(a, b, c), g2(d, e, f);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 2);
@@ -58,9 +59,10 @@ TEST(ParserSection28, MultipleInstances) {
 }
 
 TEST(ParserSection28, MultipleInstancesThree) {
-  auto r = Parse("module m;\n"
-                 "  nand n1(a, b, c), n2(d, e, f), n3(g, h, i);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  nand n1(a, b, c), n2(d, e, f), n3(g, h, i);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 3);
@@ -70,9 +72,10 @@ TEST(ParserSection28, MultipleInstancesThree) {
 }
 
 TEST(ParserSection28, MultipleInstancesNoNames) {
-  auto r = Parse("module m;\n"
-                 "  or (a, b, c), (d, e, f);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  or (a, b, c), (d, e, f);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 2);
@@ -81,9 +84,10 @@ TEST(ParserSection28, MultipleInstancesNoNames) {
 }
 
 TEST(ParserSection28, MultipleInstancesWithStrengthAndDelay) {
-  auto r = Parse("module m;\n"
-                 "  and (strong0, strong1) #5 g1(a, b, c), g2(d, e, f);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  and (strong0, strong1) #5 g1(a, b, c), g2(d, e, f);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 2);
@@ -91,13 +95,14 @@ TEST(ParserSection28, MultipleInstancesWithStrengthAndDelay) {
 }
 
 TEST(ParserSection28, StrengthWithDelay) {
-  auto r = Parse("module m;\n"
-                 "  and (strong0, strong1) #5 g1(out, a, b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  and (strong0, strong1) #5 g1(out, a, b);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->drive_strength0, 4); // strong0
-  EXPECT_EQ(item->drive_strength1, 4); // strong1
+  EXPECT_EQ(item->drive_strength0, 4);  // strong0
+  EXPECT_EQ(item->drive_strength1, 4);  // strong1
   EXPECT_NE(item->gate_delay, nullptr);
   ASSERT_EQ(item->gate_terminals.size(), 3);
 }

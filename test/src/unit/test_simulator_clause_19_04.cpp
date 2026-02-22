@@ -1,9 +1,11 @@
 // §19.4: Using covergroups in classes
 
-#include "simulation/coverage.h"
 #include <gtest/gtest.h>
+
 #include <string>
 #include <vector>
+
+#include "simulation/coverage.h"
 
 using namespace delta;
 
@@ -25,4 +27,4 @@ TEST(Coverage, CoverGroupAsClassMember) {
   EXPECT_EQ(obj.cg->name, "cg_in_class");
 }
 
-} // namespace
+}  // namespace

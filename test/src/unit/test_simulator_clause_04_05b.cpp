@@ -1,7 +1,8 @@
 // §4.5: SystemVerilog simulation reference algorithm
 
-#include "simulation/process.h"
 #include <gtest/gtest.h>
+
+#include "simulation/process.h"
 
 using namespace delta;
 
@@ -17,4 +18,4 @@ TEST(Process, ProcessDefaultState_KindAndCoro) {
   EXPECT_EQ(p.home_region, Region::kActive);
 }
 
-} // namespace
+}  // namespace

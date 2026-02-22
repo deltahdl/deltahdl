@@ -26,7 +26,7 @@ TEST(SimCh4094, AlwaysComputesUpdatedValue) {
   auto *eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-    int rhs_val = src; // Compute the updated value.
+    int rhs_val = src;  // Compute the updated value.
     auto *nba = sched.GetEventPool().Acquire();
     nba->kind = EventKind::kUpdate;
     nba->callback = [&, rhs_val]() { dst = rhs_val; };
@@ -143,7 +143,7 @@ TEST(SimCh4094, RhsComputedAtScheduleTime) {
   auto *eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-    int rhs_val = src; // Capture RHS now (src=10).
+    int rhs_val = src;  // Capture RHS now (src=10).
     auto *nba = sched.GetEventPool().Acquire();
     nba->kind = EventKind::kUpdate;
     nba->callback = [&, rhs_val]() { dst = rhs_val; };
@@ -174,7 +174,7 @@ TEST(SimCh4094, LhsTargetDeterminedAtScheduleTime) {
   auto *eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-    int target_select = select; // Capture target at schedule time.
+    int target_select = select;  // Capture target at schedule time.
     auto *nba = sched.GetEventPool().Acquire();
     nba->kind = EventKind::kUpdate;
     nba->callback = [&, target_select]() {
@@ -313,8 +313,8 @@ TEST(SimCh4094, SwapPatternBothRhsComputedBeforeUpdate) {
   auto *eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-    int rhs_x = y; // Capture y=2 for x.
-    int rhs_y = x; // Capture x=1 for y.
+    int rhs_x = y;  // Capture y=2 for x.
+    int rhs_y = x;  // Capture x=1 for y.
 
     auto *nba1 = sched.GetEventPool().Acquire();
     nba1->kind = EventKind::kUpdate;

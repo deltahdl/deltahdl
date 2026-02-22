@@ -1,5 +1,11 @@
 // §6.12: Real, shortreal, and realtime data types
 
+#include <gtest/gtest.h>
+
+#include <cmath>
+#include <cstring>
+#include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -7,10 +13,6 @@
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
-#include <cmath>
-#include <cstring>
-#include <gtest/gtest.h>
-#include <string>
 
 using namespace delta;
 
@@ -102,4 +104,4 @@ TEST(RealTypes, IsRealVariable) {
   EXPECT_FALSE(f.ctx.IsRealVariable("i"));
 }
 
-} // namespace
+}  // namespace

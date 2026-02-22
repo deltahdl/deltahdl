@@ -34,7 +34,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA701Fixture &f) {
   return design;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.7.1 Specify block declaration — Elaboration
@@ -43,11 +43,12 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA701Fixture &f) {
 // Empty specify block elaborates without errors
 TEST(ElabA701, EmptySpecifyBlockElaborates) {
   ElabA701Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  specify\n"
-                              "  endspecify\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -55,12 +56,13 @@ TEST(ElabA701, EmptySpecifyBlockElaborates) {
 // Specify block with path declaration elaborates
 TEST(ElabA701, SpecifyBlockWithPathElaborates) {
   ElabA701Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  specify\n"
-                              "    (a => b) = 5;\n"
-                              "  endspecify\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -68,13 +70,14 @@ TEST(ElabA701, SpecifyBlockWithPathElaborates) {
 // Specify block with pulsestyle declaration elaborates
 TEST(ElabA701, SpecifyBlockWithPulsestyleElaborates) {
   ElabA701Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  specify\n"
-                              "    pulsestyle_onevent out1;\n"
-                              "    pulsestyle_ondetect out2;\n"
-                              "  endspecify\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    pulsestyle_onevent out1;\n"
+      "    pulsestyle_ondetect out2;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -82,13 +85,14 @@ TEST(ElabA701, SpecifyBlockWithPulsestyleElaborates) {
 // Specify block with showcancelled declaration elaborates
 TEST(ElabA701, SpecifyBlockWithShowcancelledElaborates) {
   ElabA701Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  specify\n"
-                              "    showcancelled out1;\n"
-                              "    noshowcancelled out2;\n"
-                              "  endspecify\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    showcancelled out1;\n"
+      "    noshowcancelled out2;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -96,16 +100,17 @@ TEST(ElabA701, SpecifyBlockWithShowcancelledElaborates) {
 // Specify block with all five item kinds elaborates
 TEST(ElabA701, SpecifyBlockWithAllItemKindsElaborates) {
   ElabA701Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  specify\n"
-                              "    specparam tPD = 5;\n"
-                              "    pulsestyle_onevent out1;\n"
-                              "    showcancelled out2;\n"
-                              "    (a => b) = tPD;\n"
-                              "    $setup(data, posedge clk, 10);\n"
-                              "  endspecify\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    specparam tPD = 5;\n"
+      "    pulsestyle_onevent out1;\n"
+      "    showcancelled out2;\n"
+      "    (a => b) = tPD;\n"
+      "    $setup(data, posedge clk, 10);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }

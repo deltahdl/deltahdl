@@ -52,9 +52,10 @@ static Stmt *FirstInitialStmt(ParseResult50702 &r) {
 }
 
 TEST(ParserCh50702, RealLiteral_DecimalNotation) {
-  auto r = Parse("module m;\n"
-                 "  initial x = 14.72;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = 14.72;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -65,9 +66,10 @@ TEST(ParserCh50702, RealLiteral_DecimalNotation) {
 }
 
 TEST(ParserCh50702, RealLiteral_ScientificNotation) {
-  auto r = Parse("module m;\n"
-                 "  initial x = 1.30e-2;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = 1.30e-2;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -79,8 +81,9 @@ TEST(ParserCh50702, RealLiteral_ScientificNotation) {
 
 TEST(ParserCh50702, RealLiteral_ExponentOnly) {
   // 39e8 is a valid real constant (exponent notation without decimal point).
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  real r;\n"
-                      "  initial r = 39e8;\n"
-                      "endmodule"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r;\n"
+              "  initial r = 39e8;\n"
+              "endmodule"));
 }

@@ -1,12 +1,13 @@
 // §11.4.5: Equality operators
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "elaboration/const_eval.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -44,4 +45,4 @@ TEST(ConstEval, Comparison) {
   }
 }
 
-} // namespace
+}  // namespace

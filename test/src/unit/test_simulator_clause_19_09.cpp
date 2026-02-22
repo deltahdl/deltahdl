@@ -1,9 +1,11 @@
 // §19.9: Predefined coverage system tasks and system functions
 
-#include "simulation/coverage.h"
 #include <gtest/gtest.h>
+
 #include <string>
 #include <vector>
+
+#include "simulation/coverage.h"
 
 using namespace delta;
 
@@ -17,4 +19,4 @@ TEST(Coverage, GlobalCoverageEmpty) {
   EXPECT_DOUBLE_EQ(db.GetGlobalCoverage(), 0.0);
 }
 
-} // namespace
+}  // namespace

@@ -1,11 +1,12 @@
 // §8.3: Syntax
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -57,4 +58,4 @@ TEST(Parser, EmptyClass) {
   EXPECT_FALSE(r.cu->classes[0]->is_virtual);
 }
 
-} // namespace
+}  // namespace

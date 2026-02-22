@@ -28,8 +28,7 @@ static ParseResult11 Parse(const std::string &src) {
 
 static Stmt *FirstInitialStmt(ParseResult11 &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock)
-      continue;
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
     }
@@ -41,8 +40,7 @@ static Stmt *FirstInitialStmt(ParseResult11 &r) {
 // Helper: get the RHS of the first blocking assignment in initial block.
 static Expr *FirstAssignRhs(ParseResult11 &r) {
   auto *stmt = FirstInitialStmt(r);
-  if (!stmt)
-    return nullptr;
+  if (!stmt) return nullptr;
   return stmt->rhs;
 }
 
@@ -51,9 +49,10 @@ static Expr *FirstAssignRhs(ParseResult11 &r) {
 // =========================================================================
 
 TEST(ParserSection11, CompoundAssignPlusEq) {
-  auto r = Parse("module t;\n"
-                 "  initial a += 1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial a += 1;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -62,9 +61,10 @@ TEST(ParserSection11, CompoundAssignPlusEq) {
 }
 
 TEST(ParserSection11, CompoundAssignMinusEq) {
-  auto r = Parse("module t;\n"
-                 "  initial a -= 1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial a -= 1;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -72,81 +72,91 @@ TEST(ParserSection11, CompoundAssignMinusEq) {
 }
 
 TEST(ParserSection11, CompoundAssignStarEq) {
-  auto r = Parse("module t;\n"
-                 "  initial a *= 2;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial a *= 2;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserSection11, CompoundAssignSlashEq) {
-  auto r = Parse("module t;\n"
-                 "  initial a /= 2;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial a /= 2;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserSection11, CompoundAssignPercentEq) {
-  auto r = Parse("module t;\n"
-                 "  initial a %= 3;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial a %= 3;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserSection11, CompoundAssignAmpEq) {
-  auto r = Parse("module t;\n"
-                 "  initial a &= 8'hFF;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial a &= 8'hFF;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserSection11, CompoundAssignPipeEq) {
-  auto r = Parse("module t;\n"
-                 "  initial a |= 8'h0F;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial a |= 8'h0F;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserSection11, CompoundAssignCaretEq) {
-  auto r = Parse("module t;\n"
-                 "  initial a ^= b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial a ^= b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserSection11, CompoundAssignLtLtEq) {
-  auto r = Parse("module t;\n"
-                 "  initial a <<= 2;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial a <<= 2;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserSection11, CompoundAssignGtGtEq) {
-  auto r = Parse("module t;\n"
-                 "  initial a >>= 2;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial a >>= 2;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserSection11, CompoundAssignLtLtLtEq) {
-  auto r = Parse("module t;\n"
-                 "  initial a <<<= 1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial a <<<= 1;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserSection11, CompoundAssignGtGtGtEq) {
-  auto r = Parse("module t;\n"
-                 "  initial a >>>= 1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial a >>>= 1;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -156,25 +166,28 @@ TEST(ParserSection11, CompoundAssignGtGtGtEq) {
 // =========================================================================
 
 TEST(ParserSection11, PrefixIncrement) {
-  auto r = Parse("module t;\n"
-                 "  initial ++a;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial ++a;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserSection11, PrefixDecrement) {
-  auto r = Parse("module t;\n"
-                 "  initial --a;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial --a;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserSection11, PostfixIncrementParses) {
-  auto r = Parse("module t;\n"
-                 "  initial a++;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial a++;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -183,9 +196,10 @@ TEST(ParserSection11, PostfixIncrementParses) {
 }
 
 TEST(ParserSection11, PostfixIncrementOp) {
-  auto r = Parse("module t;\n"
-                 "  initial a++;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial a++;\n"
+      "endmodule\n");
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->expr, nullptr);
@@ -194,9 +208,10 @@ TEST(ParserSection11, PostfixIncrementOp) {
 }
 
 TEST(ParserSection11, PostfixDecrementParses) {
-  auto r = Parse("module t;\n"
-                 "  initial a--;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial a--;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -205,9 +220,10 @@ TEST(ParserSection11, PostfixDecrementParses) {
 }
 
 TEST(ParserSection11, PostfixDecrementOp) {
-  auto r = Parse("module t;\n"
-                 "  initial a--;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial a--;\n"
+      "endmodule\n");
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->expr, nullptr);
@@ -220,11 +236,12 @@ TEST(ParserSection11, PostfixDecrementOp) {
 // =========================================================================
 
 TEST(ParserSection11, InsideBasicListParses) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    if (a inside {1, 2, 3}) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (a inside {1, 2, 3}) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -233,11 +250,12 @@ TEST(ParserSection11, InsideBasicListParses) {
 }
 
 TEST(ParserSection11, InsideBasicListCondition) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    if (a inside {1, 2, 3}) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (a inside {1, 2, 3}) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   auto *cond = stmt->condition;
@@ -247,11 +265,12 @@ TEST(ParserSection11, InsideBasicListCondition) {
 }
 
 TEST(ParserSection11, InsideBasicListLhs) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    if (a inside {1, 2, 3}) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (a inside {1, 2, 3}) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   auto *cond = stmt->condition;
@@ -261,11 +280,12 @@ TEST(ParserSection11, InsideBasicListLhs) {
 }
 
 TEST(ParserSection11, InsideWithRange) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    if (a inside {[16:23], [32:47]}) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (a inside {[16:23], [32:47]}) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -276,11 +296,12 @@ TEST(ParserSection11, InsideWithRange) {
 }
 
 TEST(ParserSection11, InsideWithRangeElements) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    if (a inside {[16:23], [32:47]}) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (a inside {[16:23], [32:47]}) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   auto *cond = stmt->condition;
@@ -289,10 +310,11 @@ TEST(ParserSection11, InsideWithRangeElements) {
 }
 
 TEST(ParserSection11, InsideInAssign) {
-  auto r = Parse("module t;\n"
-                 "  wire r;\n"
-                 "  assign r = a inside {1, 2, 3};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  wire r;\n"
+      "  assign r = a inside {1, 2, 3};\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -302,9 +324,10 @@ TEST(ParserSection11, InsideInAssign) {
 // =========================================================================
 
 TEST(ParserSection11, StreamingRight) {
-  auto r = Parse("module t;\n"
-                 "  initial x = {>> {a, b, c}};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = {>> {a, b, c}};\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstAssignRhs(r);
@@ -313,9 +336,10 @@ TEST(ParserSection11, StreamingRight) {
 }
 
 TEST(ParserSection11, StreamingRightDetails) {
-  auto r = Parse("module t;\n"
-                 "  initial x = {>> {a, b, c}};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = {>> {a, b, c}};\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kGtGt);
@@ -323,9 +347,10 @@ TEST(ParserSection11, StreamingRightDetails) {
 }
 
 TEST(ParserSection11, StreamingLeft) {
-  auto r = Parse("module t;\n"
-                 "  initial x = {<< {a, b, c}};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = {<< {a, b, c}};\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstAssignRhs(r);
@@ -335,15 +360,16 @@ TEST(ParserSection11, StreamingLeft) {
 }
 
 TEST(ParserSection11, StreamingWithSliceSize) {
-  auto r = Parse("module t;\n"
-                 "  initial x = {<< 8 {a, b}};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = {<< 8 {a, b}};\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
-  EXPECT_NE(rhs->lhs, nullptr); // slice_size
+  EXPECT_NE(rhs->lhs, nullptr);  // slice_size
 }
 
 // =========================================================================
@@ -351,18 +377,20 @@ TEST(ParserSection11, StreamingWithSliceSize) {
 // =========================================================================
 
 TEST(ParserSection11, MinTypMaxInDelay) {
-  auto r = Parse("module t;\n"
-                 "  initial #(1:2:3) x = 1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial #(1:2:3) x = 1;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserSection11, MinTypMaxInContAssign) {
-  auto r = Parse("module t;\n"
-                 "  wire a;\n"
-                 "  assign #(1:2:3) a = 1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  wire a;\n"
+      "  assign #(1:2:3) a = 1;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -372,9 +400,10 @@ TEST(ParserSection11, MinTypMaxInContAssign) {
 // =========================================================================
 
 TEST(ParserSection11, ArithmeticShiftLeft) {
-  auto r = Parse("module t;\n"
-                 "  initial x = a <<< 2;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = a <<< 2;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstAssignRhs(r);
@@ -384,9 +413,10 @@ TEST(ParserSection11, ArithmeticShiftLeft) {
 }
 
 TEST(ParserSection11, ArithmeticShiftRight) {
-  auto r = Parse("module t;\n"
-                 "  initial x = a >>> 2;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = a >>> 2;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstAssignRhs(r);
@@ -400,17 +430,19 @@ TEST(ParserSection11, ArithmeticShiftRight) {
 // =========================================================================
 
 TEST(ParserSection11, AssignInExprParenthesized) {
-  auto r = Parse("module t;\n"
-                 "  initial if ((a = b)) x = 1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial if ((a = b)) x = 1;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserSection11, CompoundAssignInExpr) {
-  auto r = Parse("module t;\n"
-                 "  initial b = (a += 1);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial b = (a += 1);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -420,23 +452,25 @@ TEST(ParserSection11, CompoundAssignInExpr) {
 // =========================================================================
 
 TEST(ParserSection11, PostfixIncrementInForStep) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    for (int i = 0; i < 10; i++)\n"
-                 "      x = i;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 10; i++)\n"
+      "      x = i;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserSection11, PrefixDecrementInForStep) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    for (int i = 10; i > 0; --i)\n"
-                 "      x = i;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    for (int i = 10; i > 0; --i)\n"
+      "      x = i;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -446,9 +480,10 @@ TEST(ParserSection11, PrefixDecrementInForStep) {
 // =========================================================================
 
 TEST(ParserSection11, ArithmeticAdd) {
-  auto r = Parse("module t;\n"
-                 "  initial x = a + b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = a + b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstAssignRhs(r);
@@ -458,54 +493,60 @@ TEST(ParserSection11, ArithmeticAdd) {
 }
 
 TEST(ParserSection11, ArithmeticSub) {
-  auto r = Parse("module t;\n"
-                 "  initial x = a - b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = a - b;\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kMinus);
 }
 
 TEST(ParserSection11, ArithmeticMul) {
-  auto r = Parse("module t;\n"
-                 "  initial x = a * b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = a * b;\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kStar);
 }
 
 TEST(ParserSection11, ArithmeticDiv) {
-  auto r = Parse("module t;\n"
-                 "  initial x = a / b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = a / b;\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kSlash);
 }
 
 TEST(ParserSection11, ArithmeticMod) {
-  auto r = Parse("module t;\n"
-                 "  initial x = a % b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = a % b;\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kPercent);
 }
 
 TEST(ParserSection11, ArithmeticPower) {
-  auto r = Parse("module t;\n"
-                 "  initial x = a ** b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = a ** b;\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kPower);
 }
 
 TEST(ParserSection11, UnaryNegation) {
-  auto r = Parse("module t;\n"
-                 "  initial x = -a;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = -a;\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);

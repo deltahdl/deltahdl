@@ -1,5 +1,10 @@
 // §15.3.2: Put()
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <string_view>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -14,9 +19,6 @@
 #include "simulation/stmt_result.h"
 #include "simulation/sync_objects.h"
 #include "simulation/variable.h"
-#include <cstdint>
-#include <gtest/gtest.h>
-#include <string_view>
 
 using namespace delta;
 
@@ -57,10 +59,10 @@ TEST(IpcSync, SemaphorePutWakesWaiters) {
   // Simulate a waiting coroutine by adding a waiter manually.
   // We cannot create a real coroutine here, but we can verify the
   // waiter queue management.
-  EXPECT_EQ(sem.TryGet(1), 0); // No keys available.
+  EXPECT_EQ(sem.TryGet(1), 0);  // No keys available.
   sem.Put(1);
-  EXPECT_EQ(sem.key_count, 1); // Key added, no waiters to wake.
+  EXPECT_EQ(sem.key_count, 1);  // Key added, no waiters to wake.
   (void)woken;
 }
 
-} // namespace
+}  // namespace

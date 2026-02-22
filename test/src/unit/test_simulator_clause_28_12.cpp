@@ -1,10 +1,11 @@
 // §28.12: Strengths and values of combined signals
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "simulation/net.h"
 #include "simulation/scheduler.h"
 #include "simulation/variable.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -127,4 +128,4 @@ TEST(StrengthResolution, MultiBitMixed) {
   EXPECT_EQ(var->value.ToUint64(), 0x0Fu);
 }
 
-} // namespace
+}  // namespace

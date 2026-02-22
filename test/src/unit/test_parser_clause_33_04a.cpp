@@ -1,17 +1,18 @@
 // §33.4: Configurations
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/ast.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
 struct ConfigTest : ::testing::Test {
-protected:
+ protected:
   CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
@@ -311,4 +312,4 @@ TEST_F(ConfigTest, EndconfigWithLabel) {
   EXPECT_FALSE(HasErrors());
 }
 
-} // namespace
+}  // namespace

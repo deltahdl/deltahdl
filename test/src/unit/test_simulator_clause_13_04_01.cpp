@@ -1,12 +1,13 @@
 // §13.4.1: Return values and void functions
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -59,4 +60,4 @@ TEST(Functions, VoidFunctionReturnsZero) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-} // namespace
+}  // namespace

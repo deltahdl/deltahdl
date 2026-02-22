@@ -1,5 +1,11 @@
 // §6.19.5.6: Name()
 
+#include <gtest/gtest.h>
+
+#include <string>
+#include <string_view>
+#include <vector>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -7,10 +13,6 @@
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
-#include <string>
-#include <string_view>
-#include <vector>
 
 using namespace delta;
 
@@ -26,9 +28,9 @@ struct EnumFixture {
 
   // Register an enum type with the given members and values.
   // Returns the variable associated with the enum.
-  Variable *
-  RegisterEnum(std::string_view var_name, std::string_view type_name,
-               const std::vector<std::pair<std::string, uint64_t>> &members) {
+  Variable *RegisterEnum(
+      std::string_view var_name, std::string_view type_name,
+      const std::vector<std::pair<std::string, uint64_t>> &members) {
     EnumTypeInfo info;
     char *tn = arena.AllocString(type_name.data(), type_name.size());
     info.type_name = std::string_view(tn, type_name.size());
@@ -93,7 +95,7 @@ TEST(EnumMethods, NameReturnsStringRep) {
   EnumFixture f;
   auto *var = f.RegisterEnum("color", "color_t",
                              {{"RED", 0}, {"GREEN", 1}, {"BLUE", 2}});
-  var->value = MakeLogic4VecVal(f.arena, 32, 1); // GREEN
+  var->value = MakeLogic4VecVal(f.arena, 32, 1);  // GREEN
   auto *call = f.MakeEnumMethodCall("color", "name");
   auto result = EvalExpr(call, f.ctx, f.arena);
 
@@ -103,8 +105,7 @@ TEST(EnumMethods, NameReturnsStringRep) {
   uint32_t nbytes = (result.width + 7) / 8;
   for (uint32_t i = nbytes; i > 0; --i) {
     auto ch = static_cast<char>((v >> ((i - 1) * 8)) & 0xFF);
-    if (ch != 0)
-      name_str += ch;
+    if (ch != 0) name_str += ch;
   }
   EXPECT_EQ(name_str, "GREEN");
 }
@@ -113,7 +114,7 @@ TEST(EnumMethods, NameForFirstMember) {
   EnumFixture f;
   auto *var = f.RegisterEnum("color", "color_t",
                              {{"RED", 0}, {"GREEN", 1}, {"BLUE", 2}});
-  var->value = MakeLogic4VecVal(f.arena, 32, 0); // RED
+  var->value = MakeLogic4VecVal(f.arena, 32, 0);  // RED
   auto *call = f.MakeEnumMethodCall("color", "name");
   auto result = EvalExpr(call, f.ctx, f.arena);
   std::string name_str;
@@ -121,8 +122,7 @@ TEST(EnumMethods, NameForFirstMember) {
   uint32_t nbytes = (result.width + 7) / 8;
   for (uint32_t i = nbytes; i > 0; --i) {
     auto ch = static_cast<char>((v >> ((i - 1) * 8)) & 0xFF);
-    if (ch != 0)
-      name_str += ch;
+    if (ch != 0) name_str += ch;
   }
   EXPECT_EQ(name_str, "RED");
 }
@@ -131,11 +131,11 @@ TEST(EnumMethods, NameForUnknownValue) {
   EnumFixture f;
   auto *var = f.RegisterEnum("color", "color_t",
                              {{"RED", 0}, {"GREEN", 1}, {"BLUE", 2}});
-  var->value = MakeLogic4VecVal(f.arena, 32, 99); // Not a valid member
+  var->value = MakeLogic4VecVal(f.arena, 32, 99);  // Not a valid member
   auto *call = f.MakeEnumMethodCall("color", "name");
   auto result = EvalExpr(call, f.ctx, f.arena);
   // name() returns empty string for invalid enum values.
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-} // namespace
+}  // namespace

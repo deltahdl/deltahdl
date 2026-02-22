@@ -69,4 +69,4 @@ TEST(UdpLevelDominance, LevelOverridesEdge) {
   EXPECT_EQ(state.GetOutput(), '1');
 }
 
-} // namespace
+}  // namespace

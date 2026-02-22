@@ -30,7 +30,7 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.7 -- Specify section
@@ -52,28 +52,31 @@ TEST(ParserAnnexA, A7SpecifyFullPath) {
 }
 
 TEST(ParserAnnexA, A7TimingCheckSetup) {
-  auto r = Parse("module m;\n"
-                 "  specify $setup(data, posedge clk, 10); endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify $setup(data, posedge clk, 10); endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserAnnexA, A7TimingCheckHold) {
-  auto r = Parse("module m;\n"
-                 "  specify $hold(posedge clk, data, 5); endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify $hold(posedge clk, data, 5); endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserAnnexA, A7SpecparamInSpecify) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    specparam tRISE = 100;\n"
-                 "    (a => b) = tRISE;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    specparam tRISE = 100;\n"
+      "    (a => b) = tRISE;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }

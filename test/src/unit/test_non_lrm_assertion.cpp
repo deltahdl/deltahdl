@@ -1,12 +1,14 @@
 // Non-LRM tests
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "simulation/assertion.h"
 #include "simulation/sim_context.h"
-#include <cstdint>
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -34,4 +36,4 @@ TEST(Assertion, CustomCheckFunction) {
   EXPECT_EQ(r2, AssertionResult::kFail);
 }
 
-} // namespace
+}  // namespace

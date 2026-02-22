@@ -1,11 +1,12 @@
 // §15.5.2: Waiting for an event
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -49,10 +50,11 @@ struct ModportPortExpected {
 namespace {
 
 TEST(Parser, EventTrigger) {
-  auto r = Parse("module t;\n"
-                 "  event ev;\n"
-                 "  initial ->ev;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  event ev;\n"
+      "  initial ->ev;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = r.cu->modules[0]->items[1]->body;
   EXPECT_EQ(stmt->kind, StmtKind::kEventTrigger);
@@ -61,4 +63,4 @@ TEST(Parser, EventTrigger) {
   EXPECT_EQ(stmt->expr->text, "ev");
 }
 
-} // namespace
+}  // namespace

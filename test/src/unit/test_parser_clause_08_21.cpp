@@ -1,11 +1,12 @@
 // §8.21: Abstract classes and pure virtual methods
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -54,4 +55,4 @@ TEST(Parser, VirtualClass) {
   EXPECT_TRUE(r.cu->classes[0]->is_virtual);
 }
 
-} // namespace
+}  // namespace

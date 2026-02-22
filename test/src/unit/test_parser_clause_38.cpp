@@ -42,8 +42,7 @@ static bool ParseOk38(const std::string &src) {
 
 static ModuleItem *FindItemByKind(ParseResult38 &r, ModuleItemKind kind) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind == kind)
-      return item;
+    if (item->kind == kind) return item;
   }
   return nullptr;
 }
@@ -55,40 +54,44 @@ static ModuleItem *FindItemByKind(ParseResult38 &r, ModuleItemKind kind) {
 // =============================================================================
 
 TEST(ParserSection38, VpiSystemCallDeposit) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    $deposit(sig, 1'b1);\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    $deposit(sig, 1'b1);\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserSection38, VpiSystemCallForce) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    force sig = 1'b0;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    force sig = 1'b0;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserSection38, VpiSystemCallRelease) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    release sig;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    release sig;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserSection38, DpiImportForVpiAccess) {
-  auto r = Parse("module m;\n"
-                 "  import \"DPI-C\" context function void\n"
-                 "    set_value(input int handle, input int val);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" context function void\n"
+      "    set_value(input int handle, input int val);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *dpi = FindItemByKind(r, ModuleItemKind::kDpiImport);

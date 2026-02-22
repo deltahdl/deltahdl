@@ -33,10 +33,8 @@ ParseResult Parse(const std::string &src) {
 static ModuleItem *FindClockingBlock(ParseResult &r, size_t idx = 0) {
   size_t count = 0;
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kClockingBlock)
-      continue;
-    if (count == idx)
-      return item;
+    if (item->kind != ModuleItemKind::kClockingBlock) continue;
+    if (count == idx) return item;
     ++count;
   }
   return nullptr;
@@ -44,8 +42,7 @@ static ModuleItem *FindClockingBlock(ParseResult &r, size_t idx = 0) {
 
 static Stmt *FirstInitialStmt(ParseResult &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock)
-      continue;
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
     }
@@ -54,18 +51,19 @@ static Stmt *FirstInitialStmt(ParseResult &r) {
   return nullptr;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.6.11 clocking_declaration — plain clocking block
 // =============================================================================
 
 TEST(ParserA611, ClockingDeclPlain) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    input data;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);
@@ -81,11 +79,12 @@ TEST(ParserA611, ClockingDeclPlain) {
 // =============================================================================
 
 TEST(ParserA611, ClockingDeclDefault) {
-  auto r = Parse("module m;\n"
-                 "  default clocking cb @(posedge clk);\n"
-                 "    input data;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  default clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);
@@ -100,10 +99,11 @@ TEST(ParserA611, ClockingDeclDefault) {
 // =============================================================================
 
 TEST(ParserA611, ClockingDeclGlobal) {
-  auto r = Parse("module m;\n"
-                 "  global clocking gclk @(posedge sys_clk);\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  global clocking gclk @(posedge sys_clk);\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);
@@ -119,11 +119,12 @@ TEST(ParserA611, ClockingDeclGlobal) {
 // =============================================================================
 
 TEST(ParserA611, ClockingDeclUnnamed) {
-  auto r = Parse("module m;\n"
-                 "  default clocking @(posedge clk);\n"
-                 "    input data;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  default clocking @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);
@@ -137,11 +138,12 @@ TEST(ParserA611, ClockingDeclUnnamed) {
 // =============================================================================
 
 TEST(ParserA611, ClockingDeclEndLabel) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    input data;\n"
-                 "  endclocking : cb\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking : cb\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);
@@ -154,11 +156,12 @@ TEST(ParserA611, ClockingDeclEndLabel) {
 // =============================================================================
 
 TEST(ParserA611, ClockingEventBareIdentifier) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @clk;\n"
-                 "    input data;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @clk;\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);
@@ -172,11 +175,12 @@ TEST(ParserA611, ClockingEventBareIdentifier) {
 // =============================================================================
 
 TEST(ParserA611, ClockingEventParenExpr) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    input data;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);
@@ -190,12 +194,13 @@ TEST(ParserA611, ClockingEventParenExpr) {
 // =============================================================================
 
 TEST(ParserA611, ClockingItemDefaultSkewInput) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    default input #1;\n"
-                 "    input data;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    default input #1;\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);
@@ -209,12 +214,13 @@ TEST(ParserA611, ClockingItemDefaultSkewInput) {
 // =============================================================================
 
 TEST(ParserA611, ClockingItemDefaultSkewOutput) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    default output #2;\n"
-                 "    output ack;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    default output #2;\n"
+      "    output ack;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);
@@ -228,12 +234,13 @@ TEST(ParserA611, ClockingItemDefaultSkewOutput) {
 // =============================================================================
 
 TEST(ParserA611, ClockingItemDefaultSkewInputOutput) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    default input #1 output #2;\n"
-                 "    input data;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    default input #1 output #2;\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);
@@ -246,11 +253,12 @@ TEST(ParserA611, ClockingItemDefaultSkewInputOutput) {
 // =============================================================================
 
 TEST(ParserA611, ClockingDirectionInput) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    input data;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);
@@ -265,11 +273,12 @@ TEST(ParserA611, ClockingDirectionInput) {
 // =============================================================================
 
 TEST(ParserA611, ClockingDirectionOutput) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    output ack;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    output ack;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);
@@ -284,11 +293,12 @@ TEST(ParserA611, ClockingDirectionOutput) {
 // =============================================================================
 
 TEST(ParserA611, ClockingDirectionInputOutput) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    input #2 output #4 cmd;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input #2 output #4 cmd;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);
@@ -306,11 +316,12 @@ TEST(ParserA611, ClockingDirectionInputOutput) {
 // =============================================================================
 
 TEST(ParserA611, ClockingDirectionInout) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    inout bidir;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    inout bidir;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);
@@ -325,11 +336,12 @@ TEST(ParserA611, ClockingDirectionInout) {
 // =============================================================================
 
 TEST(ParserA611, ListOfClockingDeclAssignSingle) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    input data;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);
@@ -343,11 +355,12 @@ TEST(ParserA611, ListOfClockingDeclAssignSingle) {
 // =============================================================================
 
 TEST(ParserA611, ListOfClockingDeclAssignMultiple) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    input a, b, c;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input a, b, c;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);
@@ -363,11 +376,12 @@ TEST(ParserA611, ListOfClockingDeclAssignMultiple) {
 // =============================================================================
 
 TEST(ParserA611, ClockingDeclAssignBare) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    input data;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);
@@ -382,11 +396,12 @@ TEST(ParserA611, ClockingDeclAssignBare) {
 // =============================================================================
 
 TEST(ParserA611, ClockingDeclAssignWithHierExpr) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    input enable = top.dut.enable;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input enable = top.dut.enable;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);
@@ -401,11 +416,12 @@ TEST(ParserA611, ClockingDeclAssignWithHierExpr) {
 // =============================================================================
 
 TEST(ParserA611, ClockingSkewEdgeOnly) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    output posedge ack;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    output posedge ack;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);
@@ -421,11 +437,12 @@ TEST(ParserA611, ClockingSkewEdgeOnly) {
 // =============================================================================
 
 TEST(ParserA611, ClockingSkewDelayOnly) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    input #3 data;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input #3 data;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);
@@ -442,11 +459,12 @@ TEST(ParserA611, ClockingSkewDelayOnly) {
 // =============================================================================
 
 TEST(ParserA611, ClockingSkewEdgeAndDelay) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    output negedge #1 ack;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    output negedge #1 ack;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);
@@ -462,11 +480,12 @@ TEST(ParserA611, ClockingSkewEdgeAndDelay) {
 // =============================================================================
 
 TEST(ParserA611, ClockingSkew1step) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    input #1step data;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input #1step data;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);
@@ -482,14 +501,15 @@ TEST(ParserA611, ClockingSkew1step) {
 // =============================================================================
 
 TEST(ParserA611, ClockingDriveSimple) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    output data;\n"
-                 "  endclocking\n"
-                 "  initial begin\n"
-                 "    cb.data <= 8'hFF;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    output data;\n"
+      "  endclocking\n"
+      "  initial begin\n"
+      "    cb.data <= 8'hFF;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -502,14 +522,15 @@ TEST(ParserA611, ClockingDriveSimple) {
 // =============================================================================
 
 TEST(ParserA611, ClockingDriveWithCycleDelay) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    output data;\n"
-                 "  endclocking\n"
-                 "  initial begin\n"
-                 "    cb.data <= ##2 8'hFF;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    output data;\n"
+      "  endclocking\n"
+      "  initial begin\n"
+      "    cb.data <= ##2 8'hFF;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -524,14 +545,15 @@ TEST(ParserA611, ClockingDriveWithCycleDelay) {
 // =============================================================================
 
 TEST(ParserA611, CycleDelayNumber) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    output data;\n"
-                 "  endclocking\n"
-                 "  initial begin\n"
-                 "    cb.data <= ##3 8'h42;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    output data;\n"
+      "  endclocking\n"
+      "  initial begin\n"
+      "    cb.data <= ##3 8'h42;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -541,14 +563,15 @@ TEST(ParserA611, CycleDelayNumber) {
 // =============================================================================
 
 TEST(ParserA611, CycleDelayIdentifier) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    output data;\n"
-                 "  endclocking\n"
-                 "  initial begin\n"
-                 "    cb.data <= ##n 8'h42;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    output data;\n"
+      "  endclocking\n"
+      "  initial begin\n"
+      "    cb.data <= ##n 8'h42;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -558,14 +581,15 @@ TEST(ParserA611, CycleDelayIdentifier) {
 // =============================================================================
 
 TEST(ParserA611, CycleDelayParenExpr) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    output data;\n"
-                 "  endclocking\n"
-                 "  initial begin\n"
-                 "    cb.data <= ##(n+1) 8'h42;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    output data;\n"
+      "  endclocking\n"
+      "  initial begin\n"
+      "    cb.data <= ##(n+1) 8'h42;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -575,14 +599,15 @@ TEST(ParserA611, CycleDelayParenExpr) {
 // =============================================================================
 
 TEST(ParserA611, ClockvarExpression) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    output data;\n"
-                 "  endclocking\n"
-                 "  initial begin\n"
-                 "    cb.data <= 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    output data;\n"
+      "  endclocking\n"
+      "  initial begin\n"
+      "    cb.data <= 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -596,12 +621,13 @@ TEST(ParserA611, ClockvarExpression) {
 // =============================================================================
 
 TEST(ParserA611, DefaultClockingReference) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    input data;\n"
-                 "  endclocking\n"
-                 "  default clocking cb;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "  default clocking cb;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -611,14 +637,15 @@ TEST(ParserA611, DefaultClockingReference) {
 // =============================================================================
 
 TEST(ParserA611, MultipleDirectionGroups) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    input a;\n"
-                 "    output b;\n"
-                 "    inout c;\n"
-                 "    input #2 output #4 d;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input a;\n"
+      "    output b;\n"
+      "    inout c;\n"
+      "    input #2 output #4 d;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);
@@ -635,11 +662,12 @@ TEST(ParserA611, MultipleDirectionGroups) {
 // =============================================================================
 
 TEST(ParserA611, InputWithSkewNoOutput) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    input posedge #2 data;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input posedge #2 data;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);
@@ -656,9 +684,10 @@ TEST(ParserA611, InputWithSkewNoOutput) {
 // =============================================================================
 
 TEST(ParserA611, GlobalClockingUnnamed) {
-  auto r = Parse("module m;\n"
-                 "  global clocking @(negedge clk); endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  global clocking @(negedge clk); endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);
@@ -674,9 +703,10 @@ TEST(ParserA611, GlobalClockingUnnamed) {
 // =============================================================================
 
 TEST(ParserA611, GlobalClockingCompoundEvent) {
-  auto r = Parse("module m;\n"
-                 "  global clocking sys @(clk1 or clk2); endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  global clocking sys @(clk1 or clk2); endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);
@@ -690,11 +720,12 @@ TEST(ParserA611, GlobalClockingCompoundEvent) {
 // =============================================================================
 
 TEST(ParserA611, ClockingDeclAssignMultipleMixed) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    input a, b = top.sig_b, c;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input a, b = top.sig_b, c;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);
@@ -710,14 +741,15 @@ TEST(ParserA611, ClockingDeclAssignMultipleMixed) {
 // =============================================================================
 
 TEST(ParserA611, ClockingItemPropertyDecl) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    input data;\n"
-                 "    property p;\n"
-                 "      data;\n"
-                 "    endproperty\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "    property p;\n"
+      "      data;\n"
+      "    endproperty\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);
@@ -730,14 +762,15 @@ TEST(ParserA611, ClockingItemPropertyDecl) {
 // =============================================================================
 
 TEST(ParserA611, ClockingItemSequenceDecl) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    input data;\n"
-                 "    sequence s;\n"
-                 "      data;\n"
-                 "    endsequence\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "    sequence s;\n"
+      "      data;\n"
+      "    endsequence\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);
@@ -750,12 +783,13 @@ TEST(ParserA611, ClockingItemSequenceDecl) {
 // =============================================================================
 
 TEST(ParserA611, ClockingItemLetDecl) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    input data;\n"
-                 "    let valid = data;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "    let valid = data;\n"
+      "  endclocking\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FindClockingBlock(r);

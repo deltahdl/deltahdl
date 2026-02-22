@@ -27,7 +27,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabFixture &f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // §10.3 Continuous assignments — elaboration
@@ -35,11 +35,12 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabFixture &f) {
 
 TEST(ElabClause1003, MultipleContAssigns) {
   ElabFixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  wire a, b, c, d;\n"
-                              "  assign a = b, c = d;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  wire a, b, c, d;\n"
+      "  assign a = b, c = d;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   auto *mod = design->top_modules[0];
   ASSERT_GE(mod->assigns.size(), 2u);
@@ -47,11 +48,12 @@ TEST(ElabClause1003, MultipleContAssigns) {
 
 TEST(ElabClause1003, ContAssignDelayPreserved) {
   ElabFixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  wire a, b;\n"
-                              "  assign #10 a = b;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  wire a, b;\n"
+      "  assign #10 a = b;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   auto *mod = design->top_modules[0];
   ASSERT_GE(mod->assigns.size(), 1u);
@@ -60,11 +62,12 @@ TEST(ElabClause1003, ContAssignDelayPreserved) {
 
 TEST(ElabClause1003, ContAssignDelayRiseFall) {
   ElabFixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  wire a, b;\n"
-                              "  assign #(5, 10) a = b;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  wire a, b;\n"
+      "  assign #(5, 10) a = b;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   auto *mod = design->top_modules[0];
   ASSERT_GE(mod->assigns.size(), 1u);
@@ -75,11 +78,12 @@ TEST(ElabClause1003, ContAssignDelayRiseFall) {
 
 TEST(ElabClause1003, ContAssignDelayThreeValues) {
   ElabFixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  wire a, b;\n"
-                              "  assign #(5, 10, 15) a = b;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  wire a, b;\n"
+      "  assign #(5, 10, 15) a = b;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   auto *mod = design->top_modules[0];
   ASSERT_GE(mod->assigns.size(), 1u);
@@ -94,30 +98,33 @@ TEST(ElabClause1003, ContAssignDelayThreeValues) {
 
 TEST(ElabClause1003, Validate_IllegalDriveStrengthHighz0Highz1) {
   ElabFixture f;
-  ElaborateSrc("module m;\n"
-               "  wire w;\n"
-               "  assign (highz0, highz1) w = 1'b0;\n"
-               "endmodule\n",
-               f);
+  ElaborateSrc(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign (highz0, highz1) w = 1'b0;\n"
+      "endmodule\n",
+      f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
 TEST(ElabClause1003, Validate_IllegalDriveStrengthHighz1Highz0) {
   ElabFixture f;
-  ElaborateSrc("module m;\n"
-               "  wire w;\n"
-               "  assign (highz1, highz0) w = 1'b0;\n"
-               "endmodule\n",
-               f);
+  ElaborateSrc(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign (highz1, highz0) w = 1'b0;\n"
+      "endmodule\n",
+      f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
 TEST(ElabClause1003, Validate_LegalDriveStrengthHighz0Strong1) {
   ElabFixture f;
-  ElaborateSrc("module m;\n"
-               "  wire w;\n"
-               "  assign (highz0, strong1) w = 1'b0;\n"
-               "endmodule\n",
-               f);
+  ElaborateSrc(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign (highz0, strong1) w = 1'b0;\n"
+      "endmodule\n",
+      f);
   EXPECT_FALSE(f.diag.HasErrors());
 }

@@ -35,24 +35,21 @@ ParseResult Parse(const std::string &src) {
 
 ModuleItem *FindSpecifyBlock(const std::vector<ModuleItem *> &items) {
   for (auto *item : items) {
-    if (item->kind == ModuleItemKind::kSpecifyBlock)
-      return item;
+    if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
   }
   return nullptr;
 }
 
 TimingCheckDecl *GetSoleTimingCheck(ParseResult &r) {
-  if (!r.cu || r.cu->modules.empty())
-    return nullptr;
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
   auto *spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  if (!spec || spec->specify_items.empty())
-    return nullptr;
+  if (!spec || spec->specify_items.empty()) return nullptr;
   if (spec->specify_items[0]->kind != SpecifyItemKind::kTimingCheck)
     return nullptr;
   return &spec->specify_items[0]->timing_check;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.7.5.1 $setup_timing_check
@@ -61,11 +58,12 @@ TimingCheckDecl *GetSoleTimingCheck(ParseResult &r) {
 // $setup ( data_event , reference_event , timing_check_limit [ , [ notifier ] ]
 // )
 TEST(ParserA70501, SetupTimingCheck) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  $setup(data, posedge clk, 10);\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(data, posedge clk, 10);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
@@ -78,11 +76,12 @@ TEST(ParserA70501, SetupTimingCheck) {
 
 // $setup with notifier
 TEST(ParserA70501, SetupWithNotifier) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  $setup(data, posedge clk, 10, ntfr);\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(data, posedge clk, 10, ntfr);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
@@ -96,11 +95,12 @@ TEST(ParserA70501, SetupWithNotifier) {
 // $hold ( reference_event , data_event , timing_check_limit [ , [ notifier ] ]
 // )
 TEST(ParserA70501, HoldTimingCheck) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  $hold(posedge clk, data, 5);\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $hold(posedge clk, data, 5);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
@@ -116,11 +116,12 @@ TEST(ParserA70501, HoldTimingCheck) {
 
 // $setuphold with two limits
 TEST(ParserA70501, SetupholdTwoLimits) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  $setuphold(posedge clk, data, 10, 5);\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setuphold(posedge clk, data, 10, 5);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
@@ -130,12 +131,12 @@ TEST(ParserA70501, SetupholdTwoLimits) {
 
 // $setuphold with all 9 arguments
 TEST(ParserA70501, SetupholdFullArgs) {
-  auto r =
-      Parse("module m;\n"
-            "specify\n"
-            "  $setuphold(posedge clk, data, 10, 5, ntfr, , , dCLK, dDATA);\n"
-            "endspecify\n"
-            "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setuphold(posedge clk, data, 10, 5, ntfr, , , dCLK, dDATA);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
@@ -150,11 +151,12 @@ TEST(ParserA70501, SetupholdFullArgs) {
 // =============================================================================
 
 TEST(ParserA70501, RecoveryTimingCheck) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  $recovery(posedge clk, rst, 8, ntfr);\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $recovery(posedge clk, rst, 8, ntfr);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
@@ -167,11 +169,12 @@ TEST(ParserA70501, RecoveryTimingCheck) {
 // =============================================================================
 
 TEST(ParserA70501, RemovalTimingCheck) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  $removal(posedge clk, rst, 3, ntfr);\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $removal(posedge clk, rst, 3, ntfr);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
@@ -185,11 +188,12 @@ TEST(ParserA70501, RemovalTimingCheck) {
 
 // $recrem with all 9 arguments
 TEST(ParserA70501, RecremFullArgs) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  $recrem(posedge clk, rst, 8, 3, ntfr, , , dCLK, dRST);\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $recrem(posedge clk, rst, 8, 3, ntfr, , , dCLK, dRST);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
@@ -205,11 +209,12 @@ TEST(ParserA70501, RecremFullArgs) {
 // =============================================================================
 
 TEST(ParserA70501, SkewTimingCheck) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  $skew(posedge clk1, negedge clk2, 3, ntfr);\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $skew(posedge clk1, negedge clk2, 3, ntfr);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
@@ -227,11 +232,12 @@ TEST(ParserA70501, SkewTimingCheck) {
 
 // $timeskew with event_based_flag and remain_active_flag
 TEST(ParserA70501, TimeskewWithFlags) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  $timeskew(posedge clk1, posedge clk2, 5, ntfr, 1, 0);\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $timeskew(posedge clk1, posedge clk2, 5, ntfr, 1, 0);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
@@ -247,11 +253,12 @@ TEST(ParserA70501, TimeskewWithFlags) {
 
 // $fullskew with two limits, event_based_flag and remain_active_flag
 TEST(ParserA70501, FullskewWithFlags) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  $fullskew(posedge clk1, negedge clk2, 4, 6, ntfr, 1, 0);\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $fullskew(posedge clk1, negedge clk2, 4, 6, ntfr, 1, 0);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
@@ -269,11 +276,12 @@ TEST(ParserA70501, FullskewWithFlags) {
 // $period ( controlled_reference_event , timing_check_limit [ , [ notifier ] ]
 // )
 TEST(ParserA70501, PeriodTimingCheck) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  $period(posedge clk, 50, ntfr);\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $period(posedge clk, 50, ntfr);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
@@ -290,11 +298,12 @@ TEST(ParserA70501, PeriodTimingCheck) {
 // $width ( controlled_reference_event , timing_check_limit , threshold [ , [
 // notifier ] ] )
 TEST(ParserA70501, WidthWithThreshold) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  $width(posedge clk, 20, 1, ntfr);\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $width(posedge clk, 20, 1, ntfr);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
@@ -309,11 +318,12 @@ TEST(ParserA70501, WidthWithThreshold) {
 
 // $nochange with simple integer offsets
 TEST(ParserA70501, NochangeTimingCheck) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  $nochange(posedge clk, data, 0, 0);\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $nochange(posedge clk, data, 0, 0);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
@@ -323,11 +333,12 @@ TEST(ParserA70501, NochangeTimingCheck) {
 
 // $nochange with notifier
 TEST(ParserA70501, NochangeWithNotifier) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  $nochange(posedge clk, data, 0, 0, ntfr);\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $nochange(posedge clk, data, 0, 0, ntfr);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);

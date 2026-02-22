@@ -1,7 +1,8 @@
 // Annex M.2: Source code
 
-#include "vpi/sv_vpi_user.h"
 #include <gtest/gtest.h>
+
+#include "vpi/sv_vpi_user.h"
 
 namespace {
 
@@ -107,4 +108,4 @@ TEST(SvVpiUser, DpiAccessTypeConstants) {
   EXPECT_EQ(vpiDPIImportAcc, 4);
 }
 
-} // namespace
+}  // namespace

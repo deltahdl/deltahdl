@@ -35,7 +35,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA60701Fixture &f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.6.7.1 Patterns — Simulation tests
@@ -48,13 +48,14 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA60701Fixture &f) {
 // §10.9: positional assignment pattern packs elements MSB-first
 TEST(SimA60701, PositionalPatternPacksMSBFirst) {
   SimA60701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [15:0] x;\n"
-                              "  initial begin\n"
-                              "    x = '{8'd1, 8'd2};\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] x;\n"
+      "  initial begin\n"
+      "    x = '{8'd1, 8'd2};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -68,13 +69,14 @@ TEST(SimA60701, PositionalPatternPacksMSBFirst) {
 // §10.9: single-element positional pattern
 TEST(SimA60701, SingleElementPositionalPattern) {
   SimA60701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial begin\n"
-                              "    x = '{8'd42};\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = '{8'd42};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -87,13 +89,14 @@ TEST(SimA60701, SingleElementPositionalPattern) {
 // §10.9: four-element positional pattern
 TEST(SimA60701, FourElementPositionalPattern) {
   SimA60701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] x;\n"
-                              "  initial begin\n"
-                              "    x = '{8'd1, 8'd2, 8'd3, 8'd4};\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    x = '{8'd1, 8'd2, 8'd3, 8'd4};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -229,18 +232,19 @@ TEST(SimA60701, PositionalStructPatternInit) {
 // §10.9.2: struct with three fields, named pattern
 TEST(SimA60701, ThreeFieldStructNamedPattern) {
   SimA60701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  typedef struct packed {\n"
-                              "    logic [7:0] x;\n"
-                              "    logic [7:0] y;\n"
-                              "    logic [7:0] z;\n"
-                              "  } triple_t;\n"
-                              "  triple_t v;\n"
-                              "  initial begin\n"
-                              "    v = triple_t'{x: 8'd1, y: 8'd2, z: 8'd3};\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed {\n"
+      "    logic [7:0] x;\n"
+      "    logic [7:0] y;\n"
+      "    logic [7:0] z;\n"
+      "  } triple_t;\n"
+      "  triple_t v;\n"
+      "  initial begin\n"
+      "    v = triple_t'{x: 8'd1, y: 8'd2, z: 8'd3};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -258,19 +262,20 @@ TEST(SimA60701, ThreeFieldStructNamedPattern) {
 // §12.6.1: case-matches selects matching constant pattern
 TEST(SimA60701, CaseMatchesConstantMatch) {
   SimA60701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] sel, x;\n"
-                              "  initial begin\n"
-                              "    sel = 8'd2;\n"
-                              "    case(sel) matches\n"
-                              "      8'd1: x = 8'd10;\n"
-                              "      8'd2: x = 8'd20;\n"
-                              "      8'd3: x = 8'd30;\n"
-                              "      default: x = 8'd0;\n"
-                              "    endcase\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel, x;\n"
+      "  initial begin\n"
+      "    sel = 8'd2;\n"
+      "    case(sel) matches\n"
+      "      8'd1: x = 8'd10;\n"
+      "      8'd2: x = 8'd20;\n"
+      "      8'd3: x = 8'd30;\n"
+      "      default: x = 8'd0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -283,18 +288,19 @@ TEST(SimA60701, CaseMatchesConstantMatch) {
 // §12.6.1: case-matches falls through to default
 TEST(SimA60701, CaseMatchesDefaultFallthrough) {
   SimA60701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] sel, x;\n"
-                              "  initial begin\n"
-                              "    sel = 8'd99;\n"
-                              "    case(sel) matches\n"
-                              "      8'd1: x = 8'd10;\n"
-                              "      8'd2: x = 8'd20;\n"
-                              "      default: x = 8'd77;\n"
-                              "    endcase\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel, x;\n"
+      "  initial begin\n"
+      "    sel = 8'd99;\n"
+      "    case(sel) matches\n"
+      "      8'd1: x = 8'd10;\n"
+      "      8'd2: x = 8'd20;\n"
+      "      default: x = 8'd77;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -307,18 +313,19 @@ TEST(SimA60701, CaseMatchesDefaultFallthrough) {
 // §12.6.1: case-matches first match wins
 TEST(SimA60701, CaseMatchesFirstMatchWins) {
   SimA60701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] sel, x;\n"
-                              "  initial begin\n"
-                              "    sel = 8'd1;\n"
-                              "    case(sel) matches\n"
-                              "      8'd1: x = 8'd10;\n"
-                              "      8'd1: x = 8'd20;\n"
-                              "      default: x = 8'd0;\n"
-                              "    endcase\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel, x;\n"
+      "  initial begin\n"
+      "    sel = 8'd1;\n"
+      "    case(sel) matches\n"
+      "      8'd1: x = 8'd10;\n"
+      "      8'd1: x = 8'd20;\n"
+      "      default: x = 8'd0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -335,15 +342,16 @@ TEST(SimA60701, CaseMatchesFirstMatchWins) {
 // §12.6.2: matches with constant pattern — true case
 TEST(SimA60701, MatchesConstantTrue) {
   SimA60701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x, y;\n"
-                              "  initial begin\n"
-                              "    x = 8'd5;\n"
-                              "    if (x matches 8'd5) y = 8'd1;\n"
-                              "    else y = 8'd0;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x, y;\n"
+      "  initial begin\n"
+      "    x = 8'd5;\n"
+      "    if (x matches 8'd5) y = 8'd1;\n"
+      "    else y = 8'd0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -356,15 +364,16 @@ TEST(SimA60701, MatchesConstantTrue) {
 // §12.6.2: matches with constant pattern — false case
 TEST(SimA60701, MatchesConstantFalse) {
   SimA60701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x, y;\n"
-                              "  initial begin\n"
-                              "    x = 8'd5;\n"
-                              "    if (x matches 8'd10) y = 8'd1;\n"
-                              "    else y = 8'd0;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x, y;\n"
+      "  initial begin\n"
+      "    x = 8'd5;\n"
+      "    if (x matches 8'd10) y = 8'd1;\n"
+      "    else y = 8'd0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -381,16 +390,17 @@ TEST(SimA60701, MatchesConstantFalse) {
 // §10.9: assignment pattern in blocking assignment
 TEST(SimA60701, PatternInBlockingAssignment) {
   SimA60701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] a, b;\n"
-                              "  initial begin\n"
-                              "    a = 8'd0;\n"
-                              "    b = 8'd0;\n"
-                              "    a = 8'd11;\n"
-                              "    b = 8'd22;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 8'd0;\n"
+      "    b = 8'd0;\n"
+      "    a = 8'd11;\n"
+      "    b = 8'd22;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -406,14 +416,15 @@ TEST(SimA60701, PatternInBlockingAssignment) {
 // §10.9: assignment pattern used in conditional branch
 TEST(SimA60701, PatternInConditionalBranch) {
   SimA60701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [15:0] x;\n"
-                              "  initial begin\n"
-                              "    if (1) x = '{8'd5, 8'd6};\n"
-                              "    else x = '{8'd0, 8'd0};\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] x;\n"
+      "  initial begin\n"
+      "    if (1) x = '{8'd5, 8'd6};\n"
+      "    else x = '{8'd0, 8'd0};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -427,19 +438,20 @@ TEST(SimA60701, PatternInConditionalBranch) {
 // §10.9: assignment pattern used in case item body
 TEST(SimA60701, PatternInCaseItemBody) {
   SimA60701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] sel;\n"
-                              "  logic [15:0] x;\n"
-                              "  initial begin\n"
-                              "    sel = 8'd1;\n"
-                              "    case(sel)\n"
-                              "      8'd0: x = '{8'd0, 8'd0};\n"
-                              "      8'd1: x = '{8'd10, 8'd20};\n"
-                              "      default: x = '{8'd0, 8'd0};\n"
-                              "    endcase\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel;\n"
+      "  logic [15:0] x;\n"
+      "  initial begin\n"
+      "    sel = 8'd1;\n"
+      "    case(sel)\n"
+      "      8'd0: x = '{8'd0, 8'd0};\n"
+      "      8'd1: x = '{8'd10, 8'd20};\n"
+      "      default: x = '{8'd0, 8'd0};\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -453,16 +465,17 @@ TEST(SimA60701, PatternInCaseItemBody) {
 // §10.9: assignment pattern in for loop body
 TEST(SimA60701, PatternInForLoop) {
   SimA60701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [15:0] x;\n"
-                              "  initial begin\n"
-                              "    x = 16'd0;\n"
-                              "    for (int i = 0; i < 3; i = i + 1) begin\n"
-                              "      x = '{8'd7, 8'd8};\n"
-                              "    end\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] x;\n"
+      "  initial begin\n"
+      "    x = 16'd0;\n"
+      "    for (int i = 0; i < 3; i = i + 1) begin\n"
+      "      x = '{8'd7, 8'd8};\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);

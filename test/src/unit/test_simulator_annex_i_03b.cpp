@@ -1,10 +1,12 @@
 // Annex I.3: Source code
 
-#include "simulation/dpi_runtime.h"
-#include <cstdint>
 #include <gtest/gtest.h>
+
+#include <cstdint>
 #include <string>
 #include <vector>
+
+#include "simulation/dpi_runtime.h"
 
 using namespace delta;
 
@@ -20,7 +22,7 @@ TEST(DpiRuntime, SvLogicVecValLayout) {
   v.aval = 0xDEADBEEF;
   v.bval = 0;
   EXPECT_EQ(v.aval, 0xDEADBEEFu);
-  EXPECT_TRUE(v.bval == 0); // Known value.
+  EXPECT_TRUE(v.bval == 0);  // Known value.
 }
 
-} // namespace
+}  // namespace

@@ -47,7 +47,7 @@ RtlirDesign *Elaborate(const std::string &src, ElabFixture &f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.2.5 Declaration ranges
@@ -225,12 +225,13 @@ TEST(ParserA25, AssocDimElaboratesIndexWidth) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserA25, VarDimAllFourAlternatives) {
-  auto r = Parse("module m;\n"
-                 "  int d [];       \n"
-                 "  int u [3:0];    \n"
-                 "  int a [string]; \n"
-                 "  int q [$];      \n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  int d [];       \n"
+      "  int u [3:0];    \n"
+      "  int a [string]; \n"
+      "  int q [$];      \n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &items = r.cu->modules[0]->items;

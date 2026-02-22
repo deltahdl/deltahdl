@@ -1,5 +1,9 @@
 // §24.4: Eliminating testbench races
 
+#include <gtest/gtest.h>
+
+#include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -11,8 +15,6 @@
 #include "simulation/process.h"
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
-#include <string>
 
 using namespace delta;
 
@@ -20,7 +22,7 @@ using namespace delta;
 // Parse-level fixture
 // =============================================================================
 struct ProgramTestParse : ::testing::Test {
-protected:
+ protected:
   CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
@@ -75,4 +77,4 @@ TEST(ProgramSim, ReactiveContextFlag) {
   ctx.SetCurrentProcess(nullptr);
 }
 
-} // namespace
+}  // namespace

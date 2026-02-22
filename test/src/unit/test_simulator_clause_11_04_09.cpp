@@ -1,5 +1,7 @@
 // §11.4.9: Reduction operators
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -7,7 +9,6 @@
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -72,4 +73,4 @@ TEST(EvalOp, GtGtEq) {
   EXPECT_EQ(var->value.ToUint64(), 16u);
 }
 
-} // namespace
+}  // namespace

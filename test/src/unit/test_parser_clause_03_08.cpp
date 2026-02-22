@@ -32,8 +32,7 @@ static ParseResult308 Parse(const std::string &src) {
 
 static ModuleItem *FindItemByKind(ParseResult308 &r, ModuleItemKind kind) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind == kind)
-      return item;
+    if (item->kind == kind) return item;
   }
   return nullptr;
 }
@@ -42,14 +41,12 @@ static int CountItemsByKind(const std::vector<ModuleItem *> &items,
                             ModuleItemKind kind) {
   int count = 0;
   for (const auto *item : items)
-    if (item->kind == kind)
-      ++count;
+    if (item->kind == kind) ++count;
   return count;
 }
 
-static const ModuleItem *
-FindFunctionByName(const std::vector<ModuleItem *> &items,
-                   const std::string &name) {
+static const ModuleItem *FindFunctionByName(
+    const std::vector<ModuleItem *> &items, const std::string &name) {
   for (const auto *item : items)
     if (item->kind == ModuleItemKind::kFunctionDecl && item->name == name)
       return item;
@@ -88,16 +85,17 @@ TEST(ParserClause03, Cl3_8_TaskAllDirectionsAndBlocking) {
 
 // §3.8: Function returning value, void function, all 4 argument directions.
 TEST(ParserClause03, Cl3_8_FunctionReturnAndVoidAndDirections) {
-  auto r = Parse("module m;\n"
-                 "  function int compute(input int a, output int b,\n"
-                 "                       inout int c, ref int d);\n"
-                 "    b = a;\n"
-                 "    return a + c + d;\n"
-                 "  endfunction\n"
-                 "  function void show(input int val);\n"
-                 "    $display(\"%d\", val);\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function int compute(input int a, output int b,\n"
+      "                       inout int c, ref int d);\n"
+      "    b = a;\n"
+      "    return a + c + d;\n"
+      "  endfunction\n"
+      "  function void show(input int val);\n"
+      "    $display(\"%d\", val);\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(

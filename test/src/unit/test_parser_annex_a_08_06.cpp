@@ -34,8 +34,7 @@ ParseResult Parse(const std::string &src) {
 
 static Expr *FirstInitialRHS(ParseResult &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock)
-      continue;
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0]->rhs;
     }
@@ -46,8 +45,7 @@ static Expr *FirstInitialRHS(ParseResult &r) {
 
 static Expr *FirstInitialExpr(ParseResult &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock)
-      continue;
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0]->expr;
     }
@@ -56,7 +54,7 @@ static Expr *FirstInitialExpr(ParseResult &r) {
   return nullptr;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.8.6 Operators — unary_operator
@@ -629,11 +627,12 @@ TEST(ParserA86, IncOrDecPostfixDecrement) {
 // § unary_module_path_operator — ! in specify path condition
 
 TEST(ParserA86, UnaryModulePathNot) {
-  auto r = Parse("module m(input a, output y);\n"
-                 "  specify\n"
-                 "    if (!a) (a => y) = 1;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input a, output y);\n"
+      "  specify\n"
+      "    if (!a) (a => y) = 1;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -641,11 +640,12 @@ TEST(ParserA86, UnaryModulePathNot) {
 // § unary_module_path_operator — ~ in specify path condition
 
 TEST(ParserA86, UnaryModulePathBitwiseNot) {
-  auto r = Parse("module m(input a, output y);\n"
-                 "  specify\n"
-                 "    if (~a) (a => y) = 2;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input a, output y);\n"
+      "  specify\n"
+      "    if (~a) (a => y) = 2;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -657,11 +657,12 @@ TEST(ParserA86, UnaryModulePathBitwiseNot) {
 // § binary_module_path_operator — == in specify path condition
 
 TEST(ParserA86, BinaryModulePathEq) {
-  auto r = Parse("module m(input a, input b, output y);\n"
-                 "  specify\n"
-                 "    if (a == b) (a => y) = 1;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input a, input b, output y);\n"
+      "  specify\n"
+      "    if (a == b) (a => y) = 1;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -669,11 +670,12 @@ TEST(ParserA86, BinaryModulePathEq) {
 // § binary_module_path_operator — != in specify path condition
 
 TEST(ParserA86, BinaryModulePathNeq) {
-  auto r = Parse("module m(input a, input b, output y);\n"
-                 "  specify\n"
-                 "    if (a != b) (a => y) = 2;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input a, input b, output y);\n"
+      "  specify\n"
+      "    if (a != b) (a => y) = 2;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -681,11 +683,12 @@ TEST(ParserA86, BinaryModulePathNeq) {
 // § binary_module_path_operator — && in specify path condition
 
 TEST(ParserA86, BinaryModulePathLogicalAnd) {
-  auto r = Parse("module m(input a, input b, output y);\n"
-                 "  specify\n"
-                 "    if (a && b) (a => y) = 3;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input a, input b, output y);\n"
+      "  specify\n"
+      "    if (a && b) (a => y) = 3;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -693,11 +696,12 @@ TEST(ParserA86, BinaryModulePathLogicalAnd) {
 // § binary_module_path_operator — || in specify path condition
 
 TEST(ParserA86, BinaryModulePathLogicalOr) {
-  auto r = Parse("module m(input a, input b, output y);\n"
-                 "  specify\n"
-                 "    if (a || b) (a => y) = 4;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input a, input b, output y);\n"
+      "  specify\n"
+      "    if (a || b) (a => y) = 4;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -705,11 +709,12 @@ TEST(ParserA86, BinaryModulePathLogicalOr) {
 // § binary_module_path_operator — & in specify path condition
 
 TEST(ParserA86, BinaryModulePathBitwiseAnd) {
-  auto r = Parse("module m(input a, input b, output y);\n"
-                 "  specify\n"
-                 "    if (a & b) (a => y) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input a, input b, output y);\n"
+      "  specify\n"
+      "    if (a & b) (a => y) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -717,11 +722,12 @@ TEST(ParserA86, BinaryModulePathBitwiseAnd) {
 // § binary_module_path_operator — | in specify path condition
 
 TEST(ParserA86, BinaryModulePathBitwiseOr) {
-  auto r = Parse("module m(input a, input b, output y);\n"
-                 "  specify\n"
-                 "    if (a | b) (a => y) = 6;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input a, input b, output y);\n"
+      "  specify\n"
+      "    if (a | b) (a => y) = 6;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -729,11 +735,12 @@ TEST(ParserA86, BinaryModulePathBitwiseOr) {
 // § binary_module_path_operator — ^ in specify path condition
 
 TEST(ParserA86, BinaryModulePathXor) {
-  auto r = Parse("module m(input a, input b, output y);\n"
-                 "  specify\n"
-                 "    if (a ^ b) (a => y) = 7;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input a, input b, output y);\n"
+      "  specify\n"
+      "    if (a ^ b) (a => y) = 7;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -741,11 +748,12 @@ TEST(ParserA86, BinaryModulePathXor) {
 // § binary_module_path_operator — ^~ in specify path condition
 
 TEST(ParserA86, BinaryModulePathXnor) {
-  auto r = Parse("module m(input a, input b, output y);\n"
-                 "  specify\n"
-                 "    if (a ^~ b) (a => y) = 8;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input a, input b, output y);\n"
+      "  specify\n"
+      "    if (a ^~ b) (a => y) = 8;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -753,11 +761,12 @@ TEST(ParserA86, BinaryModulePathXnor) {
 // § binary_module_path_operator — ~^ in specify path condition
 
 TEST(ParserA86, BinaryModulePathXnorAlt) {
-  auto r = Parse("module m(input a, input b, output y);\n"
-                 "  specify\n"
-                 "    if (a ~^ b) (a => y) = 9;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input a, input b, output y);\n"
+      "  specify\n"
+      "    if (a ~^ b) (a => y) = 9;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }

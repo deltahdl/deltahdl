@@ -1,5 +1,9 @@
 // §10.10: Unpacked array concatenation
 
+#include <gtest/gtest.h>
+
+#include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -9,8 +13,6 @@
 #include "simulation/eval.h"
 #include "simulation/eval_array.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
-#include <string>
 
 using namespace delta;
 
@@ -47,4 +49,4 @@ TEST(UnpackedArrayConcat, BasicConcat) {
   EXPECT_EQ(found1->value.ToUint64(), 20u);
 }
 
-} // namespace
+}  // namespace

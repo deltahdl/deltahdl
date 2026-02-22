@@ -1,12 +1,13 @@
 // §14.13: Input sampling
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "simulation/clocking.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -57,4 +58,4 @@ TEST(Clocking, AttachSamplesOnClockEdge) {
   EXPECT_EQ(sampled, 0xAAu);
 }
 
-} // namespace
+}  // namespace

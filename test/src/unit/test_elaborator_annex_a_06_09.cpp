@@ -32,7 +32,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA609Fixture &f) {
   return design;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.6.9 Subroutine call statements — Elaboration
@@ -41,14 +41,15 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA609Fixture &f) {
 // tf_call: task call elaborates without error
 TEST(ElabA609, TfCallElaborates) {
   ElabA609Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  logic [7:0] x;\n"
-                              "  task set_x;\n"
-                              "    x = 8'd1;\n"
-                              "  endtask\n"
-                              "  initial set_x();\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  task set_x;\n"
+      "    x = 8'd1;\n"
+      "  endtask\n"
+      "  initial set_x();\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -56,10 +57,11 @@ TEST(ElabA609, TfCallElaborates) {
 // system_tf_call: system call elaborates without error
 TEST(ElabA609, SystemCallElaborates) {
   ElabA609Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  initial $display(\"hello\");\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  initial $display(\"hello\");\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -67,11 +69,12 @@ TEST(ElabA609, SystemCallElaborates) {
 // void'(function_subroutine_call) elaborates without error
 TEST(ElabA609, VoidCastElaborates) {
   ElabA609Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  function int foo(); return 1; endfunction\n"
-                              "  initial void'(foo());\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  function int foo(); return 1; endfunction\n"
+      "  initial void'(foo());\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -79,10 +82,11 @@ TEST(ElabA609, VoidCastElaborates) {
 // method_call elaborates without error
 TEST(ElabA609, MethodCallElaborates) {
   ElabA609Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  initial begin obj.method(); end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  initial begin obj.method(); end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }

@@ -39,8 +39,7 @@ static bool ParseOk(const std::string &src) {
 
 static ModuleItem *FirstAlwaysItem(ParseResult9j &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysBlock)
-      return item;
+    if (item->kind == ModuleItemKind::kAlwaysBlock) return item;
   }
   return nullptr;
 }
@@ -49,8 +48,7 @@ static ModuleItem *NthAlwaysItem(ParseResult9j &r, size_t n) {
   size_t count = 0;
   for (auto *item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kAlwaysBlock) {
-      if (count == n)
-        return item;
+      if (count == n) return item;
       ++count;
     }
   }
@@ -59,8 +57,7 @@ static ModuleItem *NthAlwaysItem(ParseResult9j &r, size_t n) {
 
 static Stmt *FirstInitialStmt(ParseResult9j &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock)
-      continue;
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
     }
@@ -71,11 +68,9 @@ static Stmt *FirstInitialStmt(ParseResult9j &r) {
 
 static Stmt *NthInitialStmt(ParseResult9j &r, size_t n) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock)
-      continue;
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
-      if (n < item->body->stmts.size())
-        return item->body->stmts[n];
+      if (n < item->body->stmts.size()) return item->body->stmts[n];
     }
   }
   return nullptr;
@@ -87,10 +82,11 @@ static Stmt *NthInitialStmt(ParseResult9j &r, size_t n) {
 
 // @* at always block level: always @* stmt
 TEST(ParserSection9, Sec9_4_2_3_AtStarAlwaysSimple) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b;\n"
-                 "  always @* a = b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  always @* a = b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -103,10 +99,11 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarAlwaysSimple) {
 
 // @(*) at always block level: always @(*) stmt
 TEST(ParserSection9, Sec9_4_2_3_AtStarParenAlwaysSimple) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b;\n"
-                 "  always @(*) a = b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  always @(*) a = b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -120,12 +117,13 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarParenAlwaysSimple) {
 // @* at statement level inside initial: produces kEventControl with
 // is_star_event=true
 TEST(ParserSection9, Sec9_4_2_3_AtStarStmtLevelInitial) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b;\n"
-                 "  initial begin\n"
-                 "    @* a = b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial begin\n"
+      "    @* a = b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -137,12 +135,13 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarStmtLevelInitial) {
 
 // @(*) at statement level: produces kEventControl with is_star_event=true
 TEST(ParserSection9, Sec9_4_2_3_AtStarParenStmtLevel) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b;\n"
-                 "  initial begin\n"
-                 "    @(*) a = b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial begin\n"
+      "    @(*) a = b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -154,13 +153,14 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarParenStmtLevel) {
 
 // @* with begin-end block body at always level
 TEST(ParserSection9, Sec9_4_2_3_AtStarBeginEndBlock) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b, c;\n"
-                 "  always @* begin\n"
-                 "    a = b;\n"
-                 "    c = a;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b, c;\n"
+      "  always @* begin\n"
+      "    a = b;\n"
+      "    c = a;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -173,13 +173,14 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarBeginEndBlock) {
 
 // @(*) with begin-end block body at always level
 TEST(ParserSection9, Sec9_4_2_3_AtStarParenBeginEndBlock) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b, c;\n"
-                 "  always @(*) begin\n"
-                 "    a = b;\n"
-                 "    c = a;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b, c;\n"
+      "  always @(*) begin\n"
+      "    a = b;\n"
+      "    c = a;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -192,10 +193,11 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarParenBeginEndBlock) {
 
 // @* with if-else body
 TEST(ParserSection9, Sec9_4_2_3_AtStarIfElseBody) {
-  auto r = Parse("module m;\n"
-                 "  reg sel, a, b, out;\n"
-                 "  always @* if (sel) out = a; else out = b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg sel, a, b, out;\n"
+      "  always @* if (sel) out = a; else out = b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -210,15 +212,16 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarIfElseBody) {
 
 // @* with case body
 TEST(ParserSection9, Sec9_4_2_3_AtStarCaseBody) {
-  auto r = Parse("module m;\n"
-                 "  reg [1:0] sel;\n"
-                 "  reg [7:0] out;\n"
-                 "  always @* case (sel)\n"
-                 "    2'b00: out = 8'h00;\n"
-                 "    2'b01: out = 8'h11;\n"
-                 "    default: out = 8'hFF;\n"
-                 "  endcase\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg [1:0] sel;\n"
+      "  reg [7:0] out;\n"
+      "  always @* case (sel)\n"
+      "    2'b00: out = 8'h00;\n"
+      "    2'b01: out = 8'h11;\n"
+      "    default: out = 8'hFF;\n"
+      "  endcase\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -231,14 +234,15 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarCaseBody) {
 
 // @(*) with multiple assignments in begin-end
 TEST(ParserSection9, Sec9_4_2_3_AtStarParenMultipleAssignments) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b, c, d, x, y, z;\n"
-                 "  always @(*) begin\n"
-                 "    x = a & b;\n"
-                 "    y = c | d;\n"
-                 "    z = x ^ y;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b, c, d, x, y, z;\n"
+      "  always @(*) begin\n"
+      "    x = a & b;\n"
+      "    y = c | d;\n"
+      "    z = x ^ y;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -251,10 +255,11 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarParenMultipleAssignments) {
 
 // @* in initial block (statement-level event control)
 TEST(ParserSection9, Sec9_4_2_3_AtStarInInitialBlock) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b;\n"
-                 "  initial @* a = b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial @* a = b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -269,10 +274,11 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarInInitialBlock) {
 
 // @(*) in initial block
 TEST(ParserSection9, Sec9_4_2_3_AtStarParenInInitialBlock) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b;\n"
-                 "  initial @(*) a = b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial @(*) a = b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = r.cu->modules[0]->items[0]->body;
@@ -284,10 +290,11 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarParenInInitialBlock) {
 
 // @* in always block -- sensitivity list is empty, body is the statement
 TEST(ParserSection9, Sec9_4_2_3_AtStarAlwaysSensitivityEmpty) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b;\n"
-                 "  always @* a = b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  always @* a = b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -298,10 +305,11 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarAlwaysSensitivityEmpty) {
 
 // @(*) in always block -- same: sensitivity empty, body is statement
 TEST(ParserSection9, Sec9_4_2_3_AtStarParenAlwaysSensitivityEmpty) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b;\n"
-                 "  always @(*) a = b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  always @(*) a = b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -312,17 +320,18 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarParenAlwaysSensitivityEmpty) {
 
 // @* with nested blocks
 TEST(ParserSection9, Sec9_4_2_3_AtStarNestedBlocks) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b, c;\n"
-                 "  always @* begin\n"
-                 "    begin\n"
-                 "      a = b;\n"
-                 "    end\n"
-                 "    begin\n"
-                 "      c = a;\n"
-                 "    end\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b, c;\n"
+      "  always @* begin\n"
+      "    begin\n"
+      "      a = b;\n"
+      "    end\n"
+      "    begin\n"
+      "      c = a;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -337,13 +346,14 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarNestedBlocks) {
 
 // @* with variable declarations in body
 TEST(ParserSection9, Sec9_4_2_3_AtStarVarDeclInBody) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b;\n"
-                 "  always @* begin\n"
-                 "    int temp;\n"
-                 "    temp = a + b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  always @* begin\n"
+      "    int temp;\n"
+      "    temp = a + b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -357,13 +367,14 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarVarDeclInBody) {
 
 // @(*) with complex combinational logic
 TEST(ParserSection9, Sec9_4_2_3_AtStarParenComplexCombLogic) {
-  auto r = Parse("module m;\n"
-                 "  reg [7:0] a, b, c, sum, product;\n"
-                 "  always @(*) begin\n"
-                 "    sum = a + b + c;\n"
-                 "    product = a * b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg [7:0] a, b, c, sum, product;\n"
+      "  always @(*) begin\n"
+      "    sum = a + b + c;\n"
+      "    product = a * b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -376,12 +387,13 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarParenComplexCombLogic) {
 
 // @* with function calls in body
 TEST(ParserSection9, Sec9_4_2_3_AtStarFunctionCalls) {
-  auto r = Parse("module m;\n"
-                 "  reg [7:0] a, result;\n"
-                 "  always @* begin\n"
-                 "    result = $clog2(a);\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg [7:0] a, result;\n"
+      "  always @* begin\n"
+      "    result = $clog2(a);\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -393,14 +405,15 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarFunctionCalls) {
 
 // @* with for loop in body
 TEST(ParserSection9, Sec9_4_2_3_AtStarForLoop) {
-  auto r = Parse("module m;\n"
-                 "  reg [7:0] data [0:3];\n"
-                 "  reg [7:0] out [0:3];\n"
-                 "  always @* begin\n"
-                 "    for (int i = 0; i < 4; i++)\n"
-                 "      out[i] = data[i];\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg [7:0] data [0:3];\n"
+      "  reg [7:0] out [0:3];\n"
+      "  always @* begin\n"
+      "    for (int i = 0; i < 4; i++)\n"
+      "      out[i] = data[i];\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -414,11 +427,12 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarForLoop) {
 
 // Multiple @* blocks in same module
 TEST(ParserSection9, Sec9_4_2_3_MultipleAtStarBlocks) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b, c, x, y;\n"
-                 "  always @* x = a & b;\n"
-                 "  always @* y = b | c;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b, c, x, y;\n"
+      "  always @* x = a & b;\n"
+      "  always @* y = b | c;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item0 = NthAlwaysItem(r, 0);
@@ -433,18 +447,19 @@ TEST(ParserSection9, Sec9_4_2_3_MultipleAtStarBlocks) {
 
 // @* with case inside body
 TEST(ParserSection9, Sec9_4_2_3_AtStarCaseInside) {
-  auto r = Parse("module m;\n"
-                 "  reg [1:0] sel;\n"
-                 "  reg [7:0] out, a, b, c, d;\n"
-                 "  always @* begin\n"
-                 "    case (sel)\n"
-                 "      2'd0: out = a;\n"
-                 "      2'd1: out = b;\n"
-                 "      2'd2: out = c;\n"
-                 "      default: out = d;\n"
-                 "    endcase\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg [1:0] sel;\n"
+      "  reg [7:0] out, a, b, c, d;\n"
+      "  always @* begin\n"
+      "    case (sel)\n"
+      "      2'd0: out = a;\n"
+      "      2'd1: out = b;\n"
+      "      2'd2: out = c;\n"
+      "      default: out = d;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -459,17 +474,18 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarCaseInside) {
 
 // @* with unique case
 TEST(ParserSection9, Sec9_4_2_3_AtStarUniqueCase) {
-  auto r = Parse("module m;\n"
-                 "  reg [1:0] sel;\n"
-                 "  reg out;\n"
-                 "  always @* begin\n"
-                 "    unique case (sel)\n"
-                 "      2'b00: out = 0;\n"
-                 "      2'b01: out = 1;\n"
-                 "      default: out = 0;\n"
-                 "    endcase\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg [1:0] sel;\n"
+      "  reg out;\n"
+      "  always @* begin\n"
+      "    unique case (sel)\n"
+      "      2'b00: out = 0;\n"
+      "      2'b01: out = 1;\n"
+      "      default: out = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -484,16 +500,17 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarUniqueCase) {
 
 // @* with priority case
 TEST(ParserSection9, Sec9_4_2_3_AtStarPriorityCase) {
-  auto r = Parse("module m;\n"
-                 "  reg [1:0] sel;\n"
-                 "  reg out;\n"
-                 "  always @* begin\n"
-                 "    priority case (sel)\n"
-                 "      2'b00: out = 0;\n"
-                 "      default: out = 1;\n"
-                 "    endcase\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg [1:0] sel;\n"
+      "  reg out;\n"
+      "  always @* begin\n"
+      "    priority case (sel)\n"
+      "      2'b00: out = 0;\n"
+      "      default: out = 1;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -508,11 +525,12 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarPriorityCase) {
 
 // @* with concatenation assignments
 TEST(ParserSection9, Sec9_4_2_3_AtStarConcatenation) {
-  auto r = Parse("module m;\n"
-                 "  reg [3:0] a, b;\n"
-                 "  reg [7:0] out;\n"
-                 "  always @* out = {a, b};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg [3:0] a, b;\n"
+      "  reg [7:0] out;\n"
+      "  always @* out = {a, b};\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -526,10 +544,11 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarConcatenation) {
 
 // @* with ternary expression assignment
 TEST(ParserSection9, Sec9_4_2_3_AtStarTernary) {
-  auto r = Parse("module m;\n"
-                 "  reg sel, a, b, out;\n"
-                 "  always @* out = sel ? a : b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg sel, a, b, out;\n"
+      "  always @* out = sel ? a : b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -543,12 +562,13 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarTernary) {
 
 // Verify is_star_event is true and events empty for @(*) at statement level
 TEST(ParserSection9, Sec9_4_2_3_IsStarEventTrueAtStarParen) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b;\n"
-                 "  initial begin\n"
-                 "    @(*) a = b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial begin\n"
+      "    @(*) a = b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -560,12 +580,13 @@ TEST(ParserSection9, Sec9_4_2_3_IsStarEventTrueAtStarParen) {
 
 // @* body is present for statement-level event control
 TEST(ParserSection9, Sec9_4_2_3_AtStarStmtBodyPresent) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b;\n"
-                 "  initial begin\n"
-                 "    @* a = b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial begin\n"
+      "    @* a = b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -577,15 +598,16 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarStmtBodyPresent) {
 
 // @* statement level with begin-end block
 TEST(ParserSection9, Sec9_4_2_3_AtStarStmtLevelBeginEnd) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b, c;\n"
-                 "  initial begin\n"
-                 "    @* begin\n"
-                 "      a = b;\n"
-                 "      c = a;\n"
-                 "    end\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b, c;\n"
+      "  initial begin\n"
+      "    @* begin\n"
+      "      a = b;\n"
+      "      c = a;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -599,13 +621,14 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarStmtLevelBeginEnd) {
 
 // Multiple @* event controls in sequence inside initial block
 TEST(ParserSection9, Sec9_4_2_3_MultipleAtStarInInitial) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b, c, d;\n"
-                 "  initial begin\n"
-                 "    @* a = b;\n"
-                 "    @(*) c = d;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b, c, d;\n"
+      "  initial begin\n"
+      "    @* a = b;\n"
+      "    @(*) c = d;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *s0 = NthInitialStmt(r, 0);
@@ -620,30 +643,32 @@ TEST(ParserSection9, Sec9_4_2_3_MultipleAtStarInInitial) {
 
 // ParseOk: @* parses without errors in a typical combinational module
 TEST(ParserSection9, Sec9_4_2_3_ParseOkAtStarCombiModule) {
-  EXPECT_TRUE(ParseOk("module mux4(\n"
-                      "  input [1:0] sel,\n"
-                      "  input [7:0] a, b, c, d,\n"
-                      "  output reg [7:0] out\n"
-                      ");\n"
-                      "  always @* begin\n"
-                      "    case (sel)\n"
-                      "      2'd0: out = a;\n"
-                      "      2'd1: out = b;\n"
-                      "      2'd2: out = c;\n"
-                      "      default: out = d;\n"
-                      "    endcase\n"
-                      "  end\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module mux4(\n"
+              "  input [1:0] sel,\n"
+              "  input [7:0] a, b, c, d,\n"
+              "  output reg [7:0] out\n"
+              ");\n"
+              "  always @* begin\n"
+              "    case (sel)\n"
+              "      2'd0: out = a;\n"
+              "      2'd1: out = b;\n"
+              "      2'd2: out = c;\n"
+              "      default: out = d;\n"
+              "    endcase\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // ParseOk: @(*) parses without errors in a typical combinational module
 TEST(ParserSection9, Sec9_4_2_3_ParseOkAtStarParenCombiModule) {
-  EXPECT_TRUE(ParseOk("module adder(\n"
-                      "  input [7:0] a, b,\n"
-                      "  output reg [8:0] sum\n"
-                      ");\n"
-                      "  always @(*) begin\n"
-                      "    sum = a + b;\n"
-                      "  end\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module adder(\n"
+              "  input [7:0] a, b,\n"
+              "  output reg [8:0] sum\n"
+              ");\n"
+              "  always @(*) begin\n"
+              "    sum = a + b;\n"
+              "  end\n"
+              "endmodule\n"));
 }

@@ -37,7 +37,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA701Fixture &f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // Simulation tests — A.7.1 Specify block declaration
@@ -46,13 +46,14 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA701Fixture &f) {
 // Module with empty specify block simulates correctly
 TEST(SimA701, EmptySpecifyBlockSimulates) {
   SimA701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  specify\n"
-                              "  endspecify\n"
-                              "  initial x = 8'd42;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  specify\n"
+      "  endspecify\n"
+      "  initial x = 8'd42;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -65,14 +66,15 @@ TEST(SimA701, EmptySpecifyBlockSimulates) {
 // Module with specify block containing path declaration simulates correctly
 TEST(SimA701, SpecifyWithPathDeclSimulates) {
   SimA701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  specify\n"
-                              "    (a => b) = 5;\n"
-                              "  endspecify\n"
-                              "  initial x = 8'd10;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  specify\n"
+      "    (a => b) = 5;\n"
+      "  endspecify\n"
+      "  initial x = 8'd10;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -85,15 +87,16 @@ TEST(SimA701, SpecifyWithPathDeclSimulates) {
 // Module with pulsestyle declarations simulates correctly
 TEST(SimA701, SpecifyWithPulsestyleSimulates) {
   SimA701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  specify\n"
-                              "    pulsestyle_onevent out1;\n"
-                              "    pulsestyle_ondetect out2;\n"
-                              "  endspecify\n"
-                              "  initial x = 8'd77;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  specify\n"
+      "    pulsestyle_onevent out1;\n"
+      "    pulsestyle_ondetect out2;\n"
+      "  endspecify\n"
+      "  initial x = 8'd77;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -106,15 +109,16 @@ TEST(SimA701, SpecifyWithPulsestyleSimulates) {
 // Module with showcancelled declarations simulates correctly
 TEST(SimA701, SpecifyWithShowcancelledSimulates) {
   SimA701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  specify\n"
-                              "    showcancelled out1;\n"
-                              "    noshowcancelled out2;\n"
-                              "  endspecify\n"
-                              "  initial x = 8'd88;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  specify\n"
+      "    showcancelled out1;\n"
+      "    noshowcancelled out2;\n"
+      "  endspecify\n"
+      "  initial x = 8'd88;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -127,18 +131,19 @@ TEST(SimA701, SpecifyWithShowcancelledSimulates) {
 // Module with specify block containing all item types simulates correctly
 TEST(SimA701, SpecifyWithAllItemKindsSimulates) {
   SimA701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  specify\n"
-                              "    specparam tPD = 5;\n"
-                              "    pulsestyle_onevent out1;\n"
-                              "    showcancelled out2;\n"
-                              "    (a => b) = tPD;\n"
-                              "    $setup(data, posedge clk, 10);\n"
-                              "  endspecify\n"
-                              "  initial x = 8'd99;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  specify\n"
+      "    specparam tPD = 5;\n"
+      "    pulsestyle_onevent out1;\n"
+      "    showcancelled out2;\n"
+      "    (a => b) = tPD;\n"
+      "    $setup(data, posedge clk, 10);\n"
+      "  endspecify\n"
+      "  initial x = 8'd99;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -151,19 +156,20 @@ TEST(SimA701, SpecifyWithAllItemKindsSimulates) {
 // Specify block does not interfere with behavioral initial block execution
 TEST(SimA701, SpecifyBlockDoesNotInterfereBehavioral) {
   SimA701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] a, b;\n"
-                              "  specify\n"
-                              "    pulsestyle_ondetect out1;\n"
-                              "    showcancelled out2;\n"
-                              "    (x => y) = 10;\n"
-                              "  endspecify\n"
-                              "  initial begin\n"
-                              "    a = 8'd11;\n"
-                              "    b = 8'd22;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  specify\n"
+      "    pulsestyle_ondetect out1;\n"
+      "    showcancelled out2;\n"
+      "    (x => y) = 10;\n"
+      "  endspecify\n"
+      "  initial begin\n"
+      "    a = 8'd11;\n"
+      "    b = 8'd22;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);

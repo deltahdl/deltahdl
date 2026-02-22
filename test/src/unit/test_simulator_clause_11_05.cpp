@@ -1,5 +1,7 @@
 // §11.5: Operands
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -7,7 +9,6 @@
 #include "parser/parser.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -34,4 +35,4 @@ TEST(Eval, VariableLookup) {
   EXPECT_EQ(result.ToUint64(), 123u);
 }
 
-} // namespace
+}  // namespace

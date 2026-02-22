@@ -35,24 +35,21 @@ ParseResult Parse(const std::string &src) {
 
 ModuleItem *FindSpecifyBlock(const std::vector<ModuleItem *> &items) {
   for (auto *item : items) {
-    if (item->kind == ModuleItemKind::kSpecifyBlock)
-      return item;
+    if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
   }
   return nullptr;
 }
 
 TimingCheckDecl *GetSoleTimingCheck(ParseResult &r) {
-  if (!r.cu || r.cu->modules.empty())
-    return nullptr;
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
   auto *spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  if (!spec || spec->specify_items.empty())
-    return nullptr;
+  if (!spec || spec->specify_items.empty()) return nullptr;
   if (spec->specify_items[0]->kind != SpecifyItemKind::kTimingCheck)
     return nullptr;
   return &spec->specify_items[0]->timing_check;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.7.5 system_timing_check — dispatch to 12 timing check types
@@ -60,11 +57,12 @@ TimingCheckDecl *GetSoleTimingCheck(ParseResult &r) {
 
 // system_timing_check ::= $setup_timing_check
 TEST(ParserA705, SystemTimingCheckSetup) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  $setup(data, posedge clk, 10);\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(data, posedge clk, 10);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
@@ -73,11 +71,12 @@ TEST(ParserA705, SystemTimingCheckSetup) {
 
 // system_timing_check ::= $hold_timing_check
 TEST(ParserA705, SystemTimingCheckHold) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  $hold(posedge clk, data, 5);\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $hold(posedge clk, data, 5);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
@@ -86,11 +85,12 @@ TEST(ParserA705, SystemTimingCheckHold) {
 
 // system_timing_check ::= $setuphold_timing_check
 TEST(ParserA705, SystemTimingCheckSetuphold) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  $setuphold(posedge clk, data, 10, 5);\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setuphold(posedge clk, data, 10, 5);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
@@ -99,11 +99,12 @@ TEST(ParserA705, SystemTimingCheckSetuphold) {
 
 // system_timing_check ::= $recovery_timing_check
 TEST(ParserA705, SystemTimingCheckRecovery) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  $recovery(posedge clk, rst, 8);\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $recovery(posedge clk, rst, 8);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
@@ -112,11 +113,12 @@ TEST(ParserA705, SystemTimingCheckRecovery) {
 
 // system_timing_check ::= $removal_timing_check
 TEST(ParserA705, SystemTimingCheckRemoval) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  $removal(posedge clk, rst, 3);\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $removal(posedge clk, rst, 3);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
@@ -125,11 +127,12 @@ TEST(ParserA705, SystemTimingCheckRemoval) {
 
 // system_timing_check ::= $recrem_timing_check
 TEST(ParserA705, SystemTimingCheckRecrem) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  $recrem(posedge clk, rst, 8, 3);\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $recrem(posedge clk, rst, 8, 3);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
@@ -138,11 +141,12 @@ TEST(ParserA705, SystemTimingCheckRecrem) {
 
 // system_timing_check ::= $skew_timing_check
 TEST(ParserA705, SystemTimingCheckSkew) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  $skew(posedge clk1, negedge clk2, 3);\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $skew(posedge clk1, negedge clk2, 3);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
@@ -151,11 +155,12 @@ TEST(ParserA705, SystemTimingCheckSkew) {
 
 // system_timing_check ::= $timeskew_timing_check
 TEST(ParserA705, SystemTimingCheckTimeskew) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  $timeskew(posedge clk1, posedge clk2, 5);\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $timeskew(posedge clk1, posedge clk2, 5);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
@@ -164,11 +169,12 @@ TEST(ParserA705, SystemTimingCheckTimeskew) {
 
 // system_timing_check ::= $fullskew_timing_check
 TEST(ParserA705, SystemTimingCheckFullskew) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  $fullskew(posedge clk1, negedge clk2, 4, 6);\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $fullskew(posedge clk1, negedge clk2, 4, 6);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
@@ -177,11 +183,12 @@ TEST(ParserA705, SystemTimingCheckFullskew) {
 
 // system_timing_check ::= $period_timing_check
 TEST(ParserA705, SystemTimingCheckPeriod) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  $period(posedge clk, 50);\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $period(posedge clk, 50);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
@@ -190,11 +197,12 @@ TEST(ParserA705, SystemTimingCheckPeriod) {
 
 // system_timing_check ::= $width_timing_check
 TEST(ParserA705, SystemTimingCheckWidth) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  $width(posedge clk, 20);\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $width(posedge clk, 20);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
@@ -203,11 +211,12 @@ TEST(ParserA705, SystemTimingCheckWidth) {
 
 // system_timing_check ::= $nochange_timing_check
 TEST(ParserA705, SystemTimingCheckNochange) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  $nochange(posedge clk, data, 0, 0);\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $nochange(posedge clk, data, 0, 0);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
@@ -216,13 +225,14 @@ TEST(ParserA705, SystemTimingCheckNochange) {
 
 // Multiple system_timing_check in one specify block
 TEST(ParserA705, MultipleTimingChecks) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  $setup(data, posedge clk, 10);\n"
-                 "  $hold(posedge clk, data, 5);\n"
-                 "  $period(posedge clk, 50);\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(data, posedge clk, 10);\n"
+      "  $hold(posedge clk, data, 5);\n"
+      "  $period(posedge clk, 50);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *spec = FindSpecifyBlock(r.cu->modules[0]->items);
   ASSERT_NE(spec, nullptr);
@@ -237,13 +247,14 @@ TEST(ParserA705, MultipleTimingChecks) {
 
 // system_timing_check is a specify_item (mixed with paths)
 TEST(ParserA705, TimingCheckMixedWithPaths) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  (a => b) = 5;\n"
-                 "  $setup(data, posedge clk, 10);\n"
-                 "  (c *> d) = 10;\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  (a => b) = 5;\n"
+      "  $setup(data, posedge clk, 10);\n"
+      "  (c *> d) = 10;\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto *spec = FindSpecifyBlock(r.cu->modules[0]->items);
   ASSERT_NE(spec, nullptr);

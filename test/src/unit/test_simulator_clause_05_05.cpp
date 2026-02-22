@@ -38,15 +38,13 @@ static uint64_t RunAndGet(const std::string &src, const char *var_name) {
   SimCh505Fixture f;
   auto *design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
-  if (!design)
-    return 0;
+  if (!design) return 0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
   auto *var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
-  if (!var)
-    return 0;
+  if (!var) return 0;
   return var->value.ToUint64();
 }
 
@@ -55,11 +53,12 @@ static uint64_t RunAndGet(const std::string &src, const char *var_name) {
 // ---------------------------------------------------------------------------
 TEST(SimCh505, OperatorSingleCharInExpr) {
   // §5.5: Single-character operator (+) used in expression.
-  auto result = RunAndGet("module t;\n"
-                          "  logic [7:0] result;\n"
-                          "  initial result = 8'd10 + 8'd20;\n"
-                          "endmodule\n",
-                          "result");
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial result = 8'd10 + 8'd20;\n"
+      "endmodule\n",
+      "result");
   EXPECT_EQ(result, 30u);
 }
 
@@ -68,11 +67,12 @@ TEST(SimCh505, OperatorSingleCharInExpr) {
 // ---------------------------------------------------------------------------
 TEST(SimCh505, OperatorDoubleCharInExpr) {
   // §5.5: Double-character operator (<<) used in expression.
-  auto result = RunAndGet("module t;\n"
-                          "  logic [7:0] result;\n"
-                          "  initial result = 8'd1 << 3;\n"
-                          "endmodule\n",
-                          "result");
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial result = 8'd1 << 3;\n"
+      "endmodule\n",
+      "result");
   EXPECT_EQ(result, 8u);
 }
 
@@ -81,11 +81,12 @@ TEST(SimCh505, OperatorDoubleCharInExpr) {
 // ---------------------------------------------------------------------------
 TEST(SimCh505, OperatorTripleCharInExpr) {
   // §5.5: Triple-character operator (<<<) — arithmetic left shift.
-  auto result = RunAndGet("module t;\n"
-                          "  logic [7:0] result;\n"
-                          "  initial result = 8'd3 <<< 2;\n"
-                          "endmodule\n",
-                          "result");
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial result = 8'd3 <<< 2;\n"
+      "endmodule\n",
+      "result");
   EXPECT_EQ(result, 12u);
 }
 
@@ -95,11 +96,12 @@ TEST(SimCh505, OperatorTripleCharInExpr) {
 TEST(SimCh505, OperatorUnaryLeftOfOperand) {
   // §5.5: Unary operators appear to the left of their operand.
   // Unary minus (-) appears to the left of its operand.
-  auto result = RunAndGet("module t;\n"
-                          "  logic [7:0] result;\n"
-                          "  initial result = -8'sd5;\n"
-                          "endmodule\n",
-                          "result");
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial result = -8'sd5;\n"
+      "endmodule\n",
+      "result");
   EXPECT_EQ(result & 0xFF, 251u);
 }
 
@@ -108,11 +110,12 @@ TEST(SimCh505, OperatorUnaryLeftOfOperand) {
 // ---------------------------------------------------------------------------
 TEST(SimCh505, OperatorBinaryBetweenOperands) {
   // §5.5: Binary operators appear between their operands.
-  auto result = RunAndGet("module t;\n"
-                          "  logic [7:0] result;\n"
-                          "  initial result = 8'd50 - 8'd15;\n"
-                          "endmodule\n",
-                          "result");
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial result = 8'd50 - 8'd15;\n"
+      "endmodule\n",
+      "result");
   EXPECT_EQ(result, 35u);
 }
 
@@ -122,11 +125,12 @@ TEST(SimCh505, OperatorBinaryBetweenOperands) {
 TEST(SimCh505, OperatorConditionalThreeOperands) {
   // §5.5: Conditional operator has two operator chars separating three
   // operands.
-  auto result = RunAndGet("module t;\n"
-                          "  logic [7:0] result;\n"
-                          "  initial result = 1 ? 8'd42 : 8'd99;\n"
-                          "endmodule\n",
-                          "result");
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial result = 1 ? 8'd42 : 8'd99;\n"
+      "endmodule\n",
+      "result");
   EXPECT_EQ(result, 42u);
 }
 
@@ -135,11 +139,12 @@ TEST(SimCh505, OperatorConditionalThreeOperands) {
 // ---------------------------------------------------------------------------
 TEST(SimCh505, OperatorConditionalFalseBranch) {
   // §5.5: Conditional operator selects third operand when first is false.
-  auto result = RunAndGet("module t;\n"
-                          "  logic [7:0] result;\n"
-                          "  initial result = 0 ? 8'd42 : 8'd99;\n"
-                          "endmodule\n",
-                          "result");
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial result = 0 ? 8'd42 : 8'd99;\n"
+      "endmodule\n",
+      "result");
   EXPECT_EQ(result, 99u);
 }
 
@@ -148,11 +153,12 @@ TEST(SimCh505, OperatorConditionalFalseBranch) {
 // ---------------------------------------------------------------------------
 TEST(SimCh505, OperatorMixedInExpression) {
   // §5.5: Single- and double-character operators combined.
-  auto result = RunAndGet("module t;\n"
-                          "  logic [7:0] result;\n"
-                          "  initial result = (8'd3 + 8'd5) << 1;\n"
-                          "endmodule\n",
-                          "result");
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial result = (8'd3 + 8'd5) << 1;\n"
+      "endmodule\n",
+      "result");
   EXPECT_EQ(result, 16u);
 }
 
@@ -161,11 +167,12 @@ TEST(SimCh505, OperatorMixedInExpression) {
 // ---------------------------------------------------------------------------
 TEST(SimCh505, OperatorUnaryNegation) {
   // §5.5: Unary logical negation operator (!) to the left of operand.
-  auto result = RunAndGet("module t;\n"
-                          "  logic [7:0] result;\n"
-                          "  initial result = !1'b0;\n"
-                          "endmodule\n",
-                          "result");
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial result = !1'b0;\n"
+      "endmodule\n",
+      "result");
   EXPECT_EQ(result, 1u);
 }
 
@@ -174,10 +181,11 @@ TEST(SimCh505, OperatorUnaryNegation) {
 // ---------------------------------------------------------------------------
 TEST(SimCh505, OperatorNoWhitespace) {
   // §5.5: Operators work as token separators, no whitespace needed.
-  auto result = RunAndGet("module t;\n"
-                          "  logic [7:0] result;\n"
-                          "  initial result=8'd7+8'd3;\n"
-                          "endmodule\n",
-                          "result");
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial result=8'd7+8'd3;\n"
+      "endmodule\n",
+      "result");
   EXPECT_EQ(result, 10u);
 }

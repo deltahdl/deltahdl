@@ -38,15 +38,13 @@ static uint64_t RunAndGet(const std::string &src, const char *var_name) {
   SimCh507Fixture f;
   auto *design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
-  if (!design)
-    return 0;
+  if (!design) return 0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
   auto *var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
-  if (!var)
-    return 0;
+  if (!var) return 0;
   return var->value.ToUint64();
 }
 
@@ -54,15 +52,13 @@ static double RunAndGetReal(const std::string &src, const char *var_name) {
   SimCh507Fixture f;
   auto *design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
-  if (!design)
-    return 0.0;
+  if (!design) return 0.0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
   auto *var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
-  if (!var)
-    return 0.0;
+  if (!var) return 0.0;
   double d = 0.0;
   uint64_t bits = var->value.ToUint64();
   std::memcpy(&d, &bits, sizeof(double));
@@ -72,8 +68,7 @@ static double RunAndGetReal(const std::string &src, const char *var_name) {
 // Helper: elaborate, lower, and run simulation. Returns true on success.
 static bool RunSim(SimCh507Fixture &f, const std::string &src) {
   auto *design = ElaborateSrc(src, f);
-  if (!design)
-    return false;
+  if (!design) return false;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
@@ -90,18 +85,18 @@ static bool RunSim(SimCh507Fixture &f, const std::string &src) {
 TEST(SimCh507, NumberBothFormsCoexist) {
   // §5.7: Both integer and real constants in the same module.
   SimCh507Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] i;\n"
-                              "  real r;\n"
-                              "  initial begin\n"
-                              "    i = 42;\n"
-                              "    r = 3.14;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] i;\n"
+      "  real r;\n"
+      "  initial begin\n"
+      "    i = 42;\n"
+      "    r = 3.14;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   EXPECT_NE(design, nullptr);
-  if (!design)
-    return;
+  if (!design) return;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
@@ -109,8 +104,7 @@ TEST(SimCh507, NumberBothFormsCoexist) {
   auto *vr = f.ctx.FindVariable("r");
   EXPECT_NE(vi, nullptr);
   EXPECT_NE(vr, nullptr);
-  if (!vi || !vr)
-    return;
+  if (!vi || !vr) return;
   EXPECT_EQ(vi->value.ToUint64(), 42u);
   double d = 0.0;
   uint64_t bits = vr->value.ToUint64();
@@ -189,15 +183,16 @@ TEST(SimCh507, NumberRealScientific) {
 TEST(SimCh507, NumberAllIntegralBases) {
   // §5.7 + Syntax 5-2: decimal, hex, octal, binary all work as number.
   SimCh507Fixture f;
-  ASSERT_TRUE(RunSim(f, "module t;\n"
-                        "  logic [7:0] a, b, c, d;\n"
-                        "  initial begin\n"
-                        "    a = 255;\n"
-                        "    b = 8'hFF;\n"
-                        "    c = 8'o377;\n"
-                        "    d = 8'b1111_1111;\n"
-                        "  end\n"
-                        "endmodule\n"));
+  ASSERT_TRUE(RunSim(f,
+                     "module t;\n"
+                     "  logic [7:0] a, b, c, d;\n"
+                     "  initial begin\n"
+                     "    a = 255;\n"
+                     "    b = 8'hFF;\n"
+                     "    c = 8'o377;\n"
+                     "    d = 8'b1111_1111;\n"
+                     "  end\n"
+                     "endmodule\n"));
   const char *const kNames[] = {"a", "b", "c", "d"};
   for (const char *name : kNames) {
     auto *v = f.ctx.FindVariable(name);
@@ -213,18 +208,18 @@ TEST(SimCh507, NumberMixedInExpression) {
   // §5.7: Both number forms usable in expression contexts.
   // Integer literal 10 used in expression assigned to logic; real 2.5 to real.
   SimCh507Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] i;\n"
-                              "  real r;\n"
-                              "  initial begin\n"
-                              "    i = 10 + 20;\n"
-                              "    r = 1.5 + 2.5;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] i;\n"
+      "  real r;\n"
+      "  initial begin\n"
+      "    i = 10 + 20;\n"
+      "    r = 1.5 + 2.5;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   EXPECT_NE(design, nullptr);
-  if (!design)
-    return;
+  if (!design) return;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
@@ -232,8 +227,7 @@ TEST(SimCh507, NumberMixedInExpression) {
   auto *vr = f.ctx.FindVariable("r");
   EXPECT_NE(vi, nullptr);
   EXPECT_NE(vr, nullptr);
-  if (!vi || !vr)
-    return;
+  if (!vi || !vr) return;
   EXPECT_EQ(vi->value.ToUint64(), 30u);
   double d = 0.0;
   uint64_t bits = vr->value.ToUint64();
@@ -247,11 +241,12 @@ TEST(SimCh507, NumberMixedInExpression) {
 TEST(SimCh507, NumberAsPrimaryLiteralInTernary) {
   // Syntax 5-2: primary_literal ::= number | ...
   // Verify number works as primary_literal in ternary expression.
-  auto v = RunAndGet("module t;\n"
-                     "  logic [7:0] x;\n"
-                     "  initial x = 1 ? 8'd99 : 8'd0;\n"
-                     "endmodule\n",
-                     "x");
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 1 ? 8'd99 : 8'd0;\n"
+      "endmodule\n",
+      "x");
   EXPECT_EQ(v, 99u);
 }
 

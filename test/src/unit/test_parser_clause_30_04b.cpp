@@ -1,5 +1,7 @@
 // §30.4: Module path declarations
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -7,7 +9,6 @@
 #include "parser/ast.h"
 #include "parser/parser.h"
 #include "simulation/specify.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -15,7 +16,7 @@ using namespace delta;
 // Parser test fixture
 // =============================================================================
 struct SpecifyTest : ::testing::Test {
-protected:
+ protected:
   CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
@@ -26,8 +27,7 @@ protected:
   // Helper: get first specify block from first module.
   ModuleItem *FirstSpecifyBlock(CompilationUnit *cu) {
     for (auto *item : cu->modules[0]->items) {
-      if (item->kind == ModuleItemKind::kSpecifyBlock)
-        return item;
+      if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
     }
     return nullptr;
   }
@@ -46,11 +46,12 @@ namespace {
 // §30.3 Path delay declarations
 // =============================================================================
 TEST_F(SpecifyTest, ParallelPathDelay) {
-  auto *cu = Parse("module m;\n"
-                   "specify\n"
-                   "  (a => b) = 5;\n"
-                   "endspecify\n"
-                   "endmodule\n");
+  auto *cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  (a => b) = 5;\n"
+      "endspecify\n"
+      "endmodule\n");
   ASSERT_EQ(cu->modules.size(), 1u);
   auto *spec = FirstSpecifyBlock(cu);
   ASSERT_NE(spec, nullptr);
@@ -66,11 +67,12 @@ TEST_F(SpecifyTest, ParallelPathDelay) {
 }
 
 TEST_F(SpecifyTest, FullPathDelay) {
-  auto *cu = Parse("module m;\n"
-                   "specify\n"
-                   "  (a *> b) = 10;\n"
-                   "endspecify\n"
-                   "endmodule\n");
+  auto *cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  (a *> b) = 10;\n"
+      "endspecify\n"
+      "endmodule\n");
   auto *spec = FirstSpecifyBlock(cu);
   ASSERT_NE(spec, nullptr);
   ASSERT_EQ(spec->specify_items.size(), 1u);
@@ -81,11 +83,12 @@ TEST_F(SpecifyTest, FullPathDelay) {
 // §30.3.1 Edge-sensitive paths
 // =============================================================================
 TEST_F(SpecifyTest, PosedgePath) {
-  auto *cu = Parse("module m;\n"
-                   "specify\n"
-                   "  (posedge clk => q) = 10;\n"
-                   "endspecify\n"
-                   "endmodule\n");
+  auto *cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  (posedge clk => q) = 10;\n"
+      "endspecify\n"
+      "endmodule\n");
   auto *spec = FirstSpecifyBlock(cu);
   ASSERT_NE(spec, nullptr);
   ASSERT_EQ(spec->specify_items.size(), 1u);
@@ -96,14 +99,15 @@ TEST_F(SpecifyTest, PosedgePath) {
 }
 
 TEST_F(SpecifyTest, NegedgePath) {
-  auto *cu = Parse("module m;\n"
-                   "specify\n"
-                   "  (negedge clk => q) = 8;\n"
-                   "endspecify\n"
-                   "endmodule\n");
+  auto *cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  (negedge clk => q) = 8;\n"
+      "endspecify\n"
+      "endmodule\n");
   auto *spec = FirstSpecifyBlock(cu);
   ASSERT_NE(spec, nullptr);
   EXPECT_EQ(spec->specify_items[0]->path.edge, SpecifyEdge::kNegedge);
 }
 
-} // namespace
+}  // namespace

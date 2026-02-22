@@ -6,10 +6,9 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "parser/ast.h"
+#include "simulation/coverage.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
-
-#include "simulation/coverage.h"
 
 using namespace delta;
 
@@ -94,4 +93,4 @@ TEST(Coverage, GlobalCoverageSingleGroup) {
   EXPECT_DOUBLE_EQ(db.GetGlobalCoverage(), 100.0);
 }
 
-} // namespace
+}  // namespace

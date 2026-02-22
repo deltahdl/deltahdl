@@ -1,12 +1,13 @@
 // §11.4: Operator descriptions
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "elaboration/const_eval.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -36,4 +37,4 @@ TEST(ConstEval, Unary) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("!5", f)), 0);
 }
 
-} // namespace
+}  // namespace

@@ -32,7 +32,7 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.1.9 Class items
@@ -41,13 +41,14 @@ ParseResult Parse(const std::string &src) {
 // class_item ::= { attribute_instance } class_property (property_qualifier
 // path)
 TEST(SourceText, ClassPropertyWithQualifiers) {
-  auto r = Parse("class C;\n"
-                 "  rand int x;\n"
-                 "  randc bit [3:0] y;\n"
-                 "  static int count;\n"
-                 "  protected int secret;\n"
-                 "  local int hidden;\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  randc bit [3:0] y;\n"
+      "  static int count;\n"
+      "  protected int secret;\n"
+      "  local int hidden;\n"
+      "endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   auto &members = r.cu->classes[0]->members;
@@ -63,10 +64,11 @@ TEST(SourceText, ClassPropertyWithQualifiers) {
 
 // class_property ::= const { class_item_qualifier } data_type id [ = expr ] ;
 TEST(SourceText, ClassConstProperty) {
-  auto r = Parse("class C;\n"
-                 "  const int MAX = 100;\n"
-                 "  const static int SMAX = 200;\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  const int MAX = 100;\n"
+      "  const static int SMAX = 200;\n"
+      "endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   auto &members = r.cu->classes[0]->members;
@@ -81,12 +83,13 @@ TEST(SourceText, ClassConstProperty) {
 // class_method ::= { method_qualifier } function_declaration
 //                | { method_qualifier } task_declaration
 TEST(SourceText, ClassMethods) {
-  auto r = Parse("class C;\n"
-                 "  function void foo(); endfunction\n"
-                 "  task bar(); endtask\n"
-                 "  static function int sfn(); endfunction\n"
-                 "  virtual task vtask(); endtask\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  function void foo(); endfunction\n"
+      "  task bar(); endtask\n"
+      "  static function int sfn(); endfunction\n"
+      "  virtual task vtask(); endtask\n"
+      "endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   auto &members = r.cu->classes[0]->members;
@@ -102,12 +105,13 @@ TEST(SourceText, ClassMethods) {
 // class_method ::= pure virtual { class_item_qualifier } method_prototype ;
 //                | extern { method_qualifier } method_prototype ;
 TEST(SourceText, ClassPureVirtualAndExtern) {
-  auto r = Parse("class C;\n"
-                 "  pure virtual function void pv_fn();\n"
-                 "  pure virtual task pv_task();\n"
-                 "  extern function void ext_fn();\n"
-                 "  extern static task ext_task();\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  pure virtual function void pv_fn();\n"
+      "  pure virtual task pv_task();\n"
+      "  extern function void ext_fn();\n"
+      "  extern static task ext_task();\n"
+      "endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   auto &members = r.cu->classes[0]->members;
@@ -124,10 +128,11 @@ TEST(SourceText, ClassPureVirtualAndExtern) {
 
 // class_method ::= { method_qualifier } class_constructor_declaration
 TEST(SourceText, ClassConstructorDecl) {
-  auto r = Parse("class C;\n"
-                 "  function new(int val);\n"
-                 "  endfunction\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  function new(int val);\n"
+      "  endfunction\n"
+      "endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   auto &members = r.cu->classes[0]->members;
@@ -138,14 +143,15 @@ TEST(SourceText, ClassConstructorDecl) {
 
 // class_constructor_declaration with super.new()
 TEST(SourceText, ClassConstructorSuperNew) {
-  auto r = Parse("class Base;\n"
-                 "  function new(int x); endfunction\n"
-                 "endclass\n"
-                 "class Derived extends Base;\n"
-                 "  function new();\n"
-                 "    super.new(5);\n"
-                 "  endfunction\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class Base;\n"
+      "  function new(int x); endfunction\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  function new();\n"
+      "    super.new(5);\n"
+      "  endfunction\n"
+      "endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 2u);
   EXPECT_EQ(r.cu->classes[1]->base_class, "Base");
@@ -154,11 +160,12 @@ TEST(SourceText, ClassConstructorSuperNew) {
 
 // class_item ::= { attribute_instance } class_constraint
 TEST(SourceText, ClassConstraint) {
-  auto r = Parse("class C;\n"
-                 "  int x;\n"
-                 "  constraint c1 { x > 0; }\n"
-                 "  constraint c2;\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  int x;\n"
+      "  constraint c1 { x > 0; }\n"
+      "  constraint c2;\n"
+      "endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   auto &members = r.cu->classes[0]->members;
@@ -171,11 +178,12 @@ TEST(SourceText, ClassConstraint) {
 
 // class_item ::= { attribute_instance } class_declaration (nested class)
 TEST(SourceText, ClassNestedClass) {
-  auto r = Parse("class Outer;\n"
-                 "  class Inner;\n"
-                 "    int val;\n"
-                 "  endclass\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class Outer;\n"
+      "  class Inner;\n"
+      "    int val;\n"
+      "  endclass\n"
+      "endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   auto &members = r.cu->classes[0]->members;
@@ -186,11 +194,12 @@ TEST(SourceText, ClassNestedClass) {
 
 // class_item ::= { attribute_instance } interface_class_declaration
 TEST(SourceText, ClassNestedInterfaceClass) {
-  auto r = Parse("class Outer;\n"
-                 "  interface class IFace;\n"
-                 "    pure virtual function void do_it();\n"
-                 "  endclass\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class Outer;\n"
+      "  interface class IFace;\n"
+      "    pure virtual function void do_it();\n"
+      "  endclass\n"
+      "endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   auto &members = r.cu->classes[0]->members;
@@ -201,10 +210,11 @@ TEST(SourceText, ClassNestedInterfaceClass) {
 
 // class_item ::= { attribute_instance } covergroup_declaration
 TEST(SourceText, ClassCovergroupDecl) {
-  auto r = Parse("class C;\n"
-                 "  covergroup cg @(posedge clk);\n"
-                 "  endgroup\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  covergroup cg @(posedge clk);\n"
+      "  endgroup\n"
+      "endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   auto &members = r.cu->classes[0]->members;
@@ -215,10 +225,11 @@ TEST(SourceText, ClassCovergroupDecl) {
 
 // class_item ::= local_parameter_declaration ; | parameter_declaration ;
 TEST(SourceText, ClassParameters) {
-  auto r = Parse("class C;\n"
-                 "  localparam int LP = 10;\n"
-                 "  parameter int P = 20;\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  localparam int LP = 10;\n"
+      "  parameter int P = 20;\n"
+      "endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   auto &members = r.cu->classes[0]->members;
@@ -229,11 +240,12 @@ TEST(SourceText, ClassParameters) {
 
 // class_item ::= ; (empty statement)
 TEST(SourceText, ClassEmptyItem) {
-  auto r = Parse("class C;\n"
-                 "  ;\n"
-                 "  int x;\n"
-                 "  ;\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  ;\n"
+      "  int x;\n"
+      "  ;\n"
+      "endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   // Empty semicolons are consumed, only real members remain.
@@ -242,11 +254,12 @@ TEST(SourceText, ClassEmptyItem) {
 
 // class_item_qualifier / property_qualifier / method_qualifier (footnote 10)
 TEST(SourceText, ClassQualifierCombinations) {
-  auto r = Parse("class C;\n"
-                 "  static local int a;\n"
-                 "  protected rand int b;\n"
-                 "  static virtual function void sv_fn(); endfunction\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  static local int a;\n"
+      "  protected rand int b;\n"
+      "  static virtual function void sv_fn(); endfunction\n"
+      "endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   auto &members = r.cu->classes[0]->members;
@@ -261,12 +274,13 @@ TEST(SourceText, ClassQualifierCombinations) {
 
 // interface_class_item ::= type_declaration | interface_class_method | params
 TEST(SourceText, InterfaceClassItems) {
-  auto r = Parse("interface class IC;\n"
-                 "  pure virtual function void do_thing();\n"
-                 "  pure virtual task do_task();\n"
-                 "  typedef int my_int;\n"
-                 "  localparam int LP = 5;\n"
-                 "endclass\n");
+  auto r = Parse(
+      "interface class IC;\n"
+      "  pure virtual function void do_thing();\n"
+      "  pure virtual task do_task();\n"
+      "  typedef int my_int;\n"
+      "  localparam int LP = 5;\n"
+      "endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   EXPECT_TRUE(r.cu->classes[0]->is_interface);
@@ -281,10 +295,11 @@ TEST(SourceText, InterfaceClassItems) {
 
 // method_prototype ::= task_prototype | function_prototype
 TEST(SourceText, ClassMethodPrototype) {
-  auto r = Parse("class C;\n"
-                 "  extern function int get_val();\n"
-                 "  extern task do_work();\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  extern function int get_val();\n"
+      "  extern task do_work();\n"
+      "endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   auto &members = r.cu->classes[0]->members;
@@ -301,11 +316,12 @@ TEST(SourceText, ClassMethodPrototype) {
 //   [static] constraint [dynamic_override_specifiers] constraint_identifier
 //   constraint_block
 TEST(SourceText, ConstraintDeclaration) {
-  auto r = Parse("class C;\n"
-                 "  rand int x;\n"
-                 "  constraint c1 { x > 0; }\n"
-                 "  static constraint c2 { x < 100; }\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint c1 { x > 0; }\n"
+      "  static constraint c2 { x < 100; }\n"
+      "endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   auto &members = r.cu->classes[0]->members;
@@ -320,13 +336,14 @@ TEST(SourceText, ConstraintDeclaration) {
 
 // constraint_declaration with dynamic_override_specifiers (§8.20)
 TEST(SourceText, ConstraintDeclDynamicOverride) {
-  auto r = Parse("class C;\n"
-                 "  rand int x;\n"
-                 "  constraint :initial c1 { x > 0; }\n"
-                 "  constraint :extends c2 { x < 100; }\n"
-                 "  constraint :final c3 { x == 42; }\n"
-                 "  constraint :initial :final c4 { x != 0; }\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint :initial c1 { x > 0; }\n"
+      "  constraint :extends c2 { x < 100; }\n"
+      "  constraint :final c3 { x == 42; }\n"
+      "  constraint :initial :final c4 { x != 0; }\n"
+      "endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   auto &members = r.cu->classes[0]->members;
@@ -340,22 +357,23 @@ TEST(SourceText, ConstraintDeclDynamicOverride) {
 // constraint_block ::= { { constraint_block_item } }
 // constraint_block_item ::= solve ... before ... ; | constraint_expression
 TEST(SourceText, ConstraintBlockItems) {
-  auto r = Parse("class C;\n"
-                 "  rand int a;\n"
-                 "  rand int b;\n"
-                 "  rand int c;\n"
-                 "  constraint order_c {\n"
-                 "    solve a before b;\n"
-                 "    solve a before b, c;\n"
-                 "    a > 0;\n"
-                 "    soft b == 1;\n"
-                 "    a > 0 -> b < 10;\n"
-                 "    if (a > 5) { b == 1; } else { b == 0; }\n"
-                 "    foreach (c[i]) c[i] > 0;\n"
-                 "    disable soft a;\n"
-                 "    unique { a, b, c };\n"
-                 "  }\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  rand int a;\n"
+      "  rand int b;\n"
+      "  rand int c;\n"
+      "  constraint order_c {\n"
+      "    solve a before b;\n"
+      "    solve a before b, c;\n"
+      "    a > 0;\n"
+      "    soft b == 1;\n"
+      "    a > 0 -> b < 10;\n"
+      "    if (a > 5) { b == 1; } else { b == 0; }\n"
+      "    foreach (c[i]) c[i] > 0;\n"
+      "    disable soft a;\n"
+      "    unique { a, b, c };\n"
+      "  }\n"
+      "endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   auto &members = r.cu->classes[0]->members;
@@ -370,12 +388,13 @@ TEST(SourceText, ConstraintBlockItems) {
 // dist_item ::= value_range [ dist_weight ] | default :/ expression
 // dist_weight ::= := expression | :/ expression
 TEST(SourceText, ConstraintExpressionOrDist) {
-  auto r = Parse("class C;\n"
-                 "  rand int x;\n"
-                 "  constraint dist_c {\n"
-                 "    x dist { 1 := 10, [2:5] :/ 20, default :/ 1 };\n"
-                 "  }\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint dist_c {\n"
+      "    x dist { 1 := 10, [2:5] :/ 20, default :/ 1 };\n"
+      "  }\n"
+      "endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   EXPECT_EQ(r.cu->classes[0]->members[1]->name, "dist_c");
@@ -383,14 +402,15 @@ TEST(SourceText, ConstraintExpressionOrDist) {
 
 // constraint_set ::= constraint_expression | { { constraint_expression } }
 TEST(SourceText, ConstraintSet) {
-  auto r = Parse("class C;\n"
-                 "  rand int a;\n"
-                 "  rand int b;\n"
-                 "  constraint cs {\n"
-                 "    if (a > 0) b > 0;\n"
-                 "    if (a > 10) { b > 10; b < 100; }\n"
-                 "  }\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  rand int a;\n"
+      "  rand int b;\n"
+      "  constraint cs {\n"
+      "    if (a > 0) b > 0;\n"
+      "    if (a > 10) { b > 10; b < 100; }\n"
+      "  }\n"
+      "endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   EXPECT_EQ(r.cu->classes[0]->members[2]->name, "cs");
@@ -401,13 +421,14 @@ TEST(SourceText, ConstraintSet) {
 //   [dynamic_override_specifiers] constraint_identifier ;
 // constraint_prototype_qualifier ::= extern | pure
 TEST(SourceText, ConstraintPrototype) {
-  auto r = Parse("class C;\n"
-                 "  rand int x;\n"
-                 "  extern constraint c1;\n"
-                 "  pure constraint c2;\n"
-                 "  extern static constraint c3;\n"
-                 "  constraint c4;\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  extern constraint c1;\n"
+      "  pure constraint c2;\n"
+      "  extern static constraint c3;\n"
+      "  constraint c4;\n"
+      "endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   auto &members = r.cu->classes[0]->members;
@@ -422,11 +443,12 @@ TEST(SourceText, ConstraintPrototype) {
 
 // constraint_prototype with dynamic_override_specifiers
 TEST(SourceText, ConstraintPrototypeDynamicOverride) {
-  auto r = Parse("class C;\n"
-                 "  rand int x;\n"
-                 "  extern constraint :initial c1;\n"
-                 "  pure constraint :final c2;\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  extern constraint :initial c1;\n"
+      "  pure constraint :final c2;\n"
+      "endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   auto &members = r.cu->classes[0]->members;
@@ -439,45 +461,49 @@ TEST(SourceText, ConstraintPrototypeDynamicOverride) {
 //   [static] constraint [dynamic_override_specifiers] class_scope
 //   constraint_identifier constraint_block
 TEST(SourceText, ExternConstraintDeclaration) {
-  auto r = Parse("class C;\n"
-                 "  rand int x;\n"
-                 "  extern constraint c;\n"
-                 "endclass\n"
-                 "constraint C::c { x > 0; }\n");
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  extern constraint c;\n"
+      "endclass\n"
+      "constraint C::c { x > 0; }\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
 // extern_constraint_declaration with static and dynamic_override_specifiers
 TEST(SourceText, ExternConstraintDeclStaticOverride) {
-  auto r = Parse("class C;\n"
-                 "  rand int x;\n"
-                 "  extern static constraint c;\n"
-                 "endclass\n"
-                 "static constraint C::c { x > 0; }\n");
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  extern static constraint c;\n"
+      "endclass\n"
+      "static constraint C::c { x > 0; }\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
 // extern_constraint_declaration with dynamic_override_specifiers at top-level
 TEST(SourceText, ExternConstraintDeclDynOverrideTopLevel) {
-  auto r = Parse("class C;\n"
-                 "  rand int x;\n"
-                 "  extern constraint c;\n"
-                 "endclass\n"
-                 "constraint :initial C::c { x > 0; }\n");
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  extern constraint c;\n"
+      "endclass\n"
+      "constraint :initial C::c { x > 0; }\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
 // uniqueness_constraint ::= unique { range_list }
 TEST(SourceText, UniquenessConstraint) {
-  auto r = Parse("class C;\n"
-                 "  rand int a;\n"
-                 "  rand int b;\n"
-                 "  rand int c;\n"
-                 "  constraint uc { unique { a, b, c }; }\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  rand int a;\n"
+      "  rand int b;\n"
+      "  rand int c;\n"
+      "  constraint uc { unique { a, b, c }; }\n"
+      "endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   EXPECT_EQ(r.cu->classes[0]->members[3]->name, "uc");
@@ -485,14 +511,15 @@ TEST(SourceText, UniquenessConstraint) {
 
 // Constraint with foreach and nested constraint_set
 TEST(SourceText, ConstraintForeach) {
-  auto r = Parse("class C;\n"
-                 "  rand int arr[10];\n"
-                 "  constraint fc {\n"
-                 "    foreach (arr[i]) {\n"
-                 "      arr[i] inside {[0:100]};\n"
-                 "    }\n"
-                 "  }\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  rand int arr[10];\n"
+      "  constraint fc {\n"
+      "    foreach (arr[i]) {\n"
+      "      arr[i] inside {[0:100]};\n"
+      "    }\n"
+      "  }\n"
+      "endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   EXPECT_EQ(r.cu->classes[0]->members[1]->name, "fc");
@@ -500,14 +527,15 @@ TEST(SourceText, ConstraintForeach) {
 
 // Constraint implication and disable soft
 TEST(SourceText, ConstraintImplicationDisableSoft) {
-  auto r = Parse("class C;\n"
-                 "  rand int x;\n"
-                 "  rand int y;\n"
-                 "  constraint ic {\n"
-                 "    x > 0 -> y > 0;\n"
-                 "    disable soft x;\n"
-                 "  }\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  rand int y;\n"
+      "  constraint ic {\n"
+      "    x > 0 -> y > 0;\n"
+      "    disable soft x;\n"
+      "  }\n"
+      "endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   EXPECT_EQ(r.cu->classes[0]->members[2]->name, "ic");
@@ -516,10 +544,11 @@ TEST(SourceText, ConstraintImplicationDisableSoft) {
 // Footnote 11: dynamic_override_specifiers illegal with static (semantic, not
 // syntactic) — parser still accepts for later semantic check
 TEST(SourceText, ConstraintFootnote11StaticWithOverride) {
-  auto r = Parse("class C;\n"
-                 "  rand int x;\n"
-                 "  static constraint :initial c1 { x > 0; }\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  static constraint :initial c1 { x > 0; }\n"
+      "endclass\n");
   // Parser should accept; footnote 11 is a semantic restriction
   ASSERT_FALSE(r.has_errors);
 }
@@ -530,12 +559,13 @@ TEST(SourceText, ConstraintFootnote11StaticWithOverride) {
 
 // package_item: package_or_generate_item_declaration — net/data/task/function
 TEST(SourceText, PackageOrGenerateItemDecl) {
-  auto r = Parse("package pkg;\n"
-                 "  wire w;\n"
-                 "  int x;\n"
-                 "  function void f(); endfunction\n"
-                 "  task t(); endtask\n"
-                 "endpackage\n");
+  auto r = Parse(
+      "package pkg;\n"
+      "  wire w;\n"
+      "  int x;\n"
+      "  function void f(); endfunction\n"
+      "  task t(); endtask\n"
+      "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -544,9 +574,10 @@ TEST(SourceText, PackageOrGenerateItemDecl) {
 
 // package_or_generate_item_declaration: checker_declaration
 TEST(SourceText, PackageItemCheckerDecl) {
-  auto r = Parse("package pkg;\n"
-                 "  checker chk; endchecker\n"
-                 "endpackage\n");
+  auto r = Parse(
+      "package pkg;\n"
+      "  checker chk; endchecker\n"
+      "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -554,10 +585,11 @@ TEST(SourceText, PackageItemCheckerDecl) {
 
 // package_or_generate_item_declaration: dpi_import_export
 TEST(SourceText, PackageItemDpiImportExport) {
-  auto r = Parse("package pkg;\n"
-                 "  import \"DPI-C\" function void c_func();\n"
-                 "  export \"DPI-C\" function sv_func;\n"
-                 "endpackage\n");
+  auto r = Parse(
+      "package pkg;\n"
+      "  import \"DPI-C\" function void c_func();\n"
+      "  export \"DPI-C\" function sv_func;\n"
+      "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -566,9 +598,10 @@ TEST(SourceText, PackageItemDpiImportExport) {
 
 // package_or_generate_item_declaration: extern_constraint_declaration
 TEST(SourceText, PackageItemExternConstraint) {
-  auto r = Parse("package pkg;\n"
-                 "  constraint MyClass::c { x > 0; }\n"
-                 "endpackage\n");
+  auto r = Parse(
+      "package pkg;\n"
+      "  constraint MyClass::c { x > 0; }\n"
+      "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -576,9 +609,10 @@ TEST(SourceText, PackageItemExternConstraint) {
 
 // package_or_generate_item_declaration: static extern_constraint_declaration
 TEST(SourceText, PackageItemStaticExternConstraint) {
-  auto r = Parse("package pkg;\n"
-                 "  static constraint MyClass::c { x > 0; }\n"
-                 "endpackage\n");
+  auto r = Parse(
+      "package pkg;\n"
+      "  static constraint MyClass::c { x > 0; }\n"
+      "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -586,11 +620,12 @@ TEST(SourceText, PackageItemStaticExternConstraint) {
 
 // package_or_generate_item_declaration: class_declaration
 TEST(SourceText, PackageItemClassDecl) {
-  auto r = Parse("package pkg;\n"
-                 "  class C;\n"
-                 "    int x;\n"
-                 "  endclass\n"
-                 "endpackage\n");
+  auto r = Parse(
+      "package pkg;\n"
+      "  class C;\n"
+      "    int x;\n"
+      "  endclass\n"
+      "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -598,11 +633,12 @@ TEST(SourceText, PackageItemClassDecl) {
 
 // package_or_generate_item_declaration: interface_class_declaration
 TEST(SourceText, PackageItemInterfaceClassDecl) {
-  auto r = Parse("package pkg;\n"
-                 "  interface class IC;\n"
-                 "    pure virtual function void f();\n"
-                 "  endclass\n"
-                 "endpackage\n");
+  auto r = Parse(
+      "package pkg;\n"
+      "  interface class IC;\n"
+      "    pure virtual function void f();\n"
+      "  endclass\n"
+      "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -610,9 +646,10 @@ TEST(SourceText, PackageItemInterfaceClassDecl) {
 
 // package_or_generate_item_declaration: class_constructor_declaration
 TEST(SourceText, PackageItemClassConstructorDecl) {
-  auto r = Parse("package pkg;\n"
-                 "  function MyClass::new(); endfunction\n"
-                 "endpackage\n");
+  auto r = Parse(
+      "package pkg;\n"
+      "  function MyClass::new(); endfunction\n"
+      "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -620,10 +657,11 @@ TEST(SourceText, PackageItemClassConstructorDecl) {
 
 // package_or_generate_item_declaration: local_parameter_declaration
 TEST(SourceText, PackageItemLocalparamDecl) {
-  auto r = Parse("package pkg;\n"
-                 "  localparam int A = 1;\n"
-                 "  parameter int B = 2;\n"
-                 "endpackage\n");
+  auto r = Parse(
+      "package pkg;\n"
+      "  localparam int A = 1;\n"
+      "  parameter int B = 2;\n"
+      "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -632,9 +670,10 @@ TEST(SourceText, PackageItemLocalparamDecl) {
 
 // package_or_generate_item_declaration: covergroup_declaration
 TEST(SourceText, PackageItemCovergroupDecl) {
-  auto r = Parse("package pkg;\n"
-                 "  covergroup cg; endgroup\n"
-                 "endpackage\n");
+  auto r = Parse(
+      "package pkg;\n"
+      "  covergroup cg; endgroup\n"
+      "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -642,10 +681,11 @@ TEST(SourceText, PackageItemCovergroupDecl) {
 
 // package_or_generate_item_declaration: assertion_item_declaration
 TEST(SourceText, PackageItemAssertionDecl) {
-  auto r = Parse("package pkg;\n"
-                 "  property p; 1; endproperty\n"
-                 "  sequence s; 1; endsequence\n"
-                 "endpackage\n");
+  auto r = Parse(
+      "package pkg;\n"
+      "  property p; 1; endproperty\n"
+      "  sequence s; 1; endsequence\n"
+      "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -653,10 +693,11 @@ TEST(SourceText, PackageItemAssertionDecl) {
 
 // package_or_generate_item_declaration: ; (empty statement)
 TEST(SourceText, PackageItemEmptyStmt) {
-  auto r = Parse("package pkg;\n"
-                 "  ;\n"
-                 "  ;;\n"
-                 "endpackage\n");
+  auto r = Parse(
+      "package pkg;\n"
+      "  ;\n"
+      "  ;;\n"
+      "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -664,9 +705,10 @@ TEST(SourceText, PackageItemEmptyStmt) {
 
 // package_item: package_export_declaration — export *::*
 TEST(SourceText, PackageExportWildcard) {
-  auto r = Parse("package pkg;\n"
-                 "  export *::*;\n"
-                 "endpackage\n");
+  auto r = Parse(
+      "package pkg;\n"
+      "  export *::*;\n"
+      "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -676,10 +718,11 @@ TEST(SourceText, PackageExportWildcard) {
 
 // package_item: package_export_declaration — export pkg::item
 TEST(SourceText, PackageExportNamed) {
-  auto r = Parse("package pkg;\n"
-                 "  export other_pkg::my_func;\n"
-                 "  export another::*;\n"
-                 "endpackage\n");
+  auto r = Parse(
+      "package pkg;\n"
+      "  export other_pkg::my_func;\n"
+      "  export another::*;\n"
+      "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -688,10 +731,11 @@ TEST(SourceText, PackageExportNamed) {
 
 // package_item: timeunits_declaration (footnote 3)
 TEST(SourceText, PackageItemTimeunitsDecl) {
-  auto r = Parse("package pkg;\n"
-                 "  timeunit 1ns;\n"
-                 "  timeprecision 1ps;\n"
-                 "endpackage\n");
+  auto r = Parse(
+      "package pkg;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -699,12 +743,13 @@ TEST(SourceText, PackageItemTimeunitsDecl) {
 
 // anonymous_program: program ; { ... } endprogram
 TEST(SourceText, AnonymousProgram) {
-  auto r = Parse("package pkg;\n"
-                 "  program;\n"
-                 "    function void f(); endfunction\n"
-                 "    task t(); endtask\n"
-                 "  endprogram\n"
-                 "endpackage\n");
+  auto r = Parse(
+      "package pkg;\n"
+      "  program;\n"
+      "    function void f(); endfunction\n"
+      "    task t(); endtask\n"
+      "  endprogram\n"
+      "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -712,14 +757,15 @@ TEST(SourceText, AnonymousProgram) {
 
 // anonymous_program_item: class_declaration, interface_class_declaration
 TEST(SourceText, AnonymousProgramClasses) {
-  auto r = Parse("package pkg;\n"
-                 "  program;\n"
-                 "    class C; endclass\n"
-                 "    interface class IC;\n"
-                 "      pure virtual function void f();\n"
-                 "    endclass\n"
-                 "  endprogram\n"
-                 "endpackage\n");
+  auto r = Parse(
+      "package pkg;\n"
+      "  program;\n"
+      "    class C; endclass\n"
+      "    interface class IC;\n"
+      "      pure virtual function void f();\n"
+      "    endclass\n"
+      "  endprogram\n"
+      "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -727,13 +773,14 @@ TEST(SourceText, AnonymousProgramClasses) {
 
 // anonymous_program_item: covergroup, class_constructor, ;
 TEST(SourceText, AnonymousProgramMisc) {
-  auto r = Parse("package pkg;\n"
-                 "  program;\n"
-                 "    covergroup cg; endgroup\n"
-                 "    function MyClass::new(); endfunction\n"
-                 "    ;\n"
-                 "  endprogram\n"
-                 "endpackage\n");
+  auto r = Parse(
+      "package pkg;\n"
+      "  program;\n"
+      "    covergroup cg; endgroup\n"
+      "    function MyClass::new(); endfunction\n"
+      "    ;\n"
+      "  endprogram\n"
+      "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -741,10 +788,11 @@ TEST(SourceText, AnonymousProgramMisc) {
 
 // anonymous_program at file scope (outside package)
 TEST(SourceText, AnonymousProgramTopLevel) {
-  auto r = Parse("program;\n"
-                 "  function void f(); endfunction\n"
-                 "  class C; endclass\n"
-                 "endprogram\n");
+  auto r = Parse(
+      "program;\n"
+      "  function void f(); endfunction\n"
+      "  class C; endclass\n"
+      "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -754,20 +802,21 @@ TEST(SourceText, AnonymousProgramTopLevel) {
 // =============================================================================
 
 TEST(SourceText, AllDescriptionTypes) {
-  auto r = Parse("package pkg; endpackage\n"
-                 "module m; endmodule\n"
-                 "interface ifc; endinterface\n"
-                 "program prg; endprogram\n"
-                 "class C; endclass\n"
-                 "checker chk; endchecker\n"
-                 "primitive my_udp(output y, input a);\n"
-                 "  table 0 : 0 ; 1 : 1 ; endtable\n"
-                 "endprimitive\n"
-                 "config cfg;\n"
-                 "  design work.m;\n"
-                 "  default liblist work;\n"
-                 "endconfig\n"
-                 "bind m chk chk_i(.a(s));\n");
+  auto r = Parse(
+      "package pkg; endpackage\n"
+      "module m; endmodule\n"
+      "interface ifc; endinterface\n"
+      "program prg; endprogram\n"
+      "class C; endclass\n"
+      "checker chk; endchecker\n"
+      "primitive my_udp(output y, input a);\n"
+      "  table 0 : 0 ; 1 : 1 ; endtable\n"
+      "endprimitive\n"
+      "config cfg;\n"
+      "  design work.m;\n"
+      "  default liblist work;\n"
+      "endconfig\n"
+      "bind m chk chk_i(.a(s));\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->packages.size(), 1u);

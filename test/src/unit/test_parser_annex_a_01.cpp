@@ -30,7 +30,7 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.1 -- Source text productions
@@ -45,9 +45,10 @@ TEST(ParserAnnexA, A1ModuleDecl) {
 }
 
 TEST(ParserAnnexA, A1ModuleWithParams) {
-  auto r = Parse("module m #(parameter W = 8, parameter D = 4)(\n"
-                 "  input logic [W-1:0] data\n"
-                 ");\nendmodule\n");
+  auto r = Parse(
+      "module m #(parameter W = 8, parameter D = 4)(\n"
+      "  input logic [W-1:0] data\n"
+      ");\nendmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->params.size(), 2u);
@@ -55,11 +56,12 @@ TEST(ParserAnnexA, A1ModuleWithParams) {
 }
 
 TEST(ParserAnnexA, A1InterfaceDecl) {
-  auto r = Parse("interface bus_if;\n"
-                 "  logic [7:0] data;\n"
-                 "  modport master(output data);\n"
-                 "  modport slave(input data);\n"
-                 "endinterface\n");
+  auto r = Parse(
+      "interface bus_if;\n"
+      "  logic [7:0] data;\n"
+      "  modport master(output data);\n"
+      "  modport slave(input data);\n"
+      "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->interfaces.size(), 1u);
@@ -68,9 +70,10 @@ TEST(ParserAnnexA, A1InterfaceDecl) {
 }
 
 TEST(ParserAnnexA, A1ProgramDecl) {
-  auto r = Parse("program test_prog(input logic clk);\n"
-                 "  initial $display(\"Hello\");\n"
-                 "endprogram\n");
+  auto r = Parse(
+      "program test_prog(input logic clk);\n"
+      "  initial $display(\"Hello\");\n"
+      "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->programs.size(), 1u);
@@ -78,10 +81,11 @@ TEST(ParserAnnexA, A1ProgramDecl) {
 }
 
 TEST(ParserAnnexA, A1PackageDecl) {
-  auto r = Parse("package pkg;\n"
-                 "  parameter int W = 8;\n"
-                 "  typedef logic [W-1:0] word_t;\n"
-                 "endpackage\n");
+  auto r = Parse(
+      "package pkg;\n"
+      "  parameter int W = 8;\n"
+      "  typedef logic [W-1:0] word_t;\n"
+      "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -97,9 +101,10 @@ TEST(ParserAnnexA, A1CheckerDecl) {
 }
 
 TEST(ParserAnnexA, A1CompilationUnitMultipleItems) {
-  auto r = Parse("package p; endpackage\n"
-                 "module m; endmodule\n"
-                 "interface i; endinterface\n");
+  auto r = Parse(
+      "package p; endpackage\n"
+      "module m; endmodule\n"
+      "interface i; endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->packages.size(), 1u);
@@ -108,9 +113,10 @@ TEST(ParserAnnexA, A1CompilationUnitMultipleItems) {
 }
 
 TEST(ParserAnnexA, A1ModulePortDirections) {
-  auto r = Parse("module m(input logic a, output logic b,\n"
-                 "         inout wire c, ref logic d);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input logic a, output logic b,\n"
+      "         inout wire c, ref logic d);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &ports = r.cu->modules[0]->ports;

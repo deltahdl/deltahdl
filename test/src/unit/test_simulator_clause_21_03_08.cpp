@@ -45,8 +45,7 @@ static Expr *MkStr(Arena &arena, std::string_view text) {
   auto len = text.size() + 2;
   char *buf = static_cast<char *>(arena.Allocate(len + 1, 1));
   buf[0] = '"';
-  for (size_t i = 0; i < text.size(); ++i)
-    buf[i + 1] = text[i];
+  for (size_t i = 0; i < text.size(); ++i) buf[i + 1] = text[i];
   buf[len - 1] = '"';
   buf[len] = '\0';
   e->text = std::string_view(buf, len);
@@ -87,4 +86,4 @@ TEST(SysTask, FeofAtEnd) {
   std::remove(tmp.c_str());
 }
 
-} // namespace
+}  // namespace

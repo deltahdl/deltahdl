@@ -66,5 +66,5 @@ TEST(VpiAnnexK2, VpiSystfDataDefaultInit) {
   EXPECT_EQ(data.user_data, nullptr);
 }
 
-} // namespace
-} // namespace delta
+}  // namespace
+}  // namespace delta

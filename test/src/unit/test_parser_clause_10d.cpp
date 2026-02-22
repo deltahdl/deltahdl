@@ -39,8 +39,7 @@ static bool ParseOk(const std::string &src) {
 
 static Stmt *FirstInitialStmt(ParseResult10d &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock)
-      continue;
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
     }
@@ -51,11 +50,9 @@ static Stmt *FirstInitialStmt(ParseResult10d &r) {
 
 static Stmt *NthInitialStmt(ParseResult10d &r, size_t n) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock)
-      continue;
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
-      if (n < item->body->stmts.size())
-        return item->body->stmts[n];
+      if (n < item->body->stmts.size()) return item->body->stmts[n];
     }
   }
   return nullptr;
@@ -75,8 +72,7 @@ static ModuleItem *FirstAlwaysItem(ParseResult10d &r) {
 
 static Stmt *FirstAlwaysStmt(ParseResult10d &r) {
   auto *item = FirstAlwaysItem(r);
-  if (!item || !item->body)
-    return nullptr;
+  if (!item || !item->body) return nullptr;
   if (item->body->kind == StmtKind::kBlock) {
     return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
   }
@@ -89,12 +85,13 @@ static Stmt *FirstAlwaysStmt(ParseResult10d &r) {
 
 // --- 1. Simple nonblocking assignment: q <= d ---
 TEST(ParserSection10, Sec10_4_2_SimpleNonblocking) {
-  auto r = Parse("module m;\n"
-                 "  reg q, d;\n"
-                 "  initial begin\n"
-                 "    q <= d;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg q, d;\n"
+      "  initial begin\n"
+      "    q <= d;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -110,12 +107,13 @@ TEST(ParserSection10, Sec10_4_2_SimpleNonblocking) {
 
 // --- 2. Nonblocking with intra-assignment delay: q <= #10 d ---
 TEST(ParserSection10, Sec10_4_2_IntraAssignDelay) {
-  auto r = Parse("module m;\n"
-                 "  reg q, d;\n"
-                 "  initial begin\n"
-                 "    q <= #10 d;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg q, d;\n"
+      "  initial begin\n"
+      "    q <= #10 d;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -128,12 +126,13 @@ TEST(ParserSection10, Sec10_4_2_IntraAssignDelay) {
 
 // --- 3. Nonblocking with intra-assignment event: q <= @(posedge clk) d ---
 TEST(ParserSection10, Sec10_4_2_IntraAssignEventPosedge) {
-  auto r = Parse("module m;\n"
-                 "  reg q, d, clk;\n"
-                 "  initial begin\n"
-                 "    q <= @(posedge clk) d;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg q, d, clk;\n"
+      "  initial begin\n"
+      "    q <= @(posedge clk) d;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -147,10 +146,11 @@ TEST(ParserSection10, Sec10_4_2_IntraAssignEventPosedge) {
 
 // --- 4. Nonblocking in always_ff: always_ff @(posedge clk) q <= d ---
 TEST(ParserSection10, Sec10_4_2_AlwaysFFNonblocking) {
-  auto r = Parse("module m;\n"
-                 "  always_ff @(posedge clk)\n"
-                 "    q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always_ff @(posedge clk)\n"
+      "    q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -164,10 +164,11 @@ TEST(ParserSection10, Sec10_4_2_AlwaysFFNonblocking) {
 
 // --- 5. Nonblocking in always @(posedge clk) ---
 TEST(ParserSection10, Sec10_4_2_AlwaysPosedgeNonblocking) {
-  auto r = Parse("module m;\n"
-                 "  always @(posedge clk)\n"
-                 "    q <= d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk)\n"
+      "    q <= d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -183,12 +184,13 @@ TEST(ParserSection10, Sec10_4_2_AlwaysPosedgeNonblocking) {
 
 // --- 6. Nonblocking with binary expression RHS: q <= a + b ---
 TEST(ParserSection10, Sec10_4_2_ExpressionRhs) {
-  auto r = Parse("module m;\n"
-                 "  reg [7:0] q, a, b;\n"
-                 "  initial begin\n"
-                 "    q <= a + b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg [7:0] q, a, b;\n"
+      "  initial begin\n"
+      "    q <= a + b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -200,12 +202,13 @@ TEST(ParserSection10, Sec10_4_2_ExpressionRhs) {
 
 // --- 7. Nonblocking to bit-select: q[3] <= 1 ---
 TEST(ParserSection10, Sec10_4_2_BitSelectLhs) {
-  auto r = Parse("module m;\n"
-                 "  reg [7:0] q;\n"
-                 "  initial begin\n"
-                 "    q[3] <= 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg [7:0] q;\n"
+      "  initial begin\n"
+      "    q[3] <= 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -218,12 +221,13 @@ TEST(ParserSection10, Sec10_4_2_BitSelectLhs) {
 
 // --- 8. Nonblocking to part-select: q[7:4] <= 4'hF ---
 TEST(ParserSection10, Sec10_4_2_PartSelectLhs) {
-  auto r = Parse("module m;\n"
-                 "  reg [7:0] q;\n"
-                 "  initial begin\n"
-                 "    q[7:4] <= 4'hF;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg [7:0] q;\n"
+      "  initial begin\n"
+      "    q[7:4] <= 4'hF;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -236,12 +240,13 @@ TEST(ParserSection10, Sec10_4_2_PartSelectLhs) {
 
 // --- 9. Nonblocking to concatenation LHS: {q1, q2} <= {d1, d2} ---
 TEST(ParserSection10, Sec10_4_2_ConcatenationLhsRhs) {
-  auto r = Parse("module m;\n"
-                 "  reg q1, q2, d1, d2;\n"
-                 "  initial begin\n"
-                 "    {q1, q2} <= {d1, d2};\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg q1, q2, d1, d2;\n"
+      "  initial begin\n"
+      "    {q1, q2} <= {d1, d2};\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -257,12 +262,13 @@ TEST(ParserSection10, Sec10_4_2_ConcatenationLhsRhs) {
 
 // --- 10. Nonblocking with ternary RHS: q <= sel ? a : b ---
 TEST(ParserSection10, Sec10_4_2_TernaryRhs) {
-  auto r = Parse("module m;\n"
-                 "  reg q, sel, a, b;\n"
-                 "  initial begin\n"
-                 "    q <= sel ? a : b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg q, sel, a, b;\n"
+      "  initial begin\n"
+      "    q <= sel ? a : b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -274,12 +280,13 @@ TEST(ParserSection10, Sec10_4_2_TernaryRhs) {
 
 // --- 11. Nonblocking in begin-end block ---
 TEST(ParserSection10, Sec10_4_2_InBeginEndBlock) {
-  auto r = Parse("module m;\n"
-                 "  reg q, d;\n"
-                 "  initial begin\n"
-                 "    q <= d;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg q, d;\n"
+      "  initial begin\n"
+      "    q <= d;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *body = r.cu->modules[0]->items[0]->body;
@@ -291,15 +298,16 @@ TEST(ParserSection10, Sec10_4_2_InBeginEndBlock) {
 
 // --- 12. Nonblocking in if-else branches (mux pattern) ---
 TEST(ParserSection10, Sec10_4_2_IfElseMuxPattern) {
-  auto r = Parse("module m;\n"
-                 "  reg q, sel, a, b;\n"
-                 "  initial begin\n"
-                 "    if (sel)\n"
-                 "      q <= a;\n"
-                 "    else\n"
-                 "      q <= b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg q, sel, a, b;\n"
+      "  initial begin\n"
+      "    if (sel)\n"
+      "      q <= a;\n"
+      "    else\n"
+      "      q <= b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -313,18 +321,19 @@ TEST(ParserSection10, Sec10_4_2_IfElseMuxPattern) {
 
 // --- 13. Nonblocking in case statement (decoder pattern) ---
 TEST(ParserSection10, Sec10_4_2_CaseDecoderPattern) {
-  auto r = Parse("module m;\n"
-                 "  reg [1:0] sel;\n"
-                 "  reg [7:0] q;\n"
-                 "  initial begin\n"
-                 "    case (sel)\n"
-                 "      2'b00: q <= 8'h00;\n"
-                 "      2'b01: q <= 8'h01;\n"
-                 "      2'b10: q <= 8'h10;\n"
-                 "      default: q <= 8'hFF;\n"
-                 "    endcase\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg [1:0] sel;\n"
+      "  reg [7:0] q;\n"
+      "  initial begin\n"
+      "    case (sel)\n"
+      "      2'b00: q <= 8'h00;\n"
+      "      2'b01: q <= 8'h01;\n"
+      "      2'b10: q <= 8'h10;\n"
+      "      default: q <= 8'hFF;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -339,14 +348,15 @@ TEST(ParserSection10, Sec10_4_2_CaseDecoderPattern) {
 
 // --- 14. Multiple nonblocking assignments in same block ---
 TEST(ParserSection10, Sec10_4_2_MultipleInSameBlock) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b, c, d;\n"
-                 "  initial begin\n"
-                 "    a <= b;\n"
-                 "    c <= d;\n"
-                 "    b <= a;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b, c, d;\n"
+      "  initial begin\n"
+      "    a <= b;\n"
+      "    c <= d;\n"
+      "    b <= a;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *s0 = NthInitialStmt(r, 0);
@@ -365,12 +375,13 @@ TEST(ParserSection10, Sec10_4_2_MultipleInSameBlock) {
 
 // --- 15. Nonblocking with function call RHS ---
 TEST(ParserSection10, Sec10_4_2_FunctionCallRhs) {
-  auto r = Parse("module m;\n"
-                 "  reg [7:0] q;\n"
-                 "  initial begin\n"
-                 "    q <= compute(a, b);\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg [7:0] q;\n"
+      "  initial begin\n"
+      "    q <= compute(a, b);\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -382,12 +393,13 @@ TEST(ParserSection10, Sec10_4_2_FunctionCallRhs) {
 
 // --- 16. Nonblocking with system call RHS ---
 TEST(ParserSection10, Sec10_4_2_SystemCallRhs) {
-  auto r = Parse("module m;\n"
-                 "  reg [31:0] q;\n"
-                 "  initial begin\n"
-                 "    q <= $random;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg [31:0] q;\n"
+      "  initial begin\n"
+      "    q <= $random;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -399,11 +411,12 @@ TEST(ParserSection10, Sec10_4_2_SystemCallRhs) {
 
 // --- 17. Nonblocking to struct member: s.field <= val ---
 TEST(ParserSection10, Sec10_4_2_StructMemberLhs) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    s.field <= 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    s.field <= 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -416,12 +429,13 @@ TEST(ParserSection10, Sec10_4_2_StructMemberLhs) {
 
 // --- 18. Nonblocking to array element: mem[idx] <= data ---
 TEST(ParserSection10, Sec10_4_2_ArrayElementLhs) {
-  auto r = Parse("module m;\n"
-                 "  reg [7:0] mem [0:255];\n"
-                 "  initial begin\n"
-                 "    mem[0] <= 8'hAB;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg [7:0] mem [0:255];\n"
+      "  initial begin\n"
+      "    mem[0] <= 8'hAB;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -434,12 +448,13 @@ TEST(ParserSection10, Sec10_4_2_ArrayElementLhs) {
 
 // --- 19. Nonblocking with replication RHS ---
 TEST(ParserSection10, Sec10_4_2_ReplicationRhs) {
-  auto r = Parse("module m;\n"
-                 "  reg [7:0] q;\n"
-                 "  initial begin\n"
-                 "    q <= {4{2'b10}};\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg [7:0] q;\n"
+      "  initial begin\n"
+      "    q <= {4{2'b10}};\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -451,12 +466,13 @@ TEST(ParserSection10, Sec10_4_2_ReplicationRhs) {
 
 // --- 20. Nonblocking with cast RHS ---
 TEST(ParserSection10, Sec10_4_2_CastRhs) {
-  auto r = Parse("module m;\n"
-                 "  int q;\n"
-                 "  initial begin\n"
-                 "    q <= int'(3.14);\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  int q;\n"
+      "  initial begin\n"
+      "    q <= int'(3.14);\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -468,12 +484,13 @@ TEST(ParserSection10, Sec10_4_2_CastRhs) {
 
 // --- 21. Nonblocking with repeat event control ---
 TEST(ParserSection10, Sec10_4_2_RepeatEventControl) {
-  auto r = Parse("module m;\n"
-                 "  reg q, d, clk;\n"
-                 "  initial begin\n"
-                 "    q <= repeat(3) @(posedge clk) d;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg q, d, clk;\n"
+      "  initial begin\n"
+      "    q <= repeat(3) @(posedge clk) d;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -488,13 +505,14 @@ TEST(ParserSection10, Sec10_4_2_RepeatEventControl) {
 
 // --- 22. Nonblocking mixed with blocking in same module (different blocks) ---
 TEST(ParserSection10, Sec10_4_2_MixedBlockingNonblocking) {
-  auto r = Parse("module m;\n"
-                 "  reg q, d, a, b;\n"
-                 "  always @(posedge clk)\n"
-                 "    q <= d;\n"
-                 "  always @(*)\n"
-                 "    a = b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg q, d, a, b;\n"
+      "  always @(posedge clk)\n"
+      "    q <= d;\n"
+      "  always @(*)\n"
+      "    a = b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *mod = r.cu->modules[0];
@@ -519,14 +537,15 @@ TEST(ParserSection10, Sec10_4_2_MixedBlockingNonblocking) {
 
 // --- 23. Nonblocking in always_ff with reset pattern ---
 TEST(ParserSection10, Sec10_4_2_AlwaysFFResetPattern) {
-  auto r = Parse("module m;\n"
-                 "  always_ff @(posedge clk or negedge rst_n) begin\n"
-                 "    if (!rst_n)\n"
-                 "      q <= 0;\n"
-                 "    else\n"
-                 "      q <= d;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always_ff @(posedge clk or negedge rst_n) begin\n"
+      "    if (!rst_n)\n"
+      "      q <= 0;\n"
+      "    else\n"
+      "      q <= d;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);
@@ -548,12 +567,13 @@ TEST(ParserSection10, Sec10_4_2_AlwaysFFResetPattern) {
 
 // --- 24. Nonblocking with negedge intra-assignment event ---
 TEST(ParserSection10, Sec10_4_2_IntraAssignEventNegedge) {
-  auto r = Parse("module m;\n"
-                 "  reg q, d, clk;\n"
-                 "  initial begin\n"
-                 "    q <= @(negedge clk) d;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg q, d, clk;\n"
+      "  initial begin\n"
+      "    q <= @(negedge clk) d;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -566,12 +586,13 @@ TEST(ParserSection10, Sec10_4_2_IntraAssignEventNegedge) {
 
 // --- 25. Nonblocking with complex expression (shift and mask) ---
 TEST(ParserSection10, Sec10_4_2_ComplexExpressionRhs) {
-  auto r = Parse("module m;\n"
-                 "  reg [7:0] q, data;\n"
-                 "  initial begin\n"
-                 "    q <= (data << 2) | 8'h03;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg [7:0] q, data;\n"
+      "  initial begin\n"
+      "    q <= (data << 2) | 8'h03;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -583,12 +604,13 @@ TEST(ParserSection10, Sec10_4_2_ComplexExpressionRhs) {
 
 // --- 26. Nonblocking to indexed part-select (q[base +: width]) ---
 TEST(ParserSection10, Sec10_4_2_IndexedPartSelectLhs) {
-  auto r = Parse("module m;\n"
-                 "  reg [31:0] q;\n"
-                 "  initial begin\n"
-                 "    q[8 +: 8] <= 8'hAB;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg [31:0] q;\n"
+      "  initial begin\n"
+      "    q[8 +: 8] <= 8'hAB;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -601,12 +623,13 @@ TEST(ParserSection10, Sec10_4_2_IndexedPartSelectLhs) {
 
 // --- 27. Nonblocking in named begin-end block ---
 TEST(ParserSection10, Sec10_4_2_NamedBlockNonblocking) {
-  auto r = Parse("module m;\n"
-                 "  reg q, d;\n"
-                 "  initial begin : my_block\n"
-                 "    q <= d;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg q, d;\n"
+      "  initial begin : my_block\n"
+      "    q <= d;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *body = r.cu->modules[0]->items[0]->body;
@@ -619,25 +642,27 @@ TEST(ParserSection10, Sec10_4_2_NamedBlockNonblocking) {
 
 // --- 28. Pipeline pattern with multiple nonblocking assignments ---
 TEST(ParserSection10, Sec10_4_2_PipelinePattern) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  reg [7:0] stage1, stage2, stage3, d;\n"
-                      "  always_ff @(posedge clk) begin\n"
-                      "    stage1 <= d;\n"
-                      "    stage2 <= stage1;\n"
-                      "    stage3 <= stage2;\n"
-                      "  end\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  reg [7:0] stage1, stage2, stage3, d;\n"
+              "  always_ff @(posedge clk) begin\n"
+              "    stage1 <= d;\n"
+              "    stage2 <= stage1;\n"
+              "    stage3 <= stage2;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // --- 29. Nonblocking swap pattern ---
 TEST(ParserSection10, Sec10_4_2_SwapPattern) {
-  auto r = Parse("module m;\n"
-                 "  reg [7:0] a, b;\n"
-                 "  initial begin\n"
-                 "    a <= b;\n"
-                 "    b <= a;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg [7:0] a, b;\n"
+      "  initial begin\n"
+      "    a <= b;\n"
+      "    b <= a;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *s0 = NthInitialStmt(r, 0);
@@ -654,12 +679,13 @@ TEST(ParserSection10, Sec10_4_2_SwapPattern) {
 
 // --- 30. Full register file pattern with nonblocking in always_ff ---
 TEST(ParserSection10, Sec10_4_2_RegisterFilePattern) {
-  auto r = Parse("module m;\n"
-                 "  always_ff @(posedge clk) begin\n"
-                 "    if (wr_en)\n"
-                 "      regfile[wr_addr] <= wr_data;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  always_ff @(posedge clk) begin\n"
+      "    if (wr_en)\n"
+      "      regfile[wr_addr] <= wr_data;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstAlwaysItem(r);

@@ -13,5 +13,5 @@ TEST(NonLrmVpi, DefaultContextIsAvailable) {
   (void)ctx;
 }
 
-} // namespace
-} // namespace delta
+}  // namespace
+}  // namespace delta

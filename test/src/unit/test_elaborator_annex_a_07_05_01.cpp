@@ -34,7 +34,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA70501Fixture &f) {
   return design;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.7.5.1 $setup_timing_check — command structure
@@ -42,12 +42,13 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA70501Fixture &f) {
 
 TEST(ElabA70501, SetupWithNotifierElaborates) {
   ElabA70501Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  specify\n"
-                              "    $setup(data, posedge clk, 10, ntfr);\n"
-                              "  endspecify\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    $setup(data, posedge clk, 10, ntfr);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -92,13 +93,13 @@ TEST(ElabA70501, RecremFullArgsElaborates) {
 
 TEST(ElabA70501, TimeskewWithFlagsElaborates) {
   ElabA70501Fixture f;
-  auto *design =
-      ElaborateSrc("module m;\n"
-                   "  specify\n"
-                   "    $timeskew(posedge clk1, posedge clk2, 5, ntfr, 1, 0);\n"
-                   "  endspecify\n"
-                   "endmodule\n",
-                   f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    $timeskew(posedge clk1, posedge clk2, 5, ntfr, 1, 0);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -126,12 +127,13 @@ TEST(ElabA70501, FullskewWithFlagsElaborates) {
 
 TEST(ElabA70501, WidthWithThresholdElaborates) {
   ElabA70501Fixture f;
-  auto *design = ElaborateSrc("module m;\n"
-                              "  specify\n"
-                              "    $width(posedge clk, 20, 1, ntfr);\n"
-                              "  endspecify\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    $width(posedge clk, 20, 1, ntfr);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }

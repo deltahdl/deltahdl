@@ -1,5 +1,10 @@
 // §10.4.1: Blocking procedural assignments
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <string_view>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -13,9 +18,6 @@
 #include "simulation/stmt_exec.h"
 #include "simulation/stmt_result.h"
 #include "simulation/variable.h"
-#include <cstdint>
-#include <gtest/gtest.h>
-#include <string_view>
 
 using namespace delta;
 
@@ -78,7 +80,7 @@ TEST(StmtExec, BlockingAssignBitSelect) {
   stmt->rhs = MakeIntLit(f.arena, 1);
 
   RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_EQ(var->value.ToUint64(), 0x08u); // bit 3 set
+  EXPECT_EQ(var->value.ToUint64(), 0x08u);  // bit 3 set
 }
 
 // =============================================================================
@@ -102,7 +104,7 @@ TEST(StmtExec, BlockingAssignPartSelect) {
   stmt->rhs = MakeIntLit(f.arena, 0xA);
 
   RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_EQ(var->value.ToUint64(), 0xAFu); // upper nibble = A, lower = F
+  EXPECT_EQ(var->value.ToUint64(), 0xAFu);  // upper nibble = A, lower = F
 }
 
 // =============================================================================
@@ -129,4 +131,4 @@ TEST(StmtExec, BlockingAssignMemberAccess) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-} // namespace
+}  // namespace

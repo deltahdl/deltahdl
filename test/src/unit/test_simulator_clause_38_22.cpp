@@ -11,7 +11,7 @@ namespace delta {
 namespace {
 
 class VpiClause3822Test : public ::testing::Test {
-protected:
+ protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
@@ -42,5 +42,5 @@ TEST_F(VpiClause3822Test, HandleMultiBothNullReturnsNull) {
   EXPECT_EQ(h, nullptr);
 }
 
-} // namespace
-} // namespace delta
+}  // namespace
+}  // namespace delta

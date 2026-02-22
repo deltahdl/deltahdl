@@ -1,11 +1,12 @@
 // §10.3: Continuous assignments
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -49,10 +50,11 @@ struct ModportPortExpected {
 namespace {
 
 TEST(Parser, ContinuousAssignment) {
-  auto r = Parse("module top;\n"
-                 "  logic a, b;\n"
-                 "  assign a = b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module top;\n"
+      "  logic a, b;\n"
+      "  assign a = b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   bool found_assign = false;
   for (auto *item : r.cu->modules[0]->items) {
@@ -63,4 +65,4 @@ TEST(Parser, ContinuousAssignment) {
   EXPECT_TRUE(found_assign);
 }
 
-} // namespace
+}  // namespace

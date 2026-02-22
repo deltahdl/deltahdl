@@ -1,5 +1,7 @@
 // §6.25: Parameterized data types
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -11,7 +13,6 @@
 #include "lexer/lexer.h"
 #include "lexer/token.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -36,13 +37,14 @@ namespace {
 TEST(Elaboration, ParameterizedType_Basic) {
   // §6.25: C#(logic)::my_type resolves to logic (width 1).
   ElabFixture f;
-  auto *design = ElaborateSrc("class C #(type T = int);\n"
-                              "  typedef T my_type;\n"
-                              "endclass\n"
-                              "module top;\n"
-                              "  C#(logic)::my_type x;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "class C #(type T = int);\n"
+      "  typedef T my_type;\n"
+      "endclass\n"
+      "module top;\n"
+      "  C#(logic)::my_type x;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
   auto *mod = design->top_modules[0];
@@ -54,13 +56,14 @@ TEST(Elaboration, ParameterizedType_Basic) {
 TEST(Elaboration, ParameterizedType_Vector) {
   // §6.25: C#(logic [7:0])::my_type resolves to logic [7:0] (width 8).
   ElabFixture f;
-  auto *design = ElaborateSrc("class C #(type T = int);\n"
-                              "  typedef T my_type;\n"
-                              "endclass\n"
-                              "module top;\n"
-                              "  C#(logic [7:0])::my_type x;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "class C #(type T = int);\n"
+      "  typedef T my_type;\n"
+      "endclass\n"
+      "module top;\n"
+      "  C#(logic [7:0])::my_type x;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
   auto *mod = design->top_modules[0];
@@ -69,4 +72,4 @@ TEST(Elaboration, ParameterizedType_Vector) {
   EXPECT_EQ(mod->variables[0].width, 8);
 }
 
-} // namespace
+}  // namespace

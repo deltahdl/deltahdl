@@ -37,15 +37,13 @@ static uint64_t RunAndGet(const std::string &src, const char *var_name) {
   SimCh50701Fixture f;
   auto *design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
-  if (!design)
-    return 0;
+  if (!design) return 0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
   auto *var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
-  if (!var)
-    return 0;
+  if (!var) return 0;
   return var->value.ToUint64();
 }
 
@@ -58,11 +56,12 @@ static uint64_t RunAndGet(const std::string &src, const char *var_name) {
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, SimpleDecimalNumber) {
   // §5.7.1: Simple decimal number — sequence of digits 0-9.
-  auto result = RunAndGet("module t;\n"
-                          "  logic [31:0] x;\n"
-                          "  initial x = 659;\n"
-                          "endmodule\n",
-                          "x");
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial x = 659;\n"
+      "endmodule\n",
+      "x");
   EXPECT_EQ(result, 659u);
 }
 
@@ -71,11 +70,12 @@ TEST(SimCh50701, SimpleDecimalNumber) {
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, SizedBinaryLiteral) {
   // §5.7.1: Sized binary literal — 4-bit binary number.
-  auto result = RunAndGet("module t;\n"
-                          "  logic [7:0] x;\n"
-                          "  initial x = 4'b1001;\n"
-                          "endmodule\n",
-                          "x");
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 4'b1001;\n"
+      "endmodule\n",
+      "x");
   EXPECT_EQ(result, 9u);
 }
 
@@ -84,11 +84,12 @@ TEST(SimCh50701, SizedBinaryLiteral) {
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, SizedOctalLiteral) {
   // §5.7.1: based literal with octal base
-  auto result = RunAndGet("module t;\n"
-                          "  logic [15:0] x;\n"
-                          "  initial x = 12'o7460;\n"
-                          "endmodule\n",
-                          "x");
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [15:0] x;\n"
+      "  initial x = 12'o7460;\n"
+      "endmodule\n",
+      "x");
   EXPECT_EQ(result, 07460u);
 }
 
@@ -97,11 +98,12 @@ TEST(SimCh50701, SizedOctalLiteral) {
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, SizedHexLiteral) {
   // §5.7.1: based literal with hex base
-  auto result = RunAndGet("module t;\n"
-                          "  logic [31:0] x;\n"
-                          "  initial x = 20'h837FF;\n"
-                          "endmodule\n",
-                          "x");
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial x = 20'h837FF;\n"
+      "endmodule\n",
+      "x");
   EXPECT_EQ(result, 0x837FFu);
 }
 
@@ -110,11 +112,12 @@ TEST(SimCh50701, SizedHexLiteral) {
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, SizedDecimalLiteral) {
   // §5.7.1: Sized decimal literal — 5-bit decimal number.
-  auto result = RunAndGet("module t;\n"
-                          "  logic [7:0] x;\n"
-                          "  initial x = 5'd3;\n"
-                          "endmodule\n",
-                          "x");
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 5'd3;\n"
+      "endmodule\n",
+      "x");
   EXPECT_EQ(result, 3u);
 }
 
@@ -123,11 +126,12 @@ TEST(SimCh50701, SizedDecimalLiteral) {
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, UnsizedHexLiteral) {
   // §5.7.1: Unsized hex literal (at least 32 bits).
-  auto result = RunAndGet("module t;\n"
-                          "  logic [31:0] x;\n"
-                          "  initial x = 'h837FF;\n"
-                          "endmodule\n",
-                          "x");
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial x = 'h837FF;\n"
+      "endmodule\n",
+      "x");
   EXPECT_EQ(result, 0x837FFu);
 }
 
@@ -136,11 +140,12 @@ TEST(SimCh50701, UnsizedHexLiteral) {
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, UnsizedOctalLiteral) {
   // §5.7.1: Unsized octal literal.
-  auto result = RunAndGet("module t;\n"
-                          "  logic [31:0] x;\n"
-                          "  initial x = 'o7460;\n"
-                          "endmodule\n",
-                          "x");
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial x = 'o7460;\n"
+      "endmodule\n",
+      "x");
   EXPECT_EQ(result, 07460u);
 }
 
@@ -150,11 +155,12 @@ TEST(SimCh50701, UnsizedOctalLiteral) {
 TEST(SimCh50701, UnaryMinusBeforeSize) {
   // §5.7.1: Unary minus before size — two's complement of 6, held in 8 bits.
   // equivalent to -(8'd 6) = 250 in unsigned 8-bit
-  auto result = RunAndGet("module t;\n"
-                          "  logic [7:0] x;\n"
-                          "  initial x = -8'd6;\n"
-                          "endmodule\n",
-                          "x");
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = -8'd6;\n"
+      "endmodule\n",
+      "x");
   EXPECT_EQ(result, 250u);
 }
 
@@ -163,11 +169,12 @@ TEST(SimCh50701, UnaryMinusBeforeSize) {
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, NegativeTwosComplement) {
   // §5.7.1: Negative numbers use two's-complement representation.
-  auto result = RunAndGet("module t;\n"
-                          "  logic [7:0] x;\n"
-                          "  initial x = -1;\n"
-                          "endmodule\n",
-                          "x");
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = -1;\n"
+      "endmodule\n",
+      "x");
   EXPECT_EQ(result, 255u);
 }
 
@@ -177,14 +184,15 @@ TEST(SimCh50701, NegativeTwosComplement) {
 TEST(SimCh50701, HexDigitsCaseInsensitive) {
   // §5.7.1: Hex digits a-f are case insensitive.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [15:0] a, b;\n"
-                              "  initial begin\n"
-                              "    a = 16'hABcd;\n"
-                              "    b = 16'habCD;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 16'hABcd;\n"
+      "    b = 16'habCD;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -203,15 +211,16 @@ TEST(SimCh50701, HexDigitsCaseInsensitive) {
 TEST(SimCh50701, UnderscoreInNumber) {
   // §5.7.1: Underscores are legal anywhere in a number except as first char.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] a, b, c;\n"
-                              "  initial begin\n"
-                              "    a = 27_195_000;\n"
-                              "    b = 16'b0011_0101_0001_1111;\n"
-                              "    c = 32'h12ab_f001;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a, b, c;\n"
+      "  initial begin\n"
+      "    a = 27_195_000;\n"
+      "    b = 16'b0011_0101_0001_1111;\n"
+      "    c = 32'h12ab_f001;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -232,11 +241,12 @@ TEST(SimCh50701, UnderscoreInNumber) {
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, LeftPadWithZeros) {
   // §5.7.1: Value smaller than size — left-padded with zeros.
-  auto result = RunAndGet("module t;\n"
-                          "  logic [7:0] x;\n"
-                          "  initial x = 8'hF;\n"
-                          "endmodule\n",
-                          "x");
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 8'hF;\n"
+      "endmodule\n",
+      "x");
   EXPECT_EQ(result, 0x0Fu);
 }
 
@@ -245,11 +255,12 @@ TEST(SimCh50701, LeftPadWithZeros) {
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, TruncationFromLeft) {
   // §5.7.1: Value larger than size — truncated from the left.
-  auto result = RunAndGet("module t;\n"
-                          "  logic [7:0] x;\n"
-                          "  initial x = 4'b11001;\n"
-                          "endmodule\n",
-                          "x");
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 4'b11001;\n"
+      "endmodule\n",
+      "x");
   EXPECT_EQ(result, 0x09u);
 }
 
@@ -259,11 +270,12 @@ TEST(SimCh50701, TruncationFromLeft) {
 TEST(SimCh50701, XValueInHexLiteral) {
   // §5.7.1: x sets 4 bits to unknown in hex base.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [11:0] x;\n"
-                              "  initial x = 12'hx;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [11:0] x;\n"
+      "  initial x = 12'hx;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -279,11 +291,12 @@ TEST(SimCh50701, XValueInHexLiteral) {
 TEST(SimCh50701, ZValueInHexLiteral) {
   // §5.7.1: z sets 4 bits to high-impedance in hex base.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [15:0] x;\n"
-                              "  initial x = 16'hz;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] x;\n"
+      "  initial x = 16'hz;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -302,11 +315,12 @@ TEST(SimCh50701, ZValueInHexLiteral) {
 TEST(SimCh50701, XInBinaryLiteral) {
   // §5.7.1: x sets 1 bit to unknown in binary base.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [2:0] x;\n"
-                              "  initial x = 3'b01x;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [2:0] x;\n"
+      "  initial x = 3'b01x;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -324,14 +338,15 @@ TEST(SimCh50701, XInBinaryLiteral) {
 TEST(SimCh50701, QuestionMarkAsZ) {
   // §5.7.1: ? is an alternative for the z character.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [3:0] a, b;\n"
-                              "  initial begin\n"
-                              "    a = 4'b1?0?;\n"
-                              "    b = 4'b1z0z;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 4'b1?0?;\n"
+      "    b = 4'b1z0z;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -350,14 +365,15 @@ TEST(SimCh50701, QuestionMarkAsZ) {
 TEST(SimCh50701, UnbasedUnsizedLiteral01) {
   // §5.7.1: Unbased unsized literals — all bits set to specified value.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [15:0] a, b;\n"
-                              "  initial begin\n"
-                              "    a = '0;\n"
-                              "    b = '1;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] a, b;\n"
+      "  initial begin\n"
+      "    a = '0;\n"
+      "    b = '1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -376,14 +392,15 @@ TEST(SimCh50701, UnbasedUnsizedLiteral01) {
 TEST(SimCh50701, UnbasedUnsizedLiteralXZ) {
   // §5.7.1: Unbased unsized x and z set all bits to x or z.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [15:0] a, b;\n"
-                              "  initial begin\n"
-                              "    a = 'x;\n"
-                              "    b = 'z;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 'x;\n"
+      "    b = 'z;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -406,11 +423,12 @@ TEST(SimCh50701, UnbasedUnsizedLiteralXZ) {
 TEST(SimCh50701, LeftPadWithX) {
   // §5.7.1: Leftmost x causes x-padding to the left.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [11:0] x;\n"
-                              "  initial x = 'hx;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [11:0] x;\n"
+      "  initial x = 'hx;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -429,11 +447,12 @@ TEST(SimCh50701, LeftPadWithX) {
 TEST(SimCh50701, LeftPadWithZ) {
   // §5.7.1: Leftmost z causes z-padding to the left.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [11:0] x;\n"
-                              "  initial x = 'hz;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [11:0] x;\n"
+      "  initial x = 'hz;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -451,11 +470,12 @@ TEST(SimCh50701, LeftPadWithZ) {
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, SignedBasedLiteral) {
   // §5.7.1: Signed based literal — 4'shf is 4'b1111, signed = -1.
-  auto result = RunAndGet("module t;\n"
-                          "  integer x;\n"
-                          "  initial x = 4'shf;\n"
-                          "endmodule\n",
-                          "x");
+  auto result = RunAndGet(
+      "module t;\n"
+      "  integer x;\n"
+      "  initial x = 4'shf;\n"
+      "endmodule\n",
+      "x");
   uint32_t mask = 0xFFFFFFFF;
   EXPECT_EQ(result & mask, mask);
 }
@@ -466,14 +486,15 @@ TEST(SimCh50701, SignedBasedLiteral) {
 TEST(SimCh50701, SignedDesignatorBitPattern) {
   // §5.7.1: The s designator affects interpretation, not the bit pattern.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [3:0] a, b;\n"
-                              "  initial begin\n"
-                              "    a = 4'hf;\n"
-                              "    b = 4'shf;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 4'hf;\n"
+      "    b = 4'shf;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -493,14 +514,15 @@ TEST(SimCh50701, SignedDesignatorBitPattern) {
 TEST(SimCh50701, XZCaseInsensitive) {
   // §5.7.1: x and z are case insensitive in number values.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [3:0] a, b;\n"
-                              "  initial begin\n"
-                              "    a = 4'bx01x;\n"
-                              "    b = 4'bX01X;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 4'bx01x;\n"
+      "    b = 4'bX01X;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -519,11 +541,12 @@ TEST(SimCh50701, XZCaseInsensitive) {
 TEST(SimCh50701, XInOctalLiteral) {
   // §5.7.1: x sets 3 bits to unknown in octal base.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [5:0] x;\n"
-                              "  initial x = 6'o7x;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [5:0] x;\n"
+      "  initial x = 6'o7x;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -540,16 +563,17 @@ TEST(SimCh50701, XInOctalLiteral) {
 TEST(SimCh50701, BaseFormatCaseInsensitive) {
   // §5.7.1: Base format letter is case insensitive.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] a, b, c, d;\n"
-                              "  initial begin\n"
-                              "    a = 8'hFF;\n"
-                              "    b = 8'HFF;\n"
-                              "    c = 8'b11111111;\n"
-                              "    d = 8'B11111111;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, c, d;\n"
+      "  initial begin\n"
+      "    a = 8'hFF;\n"
+      "    b = 8'HFF;\n"
+      "    c = 8'b11111111;\n"
+      "    d = 8'B11111111;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -573,11 +597,12 @@ TEST(SimCh50701, BaseFormatCaseInsensitive) {
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, WhiteSpaceSizeAndBase) {
   // §5.7.1: White space allowed between size, base, and value tokens.
-  auto result = RunAndGet("module t;\n"
-                          "  logic [7:0] x;\n"
-                          "  initial x = 5 'd 3;\n"
-                          "endmodule\n",
-                          "x");
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 5 'd 3;\n"
+      "endmodule\n",
+      "x");
   EXPECT_EQ(result, 3u);
 }
 
@@ -587,11 +612,12 @@ TEST(SimCh50701, WhiteSpaceSizeAndBase) {
 TEST(SimCh50701, LeftPadKnownHex) {
   // §5.7.1: Known value with x in low nibble — yields 03x.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [11:0] x;\n"
-                              "  initial x = 'h3x;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [11:0] x;\n"
+      "  initial x = 'h3x;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -610,11 +636,12 @@ TEST(SimCh50701, LeftPadKnownHex) {
 TEST(SimCh50701, DecimalSingleDigitX) {
   // §5.7.1: Decimal literal allows single x/z/? digit only.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial x = 8'dx;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 8'dx;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -631,10 +658,11 @@ TEST(SimCh50701, DecimalSingleDigitX) {
 TEST(SimCh50701, SizeConstantNonzero) {
   // §5.7.1: Size constant must be nonzero.
   // Using size=1 (the smallest legal size) verifies nonzero is accepted.
-  auto result = RunAndGet("module t;\n"
-                          "  logic [7:0] x;\n"
-                          "  initial x = 1'b1;\n"
-                          "endmodule\n",
-                          "x");
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 1'b1;\n"
+      "endmodule\n",
+      "x");
   EXPECT_EQ(result, 1u);
 }

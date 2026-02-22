@@ -1,9 +1,11 @@
 // §19.8: Predefined coverage methods
 
-#include "simulation/coverage.h"
 #include <gtest/gtest.h>
+
 #include <string>
 #include <vector>
+
+#include "simulation/coverage.h"
 
 using namespace delta;
 
@@ -56,4 +58,4 @@ TEST(Coverage, GetInstCoverageMatchesGetCoverage) {
   EXPECT_DOUBLE_EQ(CoverageDB::GetInstCoverage(g), CoverageDB::GetCoverage(g));
 }
 
-} // namespace
+}  // namespace

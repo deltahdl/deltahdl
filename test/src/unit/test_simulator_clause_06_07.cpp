@@ -1,5 +1,7 @@
 // §6.7: Net declarations
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -12,7 +14,6 @@
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
 #include "simulation/variable.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -37,11 +38,12 @@ namespace {
 
 TEST(Lowerer, NetCreatedFromDecl) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  wire [7:0] w;\n"
-                              "  assign w = 55;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  wire [7:0] w;\n"
+      "  assign w = 55;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -56,4 +58,4 @@ TEST(Lowerer, NetCreatedFromDecl) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-} // namespace
+}  // namespace

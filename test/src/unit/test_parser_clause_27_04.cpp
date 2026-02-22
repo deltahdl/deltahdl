@@ -1,11 +1,12 @@
 // §27.4: Loop generate constructs
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -44,8 +45,7 @@ struct StructMemberExpected {
 static ModuleItem *FindItemByKind(const std::vector<ModuleItem *> &items,
                                   ModuleItemKind kind) {
   for (auto *item : items) {
-    if (item->kind == kind)
-      return item;
+    if (item->kind == kind) return item;
   }
   return nullptr;
 }
@@ -58,12 +58,13 @@ struct ModportPortExpected {
 namespace {
 
 TEST(Parser, GenerateFor) {
-  auto r = Parse("module t;\n"
-                 "  genvar i;\n"
-                 "  for (i = 0; i < 4; i = i + 1) begin\n"
-                 "    assign a[i] = b[i];\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  genvar i;\n"
+      "  for (i = 0; i < 4; i = i + 1) begin\n"
+      "    assign a[i] = b[i];\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *gen =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kGenerateFor);
@@ -74,4 +75,4 @@ TEST(Parser, GenerateFor) {
   EXPECT_FALSE(gen->gen_body.empty());
 }
 
-} // namespace
+}  // namespace

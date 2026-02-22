@@ -1,5 +1,7 @@
 // §11.9: Tagged union expressions and member access
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -7,7 +9,6 @@
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -48,4 +49,4 @@ TEST(EvalOp, MemberAccessBasic) {
   EXPECT_EQ(result.ToUint64(), 99u);
 }
 
-} // namespace
+}  // namespace

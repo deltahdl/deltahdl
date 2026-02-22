@@ -34,16 +34,17 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // Annex E.4 -- `delay_mode_distributed
 // =============================================================================
 
 TEST(ParserAnnexE, AnnexEMultipleDirectives) {
-  auto r = Parse("`default_decay_time 100\n"
-                 "`delay_mode_distributed\n"
-                 "module m; endmodule\n");
+  auto r = Parse(
+      "`default_decay_time 100\n"
+      "`delay_mode_distributed\n"
+      "module m; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   if (r.cu->modules.size() >= 1u) {
     EXPECT_EQ(r.cu->modules[0]->name, "m");

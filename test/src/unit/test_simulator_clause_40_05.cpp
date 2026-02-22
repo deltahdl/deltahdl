@@ -1,7 +1,8 @@
 // §40.5: VPI coverage extensions
 
-#include "vpi/sv_vpi_user.h"
 #include <gtest/gtest.h>
+
+#include "vpi/sv_vpi_user.h"
 
 namespace {
 
@@ -22,4 +23,4 @@ TEST(SvVpiUser, CoverageTypeConstants) {
   EXPECT_EQ(vpiCovered, 765);
 }
 
-} // namespace
+}  // namespace

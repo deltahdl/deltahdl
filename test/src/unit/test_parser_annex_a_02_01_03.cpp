@@ -30,7 +30,7 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.2.1.3 Type declarations
@@ -99,8 +99,7 @@ TEST(ParserA213, DataDeclMultipleAssign) {
   EXPECT_FALSE(r.has_errors);
   int count = 0;
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kVarDecl)
-      count++;
+    if (item->kind == ModuleItemKind::kVarDecl) count++;
   }
   EXPECT_GE(count, 2);
 }
@@ -116,8 +115,9 @@ TEST(ParserA213, DataDeclTypeDeclaration) {
 
 TEST(ParserA213, DataDeclPackageImport) {
   // package_import_declaration alternative
-  auto r = Parse("package pkg; endpackage\n"
-                 "module m; import pkg::*; endmodule");
+  auto r = Parse(
+      "package pkg; endpackage\n"
+      "module m; import pkg::*; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -135,8 +135,9 @@ TEST(ParserA213, DataDeclNettypeDeclaration) {
 // import package_import_item { , package_import_item } ;
 
 TEST(ParserA213, PackageImportSingle) {
-  auto r = Parse("package pkg; endpackage\n"
-                 "module m; import pkg::foo; endmodule");
+  auto r = Parse(
+      "package pkg; endpackage\n"
+      "module m; import pkg::foo; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -146,8 +147,9 @@ TEST(ParserA213, PackageImportSingle) {
 }
 
 TEST(ParserA213, PackageImportWildcard) {
-  auto r = Parse("package pkg; endpackage\n"
-                 "module m; import pkg::*; endmodule");
+  auto r = Parse(
+      "package pkg; endpackage\n"
+      "module m; import pkg::*; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -156,15 +158,15 @@ TEST(ParserA213, PackageImportWildcard) {
 
 TEST(ParserA213, PackageImportMultiple) {
   // Multiple comma-separated import items
-  auto r = Parse("package p1; endpackage\n"
-                 "package p2; endpackage\n"
-                 "module m; import p1::a, p2::b; endmodule");
+  auto r = Parse(
+      "package p1; endpackage\n"
+      "package p2; endpackage\n"
+      "module m; import p1::a, p2::b; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   int import_count = 0;
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kImportDecl)
-      import_count++;
+    if (item->kind == ModuleItemKind::kImportDecl) import_count++;
   }
   EXPECT_GE(import_count, 2);
 }
@@ -174,9 +176,10 @@ TEST(ParserA213, PackageImportMultiple) {
 // | export package_import_item { , package_import_item } ;
 
 TEST(ParserA213, PackageExportWildcard) {
-  auto r = Parse("package pkg;\n"
-                 "  export *::*;\n"
-                 "endpackage");
+  auto r = Parse(
+      "package pkg;\n"
+      "  export *::*;\n"
+      "endpackage");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_GE(r.cu->packages[0]->items.size(), 1u);
@@ -186,9 +189,10 @@ TEST(ParserA213, PackageExportWildcard) {
 }
 
 TEST(ParserA213, PackageExportSingleItem) {
-  auto r = Parse("package pkg;\n"
-                 "  export other_pkg::some_func;\n"
-                 "endpackage");
+  auto r = Parse(
+      "package pkg;\n"
+      "  export other_pkg::some_func;\n"
+      "endpackage");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->packages[0]->items[0];
@@ -199,15 +203,15 @@ TEST(ParserA213, PackageExportSingleItem) {
 
 TEST(ParserA213, PackageExportMultipleItems) {
   // BNF: export package_import_item { , package_import_item } ;
-  auto r = Parse("package pkg;\n"
-                 "  export p1::a, p2::b;\n"
-                 "endpackage");
+  auto r = Parse(
+      "package pkg;\n"
+      "  export p1::a, p2::b;\n"
+      "endpackage");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   int export_count = 0;
   for (auto *item : r.cu->packages[0]->items) {
-    if (item->kind == ModuleItemKind::kExportDecl)
-      export_count++;
+    if (item->kind == ModuleItemKind::kExportDecl) export_count++;
   }
   EXPECT_GE(export_count, 2);
 }
@@ -217,8 +221,9 @@ TEST(ParserA213, PackageExportMultipleItems) {
 // | package_identifier :: *
 
 TEST(ParserA213, PackageImportItemNamed) {
-  auto r = Parse("package pkg; endpackage\n"
-                 "module m; import pkg::my_func; endmodule");
+  auto r = Parse(
+      "package pkg; endpackage\n"
+      "module m; import pkg::my_func; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -228,8 +233,9 @@ TEST(ParserA213, PackageImportItemNamed) {
 }
 
 TEST(ParserA213, PackageImportItemStar) {
-  auto r = Parse("package pkg; endpackage\n"
-                 "module m; import pkg::*; endmodule");
+  auto r = Parse(
+      "package pkg; endpackage\n"
+      "module m; import pkg::*; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -312,8 +318,7 @@ TEST(ParserA213, NetDeclMultipleAssign) {
   EXPECT_FALSE(r.has_errors);
   int count = 0;
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kNetDecl)
-      count++;
+    if (item->kind == ModuleItemKind::kNetDecl) count++;
   }
   EXPECT_GE(count, 3);
 }
@@ -359,9 +364,10 @@ TEST(ParserA213, TypedefEnum) {
 }
 
 TEST(ParserA213, TypedefStruct) {
-  auto r = Parse("module m;\n"
-                 "  typedef struct { int a; int b; } pair_t;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct { int a; int b; } pair_t;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -455,29 +461,32 @@ TEST(ParserA213, NettypeDeclWithScopedResolve) {
 // static | automatic
 
 TEST(ParserA213, LifetimeStaticInBlock) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    static int x;\n"
-                 "  end\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    static int x;\n"
+      "  end\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA213, LifetimeAutomaticInBlock) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    automatic int y;\n"
-                 "  end\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    automatic int y;\n"
+      "  end\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA213, LifetimeInFunction) {
-  auto r = Parse("module m;\n"
-                 "  function automatic int calc; return 0; endfunction\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int calc; return 0; endfunction\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];

@@ -24,15 +24,17 @@ static bool ParseOk(const std::string &src) {
 }
 
 TEST(ParserSection22, UnconnectedDrivePull1) {
-  EXPECT_TRUE(ParseOk("`unconnected_drive pull1\n"
-                      "module t;\n"
-                      "endmodule\n"
-                      "`nounconnected_drive\n"));
+  EXPECT_TRUE(
+      ParseOk("`unconnected_drive pull1\n"
+              "module t;\n"
+              "endmodule\n"
+              "`nounconnected_drive\n"));
 }
 
 TEST(ParserSection22, UnconnectedDrivePull0) {
-  EXPECT_TRUE(ParseOk("`unconnected_drive pull0\n"
-                      "module t;\n"
-                      "endmodule\n"
-                      "`nounconnected_drive\n"));
+  EXPECT_TRUE(
+      ParseOk("`unconnected_drive pull0\n"
+              "module t;\n"
+              "endmodule\n"
+              "`nounconnected_drive\n"));
 }

@@ -57,15 +57,13 @@ static uint64_t RunAndGet44(const std::string &src, const char *var_name) {
   SimCh44Fixture f;
   auto *design = ElaborateSrc44(src, f);
   EXPECT_NE(design, nullptr);
-  if (!design)
-    return 0;
+  if (!design) return 0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
   auto *var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
-  if (!var)
-    return 0;
+  if (!var) return 0;
   return var->value.ToUint64();
 }
 
@@ -389,14 +387,15 @@ TEST(SimCh44, EventQueueClear) {
 // ---------------------------------------------------------------------------
 TEST(SimCh44, RegionsPredictableDesignTestbenchInteraction) {
   SimCh44Fixture f;
-  auto *design = ElaborateSrc44("module t;\n"
-                                "  logic [7:0] a, b;\n"
-                                "  initial begin\n"
-                                "    a = 8'd10;\n"
-                                "    b <= 8'd20;\n"
-                                "  end\n"
-                                "endmodule\n",
-                                f);
+  auto *design = ElaborateSrc44(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 8'd10;\n"
+      "    b <= 8'd20;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -412,12 +411,13 @@ TEST(SimCh44, RegionsPredictableDesignTestbenchInteraction) {
 // ---------------------------------------------------------------------------
 TEST(SimCh44, PredictableNBAToAlwaysCombInteraction) {
   SimCh44Fixture f;
-  auto *design = ElaborateSrc44("module t;\n"
-                                "  logic [7:0] x, y;\n"
-                                "  initial x <= 8'd50;\n"
-                                "  always_comb y = x + 8'd1;\n"
-                                "endmodule\n",
-                                f);
+  auto *design = ElaborateSrc44(
+      "module t;\n"
+      "  logic [7:0] x, y;\n"
+      "  initial x <= 8'd50;\n"
+      "  always_comb y = x + 8'd1;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -459,15 +459,16 @@ TEST(SimCh44, DynamicSchedulingWithinSameTimeSlot) {
 // ---------------------------------------------------------------------------
 TEST(SimCh44, BlockingAndNBACompleteInSameTimeSlot) {
   SimCh44Fixture f;
-  auto *design = ElaborateSrc44("module t;\n"
-                                "  logic [7:0] a, b, c;\n"
-                                "  initial begin\n"
-                                "    a = 8'd1;\n"
-                                "    b <= 8'd2;\n"
-                                "    c = 8'd3;\n"
-                                "  end\n"
-                                "endmodule\n",
-                                f);
+  auto *design = ElaborateSrc44(
+      "module t;\n"
+      "  logic [7:0] a, b, c;\n"
+      "  initial begin\n"
+      "    a = 8'd1;\n"
+      "    b <= 8'd2;\n"
+      "    c = 8'd3;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -482,16 +483,17 @@ TEST(SimCh44, BlockingAndNBACompleteInSameTimeSlot) {
 // Events at time 5, 10, and 15 each form separate time slots.
 // ---------------------------------------------------------------------------
 TEST(SimCh44, MultipleTimeSlotsFormDistinctSlots) {
-  auto result = RunAndGet44("module t;\n"
-                            "  logic [7:0] x;\n"
-                            "  initial begin\n"
-                            "    x = 8'd0;\n"
-                            "    #5 x = x + 8'd1;\n"
-                            "    #5 x = x + 8'd1;\n"
-                            "    #5 x = x + 8'd1;\n"
-                            "  end\n"
-                            "endmodule\n",
-                            "x");
+  auto result = RunAndGet44(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    #5 x = x + 8'd1;\n"
+      "    #5 x = x + 8'd1;\n"
+      "    #5 x = x + 8'd1;\n"
+      "  end\n"
+      "endmodule\n",
+      "x");
   EXPECT_EQ(result, 3u);
 }
 

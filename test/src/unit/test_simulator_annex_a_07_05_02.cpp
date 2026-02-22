@@ -37,7 +37,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA70502Fixture &f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.7.5.2 Sim — $nochange with mintypmax offsets simulates
@@ -45,15 +45,15 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA70502Fixture &f) {
 
 TEST(SimA70502, NochangeMinTypMaxOffsetsSimulates) {
   SimA70502Fixture f;
-  auto *design =
-      ElaborateSrc("module t;\n"
-                   "  logic [7:0] x;\n"
-                   "  specify\n"
-                   "    $nochange(posedge clk, data, 1:2:3, 4:5:6);\n"
-                   "  endspecify\n"
-                   "  initial x = 8'd10;\n"
-                   "endmodule\n",
-                   f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  specify\n"
+      "    $nochange(posedge clk, data, 1:2:3, 4:5:6);\n"
+      "  endspecify\n"
+      "  initial x = 8'd10;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);

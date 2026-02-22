@@ -1,5 +1,11 @@
 // §6.19.5.5: Num()
 
+#include <gtest/gtest.h>
+
+#include <string>
+#include <string_view>
+#include <vector>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -7,10 +13,6 @@
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
-#include <string>
-#include <string_view>
-#include <vector>
 
 using namespace delta;
 
@@ -26,9 +28,9 @@ struct EnumFixture {
 
   // Register an enum type with the given members and values.
   // Returns the variable associated with the enum.
-  Variable *
-  RegisterEnum(std::string_view var_name, std::string_view type_name,
-               const std::vector<std::pair<std::string, uint64_t>> &members) {
+  Variable *RegisterEnum(
+      std::string_view var_name, std::string_view type_name,
+      const std::vector<std::pair<std::string, uint64_t>> &members) {
     EnumTypeInfo info;
     char *tn = arena.AllocString(type_name.data(), type_name.size());
     info.type_name = std::string_view(tn, type_name.size());
@@ -105,4 +107,4 @@ TEST(EnumMethods, NumSingleMember) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-} // namespace
+}  // namespace

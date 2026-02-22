@@ -1,11 +1,12 @@
 // §6.17: Event data type
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -50,9 +51,10 @@ namespace {
 
 // --- Named event tests ---
 TEST(Parser, EventDeclaration) {
-  auto r = Parse("module t;\n"
-                 "  event ev;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  event ev;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
@@ -60,4 +62,4 @@ TEST(Parser, EventDeclaration) {
   EXPECT_EQ(item->name, "ev");
 }
 
-} // namespace
+}  // namespace

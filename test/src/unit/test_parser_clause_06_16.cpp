@@ -38,8 +38,7 @@ static bool ParseOk(const std::string &src) {
 }
 
 static ModuleItem *FirstItem(ParseResult616 &r) {
-  if (!r.cu || r.cu->modules.empty())
-    return nullptr;
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
   auto &items = r.cu->modules[0]->items;
   return items.empty() ? nullptr : items[0];
 }
@@ -50,9 +49,10 @@ static ModuleItem *FirstItem(ParseResult616 &r) {
 
 TEST(ParserSection6, StringDeclBasic) {
   // string variable declaration (LRM 6.16)
-  auto r = Parse("module m;\n"
-                 "  string s;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  string s;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -63,9 +63,10 @@ TEST(ParserSection6, StringDeclBasic) {
 
 TEST(ParserSection6, StringDeclWithInitializer) {
   // string variable with initial value
-  auto r = Parse("module m;\n"
-                 "  string name = \"hello\";\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  string name = \"hello\";\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = FirstItem(r);
@@ -76,65 +77,72 @@ TEST(ParserSection6, StringDeclWithInitializer) {
 
 TEST(ParserSection6, StringDeclEmptyInit) {
   // string initialized to empty string
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  string s = \"\";\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  string s = \"\";\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection6, StringParameterDecl) {
   // parameter string (LRM 6.16)
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  parameter string DEFAULT_NAME = \"John Smith\";\n"
-                      "  string myName = DEFAULT_NAME;\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  parameter string DEFAULT_NAME = \"John Smith\";\n"
+              "  string myName = DEFAULT_NAME;\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection6, StringInFunctionArg) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  function void greet(string name);\n"
-                      "    $display(\"Hello %s\", name);\n"
-                      "  endfunction\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function void greet(string name);\n"
+              "    $display(\"Hello %s\", name);\n"
+              "  endfunction\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection6, StringFunctionReturn) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  function string get_msg();\n"
-                      "    return \"ok\";\n"
-                      "  endfunction\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function string get_msg();\n"
+              "    return \"ok\";\n"
+              "  endfunction\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection6, StringConcatOp) {
   // String concatenation using {} operator
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  string a, b, c;\n"
-                      "  initial begin\n"
-                      "    a = \"hello\";\n"
-                      "    b = \" world\";\n"
-                      "    c = {a, b};\n"
-                      "  end\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  string a, b, c;\n"
+              "  initial begin\n"
+              "    a = \"hello\";\n"
+              "    b = \" world\";\n"
+              "    c = {a, b};\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection6, StringComparison) {
   // String comparison operators
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  string a, b;\n"
-                      "  initial begin\n"
-                      "    a = \"abc\";\n"
-                      "    b = \"def\";\n"
-                      "    if (a == b) $display(\"equal\");\n"
-                      "    if (a != b) $display(\"not equal\");\n"
-                      "    if (a < b) $display(\"less\");\n"
-                      "  end\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  string a, b;\n"
+              "  initial begin\n"
+              "    a = \"abc\";\n"
+              "    b = \"def\";\n"
+              "    if (a == b) $display(\"equal\");\n"
+              "    if (a != b) $display(\"not equal\");\n"
+              "    if (a < b) $display(\"less\");\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection6, MultipleStringDecls) {
-  auto r = Parse("module m;\n"
-                 "  string x, y, z;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  string x, y, z;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_GE(r.cu->modules[0]->items.size(), 3u);

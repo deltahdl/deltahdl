@@ -1,12 +1,14 @@
 // Annex A.1.3: Module parameters and ports
 
+#include <gtest/gtest.h>
+
+#include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
-#include <string>
 
 using namespace delta;
 
@@ -31,7 +33,7 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-} // namespace
+}  // namespace
 
 namespace {
 
@@ -45,10 +47,11 @@ TEST(SourceText, ModuleAnsiHeader) {
 
 // Module with non-ANSI header (list_of_ports).
 TEST(SourceText, ModuleNonAnsiHeader) {
-  auto r = Parse("module m(a, b);\n"
-                 "  input a;\n"
-                 "  output b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(a, b);\n"
+      "  input a;\n"
+      "  output b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules[0]->ports.size(), 2u);
@@ -80,9 +83,10 @@ TEST(SourceText, InterfaceAnsiHeader) {
 
 // Interface with non-ANSI ports.
 TEST(SourceText, InterfaceNonAnsiHeader) {
-  auto r = Parse("interface ifc(clk);\n"
-                 "  input clk;\n"
-                 "endinterface\n");
+  auto r = Parse(
+      "interface ifc(clk);\n"
+      "  input clk;\n"
+      "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->interfaces.size(), 1u);
@@ -112,9 +116,10 @@ TEST(SourceText, ProgramAnsiHeader) {
 
 // Program with non-ANSI ports.
 TEST(SourceText, ProgramNonAnsiHeader) {
-  auto r = Parse("program prg(clk);\n"
-                 "  input clk;\n"
-                 "endprogram\n");
+  auto r = Parse(
+      "program prg(clk);\n"
+      "  input clk;\n"
+      "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->programs.size(), 1u);
@@ -171,9 +176,10 @@ TEST(SourceText, ParamPortTypeParameter) {
 
 // parameter_port_list: mixed forms
 TEST(SourceText, ParamPortMixedForms) {
-  auto r = Parse("module m #(parameter int A = 1, localparam int B = 2,\n"
-                 "           type T = logic, int C = 3);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m #(parameter int A = 1, localparam int B = 2,\n"
+      "           type T = logic, int C = 3);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules[0]->params.size(), 4u);
@@ -195,9 +201,10 @@ TEST(SourceText, EmptyPortList) {
 // port_declaration: all 4 directions (port_direction ::=
 // input|output|inout|ref)
 TEST(SourceText, PortDirectionAllFour) {
-  auto r = Parse("module m(input logic a, output logic b,\n"
-                 "         inout wire c, ref logic d);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input logic a, output logic b,\n"
+      "         inout wire c, ref logic d);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &ports = r.cu->modules[0]->ports;
@@ -240,11 +247,12 @@ TEST(SourceText, VariablePortHeader) {
 
 // Non-ANSI list_of_ports: port with multiple ports and body declarations
 TEST(SourceText, NonAnsiMultiplePorts) {
-  auto r = Parse("module m(a, b, c);\n"
-                 "  input [7:0] a;\n"
-                 "  output [7:0] b;\n"
-                 "  inout c;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(a, b, c);\n"
+      "  input [7:0] a;\n"
+      "  output [7:0] b;\n"
+      "  inout c;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &ports = r.cu->modules[0]->ports;
@@ -256,9 +264,10 @@ TEST(SourceText, NonAnsiMultiplePorts) {
 
 // Non-ANSI port_declaration with shared type: input [7:0] a, b;
 TEST(SourceText, NonAnsiSharedType) {
-  auto r = Parse("module m(a, b);\n"
-                 "  input [7:0] a, b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(a, b);\n"
+      "  input [7:0] a, b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto &ports = r.cu->modules[0]->ports;
@@ -269,9 +278,10 @@ TEST(SourceText, NonAnsiSharedType) {
 
 // Module with both parameters and ports
 TEST(SourceText, ParamsAndPorts) {
-  auto r = Parse("module m #(parameter int W = 8)(input logic [W-1:0] data,\n"
-                 "                                 output logic valid);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m #(parameter int W = 8)(input logic [W-1:0] data,\n"
+      "                                 output logic valid);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules[0]->params.size(), 1u);
@@ -283,8 +293,9 @@ TEST(SourceText, ParamsAndPorts) {
 
 // Interface parameter port list and ports
 TEST(SourceText, InterfaceParamsAndPorts) {
-  auto r = Parse("interface ifc #(parameter int W = 8)(input logic clk);\n"
-                 "endinterface\n");
+  auto r = Parse(
+      "interface ifc #(parameter int W = 8)(input logic clk);\n"
+      "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->interfaces.size(), 1u);
@@ -294,8 +305,9 @@ TEST(SourceText, InterfaceParamsAndPorts) {
 
 // Program parameter port list and ports
 TEST(SourceText, ProgramParamsAndPorts) {
-  auto r = Parse("program prg #(parameter int N = 10)(input logic clk);\n"
-                 "endprogram\n");
+  auto r = Parse(
+      "program prg #(parameter int N = 10)(input logic clk);\n"
+      "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->programs.size(), 1u);
@@ -303,4 +315,4 @@ TEST(SourceText, ProgramParamsAndPorts) {
   EXPECT_EQ(r.cu->programs[0]->ports.size(), 1u);
 }
 
-} // namespace
+}  // namespace

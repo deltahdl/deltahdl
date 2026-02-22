@@ -52,9 +52,10 @@ static Stmt *FirstInitialStmt(ParseResult505 &r) {
 }
 
 TEST(ParserCh505, Operator_UnaryBitwiseNegate) {
-  auto r = Parse("module m;\n"
-                 "  initial x = ~y;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = ~y;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -65,9 +66,10 @@ TEST(ParserCh505, Operator_UnaryBitwiseNegate) {
 }
 
 TEST(ParserCh505, Operator_BinaryAdd) {
-  auto r = Parse("module m;\n"
-                 "  initial x = a + b;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = a + b;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -78,9 +80,10 @@ TEST(ParserCh505, Operator_BinaryAdd) {
 }
 
 TEST(ParserCh505, Operator_Ternary) {
-  auto r = Parse("module m;\n"
-                 "  initial x = sel ? a : b;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = sel ? a : b;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -102,9 +105,10 @@ TEST(ParserCh505, Operator_ArithShiftRight) {
 
 TEST(ParserCh505, Operator_CaseEquality) {
   // === is the case equality operator.
-  auto r = Parse("module m;\n"
-                 "  initial x = (a === b);\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = (a === b);\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -120,9 +124,10 @@ TEST(ParserCh505, Operator_CaseInequality) {
 }
 
 TEST(ParserCh505, Operator_ReductionAnd) {
-  auto r = Parse("module m;\n"
-                 "  initial x = &y;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = &y;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);

@@ -1,11 +1,13 @@
 // §39.4: Dynamic information
 
-#include "simulation/dpi_runtime.h"
-#include "vpi/sv_vpi_user.h"
-#include <cstdint>
 #include <gtest/gtest.h>
+
+#include <cstdint>
 #include <string>
 #include <vector>
+
+#include "simulation/dpi_runtime.h"
+#include "vpi/sv_vpi_user.h"
 
 using namespace delta;
 
@@ -19,7 +21,7 @@ TEST(Api, AssertionRegisterCallback) {
   bool fired = false;
   api.RegisterCallback(
       kCbAssertionFailure,
-      [&fired](const AssertionCbData & /*d*/) { fired = true; }, nullptr);
+      [&fired](const AssertionCbData& /*d*/) { fired = true; }, nullptr);
   EXPECT_EQ(api.CallbackCount(), 1u);
 
   AssertionCbData data;
@@ -33,7 +35,7 @@ TEST(Api, AssertionCallbackReasonFiltering) {
   int fire_count = 0;
   api.RegisterCallback(
       kCbAssertionSuccess,
-      [&fire_count](const AssertionCbData & /*d*/) { ++fire_count; }, nullptr);
+      [&fire_count](const AssertionCbData& /*d*/) { ++fire_count; }, nullptr);
 
   // Fire with non-matching reason.
   AssertionCbData data;
@@ -53,10 +55,10 @@ TEST(Api, AssertionMultipleCallbacks) {
   int count_b = 0;
   api.RegisterCallback(
       kCbAssertionStart,
-      [&count_a](const AssertionCbData & /*d*/) { ++count_a; }, nullptr);
+      [&count_a](const AssertionCbData& /*d*/) { ++count_a; }, nullptr);
   api.RegisterCallback(
       kCbAssertionStart,
-      [&count_b](const AssertionCbData & /*d*/) { ++count_b; }, nullptr);
+      [&count_b](const AssertionCbData& /*d*/) { ++count_b; }, nullptr);
   EXPECT_EQ(api.CallbackCount(), 2u);
 
   AssertionCbData data;
@@ -98,4 +100,4 @@ TEST(SvVpiUser, AttemptInfoStruct) {
   EXPECT_EQ(info.attempt_start_time.low, 100u);
 }
 
-} // namespace
+}  // namespace

@@ -1,9 +1,11 @@
 // §non_lrm
 
+#include <gtest/gtest.h>
+
+#include <string>
+
 #include "synthesis/aig.h"
 #include "synthesis/netlist_writer.h"
-#include <gtest/gtest.h>
-#include <string>
 
 using namespace delta;
 
@@ -159,4 +161,4 @@ TEST(NetlistWriter, DispatchByFormat) {
   EXPECT_NE(edif.find("test"), std::string::npos);
 }
 
-} // namespace
+}  // namespace

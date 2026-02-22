@@ -38,12 +38,13 @@ static ParseResult310 Parse(const std::string &src) {
 //         which specify the binding information of module instances to specific
 //         SystemVerilog source code. Configurations utilize libraries."
 TEST(ParserClause03, Cl3_10_ConfigBindingAndLibraries) {
-  auto r = Parse("config cfg1;\n"
-                 "  design work.top;\n"
-                 "  default liblist work;\n"
-                 "  instance top.u1 use lib2.fast_adder;\n"
-                 "  cell adder liblist lib1 lib2;\n"
-                 "endconfig : cfg1\n");
+  auto r = Parse(
+      "config cfg1;\n"
+      "  design work.top;\n"
+      "  default liblist work;\n"
+      "  instance top.u1 use lib2.fast_adder;\n"
+      "  cell adder liblist lib1 lib2;\n"
+      "endconfig : cfg1\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->configs.size(), 1u);

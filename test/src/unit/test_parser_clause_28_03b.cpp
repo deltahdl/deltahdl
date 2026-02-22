@@ -1,11 +1,12 @@
 // §28.3: Gate and switch declaration syntax
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -58,4 +59,4 @@ TEST(Parser, GateNoInstanceName) {
   EXPECT_EQ(item->gate_terminals.size(), 3);
 }
 
-} // namespace
+}  // namespace

@@ -1,5 +1,10 @@
 // §15.4.5: Get()
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <string_view>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -14,9 +19,6 @@
 #include "simulation/stmt_result.h"
 #include "simulation/sync_objects.h"
 #include "simulation/variable.h"
-#include <cstdint>
-#include <gtest/gtest.h>
-#include <string_view>
 
 using namespace delta;
 
@@ -51,7 +53,7 @@ TEST(IpcSync, MailboxTryPutBoundedSuccess) {
 TEST(IpcSync, MailboxTryPutBoundedFull) {
   MailboxObject mb(1);
   EXPECT_EQ(mb.TryPut(10), 0);
-  EXPECT_EQ(mb.TryPut(20), -1); // Full.
+  EXPECT_EQ(mb.TryPut(20), -1);  // Full.
   EXPECT_EQ(mb.Num(), 1);
 }
 
@@ -61,13 +63,13 @@ TEST(IpcSync, MailboxTryPutBoundedFull) {
 TEST(IpcSync, MailboxBoundedGetFreesSpace) {
   MailboxObject mb(1);
   EXPECT_EQ(mb.TryPut(10), 0);
-  EXPECT_EQ(mb.TryPut(20), -1); // Full.
+  EXPECT_EQ(mb.TryPut(20), -1);  // Full.
 
   uint64_t msg = 0;
   mb.TryGet(msg);
   EXPECT_EQ(msg, 10u);
-  EXPECT_EQ(mb.TryPut(30), 0); // Space freed.
+  EXPECT_EQ(mb.TryPut(30), 0);  // Space freed.
   EXPECT_EQ(mb.Num(), 1);
 }
 
-} // namespace
+}  // namespace

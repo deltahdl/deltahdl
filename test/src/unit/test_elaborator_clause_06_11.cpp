@@ -1,8 +1,9 @@
 // §6.11: Integer data types
 
+#include <gtest/gtest.h>
+
 #include "elaboration/type_eval.h"
 #include "parser/ast.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -31,4 +32,4 @@ TEST(TypeEval, ImplicitlySignedTypes) {
   }
 }
 
-} // namespace
+}  // namespace

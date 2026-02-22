@@ -37,7 +37,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA81Fixture &f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.8.1 Concatenations — Simulation
@@ -47,11 +47,12 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA81Fixture &f) {
 
 TEST(SimA81, ConcatenationTwoElements) {
   SimA81Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] result;\n"
-                              "  initial result = {4'hA, 4'h5};\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial result = {4'hA, 4'h5};\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -65,11 +66,12 @@ TEST(SimA81, ConcatenationTwoElements) {
 
 TEST(SimA81, ConcatenationThreeElements) {
   SimA81Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [11:0] result;\n"
-                              "  initial result = {4'hF, 4'h0, 4'hA};\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [11:0] result;\n"
+      "  initial result = {4'hF, 4'h0, 4'hA};\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -83,11 +85,12 @@ TEST(SimA81, ConcatenationThreeElements) {
 
 TEST(SimA81, ConcatenationNested) {
   SimA81Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [11:0] result;\n"
-                              "  initial result = {4'hA, {4'hB, 4'hC}};\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [11:0] result;\n"
+      "  initial result = {4'hA, {4'hB, 4'hC}};\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -101,11 +104,12 @@ TEST(SimA81, ConcatenationNested) {
 
 TEST(SimA81, ReplicationBasic) {
   SimA81Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] result;\n"
-                              "  initial result = {2{4'hA}};\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial result = {2{4'hA}};\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -117,11 +121,12 @@ TEST(SimA81, ReplicationBasic) {
 
 TEST(SimA81, ReplicationFour) {
   SimA81Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] result;\n"
-                              "  initial result = {4{2'b10}};\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial result = {4{2'b10}};\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -136,11 +141,12 @@ TEST(SimA81, ReplicationFour) {
 
 TEST(SimA81, ReplicationMultipleInner) {
   SimA81Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [15:0] result;\n"
-                              "  initial result = {2{4'hA, 4'h5}};\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] result;\n"
+      "  initial result = {2{4'hA, 4'h5}};\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -155,11 +161,12 @@ TEST(SimA81, ReplicationMultipleInner) {
 
 TEST(SimA81, StreamingRightShift) {
   SimA81Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] result;\n"
-                              "  initial result = {>> {8'hAB}};\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial result = {>> {8'hAB}};\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -173,11 +180,12 @@ TEST(SimA81, StreamingRightShift) {
 
 TEST(SimA81, StreamingLeftShift) {
   SimA81Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] result;\n"
-                              "  initial result = {<< {8'hAB}};\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial result = {<< {8'hAB}};\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -192,11 +200,12 @@ TEST(SimA81, StreamingLeftShift) {
 
 TEST(SimA81, StreamingMultipleElements) {
   SimA81Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] result;\n"
-                              "  initial result = {>> {4'hA, 4'h5}};\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial result = {>> {4'hA, 4'h5}};\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -210,16 +219,17 @@ TEST(SimA81, StreamingMultipleElements) {
 
 TEST(SimA81, ConcatWithVariables) {
   SimA81Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [3:0] a, b;\n"
-                              "  logic [7:0] result;\n"
-                              "  initial begin\n"
-                              "    a = 4'hC;\n"
-                              "    b = 4'h3;\n"
-                              "    result = {a, b};\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] a, b;\n"
+      "  logic [7:0] result;\n"
+      "  initial begin\n"
+      "    a = 4'hC;\n"
+      "    b = 4'h3;\n"
+      "    result = {a, b};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -233,11 +243,12 @@ TEST(SimA81, ConcatWithVariables) {
 
 TEST(SimA81, ConcatAsLHS) {
   SimA81Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [3:0] a, b;\n"
-                              "  initial {a, b} = 8'hC3;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] a, b;\n"
+      "  initial {a, b} = 8'hC3;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -254,12 +265,13 @@ TEST(SimA81, ConcatAsLHS) {
 
 TEST(SimA81, ConcatDoesNotInterfere) {
   SimA81Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] a, b;\n"
-                              "  initial a = {4'h1, 4'h2};\n"
-                              "  initial b = 8'd99;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial a = {4'h1, 4'h2};\n"
+      "  initial b = 8'd99;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);

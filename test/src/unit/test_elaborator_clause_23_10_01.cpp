@@ -1,5 +1,7 @@
 // §23.10.1: defparam statement
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -11,7 +13,6 @@
 #include "lexer/lexer.h"
 #include "lexer/token.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -35,13 +36,14 @@ namespace {
 // --- Defparam tests ---
 TEST(Elaboration, Defparam_OverridesDefault) {
   ElabFixture f;
-  auto *design = ElaborateSrc("module child #(parameter WIDTH = 4)();\n"
-                              "endmodule\n"
-                              "module top;\n"
-                              "  child u0();\n"
-                              "  defparam u0.WIDTH = 16;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module child #(parameter WIDTH = 4)();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child u0();\n"
+      "  defparam u0.WIDTH = 16;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   auto *mod = design->top_modules[0];
   ASSERT_EQ(mod->children.size(), 1);
@@ -52,13 +54,14 @@ TEST(Elaboration, Defparam_OverridesDefault) {
 
 TEST(Elaboration, Defparam_OverridesDefault_Value) {
   ElabFixture f;
-  auto *design = ElaborateSrc("module child #(parameter WIDTH = 4)();\n"
-                              "endmodule\n"
-                              "module top;\n"
-                              "  child u0();\n"
-                              "  defparam u0.WIDTH = 16;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module child #(parameter WIDTH = 4)();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child u0();\n"
+      "  defparam u0.WIDTH = 16;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   auto *child = design->top_modules[0]->children[0].resolved;
   EXPECT_EQ(child->params[0].resolved_value, 16);
@@ -67,15 +70,16 @@ TEST(Elaboration, Defparam_OverridesDefault_Value) {
 
 TEST(Elaboration, Defparam_NotFoundWarns) {
   ElabFixture f;
-  auto *design = ElaborateSrc("module child #(parameter WIDTH = 4)();\n"
-                              "endmodule\n"
-                              "module top;\n"
-                              "  child u0();\n"
-                              "  defparam u0.BOGUS = 99;\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module child #(parameter WIDTH = 4)();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child u0();\n"
+      "  defparam u0.BOGUS = 99;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
-} // namespace
+}  // namespace

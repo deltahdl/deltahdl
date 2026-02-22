@@ -1,7 +1,8 @@
 // §28.10: pullup and pulldown sources
 
-#include <cstdint>
 #include <gtest/gtest.h>
+
+#include <cstdint>
 
 // --- Local types for pullup/pulldown sources (§28.10) ---
 enum class Val4 : uint8_t { kV0 = 0, kV1 = 1, kX = 2, kZ = 3 };
@@ -35,10 +36,10 @@ bool PullSourceAcceptsDelaySpec();
 
 Val4 EvalPullSource(PullKind kind) {
   switch (kind) {
-  case PullKind::kPullup:
-    return Val4::kV1;
-  case PullKind::kPulldown:
-    return Val4::kV0;
+    case PullKind::kPullup:
+      return Val4::kV1;
+    case PullKind::kPulldown:
+      return Val4::kV0;
   }
   return Val4::kX;
 }
@@ -129,4 +130,4 @@ TEST(PullGates, PulldownIgnoresStrength1) {
 // §28.10:
 TEST(PullGates, NoDelaySpecs) { EXPECT_FALSE(PullSourceAcceptsDelaySpec()); }
 
-} // namespace
+}  // namespace

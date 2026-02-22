@@ -41,7 +41,7 @@ constexpr Region kPLIRegions[] = {
 
 constexpr size_t kPLIRegionCount = 8;
 
-} // namespace
+}  // namespace
 
 // ---------------------------------------------------------------------------
 // §4.4.2 Simulation regions are exactly 9.
@@ -85,10 +85,8 @@ TEST(SimCh442, SimAndPLIAreDisjoint) {
 // ---------------------------------------------------------------------------
 TEST(SimCh442, SimAndPLICoverAllRegions) {
   std::set<Region> all;
-  for (auto r : kSimulationRegions)
-    all.insert(r);
-  for (auto r : kPLIRegions)
-    all.insert(r);
+  for (auto r : kSimulationRegions) all.insert(r);
+  for (auto r : kPLIRegions) all.insert(r);
   EXPECT_EQ(all.size(), kRegionCount);
 }
 

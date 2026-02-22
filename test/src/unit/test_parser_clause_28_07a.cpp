@@ -27,10 +27,11 @@ static ParseResult Parse(const std::string &src) {
 }
 
 TEST(ParserSection28, PullGates) {
-  auto r = Parse("module m;\n"
-                 "  pullup (out);\n"
-                 "  pulldown (out);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  pullup (out);\n"
+      "  pulldown (out);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 2);

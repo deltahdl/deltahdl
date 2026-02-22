@@ -41,16 +41,14 @@ static bool ParseOk(const std::string &src) {
 
 static ModuleItem *FindSpecifyBlock(const std::vector<ModuleItem *> &items) {
   for (auto *item : items) {
-    if (item->kind == ModuleItemKind::kSpecifyBlock)
-      return item;
+    if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
   }
   return nullptr;
 }
 
 static SpecifyItem *GetSoleSpecifyItem(ModuleItem *spec_block) {
   EXPECT_EQ(spec_block->specify_items.size(), 1u);
-  if (spec_block->specify_items.empty())
-    return nullptr;
+  if (spec_block->specify_items.empty()) return nullptr;
   return spec_block->specify_items[0];
 }
 
@@ -63,8 +61,7 @@ struct SpecifyParseResult {
 static SpecifyParseResult ParseSpecifySingle(const std::string &src) {
   SpecifyParseResult result;
   result.pr = Parse(src);
-  if (result.pr.cu == nullptr)
-    return result;
+  if (result.pr.cu == nullptr) return result;
   result.spec_block = FindSpecifyBlock(result.pr.cu->modules[0]->items);
   if (result.spec_block != nullptr) {
     result.sole_item = GetSoleSpecifyItem(result.spec_block);
@@ -73,11 +70,12 @@ static SpecifyParseResult ParseSpecifySingle(const std::string &src) {
 }
 
 TEST(ParserSection28, Sec28_12_TwoDelayPath) {
-  auto sp = ParseSpecifySingle("module m(input a, output b);\n"
-                               "  specify\n"
-                               "    (a => b) = (5, 10);\n"
-                               "  endspecify\n"
-                               "endmodule\n");
+  auto sp = ParseSpecifySingle(
+      "module m(input a, output b);\n"
+      "  specify\n"
+      "    (a => b) = (5, 10);\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(sp.pr.cu, nullptr);
   EXPECT_FALSE(sp.pr.has_errors);
   ASSERT_NE(sp.sole_item, nullptr);
@@ -86,11 +84,12 @@ TEST(ParserSection28, Sec28_12_TwoDelayPath) {
 }
 
 TEST(ParserSection28, Sec28_12_ThreeDelayPath) {
-  auto sp = ParseSpecifySingle("module m(input a, output b);\n"
-                               "  specify\n"
-                               "    (a => b) = (3, 7, 11);\n"
-                               "  endspecify\n"
-                               "endmodule\n");
+  auto sp = ParseSpecifySingle(
+      "module m(input a, output b);\n"
+      "  specify\n"
+      "    (a => b) = (3, 7, 11);\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(sp.pr.cu, nullptr);
   EXPECT_FALSE(sp.pr.has_errors);
   ASSERT_NE(sp.sole_item, nullptr);
@@ -98,11 +97,12 @@ TEST(ParserSection28, Sec28_12_ThreeDelayPath) {
 }
 
 TEST(ParserSection28, Sec28_12_SixDelayPath) {
-  auto sp = ParseSpecifySingle("module m(input a, output b);\n"
-                               "  specify\n"
-                               "    (a => b) = (1, 2, 3, 4, 5, 6);\n"
-                               "  endspecify\n"
-                               "endmodule\n");
+  auto sp = ParseSpecifySingle(
+      "module m(input a, output b);\n"
+      "  specify\n"
+      "    (a => b) = (1, 2, 3, 4, 5, 6);\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(sp.pr.cu, nullptr);
   EXPECT_FALSE(sp.pr.has_errors);
   ASSERT_NE(sp.sole_item, nullptr);
@@ -123,13 +123,14 @@ TEST(ParserSection28, Sec28_12_TwelveDelayPath) {
 }
 
 TEST(ParserSection28, Sec28_12_MultiplePathsInSpecifyBlock) {
-  auto r = Parse("module m(input a, b, output x, y);\n"
-                 "  specify\n"
-                 "    (a => x) = 5;\n"
-                 "    (b => y) = 7;\n"
-                 "    (a => y) = 9;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input a, b, output x, y);\n"
+      "  specify\n"
+      "    (a => x) = 5;\n"
+      "    (b => y) = 7;\n"
+      "    (a => y) = 9;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *spec = FindSpecifyBlock(r.cu->modules[0]->items);
@@ -144,10 +145,11 @@ TEST(ParserSection28, Sec28_12_MultiplePathsInSpecifyBlock) {
 }
 
 TEST(ParserSection28, Sec28_12_SpecparamMinTypMax) {
-  EXPECT_TRUE(ParseOk("module m(input a, output b);\n"
-                      "  specify\n"
-                      "    specparam tPLH = 3:5:7;\n"
-                      "    (a => b) = tPLH;\n"
-                      "  endspecify\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m(input a, output b);\n"
+              "  specify\n"
+              "    specparam tPLH = 3:5:7;\n"
+              "    (a => b) = tPLH;\n"
+              "  endspecify\n"
+              "endmodule\n"));
 }

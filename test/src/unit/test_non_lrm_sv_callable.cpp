@@ -1,9 +1,11 @@
 // Non-LRM tests
 
-#include "simulation/sv_callable.h"
 #include <gtest/gtest.h>
+
 #include <string_view>
 #include <vector>
+
+#include "simulation/sv_callable.h"
 
 using namespace delta;
 
@@ -110,4 +112,4 @@ TEST(SvCallableContext, NestedCalls) {
   EXPECT_TRUE(ctx.Empty());
 }
 
-} // namespace
+}  // namespace

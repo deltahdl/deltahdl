@@ -70,7 +70,7 @@ TEST(SimCh48, BlockingAssignmentTriggersUpdateEvent) {
 
   sched.Run();
   EXPECT_EQ(q, 0);
-  EXPECT_EQ(p, 0); // Update event executed, p reflects new q.
+  EXPECT_EQ(p, 0);  // Update event executed, p reflects new q.
 }
 
 // ---------------------------------------------------------------------------

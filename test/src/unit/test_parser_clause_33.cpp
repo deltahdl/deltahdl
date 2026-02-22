@@ -14,7 +14,7 @@ using namespace delta;
 namespace {
 
 struct ConfigParseTest : ::testing::Test {
-protected:
+ protected:
   CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
@@ -114,4 +114,4 @@ TEST_F(ConfigParseTest, MultipleConfigs) {
   EXPECT_EQ(unit->configs[1]->name, "cfg2");
 }
 
-} // namespace
+}  // namespace

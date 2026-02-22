@@ -39,8 +39,7 @@ static bool ParseOk(const std::string &src) {
 
 static Stmt *FirstInitialStmt(ParseResult11e &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock)
-      continue;
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
     }
@@ -51,8 +50,7 @@ static Stmt *FirstInitialStmt(ParseResult11e &r) {
 
 static Expr *FirstAssignRhs(ParseResult11e &r) {
   auto *stmt = FirstInitialStmt(r);
-  if (!stmt)
-    return nullptr;
+  if (!stmt) return nullptr;
   return stmt->rhs;
 }
 
@@ -63,29 +61,32 @@ static Expr *FirstAssignRhs(ParseResult11e &r) {
 // --- Primary operand types ---
 
 TEST(ParserSection11, Sec11_1_IdentifierAsExpression) {
-  auto r = Parse("module t;\n"
-                 "  initial x = foo;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = foo;\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kIdentifier);
 }
 
 TEST(ParserSection11, Sec11_1_StringLiteralAsExpression) {
-  auto r = Parse("module t;\n"
-                 "  string s;\n"
-                 "  initial s = \"hello world\";\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  string s;\n"
+      "  initial s = \"hello world\";\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kStringLiteral);
 }
 
 TEST(ParserSection11, Sec11_1_RealLiteralAsExpression) {
-  auto r = Parse("module t;\n"
-                 "  real r;\n"
-                 "  initial r = 3.14;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  real r;\n"
+      "  initial r = 3.14;\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
@@ -94,9 +95,10 @@ TEST(ParserSection11, Sec11_1_RealLiteralAsExpression) {
 // --- Call expressions ---
 
 TEST(ParserSection11, Sec11_1_SystemFunctionCallExpression) {
-  auto r = Parse("module t;\n"
-                 "  initial x = $clog2(256);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = $clog2(256);\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSystemCall);
@@ -104,9 +106,10 @@ TEST(ParserSection11, Sec11_1_SystemFunctionCallExpression) {
 }
 
 TEST(ParserSection11, Sec11_1_FunctionCallExpression) {
-  auto r = Parse("module t;\n"
-                 "  initial x = my_func(a, b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = my_func(a, b);\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
@@ -117,9 +120,10 @@ TEST(ParserSection11, Sec11_1_FunctionCallExpression) {
 // --- Member access ---
 
 TEST(ParserSection11, Sec11_1_MemberAccessExpression) {
-  auto r = Parse("module t;\n"
-                 "  initial x = obj.field;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = obj.field;\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kMemberAccess);
@@ -128,9 +132,10 @@ TEST(ParserSection11, Sec11_1_MemberAccessExpression) {
 // --- Parenthesized expression ---
 
 TEST(ParserSection11, Sec11_1_ParenthesizedExprPreservesSemantics) {
-  auto r = Parse("module t;\n"
-                 "  initial x = (a + b) * c;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = (a + b) * c;\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
@@ -143,9 +148,10 @@ TEST(ParserSection11, Sec11_1_ParenthesizedExprPreservesSemantics) {
 // --- Unary operators ---
 
 TEST(ParserSection11, Sec11_1_UnaryBitwiseNot) {
-  auto r = Parse("module t;\n"
-                 "  initial x = ~b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = ~b;\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
@@ -153,9 +159,10 @@ TEST(ParserSection11, Sec11_1_UnaryBitwiseNot) {
 }
 
 TEST(ParserSection11, Sec11_1_UnaryLogicalNot) {
-  auto r = Parse("module t;\n"
-                 "  initial x = !flag;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = !flag;\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
@@ -163,9 +170,10 @@ TEST(ParserSection11, Sec11_1_UnaryLogicalNot) {
 }
 
 TEST(ParserSection11, Sec11_1_UnaryReductionNand) {
-  auto r = Parse("module t;\n"
-                 "  initial x = ~&data;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = ~&data;\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
@@ -173,9 +181,10 @@ TEST(ParserSection11, Sec11_1_UnaryReductionNand) {
 }
 
 TEST(ParserSection11, Sec11_1_UnaryReductionNor) {
-  auto r = Parse("module t;\n"
-                 "  initial x = ~|data;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = ~|data;\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
@@ -183,9 +192,10 @@ TEST(ParserSection11, Sec11_1_UnaryReductionNor) {
 }
 
 TEST(ParserSection11, Sec11_1_UnaryReductionXnorTildeCaret) {
-  auto r = Parse("module t;\n"
-                 "  initial x = ~^data;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = ~^data;\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
@@ -193,9 +203,10 @@ TEST(ParserSection11, Sec11_1_UnaryReductionXnorTildeCaret) {
 }
 
 TEST(ParserSection11, Sec11_1_UnaryReductionXnorCaretTilde) {
-  auto r = Parse("module t;\n"
-                 "  initial x = ^~data;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = ^~data;\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
@@ -205,9 +216,10 @@ TEST(ParserSection11, Sec11_1_UnaryReductionXnorCaretTilde) {
 // --- Binary operators overview ---
 
 TEST(ParserSection11, Sec11_1_BinaryXnorTildeCaret) {
-  auto r = Parse("module t;\n"
-                 "  initial x = a ~^ b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = a ~^ b;\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
@@ -215,9 +227,10 @@ TEST(ParserSection11, Sec11_1_BinaryXnorTildeCaret) {
 }
 
 TEST(ParserSection11, Sec11_1_BinaryPowerOperator) {
-  auto r = Parse("module t;\n"
-                 "  initial x = base ** exp;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = base ** exp;\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
@@ -231,9 +244,10 @@ TEST(ParserSection11, Sec11_1_BinaryPowerOperator) {
 // --- Ternary conditional expression ---
 
 TEST(ParserSection11, Sec11_1_TernaryConditionalFields) {
-  auto r = Parse("module t;\n"
-                 "  initial x = en ? val_a : val_b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = en ? val_a : val_b;\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
@@ -248,9 +262,10 @@ TEST(ParserSection11, Sec11_1_TernaryConditionalFields) {
 // --- Concatenation ---
 
 TEST(ParserSection11, Sec11_1_ConcatenationElements) {
-  auto r = Parse("module t;\n"
-                 "  initial x = {a, b, 1'b0};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = {a, b, 1'b0};\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kConcatenation);
@@ -262,9 +277,10 @@ TEST(ParserSection11, Sec11_1_ConcatenationElements) {
 // --- Replication ---
 
 TEST(ParserSection11, Sec11_1_ReplicateRepeatCountAndElements) {
-  auto r = Parse("module t;\n"
-                 "  initial x = {3{a, b}};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = {3{a, b}};\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kReplicate);
@@ -276,9 +292,10 @@ TEST(ParserSection11, Sec11_1_ReplicateRepeatCountAndElements) {
 // --- Bit-select ---
 
 TEST(ParserSection11, Sec11_1_BitSelectIndex) {
-  auto r = Parse("module t;\n"
-                 "  initial x = data[7];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = data[7];\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
@@ -292,9 +309,10 @@ TEST(ParserSection11, Sec11_1_BitSelectIndex) {
 // --- Part-select ---
 
 TEST(ParserSection11, Sec11_1_PartSelectIndexAndEnd) {
-  auto r = Parse("module t;\n"
-                 "  initial x = data[15:0];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = data[15:0];\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
@@ -307,9 +325,10 @@ TEST(ParserSection11, Sec11_1_PartSelectIndexAndEnd) {
 // --- Indexed part-select +: and -: ---
 
 TEST(ParserSection11, Sec11_1_IndexedPartSelectPlusFlag) {
-  auto r = Parse("module t;\n"
-                 "  initial x = vec[i +: 4];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = vec[i +: 4];\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
@@ -320,9 +339,10 @@ TEST(ParserSection11, Sec11_1_IndexedPartSelectPlusFlag) {
 }
 
 TEST(ParserSection11, Sec11_1_IndexedPartSelectMinusFlag) {
-  auto r = Parse("module t;\n"
-                 "  initial x = vec[j -: 8];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = vec[j -: 8];\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
@@ -333,9 +353,10 @@ TEST(ParserSection11, Sec11_1_IndexedPartSelectMinusFlag) {
 // --- Cast expression ---
 
 TEST(ParserSection11, Sec11_1_CastExpression) {
-  auto r = Parse("module t;\n"
-                 "  initial x = int'(3.14);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = int'(3.14);\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kCast);
@@ -344,10 +365,11 @@ TEST(ParserSection11, Sec11_1_CastExpression) {
 // --- Assignment pattern ---
 
 TEST(ParserSection11, Sec11_1_AssignmentPatternExpression) {
-  auto r = Parse("module t;\n"
-                 "  int arr[3];\n"
-                 "  initial arr = '{1, 2, 3};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[3];\n"
+      "  initial arr = '{1, 2, 3};\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
@@ -357,9 +379,10 @@ TEST(ParserSection11, Sec11_1_AssignmentPatternExpression) {
 // --- Streaming concatenation ---
 
 TEST(ParserSection11, Sec11_1_StreamingConcatLeftShift) {
-  auto r = Parse("module t;\n"
-                 "  initial x = {<< {a, b}};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = {<< {a, b}};\n"
+      "endmodule\n");
   auto *rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
@@ -370,9 +393,10 @@ TEST(ParserSection11, Sec11_1_StreamingConcatLeftShift) {
 // --- Postfix increment/decrement ---
 
 TEST(ParserSection11, Sec11_1_PostfixIncrementExpression) {
-  auto r = Parse("module t;\n"
-                 "  initial counter++;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial counter++;\n"
+      "endmodule\n");
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
@@ -382,9 +406,10 @@ TEST(ParserSection11, Sec11_1_PostfixIncrementExpression) {
 }
 
 TEST(ParserSection11, Sec11_1_PostfixDecrementExpression) {
-  auto r = Parse("module t;\n"
-                 "  initial counter--;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial counter--;\n"
+      "endmodule\n");
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->expr, nullptr);
@@ -395,11 +420,12 @@ TEST(ParserSection11, Sec11_1_PostfixDecrementExpression) {
 // --- Inside expression ---
 
 TEST(ParserSection11, Sec11_1_InsideExpressionWithLhsAndElements) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    if (val inside {1, 2, 3}) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (val inside {1, 2, 3}) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   auto *cond = stmt->condition;
@@ -413,10 +439,11 @@ TEST(ParserSection11, Sec11_1_InsideExpressionWithLhsAndElements) {
 // --- Expressions in different contexts ---
 
 TEST(ParserSection11, Sec11_1_ExprInContinuousAssign) {
-  auto r = Parse("module t;\n"
-                 "  wire a, b, c;\n"
-                 "  assign c = a ^ b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  wire a, b, c;\n"
+      "  assign c = a ^ b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ModuleItem *ca = nullptr;
@@ -433,9 +460,10 @@ TEST(ParserSection11, Sec11_1_ExprInContinuousAssign) {
 }
 
 TEST(ParserSection11, Sec11_1_ExprInInitialBlock) {
-  auto r = Parse("module t;\n"
-                 "  initial x = (a | b) & c;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = (a | b) & c;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *rhs = FirstAssignRhs(r);
@@ -445,59 +473,62 @@ TEST(ParserSection11, Sec11_1_ExprInInitialBlock) {
 }
 
 TEST(ParserSection11, Sec11_1_ExprAsFunctionArgument) {
-  EXPECT_TRUE(ParseOk("module t;\n"
-                      "  initial $display(a + b, c * d, {e, f});\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial $display(a + b, c * d, {e, f});\n"
+              "endmodule\n"));
 }
 
 // --- Additional all-operator coverage ---
 
 TEST(ParserSection11, Sec11_1_AllBinaryOperatorsParse) {
-  EXPECT_TRUE(ParseOk("module t;\n"
-                      "  initial begin\n"
-                      "    x = a + b;\n"
-                      "    x = a - b;\n"
-                      "    x = a * b;\n"
-                      "    x = a / b;\n"
-                      "    x = a % b;\n"
-                      "    x = a ** b;\n"
-                      "    x = a == b;\n"
-                      "    x = a != b;\n"
-                      "    x = a === b;\n"
-                      "    x = a !== b;\n"
-                      "    x = a < b;\n"
-                      "    x = a <= b;\n"
-                      "    x = a > b;\n"
-                      "    x = a >= b;\n"
-                      "    x = a && b;\n"
-                      "    x = a || b;\n"
-                      "    x = a & b;\n"
-                      "    x = a | b;\n"
-                      "    x = a ^ b;\n"
-                      "    x = a ~^ b;\n"
-                      "    x = a ^~ b;\n"
-                      "    x = a << b;\n"
-                      "    x = a >> b;\n"
-                      "    x = a <<< b;\n"
-                      "    x = a >>> b;\n"
-                      "  end\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial begin\n"
+              "    x = a + b;\n"
+              "    x = a - b;\n"
+              "    x = a * b;\n"
+              "    x = a / b;\n"
+              "    x = a % b;\n"
+              "    x = a ** b;\n"
+              "    x = a == b;\n"
+              "    x = a != b;\n"
+              "    x = a === b;\n"
+              "    x = a !== b;\n"
+              "    x = a < b;\n"
+              "    x = a <= b;\n"
+              "    x = a > b;\n"
+              "    x = a >= b;\n"
+              "    x = a && b;\n"
+              "    x = a || b;\n"
+              "    x = a & b;\n"
+              "    x = a | b;\n"
+              "    x = a ^ b;\n"
+              "    x = a ~^ b;\n"
+              "    x = a ^~ b;\n"
+              "    x = a << b;\n"
+              "    x = a >> b;\n"
+              "    x = a <<< b;\n"
+              "    x = a >>> b;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection11, Sec11_1_AllUnaryOperatorsParse) {
-  EXPECT_TRUE(ParseOk("module t;\n"
-                      "  initial begin\n"
-                      "    x = +a;\n"
-                      "    x = -a;\n"
-                      "    x = ~a;\n"
-                      "    x = !a;\n"
-                      "    x = &a;\n"
-                      "    x = |a;\n"
-                      "    x = ^a;\n"
-                      "    x = ~&a;\n"
-                      "    x = ~|a;\n"
-                      "    x = ~^a;\n"
-                      "    x = ^~a;\n"
-                      "  end\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial begin\n"
+              "    x = +a;\n"
+              "    x = -a;\n"
+              "    x = ~a;\n"
+              "    x = !a;\n"
+              "    x = &a;\n"
+              "    x = |a;\n"
+              "    x = ^a;\n"
+              "    x = ~&a;\n"
+              "    x = ~|a;\n"
+              "    x = ~^a;\n"
+              "    x = ^~a;\n"
+              "  end\n"
+              "endmodule\n"));
 }

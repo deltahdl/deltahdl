@@ -1,11 +1,12 @@
 // §28.6: bufif1, bufif0, notif1, and notif0 gates
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -57,4 +58,4 @@ TEST(Parser, GateBufif0) {
   EXPECT_EQ(item->gate_terminals.size(), 3);
 }
 
-} // namespace
+}  // namespace

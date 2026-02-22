@@ -102,13 +102,13 @@ TEST(SimCh4096, BidirectionalNoStrengthReduction) {
   drive->kind = EventKind::kEvaluation;
   drive->callback = [&]() {
     net_a_val = 1;
-    net_a_strength = 7; // Supply strength.
+    net_a_strength = 7;  // Supply strength.
     // Bidirectional port propagation: no strength reduction.
     auto *prop = sched.GetEventPool().Acquire();
     prop->kind = EventKind::kUpdate;
     prop->callback = [&]() {
       net_b_val = net_a_val;
-      net_b_strength = net_a_strength; // Preserved, not reduced.
+      net_b_strength = net_a_strength;  // Preserved, not reduced.
     };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, prop);
   };
@@ -116,7 +116,7 @@ TEST(SimCh4096, BidirectionalNoStrengthReduction) {
 
   sched.Run();
   EXPECT_EQ(net_b_val, 1);
-  EXPECT_EQ(net_b_strength, 7); // Supply strength preserved.
+  EXPECT_EQ(net_b_strength, 7);  // Supply strength preserved.
 }
 
 // ---------------------------------------------------------------------------
@@ -207,12 +207,12 @@ TEST(SimCh4096, InoutPortNonStrengthReducingTransistor) {
   drive_outside_t0->kind = EventKind::kEvaluation;
   drive_outside_t0->callback = [&]() {
     outside_val = 1;
-    outside_str = 7; // Supply.
+    outside_str = 7;  // Supply.
     auto *prop = sched.GetEventPool().Acquire();
     prop->kind = EventKind::kUpdate;
     prop->callback = [&]() {
       local_val = outside_val;
-      local_str = outside_str; // No reduction.
+      local_str = outside_str;  // No reduction.
     };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, prop);
   };
@@ -222,12 +222,12 @@ TEST(SimCh4096, InoutPortNonStrengthReducingTransistor) {
   drive_local_t5->kind = EventKind::kEvaluation;
   drive_local_t5->callback = [&]() {
     local_val = 0;
-    local_str = 6; // Strong.
+    local_str = 6;  // Strong.
     auto *prop = sched.GetEventPool().Acquire();
     prop->kind = EventKind::kUpdate;
     prop->callback = [&]() {
       outside_val = local_val;
-      outside_str = local_str; // No reduction.
+      outside_str = local_str;  // No reduction.
     };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, prop);
   };
@@ -235,7 +235,7 @@ TEST(SimCh4096, InoutPortNonStrengthReducingTransistor) {
 
   sched.Run();
   EXPECT_EQ(outside_val, 0);
-  EXPECT_EQ(outside_str, 6); // Strong strength preserved, not reduced.
+  EXPECT_EQ(outside_str, 6);  // Strong strength preserved, not reduced.
   EXPECT_EQ(local_val, 0);
 }
 
@@ -245,7 +245,7 @@ TEST(SimCh4096, InoutPortNonStrengthReducingTransistor) {
 TEST(SimCh4096, PrimitiveTerminalsDirectConnection) {
   Arena arena;
   Scheduler sched(arena);
-  int net_bit = -1; // 1-bit net.
+  int net_bit = -1;  // 1-bit net.
 
   // Model: and gate output → directly connected to net_bit (1-bit net).
   // The primitive evaluates and directly drives the net, no intervening
@@ -285,7 +285,7 @@ TEST(SimCh4096, PrimitiveOutputNoStrengthAlteration) {
   prim_eval->kind = EventKind::kEvaluation;
   prim_eval->callback = [&]() {
     int prim_out_val = 1;
-    int prim_out_str = 6; // Strong strength from primitive.
+    int prim_out_str = 6;  // Strong strength from primitive.
     // Direct connection: no strength alteration.
     auto *update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
@@ -299,7 +299,7 @@ TEST(SimCh4096, PrimitiveOutputNoStrengthAlteration) {
 
   sched.Run();
   EXPECT_EQ(net_val, 1);
-  EXPECT_EQ(net_strength, 6); // Strength unaltered.
+  EXPECT_EQ(net_strength, 6);  // Strength unaltered.
 }
 
 // ---------------------------------------------------------------------------

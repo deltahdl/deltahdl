@@ -1,11 +1,12 @@
 // §8.6: Object methods
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -49,11 +50,12 @@ struct ModportPortExpected {
 namespace {
 
 TEST(Parser, ClassWithMethod) {
-  auto r = Parse("class pkt;\n"
-                 "  function int get_data();\n"
-                 "    return data;\n"
-                 "  endfunction\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class pkt;\n"
+      "  function int get_data();\n"
+      "    return data;\n"
+      "  endfunction\n"
+      "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   auto *cls = r.cu->classes[0];
   ASSERT_EQ(cls->members.size(), 1);
@@ -61,4 +63,4 @@ TEST(Parser, ClassWithMethod) {
   EXPECT_NE(cls->members[0]->method, nullptr);
 }
 
-} // namespace
+}  // namespace

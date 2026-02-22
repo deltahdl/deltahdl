@@ -1,11 +1,12 @@
 // §11.3: Operators
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -49,11 +50,12 @@ struct ModportPortExpected {
 namespace {
 
 TEST(Parser, ExpressionPrecedence) {
-  auto r = Parse("module expr;\n"
-                 "  logic a;\n"
-                 "  assign a = 1 + 2 * 3;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module expr;\n"
+      "  logic a;\n"
+      "  assign a = 1 + 2 * 3;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
 }
 
-} // namespace
+}  // namespace

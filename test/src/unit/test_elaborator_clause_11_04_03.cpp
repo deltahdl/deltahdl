@@ -1,12 +1,13 @@
 // §11.4.3: Arithmetic operators
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "elaboration/const_eval.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -50,4 +51,4 @@ TEST(ConstEval, Power) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("3 ** 0", f)), 1);
 }
 
-} // namespace
+}  // namespace

@@ -65,4 +65,4 @@ TEST(SysTask, AssertControlDoesNotCrash) {
   EXPECT_EQ(result.width, 1u);
 }
 
-} // namespace
+}  // namespace

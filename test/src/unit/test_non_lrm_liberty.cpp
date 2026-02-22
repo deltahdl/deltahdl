@@ -1,8 +1,10 @@
 // Non-LRM tests
 
-#include "synthesis/liberty.h"
 #include <gtest/gtest.h>
+
 #include <string_view>
+
+#include "synthesis/liberty.h"
 
 using namespace delta;
 
@@ -179,4 +181,4 @@ TEST(Liberty, ParseCellAreaValues) {
   EXPECT_FLOAT_EQ(lib.cells[1].area, 4.0f);
 }
 
-} // namespace
+}  // namespace

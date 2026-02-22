@@ -1,9 +1,10 @@
 // §4.5: SystemVerilog simulation reference algorithm
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/types.h"
 #include "simulation/scheduler.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -28,4 +29,4 @@ TEST(Scheduler, ScheduleAndRunSingleEvent) {
   EXPECT_TRUE(executed);
 }
 
-} // namespace
+}  // namespace

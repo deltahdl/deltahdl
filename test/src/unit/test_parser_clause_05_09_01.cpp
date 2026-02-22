@@ -24,19 +24,22 @@ static bool ParseOk(const std::string &src) {
 }
 
 TEST(ParserCh50901, StringEscape_Newline) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  initial $display(\"line1\\nline2\");\n"
-                      "endmodule"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial $display(\"line1\\nline2\");\n"
+              "endmodule"));
 }
 
 TEST(ParserCh50901, StringEscape_Tab) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  initial $display(\"col1\\tcol2\");\n"
-                      "endmodule"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial $display(\"col1\\tcol2\");\n"
+              "endmodule"));
 }
 
 TEST(ParserCh50901, StringEscape_Quote) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  initial $display(\"say \\\"hello\\\"\");\n"
-                      "endmodule"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial $display(\"say \\\"hello\\\"\");\n"
+              "endmodule"));
 }

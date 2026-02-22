@@ -63,4 +63,4 @@ TEST(SysTask, DistNormalReturns32Bit) {
   EXPECT_EQ(result.width, 32u);
 }
 
-} // namespace
+}  // namespace

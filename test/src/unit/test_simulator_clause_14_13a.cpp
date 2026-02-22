@@ -1,5 +1,10 @@
 // §14.13: Input sampling
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <string_view>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -9,9 +14,6 @@
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
 #include "simulation/variable.h"
-#include <cstdint>
-#include <gtest/gtest.h>
-#include <string_view>
 
 using namespace delta;
 
@@ -143,4 +145,4 @@ TEST(ClockingSim, SampledValueUpdatesOnEachEdge) {
   EXPECT_EQ(cmgr.GetSampledValue("cb", "data"), 0x22u);
 }
 
-} // namespace
+}  // namespace

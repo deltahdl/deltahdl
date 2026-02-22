@@ -1,5 +1,11 @@
 // §6.19.5.4: Prev()
 
+#include <gtest/gtest.h>
+
+#include <string>
+#include <string_view>
+#include <vector>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -7,10 +13,6 @@
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
-#include <string>
-#include <string_view>
-#include <vector>
 
 using namespace delta;
 
@@ -26,9 +28,9 @@ struct EnumFixture {
 
   // Register an enum type with the given members and values.
   // Returns the variable associated with the enum.
-  Variable *
-  RegisterEnum(std::string_view var_name, std::string_view type_name,
-               const std::vector<std::pair<std::string, uint64_t>> &members) {
+  Variable *RegisterEnum(
+      std::string_view var_name, std::string_view type_name,
+      const std::vector<std::pair<std::string, uint64_t>> &members) {
     EnumTypeInfo info;
     char *tn = arena.AllocString(type_name.data(), type_name.size());
     info.type_name = std::string_view(tn, type_name.size());
@@ -93,31 +95,31 @@ TEST(EnumMethods, PrevReturnsPrevMember) {
   EnumFixture f;
   auto *var = f.RegisterEnum("color", "color_t",
                              {{"RED", 0}, {"GREEN", 1}, {"BLUE", 2}});
-  var->value = MakeLogic4VecVal(f.arena, 32, 2); // BLUE
+  var->value = MakeLogic4VecVal(f.arena, 32, 2);  // BLUE
   auto *call = f.MakeEnumMethodCall("color", "prev");
   auto result = EvalExpr(call, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u); // GREEN
+  EXPECT_EQ(result.ToUint64(), 1u);  // GREEN
 }
 
 TEST(EnumMethods, PrevWrapsFromFirst) {
   EnumFixture f;
   auto *var = f.RegisterEnum("color", "color_t",
                              {{"RED", 0}, {"GREEN", 1}, {"BLUE", 2}});
-  var->value = MakeLogic4VecVal(f.arena, 32, 0); // RED
+  var->value = MakeLogic4VecVal(f.arena, 32, 0);  // RED
   auto *call = f.MakeEnumMethodCall("color", "prev");
   auto result = EvalExpr(call, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 2u); // wraps to BLUE
+  EXPECT_EQ(result.ToUint64(), 2u);  // wraps to BLUE
 }
 
 TEST(EnumMethods, PrevWithCount) {
   EnumFixture f;
   auto *var = f.RegisterEnum("color", "color_t",
                              {{"RED", 0}, {"GREEN", 1}, {"BLUE", 2}});
-  var->value = MakeLogic4VecVal(f.arena, 32, 2); // BLUE
+  var->value = MakeLogic4VecVal(f.arena, 32, 2);  // BLUE
   auto *call =
       f.MakeEnumMethodCallWithArgs("color", "prev", {f.MakeIntLiteral(2)});
   auto result = EvalExpr(call, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u); // RED (back 2 from BLUE)
+  EXPECT_EQ(result.ToUint64(), 0u);  // RED (back 2 from BLUE)
 }
 
 TEST(EnumMethods, PrevOnNonMemberValue) {
@@ -136,7 +138,7 @@ TEST(EnumMethods, PrevFullIteration) {
   EnumFixture f;
   auto *var =
       f.RegisterEnum("state", "state_t", {{"A", 10}, {"B", 20}, {"C", 30}});
-  var->value = MakeLogic4VecVal(f.arena, 32, 10); // A
+  var->value = MakeLogic4VecVal(f.arena, 32, 10);  // A
 
   std::vector<uint64_t> visited;
   for (int i = 0; i < 4; ++i) {
@@ -148,4 +150,4 @@ TEST(EnumMethods, PrevFullIteration) {
   EXPECT_EQ(visited, (std::vector<uint64_t>{10, 30, 20, 10}));
 }
 
-} // namespace
+}  // namespace

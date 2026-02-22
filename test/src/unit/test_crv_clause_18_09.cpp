@@ -1,13 +1,15 @@
 // §18.9: Controlling constraints with constraint_mode()
 
-#include "simulation/constraint_solver.h"
+#include <gtest/gtest.h>
+
 #include <algorithm>
 #include <cstdint>
-#include <gtest/gtest.h>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+
+#include "simulation/constraint_solver.h"
 
 using namespace delta;
 
@@ -86,4 +88,4 @@ TEST(Constraint, ConstraintModeReEnable) {
   EXPECT_EQ(solver.GetValue("x"), 77);
 }
 
-} // namespace
+}  // namespace

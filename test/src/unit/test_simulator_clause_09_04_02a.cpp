@@ -18,8 +18,7 @@ enum class EdgeKind : uint8_t {
 };
 
 EdgeKind DetectEdge(Logic4 from, Logic4 to) {
-  if (from == to)
-    return EdgeKind::kNone;
+  if (from == to) return EdgeKind::kNone;
   if (from == Logic4::kVal0 &&
       (to == Logic4::kVal1 || to == Logic4::kX || to == Logic4::kZ))
     return EdgeKind::kPosedge;
@@ -120,4 +119,4 @@ TEST(TimingControl, NoEdgeDetectedXToZ) {
   EXPECT_FALSE(IsEdge(Logic4::kX, Logic4::kZ));
 }
 
-} // namespace
+}  // namespace

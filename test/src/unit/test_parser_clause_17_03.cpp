@@ -1,5 +1,9 @@
 // §17.3: Checker instantiation
 
+#include <gtest/gtest.h>
+
+#include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -10,8 +14,6 @@
 #include "parser/parser.h"
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
-#include <string>
 
 using namespace delta;
 
@@ -19,7 +21,7 @@ using namespace delta;
 // Parse-level fixture
 // =============================================================================
 struct CheckerParseTest : ::testing::Test {
-protected:
+ protected:
   CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
@@ -47,8 +49,7 @@ struct CheckerElabFixture {
 static const ModuleItem *FindItemOfKind(const std::vector<ModuleItem *> &items,
                                         ModuleItemKind kind) {
   for (const auto *item : items) {
-    if (item->kind == kind)
-      return item;
+    if (item->kind == kind) return item;
   }
   return nullptr;
 }
@@ -77,4 +78,4 @@ TEST_F(CheckerParseTest, CheckerInstantiatedInModule) {
   EXPECT_EQ(inst->inst_name, "chk_inst");
 }
 
-} // namespace
+}  // namespace

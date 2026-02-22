@@ -1,5 +1,7 @@
 // §6.5: for more details.
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -11,7 +13,6 @@
 #include "lexer/lexer.h"
 #include "lexer/token.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -35,45 +36,49 @@ namespace {
 // --- §6.5: Variable constraints ---
 TEST(Elaboration, VarRedeclare_Error) {
   ElabFixture f;
-  ElaborateSrc("module top();\n"
-               "  reg v;\n"
-               "  wire v;\n"
-               "endmodule\n",
-               f);
+  ElaborateSrc(
+      "module top();\n"
+      "  reg v;\n"
+      "  wire v;\n"
+      "endmodule\n",
+      f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
 TEST(Elaboration, VarMultiContAssign_Error) {
   ElabFixture f;
-  ElaborateSrc("module top();\n"
-               "  int v;\n"
-               "  assign v = 12;\n"
-               "  assign v = 13;\n"
-               "endmodule\n",
-               f);
+  ElaborateSrc(
+      "module top();\n"
+      "  int v;\n"
+      "  assign v = 12;\n"
+      "  assign v = 13;\n"
+      "endmodule\n",
+      f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
 TEST(Elaboration, VarMixedAssign_Error) {
   ElabFixture f;
-  ElaborateSrc("module top();\n"
-               "  wire clk = 0;\n"
-               "  int v;\n"
-               "  assign v = 12;\n"
-               "  always @(posedge clk) v <= ~v;\n"
-               "endmodule\n",
-               f);
+  ElaborateSrc(
+      "module top();\n"
+      "  wire clk = 0;\n"
+      "  int v;\n"
+      "  assign v = 12;\n"
+      "  always @(posedge clk) v <= ~v;\n"
+      "endmodule\n",
+      f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
 TEST(Elaboration, VarSingleContAssign_Ok) {
   ElabFixture f;
-  ElaborateSrc("module top();\n"
-               "  int v;\n"
-               "  assign v = 12;\n"
-               "endmodule\n",
-               f);
+  ElaborateSrc(
+      "module top();\n"
+      "  int v;\n"
+      "  assign v = 12;\n"
+      "endmodule\n",
+      f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-} // namespace
+}  // namespace

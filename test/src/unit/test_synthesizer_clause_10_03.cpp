@@ -25,12 +25,10 @@ static const RtlirModule *ElaborateSrc(SynthFixture &f,
   Lexer lexer(f.src_mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
   auto *cu = parser.Parse();
-  if (!cu || cu->modules.empty())
-    return nullptr;
+  if (!cu || cu->modules.empty()) return nullptr;
   Elaborator elab(f.arena, f.diag, cu);
   auto *design = elab.Elaborate(cu->modules.back()->name);
-  if (!design || design->top_modules.empty())
-    return nullptr;
+  if (!design || design->top_modules.empty()) return nullptr;
   return design->top_modules[0];
 }
 
@@ -38,9 +36,10 @@ namespace {
 
 TEST(SynthLower, AcceptCombinationalModule) {
   SynthFixture f;
-  auto *mod = ElaborateSrc(f, "module m(input a, input b, output y);\n"
-                              "  assign y = a & b;\n"
-                              "endmodule");
+  auto *mod = ElaborateSrc(f,
+                           "module m(input a, input b, output y);\n"
+                           "  assign y = a & b;\n"
+                           "endmodule");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto *aig = synth.Lower(mod);
@@ -50,9 +49,10 @@ TEST(SynthLower, AcceptCombinationalModule) {
 
 TEST(SynthLower, AssignDirectWire) {
   SynthFixture f;
-  auto *mod = ElaborateSrc(f, "module m(input a, output y);\n"
-                              "  assign y = a;\n"
-                              "endmodule");
+  auto *mod = ElaborateSrc(f,
+                           "module m(input a, output y);\n"
+                           "  assign y = a;\n"
+                           "endmodule");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto *aig = synth.Lower(mod);
@@ -64,9 +64,10 @@ TEST(SynthLower, AssignDirectWire) {
 
 TEST(SynthLower, AssignAndGate) {
   SynthFixture f;
-  auto *mod = ElaborateSrc(f, "module m(input a, input b, output y);\n"
-                              "  assign y = a & b;\n"
-                              "endmodule");
+  auto *mod = ElaborateSrc(f,
+                           "module m(input a, input b, output y);\n"
+                           "  assign y = a & b;\n"
+                           "endmodule");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto *aig = synth.Lower(mod);
@@ -78,9 +79,10 @@ TEST(SynthLower, AssignAndGate) {
 
 TEST(SynthLower, AssignOrGate) {
   SynthFixture f;
-  auto *mod = ElaborateSrc(f, "module m(input a, input b, output y);\n"
-                              "  assign y = a | b;\n"
-                              "endmodule");
+  auto *mod = ElaborateSrc(f,
+                           "module m(input a, input b, output y);\n"
+                           "  assign y = a | b;\n"
+                           "endmodule");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto *aig = synth.Lower(mod);
@@ -90,9 +92,10 @@ TEST(SynthLower, AssignOrGate) {
 
 TEST(SynthLower, AssignNotGate) {
   SynthFixture f;
-  auto *mod = ElaborateSrc(f, "module m(input a, output y);\n"
-                              "  assign y = ~a;\n"
-                              "endmodule");
+  auto *mod = ElaborateSrc(f,
+                           "module m(input a, output y);\n"
+                           "  assign y = ~a;\n"
+                           "endmodule");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto *aig = synth.Lower(mod);
@@ -103,9 +106,10 @@ TEST(SynthLower, AssignNotGate) {
 
 TEST(SynthLower, AssignXorGate) {
   SynthFixture f;
-  auto *mod = ElaborateSrc(f, "module m(input a, input b, output y);\n"
-                              "  assign y = a ^ b;\n"
-                              "endmodule");
+  auto *mod = ElaborateSrc(f,
+                           "module m(input a, input b, output y);\n"
+                           "  assign y = a ^ b;\n"
+                           "endmodule");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto *aig = synth.Lower(mod);
@@ -115,10 +119,10 @@ TEST(SynthLower, AssignXorGate) {
 
 TEST(SynthLower, AssignTernaryMux) {
   SynthFixture f;
-  auto *mod =
-      ElaborateSrc(f, "module m(input sel, input a, input b, output y);\n"
-                      "  assign y = sel ? a : b;\n"
-                      "endmodule");
+  auto *mod = ElaborateSrc(f,
+                           "module m(input sel, input a, input b, output y);\n"
+                           "  assign y = sel ? a : b;\n"
+                           "endmodule");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto *aig = synth.Lower(mod);
@@ -129,9 +133,10 @@ TEST(SynthLower, AssignTernaryMux) {
 
 TEST(SynthLower, AssignConstant) {
   SynthFixture f;
-  auto *mod = ElaborateSrc(f, "module m(output y);\n"
-                              "  assign y = 1'b1;\n"
-                              "endmodule");
+  auto *mod = ElaborateSrc(f,
+                           "module m(output y);\n"
+                           "  assign y = 1'b1;\n"
+                           "endmodule");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto *aig = synth.Lower(mod);
@@ -141,9 +146,10 @@ TEST(SynthLower, AssignConstant) {
 
 TEST(SynthLower, AssignConstantZero) {
   SynthFixture f;
-  auto *mod = ElaborateSrc(f, "module m(output y);\n"
-                              "  assign y = 1'b0;\n"
-                              "endmodule");
+  auto *mod = ElaborateSrc(f,
+                           "module m(output y);\n"
+                           "  assign y = 1'b0;\n"
+                           "endmodule");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto *aig = synth.Lower(mod);
@@ -154,10 +160,11 @@ TEST(SynthLower, AssignConstantZero) {
 TEST(SynthLower, MultiBitAndGate) {
   SynthFixture f;
   auto *mod =
-      ElaborateSrc(f, "module m(input logic [1:0] a, input logic [1:0] b,\n"
-                      "         output logic [1:0] y);\n"
-                      "  assign y = a & b;\n"
-                      "endmodule");
+      ElaborateSrc(f,
+                   "module m(input logic [1:0] a, input logic [1:0] b,\n"
+                   "         output logic [1:0] y);\n"
+                   "  assign y = a & b;\n"
+                   "endmodule");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto *aig = synth.Lower(mod);
@@ -166,4 +173,4 @@ TEST(SynthLower, MultiBitAndGate) {
   EXPECT_EQ(aig->outputs.size(), 2);
 }
 
-} // namespace
+}  // namespace

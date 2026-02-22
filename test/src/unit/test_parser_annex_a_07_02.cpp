@@ -35,22 +35,19 @@ ParseResult Parse(const std::string &src) {
 
 ModuleItem *FindSpecifyBlock(const std::vector<ModuleItem *> &items) {
   for (auto *item : items) {
-    if (item->kind == ModuleItemKind::kSpecifyBlock)
-      return item;
+    if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
   }
   return nullptr;
 }
 
 SpecifyItem *GetSolePathItem(ParseResult &r) {
-  if (!r.cu || r.cu->modules.empty())
-    return nullptr;
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
   auto *spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  if (!spec || spec->specify_items.empty())
-    return nullptr;
+  if (!spec || spec->specify_items.empty()) return nullptr;
   return spec->specify_items[0];
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.7.2 path_declaration — 3 alternatives
@@ -58,11 +55,12 @@ SpecifyItem *GetSolePathItem(ParseResult &r) {
 
 // path_declaration ::= simple_path_declaration ;
 TEST(ParserA702, PathDeclSimpleParallel) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (a => b) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -76,11 +74,12 @@ TEST(ParserA702, PathDeclSimpleParallel) {
 
 // path_declaration ::= simple_path_declaration ; (full connection)
 TEST(ParserA702, PathDeclSimpleFull) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (a, b *> c) = 10;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a, b *> c) = 10;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -92,11 +91,12 @@ TEST(ParserA702, PathDeclSimpleFull) {
 
 // path_declaration ::= edge_sensitive_path_declaration ;
 TEST(ParserA702, PathDeclEdgeSensitiveParallel) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (posedge clk => q) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (posedge clk => q) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -107,11 +107,12 @@ TEST(ParserA702, PathDeclEdgeSensitiveParallel) {
 
 // path_declaration ::= edge_sensitive_path_declaration ; (full)
 TEST(ParserA702, PathDeclEdgeSensitiveFull) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (posedge clk *> q, qb) = (3, 5);\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (posedge clk *> q, qb) = (3, 5);\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -123,11 +124,12 @@ TEST(ParserA702, PathDeclEdgeSensitiveFull) {
 
 // path_declaration ::= state_dependent_path_declaration ; (if)
 TEST(ParserA702, PathDeclStateDependentIf) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    if (en) (a => b) = 10;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    if (en) (a => b) = 10;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -138,11 +140,12 @@ TEST(ParserA702, PathDeclStateDependentIf) {
 
 // path_declaration ::= state_dependent_path_declaration ; (ifnone)
 TEST(ParserA702, PathDeclStateDependentIfnone) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    ifnone (a => b) = 15;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    ifnone (a => b) = 15;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -156,11 +159,12 @@ TEST(ParserA702, PathDeclStateDependentIfnone) {
 // =============================================================================
 
 TEST(ParserA702, SimplePathParallelSingleDelay) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (a => b) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -175,11 +179,12 @@ TEST(ParserA702, SimplePathParallelSingleDelay) {
 
 // simple_path_declaration — full_path_description = path_delay_value
 TEST(ParserA702, SimplePathFullMultiplePorts) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (a, b, c *> x, y) = 12;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a, b, c *> x, y) = 12;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -200,11 +205,12 @@ TEST(ParserA702, SimplePathFullMultiplePorts) {
 
 // ( input + => output ) — positive polarity, parallel
 TEST(ParserA702, ParallelPathPositivePolarity) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (a + => b) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a + => b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -215,11 +221,12 @@ TEST(ParserA702, ParallelPathPositivePolarity) {
 
 // ( input - => output ) — negative polarity, parallel
 TEST(ParserA702, ParallelPathNegativePolarity) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (a - => b) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a - => b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -230,11 +237,12 @@ TEST(ParserA702, ParallelPathNegativePolarity) {
 
 // ( input => output ) — no polarity (default)
 TEST(ParserA702, ParallelPathNoPolarity) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (a => b) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -248,11 +256,12 @@ TEST(ParserA702, ParallelPathNoPolarity) {
 
 // ( inputs + *> outputs ) — positive polarity, full
 TEST(ParserA702, FullPathPositivePolarity) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (a + *> b) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a + *> b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -263,11 +272,12 @@ TEST(ParserA702, FullPathPositivePolarity) {
 
 // ( inputs - *> outputs ) — negative polarity, full
 TEST(ParserA702, FullPathNegativePolarity) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (a - *> b) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a - *> b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -278,11 +288,12 @@ TEST(ParserA702, FullPathNegativePolarity) {
 
 // ( inputs *> outputs ) — no polarity (default)
 TEST(ParserA702, FullPathNoPolarity) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (a, b *> c) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a, b *> c) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -296,11 +307,12 @@ TEST(ParserA702, FullPathNoPolarity) {
 // =============================================================================
 
 TEST(ParserA702, EdgeIdentifierPosedge) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (posedge clk => q) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (posedge clk => q) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -309,11 +321,12 @@ TEST(ParserA702, EdgeIdentifierPosedge) {
 }
 
 TEST(ParserA702, EdgeIdentifierNegedge) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (negedge clk => q) = 8;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (negedge clk => q) = 8;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -322,11 +335,12 @@ TEST(ParserA702, EdgeIdentifierNegedge) {
 }
 
 TEST(ParserA702, EdgeIdentifierEdge) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (edge clk => q) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (edge clk => q) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -340,11 +354,12 @@ TEST(ParserA702, EdgeIdentifierEdge) {
 
 // parallel_edge_sensitive_path_description with data_source
 TEST(ParserA702, EdgeSensitiveParallelWithDataSource) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (posedge clk => (q : d)) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (posedge clk => (q : d)) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -358,11 +373,12 @@ TEST(ParserA702, EdgeSensitiveParallelWithDataSource) {
 
 // parallel_edge_sensitive_path_description without data_source
 TEST(ParserA702, EdgeSensitiveParallelWithoutDataSource) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (negedge clk => q) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (negedge clk => q) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -373,11 +389,12 @@ TEST(ParserA702, EdgeSensitiveParallelWithoutDataSource) {
 
 // parallel_edge_sensitive_path_description with polarity and data_source
 TEST(ParserA702, EdgeSensitiveParallelPolarityAndDataSource) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (posedge clk + => (q : d)) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (posedge clk + => (q : d)) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -393,11 +410,12 @@ TEST(ParserA702, EdgeSensitiveParallelPolarityAndDataSource) {
 
 // full_edge_sensitive_path_description with data_source
 TEST(ParserA702, EdgeSensitiveFullWithDataSource) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (posedge clk *> (q : d)) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (posedge clk *> (q : d)) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -409,11 +427,12 @@ TEST(ParserA702, EdgeSensitiveFullWithDataSource) {
 
 // full_edge_sensitive_path_description without data_source
 TEST(ParserA702, EdgeSensitiveFullWithoutDataSource) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (posedge clk *> q, qb) = (3, 5);\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (posedge clk *> q, qb) = (3, 5);\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -425,11 +444,12 @@ TEST(ParserA702, EdgeSensitiveFullWithoutDataSource) {
 
 // full_edge_sensitive_path_description with edge keyword and data_source
 TEST(ParserA702, EdgeSensitiveFullEdgeKeywordWithDataSource) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (edge clk *> (q : d)) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (edge clk *> (q : d)) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -445,11 +465,12 @@ TEST(ParserA702, EdgeSensitiveFullEdgeKeywordWithDataSource) {
 
 // if (expr) simple_path_declaration — parallel
 TEST(ParserA702, StateDependentIfSimpleParallel) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    if (en) (a => b) = 10;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    if (en) (a => b) = 10;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -461,11 +482,12 @@ TEST(ParserA702, StateDependentIfSimpleParallel) {
 
 // if (expr) simple_path_declaration — full
 TEST(ParserA702, StateDependentIfSimpleFull) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    if (en) (a, b *> c) = 10;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    if (en) (a, b *> c) = 10;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -476,11 +498,12 @@ TEST(ParserA702, StateDependentIfSimpleFull) {
 
 // if (expr) edge_sensitive_path_declaration
 TEST(ParserA702, StateDependentIfEdgeSensitive) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    if (en) (posedge clk => q) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    if (en) (posedge clk => q) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -491,11 +514,12 @@ TEST(ParserA702, StateDependentIfEdgeSensitive) {
 
 // ifnone simple_path_declaration
 TEST(ParserA702, StateDependentIfnoneSimple) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    ifnone (a => b) = 15;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    ifnone (a => b) = 15;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -511,11 +535,12 @@ TEST(ParserA702, StateDependentIfnoneSimple) {
 
 // Polarity with edge-sensitive full path
 TEST(ParserA702, PolarityWithEdgeFullPath) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (negedge clk - *> (q : d)) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (negedge clk - *> (q : d)) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -528,11 +553,12 @@ TEST(ParserA702, PolarityWithEdgeFullPath) {
 
 // Polarity with conditional path
 TEST(ParserA702, PolarityWithConditionalPath) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    if (sel) (a + => b) = 8;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    if (sel) (a + => b) = 8;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -547,11 +573,12 @@ TEST(ParserA702, PolarityWithConditionalPath) {
 
 // Edge-sensitive path with output-side polarity and data source
 TEST(ParserA702, DataSourceWithOutputPolarity) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (posedge clk => (q + : d)) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (posedge clk => (q + : d)) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -562,11 +589,12 @@ TEST(ParserA702, DataSourceWithOutputPolarity) {
 
 // Edge-sensitive path with negative output polarity and data source
 TEST(ParserA702, DataSourceWithNegativeOutputPolarity) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (posedge clk => (q - : d)) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (posedge clk => (q - : d)) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *si = GetSolePathItem(r);
@@ -580,15 +608,16 @@ TEST(ParserA702, DataSourceWithNegativeOutputPolarity) {
 // =============================================================================
 
 TEST(ParserA702, MultiplePathDeclarations) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (a => b) = 5;\n"
-                 "    (c, d *> e) = 10;\n"
-                 "    (posedge clk => q) = 3;\n"
-                 "    if (en) (a => b) = 8;\n"
-                 "    ifnone (a => b) = 15;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b) = 5;\n"
+      "    (c, d *> e) = 10;\n"
+      "    (posedge clk => q) = 3;\n"
+      "    if (en) (a => b) = 8;\n"
+      "    ifnone (a => b) = 15;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *spec = FindSpecifyBlock(r.cu->modules[0]->items);

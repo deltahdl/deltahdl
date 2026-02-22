@@ -1,11 +1,12 @@
 // §8.18: Data hiding and encapsulation
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -49,10 +50,11 @@ struct ModportPortExpected {
 namespace {
 
 TEST(Parser, ClassPropertyQualifiers) {
-  auto r = Parse("class pkt;\n"
-                 "  rand int data;\n"
-                 "  local int secret;\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class pkt;\n"
+      "  rand int data;\n"
+      "  local int secret;\n"
+      "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   auto *cls = r.cu->classes[0];
   ASSERT_EQ(cls->members.size(), 2);
@@ -60,4 +62,4 @@ TEST(Parser, ClassPropertyQualifiers) {
   EXPECT_TRUE(cls->members[1]->is_local);
 }
 
-} // namespace
+}  // namespace

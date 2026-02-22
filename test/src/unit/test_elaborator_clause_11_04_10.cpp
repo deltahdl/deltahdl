@@ -1,12 +1,13 @@
 // §11.4.10: Shift operators
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "elaboration/const_eval.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -37,4 +38,4 @@ TEST(ConstEval, Shifts) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("16 >>> 2", f)), 4);
 }
 
-} // namespace
+}  // namespace

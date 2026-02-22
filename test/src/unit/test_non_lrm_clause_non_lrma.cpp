@@ -1,8 +1,9 @@
 // §non_lrm
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/types.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -33,4 +34,4 @@ TEST(Arena, Reset) {
   EXPECT_EQ(arena.TotalAllocated(), 0);
 }
 
-} // namespace
+}  // namespace

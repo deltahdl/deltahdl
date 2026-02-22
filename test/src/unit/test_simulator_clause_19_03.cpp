@@ -1,9 +1,11 @@
 // §19.3: Defining the coverage model: covergroup
 
-#include "simulation/coverage.h"
 #include <gtest/gtest.h>
+
 #include <string>
 #include <vector>
+
+#include "simulation/coverage.h"
 
 using namespace delta;
 
@@ -37,4 +39,4 @@ TEST(Coverage, MultipleGroupInstances) {
   EXPECT_EQ(db.FindGroup("cg2")->name, "cg2");
 }
 
-} // namespace
+}  // namespace

@@ -32,8 +32,7 @@ ParseResult Parse(const std::string &src) {
 
 static Stmt *FirstInitialStmt(ParseResult &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock)
-      continue;
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
     }
@@ -44,8 +43,7 @@ static Stmt *FirstInitialStmt(ParseResult &r) {
 
 static Stmt *InitialBody(ParseResult &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock)
-      continue;
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
     return item->body;
   }
   return nullptr;
@@ -53,13 +51,12 @@ static Stmt *InitialBody(ParseResult &r) {
 
 static ModuleItem *FirstFunctionDecl(ParseResult &r) {
   for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kFunctionDecl)
-      return item;
+    if (item->kind == ModuleItemKind::kFunctionDecl) return item;
   }
   return nullptr;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.6.5 Timing control statements
@@ -72,11 +69,12 @@ static ModuleItem *FirstFunctionDecl(ParseResult &r) {
 
 // §9.4: delay control followed by statement
 TEST(ParserA605, ProceduralTimingControlDelay) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    #10 x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    #10 x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -89,11 +87,12 @@ TEST(ParserA605, ProceduralTimingControlDelay) {
 
 // §9.4: delay control followed by null statement
 TEST(ParserA605, ProceduralTimingControlDelayNull) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    #10 ;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    #10 ;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -105,11 +104,12 @@ TEST(ParserA605, ProceduralTimingControlDelayNull) {
 
 // §9.4.2: event control followed by statement
 TEST(ParserA605, ProceduralTimingControlEvent) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @(posedge clk) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge clk) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -121,11 +121,12 @@ TEST(ParserA605, ProceduralTimingControlEvent) {
 
 // §9.4.2: event control followed by null statement
 TEST(ParserA605, ProceduralTimingControlEventNull) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @(posedge clk) ;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge clk) ;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -143,11 +144,12 @@ TEST(ParserA605, ProceduralTimingControlEventNull) {
 
 // §9.4.5: intra-assignment delay in blocking assignment
 TEST(ParserA605, IntraAssignDelayBlocking) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    a = #5 b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a = #5 b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -159,11 +161,12 @@ TEST(ParserA605, IntraAssignDelayBlocking) {
 
 // §9.4.5: intra-assignment event in blocking assignment
 TEST(ParserA605, IntraAssignEventBlocking) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    a = @(posedge clk) b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a = @(posedge clk) b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -175,11 +178,12 @@ TEST(ParserA605, IntraAssignEventBlocking) {
 
 // §9.4.5: repeat event control in blocking assignment
 TEST(ParserA605, IntraAssignRepeatEventBlocking) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    a = repeat(3) @(posedge clk) b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a = repeat(3) @(posedge clk) b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -191,11 +195,12 @@ TEST(ParserA605, IntraAssignRepeatEventBlocking) {
 
 // §9.4.5: intra-assignment delay in nonblocking assignment
 TEST(ParserA605, IntraAssignDelayNonblocking) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    a <= #5 b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a <= #5 b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -206,11 +211,12 @@ TEST(ParserA605, IntraAssignDelayNonblocking) {
 
 // §9.4.5: intra-assignment event in nonblocking assignment
 TEST(ParserA605, IntraAssignEventNonblocking) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    a <= @(posedge clk) b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a <= @(posedge clk) b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -221,11 +227,12 @@ TEST(ParserA605, IntraAssignEventNonblocking) {
 
 // §9.4.5: repeat event control in nonblocking assignment
 TEST(ParserA605, IntraAssignRepeatEventNonblocking) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    a <= repeat(5) @(posedge clk) data;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a <= repeat(5) @(posedge clk) data;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -241,11 +248,12 @@ TEST(ParserA605, IntraAssignRepeatEventNonblocking) {
 
 // §9.4.1: simple numeric delay
 TEST(ParserA605, DelayControlNumeric) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    #10 x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    #10 x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -256,11 +264,12 @@ TEST(ParserA605, DelayControlNumeric) {
 
 // §9.4.1: identifier-based delay
 TEST(ParserA605, DelayControlIdentifier) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    #d x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    #d x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -272,11 +281,12 @@ TEST(ParserA605, DelayControlIdentifier) {
 
 // §9.4.1: parenthesized delay expression
 TEST(ParserA605, DelayControlParenthesized) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    #(10) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    #(10) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -287,11 +297,12 @@ TEST(ParserA605, DelayControlParenthesized) {
 
 // §9.4.1/§11.11: parenthesized mintypmax delay
 TEST(ParserA605, DelayControlMintypmax) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    #(1:2:3) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    #(1:2:3) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -307,11 +318,12 @@ TEST(ParserA605, DelayControlMintypmax) {
 
 // §9.4.2.2: @* implicit sensitivity
 TEST(ParserA605, EventControlAtStar) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @* y = a & b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @* y = a & b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -322,11 +334,12 @@ TEST(ParserA605, EventControlAtStar) {
 
 // §9.4.2.2: @(*) implicit sensitivity
 TEST(ParserA605, EventControlAtStarParen) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @(*) y = a & b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(*) y = a & b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -337,11 +350,12 @@ TEST(ParserA605, EventControlAtStarParen) {
 
 // §9.4.2: @identifier simple event control
 TEST(ParserA605, EventControlBareIdentifier) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @r x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @r x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -354,11 +368,12 @@ TEST(ParserA605, EventControlBareIdentifier) {
 
 // §9.4.2: @(expression) parenthesized event control
 TEST(ParserA605, EventControlParenthesized) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @(clk) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(clk) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -374,11 +389,12 @@ TEST(ParserA605, EventControlParenthesized) {
 
 // §9.4.2: @(posedge clk) — clocking event with edge
 TEST(ParserA605, ClockingEventPosedge) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @(posedge clk) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge clk) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -389,11 +405,12 @@ TEST(ParserA605, ClockingEventPosedge) {
 
 // §9.4.2: @(negedge clk) — clocking event with negedge
 TEST(ParserA605, ClockingEventNegedge) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @(negedge clk) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(negedge clk) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -413,11 +430,12 @@ TEST(ParserA605, ClockingEventNegedge) {
 
 // §9.4.2: edge_identifier = edge (generic)
 TEST(ParserA605, EventExprEdge) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @(edge clk) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(edge clk) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -428,11 +446,12 @@ TEST(ParserA605, EventExprEdge) {
 
 // §9.4.2: expression without edge (any change)
 TEST(ParserA605, EventExprAnyChange) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @(a) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(a) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -443,11 +462,12 @@ TEST(ParserA605, EventExprAnyChange) {
 
 // §9.4.2.3: iff qualifier on event expression
 TEST(ParserA605, EventExprIff) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @(a iff enable) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(a iff enable) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -458,11 +478,12 @@ TEST(ParserA605, EventExprIff) {
 
 // §9.4.2.3: posedge with iff qualifier
 TEST(ParserA605, EventExprPosedgeIff) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @(posedge a iff enable == 1) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge a iff enable == 1) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -474,11 +495,12 @@ TEST(ParserA605, EventExprPosedgeIff) {
 
 // §9.4.2.1: or-separated event list
 TEST(ParserA605, EventExprOr) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @(posedge clk_a or posedge clk_b) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge clk_a or posedge clk_b) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -490,11 +512,12 @@ TEST(ParserA605, EventExprOr) {
 
 // §9.4.2.1: comma-separated event list
 TEST(ParserA605, EventExprComma) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @(a, b, c) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(a, b, c) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -504,11 +527,12 @@ TEST(ParserA605, EventExprComma) {
 
 // §9.4.2.1: mixed or and comma
 TEST(ParserA605, EventExprMixedOrComma) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @(a or b, c) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(a or b, c) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -518,11 +542,12 @@ TEST(ParserA605, EventExprMixedOrComma) {
 
 // §9.4.2.1: posedge with comma
 TEST(ParserA605, EventExprPosedgeComma) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @(posedge clk, negedge rstn) x <= 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge clk, negedge rstn) x <= 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -540,11 +565,12 @@ TEST(ParserA605, EventExprPosedgeComma) {
 
 // §9.4: procedural_timing_control with delay_control
 TEST(ParserA605, ProceduralTimingControlDelayControl) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    #5 x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    #5 x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -554,11 +580,12 @@ TEST(ParserA605, ProceduralTimingControlDelayControl) {
 
 // §9.4: procedural_timing_control with event_control
 TEST(ParserA605, ProceduralTimingControlEventControl) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @(negedge clk) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(negedge clk) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -572,9 +599,10 @@ TEST(ParserA605, ProceduralTimingControlEventControl) {
 
 // §12.8: return with expression from non-void function
 TEST(ParserA605, JumpReturnWithExpr) {
-  auto r = Parse("module m;\n"
-                 "  function int f(); return 42; endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function int f(); return 42; endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *func = FirstFunctionDecl(r);
@@ -587,9 +615,10 @@ TEST(ParserA605, JumpReturnWithExpr) {
 
 // §12.8: return without expression from void function
 TEST(ParserA605, JumpReturnVoid) {
-  auto r = Parse("module m;\n"
-                 "  function void f(); return; endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function void f(); return; endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *func = FirstFunctionDecl(r);
@@ -602,13 +631,14 @@ TEST(ParserA605, JumpReturnVoid) {
 
 // §12.8: break statement
 TEST(ParserA605, JumpBreak) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    forever begin\n"
-                 "      break;\n"
-                 "    end\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    forever begin\n"
+      "      break;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *body = InitialBody(r);
@@ -623,13 +653,14 @@ TEST(ParserA605, JumpBreak) {
 
 // §12.8: continue statement
 TEST(ParserA605, JumpContinue) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    forever begin\n"
-                 "      continue;\n"
-                 "    end\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    forever begin\n"
+      "      continue;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *body = InitialBody(r);
@@ -650,11 +681,12 @@ TEST(ParserA605, JumpContinue) {
 
 // §9.4.3: wait (condition) statement
 TEST(ParserA605, WaitConditionStatement) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    wait (ready) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    wait (ready) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -666,11 +698,12 @@ TEST(ParserA605, WaitConditionStatement) {
 
 // §9.4.3: wait (condition) null statement
 TEST(ParserA605, WaitConditionNull) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    wait (ready) ;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    wait (ready) ;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -682,11 +715,12 @@ TEST(ParserA605, WaitConditionNull) {
 
 // §9.6.1: wait fork
 TEST(ParserA605, WaitFork) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    wait fork;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    wait fork;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -696,11 +730,12 @@ TEST(ParserA605, WaitFork) {
 
 // §15.5.4: wait_order with semicolon (null action)
 TEST(ParserA605, WaitOrderNull) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    wait_order(a, b, c);\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    wait_order(a, b, c);\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -711,11 +746,12 @@ TEST(ParserA605, WaitOrderNull) {
 
 // §15.5.4: wait_order with success statement
 TEST(ParserA605, WaitOrderWithAction) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    wait_order(a, b) success = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    wait_order(a, b) success = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -726,12 +762,13 @@ TEST(ParserA605, WaitOrderWithAction) {
 
 // §15.5.4: wait_order with else clause
 TEST(ParserA605, WaitOrderWithElse) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    wait_order(a, b, c) success = 1;\n"
-                 "    else success = 0;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    wait_order(a, b, c) success = 1;\n"
+      "    else success = 0;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -743,12 +780,13 @@ TEST(ParserA605, WaitOrderWithElse) {
 
 // §15.5.4: wait_order with only else clause
 TEST(ParserA605, WaitOrderElseOnly) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    wait_order(a, b)\n"
-                 "    else x = 0;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    wait_order(a, b)\n"
+      "    else x = 0;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -766,11 +804,12 @@ TEST(ParserA605, WaitOrderElseOnly) {
 
 // §15.5.1: blocking event trigger
 TEST(ParserA605, EventTriggerBlocking) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    -> ev;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    -> ev;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -781,11 +820,12 @@ TEST(ParserA605, EventTriggerBlocking) {
 
 // §15.5.1: nonblocking event trigger
 TEST(ParserA605, EventTriggerNonblocking) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    ->> ev;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    ->> ev;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -803,11 +843,12 @@ TEST(ParserA605, EventTriggerNonblocking) {
 
 // §9.6.2: disable named block
 TEST(ParserA605, DisableBlock) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    disable my_block;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    disable my_block;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -818,11 +859,12 @@ TEST(ParserA605, DisableBlock) {
 
 // §9.6.3: disable fork
 TEST(ParserA605, DisableFork) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    disable fork;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    disable fork;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);
@@ -836,11 +878,12 @@ TEST(ParserA605, DisableFork) {
 
 // §9.4.2: all three edge identifiers parsed correctly
 TEST(ParserA605, EdgeIdentifiers) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    @(posedge a or negedge b or edge c) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge a or negedge b or edge c) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *stmt = FirstInitialStmt(r);

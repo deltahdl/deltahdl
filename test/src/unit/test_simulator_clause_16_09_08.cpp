@@ -1,5 +1,11 @@
 // §16.9.8: First_match operation
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <string_view>
+#include <vector>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -7,10 +13,6 @@
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
 #include "simulation/sva_engine.h"
-#include <cstdint>
-#include <gtest/gtest.h>
-#include <string_view>
-#include <vector>
 
 using namespace delta;
 
@@ -36,4 +38,4 @@ TEST(SvaEngine, SequenceOperatorIntersect) {
   EXPECT_FALSE(EvalSequenceIntersect(true, false, 3, 3));
 }
 
-} // namespace
+}  // namespace

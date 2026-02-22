@@ -52,9 +52,10 @@ static bool ParseOk(const std::string &src) {
 // From test_parser_clause_05.cpp
 
 TEST(ParserCh513, BuiltInMethodCall_Parse) {
-  auto r = Parse("module t;\n"
-                 "  initial x = arr.size();\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = arr.size();\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -66,9 +67,10 @@ TEST(ParserCh513, BuiltInMethodCall_Parse) {
 
 TEST(ParserCh513, BuiltInMethodCall_Callee) {
   // The callee_expr should be the full member-access expression.
-  auto r = Parse("module t;\n"
-                 "  initial x = arr.size();\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = arr.size();\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -80,9 +82,10 @@ TEST(ParserCh513, BuiltInMethodCall_Callee) {
 
 TEST(ParserCh513, BuiltInMethodCall_ChainedAccess) {
   // Chained member access: obj.arr.size() parses as a call.
-  auto r = Parse("module t;\n"
-                 "  initial x = obj.arr.size();\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = obj.arr.size();\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -95,37 +98,42 @@ TEST(ParserCh513, BuiltInMethodCall_ChainedAccess) {
 
 TEST(ParserCh513, BuiltInMethod_NoParens) {
   // When a method has no arguments the parentheses are optional.
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  int q[$];\n"
-                      "  initial x = q.size;\n"
-                      "endmodule"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int q[$];\n"
+              "  initial x = q.size;\n"
+              "endmodule"));
 }
 
 TEST(ParserCh513, BuiltInMethod_ChainedAccess) {
   // Chained member accesses: a.b.c().
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  initial x = obj.sub.method();\n"
-                      "endmodule"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial x = obj.sub.method();\n"
+              "endmodule"));
 }
 
 TEST(ParserCh513, BuiltInMethod_WithArgs) {
   // Built-in method with arguments: arr.find with (item > 3).
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  int q[$];\n"
-                      "  initial q.sort();\n"
-                      "endmodule"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int q[$];\n"
+              "  initial q.sort();\n"
+              "endmodule"));
 }
 
 TEST(ParserCh513, BuiltInMethod_Delete) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  int q[$];\n"
-                      "  initial q.delete();\n"
-                      "endmodule"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int q[$];\n"
+              "  initial q.delete();\n"
+              "endmodule"));
 }
 
 TEST(ParserCh513, BuiltInMethod_PushBack) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  int q[$];\n"
-                      "  initial q.push_back(42);\n"
-                      "endmodule"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int q[$];\n"
+              "  initial q.push_back(42);\n"
+              "endmodule"));
 }

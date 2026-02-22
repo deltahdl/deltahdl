@@ -36,24 +36,23 @@ static bool SwitchConducts(SwitchKind kind, Logic4Word control) {
   bool is_one = (c_aval == 1 && c_bval == 0);
   bool is_zero = (c_aval == 0 && c_bval == 0);
   switch (kind) {
-  case SwitchKind::kTran:
-  case SwitchKind::kRtran:
-    return true;
-  case SwitchKind::kTranif1:
-  case SwitchKind::kRtranif1:
-    return is_one;
-  case SwitchKind::kTranif0:
-  case SwitchKind::kRtranif0:
-    return is_zero;
+    case SwitchKind::kTran:
+    case SwitchKind::kRtran:
+      return true;
+    case SwitchKind::kTranif1:
+    case SwitchKind::kRtranif1:
+      return is_one;
+    case SwitchKind::kTranif0:
+    case SwitchKind::kRtranif0:
+      return is_zero;
   }
   return false;
 }
 
 static bool SwitchControlIsUnknown(SwitchKind kind, Logic4Word control) {
-  if (kind == SwitchKind::kTran || kind == SwitchKind::kRtran)
-    return false;
+  if (kind == SwitchKind::kTran || kind == SwitchKind::kRtran) return false;
   uint8_t c_bval = control.bval & 1;
-  return c_bval != 0; // x or z
+  return c_bval != 0;  // x or z
 }
 
 static bool IsZ(const Logic4Word &w) {
@@ -126,8 +125,7 @@ static void InitializeTerminals(std::vector<SwitchInst> &switches) {
 
 static void ResolveSwitchFirstPass(std::vector<SwitchInst> &switches) {
   for (auto &sw : switches) {
-    if (!HasValidTerminals(sw))
-      continue;
+    if (!HasValidTerminals(sw)) continue;
     bool conducts = SwitchConducts(sw.kind, sw.control);
     bool unknown_ctrl = SwitchControlIsUnknown(sw.kind, sw.control);
     if (unknown_ctrl && !sw.user_defined_nets) {
@@ -140,12 +138,9 @@ static void ResolveSwitchFirstPass(std::vector<SwitchInst> &switches) {
 
 static void ChainPropagate(std::vector<SwitchInst> &switches) {
   for (auto &sw : switches) {
-    if (!HasValidTerminals(sw))
-      continue;
-    if (!SwitchConducts(sw.kind, sw.control))
-      continue;
-    if (SwitchControlIsUnknown(sw.kind, sw.control))
-      continue;
+    if (!HasValidTerminals(sw)) continue;
+    if (!SwitchConducts(sw.kind, sw.control)) continue;
+    if (SwitchControlIsUnknown(sw.kind, sw.control)) continue;
     auto &va = *sw.terminal_a->resolved;
     auto &vb = *sw.terminal_b->resolved;
     if (IsZ(va.value.words[0]) && !IsZ(vb.value.words[0])) {
@@ -424,4 +419,4 @@ TEST(SwitchProcessing, UserDefinedNetControlOffSeparate) {
   EXPECT_EQ(ValOf(*vb), kValZ);
 }
 
-} // namespace
+}  // namespace

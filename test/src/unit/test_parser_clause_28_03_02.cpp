@@ -27,9 +27,10 @@ static ParseResult Parse(const std::string &src) {
 }
 
 TEST(ParserSection28, BasicAndGate) {
-  auto r = Parse("module m;\n"
-                 "  and g1(out, a, b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  and g1(out, a, b);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
@@ -39,9 +40,10 @@ TEST(ParserSection28, BasicAndGate) {
 }
 
 TEST(ParserSection28, BasicOrGate) {
-  auto r = Parse("module m;\n"
-                 "  or (out, a, b, c);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  or (out, a, b, c);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->gate_kind, GateKind::kOr);
@@ -50,14 +52,15 @@ TEST(ParserSection28, BasicOrGate) {
 }
 
 TEST(ParserSection28, AllNInputGates) {
-  auto r = Parse("module m;\n"
-                 "  and (o, a, b);\n"
-                 "  nand (o, a, b);\n"
-                 "  or (o, a, b);\n"
-                 "  nor (o, a, b);\n"
-                 "  xor (o, a, b);\n"
-                 "  xnor (o, a, b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  and (o, a, b);\n"
+      "  nand (o, a, b);\n"
+      "  or (o, a, b);\n"
+      "  nor (o, a, b);\n"
+      "  xor (o, a, b);\n"
+      "  xnor (o, a, b);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 6);

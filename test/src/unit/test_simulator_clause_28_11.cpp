@@ -1,7 +1,8 @@
 // §28.11: Logic strength modeling
 
-#include <cstdint>
 #include <gtest/gtest.h>
+
+#include <cstdint>
 
 // --- Local types for strength modeling (§28.11-§28.14) ---
 enum class StrengthLevel : uint8_t {
@@ -46,38 +47,38 @@ StrengthLevel ReduceResistive(StrengthLevel input);
 StrengthLevel MapStrengthKeyword0(uint8_t keyword_index) {
   // 0=none, 1=highz, 2=weak, 3=pull, 4=strong, 5=supply
   switch (keyword_index) {
-  case 0:
-  case 1:
-    return StrengthLevel::kHighz;
-  case 2:
-    return StrengthLevel::kWeak;
-  case 3:
-    return StrengthLevel::kPull;
-  case 4:
-    return StrengthLevel::kStrong;
-  case 5:
-    return StrengthLevel::kSupply;
-  default:
-    return StrengthLevel::kHighz;
+    case 0:
+    case 1:
+      return StrengthLevel::kHighz;
+    case 2:
+      return StrengthLevel::kWeak;
+    case 3:
+      return StrengthLevel::kPull;
+    case 4:
+      return StrengthLevel::kStrong;
+    case 5:
+      return StrengthLevel::kSupply;
+    default:
+      return StrengthLevel::kHighz;
   }
 }
 
 StrengthLevel MapStrengthKeyword1(uint8_t keyword_index) {
   // 0=none, 1=highz, 2=weak, 3=pull, 4=strong, 5=supply
   switch (keyword_index) {
-  case 0:
-  case 1:
-    return StrengthLevel::kHighz;
-  case 2:
-    return StrengthLevel::kWeak;
-  case 3:
-    return StrengthLevel::kPull;
-  case 4:
-    return StrengthLevel::kStrong;
-  case 5:
-    return StrengthLevel::kSupply;
-  default:
-    return StrengthLevel::kHighz;
+    case 0:
+    case 1:
+      return StrengthLevel::kHighz;
+    case 2:
+      return StrengthLevel::kWeak;
+    case 3:
+      return StrengthLevel::kPull;
+    case 4:
+      return StrengthLevel::kStrong;
+    case 5:
+      return StrengthLevel::kSupply;
+    default:
+      return StrengthLevel::kHighz;
   }
 }
 
@@ -187,19 +188,19 @@ StrengthLevel ReduceResistive(StrengthLevel input) {
   //   supply → pull, strong → pull, pull → weak, large → medium,
   //   weak → medium, medium → small, small → small, highz → highz.
   switch (input) {
-  case StrengthLevel::kSupply:
-  case StrengthLevel::kStrong:
-    return StrengthLevel::kPull;
-  case StrengthLevel::kPull:
-    return StrengthLevel::kWeak;
-  case StrengthLevel::kLarge:
-  case StrengthLevel::kWeak:
-    return StrengthLevel::kMedium;
-  case StrengthLevel::kMedium:
-  case StrengthLevel::kSmall:
-    return StrengthLevel::kSmall;
-  default:
-    return StrengthLevel::kHighz;
+    case StrengthLevel::kSupply:
+    case StrengthLevel::kStrong:
+      return StrengthLevel::kPull;
+    case StrengthLevel::kPull:
+      return StrengthLevel::kWeak;
+    case StrengthLevel::kLarge:
+    case StrengthLevel::kWeak:
+      return StrengthLevel::kMedium;
+    case StrengthLevel::kMedium:
+    case StrengthLevel::kSmall:
+      return StrengthLevel::kSmall;
+    default:
+      return StrengthLevel::kHighz;
   }
 }
 
@@ -264,4 +265,4 @@ TEST(StrengthModel, Highz0StrongIsLegal) {
       ValidateStrengthPair(StrengthLevel::kHighz, StrengthLevel::kStrong));
 }
 
-} // namespace
+}  // namespace

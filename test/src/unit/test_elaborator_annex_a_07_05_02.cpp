@@ -34,7 +34,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA70502Fixture &f) {
   return design;
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.7.5.2 Elab — mintypmax timing check limits ($nochange offsets)
@@ -42,13 +42,13 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA70502Fixture &f) {
 
 TEST(ElabA70502, NochangeMinTypMaxOffsetsElaborate) {
   ElabA70502Fixture f;
-  auto *design =
-      ElaborateSrc("module m;\n"
-                   "  specify\n"
-                   "    $nochange(posedge clk, data, 1:2:3, 4:5:6);\n"
-                   "  endspecify\n"
-                   "endmodule\n",
-                   f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    $nochange(posedge clk, data, 1:2:3, 4:5:6);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
@@ -59,13 +59,13 @@ TEST(ElabA70502, NochangeMinTypMaxOffsetsElaborate) {
 
 TEST(ElabA70502, TimestampCondMinTypMaxElaborates) {
   ElabA70502Fixture f;
-  auto *design =
-      ElaborateSrc("module m;\n"
-                   "  specify\n"
-                   "    $setuphold(posedge clk, data, 10, 5, ntfr, 1:2:3);\n"
-                   "  endspecify\n"
-                   "endmodule\n",
-                   f);
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    $setuphold(posedge clk, data, 10, 5, ntfr, 1:2:3);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }

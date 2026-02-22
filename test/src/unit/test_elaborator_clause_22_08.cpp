@@ -1,5 +1,7 @@
 // §22.8: `default_nettype
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -11,7 +13,6 @@
 #include "lexer/lexer.h"
 #include "lexer/token.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -26,9 +27,10 @@ namespace {
 TEST(Elaboration, ImplicitNetNone_Error) {
   // `default_nettype none causes undeclared identifier to be an error.
   ElabFixture f;
-  auto fid = f.mgr.AddFile("<test>", "module top;\n"
-                                     "  assign w = 1'b1;\n"
-                                     "endmodule\n");
+  auto fid = f.mgr.AddFile("<test>",
+                           "module top;\n"
+                           "  assign w = 1'b1;\n"
+                           "endmodule\n");
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
   auto *cu = parser.Parse();
@@ -38,4 +40,4 @@ TEST(Elaboration, ImplicitNetNone_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-} // namespace
+}  // namespace

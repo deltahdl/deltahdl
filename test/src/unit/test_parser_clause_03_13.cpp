@@ -47,8 +47,7 @@ static bool ParseOk(const std::string &src) {
 static bool HasItemOfKindAndName(const std::vector<ModuleItem *> &items,
                                  ModuleItemKind kind, const std::string &name) {
   for (const auto *item : items)
-    if (item->kind == kind && item->name == name)
-      return true;
+    if (item->kind == kind && item->name == name) return true;
   return false;
 }
 
@@ -56,8 +55,7 @@ static bool HasAttrNamed(const std::vector<ModuleItem *> &items,
                          const std::string &name) {
   for (const auto *item : items)
     for (const auto &attr : item->attrs)
-      if (attr.name == name)
-        return true;
+      if (attr.name == name) return true;
   return false;
 }
 
@@ -67,11 +65,12 @@ static bool HasAttrNamed(const std::vector<ModuleItem *> &items,
 
 // 1. Module and package in definition name space (can coexist without conflict)
 TEST(ParserClause03, Cl3_13_ModuleAndPackageInDefinitionNameSpace) {
-  auto r = Parse("package my_pkg;\n"
-                 "  typedef int myint;\n"
-                 "endpackage\n"
-                 "module my_mod;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "package my_pkg;\n"
+      "  typedef int myint;\n"
+      "endpackage\n"
+      "module my_mod;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -82,12 +81,13 @@ TEST(ParserClause03, Cl3_13_ModuleAndPackageInDefinitionNameSpace) {
 
 // 2. Same-name variables in different modules (separate scopes)
 TEST(ParserClause03, Cl3_13_SameNameVarsInDifferentModules) {
-  auto r = Parse("module a;\n"
-                 "  logic [7:0] data;\n"
-                 "endmodule\n"
-                 "module b;\n"
-                 "  logic [7:0] data;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module a;\n"
+      "  logic [7:0] data;\n"
+      "endmodule\n"
+      "module b;\n"
+      "  logic [7:0] data;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 2u);
@@ -100,12 +100,13 @@ TEST(ParserClause03, Cl3_13_SameNameVarsInDifferentModules) {
 
 // 3. Named begin-end block creating a subscope
 TEST(ParserClause03, Cl3_13_NamedBeginEndBlock) {
-  auto r = Parse("module m;\n"
-                 "  initial begin : my_block\n"
-                 "    int x;\n"
-                 "    x = 1;\n"
-                 "  end : my_block\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : my_block\n"
+      "    int x;\n"
+      "    x = 1;\n"
+      "  end : my_block\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 1u);
@@ -119,14 +120,15 @@ TEST(ParserClause03, Cl3_13_NamedBeginEndBlock) {
 
 // 4. Nested named begin-end blocks
 TEST(ParserClause03, Cl3_13_NestedNamedBlocks) {
-  auto r = Parse("module m;\n"
-                 "  initial begin : outer\n"
-                 "    begin : inner\n"
-                 "      int y;\n"
-                 "      y = 42;\n"
-                 "    end : inner\n"
-                 "  end : outer\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : outer\n"
+      "    begin : inner\n"
+      "      int y;\n"
+      "      y = 42;\n"
+      "    end : inner\n"
+      "  end : outer\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -138,25 +140,27 @@ TEST(ParserClause03, Cl3_13_NestedNamedBlocks) {
 
 // 5. Fork-join block creating a subscope
 TEST(ParserClause03, Cl3_13_ForkJoinBlockSubscope) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  initial begin\n"
-                      "    fork\n"
-                      "      $display(\"a\");\n"
-                      "      $display(\"b\");\n"
-                      "    join\n"
-                      "  end\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    fork\n"
+              "      $display(\"a\");\n"
+              "      $display(\"b\");\n"
+              "    join\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // 6. Task and function names in same module scope
 TEST(ParserClause03, Cl3_13_TaskAndFunctionInSameModule) {
-  auto r = Parse("module m;\n"
-                 "  function int add(int a, int b);\n"
-                 "    return a + b;\n"
-                 "  endfunction\n"
-                 "  task do_work(input int x);\n"
-                 "  endtask\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function int add(int a, int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "  task do_work(input int x);\n"
+      "  endtask\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *mod = r.cu->modules[0];
@@ -176,20 +180,22 @@ TEST(ParserClause03, Cl3_13_TaskAndFunctionInSameModule) {
 TEST(ParserClause03, Cl3_13_VarNameSameAsModuleName) {
   // A variable named 'top' inside module 'top' is legal because
   // the definition name space and the local scope are distinct.
-  EXPECT_TRUE(ParseOk("module top;\n"
-                      "  logic top;\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module top;\n"
+              "  logic top;\n"
+              "endmodule\n"));
 }
 
 // 8. Package with internal declarations (local scope)
 TEST(ParserClause03, Cl3_13_PackageWithInternalDeclarations) {
-  auto r = Parse("package my_pkg;\n"
-                 "  typedef logic [7:0] byte_t;\n"
-                 "  parameter int WIDTH = 8;\n"
-                 "  function automatic int double_it(int x);\n"
-                 "    return x * 2;\n"
-                 "  endfunction\n"
-                 "endpackage\n");
+  auto r = Parse(
+      "package my_pkg;\n"
+      "  typedef logic [7:0] byte_t;\n"
+      "  parameter int WIDTH = 8;\n"
+      "  function automatic int double_it(int x);\n"
+      "    return x * 2;\n"
+      "  endfunction\n"
+      "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -200,12 +206,13 @@ TEST(ParserClause03, Cl3_13_PackageWithInternalDeclarations) {
 
 // 9. Package import with :: operator
 TEST(ParserClause03, Cl3_13_PackageImportExplicit) {
-  auto r = Parse("package pkg;\n"
-                 "  typedef int myint;\n"
-                 "endpackage\n"
-                 "module m;\n"
-                 "  import pkg::myint;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "package pkg;\n"
+      "  typedef int myint;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import pkg::myint;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *mod = r.cu->modules[0];
@@ -219,12 +226,13 @@ TEST(ParserClause03, Cl3_13_PackageImportExplicit) {
 
 // 10. Package wildcard import (import pkg::*)
 TEST(ParserClause03, Cl3_13_PackageWildcardImport) {
-  auto r = Parse("package pkg;\n"
-                 "  typedef int myint;\n"
-                 "endpackage\n"
-                 "module m;\n"
-                 "  import pkg::*;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "package pkg;\n"
+      "  typedef int myint;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import pkg::*;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *mod = r.cu->modules[0];
@@ -237,34 +245,35 @@ TEST(ParserClause03, Cl3_13_PackageWildcardImport) {
 
 // 11. Multiple packages imported into same module
 TEST(ParserClause03, Cl3_13_MultiplePackageImports) {
-  auto r = Parse("package alpha;\n"
-                 "  typedef int alpha_t;\n"
-                 "endpackage\n"
-                 "package beta;\n"
-                 "  typedef int beta_t;\n"
-                 "endpackage\n"
-                 "module m;\n"
-                 "  import alpha::*;\n"
-                 "  import beta::beta_t;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "package alpha;\n"
+      "  typedef int alpha_t;\n"
+      "endpackage\n"
+      "package beta;\n"
+      "  typedef int beta_t;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import alpha::*;\n"
+      "  import beta::beta_t;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 2u);
   auto *mod = r.cu->modules[0];
   int import_count = 0;
   for (auto *item : mod->items) {
-    if (item->kind == ModuleItemKind::kImportDecl)
-      import_count++;
+    if (item->kind == ModuleItemKind::kImportDecl) import_count++;
   }
   EXPECT_EQ(import_count, 2);
 }
 
 // 12. Class scope -- members in class name space
 TEST(ParserClause03, Cl3_13_ClassScopeMembers) {
-  auto r = Parse("class my_cls;\n"
-                 "  int data;\n"
-                 "  string name;\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class my_cls;\n"
+      "  int data;\n"
+      "  string name;\n"
+      "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
@@ -279,15 +288,16 @@ TEST(ParserClause03, Cl3_13_ClassScopeMembers) {
 
 // 13. Class with methods sharing scope with member variables
 TEST(ParserClause03, Cl3_13_ClassMethodsAndProperties) {
-  auto r = Parse("class my_cls;\n"
-                 "  int count;\n"
-                 "  function void increment();\n"
-                 "    count = count + 1;\n"
-                 "  endfunction\n"
-                 "  task reset();\n"
-                 "    count = 0;\n"
-                 "  endtask\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class my_cls;\n"
+      "  int count;\n"
+      "  function void increment();\n"
+      "    count = count + 1;\n"
+      "  endfunction\n"
+      "  task reset();\n"
+      "    count = 0;\n"
+      "  endtask\n"
+      "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *cls = r.cu->classes[0];
@@ -304,12 +314,13 @@ TEST(ParserClause03, Cl3_13_ClassMethodsAndProperties) {
 
 // 14. Generate block scope (for-generate)
 TEST(ParserClause03, Cl3_13_GenerateForBlockScope) {
-  auto r = Parse("module m;\n"
-                 "  genvar i;\n"
-                 "  for (i = 0; i < 4; i = i + 1) begin : gen_blk\n"
-                 "    logic [7:0] data;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  genvar i;\n"
+      "  for (i = 0; i < 4; i = i + 1) begin : gen_blk\n"
+      "    logic [7:0] data;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *mod = r.cu->modules[0];
@@ -325,14 +336,15 @@ TEST(ParserClause03, Cl3_13_GenerateForBlockScope) {
 
 // 15. Labeled generate blocks (if-generate)
 TEST(ParserClause03, Cl3_13_LabeledIfGenerateBlock) {
-  auto r = Parse("module m;\n"
-                 "  parameter USE_FAST = 1;\n"
-                 "  if (USE_FAST) begin : fast_path\n"
-                 "    logic [7:0] result;\n"
-                 "  end else begin : slow_path\n"
-                 "    logic [15:0] result;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  parameter USE_FAST = 1;\n"
+      "  if (USE_FAST) begin : fast_path\n"
+      "    logic [7:0] result;\n"
+      "  end else begin : slow_path\n"
+      "    logic [15:0] result;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *mod = r.cu->modules[0];
@@ -348,12 +360,13 @@ TEST(ParserClause03, Cl3_13_LabeledIfGenerateBlock) {
 
 // 16. Interface with modport declarations
 TEST(ParserClause03, Cl3_13_InterfaceWithModports) {
-  auto r = Parse("interface bus_if;\n"
-                 "  logic [7:0] data;\n"
-                 "  logic valid, ready;\n"
-                 "  modport master (output data, output valid, input ready);\n"
-                 "  modport slave (input data, input valid, output ready);\n"
-                 "endinterface\n");
+  auto r = Parse(
+      "interface bus_if;\n"
+      "  logic [7:0] data;\n"
+      "  logic valid, ready;\n"
+      "  modport master (output data, output valid, input ready);\n"
+      "  modport slave (input data, input valid, output ready);\n"
+      "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->interfaces.size(), 1u);
@@ -366,12 +379,13 @@ TEST(ParserClause03, Cl3_13_InterfaceWithModports) {
 
 // 17. Program block with declarations
 TEST(ParserClause03, Cl3_13_ProgramBlockWithDeclarations) {
-  auto r = Parse("program test_prog;\n"
-                 "  int count;\n"
-                 "  initial begin\n"
-                 "    count = 0;\n"
-                 "  end\n"
-                 "endprogram\n");
+  auto r = Parse(
+      "program test_prog;\n"
+      "  int count;\n"
+      "  initial begin\n"
+      "    count = 0;\n"
+      "  end\n"
+      "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->programs.size(), 1u);
@@ -382,13 +396,14 @@ TEST(ParserClause03, Cl3_13_ProgramBlockWithDeclarations) {
 
 // 18. $unit scope -- declarations outside any module/package
 TEST(ParserClause03, Cl3_13_UnitScopeDeclarations) {
-  auto r = Parse("function automatic int helper(int x);\n"
-                 "  return x + 1;\n"
-                 "endfunction\n"
-                 "task automatic global_task(input int v);\n"
-                 "endtask\n"
-                 "module m;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "function automatic int helper(int x);\n"
+      "  return x + 1;\n"
+      "endfunction\n"
+      "task automatic global_task(input int v);\n"
+      "endtask\n"
+      "module m;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_GE(r.cu->cu_items.size(), 2u);
@@ -402,57 +417,61 @@ TEST(ParserClause03, Cl3_13_UnitScopeDeclarations) {
 // 19. Hierarchical reference syntax (a.b.c)
 TEST(ParserClause03, Cl3_13_HierarchicalReferenceSyntax) {
   // Hierarchical names like top.sub.sig are member-access expressions.
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  initial begin\n"
-                      "    $display(\"%0d\", top.sub.sig);\n"
-                      "  end\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    $display(\"%0d\", top.sub.sig);\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // 20. Package scope resolution (pkg::item)
 TEST(ParserClause03, Cl3_13_PackageScopeResolution) {
-  EXPECT_TRUE(ParseOk("package pkg;\n"
-                      "  parameter int WIDTH = 8;\n"
-                      "endpackage\n"
-                      "module m;\n"
-                      "  logic [pkg::WIDTH-1:0] data;\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("package pkg;\n"
+              "  parameter int WIDTH = 8;\n"
+              "endpackage\n"
+              "module m;\n"
+              "  logic [pkg::WIDTH-1:0] data;\n"
+              "endmodule\n"));
 }
 
 // 21. Class scope resolution (cls::member)
 TEST(ParserClause03, Cl3_13_ClassScopeResolution) {
-  EXPECT_TRUE(ParseOk("class base;\n"
-                      "  typedef int my_type;\n"
-                      "endclass\n"
-                      "module m;\n"
-                      "  base::my_type x;\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("class base;\n"
+              "  typedef int my_type;\n"
+              "endclass\n"
+              "module m;\n"
+              "  base::my_type x;\n"
+              "endmodule\n"));
 }
 
 // 22. Typedef in package scope
 TEST(ParserClause03, Cl3_13_TypedefInPackageScope) {
-  auto r = Parse("package types_pkg;\n"
-                 "  typedef logic [7:0] byte_t;\n"
-                 "  typedef logic [15:0] word_t;\n"
-                 "endpackage\n");
+  auto r = Parse(
+      "package types_pkg;\n"
+      "  typedef logic [7:0] byte_t;\n"
+      "  typedef logic [15:0] word_t;\n"
+      "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
   auto *pkg = r.cu->packages[0];
   int typedef_count = 0;
   for (auto *item : pkg->items) {
-    if (item->kind == ModuleItemKind::kTypedef)
-      typedef_count++;
+    if (item->kind == ModuleItemKind::kTypedef) typedef_count++;
   }
   EXPECT_EQ(typedef_count, 2);
 }
 
 // 23. Enum in module scope
 TEST(ParserClause03, Cl3_13_EnumInModuleScope) {
-  auto r = Parse("module m;\n"
-                 "  typedef enum logic [1:0] {IDLE, RUN, DONE} state_t;\n"
-                 "  state_t current_state;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  typedef enum logic [1:0] {IDLE, RUN, DONE} state_t;\n"
+      "  state_t current_state;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *mod = r.cu->modules[0];
@@ -468,14 +487,15 @@ TEST(ParserClause03, Cl3_13_EnumInModuleScope) {
 
 // 24. Named fork-join blocks
 TEST(ParserClause03, Cl3_13_NamedForkJoinBlock) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork : my_fork\n"
-                 "      $display(\"a\");\n"
-                 "      $display(\"b\");\n"
-                 "    join : my_fork\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork : my_fork\n"
+      "      $display(\"a\");\n"
+      "      $display(\"b\");\n"
+      "    join : my_fork\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -488,12 +508,13 @@ TEST(ParserClause03, Cl3_13_NamedForkJoinBlock) {
 
 // 25. begin-end with no name (anonymous block)
 TEST(ParserClause03, Cl3_13_AnonymousBeginEndBlock) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    int x;\n"
-                 "    x = 5;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int x;\n"
+      "    x = 5;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -505,18 +526,19 @@ TEST(ParserClause03, Cl3_13_AnonymousBeginEndBlock) {
 
 // 26. Multiple named blocks at same level
 TEST(ParserClause03, Cl3_13_MultipleNamedBlocksSameLevel) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    begin : block_a\n"
-                 "      int x;\n"
-                 "      x = 1;\n"
-                 "    end : block_a\n"
-                 "    begin : block_b\n"
-                 "      int y;\n"
-                 "      y = 2;\n"
-                 "    end : block_b\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    begin : block_a\n"
+      "      int x;\n"
+      "      x = 1;\n"
+      "    end : block_a\n"
+      "    begin : block_b\n"
+      "      int y;\n"
+      "      y = 2;\n"
+      "    end : block_b\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *body = r.cu->modules[0]->items[0]->body;
@@ -528,10 +550,11 @@ TEST(ParserClause03, Cl3_13_MultipleNamedBlocksSameLevel) {
 
 // 27. Parameter and localparam in module scope
 TEST(ParserClause03, Cl3_13_ParameterAndLocalparamInModule) {
-  auto r = Parse("module m;\n"
-                 "  parameter int WIDTH = 8;\n"
-                 "  localparam int DEPTH = 16;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  parameter int WIDTH = 8;\n"
+      "  localparam int DEPTH = 16;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *mod = r.cu->modules[0];
@@ -565,13 +588,14 @@ TEST(ParserClause03, Cl3_13_PortNamesInModuleScope) {
 
 // 29. Function with local variables creating subscope
 TEST(ParserClause03, Cl3_13_FunctionWithLocalVarsSubscope) {
-  auto r = Parse("module m;\n"
-                 "  function automatic int compute(int a, int b);\n"
-                 "    int temp;\n"
-                 "    temp = a + b;\n"
-                 "    return temp;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int compute(int a, int b);\n"
+      "    int temp;\n"
+      "    temp = a + b;\n"
+      "    return temp;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *mod = r.cu->modules[0];
@@ -585,39 +609,43 @@ TEST(ParserClause03, Cl3_13_FunctionWithLocalVarsSubscope) {
 
 // 30. Nested class (class within a module -- class in module scope)
 TEST(ParserClause03, Cl3_13_NestedClassInModule) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  class inner_cls;\n"
-                      "    int value;\n"
-                      "    function void set(int v);\n"
-                      "      value = v;\n"
-                      "    endfunction\n"
-                      "  endclass\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  class inner_cls;\n"
+              "    int value;\n"
+              "    function void set(int v);\n"
+              "      value = v;\n"
+              "    endfunction\n"
+              "  endclass\n"
+              "endmodule\n"));
 }
 
 // 31. Text macro name space (d) — `define introduces names with leading `
 TEST(ParserClause03, Cl3_13_TextMacroNameSpace) {
   // Macro defined and used; subsequent redefinition overrides previous
-  auto r = Parse("`define WIDTH 8\n"
-                 "`define DEPTH 16\n"
-                 "module m;\n"
-                 "  logic [`WIDTH-1:0] data;\n"
-                 "  logic [`DEPTH-1:0] addr;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "`define WIDTH 8\n"
+      "`define DEPTH 16\n"
+      "module m;\n"
+      "  logic [`WIDTH-1:0] data;\n"
+      "  logic [`DEPTH-1:0] addr;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 1u);
   // Macro names are unambiguous with other name spaces (leading ` character)
-  EXPECT_TRUE(ParseOk("`define data 42\n"
-                      "module m; logic [7:0] data; endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("`define data 42\n"
+              "module m; logic [7:0] data; endmodule\n"));
 }
 
 // 32. Attribute name space (h) — enclosed by (* and *)
 TEST(ParserClause03, Cl3_13_AttributeNameSpace) {
-  auto r = Parse("module m;\n"
-                 "  (* synthesis *) logic flag;\n"
-                 "  (* full_case, parallel_case *) logic [1:0] sel;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  (* synthesis *) logic flag;\n"
+      "  (* full_case, parallel_case *) logic [1:0] sel;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   // Verify attributes are parsed and attached to declarations
@@ -635,10 +663,10 @@ TEST(ParserClause03, Cl3_13_AllEightNameSpaces) {
       // (c) Compilation-unit scope name space
       "function automatic int cu_fn(int a); return a; endfunction\n"
       // (a) Definitions name space: module, interface, program, primitive
-      "module m (input logic clk, output logic q);\n" // (g) Port name space
-      "  (* keep *) logic flag;\n"               // (h) Attribute name space
-      "  import pkg::*;\n"                       // (e) Module name space
-      "  always_ff @(posedge clk) begin : blk\n" // (f) Block name space
+      "module m (input logic clk, output logic q);\n"  // (g) Port name space
+      "  (* keep *) logic flag;\n"                // (h) Attribute name space
+      "  import pkg::*;\n"                        // (e) Module name space
+      "  always_ff @(posedge clk) begin : blk\n"  // (f) Block name space
       "    int cnt;\n"
       "    cnt = `VAL;\n"
       "    q <= flag;\n"

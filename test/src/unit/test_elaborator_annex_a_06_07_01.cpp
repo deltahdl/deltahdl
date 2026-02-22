@@ -35,7 +35,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA60701Fixture &f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.6.7.1 Patterns — Elaboration tests
@@ -74,13 +74,14 @@ TEST(ElabA60701, StructNamedPatternElaborates) {
 // §10.9: assignment pattern with default key elaborates
 TEST(ElabA60701, PatternDefaultKeyElaborates) {
   ElabA60701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] arr [0:3];\n"
-                              "  initial begin\n"
-                              "    arr = '{default: 8'd0};\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] arr [0:3];\n"
+      "  initial begin\n"
+      "    arr = '{default: 8'd0};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 }
 
@@ -102,31 +103,33 @@ TEST(ElabA60701, TypedPatternExpressionElaborates) {
 // §12.6: case-matches statement elaborates
 TEST(ElabA60701, CaseMatchesElaborates) {
   ElabA60701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x, y;\n"
-                              "  initial begin\n"
-                              "    x = 8'd5;\n"
-                              "    case(x) matches\n"
-                              "      8'd5: y = 8'd10;\n"
-                              "      default: y = 8'd0;\n"
-                              "    endcase\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x, y;\n"
+      "  initial begin\n"
+      "    x = 8'd5;\n"
+      "    case(x) matches\n"
+      "      8'd5: y = 8'd10;\n"
+      "      default: y = 8'd0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 }
 
 // §12.6.2: matches operator in if-condition elaborates
 TEST(ElabA60701, MatchesInIfElaborates) {
   ElabA60701Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x, y;\n"
-                              "  initial begin\n"
-                              "    x = 8'd3;\n"
-                              "    if (x matches 8'd3) y = 8'd1;\n"
-                              "    else y = 8'd0;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x, y;\n"
+      "  initial begin\n"
+      "    x = 8'd3;\n"
+      "    if (x matches 8'd3) y = 8'd1;\n"
+      "    else y = 8'd0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 }

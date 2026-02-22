@@ -26,9 +26,10 @@ TEST(Preprocessor, FileExpansion) {
 
 TEST(Preprocessor, LineExpansion) {
   PreprocFixture f;
-  auto result = Preprocess("line1\n"
-                           "`__LINE__\n",
-                           f);
+  auto result = Preprocess(
+      "line1\n"
+      "`__LINE__\n",
+      f);
   EXPECT_NE(result.find('2'), std::string::npos);
 }
 
@@ -36,9 +37,10 @@ TEST(Preprocessor, LineExpansion) {
 
 TEST(Preprocessor, LineDirectiveAffectsLineMacro) {
   PreprocFixture f;
-  auto result = Preprocess("`line 100 \"test.sv\" 0\n"
-                           "`__LINE__\n",
-                           f);
+  auto result = Preprocess(
+      "`line 100 \"test.sv\" 0\n"
+      "`__LINE__\n",
+      f);
   EXPECT_NE(result.find("101"), std::string::npos);
 }
 

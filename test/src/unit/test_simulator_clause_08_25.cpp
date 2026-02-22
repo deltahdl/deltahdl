@@ -1,5 +1,9 @@
 // §8.25: Parameterized classes
 
+#include <gtest/gtest.h>
+
+#include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -7,8 +11,6 @@
 #include "simulation/class_object.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
-#include <string>
 
 using namespace delta;
 
@@ -81,4 +83,4 @@ TEST(ClassSim, ParameterizedClassInstantiation) {
   EXPECT_EQ(obj->GetProperty("second", f.arena).ToUint64(), 20u);
 }
 
-} // namespace
+}  // namespace

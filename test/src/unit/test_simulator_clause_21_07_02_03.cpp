@@ -8,15 +8,15 @@
 #include <string>
 
 #include "common/arena.h"
+#include "gtest/gtest.h"
 #include "simulation/variable.h"
 #include "simulation/vcd_writer.h"
-#include "gtest/gtest.h"
 
 namespace delta {
 namespace {
 
 class VcdClause21070203Test : public ::testing::Test {
-protected:
+ protected:
   void SetUp() override {
     char tmpl[] = "/tmp/test_vcd_XXXXXX";
     int fd = mkstemp(tmpl);
@@ -78,5 +78,5 @@ TEST_F(VcdClause21070203Test, RegistersSignal) {
   EXPECT_NE(content.find("clk"), std::string::npos);
 }
 
-} // namespace
-} // namespace delta
+}  // namespace
+}  // namespace delta

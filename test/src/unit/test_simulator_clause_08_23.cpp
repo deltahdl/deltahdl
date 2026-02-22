@@ -1,5 +1,9 @@
 // §8.23: Class scope resolution operator ::
 
+#include <gtest/gtest.h>
+
+#include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -7,8 +11,6 @@
 #include "simulation/class_object.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
-#include <string>
 
 using namespace delta;
 
@@ -24,9 +26,9 @@ struct ClassFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 // Build a simple ClassTypeInfo and register it with the context.
-static ClassTypeInfo *
-MakeClassType(ClassFixture &f, std::string_view name,
-              const std::vector<std::string_view> &props) {
+static ClassTypeInfo *MakeClassType(
+    ClassFixture &f, std::string_view name,
+    const std::vector<std::string_view> &props) {
   auto *info = f.arena.Create<ClassTypeInfo>();
   info->name = name;
   for (auto p : props) {
@@ -67,4 +69,4 @@ TEST(ClassSim, ScopeResolutionMethodLookup) {
   EXPECT_EQ(it->second->name, "compute");
 }
 
-} // namespace
+}  // namespace

@@ -47,7 +47,7 @@ RtlirDesign *Elaborate(const std::string &src, ElabFixture &f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.2.6 Function declarations
@@ -89,8 +89,9 @@ TEST(ParserA26, FuncReturnTypeImplicit) {
 }
 
 TEST(ParserA26, FuncReturnTypeImplicitSigned) {
-  auto r = Parse("module m;\n  function signed [7:0] foo();\n"
-                 "    return 0;\n  endfunction\nendmodule\n");
+  auto r = Parse(
+      "module m;\n  function signed [7:0] foo();\n"
+      "    return 0;\n  endfunction\nendmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -99,8 +100,9 @@ TEST(ParserA26, FuncReturnTypeImplicitSigned) {
 }
 
 TEST(ParserA26, FuncReturnTypeLogicPacked) {
-  auto r = Parse("module m;\n  function logic [3:0] baz();\n"
-                 "    return 4'b0;\n  endfunction\nendmodule\n");
+  auto r = Parse(
+      "module m;\n  function logic [3:0] baz();\n"
+      "    return 4'b0;\n  endfunction\nendmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -116,8 +118,9 @@ TEST(ParserA26, FuncReturnTypeLogicPacked) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserA26, FuncLifetimeAutomatic) {
-  auto r = Parse("module m;\n  function automatic int foo();\n"
-                 "    return 1;\n  endfunction\nendmodule\n");
+  auto r = Parse(
+      "module m;\n  function automatic int foo();\n"
+      "    return 1;\n  endfunction\nendmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -126,8 +129,9 @@ TEST(ParserA26, FuncLifetimeAutomatic) {
 }
 
 TEST(ParserA26, FuncLifetimeStatic) {
-  auto r = Parse("module m;\n  function static int foo();\n"
-                 "    return 1;\n  endfunction\nendmodule\n");
+  auto r = Parse(
+      "module m;\n  function static int foo();\n"
+      "    return 1;\n  endfunction\nendmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -136,8 +140,9 @@ TEST(ParserA26, FuncLifetimeStatic) {
 }
 
 TEST(ParserA26, FuncLifetimeDefault) {
-  auto r = Parse("module m;\n  function int foo();\n"
-                 "    return 1;\n  endfunction\nendmodule\n");
+  auto r = Parse(
+      "module m;\n  function int foo();\n"
+      "    return 1;\n  endfunction\nendmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -146,45 +151,48 @@ TEST(ParserA26, FuncLifetimeDefault) {
 }
 
 TEST(ParserA26, FuncDynamicOverrideInitial) {
-  auto r =
-      Parse("class C;\n"
-            "  virtual function :initial int foo(); return 0; endfunction\n"
-            "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  virtual function :initial int foo(); return 0; endfunction\n"
+      "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA26, FuncDynamicOverrideExtends) {
-  auto r =
-      Parse("class C;\n"
-            "  virtual function :extends int foo(); return 0; endfunction\n"
-            "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  virtual function :extends int foo(); return 0; endfunction\n"
+      "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA26, FuncDynamicOverrideFinal) {
-  auto r = Parse("class C;\n"
-                 "  virtual function :final int foo(); return 0; endfunction\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  virtual function :final int foo(); return 0; endfunction\n"
+      "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA26, FuncDynamicOverrideInitialFinal) {
-  auto r = Parse("class C;\n"
-                 "  virtual function :initial :final int foo();\n"
-                 "    return 0;\n  endfunction\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  virtual function :initial :final int foo();\n"
+      "    return 0;\n  endfunction\n"
+      "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA26, FuncDynamicOverrideExtendsFinal) {
-  auto r = Parse("class C;\n"
-                 "  virtual function :extends :final int foo();\n"
-                 "    return 0;\n  endfunction\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  virtual function :extends :final int foo();\n"
+      "    return 0;\n  endfunction\n"
+      "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -204,10 +212,11 @@ TEST(ParserA26, FuncBodyNewStyleEmptyPorts) {
 }
 
 TEST(ParserA26, FuncBodyNewStyleWithArgs) {
-  auto r = Parse("module m;\n"
-                 "  function int add(input int a, input int b);\n"
-                 "    return a + b;\n"
-                 "  endfunction\nendmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function int add(input int a, input int b);\n"
+      "    return a + b;\n"
+      "  endfunction\nendmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -218,10 +227,11 @@ TEST(ParserA26, FuncBodyNewStyleWithArgs) {
 }
 
 TEST(ParserA26, FuncBodyNewStyleWithDefaultValue) {
-  auto r = Parse("module m;\n"
-                 "  function int foo(input int x = 5);\n"
-                 "    return x;\n"
-                 "  endfunction\nendmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function int foo(input int x = 5);\n"
+      "    return x;\n"
+      "  endfunction\nendmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -246,9 +256,10 @@ TEST(ParserA26, FuncBodyNewStyleMultipleDirections) {
 }
 
 TEST(ParserA26, FuncBodyNewStyleConstRef) {
-  auto r = Parse("module m;\n"
-                 "  function void foo(const ref int x);\n"
-                 "  endfunction\nendmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function void foo(const ref int x);\n"
+      "  endfunction\nendmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -258,9 +269,10 @@ TEST(ParserA26, FuncBodyNewStyleConstRef) {
 }
 
 TEST(ParserA26, FuncBodyNewStyleStickyDirection) {
-  auto r = Parse("module m;\n"
-                 "  function void foo(input int a, int b, int c);\n"
-                 "  endfunction\nendmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function void foo(input int a, int b, int c);\n"
+      "  endfunction\nendmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -271,12 +283,13 @@ TEST(ParserA26, FuncBodyNewStyleStickyDirection) {
 }
 
 TEST(ParserA26, FuncBodyWithBlockItemDecl) {
-  auto r = Parse("module m;\n"
-                 "  function int foo(input int x);\n"
-                 "    int temp;\n"
-                 "    temp = x + 1;\n"
-                 "    return temp;\n"
-                 "  endfunction\nendmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function int foo(input int x);\n"
+      "    int temp;\n"
+      "    temp = x + 1;\n"
+      "    return temp;\n"
+      "  endfunction\nendmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -285,10 +298,11 @@ TEST(ParserA26, FuncBodyWithBlockItemDecl) {
 }
 
 TEST(ParserA26, FuncBodyWithEndLabel) {
-  auto r = Parse("module m;\n"
-                 "  function void foo();\n"
-                 "  endfunction : foo\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function void foo();\n"
+      "  endfunction : foo\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->name, "foo");
@@ -299,12 +313,13 @@ TEST(ParserA26, FuncBodyWithEndLabel) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserA26, FuncBodyOldStylePorts) {
-  auto r = Parse("module m;\n"
-                 "  function int foo;\n"
-                 "    input int a;\n"
-                 "    input int b;\n"
-                 "    foo = a + b;\n"
-                 "  endfunction\nendmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function int foo;\n"
+      "    input int a;\n"
+      "    input int b;\n"
+      "    foo = a + b;\n"
+      "  endfunction\nendmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -315,12 +330,13 @@ TEST(ParserA26, FuncBodyOldStylePorts) {
 }
 
 TEST(ParserA26, FuncBodyOldStyleOutputPort) {
-  auto r = Parse("module m;\n"
-                 "  function void xfer;\n"
-                 "    input int a;\n"
-                 "    output int b;\n"
-                 "    b = a;\n"
-                 "  endfunction\nendmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function void xfer;\n"
+      "    input int a;\n"
+      "    output int b;\n"
+      "    b = a;\n"
+      "  endfunction\nendmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -333,40 +349,44 @@ TEST(ParserA26, FuncBodyOldStyleOutputPort) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserA26, FuncBodyClassScope) {
-  auto r = Parse("class C;\n"
-                 "  extern function int foo();\n"
-                 "endclass\n"
-                 "function int C::foo();\n"
-                 "  return 42;\n"
-                 "endfunction\n");
+  auto r = Parse(
+      "class C;\n"
+      "  extern function int foo();\n"
+      "endclass\n"
+      "function int C::foo();\n"
+      "  return 42;\n"
+      "endfunction\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA26, FuncBodyConstructorNew) {
-  auto r = Parse("class C;\n"
-                 "  function new();\n"
-                 "  endfunction\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  function new();\n"
+      "  endfunction\n"
+      "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA26, FuncBodyConstructorNewEndLabel) {
-  auto r = Parse("class C;\n"
-                 "  function new(int x);\n"
-                 "  endfunction : new\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  function new(int x);\n"
+      "  endfunction : new\n"
+      "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA26, FuncBodyOutOfBlockConstructor) {
-  auto r = Parse("class C;\n"
-                 "  extern function new();\n"
-                 "endclass\n"
-                 "function C::new();\n"
-                 "endfunction\n");
+  auto r = Parse(
+      "class C;\n"
+      "  extern function new();\n"
+      "endclass\n"
+      "function C::new();\n"
+      "endfunction\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -378,9 +398,10 @@ TEST(ParserA26, FuncBodyOutOfBlockConstructor) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserA26, FuncPrototypeExtern) {
-  auto r = Parse("module m;\n"
-                 "  extern function int foo(input int x);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  extern function int foo(input int x);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -391,9 +412,10 @@ TEST(ParserA26, FuncPrototypeExtern) {
 }
 
 TEST(ParserA26, FuncPrototypeExternVoid) {
-  auto r = Parse("module m;\n"
-                 "  extern function void bar();\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  extern function void bar();\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -402,9 +424,10 @@ TEST(ParserA26, FuncPrototypeExternVoid) {
 }
 
 TEST(ParserA26, FuncPrototypePureVirtual) {
-  auto r = Parse("class C;\n"
-                 "  pure virtual function int compute(input int x);\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  pure virtual function int compute(input int x);\n"
+      "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -420,10 +443,10 @@ TEST(ParserA26, FuncPrototypePureVirtual) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserA26, DpiImportFunction) {
-  auto r =
-      Parse("module m;\n"
-            "  import \"DPI-C\" function int c_add(input int a, input int b);\n"
-            "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function int c_add(input int a, input int b);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -435,9 +458,10 @@ TEST(ParserA26, DpiImportFunction) {
 }
 
 TEST(ParserA26, DpiImportFunctionVoid) {
-  auto r = Parse("module m;\n"
-                 "  import \"DPI-C\" function void c_print(input int x);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function void c_print(input int x);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -446,9 +470,10 @@ TEST(ParserA26, DpiImportFunctionVoid) {
 }
 
 TEST(ParserA26, DpiImportTask) {
-  auto r = Parse("module m;\n"
-                 "  import \"DPI-C\" task c_do_work(input int x);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" task c_do_work(input int x);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -462,18 +487,20 @@ TEST(ParserA26, DpiImportTask) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserA26, DpiSpecStringDpiC) {
-  auto r = Parse("module m;\n"
-                 "  import \"DPI-C\" function void foo();\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function void foo();\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kDpiImport);
 }
 
 TEST(ParserA26, DpiSpecStringDpi) {
-  auto r = Parse("module m;\n"
-                 "  import \"DPI\" function void foo();\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI\" function void foo();\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kDpiImport);
@@ -497,9 +524,10 @@ TEST(ParserA26, DpiFunctionImportPure) {
 }
 
 TEST(ParserA26, DpiFunctionImportContext) {
-  auto r = Parse("module m;\n"
-                 "  import \"DPI-C\" context function void ctx_func();\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" context function void ctx_func();\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -512,9 +540,10 @@ TEST(ParserA26, DpiFunctionImportContext) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserA26, DpiTaskImportContext) {
-  auto r = Parse("module m;\n"
-                 "  import \"DPI-C\" context task ctx_task(input int x);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" context task ctx_task(input int x);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -540,9 +569,10 @@ TEST(ParserA26, DpiImportWithCIdentifier) {
 }
 
 TEST(ParserA26, DpiImportTaskWithCIdentifier) {
-  auto r = Parse("module m;\n"
-                 "  import \"DPI-C\" c_work = task do_work();\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" c_work = task do_work();\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -552,10 +582,10 @@ TEST(ParserA26, DpiImportTaskWithCIdentifier) {
 }
 
 TEST(ParserA26, DpiImportPureWithCIdentifier) {
-  auto r =
-      Parse("module m;\n"
-            "  import \"DPI-C\" pure c_fn = function int fn(input int a);\n"
-            "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" pure c_fn = function int fn(input int a);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -569,10 +599,11 @@ TEST(ParserA26, DpiImportPureWithCIdentifier) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserA26, DpiExportFunction) {
-  auto r = Parse("module m;\n"
-                 "  function void sv_func(); endfunction\n"
-                 "  export \"DPI-C\" function sv_func;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function void sv_func(); endfunction\n"
+      "  export \"DPI-C\" function sv_func;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[1];
@@ -582,10 +613,11 @@ TEST(ParserA26, DpiExportFunction) {
 }
 
 TEST(ParserA26, DpiExportTask) {
-  auto r = Parse("module m;\n"
-                 "  task sv_task(); endtask\n"
-                 "  export \"DPI-C\" task sv_task;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  task sv_task(); endtask\n"
+      "  export \"DPI-C\" task sv_task;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[1];
@@ -595,10 +627,11 @@ TEST(ParserA26, DpiExportTask) {
 }
 
 TEST(ParserA26, DpiExportWithCIdentifier) {
-  auto r = Parse("module m;\n"
-                 "  function void sv_func(); endfunction\n"
-                 "  export \"DPI-C\" c_name = function sv_func;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function void sv_func(); endfunction\n"
+      "  export \"DPI-C\" c_name = function sv_func;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[1];
@@ -608,10 +641,11 @@ TEST(ParserA26, DpiExportWithCIdentifier) {
 }
 
 TEST(ParserA26, DpiExportDpiLegacy) {
-  auto r = Parse("module m;\n"
-                 "  function void sv_func(); endfunction\n"
-                 "  export \"DPI\" function sv_func;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function void sv_func(); endfunction\n"
+      "  export \"DPI\" function sv_func;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[1]->kind, ModuleItemKind::kDpiExport);
@@ -622,9 +656,10 @@ TEST(ParserA26, DpiExportDpiLegacy) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserA26, DpiFuncProtoNoArgs) {
-  auto r = Parse("module m;\n"
-                 "  import \"DPI-C\" function int get_value();\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function int get_value();\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -632,10 +667,11 @@ TEST(ParserA26, DpiFuncProtoNoArgs) {
 }
 
 TEST(ParserA26, DpiFuncProtoMultipleArgs) {
-  auto r = Parse("module m;\n"
-                 "  import \"DPI-C\" function int compute(\n"
-                 "    input int a, input int b, input int c);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function int compute(\n"
+      "    input int a, input int b, input int c);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -643,10 +679,11 @@ TEST(ParserA26, DpiFuncProtoMultipleArgs) {
 }
 
 TEST(ParserA26, DpiTaskProtoWithArgs) {
-  auto r = Parse("module m;\n"
-                 "  import \"DPI-C\" task run_sim(\n"
-                 "    input int cycles, output int result);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" task run_sim(\n"
+      "    input int cycles, output int result);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -661,9 +698,10 @@ TEST(ParserA26, DpiTaskProtoWithArgs) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserA26, FuncArgUnpackedDim) {
-  auto r = Parse("module m;\n"
-                 "  function void foo(input int arr [4]);\n"
-                 "  endfunction\nendmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function void foo(input int arr [4]);\n"
+      "  endfunction\nendmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
@@ -677,25 +715,27 @@ TEST(ParserA26, FuncArgUnpackedDim) {
 
 TEST(ParserA26, ElabFunctionDeclInModule) {
   ElabFixture f;
-  auto *design = Elaborate("module m;\n"
-                           "  function int add(input int a, input int b);\n"
-                           "    return a + b;\n"
-                           "  endfunction\n"
-                           "endmodule\n",
-                           f);
+  auto *design = Elaborate(
+      "module m;\n"
+      "  function int add(input int a, input int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
 TEST(ParserA26, ElabFunctionAutomaticLifetime) {
   ElabFixture f;
-  auto *design = Elaborate("module m;\n"
-                           "  function automatic int fact(input int n);\n"
-                           "    if (n <= 1) return 1;\n"
-                           "    return n;\n"
-                           "  endfunction\n"
-                           "endmodule\n",
-                           f);
+  auto *design = Elaborate(
+      "module m;\n"
+      "  function automatic int fact(input int n);\n"
+      "    if (n <= 1) return 1;\n"
+      "    return n;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
 }

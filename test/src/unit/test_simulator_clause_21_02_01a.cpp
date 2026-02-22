@@ -58,4 +58,4 @@ TEST(SysTask, FormatModule_m) {
   EXPECT_FALSE(out.empty());
 }
 
-} // namespace
+}  // namespace

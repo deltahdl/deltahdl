@@ -1,11 +1,12 @@
 // §13.4: Functions
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -49,11 +50,12 @@ struct ModportPortExpected {
 namespace {
 
 TEST(Parser, FunctionDecl) {
-  auto r = Parse("module t;\n"
-                 "  function int add(input int a, input int b);\n"
-                 "    return a + b;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  function int add(input int a, input int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
@@ -65,4 +67,4 @@ TEST(Parser, FunctionDecl) {
   }
 }
 
-} // namespace
+}  // namespace

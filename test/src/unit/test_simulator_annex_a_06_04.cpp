@@ -36,7 +36,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA604Fixture &f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-} // namespace
+}  // namespace
 
 // =============================================================================
 // A.6.4 Statements — Simulation
@@ -49,15 +49,16 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA604Fixture &f) {
 // §12.3: null statement has no effect in simulation
 TEST(SimA604, NullStatementNoEffect) {
   SimA604Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial begin\n"
-                              "    x = 8'd5;\n"
-                              "    ;\n"
-                              "    ;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd5;\n"
+      "    ;\n"
+      "    ;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -70,13 +71,14 @@ TEST(SimA604, NullStatementNoEffect) {
 // §12.3: labeled statements execute normally
 TEST(SimA604, LabeledStatementExecutes) {
   SimA604Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial begin\n"
-                              "    step1: x = 8'd42;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    step1: x = 8'd42;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -89,13 +91,14 @@ TEST(SimA604, LabeledStatementExecutes) {
 // §12.3: statements with attributes execute normally
 TEST(SimA604, AttributedStatementExecutes) {
   SimA604Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  initial begin\n"
-                              "    (* synthesis *) x = 8'd99;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    (* synthesis *) x = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -109,18 +112,19 @@ TEST(SimA604, AttributedStatementExecutes) {
 // (verifying the dispatcher works across multiple statement types in sequence)
 TEST(SimA604, StmtItemDispatchMixed) {
   SimA604Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] a, b, c;\n"
-                              "  initial begin\n"
-                              "    a = 8'd1;\n"      // blocking_assignment
-                              "    if (a == 8'd1)\n" // conditional_statement
-                              "      b = 8'd2;\n"
-                              "    begin\n" // seq_block
-                              "      c = a + b;\n"
-                              "    end\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, c;\n"
+      "  initial begin\n"
+      "    a = 8'd1;\n"       // blocking_assignment
+      "    if (a == 8'd1)\n"  // conditional_statement
+      "      b = 8'd2;\n"
+      "    begin\n"  // seq_block
+      "      c = a + b;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -139,16 +143,17 @@ TEST(SimA604, StmtItemDispatchMixed) {
 // §13: function_statement execution via function call
 TEST(SimA604, FunctionStatementExecution) {
   SimA604Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] x;\n"
-                              "  function void set_x();\n"
-                              "    x = 8'd77;\n"
-                              "  endfunction\n"
-                              "  initial begin\n"
-                              "    set_x();\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  function void set_x();\n"
+      "    x = 8'd77;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    set_x();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);

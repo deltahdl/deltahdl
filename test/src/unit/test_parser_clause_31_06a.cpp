@@ -30,16 +30,14 @@ static ParseResult31 Parse(const std::string &src) {
 
 static ModuleItem *FindSpecifyBlock(const std::vector<ModuleItem *> &items) {
   for (auto *item : items) {
-    if (item->kind == ModuleItemKind::kSpecifyBlock)
-      return item;
+    if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
   }
   return nullptr;
 }
 
 static SpecifyItem *GetSoleSpecifyItem(ModuleItem *spec_block) {
   EXPECT_EQ(spec_block->specify_items.size(), 1u);
-  if (spec_block->specify_items.empty())
-    return nullptr;
+  if (spec_block->specify_items.empty()) return nullptr;
   return spec_block->specify_items[0];
 }
 
@@ -52,8 +50,7 @@ struct SpecifyParseResult {
 static SpecifyParseResult ParseSpecifySingle(const std::string &src) {
   SpecifyParseResult result;
   result.pr = Parse(src);
-  if (result.pr.cu == nullptr)
-    return result;
+  if (result.pr.cu == nullptr) return result;
   result.spec_block = FindSpecifyBlock(result.pr.cu->modules[0]->items);
   if (result.spec_block != nullptr) {
     result.sole_item = GetSoleSpecifyItem(result.spec_block);
@@ -62,12 +59,13 @@ static SpecifyParseResult ParseSpecifySingle(const std::string &src) {
 }
 
 TEST(ParserSection28, Sec28_12_TimingCheckWithNotifier) {
-  auto sp = ParseSpecifySingle("module m(input d, clk);\n"
-                               "  reg notif_reg;\n"
-                               "  specify\n"
-                               "    $setup(d, posedge clk, 10, notif_reg);\n"
-                               "  endspecify\n"
-                               "endmodule\n");
+  auto sp = ParseSpecifySingle(
+      "module m(input d, clk);\n"
+      "  reg notif_reg;\n"
+      "  specify\n"
+      "    $setup(d, posedge clk, 10, notif_reg);\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(sp.pr.cu, nullptr);
   EXPECT_FALSE(sp.pr.has_errors);
   ASSERT_NE(sp.sole_item, nullptr);
@@ -76,11 +74,12 @@ TEST(ParserSection28, Sec28_12_TimingCheckWithNotifier) {
 }
 
 TEST(ParserSection28, Sec28_12_TimingCheckWithEdges) {
-  auto sp = ParseSpecifySingle("module m(input d, clk);\n"
-                               "  specify\n"
-                               "    $setup(negedge d, posedge clk, 8);\n"
-                               "  endspecify\n"
-                               "endmodule\n");
+  auto sp = ParseSpecifySingle(
+      "module m(input d, clk);\n"
+      "  specify\n"
+      "    $setup(negedge d, posedge clk, 8);\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(sp.pr.cu, nullptr);
   EXPECT_FALSE(sp.pr.has_errors);
   ASSERT_NE(sp.sole_item, nullptr);

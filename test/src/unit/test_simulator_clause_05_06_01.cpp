@@ -38,59 +38,61 @@ static uint64_t RunAndGet(const std::string &src, const char *var_name) {
   SimCh50601Fixture f;
   auto *design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
-  if (!design)
-    return 0;
+  if (!design) return 0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
   auto *var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
-  if (!var)
-    return 0;
+  if (!var) return 0;
   return var->value.ToUint64();
 }
 
 TEST(SimCh50601, EscapedIdentAsVariable) {
   // §5.6.1: Escaped identifiers can name variables.
-  auto result = RunAndGet("module t;\n"
-                          "  logic [7:0] \\myvar ;\n"
-                          "  initial \\myvar = 8'd55;\n"
-                          "endmodule\n",
-                          "\\myvar");
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] \\myvar ;\n"
+      "  initial \\myvar = 8'd55;\n"
+      "endmodule\n",
+      "\\myvar");
   EXPECT_EQ(result, 55u);
 }
 
 TEST(SimCh50601, EscapedIdentSpecialChars) {
   // §5.6.1: Escaped identifiers may include printable ASCII 33-126.
-  auto result = RunAndGet("module t;\n"
-                          "  logic [7:0] \\data+bus ;\n"
-                          "  initial \\data+bus = 8'd77;\n"
-                          "endmodule\n",
-                          "\\data+bus");
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] \\data+bus ;\n"
+      "  initial \\data+bus = 8'd77;\n"
+      "endmodule\n",
+      "\\data+bus");
   EXPECT_EQ(result, 77u);
 }
 
 TEST(SimCh50601, EscapedKeywordAsVariable) {
   // §5.6.1: An escaped keyword is treated as a user-defined identifier.
-  auto result = RunAndGet("module t;\n"
-                          "  logic [7:0] \\module ;\n"
-                          "  initial \\module = 8'd99;\n"
-                          "endmodule\n",
-                          "\\module");
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] \\module ;\n"
+      "  initial \\module = 8'd99;\n"
+      "endmodule\n",
+      "\\module");
   EXPECT_EQ(result, 99u);
 }
 
 TEST(SimCh50601, EscapedIdentMultipleVars) {
   // §5.6.1: Multiple escaped identifiers in the same module.
   SimCh50601Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] \\a+b , \\c-d ;\n"
-                              "  initial begin\n"
-                              "    \\a+b = 8'd10;\n"
-                              "    \\c-d = 8'd20;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] \\a+b , \\c-d ;\n"
+      "  initial begin\n"
+      "    \\a+b = 8'd10;\n"
+      "    \\c-d = 8'd20;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -106,14 +108,15 @@ TEST(SimCh50601, EscapedIdentMultipleVars) {
 TEST(SimCh50601, EscapedIdentInExpression) {
   // §5.6.1: Escaped identifiers used in expressions.
   SimCh50601Fixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [7:0] \\x! , result;\n"
-                              "  initial begin\n"
-                              "    \\x! = 8'd6;\n"
-                              "    result = \\x! + 8'd4;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] \\x! , result;\n"
+      "  initial begin\n"
+      "    \\x! = 8'd6;\n"
+      "    result = \\x! + 8'd4;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);

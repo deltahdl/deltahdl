@@ -1,12 +1,14 @@
 // §33.3: Libraries
 
+#include <gtest/gtest.h>
+
+#include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <gtest/gtest.h>
-#include <string>
 
 using namespace delta;
 
@@ -125,8 +127,9 @@ TEST(LibraryText, LibraryDeclMultipleIncdir) {
 
 // Library declaration with both multiple file paths and multiple -incdir.
 TEST(LibraryText, LibraryDeclFullForm) {
-  auto r = ParseLibrary("library rtlLib /proj/rtl/*.v, /proj/extra/*.v\n"
-                        "  -incdir /proj/inc, /proj/common;\n");
+  auto r = ParseLibrary(
+      "library rtlLib /proj/rtl/*.v, /proj/extra/*.v\n"
+      "  -incdir /proj/inc, /proj/common;\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->libraries.size(), 1u);
@@ -193,10 +196,11 @@ TEST(LibraryText, IncludeStatementRelative) {
 // =============================================================================
 // Multiple library descriptions mixed together.
 TEST(LibraryText, MixedDescriptions) {
-  auto r = ParseLibrary("library lib1 /a/*.v;\n"
-                        ";\n"
-                        "include /proj/other.map;\n"
-                        "library lib2 /b/*.v;\n");
+  auto r = ParseLibrary(
+      "library lib1 /a/*.v;\n"
+      ";\n"
+      "include /proj/other.map;\n"
+      "library lib2 /b/*.v;\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->libraries.size(), 2u);
@@ -210,8 +214,9 @@ TEST(LibraryText, MixedDescriptions) {
 // =============================================================================
 // Line comments.
 TEST(LibraryText, LineComments) {
-  auto r = ParseLibrary("// This is a library map file\n"
-                        "library lib1 /proj/*.v; // RTL files\n");
+  auto r = ParseLibrary(
+      "// This is a library map file\n"
+      "library lib1 /proj/*.v; // RTL files\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->libraries.size(), 1u);
@@ -219,9 +224,10 @@ TEST(LibraryText, LineComments) {
 
 // Block comments.
 TEST(LibraryText, BlockComments) {
-  auto r = ParseLibrary("/* Multi-line\n"
-                        "   comment */\n"
-                        "library lib1 /proj/*.v;\n");
+  auto r = ParseLibrary(
+      "/* Multi-line\n"
+      "   comment */\n"
+      "library lib1 /proj/*.v;\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->libraries.size(), 1u);
@@ -253,9 +259,10 @@ TEST(LibraryText, IncludeStmtHasSourceLoc) {
 // =============================================================================
 // Multiple libraries, each mapping different file patterns.
 TEST(LibraryText, MultipleLibraries) {
-  auto r = ParseLibrary("library rtlLib *.v;\n"
-                        "library gateLib ./*.vg;\n"
-                        "library tbLib ../tb/*.sv;\n");
+  auto r = ParseLibrary(
+      "library rtlLib *.v;\n"
+      "library gateLib ./*.vg;\n"
+      "library tbLib ../tb/*.sv;\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->libraries.size(), 3u);
@@ -317,15 +324,16 @@ TEST(LibraryText, LrmExampleDotSlash) {
 
 // LRM comprehensive example with all features.
 TEST(LibraryText, LrmComprehensiveExample) {
-  auto r = ParseLibrary("// Library map file\n"
-                        "library rtlLib /proj/rtl/*.v, /proj/common/*.v\n"
-                        "  -incdir /proj/inc, /proj/common/inc;\n"
-                        "library gateLib /proj/gates/*.vg;\n"
-                        "include /proj/sub_libs.map;\n"
-                        "config top_cfg;\n"
-                        "  design rtlLib.top;\n"
-                        "  default liblist rtlLib gateLib;\n"
-                        "endconfig\n");
+  auto r = ParseLibrary(
+      "// Library map file\n"
+      "library rtlLib /proj/rtl/*.v, /proj/common/*.v\n"
+      "  -incdir /proj/inc, /proj/common/inc;\n"
+      "library gateLib /proj/gates/*.vg;\n"
+      "include /proj/sub_libs.map;\n"
+      "config top_cfg;\n"
+      "  design rtlLib.top;\n"
+      "  default liblist rtlLib gateLib;\n"
+      "endconfig\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->libraries.size(), 2u);
@@ -352,4 +360,4 @@ TEST(LibraryText, LexerFilePathSpecParentDir) {
   EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "../rtl/*.v");
 }
 
-} // namespace
+}  // namespace

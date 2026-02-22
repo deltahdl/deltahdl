@@ -1,5 +1,7 @@
 // §10.4.2: Nonblocking procedural assignments
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -12,7 +14,6 @@
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
 #include "simulation/variable.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -37,15 +38,15 @@ namespace {
 
 TEST(Lowerer, NbaDefersUpdate) {
   LowerFixture f;
-  auto *design =
-      ElaborateSrc("module t;\n"
-                   "  logic [31:0] x;\n"
-                   "  initial begin\n"
-                   "    x <= 42;\n"
-                   "    x = x;  // read x: should still be 0 (X→0), not 42\n"
-                   "  end\n"
-                   "endmodule\n",
-                   f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    x <= 42;\n"
+      "    x = x;  // read x: should still be 0 (X→0), not 42\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -64,14 +65,15 @@ TEST(Lowerer, NbaDefersUpdate) {
 
 TEST(Lowerer, NbaAppliesToValue) {
   LowerFixture f;
-  auto *design = ElaborateSrc("module t;\n"
-                              "  logic [31:0] a, b;\n"
-                              "  initial begin\n"
-                              "    a <= 10;\n"
-                              "    b <= 20;\n"
-                              "  end\n"
-                              "endmodule\n",
-                              f);
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a, b;\n"
+      "  initial begin\n"
+      "    a <= 10;\n"
+      "    b <= 20;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -86,4 +88,4 @@ TEST(Lowerer, NbaAppliesToValue) {
   EXPECT_EQ(b->value.ToUint64(), 20u);
 }
 
-} // namespace
+}  // namespace

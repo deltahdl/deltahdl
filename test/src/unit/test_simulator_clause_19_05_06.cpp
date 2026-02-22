@@ -1,9 +1,11 @@
 // §19.5.6: Specifying Illegal coverage point values or transitions
 
-#include "simulation/coverage.h"
 #include <gtest/gtest.h>
+
 #include <string>
 #include <vector>
+
+#include "simulation/coverage.h"
 
 using namespace delta;
 
@@ -48,4 +50,4 @@ TEST(Coverage, IllegalBinsExcludedFromCoverage) {
   EXPECT_DOUBLE_EQ(CoverageDB::GetPointCoverage(cp), 100.0);
 }
 
-} // namespace
+}  // namespace

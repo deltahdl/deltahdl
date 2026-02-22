@@ -1,12 +1,13 @@
 // §13.5.3: Default argument values
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -125,4 +126,4 @@ TEST(Functions, DefaultArgumentMultiple) {
   EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 6u);
 }
 
-} // namespace
+}  // namespace

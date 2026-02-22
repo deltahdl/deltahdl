@@ -1,5 +1,7 @@
 // §31.4: Timing checks for clock and control signals
 
+#include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -7,7 +9,6 @@
 #include "parser/ast.h"
 #include "parser/parser.h"
 #include "simulation/specify.h"
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -15,7 +16,7 @@ using namespace delta;
 // Parser test fixture
 // =============================================================================
 struct SpecifyTest : ::testing::Test {
-protected:
+ protected:
   CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
@@ -26,8 +27,7 @@ protected:
   // Helper: get first specify block from first module.
   ModuleItem *FirstSpecifyBlock(CompilationUnit *cu) {
     for (auto *item : cu->modules[0]->items) {
-      if (item->kind == ModuleItemKind::kSpecifyBlock)
-        return item;
+      if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
     }
     return nullptr;
   }
@@ -43,11 +43,12 @@ protected:
 namespace {
 
 TEST_F(SpecifyTest, WidthTimingCheck) {
-  auto *cu = Parse("module m;\n"
-                   "specify\n"
-                   "  $width(posedge clk, 20);\n"
-                   "endspecify\n"
-                   "endmodule\n");
+  auto *cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $width(posedge clk, 20);\n"
+      "endspecify\n"
+      "endmodule\n");
   auto *spec = FirstSpecifyBlock(cu);
   ASSERT_NE(spec, nullptr);
   auto &tc = spec->specify_items[0]->timing_check;
@@ -58,11 +59,12 @@ TEST_F(SpecifyTest, WidthTimingCheck) {
 }
 
 TEST_F(SpecifyTest, PeriodTimingCheck) {
-  auto *cu = Parse("module m;\n"
-                   "specify\n"
-                   "  $period(posedge clk, 50);\n"
-                   "endspecify\n"
-                   "endmodule\n");
+  auto *cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $period(posedge clk, 50);\n"
+      "endspecify\n"
+      "endmodule\n");
   auto *spec = FirstSpecifyBlock(cu);
   ASSERT_NE(spec, nullptr);
   EXPECT_EQ(spec->specify_items[0]->timing_check.check_kind,
@@ -70,11 +72,12 @@ TEST_F(SpecifyTest, PeriodTimingCheck) {
 }
 
 TEST_F(SpecifyTest, SkewTimingCheck) {
-  auto *cu = Parse("module m;\n"
-                   "specify\n"
-                   "  $skew(posedge clk1, negedge clk2, 3);\n"
-                   "endspecify\n"
-                   "endmodule\n");
+  auto *cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $skew(posedge clk1, negedge clk2, 3);\n"
+      "endspecify\n"
+      "endmodule\n");
   auto *spec = FirstSpecifyBlock(cu);
   ASSERT_NE(spec, nullptr);
   auto &tc = spec->specify_items[0]->timing_check;
@@ -86,11 +89,12 @@ TEST_F(SpecifyTest, SkewTimingCheck) {
 }
 
 TEST_F(SpecifyTest, NochangeTimingCheck) {
-  auto *cu = Parse("module m;\n"
-                   "specify\n"
-                   "  $nochange(posedge clk, data, 0, 0);\n"
-                   "endspecify\n"
-                   "endmodule\n");
+  auto *cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $nochange(posedge clk, data, 0, 0);\n"
+      "endspecify\n"
+      "endmodule\n");
   auto *spec = FirstSpecifyBlock(cu);
   ASSERT_NE(spec, nullptr);
   auto &tc = spec->specify_items[0]->timing_check;
@@ -99,11 +103,12 @@ TEST_F(SpecifyTest, NochangeTimingCheck) {
 }
 
 TEST_F(SpecifyTest, TimeskewTimingCheck) {
-  auto *cu = Parse("module m;\n"
-                   "specify\n"
-                   "  $timeskew(posedge clk1, posedge clk2, 5);\n"
-                   "endspecify\n"
-                   "endmodule\n");
+  auto *cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $timeskew(posedge clk1, posedge clk2, 5);\n"
+      "endspecify\n"
+      "endmodule\n");
   auto *spec = FirstSpecifyBlock(cu);
   ASSERT_NE(spec, nullptr);
   auto &tc = spec->specify_items[0]->timing_check;
@@ -116,11 +121,12 @@ TEST_F(SpecifyTest, TimeskewTimingCheck) {
 }
 
 TEST_F(SpecifyTest, FullskewTimingCheck) {
-  auto *cu = Parse("module m;\n"
-                   "specify\n"
-                   "  $fullskew(posedge clk1, negedge clk2, 4, 6);\n"
-                   "endspecify\n"
-                   "endmodule\n");
+  auto *cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $fullskew(posedge clk1, negedge clk2, 4, 6);\n"
+      "endspecify\n"
+      "endmodule\n");
   auto *spec = FirstSpecifyBlock(cu);
   ASSERT_NE(spec, nullptr);
   auto &tc = spec->specify_items[0]->timing_check;
@@ -130,4 +136,4 @@ TEST_F(SpecifyTest, FullskewTimingCheck) {
   ASSERT_GE(tc.limits.size(), 2u);
 }
 
-} // namespace
+}  // namespace
