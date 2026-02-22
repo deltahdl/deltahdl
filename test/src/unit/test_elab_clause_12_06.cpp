@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §12.6: Pattern matching conditional statements
 
 #include <gtest/gtest.h>
 #include <string>
@@ -48,36 +48,6 @@ static void VerifyStructField(const StructFieldInfo& field,
 }
 
 namespace {
-
-TEST(AssignmentPattern, SingleElement) {
-  AggFixture f;
-  auto* a = f.ctx.CreateVariable("a", 32);
-  a->value = MakeLogic4VecVal(f.arena, 32, 42);
-  auto* expr = ParseExprFrom("'{a}", f);
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 42u);
-}
-
-TEST(AssignmentPattern, EmptyPattern) {
-  AggFixture f;
-  auto* expr = ParseExprFrom("'{}", f);
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.width, 0u);
-}
-
-TEST(AssignmentPattern, SizedLiterals) {
-  // Test the parser fix for integer literal first elements
-  AggFixture f;
-  auto* expr = ParseExprFrom("'{32'd5, 32'd10}", f);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kAssignmentPattern);
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  // Both are 32-bit (evaluator returns 32-bit for all int literals)
-  // {32'd5, 32'd10} → 64-bit: upper=5, lower=10
-  EXPECT_EQ(result.width, 64u);
-  uint64_t expected = (uint64_t{5} << 32) | 10;
-  EXPECT_EQ(result.ToUint64(), expected);
-}
 
 // =============================================================================
 // §12.6 Pattern matching — matches operator
