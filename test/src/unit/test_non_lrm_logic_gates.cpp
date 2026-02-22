@@ -1,9 +1,9 @@
-#include <gtest/gtest.h>
+// Non-LRM tests
 
+#include <gtest/gtest.h>
 #include <cstdint>
 
 // --- Local types for logic gate evaluation (§28.4, §28.5) ---
-
 enum class Val4 : uint8_t { kV0 = 0, kV1 = 1, kX = 2, kZ = 3 };
 
 enum class GateKind : uint8_t {
@@ -18,11 +18,12 @@ enum class GateKind : uint8_t {
 };
 
 Val4 EvalNInputGate(GateKind kind, Val4 a, Val4 b);
+
 Val4 EvalNOutputGate(GateKind kind, Val4 input);
+
 uint64_t ComputeGateDelay(uint64_t d_rise, uint64_t d_fall, Val4 from, Val4 to);
 
 // --- Implementations ---
-
 static Val4 InvertVal4(Val4 v) {
   switch (v) {
     case Val4::kV0:
@@ -102,10 +103,11 @@ uint64_t ComputeGateDelay(uint64_t d_rise, uint64_t d_fall, Val4 from,
   return (d_rise < d_fall) ? d_rise : d_fall;
 }
 
+namespace {
+
 // =============================================================
 // §28.4: and, nand, nor, or, xor, and xnor gates
 // =============================================================
-
 // §28.4: Truth tables (Table 28-3)
 TEST(LogicGates, AndGateTruthTable) {
   struct Case {
@@ -188,21 +190,6 @@ TEST(LogicGates, XorGateTruthTable) {
   }
 }
 
-// Helper: verify that inverted_gate == NOT(gate) for all input combinations.
-static void CheckInversion(GateKind gate, GateKind inverted_gate) {
-  Val4 vals[] = {Val4::kV0, Val4::kV1, Val4::kX, Val4::kZ};
-  for (Val4 a : vals) {
-    for (Val4 b : vals) {
-      Val4 result = EvalNInputGate(gate, a, b);
-      Val4 inv_result = EvalNInputGate(inverted_gate, a, b);
-      EXPECT_EQ(inv_result, InvertVal4(result))
-          << "Gate " << static_cast<int>(gate) << " inv "
-          << static_cast<int>(inverted_gate) << " a=" << static_cast<int>(a)
-          << " b=" << static_cast<int>(b);
-    }
-  }
-}
-
 // §28.4: nand = NOT(and), nor = NOT(or), xnor = NOT(xor)
 TEST(LogicGates, NandIsInvertedAnd) {
   CheckInversion(GateKind::kAnd, GateKind::kNand);
@@ -242,7 +229,6 @@ TEST(LogicGates, NoDelayZeroPropagation) {
 // =============================================================
 // §28.5: buf and not gates
 // =============================================================
-
 // §28.5: Truth tables (Table 28-4)
 TEST(LogicGates, BufGateTruthTable) {
   EXPECT_EQ(EvalNOutputGate(GateKind::kBuf, Val4::kV0), Val4::kV0);
@@ -258,6 +244,4 @@ TEST(LogicGates, NotGateTruthTable) {
   EXPECT_EQ(EvalNOutputGate(GateKind::kNot, Val4::kZ), Val4::kX);
 }
 
-// §28.5: "These two logic gates shall have one input and one or more
-//  outputs. The last terminal in the terminal list shall connect to the
-//  input of the logic gate."
+}  // namespace
