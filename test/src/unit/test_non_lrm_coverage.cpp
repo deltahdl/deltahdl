@@ -1,18 +1,19 @@
-#include <gtest/gtest.h>
+// Non-LRM tests
 
+#include <gtest/gtest.h>
 #include <cstdint>
 #include <string>
 #include <utility>
 #include <vector>
-
 #include "simulation/coverage.h"
 
 using namespace delta;
 
+namespace {
+
 // =============================================================================
 // S19.2-19.3: Covergroup definition and instantiation
 // =============================================================================
-
 TEST(Coverage, CreateGroupAndFind) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg_addr");
@@ -41,7 +42,6 @@ TEST(Coverage, MultipleGroupInstances) {
 // =============================================================================
 // S19.5: Coverpoint declaration
 // =============================================================================
-
 TEST(Coverage, AddCoverPointToGroup) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -54,7 +54,6 @@ TEST(Coverage, AddCoverPointToGroup) {
 // =============================================================================
 // S19.5.1-19.5.3: Explicit bins
 // =============================================================================
-
 TEST(Coverage, ExplicitBinCreation) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -91,7 +90,6 @@ TEST(Coverage, SampleHitsExplicitBin) {
 // =============================================================================
 // S19.5.1-19.5.3: Auto bins
 // =============================================================================
-
 TEST(Coverage, AutoBinCreation) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -148,7 +146,6 @@ TEST(Coverage, AutoBinSampleAndCoverage) {
 // =============================================================================
 // S19.5.4: Transition bins
 // =============================================================================
-
 TEST(Coverage, TransitionBinNotMatchedByScalar) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -168,7 +165,6 @@ TEST(Coverage, TransitionBinNotMatchedByScalar) {
 // =============================================================================
 // S19.5.5: Wildcard bins
 // =============================================================================
-
 TEST(Coverage, WildcardBinMatchesValues) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -189,7 +185,6 @@ TEST(Coverage, WildcardBinMatchesValues) {
 // =============================================================================
 // S19.5.6: Illegal bins
 // =============================================================================
-
 TEST(Coverage, IllegalBinsNotSampled) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -229,7 +224,6 @@ TEST(Coverage, IllegalBinsExcludedFromCoverage) {
 // =============================================================================
 // S19.5.7: Ignore bins
 // =============================================================================
-
 TEST(Coverage, IgnoreBinsNotSampled) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -267,7 +261,6 @@ TEST(Coverage, IgnoreBinsExcludedFromCoverage) {
 // =============================================================================
 // S19.6: Cross coverage
 // =============================================================================
-
 TEST(Coverage, CrossCoverageCreation) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -324,7 +317,6 @@ TEST(Coverage, CrossCoverageSampling) {
 // =============================================================================
 // S19.6.1: Cross bins coverage computation
 // =============================================================================
-
 TEST(Coverage, CrossCoverageComputation) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -351,7 +343,6 @@ TEST(Coverage, CrossCoverageComputation) {
 // =============================================================================
 // S19.7: Coverage options: at_least, weight, goal
 // =============================================================================
-
 TEST(Coverage, AtLeastOption) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -407,7 +398,6 @@ TEST(Coverage, GoalOption) {
 // =============================================================================
 // S19.8: Coverage methods
 // =============================================================================
-
 TEST(Coverage, SampleCountIncremented) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -455,7 +445,6 @@ TEST(Coverage, GetInstCoverageMatchesGetCoverage) {
 // =============================================================================
 // S19.9: $get_coverage system function
 // =============================================================================
-
 TEST(Coverage, GlobalCoverageEmpty) {
   CoverageDB db;
   EXPECT_DOUBLE_EQ(db.GetGlobalCoverage(), 0.0);
@@ -477,7 +466,6 @@ TEST(Coverage, GlobalCoverageSingleGroup) {
 // =============================================================================
 // S19.3: Covergroup in class (CoverGroup is independent, can be embedded)
 // =============================================================================
-
 TEST(Coverage, CoverGroupAsClassMember) {
   // Simulates a covergroup embedded in a class: just a struct.
   struct MyClass {
@@ -494,7 +482,6 @@ TEST(Coverage, CoverGroupAsClassMember) {
 // =============================================================================
 // S19.5: Coverpoint with iff guard
 // =============================================================================
-
 TEST(Coverage, IffGuardBlocksSampling) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -530,7 +517,6 @@ TEST(Coverage, IffGuardAllowsSampling) {
 // =============================================================================
 // S19.7: Auto bin max control
 // =============================================================================
-
 TEST(Coverage, AutoBinMaxControl) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -543,7 +529,6 @@ TEST(Coverage, AutoBinMaxControl) {
 // =============================================================================
 // Edge case: empty covergroup coverage
 // =============================================================================
-
 TEST(Coverage, EmptyGroupCoverageIsZero) {
   CoverageDB db;
   auto* g = db.CreateGroup("empty");
@@ -559,7 +544,6 @@ TEST(Coverage, PointCoverageWithNoBinsIs100) {
 // =============================================================================
 // Multiple coverpoints in one group
 // =============================================================================
-
 TEST(Coverage, MultipleCoverpointsAveraged) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -581,3 +565,5 @@ TEST(Coverage, MultipleCoverpointsAveraged) {
   // a=100%, b=0% => average = 50%.
   EXPECT_DOUBLE_EQ(CoverageDB::GetCoverage(g), 50.0);
 }
+
+}  // namespace
