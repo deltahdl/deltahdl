@@ -172,13 +172,13 @@ event loop that advances simulation time.
      └─────┬─────┘
            │
            ▼
-  ┌─────────────────┐
-  │ Event Scheduler │◄──┐
-  └────────┬────────┘   │
-           │            │ event
-           ▼            │ loop
+     ┌───────────┐
+     │ Scheduler │◄────┐
+     └─────┬─────┘     │
+           │           │ event
+           ▼           │ loop
      ┌───────────┐     │
-     │ Processes │─────┘
+     │ Evaluator │─────┘
      └───────────┘
 ```
 
