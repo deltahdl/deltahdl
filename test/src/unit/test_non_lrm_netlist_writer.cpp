@@ -1,16 +1,17 @@
+// Non-LRM tests
+
 #include <gtest/gtest.h>
-
 #include <string>
-
 #include "synthesis/aig.h"
 #include "synthesis/netlist_writer.h"
 
 using namespace delta;
 
+namespace {
+
 // =============================================================================
 // BLIF output
 // =============================================================================
-
 TEST(NetlistWriter, BlifSimpleAnd) {
   AigGraph g;
   auto a = g.AddInput();
@@ -45,7 +46,6 @@ TEST(NetlistWriter, BlifConstantOutput) {
 // =============================================================================
 // Verilog output
 // =============================================================================
-
 TEST(NetlistWriter, VerilogSimpleAnd) {
   AigGraph g;
   auto a = g.AddInput();
@@ -79,7 +79,6 @@ TEST(NetlistWriter, VerilogConstantOutput) {
 // =============================================================================
 // JSON output
 // =============================================================================
-
 TEST(NetlistWriter, JsonContainsExpectedKeys) {
   AigGraph g;
   auto a = g.AddInput();
@@ -99,7 +98,6 @@ TEST(NetlistWriter, JsonContainsExpectedKeys) {
 // =============================================================================
 // EDIF output
 // =============================================================================
-
 TEST(NetlistWriter, EdifBasicStructure) {
   AigGraph g;
   auto a = g.AddInput();
@@ -119,7 +117,6 @@ TEST(NetlistWriter, EdifBasicStructure) {
 // =============================================================================
 // Multi-input, multi-output
 // =============================================================================
-
 TEST(NetlistWriter, BlifMultiInputMultiOutput) {
   AigGraph g;
   auto a = g.AddInput();
@@ -146,7 +143,6 @@ TEST(NetlistWriter, BlifMultiInputMultiOutput) {
 // =============================================================================
 // Format dispatch
 // =============================================================================
-
 TEST(NetlistWriter, DispatchByFormat) {
   AigGraph g;
   auto a = g.AddInput();
@@ -162,3 +158,5 @@ TEST(NetlistWriter, DispatchByFormat) {
   EXPECT_NE(json.find("\"test\""), std::string::npos);
   EXPECT_NE(edif.find("test"), std::string::npos);
 }
+
+}  // namespace
