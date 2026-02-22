@@ -14,7 +14,7 @@ function(add_unit_test name)
     gtest_discover_tests(${name})
 endfunction()
 
-add_unit_test(test_non_lrm_adv_sim)
+add_unit_test(test_sim_clause_non_lrmc)
 add_unit_test(test_sim_clause_06_16)
 add_unit_test(test_sim_clause_07_05)
 add_unit_test(test_sim_clause_07_08)
