@@ -95,8 +95,9 @@ jobs:
         run: PYTHONPATH=. python3 -m mypy scripts/split_tests.py
       - name: Run mypy on tests
         run: >-
-          MYPYPATH=.:scripts python3 -m mypy
-          --explicit-package-bases test/scripts/split_tests/
+          MYPYPATH=.:scripts:test/scripts/split_tests/unit
+          python3 -m mypy --explicit-package-bases
+          test/scripts/split_tests/
       - name: Detect copy-paste in source
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
