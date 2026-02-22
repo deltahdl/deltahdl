@@ -279,34 +279,29 @@ def test_append_tests_to_file_basic(tmp_path):
     assert "TEST(S, New)" in text
 
 
-def test_append_tests_to_file_new_preamble(tmp_path):
-    """Appends preamble items that are not already present."""
+def _append_with_preamble(tmp_path, existing_content):
+    """Write existing_content, append a preamble + test, return file text."""
     f = tmp_path / "existing.cpp"
-    f.write_text(
-        "namespace {\n"
-        "}  // namespace\n",
-        encoding="utf-8",
-    )
+    f.write_text(existing_content, encoding="utf-8")
     pre = split_tests.PreambleItem(lines=["struct Bar {", "};"])
     t = _tb("T", comments=[])
     split_tests.append_tests_to_file(f, [pre], [t])
-    text = f.read_text(encoding="utf-8")
+    return f.read_text(encoding="utf-8")
+
+
+def test_append_tests_to_file_new_preamble(tmp_path):
+    """Appends preamble items that are not already present."""
+    text = _append_with_preamble(
+        tmp_path, "namespace {\n}  // namespace\n"
+    )
     assert "struct Bar {" in text
 
 
 def test_append_tests_to_file_duplicate_preamble(tmp_path):
     """Skips preamble items already present in the file."""
-    f = tmp_path / "existing.cpp"
-    f.write_text(
-        "struct Bar {\n};\n"
-        "namespace {\n"
-        "}  // namespace\n",
-        encoding="utf-8",
+    text = _append_with_preamble(
+        tmp_path, "struct Bar {\n};\nnamespace {\n}  // namespace\n"
     )
-    pre = split_tests.PreambleItem(lines=["struct Bar {", "};"])
-    t = _tb("T", comments=[])
-    split_tests.append_tests_to_file(f, [pre], [t])
-    text = f.read_text(encoding="utf-8")
     assert text.count("struct Bar {") == 1
 
 
