@@ -230,39 +230,39 @@ dividing each simulation timestep into 17 ordered regions:
 
 ```text
             ┌───────────────┐
-            │  Preponed      │
+            │  Preponed     │
             ├───────────────┤
-            │  PreActive     │
+            │  PreActive    │
             ├───────────────┤
-          ┌─┤  Active        │◄─┐
+          ┌─┤  Active       │◄─┐
           │ ├───────────────┤  │
-          │ │  Inactive      │  │ active
+          │ │  Inactive     │  │ active
           │ ├───────────────┤  │ iteration
-          │ │  PreNBA        │  │ loop
+          │ │  PreNBA       │  │ loop
           │ ├───────────────┤  │
-          │ │  NBA           │  │
+          │ │  NBA          │  │
           │ ├───────────────┤  │
-          └─┤  PostNBA       │──┘
+          └─┤  PostNBA      │──┘
             ├───────────────┤
-            │  PreObserved   │
+            │  PreObserved  │
             ├───────────────┤
-          ┌─┤  Observed      │◄─┐
+          ┌─┤  Observed     │◄─┐
           │ ├───────────────┤  │
-          │ │  PostObserved  │  │ reactive
+          │ │  PostObserved │  │ reactive
           │ ├───────────────┤  │ iteration
-          │ │  Reactive      │  │ loop
+          │ │  Reactive     │  │ loop
           │ ├───────────────┤  │
-          │ │  ReInactive    │  │
+          │ │  ReInactive   │  │
           │ ├───────────────┤  │
-          │ │  PreReNBA      │  │
+          │ │  PreReNBA     │  │
           │ ├───────────────┤  │
-          │ │  ReNBA         │  │
+          │ │  ReNBA        │  │
           │ ├───────────────┤  │
-          └─┤  PostReNBA     │──┘
+          └─┤  PostReNBA    │──┘
             ├───────────────┤
-            │  PrePostponed  │
+            │  PrePostponed │
             ├───────────────┤
-            │  Postponed     │
+            │  Postponed    │
             └───────────────┘
 ```
 
