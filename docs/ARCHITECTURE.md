@@ -51,7 +51,7 @@ After elaboration the user selects either simulation or synthesis, and the
 corresponding Lowerer translates the RTLIR into the structures needed by
 that back end.
 
-```
+```text
   Simulation mode:              Synthesis mode:
 
   ┌────────────────┐            ┌────────────────┐
@@ -78,7 +78,6 @@ that back end.
     │ Simulator │               │ Synthesizer  │
     └───────────┘               └──────────────┘
 ```
-
 
 ## Compilation
 
@@ -154,7 +153,6 @@ maps. Each process carries its sensitivity list and a pointer to its AST body
 statement. An `RtlirDesign` collects the top-level modules and a lookup map
 of all elaborated modules.
 
-
 ## Simulator
 
 The Simulator takes the RTLIR produced by the Elaborator and executes the
@@ -189,7 +187,7 @@ arrays, and queues.
 The scheduler implements the IEEE 1800-2023 stratified event algorithm. Each
 simulation timestep is divided into 17 ordered regions.
 
-```
+```text
             ┌─────────────┐
             │  Preponed    │
             ├─────────────┤
@@ -255,7 +253,7 @@ it belongs to the reactive set.
 
 All simulation values use dual-rail aval/bval encoding per the VPI convention.
 
-```
+```text
   ┌───────┬──────┬──────┐
   │ Value │ aval │ bval │
   ├───────┼──────┼──────┤
@@ -462,7 +460,6 @@ merges multiple pending updates to the same target within a region into a
 single write. Runtime representations for dynamic arrays, associative arrays,
 and SystemVerilog strings are also provided here.
 
-
 ## Synthesizer
 
 The Synthesizer takes the RTLIR produced by the Elaborator and converts it
@@ -537,7 +534,6 @@ The netlist writer serializes the AIG into one of four output formats: BLIF
 interchange), or EDIF. Since AIG nodes do not carry port names, generic names
 are synthesized: inputs are named i0, i1, and so on; outputs are named o0,
 o1, and so on; internal nodes use the prefix n followed by the node identifier.
-
 
 ## Appendix A: Design Decisions
 
