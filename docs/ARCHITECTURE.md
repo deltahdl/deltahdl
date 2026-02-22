@@ -3,42 +3,46 @@
 ## Table of Contents
 
 1. [Introduction](#introduction)
-2. [Compilation](#compilation)
+2. [Front End](#front-end)
    1. [Preprocessor](#preprocessor)
    2. [Lexer](#lexer)
    3. [Parser](#parser)
    4. [Elaborator](#elaborator)
-3. [Simulator](#simulator)
-   1. [Lowerer](#lowerer)
-   2. [SimContext](#simcontext)
-   3. [Event Scheduler](#event-scheduler)
-   4. [Process Model](#process-model)
-   5. [Four-Value Logic](#four-value-logic)
-   6. [Signal Strength](#signal-strength)
-   7. [Variables and Nets](#variables-and-nets)
-   8. [Expression Evaluation](#expression-evaluation)
-   9. [VCD Writer](#vcd-writer)
-   10. [VPI](#vpi)
-   11. [DPI-C](#dpi-c)
-   12. [Compiled Simulation](#compiled-simulation)
-   13. [Multi-Threaded Simulation](#multi-threaded-simulation)
-   14. [Clocking Blocks](#clocking-blocks)
-   15. [Concurrent Assertions](#concurrent-assertions)
-   16. [Functional Coverage](#functional-coverage)
-   17. [Constrained Random Verification](#constrained-random-verification)
-   18. [Timing Specification and SDF](#timing-specification-and-sdf)
-   19. [User-Defined Primitives](#user-defined-primitives)
-   20. [Class Objects](#class-objects)
-   21. [Synchronization Objects](#synchronization-objects)
-   22. [Advanced Simulation](#advanced-simulation)
-4. [Synthesizer](#synthesizer)
-   1. [SynthLower](#synthlower)
-   2. [AIG](#aig)
-   3. [AIG Optimization](#aig-optimization)
-   4. [Memory Inference](#memory-inference)
-   5. [Technology Mapping](#technology-mapping)
-   6. [Netlist Writer](#netlist-writer)
-5. [Appendix A: Design Decisions](#appendix-a-design-decisions)
+3. [Back End](#back-end)
+   1. [Simulator](#simulator)
+      1. [Lowerer](#lowerer)
+      2. [SimContext](#simcontext)
+      3. [Event Scheduler](#event-scheduler)
+      4. [Process Model](#process-model)
+      5. [Four-Value Logic](#four-value-logic)
+      6. [Signal Strength](#signal-strength)
+      7. [Variables and Nets](#variables-and-nets)
+      8. [Expression Evaluation](#expression-evaluation)
+      9. [VCD Writer](#vcd-writer)
+      10. [VPI](#vpi)
+      11. [DPI-C](#dpi-c)
+      12. [Compiled Simulation](#compiled-simulation)
+      13. [Multi-Threaded Simulation](#multi-threaded-simulation)
+      14. [Clocking Blocks](#clocking-blocks)
+      15. [Concurrent Assertions](#concurrent-assertions)
+      16. [Functional Coverage](#functional-coverage)
+      17. [Constrained Random Verification](#constrained-random-verification)
+      18. [Timing Specification and SDF](#timing-specification-and-sdf)
+      19. [User-Defined Primitives](#user-defined-primitives)
+      20. [Class Objects](#class-objects)
+      21. [Synchronization Objects](#synchronization-objects)
+      22. [Advanced Simulation](#advanced-simulation)
+   2. [Synthesizer](#synthesizer)
+      1. [SynthLower](#synthlower)
+      2. [AIG](#aig)
+      3. [AIG Optimization](#aig-optimization)
+      4. [Memory Inference](#memory-inference)
+      5. [Technology Mapping](#technology-mapping)
+      6. [Netlist Writer](#netlist-writer)
+4. [Appendixes](#appendixes)
+   1. [Appendix A: Design Decisions](#appendix-a-design-decisions)
+   2. [Appendix B: Abbreviations](#appendix-b-abbreviations)
+   3. [Appendix C: Glossary](#appendix-c-glossary)
 
 ## Introduction
 
@@ -79,7 +83,7 @@ that back end.
     └───────────┘               └──────────────┘
 ```
 
-## Compilation
+## Front End
 
 ### Preprocessor
 
@@ -153,14 +157,16 @@ maps. Each process carries its sensitivity list and a pointer to its AST body
 statement. An `RtlirDesign` collects the top-level modules and a lookup map
 of all elaborated modules.
 
-## Simulator
+## Back End
+
+### Simulator
 
 The Simulator takes the RTLIR produced by the Elaborator and executes the
 design over time. The Lowerer translates each RTLIR element into a runtime
 object, the SimContext holds all of that state, and the Scheduler drives the
 event loop that advances simulation time.
 
-### Lowerer
+#### Lowerer
 
 The lowerer translates an `RtlirDesign` into runtime simulation objects. For
 each RTLIR variable it creates a `Variable` in the `SimContext`, initializing
@@ -171,7 +177,7 @@ or a `CompiledProcess` depending on whether the body contains timing controls.
 Continuous assignments are lowered into processes scheduled in the Active
 region.
 
-### SimContext
+#### SimContext
 
 `SimContext` owns the simulation state: variables, nets, the scheduler, the
 diagnostic engine, and auxiliary managers for VPI, DPI, clocking, assertions,
