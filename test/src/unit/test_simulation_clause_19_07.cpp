@@ -67,4 +67,16 @@ TEST(Coverage, GoalOption) {
   EXPECT_DOUBLE_EQ(g->options.goal, 90.0);
 }
 
+// =============================================================================
+// S19.7: Auto bin max control
+// =============================================================================
+TEST(Coverage, AutoBinMaxControl) {
+  CoverageDB db;
+  auto* g = db.CreateGroup("cg");
+  g->options.auto_bin_max = 8;
+  auto* cp = CoverageDB::AddCoverPoint(g, "addr");
+  // auto_bin_count should inherit from group options.
+  EXPECT_EQ(cp->auto_bin_count, 8u);
+}
+
 }  // namespace
