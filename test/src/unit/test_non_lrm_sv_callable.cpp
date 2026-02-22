@@ -1,16 +1,17 @@
-#include <gtest/gtest.h>
+// Non-LRM tests
 
+#include <gtest/gtest.h>
 #include <string_view>
 #include <vector>
-
 #include "simulation/sv_callable.h"
 
 using namespace delta;
 
+namespace {
+
 // =============================================================================
 // SvCallable
 // =============================================================================
-
 TEST(SvCallable, ConstructFunction_BasicProperties) {
   std::vector<CallableParam> params = {
       {"a", Direction::kInput, 8},
@@ -55,7 +56,6 @@ TEST(SvCallable, ParamDirections) {
 // =============================================================================
 // SvCallableContext
 // =============================================================================
-
 TEST(SvCallableContext, EmptyStack) {
   SvCallableContext ctx;
   EXPECT_TRUE(ctx.Empty());
@@ -109,3 +109,5 @@ TEST(SvCallableContext, NestedCalls) {
   ctx.PopFrame();
   EXPECT_TRUE(ctx.Empty());
 }
+
+}  // namespace
