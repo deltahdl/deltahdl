@@ -1,10 +1,13 @@
-#include <gtest/gtest.h>
+// Non-LRM tests
 
+#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/types.h"
 #include "simulation/scheduler.h"
 
 using namespace delta;
+
+namespace {
 
 TEST(Scheduler, InitialState) {
   Arena arena;
@@ -26,7 +29,6 @@ TEST(Scheduler, ScheduleAndRunSingleEvent) {
 }
 
 // --- EventPool tests ---
-
 TEST(EventPool, AcquireCreatesNew) {
   Arena arena;
   EventPool pool(arena);
@@ -83,3 +85,5 @@ TEST(Scheduler, EventPoolIntegration) {
   // After execution, event should be recycled into the pool.
   EXPECT_EQ(pool.FreeCount(), 1);
 }
+
+}  // namespace
