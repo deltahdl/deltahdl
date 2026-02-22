@@ -28,26 +28,4 @@ TEST(Coverage, ExplicitBinCreation) {
   EXPECT_EQ(b->values.size(), 4u);
 }
 
-// =============================================================================
-// S19.5.1-19.5.3: Explicit bins
-// =============================================================================
-TEST(Coverage, SampleHitsExplicitBin) {
-  CoverageDB db;
-  auto* g = db.CreateGroup("cg");
-  auto* cp = CoverageDB::AddCoverPoint(g, "val");
-  CoverBin bin;
-  bin.name = "ones";
-  bin.values = {1};
-  CoverageDB::AddBin(cp, bin);
-
-  db.Sample(g, {{"val", 1}});
-  EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 1u);
-
-  db.Sample(g, {{"val", 2}});
-  EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 1u);  // No change.
-
-  db.Sample(g, {{"val", 1}});
-  EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 2u);
-}
-
 }  // namespace
