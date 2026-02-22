@@ -1,7 +1,7 @@
+// Non-LRM tests
+
 #include <gtest/gtest.h>
-
 #include <string>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -11,7 +11,6 @@
 using namespace delta;
 
 // --- Test helpers ---
-
 namespace {
 
 struct ParseResult {
@@ -34,10 +33,11 @@ ParseResult ParseLibrary(const std::string& src) {
 
 }  // namespace
 
+namespace {
+
 // =============================================================================
 // A.1.1 library_text ::= { library_description }
 // =============================================================================
-
 // Empty library text produces an empty CompilationUnit.
 TEST(LibraryText, EmptyInput) {
   auto r = ParseLibrary("");
@@ -61,7 +61,6 @@ TEST(LibraryText, NullDescription) {
 //   library library_identifier file_path_spec
 //   { , file_path_spec } [ -incdir file_path_spec { , file_path_spec } ] ;
 // =============================================================================
-
 // Basic library declaration with a single file path.
 TEST(LibraryText, BasicLibraryDecl) {
   auto r = ParseLibrary("library mylib /proj/rtl/top.v;\n");
@@ -175,7 +174,6 @@ TEST(LibraryText, LibraryDeclDirectoryPath) {
 // =============================================================================
 // A.1.1 include_statement ::= include file_path_spec ;
 // =============================================================================
-
 // Basic include statement.
 TEST(LibraryText, IncludeStatement) {
   auto r = ParseLibrary("include /proj/other.map;\n");
@@ -198,7 +196,6 @@ TEST(LibraryText, IncludeStatementRelative) {
 // A.1.1 library_description ::=
 //   library_declaration | include_statement | config_declaration | ;
 // =============================================================================
-
 // Multiple library descriptions mixed together.
 TEST(LibraryText, MixedDescriptions) {
   auto r = ParseLibrary(
@@ -232,7 +229,6 @@ TEST(LibraryText, ConfigInLibraryText) {
 // =============================================================================
 // Comments in library source text.
 // =============================================================================
-
 // Line comments.
 TEST(LibraryText, LineComments) {
   auto r = ParseLibrary(
@@ -257,7 +253,6 @@ TEST(LibraryText, BlockComments) {
 // =============================================================================
 // AST structural verification — ensures AST nodes capture all data.
 // =============================================================================
-
 // Verify LibraryDecl stores source range.
 TEST(LibraryText, LibraryDeclHasSourceRange) {
   auto r = ParseLibrary("library mylib /proj/*.v;\n");
@@ -279,7 +274,6 @@ TEST(LibraryText, IncludeStmtHasSourceLoc) {
 // =============================================================================
 // Multiple library declarations.
 // =============================================================================
-
 // Multiple libraries, each mapping different file patterns.
 TEST(LibraryText, MultipleLibraries) {
   auto r = ParseLibrary(
@@ -297,7 +291,6 @@ TEST(LibraryText, MultipleLibraries) {
 // =============================================================================
 // Error handling.
 // =============================================================================
-
 // Missing semicolon after library declaration.
 TEST(LibraryText, ErrorMissingSemicolon) {
   auto r = ParseLibrary("library lib /proj/*.v\n");
@@ -326,7 +319,6 @@ TEST(LibraryText, ErrorIncludeNoPath) {
 // =============================================================================
 // LRM §33 examples — library map file from the specification.
 // =============================================================================
-
 // LRM example: library rtlLib *.v;
 TEST(LibraryText, LrmExampleSimple) {
   auto r = ParseLibrary("library rtlLib *.v;\n");
@@ -369,7 +361,6 @@ TEST(LibraryText, LrmComprehensiveExample) {
 // =============================================================================
 // Lexer: file_path_spec token recognition.
 // =============================================================================
-
 // Verify the lexer correctly reads file path specs with special chars.
 TEST(LibraryText, LexerFilePathSpecAbsolute) {
   auto r = ParseLibrary("library lib /proj/rtl/top.v;\n");
@@ -385,3 +376,5 @@ TEST(LibraryText, LexerFilePathSpecParentDir) {
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "../rtl/*.v");
 }
+
+}  // namespace
