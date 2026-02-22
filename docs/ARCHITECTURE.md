@@ -62,6 +62,8 @@ that back end.
     └───────────┘               └──────────────┘
 ```
 
+Figure 1: Compilation pipeline for simulation and synthesis modes.
+
 ## Front End
 
 ### Preprocessor
@@ -161,6 +163,8 @@ event loop that advances simulation time.
      └───────────┘
 ```
 
+Figure 2: Simulator processing stages and event loop.
+
 #### Lowerer
 
 The lowerer translates an `RtlirDesign` into runtime simulation objects and
@@ -195,6 +199,8 @@ VPI convention:
   │   z   │   1  │   1  │
   └───────┴──────┴──────┘
 ```
+
+Figure 3: Four-value logic dual-rail encoding.
 
 Values are packed into 64-bit words. A `Logic4Word` holds one aval/bval pair
 with helpers for testing known/zero/one states, and four-value AND, OR, XOR,
@@ -265,6 +271,9 @@ dividing each simulation timestep into 17 ordered regions:
             │  Postponed    │
             └───────────────┘
 ```
+
+Figure 4: IEEE 1800-2023 stratified event regions within a
+timestep.
 
 Events are stored in a calendar keyed by `SimTime`, with each time slot
 holding one event queue per region. Within a timestep the scheduler drains
@@ -387,6 +396,8 @@ technology mapping produces the final netlist.
      │ Writer  │
      └─────────┘
 ```
+
+Figure 5: Synthesizer processing stages from RTLIR to netlist.
 
 #### Synth Lowerer
 
