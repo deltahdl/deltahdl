@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §non-lrm:aig
 
 #include <gtest/gtest.h>
 #include "synthesis/aig.h"
