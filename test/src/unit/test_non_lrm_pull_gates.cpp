@@ -1,9 +1,9 @@
-#include <gtest/gtest.h>
+// Non-LRM tests
 
+#include <gtest/gtest.h>
 #include <cstdint>
 
 // --- Local types for pullup/pulldown sources (§28.10) ---
-
 enum class Val4 : uint8_t { kV0 = 0, kV1 = 1, kX = 2, kZ = 3 };
 
 enum class StrengthLevel : uint8_t {
@@ -28,7 +28,9 @@ struct PullSourceInfo {
 };
 
 Val4 EvalPullSource(PullKind kind);
+
 StrengthLevel GetPullSourceStrength(const PullSourceInfo& info);
+
 bool PullSourceAcceptsDelaySpec();
 
 Val4 EvalPullSource(PullKind kind) {
@@ -51,10 +53,11 @@ StrengthLevel GetPullSourceStrength(const PullSourceInfo& info) {
 
 bool PullSourceAcceptsDelaySpec() { return false; }
 
+namespace {
+
 // =============================================================
 // §28.10: pullup and pulldown sources
 // =============================================================
-
 // §28.10: "A pullup source shall place a logic value 1 on the nets
 //  connected in its terminal list."
 TEST(PullGates, PullupOutputsOne) {
@@ -123,5 +126,7 @@ TEST(PullGates, PulldownIgnoresStrength1) {
   EXPECT_EQ(GetPullSourceStrength(info), StrengthLevel::kPull);
 }
 
-// §28.10: "There shall be no delay specifications for these sources."
+// §28.10:
 TEST(PullGates, NoDelaySpecs) { EXPECT_FALSE(PullSourceAcceptsDelaySpec()); }
+
+}  // namespace
