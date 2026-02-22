@@ -1,5 +1,6 @@
-#include <gtest/gtest.h>
+// §13.5: Subroutine calls and argument passing
 
+#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -29,58 +30,11 @@ static Expr* ParseExprFrom(const std::string& src, ExprFixture& f) {
   return item->body->rhs;
 }
 
-TEST(Eval, IntegerLiteral) {
-  ExprFixture f;
-  auto* expr = ParseExprFrom("42", f);
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 42u);
-}
-
-TEST(Eval, Addition) {
-  ExprFixture f;
-  auto* expr = ParseExprFrom("10 + 32", f);
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 42u);
-}
-
-TEST(Eval, BitwiseAnd) {
-  ExprFixture f;
-  auto* expr = ParseExprFrom("15 & 6", f);
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 6u);
-}
-
-TEST(Eval, Comparison) {
-  ExprFixture f;
-  auto* expr = ParseExprFrom("5 > 3", f);
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
-TEST(Eval, Ternary) {
-  ExprFixture f;
-  auto* expr = ParseExprFrom("1 ? 42 : 99", f);
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 42u);
-}
-
-TEST(Eval, VariableLookup) {
-  ExprFixture f;
-  auto* var = f.ctx.CreateVariable("myvar", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 123);
-
-  // Create an identifier expression manually.
-  auto* expr = f.arena.Create<Expr>();
-  expr->kind = ExprKind::kIdentifier;
-  expr->text = "myvar";
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 123u);
-}
+namespace {
 
 // =============================================================================
 // Function output argument writeback
 // =============================================================================
-
 TEST(Eval, FunctionOutputArgWriteback) {
   ExprFixture f;
 
@@ -280,3 +234,5 @@ TEST(Eval, NestedFunctionOutputArgs) {
   // which then writes back to caller's "result".
   EXPECT_EQ(result_var->value.ToUint64(), 105u);
 }
+
+}  // namespace
