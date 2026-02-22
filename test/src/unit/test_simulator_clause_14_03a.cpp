@@ -124,4 +124,23 @@ TEST(ClockingSim, InoutSignalDirection) {
   EXPECT_EQ(cmgr.GetOutputSkew("cb", "bidir").ticks, 3u);
 }
 
+// =============================================================================
+// 20. SimContext clocking manager integration
+// =============================================================================
+TEST(ClockingSim, SimContextClockingManagerAccess) {
+  ClockingSimFixture f;
+  ClockingManager cmgr;
+
+  ClockingBlock block;
+  block.name = "main_cb";
+  block.clock_signal = "clk";
+  block.clock_edge = Edge::kPosedge;
+  block.default_input_skew = SimTime{0};
+  block.default_output_skew = SimTime{0};
+  cmgr.Register(block);
+
+  f.ctx.SetClockingManager(&cmgr);
+  EXPECT_EQ(f.ctx.GetClockingManager(), &cmgr);
+}
+
 }  // namespace
