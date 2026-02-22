@@ -43,9 +43,13 @@
 ## Introduction
 
 DeltaHDL compiles SystemVerilog source files through a staged pipeline. The
-front end (Preprocessor through Elaborator) is shared. After elaboration the
-user selects either simulation or synthesis, and the pipeline continues down
-one of the two paths.
+front end (Preprocessor through Elaborator) is shared. The Elaborator
+produces a Register-Transfer Level Intermediate Representation (RTLIR), which
+is a simplified model of the design containing ports, nets, variables,
+assignments, and processes with resolved types and evaluated parameters.
+After elaboration the user selects either simulation or synthesis, and the
+corresponding Lowerer translates the RTLIR into the structures needed by
+that back end.
 
 ```
                     ┌────────────────┐
