@@ -11,8 +11,6 @@ using namespace delta;
 // =============================================================================
 // Helper: build a minimal Liberty library for testing
 // =============================================================================
-namespace {
-
 Liberty MakeTestLib() {
   Liberty lib;
   lib.library_name = "testlib";
@@ -51,8 +49,6 @@ Liberty MakeTestLib() {
 
   return lib;
 }
-
-}  // namespace
 
 namespace {
 
