@@ -327,7 +327,7 @@ jobs:
           cmake --build build --parallel 4 --target deltahdl
           targets=$(grep -oP 'add_unit_test\(\K[^)]+' \
             test/CMakeLists.txt \
-            | awk "(NR-1) % 4 == ${{ matrix.shard }}")
+            | awk "(NR-1) % 3 == ${{ matrix.shard }}")
           cmake --build build --parallel 4 --target $targets
       - name: Upload build
         uses: actions/upload-artifact@v4
@@ -338,7 +338,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2]
   build-ubuntu-24-04-x86-64-gcc:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
@@ -378,7 +378,7 @@ jobs:
           cmake --build build --parallel 4 --target deltahdl
           targets=$(grep -oP 'add_unit_test\(\K[^)]+' \
             test/CMakeLists.txt \
-            | awk "(NR-1) % 3 == ${{ matrix.shard }}")
+            | awk "(NR-1) % 4 == ${{ matrix.shard }}")
           cmake --build build --parallel 4 --target $targets
       - name: Upload build
         uses: actions/upload-artifact@v4
@@ -389,7 +389,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2]
+        shard: [0, 1, 2, 3]
   # Ensures sv-tests is cached for integration-test jobs. Compares
   # the latest remote SHA against the SV_TESTS_SHA repo variable to
   # decide if a clone is needed. On warm cache (same SHA) this is a
@@ -1075,11 +1075,6 @@ jobs:
         with:
           name: build-ubuntu-24-04-x86-64-clang-shard-2
           path: build/
-      - name: Download build shard 3
-        uses: actions/download-artifact@v4
-        with:
-          name: build-ubuntu-24-04-x86-64-clang-shard-3
-          path: build/
       - name: Fix permissions
         run: >-
           find build/test -maxdepth 1 -type f -name 'test_*'
@@ -1107,6 +1102,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: build-ubuntu-24-04-x86-64-gcc-shard-2
+          path: build/
+      - name: Download build shard 3
+        uses: actions/download-artifact@v4
+        with:
+          name: build-ubuntu-24-04-x86-64-gcc-shard-3
           path: build/
       - name: Fix permissions
         run: >-
