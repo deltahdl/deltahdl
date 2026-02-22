@@ -1,11 +1,11 @@
-#include <gtest/gtest.h>
+// §28.16: Gate and net delays
 
+#include <gtest/gtest.h>
 #include <algorithm>
 #include <cstdint>
 #include <initializer_list>
 
 // --- Local types for gate/net delays (§28.16) ---
-
 enum class Val4 : uint8_t { kV0 = 0, kV1 = 1, kX = 2, kZ = 3 };
 
 struct DelaySpec {
@@ -24,7 +24,9 @@ struct MinTypMax {
 enum class ChargeDecayState : uint8_t { kIdle, kDecaying, kDone };
 
 uint64_t ComputePropagationDelay(const DelaySpec& spec, Val4 from, Val4 to);
+
 uint64_t SelectMinTypMax(const MinTypMax& mtm, uint8_t selector);
+
 bool ValidateTriregChargeDecaySpec(const DelaySpec& spec);
 
 uint64_t ComputePropagationDelay(const DelaySpec& spec, Val4 from, Val4 to) {
@@ -73,10 +75,11 @@ bool ValidateTriregChargeDecaySpec(const DelaySpec& spec) {
   return spec.count == 3;
 }
 
+namespace {
+
 // =============================================================
 // §28.16: Gate and net delays
 // =============================================================
-
 // §28.16: "the default delay shall be zero when no delay
 //  specification is given."
 TEST(GateNetDelays, DefaultDelayIsZero) {
@@ -172,11 +175,9 @@ TEST(GateNetDelays, ThreeDelayZTo1IsD1) {
 //  propagation delay from an input to an output."
 // (This is an architectural constraint, not directly testable via
 //  the delay computation API — noted for completeness.)
-
 // =============================================================
 // §28.16.1: min:typ:max delays
 // =============================================================
-
 // §28.16.1: "The minimum, typical, and maximum values for each delay
 //  shall be specified as expressions separated by colons."
 // §28.16.1: "There shall be no required relation (e.g., min ≤ typ
@@ -207,13 +208,11 @@ TEST(MinTypMaxDelays, NoRequiredOrdering) {
 // =============================================================
 // §28.16.2: trireg net charge decay
 // =============================================================
-
 // §28.16.2: "The first two delays shall specify the delay for
 //  transition to the 1 and 0 logic states when the trireg net is
 //  driven to these states by a driver."
 // §28.16.2: "The third delay shall specify the charge decay time
 //  instead of the delay in a transition to the z logic state."
-
 // §28.16.2.2: "The charge decay time specification in a trireg net
 //  declaration shall be preceded by a rise and a fall delay
 //  specification."
@@ -233,18 +232,4 @@ TEST(TriregChargeDecay, TwoDelaysHasNoChargeDecay) {
   EXPECT_FALSE(ValidateTriregChargeDecaySpec(spec));
 }
 
-// §28.16.2: "The z value shall not propagate from the drivers of a
-//  trireg net to a trireg net."
-// §28.16.2: "When the drivers of a trireg net make transitions from
-//  the 1, 0, or x logic states to off, the trireg net shall retain
-//  the previous 1, 0, or x logic state."
-
-// §28.16.2.1: "The charge decay process shall begin when the drivers
-//  of the trireg net turn off and the trireg net starts to hold
-//  charge."
-// §28.16.2.1: "The charge decay process shall end under the
-//  following two conditions:
-//  a) The delay specified by charge decay time elapses ... trireg
-//     net makes a transition from 1 or 0 to x.
-//  b) The drivers of trireg net turn on and propagate a 1, 0, or x
-//     into the trireg net."
+}  // namespace
