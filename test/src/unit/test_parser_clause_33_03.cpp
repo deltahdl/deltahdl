@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §33.3: Libraries
 
 #include <gtest/gtest.h>
 #include <string>
@@ -11,8 +11,6 @@
 using namespace delta;
 
 // --- Test helpers ---
-namespace {
-
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
@@ -30,8 +28,6 @@ ParseResult ParseLibrary(const std::string& src) {
   result.has_errors = diag.HasErrors();
   return result;
 }
-
-}  // namespace
 
 namespace {
 
@@ -209,21 +205,6 @@ TEST(LibraryText, MixedDescriptions) {
   EXPECT_EQ(r.cu->libraries[0]->name, "lib1");
   EXPECT_EQ(r.cu->libraries[1]->name, "lib2");
   ASSERT_EQ(r.cu->lib_includes.size(), 1u);
-}
-
-// Config declaration within library text.
-TEST(LibraryText, ConfigInLibraryText) {
-  auto r = ParseLibrary(
-      "library lib1 /a/*.v;\n"
-      "config cfg;\n"
-      "  design lib1.top;\n"
-      "  default liblist lib1;\n"
-      "endconfig\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->libraries.size(), 1u);
-  ASSERT_EQ(r.cu->configs.size(), 1u);
-  EXPECT_EQ(r.cu->configs[0]->name, "cfg");
 }
 
 // =============================================================================
