@@ -3,12 +3,12 @@
 ## Table of Contents
 
 1. [Introduction](#introduction)
-2. [Compilation Pipeline](#compilation-pipeline)
+2. [Compilation](#compilation)
    1. [Preprocessor](#preprocessor)
    2. [Lexer](#lexer)
    3. [Parser](#parser)
    4. [Elaborator](#elaborator)
-3. [Simulation](#simulation)
+3. [Simulator](#simulator)
    1. [Lowerer](#lowerer)
    2. [SimContext](#simcontext)
    3. [Event Scheduler](#event-scheduler)
@@ -31,14 +31,14 @@
    20. [Class Objects](#class-objects)
    21. [Synchronization Objects](#synchronization-objects)
    22. [Advanced Simulation](#advanced-simulation)
-4. [Synthesis](#synthesis)
+4. [Synthesizer](#synthesizer)
    1. [SynthLower](#synthlower)
    2. [AIG](#aig)
    3. [AIG Optimization](#aig-optimization)
    4. [Memory Inference](#memory-inference)
    5. [Technology Mapping](#technology-mapping)
    6. [Netlist Writer](#netlist-writer)
-5. [Design Decisions](#design-decisions)
+5. [Appendix A: Design Decisions](#appendix-a-design-decisions)
 
 ## Introduction
 
@@ -80,7 +80,7 @@ that back end.
 ```
 
 
-## Compilation Pipeline
+## Compilation
 
 ### Preprocessor
 
@@ -123,8 +123,15 @@ containing modules, packages, interfaces, programs, and classes.
 
 ### Elaborator
 
-The elaborator walks the AST, resolves types, evaluates constant expressions,
-and produces a register-transfer level intermediate representation (RTLIR).
+The elaborator walks the AST and produces the RTLIR. It takes the general
+description the Parser produced and turns it into a fully detailed one. The
+Parser accepts code where widths depend on parameters, where blocks of code
+may or may not exist depending on conditions, and where types are referenced
+by name without their full definition inline. The Elaborator fills all of that
+in. When it finishes, every signal has a known width, every conditional block
+has been decided, every type reference has been replaced with its full
+definition, and every process knows exactly which signals it watches.
+
 It is assisted by three sub-passes. The type evaluator resolves data types
 including structs, unions, enums, and typedefs, computing widths and sign
 information. The constant evaluator folds expressions whose values can be
@@ -147,32 +154,13 @@ maps. Each process carries its sensitivity list and a pointer to its AST body
 statement. An `RtlirDesign` collects the top-level modules and a lookup map
 of all elaborated modules.
 
-After elaboration the pipeline branches into either simulation or synthesis.
 
+## Simulator
 
-## Simulation
-
-```
-                    RtlirDesign
-                         │
-                         ▼
-                   ┌──────────┐
-                   │  Lowerer  │
-                   └─────┬─────┘
-                         │
-                         ▼
-  ┌───────┐        ┌───────────┐        ┌─────────┐
-  │  VPI  ├───────►│ SimContext │◄───────┤  DPI-C  │
-  └───────┘        └─────┬─────┘        └─────────┘
-                         │
-                         ▼
-                   ┌───────────┐
-                   │ Scheduler │
-                   └─────┬─────┘
-                         │
-                         ▼
-                  Waveforms (.vcd)
-```
+The Simulator takes the RTLIR produced by the Elaborator and executes the
+design over time. The Lowerer translates each RTLIR element into a runtime
+object, the SimContext holds all of that state, and the Scheduler drives the
+event loop that advances simulation time.
 
 ### Lowerer
 
@@ -475,34 +463,12 @@ single write. Runtime representations for dynamic arrays, associative arrays,
 and SystemVerilog strings are also provided here.
 
 
-## Synthesis
+## Synthesizer
 
-```
-                    RtlirDesign
-                         │
-                         ▼
-                   ┌─────────────┐
-                   │  SynthLower  │
-                   └──────┬───────┘
-                          │
-                          ▼
-                   ┌─────────────┐
-                   │   AIG Opts   │
-                   └──────┬───────┘
-                          │
-                          ▼
-              ┌───────────┴───────────┐
-              │                       │
-              ▼                       ▼
-         ┌──────────┐          ┌───────────┐
-         │ LUT Map  │          │ Cell Map  │
-         └─────┬────┘          └─────┬─────┘
-               │                     │
-               └──────────┬──────────┘
-                          │
-                          ▼
-              Netlist (.blif, .v, .json)
-```
+The Synthesizer takes the RTLIR produced by the Elaborator and converts it
+into a hardware netlist. The SynthLower translates the design into an
+And-Inverter Graph, optimization passes reduce its size and depth, and
+technology mapping produces the final netlist.
 
 ### SynthLower
 
@@ -573,7 +539,7 @@ are synthesized: inputs are named i0, i1, and so on; outputs are named o0,
 o1, and so on; internal nodes use the prefix n followed by the node identifier.
 
 
-## Design Decisions
+## Appendix A: Design Decisions
 
 The lexer and parser are written by hand rather than generated by tools like
 flex, bison, or ANTLR. This gives full control over error recovery and
