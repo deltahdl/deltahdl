@@ -1,9 +1,9 @@
-#include <gtest/gtest.h>
+// §20.8: Math functions
 
+#include <gtest/gtest.h>
 #include <cmath>
 #include <cstring>
 #include <string>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -17,7 +17,6 @@ using namespace delta;
 // =============================================================================
 // Helper: extract double from a Logic4Vec stored as IEEE 754 bits
 // =============================================================================
-
 static double VecToDouble(const Logic4Vec& vec) {
   uint64_t bits = vec.ToUint64();
   double d = 0.0;
@@ -28,7 +27,6 @@ static double VecToDouble(const Logic4Vec& vec) {
 // =============================================================================
 // Test fixture
 // =============================================================================
-
 struct RealFixture {
   SourceManager mgr;
   Arena arena;
@@ -60,55 +58,11 @@ struct RealFixture {
   }
 };
 
-// =============================================================================
-// §6.12: Real literal evaluation
-// =============================================================================
-
-TEST(RealTypes, RealLiteralEval) {
-  RealFixture f;
-  auto* lit = f.MakeRealLiteral(3.14);
-  auto result = EvalExpr(lit, f.ctx, f.arena);
-  EXPECT_NEAR(VecToDouble(result), 3.14, 1e-10);
-}
-
-TEST(RealTypes, RealLiteralZero) {
-  RealFixture f;
-  auto* lit = f.MakeRealLiteral(0.0);
-  auto result = EvalExpr(lit, f.ctx, f.arena);
-  EXPECT_EQ(VecToDouble(result), 0.0);
-}
-
-TEST(RealTypes, RealLiteralNegative) {
-  RealFixture f;
-  auto* lit = f.MakeRealLiteral(-2.5);
-  auto result = EvalExpr(lit, f.ctx, f.arena);
-  EXPECT_NEAR(VecToDouble(result), -2.5, 1e-10);
-}
-
-// =============================================================================
-// §6.12: Real variable storage
-// =============================================================================
-
-TEST(RealTypes, RealVarStorage) {
-  RealFixture f;
-  f.CreateRealVar("x", 1.5);
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_NEAR(VecToDouble(var->value), 1.5, 1e-10);
-}
-
-TEST(RealTypes, IsRealVariable) {
-  RealFixture f;
-  f.CreateRealVar("r", 0.0);
-  EXPECT_TRUE(f.ctx.IsRealVariable("r"));
-  f.ctx.CreateVariable("i", 32);
-  EXPECT_FALSE(f.ctx.IsRealVariable("i"));
-}
+namespace {
 
 // =============================================================================
 // §20.8: Math system calls with real args
 // =============================================================================
-
 TEST(RealTypes, MathSqrtReal) {
   RealFixture f;
   // $sqrt(4.0) should return 2.0.
@@ -130,3 +84,5 @@ TEST(RealTypes, MathLnReal) {
   auto result = EvalExpr(call, f.ctx, f.arena);
   EXPECT_NEAR(VecToDouble(result), 0.0, 1e-10);
 }
+
+}  // namespace
