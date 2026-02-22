@@ -1,14 +1,11 @@
-// Tests for §34 Protected envelopes — preprocessor pragma protect handling
+// §34.5: Protect pragma keywords
 
 #include <gtest/gtest.h>
-
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "preprocessor/preprocessor.h"
 
 using namespace delta;
-
-namespace {
 
 struct ProtectedTest : ::testing::Test {
  protected:
@@ -23,47 +20,11 @@ struct ProtectedTest : ::testing::Test {
   PreprocConfig config_;
 };
 
-// =============================================================================
-// §34.4 Pragma protect directive recognition
-// =============================================================================
-
-TEST_F(ProtectedTest, PragmaProtectConsumed) {
-  auto result = Preprocess("`pragma protect begin\n");
-  EXPECT_FALSE(diag_.HasErrors());
-  // Pragma line should be consumed (not appear in output).
-  EXPECT_EQ(result.find("pragma"), std::string::npos);
-}
-
-TEST_F(ProtectedTest, PragmaProtectEndConsumed) {
-  auto result = Preprocess("`pragma protect end\n");
-  EXPECT_FALSE(diag_.HasErrors());
-  EXPECT_EQ(result.find("pragma"), std::string::npos);
-}
-
-// =============================================================================
-// §34.5.1/2 Protected envelope begin/end parsing
-// =============================================================================
-
-TEST_F(ProtectedTest, BeginEndEnvelope) {
-  auto result = Preprocess(
-      "module m;\n"
-      "`pragma protect begin\n"
-      "  logic secret_wire;\n"
-      "`pragma protect end\n"
-      "endmodule\n");
-  EXPECT_FALSE(diag_.HasErrors());
-  // Non-pragma lines should pass through.
-  EXPECT_NE(result.find("module m;"), std::string::npos);
-  EXPECT_NE(result.find("logic secret_wire;"), std::string::npos);
-  EXPECT_NE(result.find("endmodule"), std::string::npos);
-  // Pragma lines consumed.
-  EXPECT_EQ(result.find("pragma"), std::string::npos);
-}
+namespace {
 
 // =============================================================================
 // §34.5.3/4 Protected region with encoding (begin_protected/end_protected)
 // =============================================================================
-
 TEST_F(ProtectedTest, ProtectedRegionWithEncoding) {
   auto result = Preprocess(
       "`pragma protect encoding=(enctype=\"raw\")\n"
@@ -82,7 +43,6 @@ TEST_F(ProtectedTest, ProtectedRegionWithEncoding) {
 // =============================================================================
 // §34.5 Key block recognition
 // =============================================================================
-
 TEST_F(ProtectedTest, KeyBlockPragma) {
   auto result = Preprocess(
       "`pragma protect key_keyowner=\"Acme\"\n"
@@ -99,7 +59,6 @@ TEST_F(ProtectedTest, KeyBlockPragma) {
 // =============================================================================
 // §34.5 Viewport support
 // =============================================================================
-
 TEST_F(ProtectedTest, ViewportPragma) {
   auto result = Preprocess(
       "`pragma protect viewport=all\n"
@@ -111,27 +70,8 @@ TEST_F(ProtectedTest, ViewportPragma) {
 }
 
 // =============================================================================
-// §34.5 Reset directive
-// =============================================================================
-
-TEST_F(ProtectedTest, ResetDirective) {
-  auto result = Preprocess(
-      "`pragma protect begin\n"
-      "  wire secret;\n"
-      "`pragma protect end\n"
-      "`pragma reset protect\n"
-      "module m;\n"
-      "endmodule\n");
-  EXPECT_FALSE(diag_.HasErrors());
-  // All pragma lines consumed. `pragma reset protect is also consumed.
-  EXPECT_EQ(result.find("pragma"), std::string::npos);
-  EXPECT_NE(result.find("module m;"), std::string::npos);
-}
-
-// =============================================================================
 // §34.5 License checking stub
 // =============================================================================
-
 TEST_F(ProtectedTest, RuntimeLicensePragma) {
   auto result = Preprocess(
       "`pragma protect runtime_license=(library=\"lic.so\","
