@@ -187,7 +187,8 @@ can perform field access and method dispatch at runtime, and it manages
 dynamic arrays, associative arrays, and queues.
 
 All values created during lowering use dual-rail aval/bval encoding per the
-VPI convention. Values are packed into 64-bit words. A `Logic4Word` holds one aval/bval pair
+VPI convention. Values are packed into 64-bit words. A `Logic4Word` holds
+one aval/bval pair
 with helpers for testing known/zero/one states, and four-value AND, OR, XOR,
 and NOT operations are implemented as bitwise functions on the two rails. A
 `Logic4Vec` holds a bit width and a pointer to an arena-allocated array of

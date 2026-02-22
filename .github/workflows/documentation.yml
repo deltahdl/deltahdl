@@ -1,7 +1,7 @@
 ---
 concurrency:
   cancel-in-progress: true
-  group: markdownlint-${{ github.ref }}
+  group: documentation-${{ github.ref }}
 jobs:
   detect:
     outputs:
@@ -48,7 +48,7 @@ jobs:
         with:
           key: >-
             pip-${{ github.job }}-${{
-            hashFiles('.github/workflows/markdownlint.yml') }}
+            hashFiles('.github/workflows/documentation.yml') }}
           path: ~/.cache/pip
           restore-keys: |
             pip-${{ github.job }}-
@@ -83,7 +83,7 @@ jobs:
         with:
           key: >-
             pip-${{ github.job }}-${{
-            hashFiles('.github/workflows/markdownlint.yml') }}
+            hashFiles('.github/workflows/documentation.yml') }}
           path: ~/.cache/pip
           restore-keys: |
             pip-${{ github.job }}-
@@ -98,7 +98,7 @@ jobs:
           assert-no-inline-directives
           --tools yamllint
           --verbose
-          .github/workflows/markdownlint.yml
+          .github/workflows/documentation.yml
       - name: Lint YAML
         run: |
           EMPTY='empty-lines: {max: 0, max-start: 0, max-end: 1}'
@@ -110,16 +110,16 @@ jobs:
           yamllint --strict \
             --config-data \
             "{extends: default, rules: {$RULES}}" \
-            .github/workflows/markdownlint.yml
-name: Markdown Lint
+            .github/workflows/documentation.yml
+name: Documentation
 on:
   pull_request:
     paths:
       - '**/*.md'
-      - .github/workflows/markdownlint.yml
+      - .github/workflows/documentation.yml
   push:
     branches: [main]
     paths:
       - '**/*.md'
-      - .github/workflows/markdownlint.yml
+      - .github/workflows/documentation.yml
   workflow_dispatch:
