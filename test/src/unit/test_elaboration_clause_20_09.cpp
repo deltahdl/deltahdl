@@ -57,4 +57,11 @@ TEST(ConstEval, Onehot0) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$onehot0(8'b00010010)", f)), 0);
 }
 
+TEST(ConstEval, Clog2) {
+  EvalFixture f;
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("$clog2(256)", f)), 8);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("$clog2(1)", f)), 0);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("$clog2(5)", f)), 3);
+}
+
 }  // namespace
