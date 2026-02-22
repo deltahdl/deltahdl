@@ -1,11 +1,7 @@
-// Tests for aggregate value runtime: struct types, assignment patterns,
-// pattern matching, tagged unions, and unpacked array concatenation.
-// Covers §10.9, §10.10, §11.2.2, §11.4.14.4, §11.9, §12.6.
+// Non-LRM tests
 
 #include <gtest/gtest.h>
-
 #include <string>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -18,12 +14,9 @@
 
 using namespace delta;
 
-namespace {
-
 // =============================================================================
 // Helper fixture
 // =============================================================================
-
 struct AggFixture {
   SourceManager mgr;
   Arena arena;
@@ -45,7 +38,6 @@ static Expr* ParseExprFrom(const std::string& src, AggFixture& f) {
 // =============================================================================
 // §7.2 Struct type metadata — StructTypeInfo registration
 // =============================================================================
-
 static void VerifyStructField(const StructFieldInfo& field,
                               const char* expected_name,
                               uint32_t expected_offset, uint32_t expected_width,
@@ -54,6 +46,8 @@ static void VerifyStructField(const StructFieldInfo& field,
   EXPECT_EQ(field.bit_offset, expected_offset) << "field " << index;
   EXPECT_EQ(field.width, expected_width) << "field " << index;
 }
+
+namespace {
 
 TEST(StructType, RegisterAndFind_Metadata) {
   AggFixture f;
@@ -136,17 +130,6 @@ TEST(StructType, FieldTypeKindPreserved) {
   EXPECT_EQ(found->fields[1].type_kind, DataTypeKind::kByte);
 }
 
-// =============================================================================
-// §10.9.2 Structure assignment patterns — named member
-// =============================================================================
-
-static Expr* MakeIntLit(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
-
 TEST(StructPattern, NamedMemberTwoFields) {
   // '{x: 5, y: 10} on struct { logic [7:0] x; logic [7:0] y; }
   AggFixture f;
@@ -210,7 +193,6 @@ TEST(StructPattern, NamedMemberThreeFields) {
 // =============================================================================
 // §10.9.2 Structure assignment patterns — default and type-keyed
 // =============================================================================
-
 TEST(StructPattern, DefaultAllFields) {
   // '{default: 0xFF} → all fields filled with 0xFF
   AggFixture f;
@@ -296,7 +278,6 @@ TEST(StructPattern, MixedPrecedence) {
 // =============================================================================
 // §10.9 Assignment pattern evaluation
 // =============================================================================
-
 TEST(AssignmentPattern, PositionalTwoElements) {
   // '{a, b} with 8-bit variables → 16-bit packed result
   AggFixture f;
@@ -361,7 +342,6 @@ TEST(AssignmentPattern, SizedLiterals) {
 // =============================================================================
 // §12.6 Pattern matching — matches operator
 // =============================================================================
-
 TEST(Matches, ExactMatchTrue) {
   // 42 matches 42 should be 1
   AggFixture f;
@@ -392,7 +372,6 @@ TEST(Matches, VariableMatch) {
 // =============================================================================
 // §11.9 Tagged union — tag tracking
 // =============================================================================
-
 TEST(TaggedUnion, SetAndGetTag) {
   AggFixture f;
   auto* var = f.ctx.CreateVariable("u", 32);
@@ -419,7 +398,6 @@ TEST(TaggedUnion, ChangeTag) {
 // =============================================================================
 // §10.10 Unpacked array concatenation
 // =============================================================================
-
 TEST(UnpackedArrayConcat, BasicConcat) {
   // Create two array elements as flat variables, verify concatenation concept.
   AggFixture f;
@@ -440,7 +418,6 @@ TEST(UnpackedArrayConcat, BasicConcat) {
 // =============================================================================
 // §11.2.2 Aggregate expressions — struct in set membership
 // =============================================================================
-
 TEST(AggregateExpr, PackedStructInsideSet) {
   // A packed struct is just a bitvector — inside should work by value.
   AggFixture f;
@@ -463,7 +440,6 @@ TEST(AggregateExpr, PackedStructNotInSet) {
 // =============================================================================
 // §7.8.6: Accessing invalid associative array indices
 // =============================================================================
-
 TEST(AssocArray, ReadMissingKeyWarns) {
   AggFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
@@ -506,25 +482,6 @@ TEST(AssocArray, ReadExistingKeyNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), before);
 }
 
-// =============================================================================
-// §7.4.5: Out-of-bounds array/queue access returns X
-// =============================================================================
-
-// Helper: build arr[idx] select expression.
-static Expr* MkSelect(Arena& arena, std::string_view name, uint64_t idx) {
-  auto* sel = arena.Create<Expr>();
-  sel->kind = ExprKind::kSelect;
-  auto* base = arena.Create<Expr>();
-  base->kind = ExprKind::kIdentifier;
-  base->text = name;
-  sel->base = base;
-  auto* idx_expr = arena.Create<Expr>();
-  idx_expr->kind = ExprKind::kIntegerLiteral;
-  idx_expr->int_val = idx;
-  sel->index = idx_expr;
-  return sel;
-}
-
 TEST(ArrayAccess, OutOfBoundsReturnsX) {
   AggFixture f;
   // Register a 4-element array arr[0:3], each element 8 bits.
@@ -558,41 +515,6 @@ TEST(QueueAccess, OutOfBoundsReturnsX) {
   EXPECT_FALSE(oob_result.IsKnown());
 }
 
-// =============================================================================
-// §7.4.5: Unpacked array slices
-// =============================================================================
-
-// Helper: build arr[hi:lo] range select expression.
-static Expr* MkSlice(Arena& arena, std::string_view name, uint64_t hi,
-                     uint64_t lo) {
-  auto* sel = arena.Create<Expr>();
-  sel->kind = ExprKind::kSelect;
-  auto* base = arena.Create<Expr>();
-  base->kind = ExprKind::kIdentifier;
-  base->text = name;
-  sel->base = base;
-  auto* hi_expr = arena.Create<Expr>();
-  hi_expr->kind = ExprKind::kIntegerLiteral;
-  hi_expr->int_val = hi;
-  sel->index = hi_expr;
-  auto* lo_expr = arena.Create<Expr>();
-  lo_expr->kind = ExprKind::kIntegerLiteral;
-  lo_expr->int_val = lo;
-  sel->index_end = lo_expr;
-  return sel;
-}
-
-// Helper: register a 4-element array and populate variables.
-static void MakeArray4(AggFixture& f, std::string_view name) {
-  f.ctx.RegisterArray(name, {0, 4, 8, false, false, false});
-  for (uint32_t i = 0; i < 4; ++i) {
-    auto tmp = std::string(name) + "[" + std::to_string(i) + "]";
-    auto* s = f.arena.AllocString(tmp.c_str(), tmp.size());
-    auto* v = f.ctx.CreateVariable(std::string_view(s, tmp.size()), 8);
-    v->value = MakeLogic4VecVal(f.arena, 8, static_cast<uint64_t>(i + 1) * 10);
-  }
-}
-
 TEST(ArraySlice, ReadSliceConcat) {
   AggFixture f;
   MakeArray4(f, "arr");
@@ -602,26 +524,6 @@ TEST(ArraySlice, ReadSliceConcat) {
   EXPECT_EQ(result.width, 16u);
   // arr[2]=30, arr[1]=20  →  (30 << 8) | 20 = 7700
   EXPECT_EQ(result.ToUint64(), (30u << 8) | 20u);
-}
-
-// =============================================================================
-// §7.4.6: Array equality / inequality
-// =============================================================================
-
-// Helper: build (lhs == rhs) binary expression.
-static Expr* MkEq(Arena& arena, std::string_view a, std::string_view b) {
-  auto* expr = arena.Create<Expr>();
-  expr->kind = ExprKind::kBinary;
-  expr->op = TokenKind::kEqEq;
-  auto* lhs = arena.Create<Expr>();
-  lhs->kind = ExprKind::kIdentifier;
-  lhs->text = a;
-  auto* rhs = arena.Create<Expr>();
-  rhs->kind = ExprKind::kIdentifier;
-  rhs->text = b;
-  expr->lhs = lhs;
-  expr->rhs = rhs;
-  return expr;
 }
 
 TEST(ArrayEquality, EqualArrays) {
@@ -642,33 +544,6 @@ TEST(ArrayEquality, UnequalArrays) {
   v->value = MakeLogic4VecVal(f.arena, 8, 99);
   auto result = EvalExpr(MkEq(f.arena, "a", "b"), f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
-}
-
-// =============================================================================
-// §7.9.8: Traversal method argument width validation
-// =============================================================================
-
-// Helper: build aa.method(ref) call expression.
-static Expr* MkAssocCall(Arena& arena, std::string_view var,
-                         std::string_view method, std::string_view ref) {
-  auto* expr = arena.Create<Expr>();
-  expr->kind = ExprKind::kCall;
-  auto* access = arena.Create<Expr>();
-  access->kind = ExprKind::kMemberAccess;
-  auto* base = arena.Create<Expr>();
-  base->kind = ExprKind::kIdentifier;
-  base->text = var;
-  auto* meth = arena.Create<Expr>();
-  meth->kind = ExprKind::kIdentifier;
-  meth->text = method;
-  access->lhs = base;
-  access->rhs = meth;
-  expr->lhs = access;
-  auto* arg = arena.Create<Expr>();
-  arg->kind = ExprKind::kIdentifier;
-  arg->text = ref;
-  expr->args.push_back(arg);
-  return expr;
 }
 
 TEST(AssocTraversal, FirstReturnsTruncationFlag) {
@@ -725,24 +600,6 @@ TEST(AssocTraversal, ByteIndexFirstReturnsOneForByteRef) {
   EXPECT_EQ(ref->value.ToUint64(), 200u);
 }
 
-// =============================================================================
-// Phase 1: §7.12 Dynamic array method dispatch via ArrayInfo
-// =============================================================================
-
-// Helper: register dynamic array with elements via QueueObject + ArrayInfo.
-static void MakeDynArray(AggFixture& f, std::string_view name,
-                         const std::vector<uint64_t>& vals) {
-  auto* q = f.ctx.CreateQueue(name, 32);
-  for (auto v : vals) {
-    q->elements.push_back(MakeLogic4VecVal(f.arena, 32, v));
-  }
-  ArrayInfo info;
-  info.is_dynamic = true;
-  info.elem_width = 32;
-  info.size = static_cast<uint32_t>(vals.size());
-  f.ctx.RegisterArray(name, info);
-}
-
 TEST(DynArrayMethod, SumReduction) {
   AggFixture f;
   MakeDynArray(f, "d", {10, 20, 30, 40});
@@ -782,7 +639,6 @@ TEST(DynArrayMethod, MaxReduction) {
 // =============================================================================
 // Phase 3: §21.2.1 FormatArg specifiers
 // =============================================================================
-
 TEST(FormatArg, DecimalUnsigned) {
   Arena arena;
   auto val = MakeLogic4VecVal(arena, 8, 42);
@@ -819,7 +675,6 @@ TEST(FormatArg, StringFromAscii) {
 // =============================================================================
 // Phase 6: §13 Task call setup/teardown
 // =============================================================================
-
 TEST(TaskCall, SetupReturnsTaskItem) {
   AggFixture f;
   // Create a task declaration node.
