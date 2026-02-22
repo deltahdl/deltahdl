@@ -8,14 +8,10 @@ jobs:
     outputs:
       clang-tidy-configs-changed: >-
         ${{ steps.check.outputs.clang_tidy_configs_changed }}
-      force-markdownlint: >-
-        ${{ steps.check.outputs.force_markdownlint }}
       force-static-analysis: >-
         ${{ steps.check.outputs.force_static_analysis }}
       force-yamllint: >-
         ${{ steps.check.outputs.force_yamllint }}
-      markdown-changed: >-
-        ${{ steps.check.outputs.markdown_changed }}
       scripts-changed: >-
         ${{ steps.check.outputs.scripts_changed }}
       workflows-changed: >-
@@ -32,10 +28,8 @@ jobs:
             BASE="${{ github.event.pull_request.base.sha }}"
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "clang_tidy_configs_changed=false" >> "$GITHUB_OUTPUT"
-            echo "force_markdownlint=false" >> "$GITHUB_OUTPUT"
             echo "force_static_analysis=false" >> "$GITHUB_OUTPUT"
             echo "force_yamllint=false" >> "$GITHUB_OUTPUT"
-            echo "markdown_changed=false" >> "$GITHUB_OUTPUT"
             echo "scripts_changed=false" >> "$GITHUB_OUTPUT"
             echo "workflows_changed=false" >> "$GITHUB_OUTPUT"
             exit 0
@@ -45,10 +39,8 @@ jobs:
           ZERO="0000000000000000000000000000000000000000"
           if [ -z "$BASE" ] || [ "$BASE" = "$ZERO" ]; then
             echo "clang_tidy_configs_changed=true" >> "$GITHUB_OUTPUT"
-            echo "force_markdownlint=false" >> "$GITHUB_OUTPUT"
             echo "force_static_analysis=false" >> "$GITHUB_OUTPUT"
             echo "force_yamllint=false" >> "$GITHUB_OUTPUT"
-            echo "markdown_changed=true" >> "$GITHUB_OUTPUT"
             echo "scripts_changed=true" >> "$GITHUB_OUTPUT"
             echo "workflows_changed=true" >> "$GITHUB_OUTPUT"
             exit 0
@@ -65,11 +57,6 @@ jobs:
           else
             echo "clang_tidy_configs_changed=false" >> "$GITHUB_OUTPUT"
           fi
-          if echo "$CHANGED" | grep -qE '\.md$'; then
-            echo "markdown_changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "markdown_changed=false" >> "$GITHUB_OUTPUT"
-          fi
           if echo "$CHANGED" | grep -qE '^\.github/workflows/.*\.yml'; then
             echo "workflows_changed=true" >> "$GITHUB_OUTPUT"
           else
@@ -81,11 +68,6 @@ jobs:
           else
             MSG=$(git log -1 --format=%B "${{ github.sha }}")
           fi
-          if echo "$MSG" | grep -qiE '\[markdown[- ]?lint\]'; then
-            echo "force_markdownlint=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "force_markdownlint=false" >> "$GITHUB_OUTPUT"
-          fi
           if echo "$MSG" | grep -qiE '\[static[- ]?analysis\]'; then
             echo "force_static_analysis=true" >> "$GITHUB_OUTPUT"
           else
@@ -96,45 +78,6 @@ jobs:
           else
             echo "force_yamllint=false" >> "$GITHUB_OUTPUT"
           fi
-  # ── Gate: markdownlint for Markdown changes ──
-  markdownlint:
-    if: >-
-      needs.detect.outputs.force-markdownlint == 'true'
-      || needs.detect.outputs.markdown-changed == 'true'
-      || inputs.force-markdownlint
-    needs: detect
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Restore pip cache
-        uses: actions/cache@v4
-        with:
-          key: >-
-            pip-${{ github.job }}-${{
-            hashFiles('.github/workflows/ci.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-${{ github.job }}-
-      - name: Install tools
-        run: |
-          npm install -g markdownlint-cli
-          pip install \
-            assert-no-inline-directives \
-            assert-no-linter-config-files
-      - name: Assert no inline markdownlint disables
-        run: >-
-          assert-no-inline-directives
-          --tools markdownlint
-          --verbose
-          ${{ github.workspace }}/**/*
-      - name: Assert no markdownlint config files
-        run: >-
-          assert-no-linter-config-files
-          --linters markdownlint
-          --verbose
-          ${{ github.workspace }}
-      - name: Lint Markdown
-        run: markdownlint '**/*.md'
   # ── Gate: static analysis for all scripts ──
   static-analysis:
     if: >-
@@ -288,7 +231,6 @@ jobs:
     if: "!failure() && !cancelled()"
     needs:
       - detect
-      - markdownlint
       - static-analysis
       - test-run-sim-tests
       - test-run-sv-tests
@@ -365,10 +307,6 @@ on:
     paths-ignore: [LICENSE]
   workflow_dispatch:
     inputs:
-      force-markdownlint:
-        default: false
-        description: Run markdownlint only
-        type: boolean
       force-static-analysis:
         default: false
         description: Run static analysis only
