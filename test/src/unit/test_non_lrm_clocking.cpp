@@ -1,5 +1,6 @@
-#include <gtest/gtest.h>
+// Non-LRM tests
 
+#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -9,10 +10,11 @@
 
 using namespace delta;
 
+namespace {
+
 // =============================================================================
 // ClockingBlock registration
 // =============================================================================
-
 TEST(Clocking, RegisterAndFind) {
   ClockingManager mgr;
   ClockingBlock block;
@@ -38,7 +40,6 @@ TEST(Clocking, FindNonexistent) {
 // =============================================================================
 // Skew resolution
 // =============================================================================
-
 TEST(Clocking, DefaultInputSkew) {
   ClockingManager mgr;
   ClockingBlock block;
@@ -89,18 +90,6 @@ TEST(Clocking, OutputSkew) {
   auto skew = mgr.GetOutputSkew("cb", "data_out");
   EXPECT_EQ(skew.ticks, 3u);
 }
-
-// =============================================================================
-// Clocking block simulation integration
-// =============================================================================
-
-struct ClockingSimFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
 
 TEST(Clocking, AttachSamplesOnClockEdge) {
   ClockingSimFixture f;
@@ -173,3 +162,5 @@ TEST(Clocking, ScheduleOutputDrive) {
   // data_out should be updated at t=13 (10 + 3 output skew).
   EXPECT_EQ(data_out->value.ToUint64(), 0x55u);
 }
+
+}  // namespace
