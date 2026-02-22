@@ -1,4 +1,4 @@
-// §11.4.11: Conditional operator
+// §6.20.4: Local parameters (localparam)
 
 #include <gtest/gtest.h>
 #include "common/arena.h"
@@ -29,20 +29,17 @@ static Expr* ParseExprFrom(const std::string& src, EvalFixture& f) {
 
 namespace {
 
-TEST(ConstEval, Ternary) {
+TEST(ConstEval, ScopedExprWithParam) {
   EvalFixture f;
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("1 ? 42 : 99", f)), 42);
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("0 ? 42 : 99", f)), 99);
+  ScopeMap scope = {{"WIDTH", 16}};
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("WIDTH > 8", f), scope), 1);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("WIDTH + 4", f), scope), 20);
 }
 
-TEST(ConstEval, ScopedTernary) {
+TEST(ConstEval, ScopedUnresolved) {
   EvalFixture f;
-  ScopeMap scope_big = {{"WIDTH", 16}};
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("WIDTH > 8 ? WIDTH : 8", f), scope_big),
-            16);
-  ScopeMap scope_small = {{"WIDTH", 4}};
-  EXPECT_EQ(
-      ConstEvalInt(ParseExprFrom("WIDTH > 8 ? WIDTH : 8", f), scope_small), 8);
+  ScopeMap scope = {{"WIDTH", 16}};
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("UNKNOWN", f), scope), std::nullopt);
 }
 
 }  // namespace

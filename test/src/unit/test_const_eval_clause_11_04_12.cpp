@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §11.4.12: Concatenation operators
 
 #include <gtest/gtest.h>
 #include "common/arena.h"
@@ -28,29 +28,6 @@ static Expr* ParseExprFrom(const std::string& src, EvalFixture& f) {
 }
 
 namespace {
-
-TEST(ConstEval, ScopedExprWithParam) {
-  EvalFixture f;
-  ScopeMap scope = {{"WIDTH", 16}};
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("WIDTH > 8", f), scope), 1);
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("WIDTH + 4", f), scope), 20);
-}
-
-TEST(ConstEval, ScopedUnresolved) {
-  EvalFixture f;
-  ScopeMap scope = {{"WIDTH", 16}};
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("UNKNOWN", f), scope), std::nullopt);
-}
-
-TEST(ConstEval, ScopedTernary) {
-  EvalFixture f;
-  ScopeMap scope_big = {{"WIDTH", 16}};
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("WIDTH > 8 ? WIDTH : 8", f), scope_big),
-            16);
-  ScopeMap scope_small = {{"WIDTH", 4}};
-  EXPECT_EQ(
-      ConstEvalInt(ParseExprFrom("WIDTH > 8 ? WIDTH : 8", f), scope_small), 8);
-}
 
 TEST(ConstEval, Concatenation) {
   EvalFixture f;
