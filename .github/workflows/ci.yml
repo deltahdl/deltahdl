@@ -304,13 +304,19 @@ on:
     paths-ignore:
       - '**/*.md'
       - .github/workflows/markdownlint.yml
+      - .github/workflows/tools.yml
       - LICENSE
+      - scripts/split_tests.py
+      - test/scripts/split_tests/**
   push:
     branches: [main]
     paths-ignore:
       - '**/*.md'
       - .github/workflows/markdownlint.yml
+      - .github/workflows/tools.yml
       - LICENSE
+      - scripts/split_tests.py
+      - test/scripts/split_tests/**
   workflow_dispatch:
     inputs:
       force-static-analysis:

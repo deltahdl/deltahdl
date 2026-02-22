@@ -1,0 +1,104 @@
+---
+concurrency:
+  cancel-in-progress: true
+  group: tools-${{ github.ref }}
+jobs:
+  e2e-test:
+    needs: integration-test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-${{ github.job }}-${{
+            hashFiles('.github/workflows/tools.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-${{ github.job }}-
+      - name: Install tools
+        run: pip install pytest
+      - name: Run e2e tests
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/split_tests/e2e/ -v
+  integration-test:
+    needs: unit-test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-${{ github.job }}-${{
+            hashFiles('.github/workflows/tools.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-${{ github.job }}-
+      - name: Install tools
+        run: pip install pytest
+      - name: Run integration tests
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/split_tests/integration/ -v
+  static-analysis:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-${{ github.job }}-${{
+            hashFiles('.github/workflows/tools.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-${{ github.job }}-
+      - name: Install tools
+        run: pip install mypy pylint
+      - name: Run pylint
+        run: >-
+          PYTHONPATH=. python3 -m pylint scripts/split_tests.py
+          --fail-on=C,R,W --fail-under=10.0
+      - name: Run mypy
+        run: PYTHONPATH=. python3 -m mypy scripts/split_tests.py
+  unit-test:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-${{ github.job }}-${{
+            hashFiles('.github/workflows/tools.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-${{ github.job }}-
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run unit tests with 100% coverage gate
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/split_tests/unit/ -v
+          --cov=split_tests
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
+name: Tools
+on:
+  pull_request:
+    paths:
+      - .github/workflows/tools.yml
+      - scripts/split_tests.py
+      - test/scripts/split_tests/**
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/tools.yml
+      - scripts/split_tests.py
+      - test/scripts/split_tests/**
+  workflow_dispatch:
