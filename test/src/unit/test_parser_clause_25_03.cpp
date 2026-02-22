@@ -67,4 +67,110 @@ TEST(Parser, InterfaceAndModule) {
   EXPECT_EQ(r.cu->modules.size(), 1);
 }
 
+// Returns true if any item in the list matches the given kind.
+bool HasItemKind(const std::vector<ModuleItem *> &items, ModuleItemKind kind) {
+  for (auto *item : items) {
+    if (item->kind == kind) return true;
+  }
+  return false;
+}
+
+// Returns true if any item matches the given kind and name.
+bool HasItemKindNamed(const std::vector<ModuleItem *> &items,
+                      ModuleItemKind kind, std::string_view name) {
+  for (auto *item : items) {
+    if (item->kind == kind && item->name == name) return true;
+  }
+  return false;
+}
+
+// =============================================================================
+// A.1.6 Interface items
+// =============================================================================
+// interface_or_generate_item ::= { attribute_instance } module_common_item
+// Verify that a module_common_item (continuous assign) is accepted inside an
+// interface body, producing an item in the interface's items list.
+TEST(SourceText, InterfaceOrGenerateItemModuleCommon) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  assign a = b;\n"
+      "endinterface\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  auto *ifc = r.cu->interfaces[0];
+  ASSERT_GE(ifc->items.size(), 1u);
+  EXPECT_EQ(ifc->items[0]->kind, ModuleItemKind::kContAssign);
+}
+
+// non_port_interface_item ::= generate_region
+TEST(SourceText, NonPortInterfaceItemGenerateRegion) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  generate\n"
+      "    assign a = b;\n"
+      "  endgenerate\n"
+      "endinterface\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_GE(r.cu->interfaces[0]->items.size(), 1u);
+}
+
+// non_port_interface_item ::= program_declaration
+TEST(SourceText, NonPortInterfaceItemProgram) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  program p; endprogram\n"
+      "endinterface\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  ASSERT_GE(r.cu->interfaces[0]->items.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->items[0]->kind,
+            ModuleItemKind::kNestedModuleDecl);
+}
+
+// non_port_interface_item ::= interface_declaration (nested interface)
+TEST(SourceText, NonPortInterfaceItemNestedInterface) {
+  auto r = Parse(
+      "interface outer;\n"
+      "  interface inner; endinterface\n"
+      "endinterface\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  ASSERT_GE(r.cu->interfaces[0]->items.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->items[0]->kind,
+            ModuleItemKind::kNestedModuleDecl);
+}
+
+// non_port_interface_item ::= timeunits_declaration
+TEST(SourceText, NonPortInterfaceItemTimeunits) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  timeunit 1ns;\n"
+      "endinterface\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+}
+
+// Combined: interface with multiple A.1.6 item types.
+TEST(SourceText, InterfaceMultipleItemTypes) {
+  auto r = Parse(
+      "interface bus_if;\n"
+      "  logic [7:0] data;\n"
+      "  extern function void validate();\n"
+      "  extern forkjoin task run_parallel();\n"
+      "  modport master(output data);\n"
+      "  modport slave(input data);\n"
+      "endinterface\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  auto *ifc = r.cu->interfaces[0];
+  // data var + extern function + extern forkjoin task = 3 items
+  ASSERT_GE(ifc->items.size(), 3u);
+  EXPECT_EQ(ifc->modports.size(), 2u);
+  EXPECT_TRUE(
+      HasItemKindNamed(ifc->items, ModuleItemKind::kFunctionDecl, "validate"));
+  EXPECT_TRUE(
+      HasItemKindNamed(ifc->items, ModuleItemKind::kTaskDecl, "run_parallel"));
+}
+
 }  // namespace

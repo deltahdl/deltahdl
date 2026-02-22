@@ -211,4 +211,211 @@ TEST_F(CheckerParseTest, CheckerWithContAssign) {
       HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kContAssign));
 }
 
+// --- Test helpers ---
+struct ParseResult {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit *cu = nullptr;
+  bool has_errors = false;
+};
+
+ParseResult Parse(const std::string &src) {
+  ParseResult result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// Returns true if any item in the list matches the given kind.
+bool HasItemKind(const std::vector<ModuleItem *> &items, ModuleItemKind kind) {
+  for (auto *item : items) {
+    if (item->kind == kind) return true;
+  }
+  return false;
+}
+
+// Returns true if any item matches the given kind and name.
+bool HasItemKindNamed(const std::vector<ModuleItem *> &items,
+                      ModuleItemKind kind, std::string_view name) {
+  for (auto *item : items) {
+    if (item->kind == kind && item->name == name) return true;
+  }
+  return false;
+}
+
+// =============================================================================
+// A.1.8 Checker items
+// =============================================================================
+// checker_port_list / checker_port_item / checker_port_direction
+TEST(SourceText, CheckerPortList) {
+  auto r = Parse(
+      "checker chk(input logic clk, output bit valid);\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  auto *chk = r.cu->checkers[0];
+  EXPECT_EQ(chk->name, "chk");
+  EXPECT_EQ(chk->decl_kind, ModuleDeclKind::kChecker);
+  ASSERT_EQ(chk->ports.size(), 2u);
+  EXPECT_EQ(chk->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(chk->ports[0].name, "clk");
+  EXPECT_EQ(chk->ports[1].direction, Direction::kOutput);
+  EXPECT_EQ(chk->ports[1].name, "valid");
+}
+
+// checker_port_item with default value (= property_actual_arg)
+TEST(SourceText, CheckerPortDefaultValue) {
+  auto r = Parse(
+      "checker chk(input logic clk = 1'b0);\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  ASSERT_EQ(r.cu->checkers[0]->ports.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(r.cu->checkers[0]->ports[0].name, "clk");
+  EXPECT_NE(r.cu->checkers[0]->ports[0].default_value, nullptr);
+}
+
+// checker_or_generate_item ::= continuous_assign
+TEST(SourceText, CheckerContinuousAssign) {
+  auto r = Parse(
+      "checker chk;\n"
+      "  assign a = b;\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  ASSERT_GE(r.cu->checkers[0]->items.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->items[0]->kind, ModuleItemKind::kContAssign);
+}
+
+// checker_or_generate_item ::= initial_construct | always_construct |
+// final_construct
+TEST(SourceText, CheckerInitialAlwaysFinal) {
+  auto r = Parse(
+      "checker chk;\n"
+      "  initial begin end\n"
+      "  always @(posedge clk) x <= 1;\n"
+      "  final begin end\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  auto &items = r.cu->checkers[0]->items;
+  ASSERT_GE(items.size(), 3u);
+  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kInitialBlock));
+  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kAlwaysBlock));
+  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kFinalBlock));
+}
+
+// checker_or_generate_item ::= assertion_item
+TEST(SourceText, CheckerAssertionItem) {
+  auto r = Parse(
+      "checker chk;\n"
+      "  assert property (@(posedge clk) a |-> b);\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  ASSERT_GE(r.cu->checkers[0]->items.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->items[0]->kind, ModuleItemKind::kAssertProperty);
+}
+
+// checker_or_generate_item_declaration ::= checker_declaration (nested)
+TEST(SourceText, CheckerNestedChecker) {
+  auto r = Parse(
+      "checker outer;\n"
+      "  checker inner;\n"
+      "    logic a;\n"
+      "  endchecker\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->name, "outer");
+}
+
+// checker_or_generate_item_declaration ::= genvar_declaration
+TEST(SourceText, CheckerGenvarDecl) {
+  auto r = Parse(
+      "checker chk;\n"
+      "  genvar i;\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  ASSERT_GE(r.cu->checkers[0]->items.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->items[0]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(r.cu->checkers[0]->items[0]->name, "i");
+}
+
+// checker_or_generate_item_declaration ::= default disable iff expr ;
+TEST(SourceText, CheckerDefaultDisableIff) {
+  auto r = Parse(
+      "checker chk;\n"
+      "  default disable iff rst;\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  ASSERT_GE(r.cu->checkers[0]->items.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->items[0]->kind,
+            ModuleItemKind::kDefaultDisableIff);
+}
+
+// checker_generate_item ::= loop | conditional | generate_region | elab task
+TEST(SourceText, CheckerGenerateItems) {
+  auto r = Parse(
+      "checker chk;\n"
+      "  for (genvar i = 0; i < 4; i++) begin end\n"
+      "  if (1) begin end\n"
+      "  generate endgenerate\n"
+      "  $info(\"checker ok\");\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  auto &items = r.cu->checkers[0]->items;
+  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kGenerateFor));
+  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kGenerateIf));
+  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kElabSystemTask));
+}
+
+// Combined: checker with multiple A.1.8 item types.
+TEST(SourceText, CheckerMultipleItemTypes) {
+  auto r = Parse(
+      "checker chk(input logic clk, output bit ok);\n"
+      "  logic sig;\n"
+      "  assign ok = sig;\n"
+      "  initial begin end\n"
+      "  always @(posedge clk) sig <= 1;\n"
+      "  final begin end\n"
+      "  assert property (@(posedge clk) sig);\n"
+      "  default disable iff !ok;\n"
+      "  function int f(); return 0; endfunction\n"
+      "  $warning(\"test\");\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  auto *chk = r.cu->checkers[0];
+  EXPECT_EQ(chk->name, "chk");
+  ASSERT_EQ(chk->ports.size(), 2u);
+  EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kVarDecl));
+  EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kContAssign));
+  EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kInitialBlock));
+  EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kAlwaysBlock));
+  EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kFinalBlock));
+  EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kAssertProperty));
+  EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kDefaultDisableIff));
+  EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kFunctionDecl));
+  EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kElabSystemTask));
+}
+
 }  // namespace

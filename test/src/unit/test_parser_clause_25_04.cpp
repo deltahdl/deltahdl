@@ -58,4 +58,34 @@ TEST(Parser, InterfaceWithPorts) {
   EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 2);
 }
 
+// Returns true if any item in the list matches the given kind.
+bool HasItemKind(const std::vector<ModuleItem *> &items, ModuleItemKind kind) {
+  for (auto *item : items) {
+    if (item->kind == kind) return true;
+  }
+  return false;
+}
+
+// Returns true if any item matches the given kind and name.
+bool HasItemKindNamed(const std::vector<ModuleItem *> &items,
+                      ModuleItemKind kind, std::string_view name) {
+  for (auto *item : items) {
+    if (item->kind == kind && item->name == name) return true;
+  }
+  return false;
+}
+
+// interface_item ::= port_declaration ;
+// Verify that port declarations are accepted in interface ANSI port list.
+TEST(SourceText, InterfaceItemPortDecl) {
+  auto r = Parse(
+      "interface ifc(input logic clk, output logic data);\n"
+      "endinterface\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 2u);
+  EXPECT_EQ(r.cu->interfaces[0]->ports[0].name, "clk");
+  EXPECT_EQ(r.cu->interfaces[0]->ports[1].name, "data");
+}
+
 }  // namespace
