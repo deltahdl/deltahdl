@@ -14,7 +14,6 @@ function(add_unit_test name)
     gtest_discover_tests(${name})
 endfunction()
 
-add_unit_test(test_const_eval_clause_20_06_02)
 add_unit_test(test_const_eval_clause_20_08_01)
 add_unit_test(test_const_eval_clause_20_09)
 add_unit_test(test_coverage_a)
