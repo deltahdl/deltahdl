@@ -188,7 +188,7 @@ enums, and classes so that the expression evaluator can perform field access
 and method dispatch at runtime. It also manages dynamic arrays, associative
 arrays, and queues.
 
-### Event Scheduler
+#### Event Scheduler
 
 The scheduler implements the IEEE 1800-2023 stratified event algorithm. Each
 simulation timestep is divided into 17 ordered regions.
@@ -241,7 +241,7 @@ events are recycled through a free-list to avoid per-event allocation
 overhead. Each event carries a callback and an intrusive next-pointer for
 queue linkage.
 
-### Process Model
+#### Process Model
 
 Processes that contain timing controls (`#delay`, `@(posedge clk)`, `wait`)
 run as C++23 coroutines. The `SimCoroutine` type wraps a `coroutine_handle`
@@ -255,7 +255,7 @@ Each `Process` tracks its kind (initial, always, always_comb, always_latch,
 always_ff, final, or continuous assignment), its home region, and whether
 it belongs to the reactive set.
 
-### Four-Value Logic
+#### Four-Value Logic
 
 All simulation values use dual-rail aval/bval encoding per the VPI convention.
 
@@ -280,14 +280,14 @@ real number, a signed quantity, or a string.
 A `Logic2Vec` provides a two-state (bit/int/byte) counterpart where the bval
 rail is absent, used in contexts where x and z values cannot occur.
 
-### Signal Strength
+#### Signal Strength
 
 Signals carry strength information per IEEE 1800-2023. The `Strength` enum
 covers all eight levels from highz through supply. A `StrengthVal` packs the
 drive-zero strength, drive-one strength, and logic value into a single byte.
 Strength-aware resolution is used when multiple drivers contend on a net.
 
-### Variables and Nets
+#### Variables and Nets
 
 A `Variable` stores a `Logic4Vec` value, a previous value for change
 detection, and an optional forced value for `force`/`release` semantics. It
@@ -306,7 +306,7 @@ are at Z the net retains its previous value at the configured charge strength,
 subject to decay over time. Charge propagation between connected trireg nets
 is also supported.
 
-### Expression Evaluation
+#### Expression Evaluation
 
 The expression evaluator interprets AST expression nodes at runtime. It is
 split across several translation units by domain: general expression
@@ -321,7 +321,7 @@ assignment evaluation which handles blocking, non-blocking, continuous, and
 force/release assignment semantics. A `StmtResult` signals the control flow
 outcome of each statement (normal, break, continue, return, disable).
 
-### VCD Writer
+#### VCD Writer
 
 The VCD writer records signal changes during simulation and writes them in
 Value Change Dump format per IEEE 1800-2023. It assigns a short identifier
@@ -329,7 +329,7 @@ character to each registered signal. The scheduler invokes it as a
 post-timestep callback so that changed values are flushed after each time
 advance.
 
-### VPI
+#### VPI
 
 The Verilog Procedural Interface exposes simulation objects to external C code
 through the standard `vpi_*` function set defined in IEEE 1800-2023 sections
@@ -341,7 +341,7 @@ real, vector), and callbacks for value changes, read-write synchronization,
 and end-of-simulation events. The C API type aliases and constant macros
 follow the IEEE-mandated naming conventions.
 
-### DPI-C
+#### DPI-C
 
 The Direct Programming Interface allows SystemVerilog code to call C functions
 (imports) and C code to call SystemVerilog functions (exports). `DpiContext`
@@ -355,7 +355,7 @@ A separate `DpiRuntime` module provides the `svdpi.h` access functions
 routines) as well as scope and context management calls required by the
 IEEE standard.
 
-### Compiled Simulation
+#### Compiled Simulation
 
 The `ProcessCompiler` analyzes process bodies to determine whether they are
 eligible for compilation. Only pure combinational processes without timing
@@ -363,7 +363,7 @@ controls qualify. For those that do, it produces a `CompiledProcess` wrapping
 a `std::function<void(SimContext&)>` lambda. The lambda evaluates the process
 body directly, avoiding the overhead of coroutine creation and suspension.
 
-### Multi-Threaded Simulation
+#### Multi-Threaded Simulation
 
 The `Partitioner` performs dependency analysis on compiled processes by
 examining which signals each process reads and writes. It groups
@@ -372,7 +372,7 @@ partitions. The `MtScheduler` executes independent partitions in parallel
 using `std::jthread`, while partitions that conflict with one another run
 sequentially within the same thread.
 
-### Clocking Blocks
+#### Clocking Blocks
 
 `ClockingManager` implements IEEE clocking block semantics. Each clocking
 block names a clock signal and edge, default input and output skews, and a
@@ -383,7 +383,7 @@ clocking blocks are tracked. Each block can have an associated named-event
 variable that is triggered on its clock edge, and user callbacks can be
 registered to fire on those edges.
 
-### Concurrent Assertions
+#### Concurrent Assertions
 
 Two layers implement SystemVerilog assertion semantics. The
 `AssertionMonitor` evaluates simple SVA-style properties (rose, fell, stable,
@@ -401,7 +401,7 @@ assertions are queued and flushed in the Observed region. Per-instance
 assertion control (enable, disable, kill, pass-off, fail-off) is managed
 by `AssertionControl`.
 
-### Functional Coverage
+#### Functional Coverage
 
 `CoverageDB` implements the IEEE functional coverage model from section 19.
 Covergroups contain coverpoints and cross-coverage definitions. Coverpoints
@@ -413,7 +413,7 @@ updates bin counts given a set of named values, and coverage percentage
 queries are available at the coverpoint, cross, covergroup, and global
 levels.
 
-### Constrained Random Verification
+#### Constrained Random Verification
 
 The `ConstraintSolver` implements the IEEE randomization model from section
 18. It supports rand and randc variable qualifiers, with randc variables
@@ -425,7 +425,7 @@ with` are supported. Per-variable `rand_mode` and per-block
 `constraint_mode` controls are available. Pre-randomize and post-randomize
 callbacks are invoked around each solve.
 
-### Timing Specification and SDF
+#### Timing Specification and SDF
 
 `SpecifyManager` handles IEEE specify block semantics from sections 30
 through 32. It stores path delays (parallel and full, with edge
@@ -437,13 +437,13 @@ signal transition times.
 The SDF parser reads Standard Delay Format files and annotates the design
 with backannotated timing data.
 
-### User-Defined Primitives
+#### User-Defined Primitives
 
 The UDP evaluator executes user-defined primitive tables at simulation time,
 supporting both combinational and sequential primitive semantics as defined
 in section 29.
 
-### Class Objects
+#### Class Objects
 
 `ClassObject` provides runtime storage for SystemVerilog class instances.
 The simulation context tracks class type information and allocates object
@@ -451,13 +451,13 @@ handles for `new` expressions. Properties are accessed by name through the
 expression evaluator. The `SvCallable` module supports SystemVerilog
 subroutine dispatch including virtual methods and interface class calls.
 
-### Synchronization Objects
+#### Synchronization Objects
 
 Simulation-level synchronization primitives (semaphores and events) are
 provided through `SyncObjects`, supporting the inter-process communication
 patterns described in the IEEE standard.
 
-### Advanced Simulation
+#### Advanced Simulation
 
 Several auxiliary simulation utilities reside in the advanced simulation
 module. A two-state fast-path detector identifies variables that have never
@@ -466,14 +466,14 @@ merges multiple pending updates to the same target within a region into a
 single write. Runtime representations for dynamic arrays, associative arrays,
 and SystemVerilog strings are also provided here.
 
-## Synthesizer
+### Synthesizer
 
 The Synthesizer takes the RTLIR produced by the Elaborator and converts it
 into a hardware netlist. The SynthLower translates the design into an
 And-Inverter Graph, optimization passes reduce its size and depth, and
 technology mapping produces the final netlist.
 
-### SynthLower
+#### SynthLower
 
 The synthesis lowerer converts an `RtlirModule` into an And-Inverter Graph
 (AIG). It first validates synthesizability, rejecting constructs that have no
@@ -485,7 +485,7 @@ latches in the AIG. `always_latch` blocks are lowered similarly. If and case
 statements are lowered through MUX construction, where each branch contributes
 a set of signal bits that are multiplexed by the condition.
 
-### AIG
+#### AIG
 
 The And-Inverter Graph is the core synthesis data structure. Each node
 represents a two-input AND gate. Edges carry a complement flag in the least
@@ -498,7 +498,7 @@ literal. Structural hashing ensures that duplicate AND nodes are never created;
 a hash table maps each (fanin0, fanin1) pair to an existing node when one has
 already been allocated.
 
-### AIG Optimization
+#### AIG Optimization
 
 Five optimization passes operate on the AIG. Constant propagation replaces
 outputs that are provably constant. Balancing restructures AND trees to
@@ -507,7 +507,7 @@ using cut enumeration to reduce node count. Refactoring performs
 larger-scope restructuring for area reduction. Redundancy removal identifies
 and eliminates stuck-at-fault redundant nodes.
 
-### Memory Inference
+#### Memory Inference
 
 The memory inference pass analyzes `always_ff` blocks in the RTLIR for
 array access patterns (indexed reads and writes) and replaces them with
@@ -515,7 +515,7 @@ dedicated memory primitives before AIG lowering. Each inferred memory
 records its depth, data width, and a set of read and write ports with
 address width, data width, and clock edge information.
 
-### Technology Mapping
+#### Technology Mapping
 
 LUT mapping partitions the AIG into K-input lookup tables. The `LutMapper`
 enumerates priority cuts for each AIG node and selects an area-oriented
@@ -533,7 +533,7 @@ Advanced synthesis passes provide delay-oriented LUT mapping that minimizes
 critical-path depth, iterative area-delay tradeoff optimization, and register
 retiming in both forward and backward directions.
 
-### Netlist Writer
+#### Netlist Writer
 
 The netlist writer serializes the AIG into one of four output formats: BLIF
 (Berkeley Logic Interchange Format), gate-level Verilog, JSON (nextpnr
@@ -541,7 +541,9 @@ interchange), or EDIF. Since AIG nodes do not carry port names, generic names
 are synthesized: inputs are named i0, i1, and so on; outputs are named o0,
 o1, and so on; internal nodes use the prefix n followed by the node identifier.
 
-## Appendix A: Design Decisions
+## Appendixes
+
+### Appendix A: Design Decisions
 
 The lexer and parser are written by hand rather than generated by tools like
 flex, bison, or ANTLR. This gives full control over error recovery and
@@ -566,3 +568,7 @@ arithmetic maps to bitwise operations on the two rails.
 The project has no external dependencies beyond the C++ standard library. All
 components including the lexer, parser, constraint solver, Liberty parser, SDF
 parser, AIG optimizer, and technology mapper are implemented from scratch.
+
+### Appendix B: Abbreviations
+
+### Appendix C: Glossary
