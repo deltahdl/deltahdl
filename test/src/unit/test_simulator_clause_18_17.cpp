@@ -1,14 +1,12 @@
 // §18.17: Random sequence generation—randsequence
 
 #include <gtest/gtest.h>
-
 #include <algorithm>
 #include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
 #include "simulation/constraint_solver.h"
 
 using namespace delta;
