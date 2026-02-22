@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §non-lrm:compiled_process
 
 #include <gtest/gtest.h>
 #include "common/arena.h"
