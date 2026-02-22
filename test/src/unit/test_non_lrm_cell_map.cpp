@@ -1,7 +1,7 @@
+// Non-LRM tests
+
 #include <gtest/gtest.h>
-
 #include <string>
-
 #include "synthesis/aig.h"
 #include "synthesis/cell_map.h"
 #include "synthesis/liberty.h"
@@ -11,7 +11,6 @@ using namespace delta;
 // =============================================================================
 // Helper: build a minimal Liberty library for testing
 // =============================================================================
-
 namespace {
 
 Liberty MakeTestLib() {
@@ -55,10 +54,11 @@ Liberty MakeTestLib() {
 
 }  // namespace
 
+namespace {
+
 // =============================================================================
 // Map single AND gate to AND2 cell
 // =============================================================================
-
 TEST(CellMap, SingleAndGate) {
   AigGraph g;
   auto a = g.AddInput();
@@ -78,7 +78,6 @@ TEST(CellMap, SingleAndGate) {
 // =============================================================================
 // Map inverter to INV cell
 // =============================================================================
-
 TEST(CellMap, InverterGate) {
   AigGraph g;
   auto a = g.AddInput();
@@ -97,7 +96,6 @@ TEST(CellMap, InverterGate) {
 // =============================================================================
 // Map OR gate (using De Morgan) to OR2 cell
 // =============================================================================
-
 TEST(CellMap, OrGateMapping) {
   AigGraph g;
   auto a = g.AddInput();
@@ -119,7 +117,6 @@ TEST(CellMap, OrGateMapping) {
 // =============================================================================
 // Handle no matching cell
 // =============================================================================
-
 TEST(CellMap, NoMatchingCell) {
   AigGraph g;
   auto a = g.AddInput();
@@ -159,7 +156,6 @@ TEST(CellMap, NoMatchingCell) {
 // =============================================================================
 // Map multi-output design
 // =============================================================================
-
 TEST(CellMap, MultiOutputDesign) {
   AigGraph g;
   auto a = g.AddInput();
@@ -177,3 +173,5 @@ TEST(CellMap, MultiOutputDesign) {
   EXPECT_EQ(mapping.instances[0].cell_name, "AND2");
   EXPECT_EQ(mapping.instances[1].cell_name, "INV");
 }
+
+}  // namespace
