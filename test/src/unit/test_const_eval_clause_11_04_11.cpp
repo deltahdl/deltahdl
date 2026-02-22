@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §11.4.11: Conditional operator
 
 #include <gtest/gtest.h>
 #include "common/arena.h"
@@ -29,37 +29,10 @@ static Expr* ParseExprFrom(const std::string& src, EvalFixture& f) {
 
 namespace {
 
-TEST(ConstEval, Logical) {
-  EvalFixture f;
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("1 && 1", f)), 1);
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("1 && 0", f)), 0);
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("0 || 1", f)), 1);
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("0 || 0", f)), 0);
-}
-
-TEST(ConstEval, Unary) {
-  EvalFixture f;
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("-5", f)), -5);
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("!0", f)), 1);
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("!5", f)), 0);
-}
-
-TEST(ConstEval, Power) {
-  EvalFixture f;
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("2 ** 10", f)), 1024);
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("3 ** 0", f)), 1);
-}
-
 TEST(ConstEval, Ternary) {
   EvalFixture f;
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("1 ? 42 : 99", f)), 42);
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("0 ? 42 : 99", f)), 99);
-}
-
-TEST(ConstEval, ScopedIdentifier) {
-  EvalFixture f;
-  ScopeMap scope = {{"WIDTH", 16}};
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("WIDTH", f), scope), 16);
 }
 
 }  // namespace
