@@ -91,23 +91,6 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-// Returns true if any item in the list matches the given kind.
-bool HasItemKind(const std::vector<ModuleItem *> &items, ModuleItemKind kind) {
-  for (auto *item : items) {
-    if (item->kind == kind) return true;
-  }
-  return false;
-}
-
-// Returns true if any item matches the given kind and name.
-bool HasItemKindNamed(const std::vector<ModuleItem *> &items,
-                      ModuleItemKind kind, std::string_view name) {
-  for (auto *item : items) {
-    if (item->kind == kind && item->name == name) return true;
-  }
-  return false;
-}
-
 // checker_or_generate_item_declaration ::= function_declaration
 TEST(SourceText, CheckerFunctionDecl) {
   auto r = Parse(

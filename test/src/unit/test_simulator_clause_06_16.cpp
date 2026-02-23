@@ -69,50 +69,6 @@ static Expr* MakeId(Arena& arena, std::string_view name) {
   return e;
 }
 
-static Expr* MakeUnary(Arena& arena, TokenKind op, Expr* operand) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kUnary;
-  e->op = op;
-  e->lhs = operand;
-  return e;
-}
-
-static Expr* MakeBinary(Arena& arena, TokenKind op, Expr* lhs, Expr* rhs) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kBinary;
-  e->op = op;
-  e->lhs = lhs;
-  e->rhs = rhs;
-  return e;
-}
-
-static Variable* MakeVar4(EvalOpXZFixture& f, std::string_view name,
-                          uint32_t width, uint64_t aval, uint64_t bval) {
-  auto* var = f.ctx.CreateVariable(name, width);
-  var->value = MakeLogic4Vec(f.arena, width);
-  var->value.words[0].aval = aval;
-  var->value.words[0].bval = bval;
-  return var;
-}
-
-static Variable* MakeRealVar(EvalOpXZFixture& f, std::string_view name,
-                             double val) {
-  auto* var = f.ctx.CreateVariable(name, 64);
-  uint64_t bits = 0;
-  std::memcpy(&bits, &val, sizeof(double));
-  var->value = MakeLogic4VecVal(f.arena, 64, bits);
-  var->value.is_real = true;
-  f.ctx.RegisterRealVariable(name);
-  return var;
-}
-
-static double ToDouble(const Logic4Vec& v) {
-  double d = 0.0;
-  uint64_t bits = v.ToUint64();
-  std::memcpy(&d, &bits, sizeof(double));
-  return d;
-}
-
 static std::string VecToStr(const Logic4Vec& vec) {
   std::string result;
   uint32_t nbytes = vec.width / 8;
