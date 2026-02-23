@@ -293,7 +293,9 @@ def _run_live_non_lrm(tmp_path, monkeypatch, src_body, resp):
     src.write_text(src_body, encoding="utf-8")
     stub_classifier(monkeypatch, tmp_path, resp)
     cmake = tmp_path / "CMakeLists.txt"
-    cmake.write_text("# header\n", encoding="utf-8")
+    cmake.write_text(
+        f"# header\nadd_unit_test({src.stem})\n", encoding="utf-8",
+    )
     monkeypatch.setattr(split_tests, "CMAKE_PATH", cmake)
     monkeypatch.setattr(
         split_tests, "STANDALONE_PATH", tmp_path / "no.md",
@@ -350,6 +352,13 @@ def test_run_live_mixed_creates_new_file(tmp_path, monkeypatch):
     """Moved tests are written to a new clause file."""
     _run_live_non_lrm(tmp_path, monkeypatch, _MIXED_BODY, _MIXED_RESP)
     assert (tmp_path / "test_parser_clause_06_01.cpp").exists()
+
+
+def test_run_live_mixed_keeps_cmake_entry(tmp_path, monkeypatch):
+    """Source kept in CMakeLists.txt when source_is_target."""
+    _run_live_non_lrm(tmp_path, monkeypatch, _MIXED_BODY, _MIXED_RESP)
+    cmake = (tmp_path / "CMakeLists.txt").read_text()
+    assert "test_non_lrm_aig" in cmake
 
 
 # ---- main ------------------------------------------------------------------

@@ -683,7 +683,7 @@ def append_tests_to_file(filepath, global_preamble, tests):
 # Stage 6: Update CMakeLists.txt
 # ---------------------------------------------------------------------------
 
-def update_cmake(old_name, new_names):
+def update_cmake(old_name, new_names, *, keep_old=False):
     """Update CMakeLists.txt: remove old entry, add new entries sorted."""
     text = CMAKE_PATH.read_text(encoding="utf-8")
     lines = text.splitlines()
@@ -693,7 +693,7 @@ def update_cmake(old_name, new_names):
         m = re.match(r"add_unit_test\((\w+)\)", line.strip())
         if m:
             name = m.group(1)
-            if name != old_name:
+            if name != old_name or keep_old:
                 test_names.append(name)
         else:
             header_lines.append(line)
@@ -911,7 +911,7 @@ def _run(args):
         to_create, to_merge, parsed, test_dir, lrm_titles,
     )
     print("Stage 6: Updating CMakeLists.txt...")
-    update_cmake(test_name, new_names)
+    update_cmake(test_name, new_names, keep_old=source_is_target)
     print("Stage 7: Cleaning up...")
     if source_is_target:
         _rewrite_source(filepath, groups, parsed, lrm_titles, test_name)
