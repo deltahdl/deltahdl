@@ -834,6 +834,20 @@ def _write_files(to_create, to_merge, parsed, test_dir, lrm_titles):
     return new_names
 
 
+def _print_dry_run_summary(to_create, to_merge):
+    """Print a detailed dry-run summary with filenames and test names."""
+    print("\n=== DRY RUN complete ===")
+    for filename, _clause, tests in to_create:
+        names = ", ".join(t.test_name for t in tests)
+        print(f"  CREATE {filename}.cpp ({len(tests)} tests: {names})")
+    for merge_path, tests in to_merge:
+        names = ", ".join(t.test_name for t in tests)
+        print(f"  MERGE  {len(tests)} tests into {merge_path.name}"
+              f" ({names})")
+    if not to_create and not to_merge:
+        print("  Nothing to do (all tests are duplicates)")
+
+
 def _run(args):
     """Execute the split operation."""
     test_dir = Path(args.output_dir).resolve()
@@ -861,16 +875,7 @@ def _run(args):
         groups, test_dir, lrm_titles, exclude_path=filepath,
     )
     if args.dry_run:
-        print(f"\n=== DRY RUN complete ===")
-        for filename, clause, tests in to_create:
-            names = ", ".join(t.test_name for t in tests)
-            print(f"  CREATE {filename}.cpp ({len(tests)} tests: {names})")
-        for merge_path, tests in to_merge:
-            names = ", ".join(t.test_name for t in tests)
-            print(f"  MERGE  {len(tests)} tests into {merge_path.name}"
-                  f" ({names})")
-        if not to_create and not to_merge:
-            print("  Nothing to do (all tests are duplicates)")
+        _print_dry_run_summary(to_create, to_merge)
         return
     n_created = len(to_create)
     n_merged = len(to_merge)
