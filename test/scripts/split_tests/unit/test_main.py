@@ -171,13 +171,13 @@ def test_resolve_destinations_excludes_source(tmp_path):
     assert len(to_create) == 0 and len(to_merge) == 0
 
 
-def test_resolve_destinations_source_is_target(tmp_path, capsys):
+def test_resolve_destinations_source_is_target(tmp_path):
     """Tests already in the correct file are skipped, not recreated."""
     src = tmp_path / "test_non_lrm_vpi.cpp"
     src.write_text("TEST(S, Keep) {\n}\n")
     t = _tb("Keep", prefix="test_non_lrm_", clause="non-lrm:vpi")
     groups = {("test_non_lrm_", "non-lrm:vpi"): [t]}
-    to_create, to_merge = _resolve_destinations(
+    to_create, _ = _resolve_destinations(
         groups, tmp_path, {}, exclude_path=src,
     )
     assert len(to_create) == 0
