@@ -1,7 +1,9 @@
 // §non-lrm:eval_advanced
 
 #include <gtest/gtest.h>
+
 #include <cstring>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -22,30 +24,30 @@ struct EvalAdvFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static Expr *MakeInt(Arena &arena, uint64_t val) {
-  auto *e = arena.Create<Expr>();
+static Expr* MakeInt(Arena& arena, uint64_t val) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
   e->int_val = val;
   return e;
 }
 
-static Expr *MakeId(Arena &arena, std::string_view name) {
-  auto *e = arena.Create<Expr>();
+static Expr* MakeId(Arena& arena, std::string_view name) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
   e->text = name;
   return e;
 }
 
-static Variable *MakeVar(EvalAdvFixture &f, std::string_view name,
+static Variable* MakeVar(EvalAdvFixture& f, std::string_view name,
                          uint32_t width, uint64_t val) {
-  auto *var = f.ctx.CreateVariable(name, width);
+  auto* var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4VecVal(f.arena, width, val);
   return var;
 }
 
-static Expr *MakeRange(Arena &arena, Expr *lo, Expr *hi,
+static Expr* MakeRange(Arena& arena, Expr* lo, Expr* hi,
                        TokenKind op = TokenKind::kEof) {
-  auto *r = arena.Create<Expr>();
+  auto* r = arena.Create<Expr>();
   r->kind = ExprKind::kSelect;
   r->index = lo;
   r->index_end = hi;

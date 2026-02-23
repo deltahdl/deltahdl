@@ -1,7 +1,9 @@
 // §11.3.6: Assignment within an expression
 
 #include <gtest/gtest.h>
+
 #include <cstring>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -22,30 +24,30 @@ struct EvalAdvFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static Expr *MakeInt(Arena &arena, uint64_t val) {
-  auto *e = arena.Create<Expr>();
+static Expr* MakeInt(Arena& arena, uint64_t val) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
   e->int_val = val;
   return e;
 }
 
-static Expr *MakeId(Arena &arena, std::string_view name) {
-  auto *e = arena.Create<Expr>();
+static Expr* MakeId(Arena& arena, std::string_view name) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
   e->text = name;
   return e;
 }
 
-static Variable *MakeVar(EvalAdvFixture &f, std::string_view name,
+static Variable* MakeVar(EvalAdvFixture& f, std::string_view name,
                          uint32_t width, uint64_t val) {
-  auto *var = f.ctx.CreateVariable(name, width);
+  auto* var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4VecVal(f.arena, width, val);
   return var;
 }
 
-static Expr *MakeRange(Arena &arena, Expr *lo, Expr *hi,
+static Expr* MakeRange(Arena& arena, Expr* lo, Expr* hi,
                        TokenKind op = TokenKind::kEof) {
-  auto *r = arena.Create<Expr>();
+  auto* r = arena.Create<Expr>();
   r->kind = ExprKind::kSelect;
   r->index = lo;
   r->index_end = hi;
@@ -62,14 +64,14 @@ TEST(EvalAdv, AssignInExprBasic) {
   EvalAdvFixture f;
   // (a = 42) should assign 42 to a and return 42.
   MakeVar(f, "aie", 32, 0);
-  auto *assign = f.arena.Create<Expr>();
+  auto* assign = f.arena.Create<Expr>();
   assign->kind = ExprKind::kBinary;
   assign->op = TokenKind::kEq;
   assign->lhs = MakeId(f.arena, "aie");
   assign->rhs = MakeInt(f.arena, 42);
   auto result = EvalExpr(assign, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 42u);
-  auto *var = f.ctx.FindVariable("aie");
+  auto* var = f.ctx.FindVariable("aie");
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
@@ -77,7 +79,7 @@ TEST(EvalAdv, AssignInExprTruncToLHSWidth) {
   EvalAdvFixture f;
   // (b = 0x1FF) where b is 8-bit should truncate to 0xFF.
   MakeVar(f, "aie8", 8, 0);
-  auto *assign = f.arena.Create<Expr>();
+  auto* assign = f.arena.Create<Expr>();
   assign->kind = ExprKind::kBinary;
   assign->op = TokenKind::kEq;
   assign->lhs = MakeId(f.arena, "aie8");
