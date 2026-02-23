@@ -896,7 +896,11 @@ def _run(args):
     print("Stage 6: Updating CMakeLists.txt...")
     update_cmake(test_name, new_names)
     print("Stage 7: Cleaning up...")
-    if test_name not in new_names:
+    source_is_target = any(
+        clause_to_filename(p, c) == test_name
+        for p, c in groups
+    )
+    if not source_is_target:
         filepath.unlink()
         print(f"  Deleted {test_name}.cpp")
     update_standalone(test_name)

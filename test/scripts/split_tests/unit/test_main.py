@@ -314,6 +314,39 @@ def test_run_live_self_named(tmp_path, monkeypatch):
     assert (tmp_path / "test_non_lrm_aig.cpp").exists()
 
 
+def test_run_live_mixed_keeps_source(tmp_path, monkeypatch):
+    """Source kept when some tests stay and others go elsewhere."""
+    src = tmp_path / "test_non_lrm_aig.cpp"
+    src.write_text(
+        "#include <gtest/gtest.h>\n\n"
+        "TEST(S, Stay) {\n}\n"
+        "TEST(S, Move) {\n}\n",
+        encoding="utf-8",
+    )
+    resp = {"tests": [
+        {"test_name": "Stay", "prefix": "test_non_lrm_",
+         "clause": "non-lrm:aig", "rationale": "r"},
+        {"test_name": "Move", "prefix": "test_parser_",
+         "clause": "6.1", "rationale": "r"},
+    ]}
+    stub_classifier(monkeypatch, tmp_path, resp)
+    cmake = tmp_path / "CMakeLists.txt"
+    cmake.write_text("# header\n", encoding="utf-8")
+    monkeypatch.setattr(split_tests, "CMAKE_PATH", cmake)
+    monkeypatch.setattr(
+        split_tests, "STANDALONE_PATH", tmp_path / "no.md",
+    )
+    monkeypatch.setattr(
+        subprocess, "run",
+        lambda *_a, **_kw: MagicMock(returncode=0),
+    )
+    args = SimpleNamespace(
+        file=str(src), output_dir=str(tmp_path), dry_run=False,
+    )
+    _run(args)
+    assert (tmp_path / "test_non_lrm_aig.cpp").exists()
+
+
 # ---- main ------------------------------------------------------------------
 
 
