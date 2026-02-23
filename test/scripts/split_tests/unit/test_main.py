@@ -266,6 +266,29 @@ def test_run_live(tmp_path, monkeypatch, capsys):
     assert "Updated CMakeLists.txt" in capsys.readouterr().out
 
 
+def test_run_live_merge(tmp_path, monkeypatch, capsys):
+    """Live run merging into existing file prints move summary."""
+    (tmp_path / "test_parser_clause_06_01.cpp").write_text(
+        "// \u00a76.1\n\n#include <gtest/gtest.h>\n\n"
+        "namespace {\n\nTEST(S, Old) {\n}\n\n}  // namespace\n",
+        encoding="utf-8",
+    )
+    f = _make_input_file(tmp_path)
+    cmake = tmp_path / "CMakeLists.txt"
+    cmake.write_text(
+        "# header\nadd_unit_test(test_input)\n",
+        encoding="utf-8",
+    )
+    stub_classifier(monkeypatch, tmp_path, _parser_response())
+    monkeypatch.setattr(split_tests, "CMAKE_PATH", cmake)
+    args = SimpleNamespace(
+        file=str(f), output_dir=str(tmp_path), dry_run=False,
+    )
+    _run(args)
+    assert "Moved 1 test(s) to test_parser_clause_06_01.cpp" in \
+        capsys.readouterr().out
+
+
 def _run_live_non_lrm(tmp_path, monkeypatch, src_body, resp):
     """Write source, stub externals, and run live pipeline."""
     src = tmp_path / "test_non_lrm_aig.cpp"
