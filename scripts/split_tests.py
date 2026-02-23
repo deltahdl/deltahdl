@@ -705,27 +705,6 @@ def update_standalone(test_name):
     )
 
 
-def commit_and_push(test_name, n_files):
-    """Git add, commit, push."""
-    co = "Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
-    subprocess.run(
-        ["git", "add", "-A"], cwd=REPO_ROOT, check=True,
-    )
-    if n_files == 0:
-        msg = f"Remove {test_name} (all tests are duplicates)"
-    else:
-        msg = f"Split {test_name} into {n_files} per-clause files"
-    subprocess.run(
-        ["git", "commit", "-m", f"{msg}\n\n{co}"],
-        cwd=REPO_ROOT,
-        check=True,
-    )
-    r = subprocess.run(
-        ["git", "push"], cwd=REPO_ROOT, check=False,
-    )
-    if r.returncode != 0:
-        print(f"  WARNING: git push failed (rc={r.returncode})")
-
 
 # ---------------------------------------------------------------------------
 # Main
@@ -904,14 +883,13 @@ def _run(args):
         print(f"  Deleted {test_name}.cpp")
     update_standalone(test_name)
     print("  Removed from STANDALONE.md")
-    n_total = n_created + n_merged
-    print("Stage 7: Committing and pushing...")
-    commit_and_push(test_name, n_total)
     print(f"\nDone! Created {n_created}, merged into {n_merged} files.")
 
 
 def main():
     """Entry point."""
+    sys.stdout.reconfigure(line_buffering=True)
+    sys.stderr.reconfigure(line_buffering=True)
     _run(_parse_args())
 
 

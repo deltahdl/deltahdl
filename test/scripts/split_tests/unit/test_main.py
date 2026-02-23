@@ -1,9 +1,7 @@
 """Unit tests for main-flow functions in split_tests."""
 
-import subprocess
 import sys
 from types import SimpleNamespace
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -261,7 +259,7 @@ def test_run_dry_run(tmp_path, monkeypatch, capsys):
 
 
 def test_run_live(tmp_path, monkeypatch, capsys):
-    """Live run writes files, updates cmake, commits."""
+    """Live run writes files and updates cmake."""
     f = _make_input_file(tmp_path)
     cmake = tmp_path / "CMakeLists.txt"
     cmake.write_text(
@@ -275,10 +273,6 @@ def test_run_live(tmp_path, monkeypatch, capsys):
     stub_classifier(monkeypatch, tmp_path, _parser_response())
     monkeypatch.setattr(split_tests, "CMAKE_PATH", cmake)
     monkeypatch.setattr(split_tests, "STANDALONE_PATH", standalone)
-    monkeypatch.setattr(
-        subprocess, "run",
-        lambda *_a, **_kw: MagicMock(returncode=0),
-    )
     args = SimpleNamespace(
         file=str(f), output_dir=str(tmp_path), dry_run=False,
     )
@@ -298,10 +292,6 @@ def _run_live_non_lrm(tmp_path, monkeypatch, src_body, resp):
     monkeypatch.setattr(split_tests, "CMAKE_PATH", cmake)
     monkeypatch.setattr(
         split_tests, "STANDALONE_PATH", tmp_path / "no.md",
-    )
-    monkeypatch.setattr(
-        subprocess, "run",
-        lambda *_a, **_kw: MagicMock(returncode=0),
     )
     _run(SimpleNamespace(
         file=str(src), output_dir=str(tmp_path), dry_run=False,
@@ -379,3 +369,22 @@ def test_main(monkeypatch):
     )
     split_tests.main()
     assert ran[0] is True
+
+
+def test_main_enables_line_buffering(monkeypatch):
+    """main reconfigures stdout to line-buffered mode."""
+    configured = []
+
+    def mock_reconfigure(**kwargs):
+        configured.append(kwargs)
+
+    monkeypatch.setattr(sys.stdout, "reconfigure", mock_reconfigure)
+    monkeypatch.setattr(split_tests, "_run", lambda _: None)
+    monkeypatch.setattr(
+        split_tests, "_parse_args",
+        lambda: SimpleNamespace(
+            file="x", output_dir="/tmp", dry_run=True,
+        ),
+    )
+    split_tests.main()
+    assert any(k.get("line_buffering") for k in configured)

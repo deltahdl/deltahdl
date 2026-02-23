@@ -1,8 +1,5 @@
 """Unit tests for file generation functions in split_tests."""
 
-import subprocess
-from unittest.mock import MagicMock
-
 import split_tests
 from helpers import make_parsed_file as _parsed
 from helpers import make_test_block as _tb
@@ -456,43 +453,3 @@ def test_update_standalone_removes_entry(monkeypatch, tmp_path):
     assert "test_x" not in text and "test_y" in text
 
 
-# ---- commit_and_push -------------------------------------------------------
-
-
-def test_commit_and_push_zero_files(monkeypatch):
-    """Uses 'Remove' message for zero files."""
-    calls = []
-    monkeypatch.setattr(
-        subprocess, "run",
-        lambda *a, **_kw: (
-            calls.append(a[0]), MagicMock(returncode=0),
-        )[1],
-    )
-    split_tests.commit_and_push("test_x", 0)
-    assert any("Remove" in " ".join(c) for c in calls if "commit" in c)
-
-
-def test_commit_and_push_nonzero_files(monkeypatch):
-    """Uses 'Split' message for non-zero files."""
-    calls = []
-    monkeypatch.setattr(
-        subprocess, "run",
-        lambda *a, **_kw: (
-            calls.append(a[0]), MagicMock(returncode=0),
-        )[1],
-    )
-    split_tests.commit_and_push("test_x", 3)
-    assert any("Split" in " ".join(c) for c in calls if "commit" in c)
-
-
-def test_commit_and_push_push_fail(monkeypatch, capsys):
-    """Prints warning when git push fails."""
-    def mock_run(*a, **_kw):
-        """Simulate git push failure."""
-        r = MagicMock()
-        r.returncode = 1 if "push" in a[0] else 0
-        return r
-
-    monkeypatch.setattr(subprocess, "run", mock_run)
-    split_tests.commit_and_push("test_x", 1)
-    assert "WARNING: git push failed" in capsys.readouterr().out
