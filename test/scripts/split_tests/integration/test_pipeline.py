@@ -202,6 +202,28 @@ def test_non_lrm_topic_creates_named_file(tmp_path, monkeypatch):
     assert (tmp_path / "test_non_lrm_aig.cpp").exists()
 
 
+# ---- Self-named source (dedup regression) ---------------------------------
+
+
+def test_self_named_source_not_treated_as_duplicate(tmp_path, monkeypatch):
+    """Source file whose name matches target is not flagged as duplicate."""
+    src = tmp_path / "test_non_lrm_aig.cpp"
+    src.write_text(
+        "#include <gtest/gtest.h>\n\nnamespace {\n\n"
+        "TEST(S, Keeper) {\n}\n\n}  // namespace\n",
+        encoding="utf-8",
+    )
+    resp = {"tests": [
+        {"test_name": "Keeper", "prefix": "test_non_lrm_",
+         "clause": "non-lrm:aig", "rationale": "r"},
+    ]}
+    _stub_externals(monkeypatch, tmp_path, resp)
+    _run(SimpleNamespace(
+        file=str(src), output_dir=str(tmp_path), dry_run=False,
+    ))
+    assert (tmp_path / "test_non_lrm_aig.cpp").exists()
+
+
 # ---- Annex routing ---------------------------------------------------------
 
 

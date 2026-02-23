@@ -141,6 +141,18 @@ def test_resolve_destinations_all_dupes(tmp_path, capsys):
     assert "All tests for 6.1 are duplicates" in capsys.readouterr().out
 
 
+def test_resolve_destinations_excludes_source(tmp_path):
+    """Source file matching target is excluded from dedup check."""
+    src = tmp_path / "test_non_lrm_aig.cpp"
+    src.write_text("TEST(S, Self) {\n}\n")
+    t = _tb("Self", prefix="test_non_lrm_", clause="non-lrm:aig")
+    groups = {("test_non_lrm_", "non-lrm:aig"): [t]}
+    to_create, _ = _resolve_destinations(
+        groups, tmp_path, {}, exclude_path=src,
+    )
+    assert len(to_create) == 1
+
+
 # ---- _write_files ----------------------------------------------------------
 
 
@@ -233,6 +245,33 @@ def test_run_live(tmp_path, monkeypatch, capsys):
     )
     _run(args)
     assert "Done!" in capsys.readouterr().out
+
+
+def test_run_live_self_named(tmp_path, monkeypatch):
+    """Source file matching output name is not deleted."""
+    src = tmp_path / "test_non_lrm_aig.cpp"
+    src.write_text(
+        "#include <gtest/gtest.h>\n\nTEST(S, T) {\n}\n",
+        encoding="utf-8",
+    )
+    resp = {"tests": [{"test_name": "T", "prefix": "test_non_lrm_",
+                        "clause": "non-lrm:aig", "rationale": "r"}]}
+    stub_classifier(monkeypatch, tmp_path, resp)
+    cmake = tmp_path / "CMakeLists.txt"
+    cmake.write_text("# header\n", encoding="utf-8")
+    monkeypatch.setattr(split_tests, "CMAKE_PATH", cmake)
+    monkeypatch.setattr(
+        split_tests, "STANDALONE_PATH", tmp_path / "no.md",
+    )
+    monkeypatch.setattr(
+        subprocess, "run",
+        lambda *_a, **_kw: MagicMock(returncode=0),
+    )
+    args = SimpleNamespace(
+        file=str(src), output_dir=str(tmp_path), dry_run=False,
+    )
+    _run(args)
+    assert (tmp_path / "test_non_lrm_aig.cpp").exists()
 
 
 # ---- main ------------------------------------------------------------------

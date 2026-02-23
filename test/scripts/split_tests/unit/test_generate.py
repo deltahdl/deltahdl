@@ -38,6 +38,16 @@ def test_find_existing_tests_variant(tmp_path):
     assert "Found" in result
 
 
+def test_find_existing_tests_excludes_source(tmp_path):
+    """Skips the source file when exclude_path is given."""
+    f = tmp_path / "test_non_lrm_aig.cpp"
+    f.write_text("TEST(S, Self) {\n}\n")
+    result = split_tests.find_existing_tests(
+        "test_non_lrm_aig", tmp_path, exclude_path=f,
+    )
+    assert "Self" not in result
+
+
 # ---- clause_to_filename ----------------------------------------------------
 
 
@@ -101,6 +111,15 @@ def test_find_merge_target_none(tmp_path):
     """Returns None when no matching files exist."""
     assert split_tests.find_merge_target(
         "test_parser_clause_06", tmp_path,
+    ) is None
+
+
+def test_find_merge_target_excludes_source(tmp_path):
+    """Returns None when only match is the excluded source file."""
+    f = tmp_path / "test_non_lrm_aig.cpp"
+    f.write_text("TEST(S, Self) {\n}\n")
+    assert split_tests.find_merge_target(
+        "test_non_lrm_aig", tmp_path, exclude_path=f,
     ) is None
 
 

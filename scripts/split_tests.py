@@ -521,7 +521,7 @@ def classify_tests(tests, test_dir):
 # Stage 3: Deduplicate
 # ---------------------------------------------------------------------------
 
-def find_existing_tests(target_base, test_dir):
+def find_existing_tests(target_base, test_dir, exclude_path=None):
     """Find TEST names in existing clause files matching target_base."""
     existing_names = set()
     patterns = [
@@ -530,6 +530,8 @@ def find_existing_tests(target_base, test_dir):
     ]
     for pattern in patterns:
         for fpath in glob.glob(pattern):
+            if exclude_path and Path(fpath).resolve() == exclude_path.resolve():
+                continue
             text = Path(fpath).read_text(encoding="utf-8")
             for m in re.finditer(
                 r"TEST(?:_[FP])?\(\w+,\s*(\w+)\)", text,
@@ -559,14 +561,19 @@ def clause_to_filename(prefix, clause):
     return f"{prefix}_clause_{padded}"
 
 
-def find_merge_target(target_base, test_dir):
+def find_merge_target(target_base, test_dir, exclude_path=None):
     """Find an existing file to merge tests into."""
     exact = test_dir / f"{target_base}.cpp"
     if exact.exists():
-        return exact
+        if not (exclude_path and exact.resolve() == exclude_path.resolve()):
+            return exact
     variants = sorted(
         glob.glob(str(test_dir / f"{target_base}_[a-z].cpp")),
     )
+    if exclude_path:
+        resolved = exclude_path.resolve()
+        variants = [v for v in variants
+                    if Path(v).resolve() != resolved]
     if variants:
         return Path(variants[-1])
     return None
@@ -778,22 +785,23 @@ def _group_tests(tests):
     return groups
 
 
-def _resolve_destinations(groups, test_dir, lrm_titles):
+def _resolve_destinations(groups, test_dir, lrm_titles,
+                          exclude_path=None):
     """Deduplicate tests and resolve create/merge destinations."""
     to_create = []
     to_merge = []
     for (prefix, clause), tests in sorted(groups.items()):
         target = clause_to_filename(prefix, clause)
-        existing = find_existing_tests(target, test_dir)
+        existing = find_existing_tests(target, test_dir, exclude_path)
         unique = [t for t in tests if t.test_name not in existing]
-        dupes = [t for t in tests if t.test_name in existing]
-        for d in dupes:
-            print(f"  DUPLICATE: {d.test_name} already in "
-                  f"{target} — dropping")
+        for d in tests:
+            if d.test_name in existing:
+                print(f"  DUPLICATE: {d.test_name} already in "
+                      f"{target} — dropping")
         if not unique:
             print(f"  All tests for {clause} are duplicates")
             continue
-        merge_path = find_merge_target(target, test_dir)
+        merge_path = find_merge_target(target, test_dir, exclude_path)
         if merge_path:
             to_merge.append((merge_path, unique))
             print(f"  Merging {len(unique)} tests into "
@@ -848,7 +856,7 @@ def _run(args):
     groups = _group_tests(parsed.all_tests)
     lrm_titles = load_lrm_titles()
     to_create, to_merge = _resolve_destinations(
-        groups, test_dir, lrm_titles,
+        groups, test_dir, lrm_titles, exclude_path=filepath,
     )
     if args.dry_run:
         print(f"\n=== DRY RUN complete. Would create "
@@ -865,8 +873,9 @@ def _run(args):
     print("Stage 6: Updating CMakeLists.txt...")
     update_cmake(test_name, new_names)
     print("Stage 7: Cleaning up...")
-    filepath.unlink()
-    print(f"  Deleted {test_name}.cpp")
+    if test_name not in new_names:
+        filepath.unlink()
+        print(f"  Deleted {test_name}.cpp")
     update_standalone(test_name)
     print("  Removed from STANDALONE.md")
     n_total = n_created + n_merged
