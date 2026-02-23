@@ -258,6 +258,29 @@ def test_print_summary_moved_and_kept(capsys):
     assert "Summary: 1 moved, 5 kept." in capsys.readouterr().out
 
 
+def test_print_summary_all_correct_zero_kept(capsys):
+    """All-correct path with n_kept=0 skips Kept bullet."""
+    _print_summary = getattr(split_tests, "_print_summary")
+    _print_summary([], [], "test_input", True, n_kept=0)
+    assert "Kept" not in capsys.readouterr().out
+
+
+def test_print_summary_not_source_zero_moved(capsys):
+    """Non-source path with empty lists reports 0 kept."""
+    _print_summary = getattr(split_tests, "_print_summary")
+    _print_summary([], [], "test_input", False)
+    assert "Summary: 0 kept." in capsys.readouterr().out
+
+
+def test_print_summary_moved_with_removals(capsys):
+    """Non-all-correct path with n_removed reports duplicates."""
+    _print_summary = getattr(split_tests, "_print_summary")
+    t = _tb("T", prefix="test_parser_", clause="6.1")
+    to_create = [("test_parser_clause_06_01", "6.1", [t])]
+    _print_summary(to_create, [], "test_input", True, n_kept=5, n_removed=2)
+    assert "2 duplicate(s) removed" in capsys.readouterr().out
+
+
 def test_print_dry_run_summary_moved(tmp_path, capsys):
     """Dry-run prints '- Would have moved'."""
     t = _tb("M", prefix="test_parser_", clause="6.1")
