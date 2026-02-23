@@ -13,6 +13,7 @@ import os
 import re
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -413,10 +414,14 @@ def _apply_classification(test, response):
 
 def classify_tests(tests, test_dir, lrm_path, arch_path):
     """Use Claude to classify each test's prefix and clause."""
-    for t in tests:
-        prompt = _build_prompt(t, test_dir, lrm_path, arch_path)
+
+    def _classify_one(test):
+        prompt = _build_prompt(test, test_dir, lrm_path, arch_path)
         response = _call_claude(prompt)
-        _apply_classification(t, response)
+        _apply_classification(test, response)
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        pool.map(_classify_one, tests)
     return tests
 
 
