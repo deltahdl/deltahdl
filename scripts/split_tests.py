@@ -649,21 +649,34 @@ def _format_clause(clause):
     return f"\u00a7{clause}"
 
 
+def _table_rule(left, mid, right, widths):
+    """Build a horizontal box-drawing rule for the given column widths."""
+    segs = ["\u2500" * (w + 2) for w in widths]
+    return "  " + left + mid.join(segs) + right
+
+
 def _print_classification_table(tests):
     """Print the classification results table."""
-    rows = [(t.test_name + "()", _format_clause(t.clause)) for t in tests]
+    rows = [(t.test_name + "()", _format_clause(t.clause),
+             t.rationale or "") for t in tests]
     tw = max(len("Test"), *(len(r[0]) for r in rows))
     cw = max(len("Clause"), *(len(r[1]) for r in rows))
+    rw = max(len("Rationale"), *(len(r[2]) for r in rows))
+    w = (tw, cw, rw)
     print("\n  Classification:")
-    print(f"  \u250c\u2500{'\u2500'*tw}\u2500\u252c\u2500{'\u2500'*cw}\u2500\u2510")
-    print(f"  \u2502 {'Test':<{tw}} \u2502 {'Clause':<{cw}} \u2502")
-    print(f"  \u251c\u2500{'\u2500'*tw}\u2500\u253c\u2500{'\u2500'*cw}\u2500\u2524")
-    sep = f"  \u251c\u2500{'\u2500'*tw}\u2500\u253c\u2500{'\u2500'*cw}\u2500\u2524"
-    for i, (name, clause) in enumerate(rows):
-        print(f"  \u2502 {name:<{tw}} \u2502 {clause:<{cw}} \u2502")
+    print(_table_rule("\u250c", "\u252c", "\u2510", w))
+    print(f"  \u2502 {'Test':<{tw}} "
+          f"\u2502 {'Clause':<{cw}} "
+          f"\u2502 {'Rationale':<{rw}} \u2502")
+    print(_table_rule("\u251c", "\u253c", "\u2524", w))
+    sep = _table_rule("\u251c", "\u253c", "\u2524", w)
+    for i, (name, clause, rationale) in enumerate(rows):
+        print(f"  \u2502 {name:<{tw}} "
+              f"\u2502 {clause:<{cw}} "
+              f"\u2502 {rationale:<{rw}} \u2502")
         if i < len(rows) - 1:
             print(sep)
-    print(f"  \u2514\u2500{'\u2500'*tw}\u2500\u2534\u2500{'\u2500'*cw}\u2500\u2518")
+    print(_table_rule("\u2514", "\u2534", "\u2518", w))
     print()
 
 

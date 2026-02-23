@@ -178,6 +178,20 @@ def test_print_classification_table_row_separators(capsys):
     assert out.count("\u251c") == 2
 
 
+def test_print_classification_table_rationale_header(capsys):
+    """Table has a Rationale column header."""
+    t = _tb("T", prefix="test_parser_", clause="6.1", rationale="reason")
+    _print_classification_table([t])
+    assert "Rationale" in capsys.readouterr().out
+
+
+def test_print_classification_table_rationale_value(capsys):
+    """Table displays the rationale text."""
+    t = _tb("T", prefix="test_parser_", clause="6.1", rationale="AIG stuff")
+    _print_classification_table([t])
+    assert "AIG stuff" in capsys.readouterr().out
+
+
 # ---- _print_summary / _print_dry_run_summary ------------------------------
 
 
