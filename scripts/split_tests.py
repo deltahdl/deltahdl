@@ -641,13 +641,26 @@ def _parse_args():
     return parser.parse_args()
 
 
+def _format_clause(clause):
+    """Format a clause for display."""
+    if clause.startswith("non-lrm:"):
+        tag = clause[len("non-lrm:"):].upper().replace("_", " ")
+        return f"Non-LRM: {tag}"
+    return f"\u00a7{clause}"
+
+
 def _print_classification_table(tests):
     """Print the classification results table."""
+    rows = [(t.test_name + "()", _format_clause(t.clause)) for t in tests]
+    tw = max(len("Test"), *(len(r[0]) for r in rows))
+    cw = max(len("Clause"), *(len(r[1]) for r in rows))
     print("\n  Classification:")
-    print(f"  {'Test':<45} Clause")
-    print(f"  {'-'*45} {'-'*12}")
-    for t in tests:
-        print(f"  {t.test_name:<45} \u00a7{t.clause}")
+    print(f"  \u250c\u2500{'\u2500'*tw}\u2500\u252c\u2500{'\u2500'*cw}\u2500\u2510")
+    print(f"  \u2502 {'Test':<{tw}} \u2502 {'Clause':<{cw}} \u2502")
+    print(f"  \u251c\u2500{'\u2500'*tw}\u2500\u253c\u2500{'\u2500'*cw}\u2500\u2524")
+    for name, clause in rows:
+        print(f"  \u2502 {name:<{tw}} \u2502 {clause:<{cw}} \u2502")
+    print(f"  \u2514\u2500{'\u2500'*tw}\u2500\u2534\u2500{'\u2500'*cw}\u2500\u2518")
     print()
 
 
@@ -662,7 +675,7 @@ def _group_tests(tests):
 
 
 def _resolve_destinations(groups, test_dir,
-                          exclude_path=None):
+                          exclude_path=None, dry_run=False):
     """Deduplicate tests and resolve create/merge destinations."""
     to_create = []
     to_merge = []
@@ -670,9 +683,10 @@ def _resolve_destinations(groups, test_dir,
         target = clause_to_filename(prefix, clause)
         existing = find_existing_tests(target, test_dir, exclude_path)
         unique = [t for t in tests if t.test_name not in existing]
+        verb = "Would have removed" if dry_run else "Removed"
         for d in tests:
             if d.test_name in existing:
-                print(f"  Removed {d.test_name} because it belongs"
+                print(f"  - {verb} {d.test_name} because it belongs"
                       f" in {target}.cpp where it already exists.")
         if not unique:
             continue
@@ -702,25 +716,12 @@ def _write_files(to_create, to_merge, parsed, test_dir, lrm_titles):
     return new_names
 
 
-def _print_dry_run_summary(to_create, to_merge):
-    """Print a detailed dry-run summary."""
-    n = sum(len(ts) for _, _, ts in to_create)
-    n += sum(len(ts) for _, ts in to_merge)
-    for filename, _clause, tests in to_create:
-        print(f"  Would create {filename}.cpp because"
-              f" {len(tests)} test(s) belong there but the"
-              " file does not exist.")
-        for t in tests:
-            print(f"  Would move {t.test_name} to"
-                  f" {filename}.cpp because that's where"
-                  " it belongs.")
-    for merge_path, tests in to_merge:
-        for t in tests:
-            print(f"  Would move {t.test_name} to"
-                  f" {merge_path.name} because that's where"
-                  " it belongs.")
-    if not to_create and not to_merge:
-        print("  all already in correct file.")
+def _print_dry_run_summary(to_create, to_merge, test_name,
+                           source_is_target, n_kept=0):
+    """Print dry-run summary using past future perfect tense."""
+    _print_summary(to_create, to_merge, test_name,
+                   source_is_target, n_kept=n_kept,
+                   dry_run=True)
 
 
 def _rewrite_source(filepath, groups, parsed, lrm_titles, test_name):
@@ -736,23 +737,39 @@ def _rewrite_source(filepath, groups, parsed, lrm_titles, test_name):
     return len(staying)
 
 
-def _print_summary(to_create, to_merge, test_name, source_is_target):
+def _print_summary(to_create, to_merge, test_name,
+                   source_is_target, n_kept=0, dry_run=False):
     """Print the because-driven summary of what was done."""
+    def _v(past):
+        """Return past future perfect tense if dry_run, else past."""
+        if not dry_run:
+            return past
+        return f"Would have {past[0].lower()}{past[1:]}"
+
+    if not to_create and not to_merge and source_is_target:
+        print("  all already in correct file.")
+        return
     for filename, _clause, tests in to_create:
-        print(f"  Created {filename}.cpp because {len(tests)}"
-              " test(s) belong there but the file did not exist.")
-        print(f"  Moved {len(tests)} test(s) to {filename}.cpp"
-              " because that's where they belong.")
+        print(f"  - {_v('Created')} {filename}.cpp because"
+              f" {len(tests)} test(s) belong there but the"
+              " file did not exist.")
+        print(f"  - {_v('Moved')} {len(tests)} test(s) to"
+              f" {filename}.cpp because that's where they"
+              " belong.")
     for merge_path, tests in to_merge:
-        print(f"  Moved {len(tests)} test(s) to {merge_path.name}"
-              " because that's where they belong.")
+        print(f"  - {_v('Moved')} {len(tests)} test(s) to"
+              f" {merge_path.name} because that's where they"
+              " belong.")
+    if source_is_target and n_kept:
+        print(f"  - {_v('Kept')} {n_kept} tests in"
+              f" {test_name}.cpp because they belong there.")
     if not source_is_target:
-        print(f"  Deleted {test_name}.cpp because all its tests"
-              " were moved elsewhere.")
-        print("  Updated CMakeLists.txt because"
+        print(f"  - {_v('Deleted')} {test_name}.cpp because all"
+              " its tests were moved elsewhere.")
+        print(f"  - {_v('Updated')} CMakeLists.txt because"
               f" {test_name} was removed.")
     else:
-        print("  Updated CMakeLists.txt because"
+        print(f"  - {_v('Updated')} CMakeLists.txt because"
               " new test targets were added.")
 
 
@@ -775,34 +792,39 @@ def _run(args):
     classify_tests(parsed.all_tests, test_dir, lrm_path, arch_path)
     _print_classification_table(parsed.all_tests)
     groups = _group_tests(parsed.all_tests)
-    to_create, to_merge = _resolve_destinations(
-        groups, test_dir, exclude_path=filepath,
-    )
-    if args.dry_run:
-        _print_dry_run_summary(to_create, to_merge)
-        return
     source_is_target = any(
         clause_to_filename(p, c) == test_name
         for p, c in groups
     )
+    to_create, to_merge = _resolve_destinations(
+        groups, test_dir, exclude_path=filepath,
+        dry_run=args.dry_run,
+    )
+    if args.dry_run:
+        n_kept = sum(1 for (p, c), ts in groups.items()
+                     if clause_to_filename(p, c) == test_name
+                     for _ in ts)
+        _print_dry_run_summary(to_create, to_merge, test_name,
+                               source_is_target, n_kept=n_kept)
+        return
     if not to_create and not to_merge and source_is_target:
-        print(f"  {test_name}.cpp \u2014 {len(parsed.all_tests)} tests,"
-              " all already in correct file.")
+        _print_summary(to_create, to_merge, test_name,
+                       source_is_target)
         return
     titles = load_lrm_titles(lrm_path)
     new_names = _write_files(
         to_create, to_merge, parsed, test_dir, titles,
     )
+    n_kept = 0
     if source_is_target:
         n_kept = _rewrite_source(
             filepath, groups, parsed, titles, test_name,
         )
-        print(f"  Kept {n_kept} tests in {test_name}.cpp"
-              " because they belong there.")
     update_cmake(test_name, new_names, keep_old=source_is_target)
     if not source_is_target:
         filepath.unlink()
-    _print_summary(to_create, to_merge, test_name, source_is_target)
+    _print_summary(to_create, to_merge, test_name,
+                   source_is_target, n_kept=n_kept)
 
 
 def main():

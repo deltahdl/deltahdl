@@ -11,6 +11,7 @@ from helpers import make_test_block as _tb
 from helpers import stub_classifier
 
 _parse_args = getattr(split_tests, "_parse_args")
+_format_clause = getattr(split_tests, "_format_clause")
 _print_classification_table = getattr(
     split_tests, "_print_classification_table",
 )
@@ -97,6 +98,24 @@ def test_parse_args_arch(monkeypatch):
     assert _parse_args().arch == "/my/ARCH.md"
 
 
+# ---- _format_clause --------------------------------------------------------
+
+
+def test_format_clause_non_lrm():
+    """Non-LRM clause formats as 'Non-LRM: TAG'."""
+    assert _format_clause("non-lrm:aig") == "Non-LRM: AIG"
+
+
+def test_format_clause_non_lrm_underscore():
+    """Non-LRM clause with underscore converts to space."""
+    assert _format_clause("non-lrm:aig_opt") == "Non-LRM: AIG OPT"
+
+
+def test_format_clause_regular():
+    """Regular clause formats with section sign."""
+    assert _format_clause("6.1") == "\u00a76.1"
+
+
 # ---- _print_classification_table -------------------------------------------
 
 
@@ -105,24 +124,137 @@ def test_print_classification_table_output(capsys):
     t = _tb("T", prefix="test_parser_", clause="6.1", rationale="r")
     _print_classification_table([t])
     out = capsys.readouterr().out
-    assert "T" in out and "\u00a76.1" in out
+    assert "T()" in out and "\u00a76.1" in out
 
 
-# ---- _print_dry_run_summary ------------------------------------------------
+def test_print_classification_table_non_lrm(capsys):
+    """Non-LRM clause displays as 'Non-LRM: AIG'."""
+    t = _tb("T", prefix="test_non_lrm_", clause="non-lrm:aig")
+    _print_classification_table([t])
+    out = capsys.readouterr().out
+    assert "Non-LRM: AIG" in out
+    assert "\u00a7non-lrm" not in out
+
+
+def test_print_classification_table_box_drawing(capsys):
+    """Table uses unicode box-drawing characters."""
+    t = _tb("T", prefix="test_parser_", clause="6.1")
+    _print_classification_table([t])
+    out = capsys.readouterr().out
+    assert "\u250c" in out  # top-left corner
+    assert "\u2502" in out  # vertical line
+    assert "\u2514" in out  # bottom-left corner
+
+
+def test_print_classification_table_parentheses(capsys):
+    """Test names include parentheses."""
+    t = _tb("Foo", prefix="test_parser_", clause="6.1")
+    _print_classification_table([t])
+    out = capsys.readouterr().out
+    assert "Foo()" in out
+
+
+# ---- _print_summary / _print_dry_run_summary ------------------------------
+
+
+def test_print_summary_create(capsys):
+    """Live summary prints 'Created' and 'Moved'."""
+    _print_summary = getattr(split_tests, "_print_summary")
+    t = _tb("T", prefix="test_parser_", clause="6.1")
+    to_create = [("test_parser_clause_06_01", "6.1", [t])]
+    _print_summary(to_create, [], "test_input", False)
+    out = capsys.readouterr().out
+    assert "- Created test_parser_clause_06_01.cpp" in out
+    assert "- Moved 1 test(s)" in out
+
+
+def test_print_summary_deleted(capsys):
+    """Live summary prints 'Deleted' when source_is_target is False."""
+    _print_summary = getattr(split_tests, "_print_summary")
+    t = _tb("T", prefix="test_parser_", clause="6.1")
+    to_create = [("test_parser_clause_06_01", "6.1", [t])]
+    _print_summary(to_create, [], "test_input", False)
+    out = capsys.readouterr().out
+    assert "- Deleted test_input.cpp" in out
+
+
+def test_print_summary_kept(capsys):
+    """Live summary prints 'Kept' when source_is_target with n_kept."""
+    _print_summary = getattr(split_tests, "_print_summary")
+    t = _tb("T", prefix="test_parser_", clause="6.1")
+    to_create = [("test_parser_clause_06_01", "6.1", [t])]
+    _print_summary(to_create, [], "test_input", True, n_kept=3)
+    out = capsys.readouterr().out
+    assert "- Kept 3 tests" in out
+
+
+def test_print_summary_all_correct(capsys):
+    """Live summary prints 'all already in correct file'."""
+    _print_summary = getattr(split_tests, "_print_summary")
+    _print_summary([], [], "test_input", True)
+    out = capsys.readouterr().out
+    assert "all already in correct file" in out
 
 
 def test_print_dry_run_summary_merge(tmp_path, capsys):
-    """Would-move line is printed for merge targets."""
+    """Dry-run prints 'Would have moved'."""
     t = _tb("M", prefix="test_parser_", clause="6.1")
     merge_path = tmp_path / "test_parser_clause_06_01.cpp"
-    _print_dry_run_summary([], [(merge_path, [t])])
-    assert "Would move" in capsys.readouterr().out
+    _print_dry_run_summary(
+        [], [(merge_path, [t])], "test_input", False,
+    )
+    out = capsys.readouterr().out
+    assert "- Would have moved" in out
+    assert "Moved" not in out.replace("Would have moved", "")
+
+
+def test_print_dry_run_summary_create(capsys):
+    """Dry-run prints 'Would have created'."""
+    t = _tb("T", prefix="test_parser_", clause="6.1")
+    to_create = [("test_parser_clause_06_01", "6.1", [t])]
+    _print_dry_run_summary(
+        to_create, [], "test_input", False,
+    )
+    out = capsys.readouterr().out
+    assert "- Would have created" in out
+
+
+def test_print_dry_run_summary_deleted(capsys):
+    """Dry-run prints 'Would have deleted'."""
+    t = _tb("T", prefix="test_parser_", clause="6.1")
+    to_create = [("test_parser_clause_06_01", "6.1", [t])]
+    _print_dry_run_summary(
+        to_create, [], "test_input", False,
+    )
+    out = capsys.readouterr().out
+    assert "- Would have deleted test_input.cpp" in out
+
+
+def test_print_dry_run_summary_updated(capsys):
+    """Dry-run prints 'Would have updated CMakeLists.txt'."""
+    t = _tb("T", prefix="test_parser_", clause="6.1")
+    to_create = [("test_parser_clause_06_01", "6.1", [t])]
+    _print_dry_run_summary(
+        to_create, [], "test_input", False,
+    )
+    out = capsys.readouterr().out
+    assert "- Would have updated CMakeLists.txt" in out
+
+
+def test_print_dry_run_summary_kept(capsys):
+    """Dry-run prints 'Would have kept'."""
+    t = _tb("T", prefix="test_parser_", clause="6.1")
+    to_create = [("test_parser_clause_06_01", "6.1", [t])]
+    _print_dry_run_summary(
+        to_create, [], "test_input", True, n_kept=3,
+    )
+    out = capsys.readouterr().out
+    assert "- Would have kept 3 tests" in out
 
 
 def test_print_dry_run_summary_nothing(capsys):
-    """'all already in correct file' is printed when both lists are empty."""
-    _print_dry_run_summary([], [])
-    assert "all already in correct file" in capsys.readouterr().out
+    """'all already in correct file' is printed when nothing to do."""
+    _print_dry_run_summary([], [], "test_input", True)
 
 
 # ---- _group_tests ----------------------------------------------------------
@@ -188,7 +320,21 @@ def test_resolve_destinations_all_dupes(tmp_path, capsys):
     t = _tb("T", prefix="test_parser_", clause="6.1")
     groups = {("test_parser_", "6.1"): [t]}
     _resolve_destinations(groups, tmp_path)
-    assert "Removed T" in capsys.readouterr().out
+    assert "- Removed T" in capsys.readouterr().out
+
+
+def test_resolve_destinations_dry_run_would_have_removed(
+    tmp_path, capsys,
+):
+    """Dry-run prints 'Would have removed' instead of 'Removed'."""
+    f = tmp_path / "test_parser_clause_06_01.cpp"
+    f.write_text("TEST(S, T) {\n}\n")
+    t = _tb("T", prefix="test_parser_", clause="6.1")
+    groups = {("test_parser_", "6.1"): [t]}
+    _resolve_destinations(groups, tmp_path, dry_run=True)
+    out = capsys.readouterr().out
+    assert "- Would have removed T" in out
+    assert "Removed T" not in out.replace("Would have removed", "")
 
 
 def test_resolve_destinations_excludes_source(tmp_path):
