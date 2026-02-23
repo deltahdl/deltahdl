@@ -307,3 +307,47 @@ def test_output_reparseable(tmp_path, monkeypatch):
     assert len(split_tests.parse_file(
         tmp_path / "test_parser_clause_06_01.cpp",
     ).all_tests) == 1
+
+
+# ---- Named namespace wrapper -----------------------------------------------
+
+
+def _do_named_ns(tmp_path, monkeypatch):
+    """Write input with namespace delta { ... } and run pipeline."""
+    f = tmp_path / "test_input.cpp"
+    f.write_text(
+        "#include <gtest/gtest.h>\n\n"
+        "#include \"simulation/vpi.h\"\n\n"
+        "namespace delta {\n"
+        "namespace {\n\n"
+        "TEST(NonLrmVpi, DefaultCtx) {\n"
+        "  EXPECT_TRUE(true);\n"
+        "}\n\n"
+        "}  // namespace\n"
+        "}  // namespace delta\n",
+        encoding="utf-8",
+    )
+    _stub_externals(monkeypatch, tmp_path, _response(
+        ("DefaultCtx", "test_non_lrm_", "non-lrm"),
+    ))
+    resp = {"tests": [
+        {"test_name": "DefaultCtx", "prefix": "test_non_lrm_",
+         "clause": "non-lrm", "non_lrm_topic": "vpi", "rationale": "r"},
+    ]}
+    monkeypatch.setattr(split_tests, "_call_claude", lambda p: resp)
+    _run_pipeline(tmp_path)
+    return tmp_path
+
+
+def test_named_ns_creates_output(tmp_path, monkeypatch):
+    """Pipeline creates output file from named-namespace input."""
+    d = _do_named_ns(tmp_path, monkeypatch)
+    assert (d / "test_non_lrm_vpi.cpp").exists()
+
+
+def test_named_ns_output_contains_test(tmp_path, monkeypatch):
+    """Output file contains the test from inside the named namespace."""
+    d = _do_named_ns(tmp_path, monkeypatch)
+    assert "TEST(NonLrmVpi, DefaultCtx)" in (
+        d / "test_non_lrm_vpi.cpp"
+    ).read_text()

@@ -238,3 +238,60 @@ def test_pipeline_cleans_standalone(tmp_path):
     assert "test_input" not in (
         tmp_path / "STANDALONE.md"
     ).read_text()
+
+
+# ---- Named namespace wrapper -----------------------------------------------
+
+
+def _setup_named_ns_pipeline(tmp_path):
+    """Prepare repo with a test file using namespace delta { ... }."""
+    _bootstrap_repo(
+        tmp_path, "# header\nadd_unit_test(test_input)\n",
+    )
+    (tmp_path / "STANDALONE.md").write_text(
+        "- [ ] test_input\n", encoding="utf-8",
+    )
+    src = tmp_path / "test_input.cpp"
+    src.write_text(
+        "#include <gtest/gtest.h>\n"
+        "\n"
+        "namespace delta {\n"
+        "namespace {\n"
+        "\n"
+        "TEST(S, Alpha) {\n"
+        "  EXPECT_TRUE(true);\n"
+        "}\n"
+        "\n"
+        "}  // namespace\n"
+        "}  // namespace delta\n",
+        encoding="utf-8",
+    )
+    resp = {"tests": [
+        {"test_name": "Alpha", "prefix": "test_parser_",
+         "clause": "6.1", "rationale": "r"},
+    ]}
+    return _env_with_fakes(tmp_path, resp)
+
+
+def test_named_ns_pipeline_reports_done(tmp_path):
+    """Pipeline succeeds on a file with named namespace wrapper."""
+    env = _setup_named_ns_pipeline(tmp_path)
+    r = _invoke(
+        "--file", str(tmp_path / "test_input.cpp"),
+        "--output-dir", str(tmp_path),
+        cwd=str(tmp_path), env=env,
+    )
+    assert "Done!" in r.stdout
+
+
+def test_named_ns_pipeline_creates_clause_file(tmp_path):
+    """Pipeline creates clause file from named-namespace input."""
+    env = _setup_named_ns_pipeline(tmp_path)
+    _invoke(
+        "--file", str(tmp_path / "test_input.cpp"),
+        "--output-dir", str(tmp_path),
+        cwd=str(tmp_path), env=env,
+    )
+    out = tmp_path / "test_parser_clause_06_01.cpp"
+    assert out.exists()
+    assert "TEST(S, Alpha)" in out.read_text()
