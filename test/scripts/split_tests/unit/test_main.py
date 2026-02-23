@@ -219,10 +219,17 @@ def test_print_summary_kept(capsys):
     assert "- Kept 3 tests" in out
 
 
-def test_print_summary_all_correct(capsys):
-    """Live summary prints conclusion line."""
+def test_print_summary_all_correct_kept(capsys):
+    """All-correct path still prints 'Kept' bullet."""
     _print_summary = getattr(split_tests, "_print_summary")
-    _print_summary([], [], "test_input", True)
+    _print_summary([], [], "test_input", True, n_kept=9)
+    assert "- Kept 9 tests" in capsys.readouterr().out
+
+
+def test_print_summary_all_correct_summary(capsys):
+    """All-correct path prints conclusion line."""
+    _print_summary = getattr(split_tests, "_print_summary")
+    _print_summary([], [], "test_input", True, n_kept=9)
     assert "\n  Summary: all already in correct file." in capsys.readouterr().out
 
 
@@ -291,9 +298,15 @@ def test_print_dry_run_summary_kept(capsys):
     assert "- Would have kept 3 tests" in out
 
 
-def test_print_dry_run_summary_nothing(capsys):
-    """Dry-run prints conclusion line when nothing to do."""
-    _print_dry_run_summary([], [], "test_input", True)
+def test_print_dry_run_summary_nothing_kept(capsys):
+    """Dry-run all-correct path prints 'Would have kept' bullet."""
+    _print_dry_run_summary([], [], "test_input", True, n_kept=13)
+    assert "- Would have kept 13 tests" in capsys.readouterr().out
+
+
+def test_print_dry_run_summary_nothing_summary(capsys):
+    """Dry-run all-correct path prints conclusion line."""
+    _print_dry_run_summary([], [], "test_input", True, n_kept=13)
     assert "\n  Summary: all already in correct file." in capsys.readouterr().out
 
 

@@ -753,6 +753,9 @@ def _print_summary(  # pylint: disable=too-many-arguments,too-many-positional-ar
         return f"Would have {past[0].lower()}{past[1:]}"
 
     if not to_create and not to_merge and source_is_target:
+        if n_kept:
+            print(f"  - {_v('Kept')} {n_kept} tests in"
+                  f" {test_name}.cpp because they belong there.")
         print("\n  Summary: all already in correct file.")
         return
     for filename, _clause, tests in to_create:
