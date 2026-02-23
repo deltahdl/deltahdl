@@ -238,15 +238,6 @@ bool HasItemKind(const std::vector<ModuleItem *> &items, ModuleItemKind kind) {
   return false;
 }
 
-// Returns true if any item matches the given kind and name.
-bool HasItemKindNamed(const std::vector<ModuleItem *> &items,
-                      ModuleItemKind kind, std::string_view name) {
-  for (auto *item : items) {
-    if (item->kind == kind && item->name == name) return true;
-  }
-  return false;
-}
-
 // =============================================================================
 // A.1.8 Checker items
 // =============================================================================
