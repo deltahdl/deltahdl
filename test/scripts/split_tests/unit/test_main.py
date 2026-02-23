@@ -249,8 +249,8 @@ def test_run_dry_run(tmp_path, monkeypatch, capsys):
     assert "dry run" in capsys.readouterr().out
 
 
-def test_run_live(tmp_path, monkeypatch, capsys):
-    """Live run writes files and updates cmake."""
+def _setup_live_run(tmp_path, monkeypatch):
+    """Create input file, cmake, and stub classifier for a live run."""
     f = _make_input_file(tmp_path)
     cmake = tmp_path / "CMakeLists.txt"
     cmake.write_text(
@@ -259,9 +259,14 @@ def test_run_live(tmp_path, monkeypatch, capsys):
     )
     stub_classifier(monkeypatch, tmp_path, _parser_response())
     monkeypatch.setattr(split_tests, "CMAKE_PATH", cmake)
-    args = SimpleNamespace(
+    return SimpleNamespace(
         file=str(f), output_dir=str(tmp_path), dry_run=False,
     )
+
+
+def test_run_live(tmp_path, monkeypatch, capsys):
+    """Live run writes files and updates cmake."""
+    args = _setup_live_run(tmp_path, monkeypatch)
     _run(args)
     assert "Updated CMakeLists.txt" in capsys.readouterr().out
 
@@ -273,17 +278,7 @@ def test_run_live_merge(tmp_path, monkeypatch, capsys):
         "namespace {\n\nTEST(S, Old) {\n}\n\n}  // namespace\n",
         encoding="utf-8",
     )
-    f = _make_input_file(tmp_path)
-    cmake = tmp_path / "CMakeLists.txt"
-    cmake.write_text(
-        "# header\nadd_unit_test(test_input)\n",
-        encoding="utf-8",
-    )
-    stub_classifier(monkeypatch, tmp_path, _parser_response())
-    monkeypatch.setattr(split_tests, "CMAKE_PATH", cmake)
-    args = SimpleNamespace(
-        file=str(f), output_dir=str(tmp_path), dry_run=False,
-    )
+    args = _setup_live_run(tmp_path, monkeypatch)
     _run(args)
     assert "Moved 1 test(s) to test_parser_clause_06_01.cpp" in \
         capsys.readouterr().out
