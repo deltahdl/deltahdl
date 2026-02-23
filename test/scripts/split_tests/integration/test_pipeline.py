@@ -21,11 +21,35 @@ def _write_input(tmp_path, body):
     return f
 
 
-def _stub_externals(monkeypatch, tmp_path, response):
-    """Stub Claude, LRM/ARCH, CMake, STANDALONE, and git."""
-    monkeypatch.setattr(split_tests, "LRM_PATH", tmp_path / "no.txt")
-    monkeypatch.setattr(split_tests, "ARCH_PATH", tmp_path / "no.md")
-    monkeypatch.setattr(split_tests, "_call_claude", lambda p: response)
+def _make_classifier(*triples):
+    """Build per-test classifier from (test_name, prefix, clause) triples."""
+    lookup = {n: {"prefix": p, "clause": c, "rationale": "r"}
+              for n, p, c in triples}
+
+    def classifier(prompt):
+        for name, resp in lookup.items():
+            if name in prompt:
+                return resp
+        return {"prefix": "test_non_lrm_", "clause": "non-lrm",
+                "rationale": "fallback"}
+
+    return classifier
+
+
+def _make_classifier_with_topic(name, prefix, clause, topic):
+    """Build per-test classifier that includes non_lrm_topic."""
+    resp = {"prefix": prefix, "clause": clause,
+            "non_lrm_topic": topic, "rationale": "r"}
+
+    def classifier(_prompt):
+        return resp
+
+    return classifier
+
+
+def _stub_externals(monkeypatch, tmp_path, classifier):
+    """Stub Claude CLI and CMake path."""
+    monkeypatch.setattr(split_tests, "_call_claude", classifier)
     cmake = tmp_path / "CMakeLists.txt"
     cmake.write_text(
         "# header\nadd_unit_test(test_input)\n", encoding="utf-8",
@@ -39,15 +63,9 @@ def _run_pipeline(tmp_path, dry_run=False):
         file=str(tmp_path / "test_input.cpp"),
         output_dir=str(tmp_path),
         dry_run=dry_run,
+        lrm=str(tmp_path / "lrm.txt"),
+        arch=str(tmp_path / "arch.md"),
     ))
-
-
-def _response(*triples):
-    """Build Claude response from (test_name, prefix, clause) triples."""
-    return {"tests": [
-        {"test_name": n, "prefix": p, "clause": c, "rationale": "r"}
-        for n, p, c in triples
-    ]}
 
 
 def _do_multi_clause(tmp_path, monkeypatch):
@@ -57,7 +75,7 @@ def _do_multi_clause(tmp_path, monkeypatch):
         "TEST(S, Alpha) {\n  EXPECT_TRUE(true);\n}\n\n"
         "TEST(S, Beta) {\n  EXPECT_EQ(1, 1);\n}\n\n",
     )
-    _stub_externals(monkeypatch, tmp_path, _response(
+    _stub_externals(monkeypatch, tmp_path, _make_classifier(
         ("Alpha", "test_parser_", "6.1"),
         ("Beta", "test_lexer_", "5.3"),
     ))
@@ -74,7 +92,7 @@ def _do_merge(tmp_path, monkeypatch):
         encoding="utf-8",
     )
     _write_input(tmp_path, "TEST(S, Fresh) {\n}\n\n")
-    _stub_externals(monkeypatch, tmp_path, _response(
+    _stub_externals(monkeypatch, tmp_path, _make_classifier(
         ("Fresh", "test_parser_", "6.1"),
     ))
     _run_pipeline(tmp_path)
@@ -84,7 +102,7 @@ def _do_merge(tmp_path, monkeypatch):
 def _do_dry_run(tmp_path, monkeypatch):
     """Run pipeline in dry-run mode, return tmp_path."""
     _write_input(tmp_path, "TEST(S, DryT) {\n}\n\n")
-    _stub_externals(monkeypatch, tmp_path, _response(
+    _stub_externals(monkeypatch, tmp_path, _make_classifier(
         ("DryT", "test_parser_", "6.1"),
     ))
     _run_pipeline(tmp_path, dry_run=True)
@@ -164,7 +182,7 @@ def test_dedup_reports_duplicate(tmp_path, monkeypatch, capsys):
         "TEST(S, Dup) {\n}\n", encoding="utf-8",
     )
     _write_input(tmp_path, "TEST(S, Dup) {\n}\n\n")
-    _stub_externals(monkeypatch, tmp_path, _response(
+    _stub_externals(monkeypatch, tmp_path, _make_classifier(
         ("Dup", "test_parser_", "6.1"),
     ))
     _run_pipeline(tmp_path)
@@ -177,11 +195,9 @@ def test_dedup_reports_duplicate(tmp_path, monkeypatch, capsys):
 def test_non_lrm_topic_creates_named_file(tmp_path, monkeypatch):
     """Non-LRM test with topic creates test_non_lrm_<topic>.cpp."""
     _write_input(tmp_path, "TEST(S, InternalHelper) {\n}\n\n")
-    resp = {"tests": [
-        {"test_name": "InternalHelper", "prefix": "test_non_lrm_",
-         "clause": "non-lrm", "non_lrm_topic": "aig", "rationale": "r"},
-    ]}
-    _stub_externals(monkeypatch, tmp_path, resp)
+    _stub_externals(monkeypatch, tmp_path, _make_classifier_with_topic(
+        "InternalHelper", "test_non_lrm_", "non-lrm", "aig",
+    ))
     _run_pipeline(tmp_path)
     assert (tmp_path / "test_non_lrm_aig.cpp").exists()
 
@@ -197,13 +213,12 @@ def test_self_named_source_not_treated_as_duplicate(tmp_path, monkeypatch):
         "TEST(S, Keeper) {\n}\n\n}  // namespace\n",
         encoding="utf-8",
     )
-    resp = {"tests": [
-        {"test_name": "Keeper", "prefix": "test_non_lrm_",
-         "clause": "non-lrm:aig", "rationale": "r"},
-    ]}
-    _stub_externals(monkeypatch, tmp_path, resp)
+    _stub_externals(monkeypatch, tmp_path, _make_classifier_with_topic(
+        "Keeper", "test_non_lrm_", "non-lrm", "aig",
+    ))
     _run(SimpleNamespace(
         file=str(src), output_dir=str(tmp_path), dry_run=False,
+        lrm=str(tmp_path / "lrm.txt"), arch=str(tmp_path / "arch.md"),
     ))
     assert (tmp_path / "test_non_lrm_aig.cpp").exists()
 
@@ -214,7 +229,7 @@ def test_self_named_source_not_treated_as_duplicate(tmp_path, monkeypatch):
 def test_annex_creates_annex_file(tmp_path, monkeypatch):
     """Annex-clause test creates test_<prefix>_annex_<letter>_<padded>.cpp."""
     _write_input(tmp_path, "TEST(S, GrammarRule) {\n}\n\n")
-    _stub_externals(monkeypatch, tmp_path, _response(
+    _stub_externals(monkeypatch, tmp_path, _make_classifier(
         ("GrammarRule", "test_parser_", "A.6.3"),
     ))
     _run_pipeline(tmp_path)
@@ -248,7 +263,7 @@ def test_preamble_propagated_to_output(tmp_path, monkeypatch):
         "namespace {\n\nTEST(S, T) {\n}\n\n}  // namespace\n",
         encoding="utf-8",
     )
-    _stub_externals(monkeypatch, tmp_path, _response(
+    _stub_externals(monkeypatch, tmp_path, _make_classifier(
         ("T", "test_parser_", "6.1"),
     ))
     _run_pipeline(tmp_path)
@@ -269,7 +284,7 @@ def test_lrm_quotes_stripped_in_output(tmp_path, monkeypatch):
         "TEST(S, QuotedTest) {\n}\n\n}  // namespace\n",
         encoding="utf-8",
     )
-    _stub_externals(monkeypatch, tmp_path, _response(
+    _stub_externals(monkeypatch, tmp_path, _make_classifier(
         ("QuotedTest", "test_parser_", "6.1"),
     ))
     _run_pipeline(tmp_path)
@@ -284,7 +299,7 @@ def test_lrm_quotes_stripped_in_output(tmp_path, monkeypatch):
 def test_output_reparseable(tmp_path, monkeypatch):
     """Generated output can be re-parsed by parse_file without errors."""
     _write_input(tmp_path, "TEST(S, Round) {\n  int x = 1;\n}\n\n")
-    _stub_externals(monkeypatch, tmp_path, _response(
+    _stub_externals(monkeypatch, tmp_path, _make_classifier(
         ("Round", "test_parser_", "6.1"),
     ))
     _run_pipeline(tmp_path)
@@ -311,14 +326,9 @@ def _do_named_ns(tmp_path, monkeypatch):
         "}  // namespace delta\n",
         encoding="utf-8",
     )
-    _stub_externals(monkeypatch, tmp_path, _response(
-        ("DefaultCtx", "test_non_lrm_", "non-lrm"),
+    _stub_externals(monkeypatch, tmp_path, _make_classifier_with_topic(
+        "DefaultCtx", "test_non_lrm_", "non-lrm", "vpi",
     ))
-    resp = {"tests": [
-        {"test_name": "DefaultCtx", "prefix": "test_non_lrm_",
-         "clause": "non-lrm", "non_lrm_topic": "vpi", "rationale": "r"},
-    ]}
-    monkeypatch.setattr(split_tests, "_call_claude", lambda p: resp)
     _run_pipeline(tmp_path)
     return tmp_path
 

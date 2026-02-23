@@ -33,21 +33,35 @@ def _make_input_file(tmp_path):
 
 
 def _parser_response():
-    """Return a standard classifier response for test_parser_ clause 6.1."""
+    """Return a standard single-test classifier response."""
     return {
-        "tests": [{"test_name": "T", "prefix": "test_parser_",
-                    "clause": "6.1", "rationale": "r"}],
+        "prefix": "test_parser_",
+        "clause": "6.1", "rationale": "r",
     }
+
+
+def _run_args(tmp_path, **overrides):
+    """Build a SimpleNamespace with all required _run args."""
+    defaults = {
+        "file": str(tmp_path / "test_input.cpp"),
+        "output_dir": str(tmp_path),
+        "dry_run": False,
+        "lrm": str(tmp_path / "lrm.txt"),
+        "arch": str(tmp_path / "arch.md"),
+    }
+    defaults.update(overrides)
+    return SimpleNamespace(**defaults)
 
 
 # ---- _parse_args -----------------------------------------------------------
 
 
 def test_parse_args_basic(monkeypatch):
-    """Parses --file, --output-dir, and --dry-run."""
+    """Parses --file, --output-dir, --lrm, and --arch."""
     monkeypatch.setattr(
         sys, "argv",
-        ["prog", "--file", "f.cpp", "--output-dir", "/out"],
+        ["prog", "--file", "f.cpp", "--output-dir", "/out",
+         "--lrm", "/lrm.txt", "--arch", "/arch.md"],
     )
     args = _parse_args()
     assert args.file == "f.cpp" and not args.dry_run
@@ -57,9 +71,30 @@ def test_parse_args_dry_run(monkeypatch):
     """Parses --dry-run flag."""
     monkeypatch.setattr(
         sys, "argv",
-        ["prog", "--file", "f.cpp", "--output-dir", "/out", "--dry-run"],
+        ["prog", "--file", "f.cpp", "--output-dir", "/out",
+         "--lrm", "/lrm.txt", "--arch", "/arch.md", "--dry-run"],
     )
     assert _parse_args().dry_run is True
+
+
+def test_parse_args_lrm(monkeypatch):
+    """Parses --lrm flag."""
+    monkeypatch.setattr(
+        sys, "argv",
+        ["prog", "--file", "f.cpp", "--output-dir", "/out",
+         "--lrm", "/my/LRM.txt", "--arch", "/arch.md"],
+    )
+    assert _parse_args().lrm == "/my/LRM.txt"
+
+
+def test_parse_args_arch(monkeypatch):
+    """Parses --arch flag."""
+    monkeypatch.setattr(
+        sys, "argv",
+        ["prog", "--file", "f.cpp", "--output-dir", "/out",
+         "--lrm", "/lrm.txt", "--arch", "/my/ARCH.md"],
+    )
+    assert _parse_args().arch == "/my/ARCH.md"
 
 
 # ---- _print_classification_table -------------------------------------------
@@ -180,7 +215,6 @@ def test_resolve_destinations_source_is_target(tmp_path):
     assert len(to_create) == 0
 
 
-
 # ---- _write_files ----------------------------------------------------------
 
 
@@ -215,11 +249,7 @@ def test_write_files_merge(tmp_path):
 
 def test_run_file_not_found(tmp_path):
     """Exits when input file does not exist."""
-    args = SimpleNamespace(
-        file=str(tmp_path / "missing.cpp"),
-        output_dir=str(tmp_path),
-        dry_run=False,
-    )
+    args = _run_args(tmp_path, file=str(tmp_path / "missing.cpp"))
     with pytest.raises(SystemExit):
         _run(args)
 
@@ -231,37 +261,31 @@ def test_run_no_test_blocks(tmp_path):
         "#include <gtest/gtest.h>\n\nint x = 0;\n",
         encoding="utf-8",
     )
-    args = SimpleNamespace(
-        file=str(f), output_dir=str(tmp_path), dry_run=False,
-    )
+    args = _run_args(tmp_path, file=str(f))
     with pytest.raises(SystemExit):
         _run(args)
 
 
 def test_run_dry_run(tmp_path, monkeypatch, capsys):
     """Dry run classifies but does not write files."""
-    f = _make_input_file(tmp_path)
-    stub_classifier(monkeypatch, tmp_path, _parser_response())
-    args = SimpleNamespace(
-        file=str(f), output_dir=str(tmp_path), dry_run=True,
-    )
+    _make_input_file(tmp_path)
+    stub_classifier(monkeypatch, _parser_response())
+    args = _run_args(tmp_path, dry_run=True)
     _run(args)
     assert "dry run" in capsys.readouterr().out
 
 
 def _setup_live_run(tmp_path, monkeypatch):
     """Create input file, cmake, and stub classifier for a live run."""
-    f = _make_input_file(tmp_path)
+    _make_input_file(tmp_path)
     cmake = tmp_path / "CMakeLists.txt"
     cmake.write_text(
         "# header\nadd_unit_test(test_input)\n",
         encoding="utf-8",
     )
-    stub_classifier(monkeypatch, tmp_path, _parser_response())
+    stub_classifier(monkeypatch, _parser_response())
     monkeypatch.setattr(split_tests, "CMAKE_PATH", cmake)
-    return SimpleNamespace(
-        file=str(f), output_dir=str(tmp_path), dry_run=False,
-    )
+    return _run_args(tmp_path)
 
 
 def test_run_live(tmp_path, monkeypatch, capsys):
@@ -284,19 +308,40 @@ def test_run_live_merge(tmp_path, monkeypatch, capsys):
         capsys.readouterr().out
 
 
-def _run_live_non_lrm(tmp_path, monkeypatch, src_body, resp):
+def _mixed_classifier(prompt):
+    """Return different classifications based on which test is in prompt."""
+    if "Stay" in prompt:
+        return {
+            "prefix": "test_non_lrm_",
+            "clause": "non-lrm:aig", "rationale": "r",
+        }
+    return {
+        "prefix": "test_parser_",
+        "clause": "6.1", "rationale": "r",
+    }
+
+
+def _run_live_non_lrm(tmp_path, monkeypatch, src_body, classifier):
     """Write source, stub externals, and run live pipeline."""
     src = tmp_path / "test_non_lrm_aig.cpp"
     src.write_text(src_body, encoding="utf-8")
-    stub_classifier(monkeypatch, tmp_path, resp)
+    monkeypatch.setattr(
+        split_tests, "_call_claude", classifier,
+    )
     cmake = tmp_path / "CMakeLists.txt"
     cmake.write_text(
         f"# header\nadd_unit_test({src.stem})\n", encoding="utf-8",
     )
     monkeypatch.setattr(split_tests, "CMAKE_PATH", cmake)
-    _run(SimpleNamespace(
-        file=str(src), output_dir=str(tmp_path), dry_run=False,
-    ))
+    _run(_run_args(tmp_path, file=str(src)))
+
+
+def _self_named_classifier(_prompt):
+    """Classify single test as non-lrm:aig."""
+    return {
+        "prefix": "test_non_lrm_",
+        "clause": "non-lrm:aig", "rationale": "r",
+    }
 
 
 def test_run_live_self_named(tmp_path, monkeypatch):
@@ -304,18 +349,10 @@ def test_run_live_self_named(tmp_path, monkeypatch):
     _run_live_non_lrm(
         tmp_path, monkeypatch,
         "#include <gtest/gtest.h>\n\nTEST(S, T) {\n}\n",
-        {"tests": [{"test_name": "T", "prefix": "test_non_lrm_",
-                     "clause": "non-lrm:aig", "rationale": "r"}]},
+        _self_named_classifier,
     )
     assert (tmp_path / "test_non_lrm_aig.cpp").exists()
 
-
-_MIXED_RESP = {"tests": [
-    {"test_name": "Stay", "prefix": "test_non_lrm_",
-     "clause": "non-lrm:aig", "rationale": "r"},
-    {"test_name": "Move", "prefix": "test_parser_",
-     "clause": "6.1", "rationale": "r"},
-]}
 
 _MIXED_BODY = (
     "#include <gtest/gtest.h>\n\n"
@@ -326,27 +363,35 @@ _MIXED_BODY = (
 
 def test_run_live_mixed_keeps_source(tmp_path, monkeypatch):
     """Source is rewritten with only the staying tests."""
-    _run_live_non_lrm(tmp_path, monkeypatch, _MIXED_BODY, _MIXED_RESP)
+    _run_live_non_lrm(
+        tmp_path, monkeypatch, _MIXED_BODY, _mixed_classifier,
+    )
     src = (tmp_path / "test_non_lrm_aig.cpp").read_text()
     assert "Stay" in src
 
 
 def test_run_live_mixed_removes_moved_from_source(tmp_path, monkeypatch):
     """Moved tests are removed from the source file."""
-    _run_live_non_lrm(tmp_path, monkeypatch, _MIXED_BODY, _MIXED_RESP)
+    _run_live_non_lrm(
+        tmp_path, monkeypatch, _MIXED_BODY, _mixed_classifier,
+    )
     src = (tmp_path / "test_non_lrm_aig.cpp").read_text()
     assert "Move" not in src
 
 
 def test_run_live_mixed_creates_new_file(tmp_path, monkeypatch):
     """Moved tests are written to a new clause file."""
-    _run_live_non_lrm(tmp_path, monkeypatch, _MIXED_BODY, _MIXED_RESP)
+    _run_live_non_lrm(
+        tmp_path, monkeypatch, _MIXED_BODY, _mixed_classifier,
+    )
     assert (tmp_path / "test_parser_clause_06_01.cpp").exists()
 
 
 def test_run_live_mixed_keeps_cmake_entry(tmp_path, monkeypatch):
     """Source kept in CMakeLists.txt when source_is_target."""
-    _run_live_non_lrm(tmp_path, monkeypatch, _MIXED_BODY, _MIXED_RESP)
+    _run_live_non_lrm(
+        tmp_path, monkeypatch, _MIXED_BODY, _mixed_classifier,
+    )
     cmake = (tmp_path / "CMakeLists.txt").read_text()
     assert "test_non_lrm_aig" in cmake
 
@@ -366,6 +411,7 @@ def test_main(monkeypatch):
         split_tests, "_parse_args",
         lambda: SimpleNamespace(
             file="x", output_dir="/tmp", dry_run=True,
+            lrm="/lrm.txt", arch="/arch.md",
         ),
     )
     split_tests.main()
@@ -385,6 +431,7 @@ def test_main_enables_line_buffering(monkeypatch):
         split_tests, "_parse_args",
         lambda: SimpleNamespace(
             file="x", output_dir="/tmp", dry_run=True,
+            lrm="/lrm.txt", arch="/arch.md",
         ),
     )
     split_tests.main()

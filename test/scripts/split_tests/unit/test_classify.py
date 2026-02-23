@@ -7,50 +7,11 @@ import pytest
 
 import split_tests
 from helpers import make_test_block as _tb
-from helpers import monkeypatch_paths
 
-_build_test_blocks_text = getattr(split_tests, "_build_test_blocks_text")
 _build_prompt = getattr(split_tests, "_build_prompt")
 _extract_json = getattr(split_tests, "_extract_json")
 _call_claude = getattr(split_tests, "_call_claude")
-_build_result_map = getattr(split_tests, "_build_result_map")
-_apply_classifications = getattr(split_tests, "_apply_classifications")
-
-
-# ---- load_lrm_toc ---------------------------------------------------------
-
-
-def test_load_lrm_toc_missing(monkeypatch, tmp_path):
-    """Returns placeholder when LRM file is missing."""
-    monkeypatch.setattr(split_tests, "LRM_PATH", tmp_path / "no.txt")
-    assert split_tests.load_lrm_toc() == "(LRM not found)"
-
-
-def test_load_lrm_toc_exists(monkeypatch, tmp_path):
-    """Returns first 2500 lines of the LRM file."""
-    lrm = tmp_path / "LRM.txt"
-    lrm.write_text("line1\nline2\n", encoding="utf-8")
-    monkeypatch.setattr(split_tests, "LRM_PATH", lrm)
-    assert "line1" in split_tests.load_lrm_toc()
-
-
-# ---- load_architecture -----------------------------------------------------
-
-
-def test_load_architecture_missing(monkeypatch, tmp_path):
-    """Returns placeholder when ARCHITECTURE.md is missing."""
-    monkeypatch.setattr(
-        split_tests, "ARCH_PATH", tmp_path / "none.md",
-    )
-    assert split_tests.load_architecture() == "(ARCHITECTURE.md not found)"
-
-
-def test_load_architecture_exists(monkeypatch, tmp_path):
-    """Returns full text of ARCHITECTURE.md."""
-    arch = tmp_path / "ARCHITECTURE.md"
-    arch.write_text("# Arch", encoding="utf-8")
-    monkeypatch.setattr(split_tests, "ARCH_PATH", arch)
-    assert split_tests.load_architecture() == "# Arch"
+_apply_classification = getattr(split_tests, "_apply_classification")
 
 
 # ---- existing_non_lrm_topics ----------------------------------------------
@@ -85,34 +46,61 @@ def test_existing_non_lrm_topics_empty_topic(tmp_path):
     assert split_tests.existing_non_lrm_topics(tmp_path) == []
 
 
-# ---- _build_test_blocks_text ----------------------------------------------
-
-
-def test_build_test_blocks_text():
-    """Builds text representation of test blocks."""
-    t = _tb("MyTest", comments=["// doc"])
-    result = _build_test_blocks_text([t])
-    assert "--- TEST(S, MyTest) ---" in result
-
-
 # ---- _build_prompt ---------------------------------------------------------
 
 
-def test_build_prompt_no_topics(monkeypatch, tmp_path):
+def test_build_prompt_no_topics(tmp_path):
     """Prompt without existing non-lrm topics omits hint."""
-    monkeypatch_paths(monkeypatch, tmp_path)
     t = _tb("X")
-    prompt = _build_prompt([t], tmp_path)
+    prompt = _build_prompt(
+        t, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
+    )
     assert "Existing non-lrm topic files" not in prompt
 
 
-def test_build_prompt_with_topics(monkeypatch, tmp_path):
+def test_build_prompt_with_topics(tmp_path):
     """Prompt with existing non-lrm topics includes hint."""
-    monkeypatch_paths(monkeypatch, tmp_path)
     (tmp_path / "test_non_lrm_aig.cpp").write_text("")
     t = _tb("X")
-    prompt = _build_prompt([t], tmp_path)
+    prompt = _build_prompt(
+        t, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
+    )
     assert "Existing non-lrm topic files" in prompt
+
+
+def test_build_prompt_contains_lrm_path(tmp_path):
+    """Prompt includes the LRM file path."""
+    lrm = tmp_path / "LRM.txt"
+    t = _tb("X")
+    prompt = _build_prompt(t, tmp_path, lrm, tmp_path / "arch.md")
+    assert str(lrm) in prompt
+
+
+def test_build_prompt_contains_arch_path(tmp_path):
+    """Prompt includes the architecture file path."""
+    arch = tmp_path / "ARCHITECTURE.md"
+    t = _tb("X")
+    prompt = _build_prompt(t, tmp_path, tmp_path / "lrm.txt", arch)
+    assert str(arch) in prompt
+
+
+def test_build_prompt_contains_test_body(tmp_path):
+    """Prompt includes the test's source code."""
+    t = _tb("MyTest")
+    prompt = _build_prompt(
+        t, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
+    )
+    assert "TEST(S, MyTest)" in prompt
+
+
+def test_build_prompt_contains_prefixes(tmp_path):
+    """Prompt lists all seven prefixes."""
+    t = _tb("X")
+    prompt = _build_prompt(
+        t, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
+    )
+    assert "test_parser_" in prompt
+    assert "test_non_lrm_" in prompt
 
 
 # ---- _extract_json ---------------------------------------------------------
@@ -148,12 +136,12 @@ def test_call_claude_success(monkeypatch):
     """Returns parsed JSON on success."""
     mock_result = MagicMock()
     mock_result.returncode = 0
-    mock_result.stdout = '{"tests": []}'
+    mock_result.stdout = '{"prefix": "test_parser_"}'
     mock_result.stderr = ""
     monkeypatch.setattr(
         subprocess, "run", lambda *_a, **_kw: mock_result,
     )
-    assert _call_claude("prompt") == {"tests": []}
+    assert _call_claude("prompt") == {"prefix": "test_parser_"}
 
 
 def test_call_claude_failure(monkeypatch):
@@ -169,143 +157,73 @@ def test_call_claude_failure(monkeypatch):
         _call_claude("prompt")
 
 
+def test_call_claude_allows_read(monkeypatch):
+    """CLI command includes --allowedTools Read."""
+    captured_cmd = []
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = '{"prefix": "test_parser_"}'
+    mock_result.stderr = ""
 
-# ---- _build_result_map -----------------------------------------------------
+    def capture_run(*args, **kwargs):
+        captured_cmd.extend(args[0])
+        return mock_result
 
-
-def test_build_result_map_simple():
-    """Maps test_name directly."""
-    resp = {"tests": [
-        {"test_name": "MyTest", "prefix": "test_parser_",
-         "clause": "6.1"},
-    ]}
-    rm = _build_result_map(resp)
-    assert "MyTest" in rm
-
-
-def test_build_result_map_wrapped_name():
-    """Strips TEST(...) wrapper from test_name."""
-    resp = {"tests": [
-        {"test_name": "TEST(Suite, MyTest)", "prefix": "test_parser_",
-         "clause": "6.1"},
-    ]}
-    rm = _build_result_map(resp)
-    assert "Suite, MyTest" in rm
+    monkeypatch.setattr(subprocess, "run", capture_run)
+    _call_claude("prompt")
+    assert "--allowedTools" in captured_cmd
+    assert "Read" in captured_cmd
 
 
-def test_build_result_map_underscore_separator():
-    """Adds entries for the part after common separators."""
-    resp = {"tests": [
-        {"test_name": "Suite_MyTest", "prefix": "test_parser_",
-         "clause": "6.1"},
-    ]}
-    rm = _build_result_map(resp)
-    assert "MyTest" in rm
+# ---- _apply_classification -------------------------------------------------
 
 
-def test_build_result_map_dot_separator():
-    """Adds entry for part after '.' separator."""
-    resp = {"tests": [
-        {"test_name": "Suite.MyTest", "prefix": "test_parser_",
-         "clause": "6.1"},
-    ]}
-    rm = _build_result_map(resp)
-    assert "MyTest" in rm
-
-
-def test_build_result_map_slash_separator():
-    """Adds entry for part after '/' separator."""
-    resp = {"tests": [
-        {"test_name": "Suite/MyTest", "prefix": "test_parser_",
-         "clause": "6.1"},
-    ]}
-    rm = _build_result_map(resp)
-    assert "MyTest" in rm
-
-
-def test_build_result_map_comma_separator():
-    """Adds entry for part after ', ' separator."""
-    resp = {"tests": [
-        {"test_name": "Suite, MyTest", "prefix": "test_parser_",
-         "clause": "6.1"},
-    ]}
-    rm = _build_result_map(resp)
-    assert "MyTest" in rm
-
-
-def test_build_result_map_double_colon_separator():
-    """Adds entry for part after '::' separator."""
-    resp = {"tests": [
-        {"test_name": "Suite::MyTest", "prefix": "test_parser_",
-         "clause": "6.1"},
-    ]}
-    rm = _build_result_map(resp)
-    assert "MyTest" in rm
-
-
-def test_build_result_map_empty():
-    """Empty response returns empty map."""
-    assert not _build_result_map({})
-
-
-# ---- _apply_classifications ------------------------------------------------
-
-
-def test_apply_classifications_found():
-    """Applies prefix, clause, and rationale from result_map."""
+def test_apply_classification_found():
+    """Applies prefix, clause, and rationale from response."""
     t = _tb("MyTest")
-    rm = {"MyTest": {
+    resp = {
         "prefix": "test_parser_", "clause": "6.1",
         "rationale": "reason",
-    }}
-    _apply_classifications([t], rm)
+    }
+    _apply_classification(t, resp)
     assert t.prefix == "test_parser_" and t.clause == "6.1"
 
 
-def test_apply_classifications_not_found():
-    """Defaults to non-lrm when test is not in result_map."""
-    t = _tb("Missing")
-    _apply_classifications([t], {})
-    assert t.prefix == "test_non_lrm"
-
-
-def test_apply_classifications_non_lrm_underscore():
+def test_apply_classification_non_lrm_underscore():
     """Normalizes non_lrm to non-lrm."""
     t = _tb("T")
-    rm = {"T": {
-        "prefix": "test_non_lrm_", "clause": "non_lrm",
-    }}
-    _apply_classifications([t], rm)
+    resp = {"prefix": "test_non_lrm_", "clause": "non_lrm"}
+    _apply_classification(t, resp)
     assert t.clause == "non-lrm"
 
 
-def test_apply_classifications_non_lrm_with_topic():
+def test_apply_classification_non_lrm_with_topic():
     """Appends topic to non-lrm clause."""
     t = _tb("T")
-    rm = {"T": {
+    resp = {
         "prefix": "test_non_lrm_", "clause": "non-lrm",
         "non_lrm_topic": "aig",
-    }}
-    _apply_classifications([t], rm)
+    }
+    _apply_classification(t, resp)
     assert t.clause == "non-lrm:aig"
 
 
-def test_apply_classifications_no_rationale():
+def test_apply_classification_no_rationale():
     """Missing rationale defaults to empty string."""
     t = _tb("T")
-    rm = {"T": {"prefix": "test_parser_", "clause": "6.1"}}
-    _apply_classifications([t], rm)
+    resp = {"prefix": "test_parser_", "clause": "6.1"}
+    _apply_classification(t, resp)
     assert t.rationale == ""
 
 
-def test_apply_classifications_non_lrm_no_topic():
+def test_apply_classification_non_lrm_no_topic():
     """non-lrm clause without topic stays as non-lrm."""
     t = _tb("T")
-    rm = {"T": {
+    resp = {
         "prefix": "test_non_lrm_", "clause": "non-lrm",
         "non_lrm_topic": None,
-    }}
-    _apply_classifications([t], rm)
+    }
+    _apply_classification(t, resp)
     assert t.clause == "non-lrm"
 
 
@@ -313,45 +231,36 @@ def test_apply_classifications_non_lrm_no_topic():
 
 
 def test_classify_tests_matching(monkeypatch, tmp_path):
-    """classify_tests applies classifications when names match."""
-    monkeypatch_paths(monkeypatch, tmp_path)
-    response = {"tests": [
-        {"test_name": "T", "prefix": "test_parser_",
-         "clause": "6.1", "rationale": "r"},
-    ]}
+    """classify_tests applies classification per test."""
+    response = {
+        "prefix": "test_parser_", "clause": "6.1", "rationale": "r",
+    }
     monkeypatch.setattr(
         split_tests, "_call_claude", lambda p: response,
     )
     t = _tb("T")
-    split_tests.classify_tests([t], tmp_path)
+    split_tests.classify_tests(
+        [t], tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
+    )
     assert t.prefix == "test_parser_"
 
 
-def test_classify_tests_mismatch(monkeypatch, tmp_path, capsys):
-    """classify_tests prints warning on name mismatch."""
-    monkeypatch_paths(monkeypatch, tmp_path)
-    response = {"tests": [
-        {"test_name": "Wrong", "prefix": "test_parser_",
-         "clause": "6.1", "rationale": "r"},
-    ]}
-    monkeypatch.setattr(
-        split_tests, "_call_claude", lambda p: response,
-    )
-    t = _tb("T")
-    split_tests.classify_tests([t], tmp_path)
-    assert "WARNING" in capsys.readouterr().out
+def test_classify_tests_per_test(monkeypatch, tmp_path):
+    """classify_tests calls Claude once per test."""
+    call_count = [0]
 
+    def counting_claude(prompt):
+        call_count[0] += 1
+        return {
+            "prefix": "test_parser_", "clause": "6.1",
+            "rationale": "r",
+        }
 
-def test_classify_tests_no_missing(monkeypatch, tmp_path, capsys):
-    """When names differ but result_map has all keys, no mismatch print."""
-    monkeypatch_paths(monkeypatch, tmp_path)
-    response = {"tests": [
-        {"test_name": "Suite_T", "prefix": "test_parser_",
-         "clause": "6.1", "rationale": "r"},
-    ]}
     monkeypatch.setattr(
-        split_tests, "_call_claude", lambda p: response,
+        split_tests, "_call_claude", counting_claude,
     )
-    t = _tb("T")
-    split_tests.classify_tests([t], tmp_path)
-    assert "Name mismatch" not in capsys.readouterr().out
+    tests = [_tb("A"), _tb("B"), _tb("C")]
+    split_tests.classify_tests(
+        tests, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
+    )
+    assert call_count[0] == 3

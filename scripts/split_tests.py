@@ -81,8 +81,6 @@ def find_repo_root() -> Path:
 
 REPO_ROOT = find_repo_root()
 CMAKE_PATH = REPO_ROOT / "test" / "CMakeLists.txt"
-LRM_PATH = Path.home() / "LRM.txt"
-ARCH_PATH = REPO_ROOT / "docs" / "ARCHITECTURE.md"
 
 
 # ---------------------------------------------------------------------------
@@ -293,21 +291,6 @@ def parse_file(filepath):
 # Stage 2: Classify via Claude
 # ---------------------------------------------------------------------------
 
-def load_lrm_toc():
-    """Load LRM table of contents (first ~2500 lines)."""
-    if not LRM_PATH.exists():
-        return "(LRM not found)"
-    lines = LRM_PATH.read_text(encoding="utf-8").splitlines()
-    return "\n".join(lines[:2500])
-
-
-def load_architecture():
-    """Load architecture doc."""
-    if not ARCH_PATH.exists():
-        return "(ARCHITECTURE.md not found)"
-    return ARCH_PATH.read_text(encoding="utf-8")
-
-
 def existing_non_lrm_topics(test_dir):
     """Scan output dir for existing test_non_lrm_*.cpp topic names."""
     topics = set()
@@ -322,78 +305,60 @@ def existing_non_lrm_topics(test_dir):
     return sorted(topics)
 
 
-def _build_test_blocks_text(tests):
-    """Build text representation of test blocks for the prompt."""
-    parts = []
-    for t in tests:
-        parts.append(
-            f"\n--- TEST({t.suite_name}, {t.test_name}) ---\n",
-        )
-        parts.extend(line + "\n" for line in t.preceding_comments)
-        parts.extend(line + "\n" for line in t.lines)
-    return "".join(parts)
+_PROMPT_TEMPLATE = """Classify this test. Determine:
 
+1. PREFIX — which pipeline stage the test exercises. Use EXACTLY one of:
+   - test_preprocessor_
+   - test_lexer_
+   - test_parser_
+   - test_elaborator_
+   - test_simulator_
+   - test_synthesizer_
+   - test_non_lrm_
+   Read the project architecture document for what each stage covers.
+   Do NOT invent new prefixes.
 
-_PROMPT_TEMPLATE = """Classify each TEST block below. For each test determine:
+2. CLAUSE — which IEEE 1800-2023 clause the test covers based on what
+   the code actually DOES. Ignore source comments — they may be wrong.
+   Use the most specific subclause possible (e.g. 9.2.2.2.2, not 9.2).
+   Clauses and annexes can be arbitrarily deep — use the most specific
+   one that applies. Read the LRM to find the right depth.
+   Read the relevant LRM sections to verify — do not guess from titles.
+   If no LRM clause applies: non-lrm
 
-1. PREFIX — which architectural pipeline stage the test exercises.
-   You MUST use one of these exact prefixes:
-   - test_preprocessor_ (preprocessor: macro expansion, `include, `ifdef)
-   - test_lexer_ (lexer/tokenizer)
-   - test_parser_ (parser and AST construction)
-   - test_elaborator_ (elaborator: type checking, constant evaluation,
-     sensitivity analysis, RTLIR)
-   - test_simulator_ (simulator: scheduler, processes, eval, VCD, VPI, DPI,
-     clocking, assertions, compiled sim, coverage, CRV, SDF)
-   - test_synthesizer_ (synthesizer: AIG, optimization, LUT/cell mapping,
-     netlist output)
-   - test_non_lrm_ (internal infrastructure with no LRM clause)
-   Do NOT invent new prefixes. Every test fits one of these categories.
+3. NON_LRM_TOPIC — only when clause is "non-lrm". A short snake_case
+   topic (e.g. "aig", "arena", "dpi_helpers"). Set to null otherwise.
+{topics}
+Project architecture: {arch_path}
+IEEE 1800-2023 LRM: {lrm_path}
 
-2. CLAUSE — which IEEE 1800-2023 clause the test covers based on what the
-   code actually DOES. Ignore source comments — they may be wrong.
-   Use the most specific subclause possible (W.X.Y.Z).
-   For annexes use: I.3, A.6, K.2, M.1, etc.
-   If no LRM clause applies use: non-lrm
+TEST({suite}, {test_name}):
+{test_body}
 
-3. NON_LRM_TOPIC — if and only if the clause is "non-lrm", provide a short
-   snake_case topic describing what the test exercises (e.g., "aig",
-   "type_eval", "arena", "dpi_helpers"). This becomes the filename suffix:
-   test_non_lrm_{{topic}}.cpp. If clause is NOT "non-lrm", set to null.{topics}
-
-Project Architecture:
-{arch}
-
-LRM Table of Contents:
-{toc}
-
-TEST blocks:
-{blocks}
-
-IMPORTANT: Respond with ONLY a JSON object matching this schema:
-{{"tests": [
-  {{"test_name": "...", "prefix": "...", "clause": "...",
-    "non_lrm_topic": "...", "rationale": "..."}}
-]}}
+Respond with ONLY JSON:
+{{"prefix": "...", "clause": "...", "non_lrm_topic": ..., "rationale": "..."}}
 """
 
 
-def _build_prompt(tests, test_dir):
-    """Build the Claude classification prompt."""
+def _build_prompt(test, test_dir, lrm_path, arch_path):
+    """Build the Claude classification prompt for a single test."""
     topics = existing_non_lrm_topics(test_dir)
     topics_hint = ""
     if topics:
         topics_hint = (
-            "\n   Existing non-lrm topic files: "
+            "   Existing non-lrm topic files: "
             + ", ".join(topics)
             + "\n   PREFER reusing one of these topics when the"
-            " test fits, to avoid near-duplicate filenames."
+            " test fits, to avoid near-duplicate filenames.\n"
         )
+    body = "\n".join(test.preceding_comments + test.lines)
     return _PROMPT_TEMPLATE.format(
         topics=topics_hint,
-        arch=load_architecture(),
-        toc=load_lrm_toc(),
-        blocks=_build_test_blocks_text(tests),
+        arch_path=arch_path,
+        lrm_path=lrm_path,
+        suite=test.suite_name,
+        test_name=test.test_name,
+        test_body=body,
     )
 
 
@@ -419,7 +384,7 @@ def _call_claude(prompt):
     env = os.environ.copy()
     env.pop("CLAUDECODE", None)
     result = subprocess.run(
-        ["claude", "-p", "--model", "sonnet"],
+        ["claude", "-p", "--model", "sonnet", "--allowedTools", "Read"],
         input=prompt,
         capture_output=True,
         text=True,
@@ -433,61 +398,25 @@ def _call_claude(prompt):
     return _extract_json(result.stdout.strip())
 
 
-def _build_result_map(response):
-    """Build lookup map from classification response."""
-    result_map = {}
-    for item in response.get("tests", []):
-        name = item["test_name"]
-        tm = re.match(r"TEST(?:_[FP])?\((.+)\)$", name)
-        if tm:
-            name = tm.group(1)
-            item["test_name"] = name
-        result_map[name] = item
-        for sep in ("_", ".", "/", ", ", "::"):
-            if sep in name:
-                result_map[name.split(sep, 1)[-1]] = item
-    return result_map
+def _apply_classification(test, response):
+    """Apply a single classification result to a test block."""
+    test.prefix = response["prefix"]
+    clause = response["clause"]
+    if clause.replace("_", "-") == "non-lrm":
+        clause = "non-lrm"
+    topic = response.get("non_lrm_topic")
+    if clause == "non-lrm" and topic:
+        clause = f"non-lrm:{topic}"
+    test.clause = clause
+    test.rationale = response.get("rationale", "")
 
 
-def _apply_classifications(tests, result_map):
-    """Apply classification results to test blocks."""
-    for t in tests:
-        if t.test_name not in result_map:
-            print(
-                f"  WARNING: Claude did not classify "
-                f"{t.test_name}, defaulting to non-lrm",
-            )
-            t.prefix = "test_non_lrm"
-            t.clause = "non-lrm"
-            continue
-        r = result_map[t.test_name]
-        t.prefix = r["prefix"]
-        clause = r["clause"]
-        if clause.replace("_", "-") == "non-lrm":
-            clause = "non-lrm"
-        topic = r.get("non_lrm_topic")
-        if clause == "non-lrm" and topic:
-            clause = f"non-lrm:{topic}"
-        t.clause = clause
-        t.rationale = r.get("rationale", "")
-
-
-def classify_tests(tests, test_dir):
+def classify_tests(tests, test_dir, lrm_path, arch_path):
     """Use Claude to classify each test's prefix and clause."""
-    prompt = _build_prompt(tests, test_dir)
-    response = _call_claude(prompt)
-    result_map = _build_result_map(response)
-    expected = {t.test_name for t in tests}
-    returned = {
-        item["test_name"] for item in response.get("tests", [])
-    }
-    if expected != returned:
-        missing = expected - set(result_map.keys())
-        if missing:
-            print(f"  Name mismatch — returned: "
-                  f"{sorted(returned)[:5]}...")
-            print(f"  Expected: {sorted(expected)[:5]}...")
-    _apply_classifications(tests, result_map)
+    for t in tests:
+        prompt = _build_prompt(t, test_dir, lrm_path, arch_path)
+        response = _call_claude(prompt)
+        _apply_classification(t, response)
     return tests
 
 
@@ -557,12 +486,12 @@ def find_merge_target(target_base, test_dir, exclude_path=None):
 # Stage 5: Generate files
 # ---------------------------------------------------------------------------
 
-def load_lrm_titles():
+def load_lrm_titles(lrm_path):
     """Build clause -> title map from LRM."""
     titles = {}
-    if not LRM_PATH.exists():
+    if not lrm_path.exists():
         return titles
-    for line in LRM_PATH.read_text(encoding="utf-8").splitlines():
+    for line in lrm_path.read_text(encoding="utf-8").splitlines():
         m = re.match(r"^(\d+(?:\.\d+)*)\s+(.+)$", line)
         if m:
             titles[m.group(1)] = m.group(2).strip()
@@ -693,6 +622,14 @@ def _parse_args():
         "--output-dir", required=True, help="Directory for output files",
     )
     parser.add_argument(
+        "--lrm", required=True,
+        help="Path to IEEE 1800-2023 LRM text file",
+    )
+    parser.add_argument(
+        "--arch", required=True,
+        help="Path to ARCHITECTURE.md file",
+    )
+    parser.add_argument(
         "--dry-run", action="store_true",
         help="Classify only, don't write files",
     )
@@ -818,18 +755,19 @@ def _run(args):
     """Execute the split operation."""
     test_dir = Path(args.output_dir).resolve()
     filepath = Path(args.file).resolve()
+    lrm_path = Path(args.lrm).resolve()
+    arch_path = Path(args.arch).resolve()
     test_name = filepath.stem
     if not filepath.exists():
         print(f"ERROR: {filepath} not found")
         sys.exit(1)
     parsed = parse_file(filepath)
-    n_tests = len(parsed.all_tests)
     if not parsed.all_tests:
         print("ERROR: No TEST blocks found")
         sys.exit(1)
     dry = " (dry run)" if args.dry_run else ""
-    print(f"{test_name}.cpp \u2014 {n_tests} tests{dry}")
-    classify_tests(parsed.all_tests, test_dir)
+    print(f"{test_name}.cpp \u2014 {len(parsed.all_tests)} tests{dry}")
+    classify_tests(parsed.all_tests, test_dir, lrm_path, arch_path)
     _print_classification_table(parsed.all_tests)
     groups = _group_tests(parsed.all_tests)
     to_create, to_merge = _resolve_destinations(
@@ -843,10 +781,10 @@ def _run(args):
         for p, c in groups
     )
     if not to_create and not to_merge and source_is_target:
-        print(f"  {test_name}.cpp \u2014 {n_tests} tests,"
+        print(f"  {test_name}.cpp \u2014 {len(parsed.all_tests)} tests,"
               " all already in correct file.")
         return
-    titles = load_lrm_titles()
+    titles = load_lrm_titles(lrm_path)
     new_names = _write_files(
         to_create, to_merge, parsed, test_dir, titles,
     )

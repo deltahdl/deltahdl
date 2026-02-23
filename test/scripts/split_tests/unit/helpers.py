@@ -32,19 +32,8 @@ def make_parsed_file(
     )
 
 
-def monkeypatch_paths(monkeypatch, tmp_path):
-    """Stub out LRM_PATH and ARCH_PATH to missing files."""
-    monkeypatch.setattr(
-        split_tests, "LRM_PATH", tmp_path / "no.txt",
-    )
-    monkeypatch.setattr(
-        split_tests, "ARCH_PATH", tmp_path / "no.md",
-    )
-
-
-def stub_classifier(monkeypatch, tmp_path, response):
-    """Stub out LRM/ARCH paths and _call_claude for classify_tests."""
-    monkeypatch_paths(monkeypatch, tmp_path)
+def stub_classifier(monkeypatch, response):
+    """Stub _call_claude for classify_tests."""
     monkeypatch.setattr(
         split_tests, "_call_claude", lambda p: response,
     )
