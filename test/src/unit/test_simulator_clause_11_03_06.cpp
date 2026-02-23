@@ -1,4 +1,4 @@
-// §non-lrm:eval_advanced
+// §11.3.6: Assignment within an expression
 
 #include <gtest/gtest.h>
 #include <cstring>
@@ -55,29 +55,37 @@ static Expr *MakeRange(Arena &arena, Expr *lo, Expr *hi,
 
 namespace {
 
-// =============================================================================
-// TwoStateDetector
-// =============================================================================
-TEST(AdvSim, TwoStateDetectorKnown2State) {
-  Arena arena;
-  auto vec = MakeLogic4VecVal(arena, 8, 0x42);
-  EXPECT_TRUE(TwoStateDetector::Is2State(vec));
+// ==========================================================================
+// §11.3.6: Assignment within expression
+// ==========================================================================
+TEST(EvalAdv, AssignInExprBasic) {
+  EvalAdvFixture f;
+  // (a = 42) should assign 42 to a and return 42.
+  MakeVar(f, "aie", 32, 0);
+  auto *assign = f.arena.Create<Expr>();
+  assign->kind = ExprKind::kBinary;
+  assign->op = TokenKind::kEq;
+  assign->lhs = MakeId(f.arena, "aie");
+  assign->rhs = MakeInt(f.arena, 42);
+  auto result = EvalExpr(assign, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 42u);
+  auto *var = f.ctx.FindVariable("aie");
+  EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(AdvSim, TwoStateDetectorWith4StateValue) {
-  Arena arena;
-  auto vec = MakeLogic4Vec(arena, 8);
-  // Set bval to non-zero to indicate X/Z.
-  vec.words[0].bval = 0x01;
-  EXPECT_FALSE(TwoStateDetector::Is2State(vec));
-}
-
-TEST(AdvSim, TwoStateDetectorZeroWidth) {
-  Logic4Vec empty;
-  empty.width = 0;
-  empty.nwords = 0;
-  empty.words = nullptr;
-  EXPECT_TRUE(TwoStateDetector::Is2State(empty));
+TEST(EvalAdv, AssignInExprTruncToLHSWidth) {
+  EvalAdvFixture f;
+  // (b = 0x1FF) where b is 8-bit should truncate to 0xFF.
+  MakeVar(f, "aie8", 8, 0);
+  auto *assign = f.arena.Create<Expr>();
+  assign->kind = ExprKind::kBinary;
+  assign->op = TokenKind::kEq;
+  assign->lhs = MakeId(f.arena, "aie8");
+  assign->rhs = MakeInt(f.arena, 0x1FF);
+  auto result = EvalExpr(assign, f.ctx, f.arena);
+  // §11.3.6: Result should be cast to LHS type (8-bit).
+  EXPECT_EQ(result.width, 8u);
+  EXPECT_EQ(result.ToUint64(), 0xFFu);
 }
 
 }  // namespace
