@@ -3,8 +3,7 @@ concurrency:
   cancel-in-progress: true
   group: tools-${{ github.ref }}
 jobs:
-  e2e-test:
-    needs: integration-test
+  test:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -12,57 +11,18 @@ jobs:
         uses: actions/cache@v4
         with:
           key: >-
-            pip-${{ github.job }}-${{
+            pip-tools-${{
             hashFiles('.github/workflows/tools.yml') }}
           path: ~/.cache/pip
           restore-keys: |
-            pip-${{ github.job }}-
-      - name: Install tools
-        run: pip install pytest
-      - name: Run e2e tests
-        run: >-
-          PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/split_tests/e2e/ -v
-  integration-test:
-    needs: unit-test
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Restore pip cache
-        uses: actions/cache@v4
-        with:
-          key: >-
-            pip-${{ github.job }}-${{
-            hashFiles('.github/workflows/tools.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-${{ github.job }}-
-      - name: Install tools
-        run: pip install pytest
-      - name: Run integration tests
-        run: >-
-          PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/split_tests/integration/ -v
-  static-analysis:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Restore pip cache
-        uses: actions/cache@v4
-        with:
-          key: >-
-            pip-${{ github.job }}-${{
-            hashFiles('.github/workflows/tools.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-${{ github.job }}-
+            pip-tools-
       - name: Install tools
         run: |
           pip install \
             assert-no-inline-directives \
             assert-no-linter-config-files \
             assert-one-assert-per-pytest \
-            mypy pylint pytest
+            mypy pylint pytest pytest-cov
           npm install -g jscpd
       - name: Assert no inline lint disables
         run: >-
@@ -106,22 +66,6 @@ jobs:
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
           --reporters console test/scripts/split_tests/
-  unit-test:
-    needs: static-analysis
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Restore pip cache
-        uses: actions/cache@v4
-        with:
-          key: >-
-            pip-${{ github.job }}-${{
-            hashFiles('.github/workflows/tools.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-${{ github.job }}-
-      - name: Install tools
-        run: pip install pytest pytest-cov
       - name: Run unit tests with 100% coverage gate
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest
@@ -130,6 +74,14 @@ jobs:
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
+      - name: Run integration tests
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/split_tests/integration/ -v
+      - name: Run e2e tests
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/split_tests/e2e/ -v
 name: Tools
 on:
   pull_request:
