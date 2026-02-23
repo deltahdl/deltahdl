@@ -116,7 +116,7 @@ def test_resolve_destinations_create(tmp_path):
     t = _tb("T", prefix="test_parser_", clause="6.1")
     groups = {("test_parser_", "6.1"): [t]}
     to_create, to_merge = _resolve_destinations(
-        groups, tmp_path, {},
+        groups, tmp_path,
     )
     assert len(to_create) == 1 and len(to_merge) == 0
 
@@ -129,7 +129,7 @@ def test_resolve_destinations_merge(tmp_path):
     t = _tb("New", prefix="test_parser_", clause="6.1")
     groups = {("test_parser_", "6.1"): [t]}
     _, to_merge = _resolve_destinations(
-        groups, tmp_path, {},
+        groups, tmp_path,
     )
     assert len(to_merge) == 1
 
@@ -141,7 +141,7 @@ def test_resolve_destinations_duplicates(tmp_path):
     t = _tb("T", prefix="test_parser_", clause="6.1")
     groups = {("test_parser_", "6.1"): [t]}
     to_create, to_merge = _resolve_destinations(
-        groups, tmp_path, {},
+        groups, tmp_path,
     )
     assert len(to_create) == 0 and len(to_merge) == 0
 
@@ -152,7 +152,7 @@ def test_resolve_destinations_all_dupes(tmp_path, capsys):
     f.write_text("TEST(S, T) {\n}\n")
     t = _tb("T", prefix="test_parser_", clause="6.1")
     groups = {("test_parser_", "6.1"): [t]}
-    _resolve_destinations(groups, tmp_path, {})
+    _resolve_destinations(groups, tmp_path)
     assert "Removed T" in capsys.readouterr().out
 
 
@@ -163,7 +163,7 @@ def test_resolve_destinations_excludes_source(tmp_path):
     t = _tb("Self", prefix="test_non_lrm_", clause="non-lrm:aig")
     groups = {("test_non_lrm_", "non-lrm:aig"): [t]}
     to_create, to_merge = _resolve_destinations(
-        groups, tmp_path, {}, exclude_path=src,
+        groups, tmp_path, exclude_path=src,
     )
     assert len(to_create) == 0 and len(to_merge) == 0
 
@@ -175,7 +175,7 @@ def test_resolve_destinations_source_is_target(tmp_path):
     t = _tb("Keep", prefix="test_non_lrm_", clause="non-lrm:vpi")
     groups = {("test_non_lrm_", "non-lrm:vpi"): [t]}
     to_create, _ = _resolve_destinations(
-        groups, tmp_path, {}, exclude_path=src,
+        groups, tmp_path, exclude_path=src,
     )
     assert len(to_create) == 0
 

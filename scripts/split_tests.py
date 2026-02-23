@@ -719,7 +719,7 @@ def _group_tests(tests):
     return groups
 
 
-def _resolve_destinations(groups, test_dir, lrm_titles,
+def _resolve_destinations(groups, test_dir,
                           exclude_path=None):
     """Deduplicate tests and resolve create/merge destinations."""
     to_create = []
@@ -832,9 +832,8 @@ def _run(args):
     classify_tests(parsed.all_tests, test_dir)
     _print_classification_table(parsed.all_tests)
     groups = _group_tests(parsed.all_tests)
-    lrm_titles = load_lrm_titles()
     to_create, to_merge = _resolve_destinations(
-        groups, test_dir, lrm_titles, exclude_path=filepath,
+        groups, test_dir, exclude_path=filepath,
     )
     if args.dry_run:
         _print_dry_run_summary(to_create, to_merge)
@@ -847,12 +846,13 @@ def _run(args):
         print(f"  {test_name}.cpp \u2014 {n_tests} tests,"
               " all already in correct file.")
         return
+    titles = load_lrm_titles()
     new_names = _write_files(
-        to_create, to_merge, parsed, test_dir, lrm_titles,
+        to_create, to_merge, parsed, test_dir, titles,
     )
     if source_is_target:
         n_kept = _rewrite_source(
-            filepath, groups, parsed, lrm_titles, test_name,
+            filepath, groups, parsed, titles, test_name,
         )
         print(f"  Kept {n_kept} tests in {test_name}.cpp"
               " because they belong there.")
