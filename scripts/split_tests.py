@@ -853,6 +853,19 @@ def _print_dry_run_summary(to_create, to_merge):
               " the correct files")
 
 
+def _rewrite_source(filepath, groups, parsed, lrm_titles, test_name):
+    """Rewrite the source file keeping only tests that belong there."""
+    staying = [t for (p, c), ts in groups.items()
+               if clause_to_filename(p, c) == test_name
+               for t in ts]
+    clause = next(c for (p, c), _ in groups.items()
+                  if clause_to_filename(p, c) == test_name)
+    title = lrm_titles.get(clause, "")
+    content = generate_file(clause, title, parsed, staying)
+    filepath.write_text(content, encoding="utf-8")
+    print(f"  Rewrote {test_name}.cpp ({len(staying)} tests kept)")
+
+
 def _run(args):
     """Execute the split operation."""
     test_dir = Path(args.output_dir).resolve()
@@ -900,7 +913,9 @@ def _run(args):
     print("Stage 6: Updating CMakeLists.txt...")
     update_cmake(test_name, new_names)
     print("Stage 7: Cleaning up...")
-    if not source_is_target:
+    if source_is_target:
+        _rewrite_source(filepath, groups, parsed, lrm_titles, test_name)
+    else:
         filepath.unlink()
         print(f"  Deleted {test_name}.cpp")
     update_standalone(test_name)

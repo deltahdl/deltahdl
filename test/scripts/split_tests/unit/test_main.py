@@ -318,21 +318,38 @@ def test_run_live_self_named(tmp_path, monkeypatch):
     assert (tmp_path / "test_non_lrm_aig.cpp").exists()
 
 
+_MIXED_RESP = {"tests": [
+    {"test_name": "Stay", "prefix": "test_non_lrm_",
+     "clause": "non-lrm:aig", "rationale": "r"},
+    {"test_name": "Move", "prefix": "test_parser_",
+     "clause": "6.1", "rationale": "r"},
+]}
+
+_MIXED_BODY = (
+    "#include <gtest/gtest.h>\n\n"
+    "TEST(S, Stay) {\n}\n"
+    "TEST(S, Move) {\n}\n"
+)
+
+
 def test_run_live_mixed_keeps_source(tmp_path, monkeypatch):
-    """Source kept when some tests stay and others go elsewhere."""
-    _run_live_non_lrm(
-        tmp_path, monkeypatch,
-        "#include <gtest/gtest.h>\n\n"
-        "TEST(S, Stay) {\n}\n"
-        "TEST(S, Move) {\n}\n",
-        {"tests": [
-            {"test_name": "Stay", "prefix": "test_non_lrm_",
-             "clause": "non-lrm:aig", "rationale": "r"},
-            {"test_name": "Move", "prefix": "test_parser_",
-             "clause": "6.1", "rationale": "r"},
-        ]},
-    )
-    assert (tmp_path / "test_non_lrm_aig.cpp").exists()
+    """Source is rewritten with only the staying tests."""
+    _run_live_non_lrm(tmp_path, monkeypatch, _MIXED_BODY, _MIXED_RESP)
+    src = (tmp_path / "test_non_lrm_aig.cpp").read_text()
+    assert "Stay" in src
+
+
+def test_run_live_mixed_removes_moved_from_source(tmp_path, monkeypatch):
+    """Moved tests are removed from the source file."""
+    _run_live_non_lrm(tmp_path, monkeypatch, _MIXED_BODY, _MIXED_RESP)
+    src = (tmp_path / "test_non_lrm_aig.cpp").read_text()
+    assert "Move" not in src
+
+
+def test_run_live_mixed_creates_new_file(tmp_path, monkeypatch):
+    """Moved tests are written to a new clause file."""
+    _run_live_non_lrm(tmp_path, monkeypatch, _MIXED_BODY, _MIXED_RESP)
+    assert (tmp_path / "test_parser_clause_06_01.cpp").exists()
 
 
 # ---- main ------------------------------------------------------------------
