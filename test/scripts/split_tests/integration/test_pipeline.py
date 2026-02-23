@@ -36,7 +36,7 @@ def _make_classifier(*triples):
     return classifier
 
 
-def _make_classifier_with_topic(name, prefix, clause, topic):
+def _make_classifier_with_topic(_name, prefix, clause, topic):
     """Build per-test classifier that includes non_lrm_topic."""
     resp = {"prefix": prefix, "clause": clause,
             "non_lrm_topic": topic, "rationale": "r"}

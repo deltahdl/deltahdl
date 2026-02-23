@@ -173,7 +173,7 @@ def test_call_claude_allows_read(monkeypatch):
     mock_result.stdout = '{"prefix": "test_parser_"}'
     mock_result.stderr = ""
 
-    def capture_run(*args, **kwargs):
+    def capture_run(*args, **_kwargs):
         captured_cmd.extend(args[0])
         return mock_result
 
@@ -256,7 +256,7 @@ def test_classify_tests_per_test(monkeypatch, tmp_path):
     """classify_tests calls Claude once per test."""
     call_count = [0]
 
-    def counting_claude(prompt):
+    def counting_claude(_prompt):
         call_count[0] += 1
         return {
             "prefix": "test_parser_", "clause": "6.1",
