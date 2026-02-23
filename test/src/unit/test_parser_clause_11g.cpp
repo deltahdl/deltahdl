@@ -26,17 +26,6 @@ static ParseResult11g Parse(const std::string &src) {
   return result;
 }
 
-static bool ParseOk(const std::string &src) {
-  SourceManager mgr;
-  Arena arena;
-  auto fid = mgr.AddFile("<test>", src);
-  DiagEngine diag(mgr);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, arena, diag);
-  parser.Parse();
-  return !diag.HasErrors();
-}
-
 static Stmt *FirstInitialStmt(ParseResult11g &r) {
   for (auto *item : r.cu->modules[0]->items) {
     if (item->kind != ModuleItemKind::kInitialBlock) continue;
