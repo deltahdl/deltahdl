@@ -46,8 +46,9 @@ jobs:
             exit 0
           fi
           CHANGED=$(git diff --name-only "$BASE" "${{ github.sha }}")
+          FILTERED=$(echo "$CHANGED" | grep -v '^scripts/split_tests\.py$' | grep -v '^test/scripts/split_tests/')
           PAT='^(lib/|scripts/|test/lib/|test/scripts/)'
-          if echo "$CHANGED" | grep -qE "$PAT"; then
+          if echo "$FILTERED" | grep -qE "$PAT"; then
             echo "scripts_changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "scripts_changed=false" >> "$GITHUB_OUTPUT"
