@@ -300,3 +300,53 @@ TEST(ParserCh512, Attribute_MultipleSeparateInstances) {
   EXPECT_EQ(item->attrs[0].name, "first");
   EXPECT_EQ(item->attrs[1].name, "second");
 }
+struct ParseResult313 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit *cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult313 Parse(const std::string &src) {
+  ParseResult313 result;
+  DiagEngine diag(result.mgr);
+  auto fid = result.mgr.AddFile("<test>", src);
+  Preprocessor preproc(result.mgr, diag, {});
+  auto pp = preproc.Preprocess(fid);
+  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
+  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static bool HasItemOfKindAndName(const std::vector<ModuleItem *> &items,
+                                 ModuleItemKind kind, const std::string &name) {
+  for (const auto *item : items)
+    if (item->kind == kind && item->name == name) return true;
+  return false;
+}
+
+static bool HasAttrNamed(const std::vector<ModuleItem *> &items,
+                         const std::string &name) {
+  for (const auto *item : items)
+    for (const auto &attr : item->attrs)
+      if (attr.name == name) return true;
+  return false;
+}
+
+// 32. Attribute name space (h) — enclosed by (* and *)
+TEST(ParserClause03, Cl3_13_AttributeNameSpace) {
+  auto r = Parse(
+      "module m;\n"
+      "  (* synthesis *) logic flag;\n"
+      "  (* full_case, parallel_case *) logic [1:0] sel;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  // Verify attributes are parsed and attached to declarations
+  EXPECT_TRUE(HasAttrNamed(r.cu->modules[0]->items, "synthesis"));
+  EXPECT_TRUE(HasAttrNamed(r.cu->modules[0]->items, "full_case"));
+}
+

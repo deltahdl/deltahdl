@@ -230,4 +230,90 @@ TEST(SourceText, PackageItemEmptyStmt) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
+struct ParseResult313 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit *cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult313 Parse(const std::string &src) {
+  ParseResult313 result;
+  DiagEngine diag(result.mgr);
+  auto fid = result.mgr.AddFile("<test>", src);
+  Preprocessor preproc(result.mgr, diag, {});
+  auto pp = preproc.Preprocess(fid);
+  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
+  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static bool ParseOk(const std::string &src) {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<test>", src);
+  Preprocessor preproc(mgr, diag, {});
+  auto pp = preproc.Preprocess(fid);
+  auto pp_fid = mgr.AddFile("<preprocessed>", pp);
+  Lexer lexer(mgr.FileContent(pp_fid), pp_fid, diag);
+  Parser parser(lexer, arena, diag);
+  parser.Parse();
+  return !diag.HasErrors();
+}
+
+static bool HasItemOfKindAndName(const std::vector<ModuleItem *> &items,
+                                 ModuleItemKind kind, const std::string &name) {
+  for (const auto *item : items)
+    if (item->kind == kind && item->name == name) return true;
+  return false;
+}
+
+static bool HasAttrNamed(const std::vector<ModuleItem *> &items,
+                         const std::string &name) {
+  for (const auto *item : items)
+    for (const auto &attr : item->attrs)
+      if (attr.name == name) return true;
+  return false;
+}
+
+// 8. Package with internal declarations (local scope)
+TEST(ParserClause03, Cl3_13_PackageWithInternalDeclarations) {
+  auto r = Parse(
+      "package my_pkg;\n"
+      "  typedef logic [7:0] byte_t;\n"
+      "  parameter int WIDTH = 8;\n"
+      "  function automatic int double_it(int x);\n"
+      "    return x * 2;\n"
+      "  endfunction\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  auto *pkg = r.cu->packages[0];
+  EXPECT_EQ(pkg->name, "my_pkg");
+  EXPECT_GE(pkg->items.size(), 3u);
+}
+
+// 22. Typedef in package scope
+TEST(ParserClause03, Cl3_13_TypedefInPackageScope) {
+  auto r = Parse(
+      "package types_pkg;\n"
+      "  typedef logic [7:0] byte_t;\n"
+      "  typedef logic [15:0] word_t;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  auto *pkg = r.cu->packages[0];
+  int typedef_count = 0;
+  for (auto *item : pkg->items) {
+    if (item->kind == ModuleItemKind::kTypedef) typedef_count++;
+  }
+  EXPECT_EQ(typedef_count, 2);
+}
+
 }  // namespace

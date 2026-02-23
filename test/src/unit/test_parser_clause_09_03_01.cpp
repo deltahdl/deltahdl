@@ -130,3 +130,121 @@ TEST(ParserCh90301, BlockVarDecl_FullStructReplication) {
               "  end\n"
               "endmodule\n"));
 }
+struct ParseResult313 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit *cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult313 Parse(const std::string &src) {
+  ParseResult313 result;
+  DiagEngine diag(result.mgr);
+  auto fid = result.mgr.AddFile("<test>", src);
+  Preprocessor preproc(result.mgr, diag, {});
+  auto pp = preproc.Preprocess(fid);
+  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
+  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static bool HasItemOfKindAndName(const std::vector<ModuleItem *> &items,
+                                 ModuleItemKind kind, const std::string &name) {
+  for (const auto *item : items)
+    if (item->kind == kind && item->name == name) return true;
+  return false;
+}
+
+static bool HasAttrNamed(const std::vector<ModuleItem *> &items,
+                         const std::string &name) {
+  for (const auto *item : items)
+    for (const auto &attr : item->attrs)
+      if (attr.name == name) return true;
+  return false;
+}
+
+// 3. Named begin-end block creating a subscope
+TEST(ParserClause03, Cl3_13_NamedBeginEndBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : my_block\n"
+      "    int x;\n"
+      "    x = 1;\n"
+      "  end : my_block\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto *mod = r.cu->modules[0];
+  ASSERT_GE(mod->items.size(), 1u);
+  auto *item = mod->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kInitialBlock);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->label, "my_block");
+}
+
+// 4. Nested named begin-end blocks
+TEST(ParserClause03, Cl3_13_NestedNamedBlocks) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : outer\n"
+      "    begin : inner\n"
+      "      int y;\n"
+      "      y = 42;\n"
+      "    end : inner\n"
+      "  end : outer\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->label, "outer");
+  ASSERT_GE(item->body->stmts.size(), 1u);
+  EXPECT_EQ(item->body->stmts[0]->label, "inner");
+}
+
+// 25. begin-end with no name (anonymous block)
+TEST(ParserClause03, Cl3_13_AnonymousBeginEndBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int x;\n"
+      "    x = 5;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  // Anonymous blocks have an empty label.
+  EXPECT_TRUE(item->body->label.empty());
+}
+
+// 26. Multiple named blocks at same level
+TEST(ParserClause03, Cl3_13_MultipleNamedBlocksSameLevel) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    begin : block_a\n"
+      "      int x;\n"
+      "      x = 1;\n"
+      "    end : block_a\n"
+      "    begin : block_b\n"
+      "      int y;\n"
+      "      y = 2;\n"
+      "    end : block_b\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  ASSERT_GE(body->stmts.size(), 2u);
+  EXPECT_EQ(body->stmts[0]->label, "block_a");
+  EXPECT_EQ(body->stmts[1]->label, "block_b");
+}
+

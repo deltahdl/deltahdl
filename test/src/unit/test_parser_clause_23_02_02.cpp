@@ -74,4 +74,70 @@ TEST(Parser, ModuleWithPorts) {
   }
 }
 
+struct ParseResult313 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit *cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult313 Parse(const std::string &src) {
+  ParseResult313 result;
+  DiagEngine diag(result.mgr);
+  auto fid = result.mgr.AddFile("<test>", src);
+  Preprocessor preproc(result.mgr, diag, {});
+  auto pp = preproc.Preprocess(fid);
+  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
+  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static bool ParseOk(const std::string &src) {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<test>", src);
+  Preprocessor preproc(mgr, diag, {});
+  auto pp = preproc.Preprocess(fid);
+  auto pp_fid = mgr.AddFile("<preprocessed>", pp);
+  Lexer lexer(mgr.FileContent(pp_fid), pp_fid, diag);
+  Parser parser(lexer, arena, diag);
+  parser.Parse();
+  return !diag.HasErrors();
+}
+
+static bool HasItemOfKindAndName(const std::vector<ModuleItem *> &items,
+                                 ModuleItemKind kind, const std::string &name) {
+  for (const auto *item : items)
+    if (item->kind == kind && item->name == name) return true;
+  return false;
+}
+
+static bool HasAttrNamed(const std::vector<ModuleItem *> &items,
+                         const std::string &name) {
+  for (const auto *item : items)
+    for (const auto &attr : item->attrs)
+      if (attr.name == name) return true;
+  return false;
+}
+
+// 28. Port names as part of module scope
+TEST(ParserClause03, Cl3_13_PortNamesInModuleScope) {
+  auto r = Parse(
+      "module m (input logic clk, input logic rst_n, output logic [7:0] q);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->ports.size(), 3u);
+  EXPECT_EQ(r.cu->modules[0]->ports[0].name, "clk");
+  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(r.cu->modules[0]->ports[1].name, "rst_n");
+  EXPECT_EQ(r.cu->modules[0]->ports[1].direction, Direction::kInput);
+  EXPECT_EQ(r.cu->modules[0]->ports[2].name, "q");
+  EXPECT_EQ(r.cu->modules[0]->ports[2].direction, Direction::kOutput);
+}
+
 }  // namespace

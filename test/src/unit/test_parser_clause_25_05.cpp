@@ -102,4 +102,73 @@ TEST(SourceText, NonPortInterfaceItemModport) {
   EXPECT_EQ(r.cu->interfaces[0]->modports[0]->name, "master");
 }
 
+struct ParseResult313 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit *cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult313 Parse(const std::string &src) {
+  ParseResult313 result;
+  DiagEngine diag(result.mgr);
+  auto fid = result.mgr.AddFile("<test>", src);
+  Preprocessor preproc(result.mgr, diag, {});
+  auto pp = preproc.Preprocess(fid);
+  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
+  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static bool ParseOk(const std::string &src) {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<test>", src);
+  Preprocessor preproc(mgr, diag, {});
+  auto pp = preproc.Preprocess(fid);
+  auto pp_fid = mgr.AddFile("<preprocessed>", pp);
+  Lexer lexer(mgr.FileContent(pp_fid), pp_fid, diag);
+  Parser parser(lexer, arena, diag);
+  parser.Parse();
+  return !diag.HasErrors();
+}
+
+static bool HasItemOfKindAndName(const std::vector<ModuleItem *> &items,
+                                 ModuleItemKind kind, const std::string &name) {
+  for (const auto *item : items)
+    if (item->kind == kind && item->name == name) return true;
+  return false;
+}
+
+static bool HasAttrNamed(const std::vector<ModuleItem *> &items,
+                         const std::string &name) {
+  for (const auto *item : items)
+    for (const auto &attr : item->attrs)
+      if (attr.name == name) return true;
+  return false;
+}
+
+// 16. Interface with modport declarations
+TEST(ParserClause03, Cl3_13_InterfaceWithModports) {
+  auto r = Parse(
+      "interface bus_if;\n"
+      "  logic [7:0] data;\n"
+      "  logic valid, ready;\n"
+      "  modport master (output data, output valid, input ready);\n"
+      "  modport slave (input data, input valid, output ready);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  auto *ifc = r.cu->interfaces[0];
+  EXPECT_EQ(ifc->name, "bus_if");
+  ASSERT_EQ(ifc->modports.size(), 2u);
+  EXPECT_EQ(ifc->modports[0]->name, "master");
+  EXPECT_EQ(ifc->modports[1]->name, "slave");
+}
+
 }  // namespace
