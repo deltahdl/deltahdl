@@ -90,7 +90,7 @@ def test_print_dry_run_summary_merge(tmp_path, capsys):
 def test_print_dry_run_summary_nothing(capsys):
     """'Nothing to do' is printed when both lists are empty."""
     _print_dry_run_summary([], [])
-    assert "Nothing to do" in capsys.readouterr().out
+    assert "already located in the correct files" in capsys.readouterr().out
 
 
 # ---- _group_tests ----------------------------------------------------------
@@ -160,15 +160,37 @@ def test_resolve_destinations_all_dupes(tmp_path, capsys):
 
 
 def test_resolve_destinations_excludes_source(tmp_path):
-    """Source file matching target is excluded from dedup check."""
+    """Source file matching target is skipped (already correct)."""
     src = tmp_path / "test_non_lrm_aig.cpp"
     src.write_text("TEST(S, Self) {\n}\n")
     t = _tb("Self", prefix="test_non_lrm_", clause="non-lrm:aig")
     groups = {("test_non_lrm_", "non-lrm:aig"): [t]}
-    to_create, _ = _resolve_destinations(
+    to_create, to_merge = _resolve_destinations(
         groups, tmp_path, {}, exclude_path=src,
     )
-    assert len(to_create) == 1
+    assert len(to_create) == 0 and len(to_merge) == 0
+
+
+def test_resolve_destinations_source_is_target(tmp_path, capsys):
+    """Tests already in the correct file are skipped, not recreated."""
+    src = tmp_path / "test_non_lrm_vpi.cpp"
+    src.write_text("TEST(S, Keep) {\n}\n")
+    t = _tb("Keep", prefix="test_non_lrm_", clause="non-lrm:vpi")
+    groups = {("test_non_lrm_", "non-lrm:vpi"): [t]}
+    to_create, to_merge = _resolve_destinations(
+        groups, tmp_path, {}, exclude_path=src,
+    )
+    assert len(to_create) == 0
+
+
+def test_resolve_destinations_source_is_target_reports_skip(tmp_path, capsys):
+    """Skip message is printed when source matches target."""
+    src = tmp_path / "test_non_lrm_vpi.cpp"
+    src.write_text("TEST(S, Keep) {\n}\n")
+    t = _tb("Keep", prefix="test_non_lrm_", clause="non-lrm:vpi")
+    groups = {("test_non_lrm_", "non-lrm:vpi"): [t]}
+    _resolve_destinations(groups, tmp_path, {}, exclude_path=src)
+    assert "already in" in capsys.readouterr().out
 
 
 # ---- _write_files ----------------------------------------------------------
@@ -266,7 +288,7 @@ def test_run_live(tmp_path, monkeypatch, capsys):
 
 
 def test_run_live_self_named(tmp_path, monkeypatch):
-    """Source file matching output name is not deleted."""
+    """Source file already in correct location is left untouched."""
     src = tmp_path / "test_non_lrm_aig.cpp"
     src.write_text(
         "#include <gtest/gtest.h>\n\nTEST(S, T) {\n}\n",

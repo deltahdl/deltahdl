@@ -803,6 +803,10 @@ def _resolve_destinations(groups, test_dir, lrm_titles,
         if not unique:
             print(f"  All tests for {clause} are duplicates")
             continue
+        if exclude_path and exclude_path.stem == target:
+            print(f"  {target}.cpp: {len(unique)} tests already in "
+                  "the correct file — skipping")
+            continue
         merge_path = find_merge_target(target, test_dir, exclude_path)
         if merge_path:
             to_merge.append((merge_path, unique))
@@ -845,7 +849,8 @@ def _print_dry_run_summary(to_create, to_merge):
         print(f"  MERGE  {len(tests)} tests into {merge_path.name}"
               f" ({names})")
     if not to_create and not to_merge:
-        print("  Nothing to do (all tests are duplicates)")
+        print("  Nothing to do — all tests are already located in"
+              " the correct files")
 
 
 def _run(args):
@@ -876,6 +881,10 @@ def _run(args):
     )
     if args.dry_run:
         _print_dry_run_summary(to_create, to_merge)
+        return
+    if not to_create and not to_merge:
+        print("\nNothing to do — all tests are already located in"
+              " the correct files.")
         return
     n_created = len(to_create)
     n_merged = len(to_merge)
