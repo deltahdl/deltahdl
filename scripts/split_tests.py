@@ -740,7 +740,6 @@ def _resolve_destinations(groups, test_dir, lrm_titles,
         if merge_path:
             to_merge.append((merge_path, unique))
         else:
-            title = lrm_titles.get(clause, "")
             to_create.append((target, clause, unique))
     return to_create, to_merge
 
@@ -795,6 +794,26 @@ def _rewrite_source(filepath, groups, parsed, lrm_titles, test_name):
     return len(staying)
 
 
+def _print_summary(to_create, to_merge, test_name, source_is_target):
+    """Print the because-driven summary of what was done."""
+    for filename, _clause, tests in to_create:
+        print(f"  Created {filename}.cpp because {len(tests)}"
+              " test(s) belong there but the file did not exist.")
+        print(f"  Moved {len(tests)} test(s) to {filename}.cpp"
+              " because that's where they belong.")
+    for merge_path, tests in to_merge:
+        print(f"  Moved {len(tests)} test(s) to {merge_path.name}"
+              " because that's where they belong.")
+    if not source_is_target:
+        print(f"  Deleted {test_name}.cpp because all its tests"
+              " were moved elsewhere.")
+        print("  Updated CMakeLists.txt because"
+              f" {test_name} was removed.")
+    else:
+        print("  Updated CMakeLists.txt because"
+              " new test targets were added.")
+
+
 def _run(args):
     """Execute the split operation."""
     test_dir = Path(args.output_dir).resolve()
@@ -831,31 +850,16 @@ def _run(args):
     new_names = _write_files(
         to_create, to_merge, parsed, test_dir, lrm_titles,
     )
-    # Print summary
     if source_is_target:
         n_kept = _rewrite_source(
             filepath, groups, parsed, lrm_titles, test_name,
         )
         print(f"  Kept {n_kept} tests in {test_name}.cpp"
               " because they belong there.")
-    for filename, _clause, tests in to_create:
-        print(f"  Created {filename}.cpp because {len(tests)}"
-              " test(s) belong there but the file did not exist.")
-        print(f"  Moved {len(tests)} test(s) to {filename}.cpp"
-              " because that's where they belong.")
-    for merge_path, tests in to_merge:
-        print(f"  Moved {len(tests)} test(s) to {merge_path.name}"
-              " because that's where they belong.")
     update_cmake(test_name, new_names, keep_old=source_is_target)
     if not source_is_target:
         filepath.unlink()
-        print(f"  Deleted {test_name}.cpp because all its tests"
-              " were moved elsewhere.")
-        print("  Updated CMakeLists.txt because"
-              f" {test_name} was removed.")
-    else:
-        print("  Updated CMakeLists.txt because"
-              " new test targets were added.")
+    _print_summary(to_create, to_merge, test_name, source_is_target)
 
 
 def main():
