@@ -892,7 +892,11 @@ def main():
     with log_path.open("a", encoding="utf-8") as log:
         sys.stdout = TeeWriter(sys.__stdout__, log)
         sys.stderr = TeeWriter(sys.__stderr__, log)
-        _run(_parse_args())
+        try:
+            _run(_parse_args())
+        finally:
+            sys.stdout = sys.__stdout__
+            sys.stderr = sys.__stderr__
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -306,3 +306,16 @@ def test_named_ns_pipeline_output_contains_test(tmp_path):
     assert "TEST(S, Alpha)" in (
         tmp_path / "test_parser_clause_06_01.cpp"
     ).read_text()
+
+
+# ---- Exit codes ------------------------------------------------------------
+
+
+def test_dry_run_exits_zero(tmp_path):
+    """Successful dry run exits with code 0."""
+    assert _run_dry(tmp_path).returncode == 0
+
+
+def test_pipeline_exits_zero(tmp_path):
+    """Successful full pipeline exits with code 0."""
+    assert _run_pipeline(tmp_path).returncode == 0
