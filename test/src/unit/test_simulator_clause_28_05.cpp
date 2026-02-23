@@ -36,49 +36,46 @@ static Val4 InvertVal4(Val4 v) {
   }
 }
 
-Val4 EvalNInputGate(GateKind kind, Val4 a, Val4 b) {
-  // Normalize z to x for input evaluation.
-  Val4 na = (a == Val4::kZ) ? Val4::kX : a;
-  Val4 nb = (b == Val4::kZ) ? Val4::kX : b;
+static Val4 NormalizeInput(Val4 v) {
+  return (v == Val4::kZ) ? Val4::kX : v;
+}
 
-  Val4 result = Val4::kX;
+static Val4 EvalAnd(Val4 a, Val4 b) {
+  if (a == Val4::kV0 || b == Val4::kV0) return Val4::kV0;
+  if (a == Val4::kV1 && b == Val4::kV1) return Val4::kV1;
+  return Val4::kX;
+}
+
+static Val4 EvalOr(Val4 a, Val4 b) {
+  if (a == Val4::kV1 || b == Val4::kV1) return Val4::kV1;
+  if (a == Val4::kV0 && b == Val4::kV0) return Val4::kV0;
+  return Val4::kX;
+}
+
+static Val4 EvalXor(Val4 a, Val4 b) {
+  if (a == Val4::kX || b == Val4::kX) return Val4::kX;
+  return (a == b) ? Val4::kV0 : Val4::kV1;
+}
+
+Val4 EvalNInputGate(GateKind kind, Val4 a, Val4 b) {
+  Val4 na = NormalizeInput(a);
+  Val4 nb = NormalizeInput(b);
   switch (kind) {
     case GateKind::kAnd:
-      if (na == Val4::kV0 || nb == Val4::kV0)
-        result = Val4::kV0;
-      else if (na == Val4::kV1 && nb == Val4::kV1)
-        result = Val4::kV1;
-      else
-        result = Val4::kX;
-      break;
+      return EvalAnd(na, nb);
     case GateKind::kOr:
-      if (na == Val4::kV1 || nb == Val4::kV1)
-        result = Val4::kV1;
-      else if (na == Val4::kV0 && nb == Val4::kV0)
-        result = Val4::kV0;
-      else
-        result = Val4::kX;
-      break;
+      return EvalOr(na, nb);
     case GateKind::kXor:
-      if (na == Val4::kX || nb == Val4::kX)
-        result = Val4::kX;
-      else
-        result = (na == nb) ? Val4::kV0 : Val4::kV1;
-      break;
+      return EvalXor(na, nb);
     case GateKind::kNand:
-      result = InvertVal4(EvalNInputGate(GateKind::kAnd, a, b));
-      break;
+      return InvertVal4(EvalAnd(na, nb));
     case GateKind::kNor:
-      result = InvertVal4(EvalNInputGate(GateKind::kOr, a, b));
-      break;
+      return InvertVal4(EvalOr(na, nb));
     case GateKind::kXnor:
-      result = InvertVal4(EvalNInputGate(GateKind::kXor, a, b));
-      break;
+      return InvertVal4(EvalXor(na, nb));
     default:
-      result = Val4::kX;
-      break;
+      return Val4::kX;
   }
-  return result;
 }
 
 Val4 EvalNOutputGate(GateKind kind, Val4 input) {
