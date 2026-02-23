@@ -427,27 +427,3 @@ def test_update_cmake_sorted(monkeypatch, tmp_path):
     split_tests.update_cmake("old", ["a_test"])
     text = cmake.read_text(encoding="utf-8")
     assert text.index("a_test") < text.index("z_test")
-
-
-# ---- update_standalone -----------------------------------------------------
-
-
-def test_update_standalone_missing(monkeypatch, tmp_path):
-    """Does nothing when STANDALONE.md is missing."""
-    monkeypatch.setattr(
-        split_tests, "STANDALONE_PATH", tmp_path / "no.md",
-    )
-    split_tests.update_standalone("test_x")
-    assert not (tmp_path / "no.md").exists()
-
-
-def test_update_standalone_removes_entry(monkeypatch, tmp_path):
-    """Removes the matching entry line."""
-    sa = tmp_path / "STANDALONE.md"
-    sa.write_text(
-        "- [ ] test_x\n- [ ] test_y\n", encoding="utf-8",
-    )
-    monkeypatch.setattr(split_tests, "STANDALONE_PATH", sa)
-    split_tests.update_standalone("test_x")
-    text = sa.read_text(encoding="utf-8")
-    assert "test_x" not in text and "test_y" in text

@@ -169,18 +169,6 @@ def test_call_claude_failure(monkeypatch):
         _call_claude("prompt")
 
 
-def test_call_claude_stderr_printed(monkeypatch, capsys):
-    """Prints stderr when present but rc=0."""
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = '{"tests": []}'
-    mock_result.stderr = "warning text"
-    monkeypatch.setattr(
-        subprocess, "run", lambda *_a, **_kw: mock_result,
-    )
-    _call_claude("prompt")
-    assert "warning text" in capsys.readouterr().out
-
 
 # ---- _build_result_map -----------------------------------------------------
 

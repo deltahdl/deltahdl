@@ -1,8 +1,6 @@
 """Integration tests for the split_tests pipeline."""
 
-import subprocess
 from types import SimpleNamespace
-from unittest.mock import MagicMock
 
 import split_tests
 
@@ -33,13 +31,6 @@ def _stub_externals(monkeypatch, tmp_path, response):
         "# header\nadd_unit_test(test_input)\n", encoding="utf-8",
     )
     monkeypatch.setattr(split_tests, "CMAKE_PATH", cmake)
-    sa = tmp_path / "STANDALONE.md"
-    sa.write_text("- [ ] test_input\n", encoding="utf-8")
-    monkeypatch.setattr(split_tests, "STANDALONE_PATH", sa)
-    monkeypatch.setattr(
-        subprocess, "run",
-        lambda *_a, **_kw: MagicMock(returncode=0),
-    )
 
 
 def _run_pipeline(tmp_path, dry_run=False):
@@ -151,13 +142,6 @@ def test_multi_clause_cmake_drops_old_entry(tmp_path, monkeypatch):
     ).read_text()
 
 
-def test_multi_clause_standalone_cleaned(tmp_path, monkeypatch):
-    """STANDALONE.md no longer references test_input."""
-    assert "test_input" not in (
-        _do_multi_clause(tmp_path, monkeypatch) / "STANDALONE.md"
-    ).read_text()
-
-
 # ---- Merge into existing file ----------------------------------------------
 
 
@@ -175,7 +159,7 @@ def test_merge_preserves_old_test(tmp_path, monkeypatch):
 
 
 def test_dedup_reports_duplicate(tmp_path, monkeypatch, capsys):
-    """Tests already in the target file are reported as duplicates."""
+    """Tests already in the target file are reported as removed."""
     (tmp_path / "test_parser_clause_06_01.cpp").write_text(
         "TEST(S, Dup) {\n}\n", encoding="utf-8",
     )
@@ -184,7 +168,7 @@ def test_dedup_reports_duplicate(tmp_path, monkeypatch, capsys):
         ("Dup", "test_parser_", "6.1"),
     ))
     _run_pipeline(tmp_path)
-    assert "DUPLICATE" in capsys.readouterr().out
+    assert "Removed Dup" in capsys.readouterr().out
 
 
 # ---- Non-LRM topic routing ------------------------------------------------

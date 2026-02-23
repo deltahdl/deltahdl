@@ -98,9 +98,6 @@ def _setup_pipeline(tmp_path):
     _bootstrap_repo(
         tmp_path, "# header\nadd_unit_test(test_input)\n",
     )
-    (tmp_path / "STANDALONE.md").write_text(
-        "- [ ] test_input\n", encoding="utf-8",
-    )
     _write_test_file(
         tmp_path,
         "TEST(S, Alpha) {\n  EXPECT_TRUE(true);\n}",
@@ -178,14 +175,14 @@ def test_file_without_tests_reports_error(tmp_path):
 
 
 def test_dry_run_reports_completion(tmp_path):
-    """Dry run output includes the completion banner."""
+    """Dry run output includes the dry run marker."""
     out = _run_dry(tmp_path).stdout
-    assert "DRY RUN complete" in out
+    assert "dry run" in out
 
 
 def test_dry_run_lists_target_filename(tmp_path):
     """Dry run output lists the target filename."""
-    assert "CREATE test_parser_clause_06_01.cpp" in _run_dry(tmp_path).stdout
+    assert "test_parser_clause_06_01.cpp" in _run_dry(tmp_path).stdout
 
 
 def test_dry_run_does_not_create_output(tmp_path):
@@ -198,8 +195,8 @@ def test_dry_run_does_not_create_output(tmp_path):
 
 
 def test_pipeline_reports_done(tmp_path):
-    """Full pipeline prints Done! on successful completion."""
-    assert "Done!" in _run_pipeline(tmp_path).stdout
+    """Full pipeline prints CMakeLists.txt update message."""
+    assert "Updated CMakeLists.txt" in _run_pipeline(tmp_path).stdout
 
 
 def test_pipeline_creates_clause_file(tmp_path):
@@ -238,14 +235,6 @@ def test_pipeline_drops_old_cmake_entry(tmp_path):
     ).read_text()
 
 
-def test_pipeline_cleans_standalone(tmp_path):
-    """STANDALONE.md no longer references the split test."""
-    _run_pipeline(tmp_path)
-    assert "test_input" not in (
-        tmp_path / "STANDALONE.md"
-    ).read_text()
-
-
 # ---- Named namespace wrapper -----------------------------------------------
 
 
@@ -253,9 +242,6 @@ def _setup_named_ns_pipeline(tmp_path):
     """Prepare repo with a test file using namespace delta { ... }."""
     _bootstrap_repo(
         tmp_path, "# header\nadd_unit_test(test_input)\n",
-    )
-    (tmp_path / "STANDALONE.md").write_text(
-        "- [ ] test_input\n", encoding="utf-8",
     )
     src = tmp_path / "test_input.cpp"
     src.write_text(
@@ -287,7 +273,7 @@ def test_named_ns_pipeline_reports_done(tmp_path):
         "--output-dir", str(tmp_path),
         cwd=str(tmp_path), env=env,
     )
-    assert "Done!" in r.stdout
+    assert "Updated CMakeLists.txt" in r.stdout
 
 
 def test_named_ns_pipeline_creates_clause_file(tmp_path):

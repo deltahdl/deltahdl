@@ -18,12 +18,6 @@ from pathlib import Path
 
 
 # ---------------------------------------------------------------------------
-# Logging — tee stdout to ~/split_tests.log
-# ---------------------------------------------------------------------------
-
-
-
-# ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
 
@@ -88,7 +82,6 @@ def find_repo_root() -> Path:
 REPO_ROOT = find_repo_root()
 CMAKE_PATH = REPO_ROOT / "test" / "CMakeLists.txt"
 LRM_PATH = Path.home() / "LRM.txt"
-STANDALONE_PATH = Path.home() / "STANDALONE.md"
 ARCH_PATH = REPO_ROOT / "docs" / "ARCHITECTURE.md"
 
 
@@ -433,11 +426,9 @@ def _call_claude(prompt):
         env=env,
         check=False,
     )
-    print(f"  Claude RC={result.returncode}")
-    if result.stderr.strip():
-        print(f"  Claude stderr: {result.stderr[:300]}")
     if result.returncode != 0:
-        print(f"ERROR: Claude CLI failed:\n{result.stderr}")
+        print(f"ERROR: Claude CLI failed (RC={result.returncode}):"
+              f"\n{result.stderr}", file=sys.stderr)
         sys.exit(1)
     return _extract_json(result.stdout.strip())
 
@@ -484,10 +475,7 @@ def _apply_classifications(tests, result_map):
 def classify_tests(tests, test_dir):
     """Use Claude to classify each test's prefix and clause."""
     prompt = _build_prompt(tests, test_dir)
-    print("  Calling Claude for classification...")
     response = _call_claude(prompt)
-    count = len(response.get("tests", []))
-    print(f"  Parsed {count} test classifications")
     result_map = _build_result_map(response)
     expected = {t.test_name for t in tests}
     returned = {
@@ -690,23 +678,6 @@ def update_cmake(old_name, new_names, *, keep_old=False):
 
 
 # ---------------------------------------------------------------------------
-# Stage 7: Clean up and commit
-# ---------------------------------------------------------------------------
-
-def update_standalone(test_name):
-    """Remove entry from ~/STANDALONE.md."""
-    if not STANDALONE_PATH.exists():
-        return
-    text = STANDALONE_PATH.read_text(encoding="utf-8")
-    lines = text.splitlines()
-    out = [ln for ln in lines if f"- [ ] {test_name}" not in ln]
-    STANDALONE_PATH.write_text(
-        "\n".join(out) + "\n", encoding="utf-8",
-    )
-
-
-
-# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -730,13 +701,11 @@ def _parse_args():
 
 def _print_classification_table(tests):
     """Print the classification results table."""
-    print("\n  Classification results:")
-    print(f"  {'Test':<45} {'Prefix':<15} "
-          f"{'Clause':<12} Rationale")
-    print(f"  {'-'*45} {'-'*15} {'-'*12} {'-'*40}")
+    print("\n  Classification:")
+    print(f"  {'Test':<45} Clause")
+    print(f"  {'-'*45} {'-'*12}")
     for t in tests:
-        print(f"  {t.test_name:<45} {t.prefix:<15} "
-              f"{t.clause:<12} {t.rationale}")
+        print(f"  {t.test_name:<45} \u00a7{t.clause}")
     print()
 
 
@@ -761,25 +730,18 @@ def _resolve_destinations(groups, test_dir, lrm_titles,
         unique = [t for t in tests if t.test_name not in existing]
         for d in tests:
             if d.test_name in existing:
-                print(f"  DUPLICATE: {d.test_name} already in "
-                      f"{target} — dropping")
+                print(f"  Removed {d.test_name} because it belongs"
+                      f" in {target}.cpp where it already exists.")
         if not unique:
-            print(f"  All tests for {clause} are duplicates")
             continue
         if exclude_path and exclude_path.stem == target:
-            print(f"  {target}.cpp: {len(unique)} tests already in "
-                  "the correct file — skipping")
             continue
         merge_path = find_merge_target(target, test_dir, exclude_path)
         if merge_path:
             to_merge.append((merge_path, unique))
-            print(f"  Merging {len(unique)} tests into "
-                  f"{merge_path.name}")
         else:
             title = lrm_titles.get(clause, "")
             to_create.append((target, clause, unique))
-            print(f"  {target}.cpp: {len(unique)} tests "
-                  f"(§{clause}: {title})")
     return to_create, to_merge
 
 
@@ -792,28 +754,32 @@ def _write_files(to_create, to_merge, parsed, test_dir, lrm_titles):
         outpath = test_dir / f"{filename}.cpp"
         outpath.write_text(content, encoding="utf-8")
         new_names.append(filename)
-        print(f"  Created {filename}.cpp ({len(tests)} tests)")
     for merge_path, tests in to_merge:
         append_tests_to_file(
             merge_path, parsed.global_preamble, tests,
         )
-        print(f"  Merged {len(tests)} tests into {merge_path.name}")
     return new_names
 
 
 def _print_dry_run_summary(to_create, to_merge):
-    """Print a detailed dry-run summary with filenames and test names."""
-    print("\n=== DRY RUN complete ===")
+    """Print a detailed dry-run summary."""
+    n = sum(len(ts) for _, _, ts in to_create)
+    n += sum(len(ts) for _, ts in to_merge)
     for filename, _clause, tests in to_create:
-        names = ", ".join(t.test_name for t in tests)
-        print(f"  CREATE {filename}.cpp ({len(tests)} tests: {names})")
+        print(f"  Would create {filename}.cpp because"
+              f" {len(tests)} test(s) belong there but the"
+              " file does not exist.")
+        for t in tests:
+            print(f"  Would move {t.test_name} to"
+                  f" {filename}.cpp because that's where"
+                  " it belongs.")
     for merge_path, tests in to_merge:
-        names = ", ".join(t.test_name for t in tests)
-        print(f"  MERGE  {len(tests)} tests into {merge_path.name}"
-              f" ({names})")
+        for t in tests:
+            print(f"  Would move {t.test_name} to"
+                  f" {merge_path.name} because that's where"
+                  " it belongs.")
     if not to_create and not to_merge:
-        print("  Nothing to do — all tests are already located in"
-              " the correct files")
+        print("  all already in correct file.")
 
 
 def _rewrite_source(filepath, groups, parsed, lrm_titles, test_name):
@@ -826,7 +792,7 @@ def _rewrite_source(filepath, groups, parsed, lrm_titles, test_name):
     title = lrm_titles.get(clause, "")
     content = generate_file(clause, title, parsed, staying)
     filepath.write_text(content, encoding="utf-8")
-    print(f"  Rewrote {test_name}.cpp ({len(staying)} tests kept)")
+    return len(staying)
 
 
 def _run(args):
@@ -837,19 +803,15 @@ def _run(args):
     if not filepath.exists():
         print(f"ERROR: {filepath} not found")
         sys.exit(1)
-    mode = "DRY RUN" if args.dry_run else "LIVE"
-    print(f"=== Splitting {test_name} ({mode}) ===")
-    print("Stage 1: Parsing...")
     parsed = parse_file(filepath)
-    print(f"  Found {len(parsed.all_tests)} tests, "
-          f"{len(parsed.global_preamble)} preamble items")
+    n_tests = len(parsed.all_tests)
     if not parsed.all_tests:
         print("ERROR: No TEST blocks found")
         sys.exit(1)
-    print("Stage 2: Classifying via Claude...")
+    dry = " (dry run)" if args.dry_run else ""
+    print(f"{test_name}.cpp \u2014 {n_tests} tests{dry}")
     classify_tests(parsed.all_tests, test_dir)
     _print_classification_table(parsed.all_tests)
-    print("Stage 3: Checking for duplicates...")
     groups = _group_tests(parsed.all_tests)
     lrm_titles = load_lrm_titles()
     to_create, to_merge = _resolve_destinations(
@@ -863,27 +825,37 @@ def _run(args):
         for p, c in groups
     )
     if not to_create and not to_merge and source_is_target:
-        print("\nNothing to do — all tests are already located in"
-              " the correct files.")
+        print(f"  {test_name}.cpp \u2014 {n_tests} tests,"
+              " all already in correct file.")
         return
-    n_created = len(to_create)
-    n_merged = len(to_merge)
-    print(f"\nStage 5: Creating {n_created}, "
-          f"merging into {n_merged} files...")
     new_names = _write_files(
         to_create, to_merge, parsed, test_dir, lrm_titles,
     )
-    print("Stage 6: Updating CMakeLists.txt...")
-    update_cmake(test_name, new_names, keep_old=source_is_target)
-    print("Stage 7: Cleaning up...")
+    # Print summary
     if source_is_target:
-        _rewrite_source(filepath, groups, parsed, lrm_titles, test_name)
-    else:
+        n_kept = _rewrite_source(
+            filepath, groups, parsed, lrm_titles, test_name,
+        )
+        print(f"  Kept {n_kept} tests in {test_name}.cpp"
+              " because they belong there.")
+    for filename, _clause, tests in to_create:
+        print(f"  Created {filename}.cpp because {len(tests)}"
+              " test(s) belong there but the file did not exist.")
+        print(f"  Moved {len(tests)} test(s) to {filename}.cpp"
+              " because that's where they belong.")
+    for merge_path, tests in to_merge:
+        print(f"  Moved {len(tests)} test(s) to {merge_path.name}"
+              " because that's where they belong.")
+    update_cmake(test_name, new_names, keep_old=source_is_target)
+    if not source_is_target:
         filepath.unlink()
-        print(f"  Deleted {test_name}.cpp")
-    update_standalone(test_name)
-    print("  Removed from STANDALONE.md")
-    print(f"\nDone! Created {n_created}, merged into {n_merged} files.")
+        print(f"  Deleted {test_name}.cpp because all its tests"
+              " were moved elsewhere.")
+        print("  Updated CMakeLists.txt because"
+              f" {test_name} was removed.")
+    else:
+        print("  Updated CMakeLists.txt because"
+              " new test targets were added.")
 
 
 def main():

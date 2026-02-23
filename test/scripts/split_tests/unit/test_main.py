@@ -66,28 +66,28 @@ def test_parse_args_dry_run(monkeypatch):
 
 
 def test_print_classification_table_output(capsys):
-    """Prints a formatted table of classifications."""
+    """Prints a formatted table with test name and clause."""
     t = _tb("T", prefix="test_parser_", clause="6.1", rationale="r")
     _print_classification_table([t])
     out = capsys.readouterr().out
-    assert "test_parser_" in out and "6.1" in out
+    assert "T" in out and "\u00a76.1" in out
 
 
 # ---- _print_dry_run_summary ------------------------------------------------
 
 
 def test_print_dry_run_summary_merge(tmp_path, capsys):
-    """MERGE line is printed for merge targets."""
+    """Would-move line is printed for merge targets."""
     t = _tb("M", prefix="test_parser_", clause="6.1")
     merge_path = tmp_path / "test_parser_clause_06_01.cpp"
     _print_dry_run_summary([], [(merge_path, [t])])
-    assert "MERGE" in capsys.readouterr().out
+    assert "Would move" in capsys.readouterr().out
 
 
 def test_print_dry_run_summary_nothing(capsys):
-    """'Nothing to do' is printed when both lists are empty."""
+    """'all already in correct file' is printed when both lists are empty."""
     _print_dry_run_summary([], [])
-    assert "already located in the correct files" in capsys.readouterr().out
+    assert "all already in correct file" in capsys.readouterr().out
 
 
 # ---- _group_tests ----------------------------------------------------------
@@ -147,13 +147,13 @@ def test_resolve_destinations_duplicates(tmp_path):
 
 
 def test_resolve_destinations_all_dupes(tmp_path, capsys):
-    """Prints 'All tests are duplicates' when all are dupes."""
+    """Prints removal message for each duplicate."""
     f = tmp_path / "test_parser_clause_06_01.cpp"
     f.write_text("TEST(S, T) {\n}\n")
     t = _tb("T", prefix="test_parser_", clause="6.1")
     groups = {("test_parser_", "6.1"): [t]}
     _resolve_destinations(groups, tmp_path, {})
-    assert "All tests for 6.1 are duplicates" in capsys.readouterr().out
+    assert "Removed T" in capsys.readouterr().out
 
 
 def test_resolve_destinations_excludes_source(tmp_path):
@@ -179,15 +179,6 @@ def test_resolve_destinations_source_is_target(tmp_path):
     )
     assert len(to_create) == 0
 
-
-def test_resolve_destinations_source_is_target_reports_skip(tmp_path, capsys):
-    """Skip message is printed when source matches target."""
-    src = tmp_path / "test_non_lrm_vpi.cpp"
-    src.write_text("TEST(S, Keep) {\n}\n")
-    t = _tb("Keep", prefix="test_non_lrm_", clause="non-lrm:vpi")
-    groups = {("test_non_lrm_", "non-lrm:vpi"): [t]}
-    _resolve_destinations(groups, tmp_path, {}, exclude_path=src)
-    assert "already in" in capsys.readouterr().out
 
 
 # ---- _write_files ----------------------------------------------------------
@@ -255,7 +246,7 @@ def test_run_dry_run(tmp_path, monkeypatch, capsys):
         file=str(f), output_dir=str(tmp_path), dry_run=True,
     )
     _run(args)
-    assert "DRY RUN complete" in capsys.readouterr().out
+    assert "dry run" in capsys.readouterr().out
 
 
 def test_run_live(tmp_path, monkeypatch, capsys):
@@ -266,18 +257,13 @@ def test_run_live(tmp_path, monkeypatch, capsys):
         "# header\nadd_unit_test(test_input)\n",
         encoding="utf-8",
     )
-    standalone = tmp_path / "STANDALONE.md"
-    standalone.write_text(
-        "- [ ] test_input\n", encoding="utf-8",
-    )
     stub_classifier(monkeypatch, tmp_path, _parser_response())
     monkeypatch.setattr(split_tests, "CMAKE_PATH", cmake)
-    monkeypatch.setattr(split_tests, "STANDALONE_PATH", standalone)
     args = SimpleNamespace(
         file=str(f), output_dir=str(tmp_path), dry_run=False,
     )
     _run(args)
-    assert "Done!" in capsys.readouterr().out
+    assert "Updated CMakeLists.txt" in capsys.readouterr().out
 
 
 def _run_live_non_lrm(tmp_path, monkeypatch, src_body, resp):
@@ -290,9 +276,6 @@ def _run_live_non_lrm(tmp_path, monkeypatch, src_body, resp):
         f"# header\nadd_unit_test({src.stem})\n", encoding="utf-8",
     )
     monkeypatch.setattr(split_tests, "CMAKE_PATH", cmake)
-    monkeypatch.setattr(
-        split_tests, "STANDALONE_PATH", tmp_path / "no.md",
-    )
     _run(SimpleNamespace(
         file=str(src), output_dir=str(tmp_path), dry_run=False,
     ))
