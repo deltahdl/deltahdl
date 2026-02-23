@@ -677,11 +677,13 @@ def _group_tests(tests):
     return groups
 
 
-def _resolve_destinations(groups, test_dir,
-                          exclude_path=None, dry_run=False):
+def _resolve_destinations(  # pylint: disable=too-many-locals
+    groups, test_dir, exclude_path=None, dry_run=False,
+):
     """Deduplicate tests and resolve create/merge destinations."""
     to_create = []
     to_merge = []
+    n_removed = 0
     for (prefix, clause), tests in sorted(groups.items()):
         target = clause_to_filename(prefix, clause)
         existing = find_existing_tests(target, test_dir, exclude_path)
@@ -689,6 +691,7 @@ def _resolve_destinations(groups, test_dir,
         verb = "Would have removed" if dry_run else "Removed"
         for d in tests:
             if d.test_name in existing:
+                n_removed += 1
                 print(f"  - {verb} {d.test_name}() because it"
                       f" belongs in {target}.cpp where it"
                       " already exists.")
@@ -701,7 +704,7 @@ def _resolve_destinations(groups, test_dir,
             to_merge.append((merge_path, unique))
         else:
             to_create.append((target, clause, unique))
-    return to_create, to_merge
+    return to_create, to_merge, n_removed
 
 
 def _write_files(to_create, to_merge, parsed, test_dir, lrm_titles):
@@ -720,12 +723,14 @@ def _write_files(to_create, to_merge, parsed, test_dir, lrm_titles):
     return new_names
 
 
-def _print_dry_run_summary(to_create, to_merge, test_name,
-                           source_is_target, n_kept=0):
+def _print_dry_run_summary(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    to_create, to_merge, test_name,
+    source_is_target, n_kept=0, n_removed=0,
+):
     """Print dry-run summary using past future perfect tense."""
     _print_summary(to_create, to_merge, test_name,
                    source_is_target, n_kept=n_kept,
-                   dry_run=True)
+                   n_removed=n_removed, dry_run=True)
 
 
 def _rewrite_source(filepath, groups, parsed, lrm_titles, test_name):
@@ -741,9 +746,10 @@ def _rewrite_source(filepath, groups, parsed, lrm_titles, test_name):
     return len(staying)
 
 
-def _print_summary(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+def _print_summary(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-branches
     to_create, to_merge, test_name,
-    source_is_target, *, n_kept=0, dry_run=False,
+    source_is_target, *, n_kept=0, n_removed=0,
+    dry_run=False,
 ):
     """Print the because-driven summary of what was done."""
     def _v(past):
@@ -752,11 +758,20 @@ def _print_summary(  # pylint: disable=too-many-arguments,too-many-positional-ar
             return past
         return f"Would have {past[0].lower()}{past[1:]}"
 
+    n_moved = (sum(len(ts) for _, _, ts in to_create)
+               + sum(len(ts) for _, ts in to_merge))
+
     if not to_create and not to_merge and source_is_target:
         if n_kept:
             print(f"  - {_v('Kept')} {n_kept} tests in"
                   f" {test_name}.cpp because they belong there.")
-        print("\n  Summary: all already in correct file.")
+        if n_removed:
+            rem = "to remove" if dry_run else "removed"
+            print(f"\n  Summary: {n_kept} kept,"
+                  f" {n_removed} duplicate(s) {rem}.")
+        else:
+            print(f"\n  Summary: all {n_kept} tests already"
+                  " in correct file.")
         return
     for filename, _clause, tests in to_create:
         print(f"  - {_v('Created')} {filename}.cpp because"
@@ -780,9 +795,20 @@ def _print_summary(  # pylint: disable=too-many-arguments,too-many-positional-ar
     else:
         print(f"  - {_v('Updated')} CMakeLists.txt because"
               " new test targets were added.")
+    parts = []
+    if n_moved:
+        parts.append(f"{n_moved} moved")
+    if n_kept:
+        parts.append(f"{n_kept} kept")
+    else:
+        parts.append("0 kept")
+    if n_removed:
+        rem = "to remove" if dry_run else "removed"
+        parts.append(f"{n_removed} duplicate(s) {rem}")
+    print(f"\n  Summary: {', '.join(parts)}.")
 
 
-def _run(args):
+def _run(args):  # pylint: disable=too-many-locals
     """Execute the split operation."""
     test_dir = Path(args.output_dir).resolve()
     filepath = Path(args.file).resolve()
@@ -805,7 +831,7 @@ def _run(args):
         clause_to_filename(p, c) == test_name
         for p, c in groups
     )
-    to_create, to_merge = _resolve_destinations(
+    to_create, to_merge, n_removed = _resolve_destinations(
         groups, test_dir, exclude_path=filepath,
         dry_run=args.dry_run,
     )
@@ -814,17 +840,21 @@ def _run(args):
                      if clause_to_filename(p, c) == test_name
                      for _ in ts)
         _print_dry_run_summary(to_create, to_merge, test_name,
-                               source_is_target, n_kept=n_kept)
+                               source_is_target, n_kept=n_kept,
+                               n_removed=n_removed)
         return
+    n_kept = sum(1 for (p, c), ts in groups.items()
+                 if clause_to_filename(p, c) == test_name
+                 for _ in ts)
     if not to_create and not to_merge and source_is_target:
         _print_summary(to_create, to_merge, test_name,
-                       source_is_target)
+                       source_is_target, n_kept=n_kept,
+                       n_removed=n_removed)
         return
     titles = load_lrm_titles(lrm_path)
     new_names = _write_files(
         to_create, to_merge, parsed, test_dir, titles,
     )
-    n_kept = 0
     if source_is_target:
         n_kept = _rewrite_source(
             filepath, groups, parsed, titles, test_name,
@@ -833,7 +863,8 @@ def _run(args):
     if not source_is_target:
         filepath.unlink()
     _print_summary(to_create, to_merge, test_name,
-                   source_is_target, n_kept=n_kept)
+                   source_is_target, n_kept=n_kept,
+                   n_removed=n_removed)
 
 
 def main():

@@ -226,11 +226,36 @@ def test_print_summary_all_correct_kept(capsys):
     assert "- Kept 9 tests" in capsys.readouterr().out
 
 
-def test_print_summary_all_correct_summary(capsys):
-    """All-correct path prints conclusion line."""
+def test_print_summary_all_correct_no_removals(capsys):
+    """All-correct with no removals says all already correct."""
     _print_summary = getattr(split_tests, "_print_summary")
     _print_summary([], [], "test_input", True, n_kept=9)
-    assert "\n  Summary: all already in correct file." in capsys.readouterr().out
+    assert "Summary: all 9 tests already in correct file." in capsys.readouterr().out
+
+
+def test_print_summary_all_correct_with_removals(capsys):
+    """All-correct with removals reports kept and removed counts."""
+    _print_summary = getattr(split_tests, "_print_summary")
+    _print_summary([], [], "test_input", True, n_kept=9, n_removed=4)
+    assert "Summary: 9 kept, 4 duplicate(s) removed." in capsys.readouterr().out
+
+
+def test_print_summary_moved_and_deleted(capsys):
+    """Summary reports moved count when tests are moved."""
+    _print_summary = getattr(split_tests, "_print_summary")
+    t = _tb("T", prefix="test_parser_", clause="6.1")
+    to_create = [("test_parser_clause_06_01", "6.1", [t])]
+    _print_summary(to_create, [], "test_input", False)
+    assert "Summary: 1 moved, 0 kept." in capsys.readouterr().out
+
+
+def test_print_summary_moved_and_kept(capsys):
+    """Summary reports moved and kept counts."""
+    _print_summary = getattr(split_tests, "_print_summary")
+    t = _tb("T", prefix="test_parser_", clause="6.1")
+    to_create = [("test_parser_clause_06_01", "6.1", [t])]
+    _print_summary(to_create, [], "test_input", True, n_kept=5)
+    assert "Summary: 1 moved, 5 kept." in capsys.readouterr().out
 
 
 def test_print_dry_run_summary_moved(tmp_path, capsys):
@@ -304,10 +329,19 @@ def test_print_dry_run_summary_nothing_kept(capsys):
     assert "- Would have kept 13 tests" in capsys.readouterr().out
 
 
-def test_print_dry_run_summary_nothing_summary(capsys):
-    """Dry-run all-correct path prints conclusion line."""
+def test_print_dry_run_summary_nothing_no_removals(capsys):
+    """Dry-run all-correct with no removals says all correct."""
     _print_dry_run_summary([], [], "test_input", True, n_kept=13)
-    assert "\n  Summary: all already in correct file." in capsys.readouterr().out
+    assert "Summary: all 13 tests already in correct file." in capsys.readouterr().out
+
+
+def test_print_dry_run_summary_nothing_with_removals(capsys):
+    """Dry-run all-correct with removals reports kept and removed."""
+    _print_dry_run_summary(
+        [], [], "test_input", True, n_kept=9, n_removed=4,
+    )
+    out = capsys.readouterr().out
+    assert "Summary: 9 kept, 4 duplicate(s) to remove." in out
 
 
 # ---- _group_tests ----------------------------------------------------------
@@ -335,7 +369,7 @@ def test_resolve_destinations_create(tmp_path):
     """Creates new files when no merge target exists."""
     t = _tb("T", prefix="test_parser_", clause="6.1")
     groups = {("test_parser_", "6.1"): [t]}
-    to_create, to_merge = _resolve_destinations(
+    to_create, to_merge, _ = _resolve_destinations(
         groups, tmp_path,
     )
     assert len(to_create) == 1 and len(to_merge) == 0
@@ -348,7 +382,7 @@ def test_resolve_destinations_merge(tmp_path):
     )
     t = _tb("New", prefix="test_parser_", clause="6.1")
     groups = {("test_parser_", "6.1"): [t]}
-    _, to_merge = _resolve_destinations(
+    _, to_merge, _ = _resolve_destinations(
         groups, tmp_path,
     )
     assert len(to_merge) == 1
@@ -360,7 +394,7 @@ def test_resolve_destinations_duplicates(tmp_path):
     f.write_text("TEST(S, T) {\n}\n")
     t = _tb("T", prefix="test_parser_", clause="6.1")
     groups = {("test_parser_", "6.1"): [t]}
-    to_create, to_merge = _resolve_destinations(
+    to_create, to_merge, _ = _resolve_destinations(
         groups, tmp_path,
     )
     assert len(to_create) == 0 and len(to_merge) == 0
@@ -394,7 +428,7 @@ def test_resolve_destinations_excludes_source(tmp_path):
     src.write_text("TEST(S, Self) {\n}\n")
     t = _tb("Self", prefix="test_non_lrm_", clause="non-lrm:aig")
     groups = {("test_non_lrm_", "non-lrm:aig"): [t]}
-    to_create, to_merge = _resolve_destinations(
+    to_create, to_merge, _ = _resolve_destinations(
         groups, tmp_path, exclude_path=src,
     )
     assert len(to_create) == 0 and len(to_merge) == 0
@@ -406,7 +440,7 @@ def test_resolve_destinations_source_is_target(tmp_path):
     src.write_text("TEST(S, Keep) {\n}\n")
     t = _tb("Keep", prefix="test_non_lrm_", clause="non-lrm:vpi")
     groups = {("test_non_lrm_", "non-lrm:vpi"): [t]}
-    to_create, _ = _resolve_destinations(
+    to_create, _, _ = _resolve_destinations(
         groups, tmp_path, exclude_path=src,
     )
     assert len(to_create) == 0
