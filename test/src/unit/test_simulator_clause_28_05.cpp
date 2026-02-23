@@ -36,9 +36,7 @@ static Val4 InvertVal4(Val4 v) {
   }
 }
 
-static Val4 NormalizeInput(Val4 v) {
-  return (v == Val4::kZ) ? Val4::kX : v;
-}
+static Val4 NormalizeInput(Val4 v) { return (v == Val4::kZ) ? Val4::kX : v; }
 
 static Val4 EvalAnd(Val4 a, Val4 b) {
   if (a == Val4::kV0 || b == Val4::kV0) return Val4::kV0;
