@@ -1,6 +1,7 @@
 // §32.9: Loading timing data from an SDF file
 
 #include <gtest/gtest.h>
+
 #include "simulation/sdf_parser.h"
 #include "simulation/specify.h"
 

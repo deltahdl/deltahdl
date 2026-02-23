@@ -1,7 +1,9 @@
 // §24.6: Program-wide space and anonymous programs
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"

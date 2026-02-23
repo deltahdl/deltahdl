@@ -1,6 +1,7 @@
 // §non-lrm:driver_update_pool
 
 #include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/types.h"
 #include "simulation/driver_update.h"

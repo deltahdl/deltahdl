@@ -1,7 +1,9 @@
 // §24.3: The program construct
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"

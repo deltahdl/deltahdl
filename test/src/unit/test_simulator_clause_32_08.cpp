@@ -1,6 +1,7 @@
 // §32.8: SDF to SystemVerilog delay value mapping
 
 #include <gtest/gtest.h>
+
 #include "simulation/sdf_parser.h"
 #include "simulation/specify.h"
 

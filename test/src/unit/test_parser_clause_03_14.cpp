@@ -1,7 +1,9 @@
 // §3.14: Simulation time units and precision
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"

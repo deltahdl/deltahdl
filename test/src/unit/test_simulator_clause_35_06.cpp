@@ -1,8 +1,10 @@
 // §35.6: Calling imported functions
 
 #include <gtest/gtest.h>
+
 #include <cstdint>
 #include <vector>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"

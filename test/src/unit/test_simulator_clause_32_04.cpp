@@ -1,6 +1,7 @@
 // §32.4: Mapping of SDF constructs to SystemVerilog
 
 #include <gtest/gtest.h>
+
 #include "simulation/sdf_parser.h"
 #include "simulation/specify.h"
 

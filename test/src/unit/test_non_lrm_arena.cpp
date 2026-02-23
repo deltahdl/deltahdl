@@ -1,6 +1,7 @@
 // §non-lrm:arena
 
 #include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/types.h"
 
