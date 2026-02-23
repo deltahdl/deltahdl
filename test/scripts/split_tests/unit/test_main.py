@@ -17,6 +17,7 @@ _parse_args = getattr(split_tests, "_parse_args")
 _print_classification_table = getattr(
     split_tests, "_print_classification_table",
 )
+_print_dry_run_summary = getattr(split_tests, "_print_dry_run_summary")
 _group_tests = getattr(split_tests, "_group_tests")
 _resolve_destinations = getattr(split_tests, "_resolve_destinations")
 _write_files = getattr(split_tests, "_write_files")
@@ -73,6 +74,23 @@ def test_print_classification_table_output(capsys):
     _print_classification_table([t])
     out = capsys.readouterr().out
     assert "test_parser_" in out and "6.1" in out
+
+
+# ---- _print_dry_run_summary ------------------------------------------------
+
+
+def test_print_dry_run_summary_merge(tmp_path, capsys):
+    """MERGE line is printed for merge targets."""
+    t = _tb("M", prefix="test_parser_", clause="6.1")
+    merge_path = tmp_path / "test_parser_clause_06_01.cpp"
+    _print_dry_run_summary([], [(merge_path, [t])])
+    assert "MERGE" in capsys.readouterr().out
+
+
+def test_print_dry_run_summary_nothing(capsys):
+    """'Nothing to do' is printed when both lists are empty."""
+    _print_dry_run_summary([], [])
+    assert "Nothing to do" in capsys.readouterr().out
 
 
 # ---- _group_tests ----------------------------------------------------------
