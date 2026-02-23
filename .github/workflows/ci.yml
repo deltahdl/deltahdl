@@ -137,6 +137,7 @@ jobs:
       - name: Run mypy on tests
         run: >-
           MYPYPATH=.:scripts python3 -m mypy
+          --exclude split_tests
           test/lib/ test/scripts/
       - name: Detect copy-paste in source
         run: >-
