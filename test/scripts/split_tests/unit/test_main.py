@@ -223,7 +223,7 @@ def test_print_summary_all_correct(capsys):
     """Live summary prints conclusion line."""
     _print_summary = getattr(split_tests, "_print_summary")
     _print_summary([], [], "test_input", True)
-    assert "Summary: all already in correct file." in capsys.readouterr().out
+    assert "\n  Summary: all already in correct file." in capsys.readouterr().out
 
 
 def test_print_dry_run_summary_moved(tmp_path, capsys):
@@ -294,7 +294,7 @@ def test_print_dry_run_summary_kept(capsys):
 def test_print_dry_run_summary_nothing(capsys):
     """Dry-run prints conclusion line when nothing to do."""
     _print_dry_run_summary([], [], "test_input", True)
-    assert "Summary: all already in correct file." in capsys.readouterr().out
+    assert "\n  Summary: all already in correct file." in capsys.readouterr().out
 
 
 # ---- _group_tests ----------------------------------------------------------
