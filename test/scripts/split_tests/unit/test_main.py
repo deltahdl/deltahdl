@@ -287,15 +287,10 @@ def test_run_live(tmp_path, monkeypatch, capsys):
     assert "Done!" in capsys.readouterr().out
 
 
-def test_run_live_self_named(tmp_path, monkeypatch):
-    """Source file already in correct location is left untouched."""
+def _run_live_non_lrm(tmp_path, monkeypatch, src_body, resp):
+    """Write source, stub externals, and run live pipeline."""
     src = tmp_path / "test_non_lrm_aig.cpp"
-    src.write_text(
-        "#include <gtest/gtest.h>\n\nTEST(S, T) {\n}\n",
-        encoding="utf-8",
-    )
-    resp = {"tests": [{"test_name": "T", "prefix": "test_non_lrm_",
-                        "clause": "non-lrm:aig", "rationale": "r"}]}
+    src.write_text(src_body, encoding="utf-8")
     stub_classifier(monkeypatch, tmp_path, resp)
     cmake = tmp_path / "CMakeLists.txt"
     cmake.write_text("# header\n", encoding="utf-8")
@@ -307,43 +302,36 @@ def test_run_live_self_named(tmp_path, monkeypatch):
         subprocess, "run",
         lambda *_a, **_kw: MagicMock(returncode=0),
     )
-    args = SimpleNamespace(
+    _run(SimpleNamespace(
         file=str(src), output_dir=str(tmp_path), dry_run=False,
+    ))
+
+
+def test_run_live_self_named(tmp_path, monkeypatch):
+    """Source file already in correct location is left untouched."""
+    _run_live_non_lrm(
+        tmp_path, monkeypatch,
+        "#include <gtest/gtest.h>\n\nTEST(S, T) {\n}\n",
+        {"tests": [{"test_name": "T", "prefix": "test_non_lrm_",
+                     "clause": "non-lrm:aig", "rationale": "r"}]},
     )
-    _run(args)
     assert (tmp_path / "test_non_lrm_aig.cpp").exists()
 
 
 def test_run_live_mixed_keeps_source(tmp_path, monkeypatch):
     """Source kept when some tests stay and others go elsewhere."""
-    src = tmp_path / "test_non_lrm_aig.cpp"
-    src.write_text(
+    _run_live_non_lrm(
+        tmp_path, monkeypatch,
         "#include <gtest/gtest.h>\n\n"
         "TEST(S, Stay) {\n}\n"
         "TEST(S, Move) {\n}\n",
-        encoding="utf-8",
+        {"tests": [
+            {"test_name": "Stay", "prefix": "test_non_lrm_",
+             "clause": "non-lrm:aig", "rationale": "r"},
+            {"test_name": "Move", "prefix": "test_parser_",
+             "clause": "6.1", "rationale": "r"},
+        ]},
     )
-    resp = {"tests": [
-        {"test_name": "Stay", "prefix": "test_non_lrm_",
-         "clause": "non-lrm:aig", "rationale": "r"},
-        {"test_name": "Move", "prefix": "test_parser_",
-         "clause": "6.1", "rationale": "r"},
-    ]}
-    stub_classifier(monkeypatch, tmp_path, resp)
-    cmake = tmp_path / "CMakeLists.txt"
-    cmake.write_text("# header\n", encoding="utf-8")
-    monkeypatch.setattr(split_tests, "CMAKE_PATH", cmake)
-    monkeypatch.setattr(
-        split_tests, "STANDALONE_PATH", tmp_path / "no.md",
-    )
-    monkeypatch.setattr(
-        subprocess, "run",
-        lambda *_a, **_kw: MagicMock(returncode=0),
-    )
-    args = SimpleNamespace(
-        file=str(src), output_dir=str(tmp_path), dry_run=False,
-    )
-    _run(args)
     assert (tmp_path / "test_non_lrm_aig.cpp").exists()
 
 
