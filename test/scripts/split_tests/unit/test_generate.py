@@ -451,4 +451,3 @@ def test_update_standalone_removes_entry(monkeypatch, tmp_path):
     split_tests.update_standalone("test_x")
     text = sa.read_text(encoding="utf-8")
     assert "test_x" not in text and "test_y" in text
-
