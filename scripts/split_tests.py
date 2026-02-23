@@ -882,7 +882,11 @@ def _run(args):
     if args.dry_run:
         _print_dry_run_summary(to_create, to_merge)
         return
-    if not to_create and not to_merge:
+    source_is_target = any(
+        clause_to_filename(p, c) == test_name
+        for p, c in groups
+    )
+    if not to_create and not to_merge and source_is_target:
         print("\nNothing to do — all tests are already located in"
               " the correct files.")
         return
@@ -896,10 +900,6 @@ def _run(args):
     print("Stage 6: Updating CMakeLists.txt...")
     update_cmake(test_name, new_names)
     print("Stage 7: Cleaning up...")
-    source_is_target = any(
-        clause_to_filename(p, c) == test_name
-        for p, c in groups
-    )
     if not source_is_target:
         filepath.unlink()
         print(f"  Deleted {test_name}.cpp")
