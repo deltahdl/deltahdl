@@ -271,14 +271,12 @@ TEST(Process, MoveSemantics) {
 }
 
 TEST(Process, ProcessResumeNullSafe) {
-  // §9.5: Resume on null coroutine must not crash.
   Process p;
   p.Resume();
   EXPECT_TRUE(p.Done());
 }
 
 TEST(Process, ProcessIdAssignment) {
-  // §9.5: Each process has a unique identifier.
   Process p1;
   p1.id = 42;
   Process p2;
@@ -296,7 +294,6 @@ TEST(Process, CoroutineRelease) {
 }
 
 TEST(Process, CoroutineDestroyOnScopeExit) {
-  // Coroutine resources cleaned up on destruction (§9.5).
   SimCoroutine coro = MakeTestCoroutine();
   // Immediately destroyed — no leak if sanitizer passes.
 }
