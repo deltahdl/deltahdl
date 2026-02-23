@@ -3,8 +3,15 @@
 #include <gtest/gtest.h>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
 #include "common/types.h"
+#include "simulation/adv_sim.h"
+#include "simulation/compiled_sim.h"
+#include "simulation/mt_sim.h"
+#include "simulation/process.h"
 #include "simulation/scheduler.h"
+#include "simulation/sim_context.h"
 
 using namespace delta;
 
@@ -66,37 +73,6 @@ TEST(Scheduler, EventPoolIntegration) {
   EXPECT_TRUE(ran);
   // After execution, event should be recycled into the pool.
   EXPECT_EQ(pool.FreeCount(), 1);
-}
-
-// Helper fixture for clocking simulation tests.
-struct ClockingSimFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag, /*seed=*/42};
-};
-
-// Schedule posedge at a given time through the scheduler.
-void SchedulePosedge(ClockingSimFixture &f, Variable *clk, uint64_t time) {
-  auto *ev = f.scheduler.GetEventPool().Acquire();
-  ev->callback = [clk, &f]() {
-    clk->prev_value = clk->value;
-    clk->value = MakeLogic4VecVal(f.arena, 1, 1);
-    clk->NotifyWatchers();
-  };
-  f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
-}
-
-// Schedule negedge at a given time through the scheduler.
-void ScheduleNegedge(ClockingSimFixture &f, Variable *clk, uint64_t time) {
-  auto *ev = f.scheduler.GetEventPool().Acquire();
-  ev->callback = [clk, &f]() {
-    clk->prev_value = clk->value;
-    clk->value = MakeLogic4VecVal(f.arena, 1, 0);
-    clk->NotifyWatchers();
-  };
-  f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
 }
 
 // =============================================================================

@@ -9,6 +9,7 @@
 #include "common/source_mgr.h"
 #include "simulation/assertion.h"
 #include "simulation/sim_context.h"
+#include "simulation/sva_engine.h"
 
 using namespace delta;
 

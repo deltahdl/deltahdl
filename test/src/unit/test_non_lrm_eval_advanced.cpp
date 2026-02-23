@@ -9,6 +9,7 @@
 #include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
+#include "simulation/adv_sim.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"  // StructTypeInfo, StructFieldInfo
 

@@ -4,6 +4,7 @@
 
 #include <cstdint>
 
+#include "synthesis/adv_synth.h"
 #include "synthesis/aig.h"
 #include "synthesis/lut_map.h"
 

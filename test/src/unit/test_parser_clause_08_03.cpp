@@ -25,6 +25,7 @@ struct ParseResult {
   SourceManager mgr;
   Arena arena;
   CompilationUnit *cu = nullptr;
+  bool has_errors = false;
 };
 
 static ParseResult Parse(const std::string &src) {
@@ -34,6 +35,7 @@ static ParseResult Parse(const std::string &src) {
   Lexer lexer(result.mgr.FileContent(fid), fid, diag);
   Parser parser(lexer, result.arena, diag);
   result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
   return result;
 }
 

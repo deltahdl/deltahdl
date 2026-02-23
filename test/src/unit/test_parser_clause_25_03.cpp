@@ -25,6 +25,7 @@ struct ParseResult {
   SourceManager mgr;
   Arena arena;
   CompilationUnit *cu = nullptr;
+  bool has_errors = false;
 };
 
 static ParseResult Parse(const std::string &src) {
@@ -34,6 +35,7 @@ static ParseResult Parse(const std::string &src) {
   Lexer lexer(result.mgr.FileContent(fid), fid, diag);
   Parser parser(lexer, result.arena, diag);
   result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
   return result;
 }
 
@@ -65,14 +67,6 @@ TEST(Parser, InterfaceAndModule) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_EQ(r.cu->interfaces.size(), 1);
   EXPECT_EQ(r.cu->modules.size(), 1);
-}
-
-// Returns true if any item in the list matches the given kind.
-bool HasItemKind(const std::vector<ModuleItem *> &items, ModuleItemKind kind) {
-  for (auto *item : items) {
-    if (item->kind == kind) return true;
-  }
-  return false;
 }
 
 // Returns true if any item matches the given kind and name.
