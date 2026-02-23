@@ -404,8 +404,18 @@ def test_parse_body_skips_named_namespace_opener():
         "TEST(S, T) {\n",
         "}\n",
     ]
-    _, tests, has_ns = _parse_body(lines, 0)
+    _, tests, _ = _parse_body(lines, 0)
     assert len(tests) == 1
+
+
+def test_parse_body_named_namespace_opener_sets_has_ns():
+    """Named namespace opener sets has_ns flag."""
+    lines = [
+        "namespace delta {\n",
+        "TEST(S, T) {\n",
+        "}\n",
+    ]
+    _, _, has_ns = _parse_body(lines, 0)
     assert has_ns is True
 
 
@@ -433,9 +443,41 @@ def test_parse_body_extracts_test_inside_named_namespace():
         "}  // namespace\n",
         "}  // namespace delta\n",
     ]
-    _, tests, has_ns = _parse_body(lines, 0)
+    _, tests, _ = _parse_body(lines, 0)
     assert len(tests) == 1
+
+
+def test_parse_body_named_namespace_captures_test_name():
+    """TEST name is correctly captured inside named namespace."""
+    lines = [
+        "namespace delta {\n",
+        "namespace {\n",
+        "\n",
+        "TEST(NonLrmVpi, DefaultContextIsAvailable) {\n",
+        "  EXPECT_TRUE(true);\n",
+        "}\n",
+        "\n",
+        "}  // namespace\n",
+        "}  // namespace delta\n",
+    ]
+    _, tests, _ = _parse_body(lines, 0)
     assert tests[0].test_name == "DefaultContextIsAvailable"
+
+
+def test_parse_body_named_namespace_sets_has_ns():
+    """Named + anonymous namespace wrappers set has_ns."""
+    lines = [
+        "namespace delta {\n",
+        "namespace {\n",
+        "\n",
+        "TEST(NonLrmVpi, DefaultContextIsAvailable) {\n",
+        "  EXPECT_TRUE(true);\n",
+        "}\n",
+        "\n",
+        "}  // namespace\n",
+        "}  // namespace delta\n",
+    ]
+    _, _, has_ns = _parse_body(lines, 0)
     assert has_ns is True
 
 
@@ -446,8 +488,18 @@ def test_parse_body_named_namespace_no_space_before_brace():
         "TEST(S, T) {\n",
         "}\n",
     ]
-    _, tests, has_ns = _parse_body(lines, 0)
+    _, tests, _ = _parse_body(lines, 0)
     assert len(tests) == 1
+
+
+def test_parse_body_named_namespace_no_space_sets_has_ns():
+    """Named namespace without space before brace sets has_ns."""
+    lines = [
+        "namespace delta{\n",
+        "TEST(S, T) {\n",
+        "}\n",
+    ]
+    _, _, has_ns = _parse_body(lines, 0)
     assert has_ns is True
 
 
@@ -486,28 +538,44 @@ def test_parse_file_body_namespace(tmp_path):
     assert pf.has_namespace_wrapper is False
 
 
-def test_parse_file_named_namespace_wrapper(tmp_path):
-    """parse_file extracts tests from a file with named namespace wrapper."""
+_NAMED_NS_FILE = (
+    "#include <gtest/gtest.h>\n"
+    "\n"
+    "#include \"simulation/vpi.h\"\n"
+    "\n"
+    "namespace delta {\n"
+    "namespace {\n"
+    "\n"
+    "TEST(NonLrmVpi, DefaultContextIsAvailable) {\n"
+    "  SetGlobalVpiContext(nullptr);\n"
+    "  VpiContext &ctx = GetGlobalVpiContext();\n"
+    "  (void)ctx;\n"
+    "}\n"
+    "\n"
+    "}  // namespace\n"
+    "}  // namespace delta\n"
+)
+
+
+def test_parse_file_named_namespace_finds_test(tmp_path):
+    """parse_file extracts the test from a named namespace file."""
     src = tmp_path / "test.cpp"
-    src.write_text(
-        "#include <gtest/gtest.h>\n"
-        "\n"
-        "#include \"simulation/vpi.h\"\n"
-        "\n"
-        "namespace delta {\n"
-        "namespace {\n"
-        "\n"
-        "TEST(NonLrmVpi, DefaultContextIsAvailable) {\n"
-        "  SetGlobalVpiContext(nullptr);\n"
-        "  VpiContext &ctx = GetGlobalVpiContext();\n"
-        "  (void)ctx;\n"
-        "}\n"
-        "\n"
-        "}  // namespace\n"
-        "}  // namespace delta\n",
-        encoding="utf-8",
-    )
+    src.write_text(_NAMED_NS_FILE, encoding="utf-8")
     pf = split_tests.parse_file(src)
     assert len(pf.all_tests) == 1
+
+
+def test_parse_file_named_namespace_test_name(tmp_path):
+    """parse_file captures correct test name from named namespace file."""
+    src = tmp_path / "test.cpp"
+    src.write_text(_NAMED_NS_FILE, encoding="utf-8")
+    pf = split_tests.parse_file(src)
     assert pf.all_tests[0].test_name == "DefaultContextIsAvailable"
+
+
+def test_parse_file_named_namespace_has_ns(tmp_path):
+    """parse_file detects namespace wrapper in named namespace file."""
+    src = tmp_path / "test.cpp"
+    src.write_text(_NAMED_NS_FILE, encoding="utf-8")
+    pf = split_tests.parse_file(src)
     assert pf.has_namespace_wrapper is True

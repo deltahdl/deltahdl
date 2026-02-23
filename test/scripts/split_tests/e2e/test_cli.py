@@ -292,6 +292,17 @@ def test_named_ns_pipeline_creates_clause_file(tmp_path):
         "--output-dir", str(tmp_path),
         cwd=str(tmp_path), env=env,
     )
-    out = tmp_path / "test_parser_clause_06_01.cpp"
-    assert out.exists()
-    assert "TEST(S, Alpha)" in out.read_text()
+    assert (tmp_path / "test_parser_clause_06_01.cpp").exists()
+
+
+def test_named_ns_pipeline_output_contains_test(tmp_path):
+    """Clause file from named-namespace input contains the test."""
+    env = _setup_named_ns_pipeline(tmp_path)
+    _invoke(
+        "--file", str(tmp_path / "test_input.cpp"),
+        "--output-dir", str(tmp_path),
+        cwd=str(tmp_path), env=env,
+    )
+    assert "TEST(S, Alpha)" in (
+        tmp_path / "test_parser_clause_06_01.cpp"
+    ).read_text()
