@@ -4,8 +4,6 @@ import subprocess
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-import pytest
-
 import split_tests
 
 _run = getattr(split_tests, "_run")
@@ -61,12 +59,8 @@ def _response(*triples):
     ]}
 
 
-# ---- Multi-clause split ----------------------------------------------------
-
-
-@pytest.fixture()
-def multi_clause(tmp_path, monkeypatch):
-    """Split two tests into separate clause files."""
+def _do_multi_clause(tmp_path, monkeypatch):
+    """Write two tests, classify to different clauses, and run pipeline."""
     _write_input(
         tmp_path,
         "TEST(S, Alpha) {\n  EXPECT_TRUE(true);\n}\n\n"
@@ -80,62 +74,8 @@ def multi_clause(tmp_path, monkeypatch):
     return tmp_path
 
 
-def test_multi_clause_creates_parser_file(multi_clause):
-    """Parser clause file is created for the parser-classified test."""
-    assert (multi_clause / "test_parser_clause_06_01.cpp").exists()
-
-
-def test_multi_clause_creates_lexer_file(multi_clause):
-    """Lexer clause file is created for the lexer-classified test."""
-    assert (multi_clause / "test_lexer_clause_05_03.cpp").exists()
-
-
-def test_multi_clause_parser_contains_alpha(multi_clause):
-    """Parser file contains the Alpha test."""
-    assert "TEST(S, Alpha)" in (
-        multi_clause / "test_parser_clause_06_01.cpp"
-    ).read_text()
-
-
-def test_multi_clause_lexer_contains_beta(multi_clause):
-    """Lexer file contains the Beta test."""
-    assert "TEST(S, Beta)" in (
-        multi_clause / "test_lexer_clause_05_03.cpp"
-    ).read_text()
-
-
-def test_multi_clause_deletes_input(multi_clause):
-    """Input file is removed after splitting."""
-    assert not (multi_clause / "test_input.cpp").exists()
-
-
-def test_multi_clause_cmake_has_new_entry(multi_clause):
-    """CMakeLists.txt contains the new parser clause entry."""
-    assert "test_parser_clause_06_01" in (
-        multi_clause / "CMakeLists.txt"
-    ).read_text()
-
-
-def test_multi_clause_cmake_drops_old_entry(multi_clause):
-    """CMakeLists.txt no longer contains the old test_input entry."""
-    assert "test_input" not in (
-        multi_clause / "CMakeLists.txt"
-    ).read_text()
-
-
-def test_multi_clause_standalone_cleaned(multi_clause):
-    """STANDALONE.md no longer references test_input."""
-    assert "test_input" not in (
-        multi_clause / "STANDALONE.md"
-    ).read_text()
-
-
-# ---- Merge into existing file ----------------------------------------------
-
-
-@pytest.fixture()
-def merged(tmp_path, monkeypatch):
-    """Merge a new test into an existing clause file."""
+def _do_merge(tmp_path, monkeypatch):
+    """Merge a new test into an existing clause file, return its path."""
     existing = tmp_path / "test_parser_clause_06_01.cpp"
     existing.write_text(
         "// \u00a76.1\n\n#include <gtest/gtest.h>\n\n"
@@ -150,14 +90,85 @@ def merged(tmp_path, monkeypatch):
     return existing
 
 
-def test_merge_adds_new_test(merged):
+def _do_dry_run(tmp_path, monkeypatch):
+    """Run pipeline in dry-run mode, return tmp_path."""
+    _write_input(tmp_path, "TEST(S, DryT) {\n}\n\n")
+    _stub_externals(monkeypatch, tmp_path, _response(
+        ("DryT", "test_parser_", "6.1"),
+    ))
+    _run_pipeline(tmp_path, dry_run=True)
+    return tmp_path
+
+
+# ---- Multi-clause split ----------------------------------------------------
+
+
+def test_multi_clause_creates_parser_file(tmp_path, monkeypatch):
+    """Parser clause file is created for the parser-classified test."""
+    assert (_do_multi_clause(tmp_path, monkeypatch)
+            / "test_parser_clause_06_01.cpp").exists()
+
+
+def test_multi_clause_creates_lexer_file(tmp_path, monkeypatch):
+    """Lexer clause file is created for the lexer-classified test."""
+    assert (_do_multi_clause(tmp_path, monkeypatch)
+            / "test_lexer_clause_05_03.cpp").exists()
+
+
+def test_multi_clause_parser_contains_alpha(tmp_path, monkeypatch):
+    """Parser file contains the Alpha test."""
+    assert "TEST(S, Alpha)" in (
+        _do_multi_clause(tmp_path, monkeypatch)
+        / "test_parser_clause_06_01.cpp"
+    ).read_text()
+
+
+def test_multi_clause_lexer_contains_beta(tmp_path, monkeypatch):
+    """Lexer file contains the Beta test."""
+    assert "TEST(S, Beta)" in (
+        _do_multi_clause(tmp_path, monkeypatch)
+        / "test_lexer_clause_05_03.cpp"
+    ).read_text()
+
+
+def test_multi_clause_deletes_input(tmp_path, monkeypatch):
+    """Input file is removed after splitting."""
+    assert not (_do_multi_clause(tmp_path, monkeypatch)
+                / "test_input.cpp").exists()
+
+
+def test_multi_clause_cmake_has_new_entry(tmp_path, monkeypatch):
+    """CMakeLists.txt contains the new parser clause entry."""
+    assert "test_parser_clause_06_01" in (
+        _do_multi_clause(tmp_path, monkeypatch) / "CMakeLists.txt"
+    ).read_text()
+
+
+def test_multi_clause_cmake_drops_old_entry(tmp_path, monkeypatch):
+    """CMakeLists.txt no longer contains the old test_input entry."""
+    assert "test_input" not in (
+        _do_multi_clause(tmp_path, monkeypatch) / "CMakeLists.txt"
+    ).read_text()
+
+
+def test_multi_clause_standalone_cleaned(tmp_path, monkeypatch):
+    """STANDALONE.md no longer references test_input."""
+    assert "test_input" not in (
+        _do_multi_clause(tmp_path, monkeypatch) / "STANDALONE.md"
+    ).read_text()
+
+
+# ---- Merge into existing file ----------------------------------------------
+
+
+def test_merge_adds_new_test(tmp_path, monkeypatch):
     """Merged file contains the new test."""
-    assert "TEST(S, Fresh)" in merged.read_text()
+    assert "TEST(S, Fresh)" in _do_merge(tmp_path, monkeypatch).read_text()
 
 
-def test_merge_preserves_old_test(merged):
+def test_merge_preserves_old_test(tmp_path, monkeypatch):
     """Merged file still contains the pre-existing test."""
-    assert "TEST(S, Old)" in merged.read_text()
+    assert "TEST(S, Old)" in _do_merge(tmp_path, monkeypatch).read_text()
 
 
 # ---- Deduplication ---------------------------------------------------------
@@ -207,25 +218,16 @@ def test_annex_creates_annex_file(tmp_path, monkeypatch):
 # ---- Dry run ---------------------------------------------------------------
 
 
-@pytest.fixture()
-def dry_run_result(tmp_path, monkeypatch):
-    """Run pipeline in dry-run mode."""
-    _write_input(tmp_path, "TEST(S, DryT) {\n}\n\n")
-    _stub_externals(monkeypatch, tmp_path, _response(
-        ("DryT", "test_parser_", "6.1"),
-    ))
-    _run_pipeline(tmp_path, dry_run=True)
-    return tmp_path
-
-
-def test_dry_run_no_output_files(dry_run_result):
+def test_dry_run_no_output_files(tmp_path, monkeypatch):
     """Dry run does not create any output files."""
-    assert not (dry_run_result / "test_parser_clause_06_01.cpp").exists()
+    assert not (_do_dry_run(tmp_path, monkeypatch)
+                / "test_parser_clause_06_01.cpp").exists()
 
 
-def test_dry_run_preserves_input(dry_run_result):
+def test_dry_run_preserves_input(tmp_path, monkeypatch):
     """Dry run does not delete the input file."""
-    assert (dry_run_result / "test_input.cpp").exists()
+    assert (_do_dry_run(tmp_path, monkeypatch)
+            / "test_input.cpp").exists()
 
 
 # ---- Preamble propagation --------------------------------------------------
