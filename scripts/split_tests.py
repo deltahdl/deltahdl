@@ -261,14 +261,16 @@ def _parse_body(lines, start_idx):
 
     while i < len(lines):
         stripped = lines[i].strip()
-        if stripped in ("}  // namespace", "} // namespace", ""):
+        if stripped == "" or re.match(
+            r'^\}\s*//\s*namespace(\s+\w+)?$', stripped,
+        ):
             i += 1
             continue
         if stripped.startswith("//"):
             comments.append(lines[i].rstrip("\n"))
             i += 1
             continue
-        if stripped == "namespace {":
+        if re.match(r'^namespace(\s+\w+)?\s*\{$', stripped):
             has_ns = True
             i += 1
             continue

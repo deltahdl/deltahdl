@@ -397,6 +397,60 @@ def test_parse_body_non_test_non_semicolon():
     assert len(tests) == 1
 
 
+def test_parse_body_skips_named_namespace_opener():
+    """Named namespace opener is skipped, TEST inside is found."""
+    lines = [
+        "namespace delta {\n",
+        "TEST(S, T) {\n",
+        "}\n",
+    ]
+    _, tests, has_ns = _parse_body(lines, 0)
+    assert len(tests) == 1
+    assert has_ns is True
+
+
+def test_parse_body_skips_named_namespace_closer():
+    """Named namespace closer is skipped without error."""
+    lines = [
+        "TEST(S, T) {\n",
+        "}\n",
+        "}  // namespace delta\n",
+    ]
+    _, tests, _ = _parse_body(lines, 0)
+    assert len(tests) == 1
+
+
+def test_parse_body_extracts_test_inside_named_namespace():
+    """TEST inside named + anonymous namespace wrappers is found."""
+    lines = [
+        "namespace delta {\n",
+        "namespace {\n",
+        "\n",
+        "TEST(NonLrmVpi, DefaultContextIsAvailable) {\n",
+        "  EXPECT_TRUE(true);\n",
+        "}\n",
+        "\n",
+        "}  // namespace\n",
+        "}  // namespace delta\n",
+    ]
+    _, tests, has_ns = _parse_body(lines, 0)
+    assert len(tests) == 1
+    assert tests[0].test_name == "DefaultContextIsAvailable"
+    assert has_ns is True
+
+
+def test_parse_body_named_namespace_no_space_before_brace():
+    """Named namespace with no space before brace is handled."""
+    lines = [
+        "namespace delta{\n",
+        "TEST(S, T) {\n",
+        "}\n",
+    ]
+    _, tests, has_ns = _parse_body(lines, 0)
+    assert len(tests) == 1
+    assert has_ns is True
+
+
 # ---- parse_file ------------------------------------------------------------
 
 
@@ -430,3 +484,30 @@ def test_parse_file_body_namespace(tmp_path):
     )
     pf = split_tests.parse_file(src)
     assert pf.has_namespace_wrapper is False
+
+
+def test_parse_file_named_namespace_wrapper(tmp_path):
+    """parse_file extracts tests from a file with named namespace wrapper."""
+    src = tmp_path / "test.cpp"
+    src.write_text(
+        "#include <gtest/gtest.h>\n"
+        "\n"
+        "#include \"simulation/vpi.h\"\n"
+        "\n"
+        "namespace delta {\n"
+        "namespace {\n"
+        "\n"
+        "TEST(NonLrmVpi, DefaultContextIsAvailable) {\n"
+        "  SetGlobalVpiContext(nullptr);\n"
+        "  VpiContext &ctx = GetGlobalVpiContext();\n"
+        "  (void)ctx;\n"
+        "}\n"
+        "\n"
+        "}  // namespace\n"
+        "}  // namespace delta\n",
+        encoding="utf-8",
+    )
+    pf = split_tests.parse_file(src)
+    assert len(pf.all_tests) == 1
+    assert pf.all_tests[0].test_name == "DefaultContextIsAvailable"
+    assert pf.has_namespace_wrapper is True
