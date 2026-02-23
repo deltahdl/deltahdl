@@ -87,5 +87,6 @@ Checks: >-
   readability-function-size,
   readability-identifier-naming,
   readability-redundant-smartptr-get,
-  readability-simplify-boolean-expr
+  readability-simplify-boolean-expr,
+  clang-diagnostic-unused-function
 HeaderFilterRegex: '(src|test)/.*\.h$'
