@@ -21,22 +21,6 @@ from pathlib import Path
 # Logging — tee stdout to ~/split_tests.log
 # ---------------------------------------------------------------------------
 
-class TeeWriter:
-    """Write to multiple streams simultaneously."""
-
-    def __init__(self, *streams):
-        self.streams = streams
-
-    def write(self, data):
-        """Write data to all streams."""
-        for s in self.streams:
-            s.write(data)
-            s.flush()
-
-    def flush(self):
-        """Flush all streams."""
-        for s in self.streams:
-            s.flush()
 
 
 # ---------------------------------------------------------------------------
@@ -927,16 +911,8 @@ def _run(args):
 
 
 def main():
-    """Entry point — sets up logging then runs."""
-    log_path = Path.home() / "split_tests.log"
-    with log_path.open("a", encoding="utf-8") as log:
-        sys.stdout = TeeWriter(sys.__stdout__, log)
-        sys.stderr = TeeWriter(sys.__stderr__, log)
-        try:
-            _run(_parse_args())
-        finally:
-            sys.stdout = sys.__stdout__
-            sys.stderr = sys.__stderr__
+    """Entry point."""
+    _run(_parse_args())
 
 
 if __name__ == "__main__":  # pragma: no cover

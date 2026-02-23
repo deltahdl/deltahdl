@@ -2,7 +2,6 @@
 
 import subprocess
 import sys
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -364,9 +363,8 @@ def test_run_live_mixed_keeps_cmake_entry(tmp_path, monkeypatch):
 # ---- main ------------------------------------------------------------------
 
 
-def test_main(tmp_path, monkeypatch):
-    """main sets up logging and calls _run."""
-    monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+def test_main(monkeypatch):
+    """main calls _run with parsed args."""
     ran = [False]
 
     def mock_run(_args):

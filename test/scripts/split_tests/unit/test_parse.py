@@ -1,7 +1,6 @@
 """Unit tests for parsing functions in split_tests."""
 
 from pathlib import Path
-from unittest.mock import MagicMock, call
 
 import pytest
 
@@ -12,23 +11,6 @@ _update_brace_depth = getattr(split_tests, "_update_brace_depth")
 _parse_header = getattr(split_tests, "_parse_header")
 _try_parse_preamble = getattr(split_tests, "_try_parse_preamble")
 _parse_body = getattr(split_tests, "_parse_body")
-
-
-# ---- TeeWriter ------------------------------------------------------------
-
-
-def test_tee_writer_write_sends_data_to_all_streams():
-    """TeeWriter.write sends data to every stream."""
-    s1, s2 = MagicMock(), MagicMock()
-    split_tests.TeeWriter(s1, s2).write("hi")
-    assert s1.write.call_args == call("hi")
-
-
-def test_tee_writer_flush_flushes_all_streams():
-    """TeeWriter.flush flushes every stream."""
-    s1, s2 = MagicMock(), MagicMock()
-    split_tests.TeeWriter(s1, s2).flush()
-    assert s2.flush.called
 
 
 # ---- find_repo_root --------------------------------------------------------
