@@ -737,8 +737,10 @@ def _rewrite_source(filepath, groups, parsed, lrm_titles, test_name):
     return len(staying)
 
 
-def _print_summary(to_create, to_merge, test_name,
-                   source_is_target, n_kept=0, dry_run=False):
+def _print_summary(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    to_create, to_merge, test_name,
+    source_is_target, *, n_kept=0, dry_run=False,
+):
     """Print the because-driven summary of what was done."""
     def _v(past):
         """Return past future perfect tense if dry_run, else past."""
