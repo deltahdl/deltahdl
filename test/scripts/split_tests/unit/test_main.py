@@ -119,77 +119,56 @@ def test_format_clause_regular():
 # ---- _print_classification_table -------------------------------------------
 
 
-def test_print_classification_table_output(capsys):
-    """Prints a formatted table with test name and clause."""
+def test_print_classification_test_line(capsys):
+    """Prints 'Test: Name()' for each test."""
+    t = _tb("Foo", prefix="test_parser_", clause="6.1", rationale="r")
+    _print_classification_table([t])
+    assert "Test: Foo()" in capsys.readouterr().out
+
+
+def test_print_classification_clause_line(capsys):
+    """Prints 'Clause:' with formatted clause."""
     t = _tb("T", prefix="test_parser_", clause="6.1", rationale="r")
     _print_classification_table([t])
-    out = capsys.readouterr().out
-    assert "T()" in out and "\u00a76.1" in out
+    assert "Clause: \u00a76.1" in capsys.readouterr().out
 
 
-def test_print_classification_table_non_lrm_shows_tag(capsys):
-    """Non-LRM clause displays as 'Non-LRM: AIG'."""
-    t = _tb("T", prefix="test_non_lrm_", clause="non-lrm:aig")
-    _print_classification_table([t])
-    assert "Non-LRM: AIG" in capsys.readouterr().out
-
-
-def test_print_classification_table_non_lrm_no_section_sign(capsys):
-    """Non-LRM clause does not use section sign."""
-    t = _tb("T", prefix="test_non_lrm_", clause="non-lrm:aig")
-    _print_classification_table([t])
-    assert "\u00a7non-lrm" not in capsys.readouterr().out
-
-
-def test_print_classification_table_box_top(capsys):
-    """Table has unicode top-left corner."""
-    t = _tb("T", prefix="test_parser_", clause="6.1")
-    _print_classification_table([t])
-    assert "\u250c" in capsys.readouterr().out
-
-
-def test_print_classification_table_box_sides(capsys):
-    """Table has unicode vertical lines."""
-    t = _tb("T", prefix="test_parser_", clause="6.1")
-    _print_classification_table([t])
-    assert "\u2502" in capsys.readouterr().out
-
-
-def test_print_classification_table_box_bottom(capsys):
-    """Table has unicode bottom-left corner."""
-    t = _tb("T", prefix="test_parser_", clause="6.1")
-    _print_classification_table([t])
-    assert "\u2514" in capsys.readouterr().out
-
-
-def test_print_classification_table_parentheses(capsys):
-    """Test names include parentheses."""
-    t = _tb("Foo", prefix="test_parser_", clause="6.1")
-    _print_classification_table([t])
-    assert "Foo()" in capsys.readouterr().out
-
-
-def test_print_classification_table_row_separators(capsys):
-    """Multi-row table has separator lines between each row."""
-    t1 = _tb("A", prefix="test_parser_", clause="6.1")
-    t2 = _tb("B", prefix="test_parser_", clause="6.1")
-    _print_classification_table([t1, t2])
-    out = capsys.readouterr().out
-    assert out.count("\u251c") == 2
-
-
-def test_print_classification_table_rationale_header(capsys):
-    """Table has a Rationale column header."""
-    t = _tb("T", prefix="test_parser_", clause="6.1", rationale="reason")
-    _print_classification_table([t])
-    assert "Rationale" in capsys.readouterr().out
-
-
-def test_print_classification_table_rationale_value(capsys):
-    """Table displays the rationale text."""
+def test_print_classification_rationale_line(capsys):
+    """Prints 'Rationale:' with rationale text."""
     t = _tb("T", prefix="test_parser_", clause="6.1", rationale="AIG stuff")
     _print_classification_table([t])
-    assert "AIG stuff" in capsys.readouterr().out
+    assert "Rationale: AIG stuff" in capsys.readouterr().out
+
+
+def test_print_classification_non_lrm_clause(capsys):
+    """Non-LRM clause displays as 'Non-LRM: AIG'."""
+    t = _tb("T", prefix="test_non_lrm_", clause="non-lrm:aig", rationale="r")
+    _print_classification_table([t])
+    assert "Clause: Non-LRM: AIG" in capsys.readouterr().out
+
+
+def test_print_classification_separator_between(capsys):
+    """Multi-test output has ---- separator between sub-reports."""
+    t1 = _tb("A", prefix="test_parser_", clause="6.1", rationale="r")
+    t2 = _tb("B", prefix="test_parser_", clause="6.1", rationale="r")
+    _print_classification_table([t1, t2])
+    assert "----" in capsys.readouterr().out
+
+
+def test_print_classification_no_trailing_separator(capsys):
+    """No ---- after the last sub-report."""
+    t1 = _tb("A", prefix="test_parser_", clause="6.1", rationale="r")
+    t2 = _tb("B", prefix="test_parser_", clause="6.1", rationale="r")
+    _print_classification_table([t1, t2])
+    out = capsys.readouterr().out
+    assert out.count("----") == 1
+
+
+def test_print_classification_single_no_separator(capsys):
+    """Single test has no ---- separator."""
+    t = _tb("T", prefix="test_parser_", clause="6.1", rationale="r")
+    _print_classification_table([t])
+    assert "----" not in capsys.readouterr().out
 
 
 # ---- _print_summary / _print_dry_run_summary ------------------------------
@@ -240,36 +219,11 @@ def test_print_summary_all_correct_kept(capsys):
     assert "- Kept 9 tests" in capsys.readouterr().out
 
 
-def test_print_summary_all_correct_no_removals(capsys):
-    """All-correct with no removals says all already correct."""
+def test_print_summary_has_summary_header(capsys):
+    """Summary section starts with 'SUMMARY'."""
     _print_summary = getattr(split_tests, "_print_summary")
     _print_summary([], [], "test_input", True, n_kept=9)
-    assert "Summary: all 9 tests already in correct file." in capsys.readouterr().out
-
-
-def test_print_summary_all_correct_with_removals(capsys):
-    """All-correct with removals reports kept and removed counts."""
-    _print_summary = getattr(split_tests, "_print_summary")
-    _print_summary([], [], "test_input", True, n_kept=9, n_removed=4)
-    assert "Summary: 9 kept, 4 duplicate(s) removed." in capsys.readouterr().out
-
-
-def test_print_summary_moved_and_deleted(capsys):
-    """Summary reports moved count when tests are moved."""
-    _print_summary = getattr(split_tests, "_print_summary")
-    t = _tb("T", prefix="test_parser_", clause="6.1")
-    to_create = [("test_parser_clause_06_01", "6.1", [t])]
-    _print_summary(to_create, [], "test_input", False)
-    assert "Summary: 1 moved, 0 kept." in capsys.readouterr().out
-
-
-def test_print_summary_moved_and_kept(capsys):
-    """Summary reports moved and kept counts."""
-    _print_summary = getattr(split_tests, "_print_summary")
-    t = _tb("T", prefix="test_parser_", clause="6.1")
-    to_create = [("test_parser_clause_06_01", "6.1", [t])]
-    _print_summary(to_create, [], "test_input", True, n_kept=5)
-    assert "Summary: 1 moved, 5 kept." in capsys.readouterr().out
+    assert "SUMMARY" in capsys.readouterr().out
 
 
 def test_print_summary_all_correct_zero_kept(capsys):
@@ -280,19 +234,10 @@ def test_print_summary_all_correct_zero_kept(capsys):
 
 
 def test_print_summary_not_source_zero_moved(capsys):
-    """Non-source path with empty lists reports 0 kept."""
+    """Non-source path with empty lists has Deleted bullet."""
     _print_summary = getattr(split_tests, "_print_summary")
     _print_summary([], [], "test_input", False)
-    assert "Summary: 0 kept." in capsys.readouterr().out
-
-
-def test_print_summary_moved_with_removals(capsys):
-    """Non-all-correct path with n_removed reports duplicates."""
-    _print_summary = getattr(split_tests, "_print_summary")
-    t = _tb("T", prefix="test_parser_", clause="6.1")
-    to_create = [("test_parser_clause_06_01", "6.1", [t])]
-    _print_summary(to_create, [], "test_input", True, n_kept=5, n_removed=2)
-    assert "2 duplicate(s) removed" in capsys.readouterr().out
+    assert "Deleted" in capsys.readouterr().out
 
 
 def test_print_dry_run_summary_moved(tmp_path, capsys):
@@ -367,18 +312,18 @@ def test_print_dry_run_summary_nothing_kept(capsys):
 
 
 def test_print_dry_run_summary_nothing_no_removals(capsys):
-    """Dry-run all-correct with no removals says all correct."""
+    """Dry-run all-correct with no removals has SUMMARY header."""
     _print_dry_run_summary([], [], "test_input", True, n_kept=13)
-    assert "Summary: all 13 tests already in correct file." in capsys.readouterr().out
+    assert "SUMMARY" in capsys.readouterr().out
 
 
 def test_print_dry_run_summary_nothing_with_removals(capsys):
-    """Dry-run all-correct with removals reports kept and removed."""
+    """Dry-run all-correct with removals has kept and removed bullets."""
     _print_dry_run_summary(
         [], [], "test_input", True, n_kept=9, n_removed=4,
     )
     out = capsys.readouterr().out
-    assert "Summary: 9 kept, 4 duplicate(s) to remove." in out
+    assert "Would have kept 9 tests" in out
 
 
 # ---- _group_tests ----------------------------------------------------------

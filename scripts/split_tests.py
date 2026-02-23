@@ -649,35 +649,14 @@ def _format_clause(clause):
     return f"\u00a7{clause}"
 
 
-def _table_rule(left, mid, right, widths):
-    """Build a horizontal box-drawing rule for the given column widths."""
-    segs = ["\u2500" * (w + 2) for w in widths]
-    return "  " + left + mid.join(segs) + right
-
-
 def _print_classification_table(tests):
-    """Print the classification results table."""
-    rows = [(t.test_name + "()", _format_clause(t.clause),
-             t.rationale or "") for t in tests]
-    tw = max(len("Test"), *(len(r[0]) for r in rows))
-    cw = max(len("Clause"), *(len(r[1]) for r in rows))
-    rw = max(len("Rationale"), *(len(r[2]) for r in rows))
-    w = (tw, cw, rw)
-    print("\n  Classification:")
-    print(_table_rule("\u250c", "\u252c", "\u2510", w))
-    print(f"  \u2502 {'Test':<{tw}} "
-          f"\u2502 {'Clause':<{cw}} "
-          f"\u2502 {'Rationale':<{rw}} \u2502")
-    print(_table_rule("\u251c", "\u253c", "\u2524", w))
-    sep = _table_rule("\u251c", "\u253c", "\u2524", w)
-    for i, (name, clause, rationale) in enumerate(rows):
-        print(f"  \u2502 {name:<{tw}} "
-              f"\u2502 {clause:<{cw}} "
-              f"\u2502 {rationale:<{rw}} \u2502")
-        if i < len(rows) - 1:
-            print(sep)
-    print(_table_rule("\u2514", "\u2534", "\u2518", w))
-    print()
+    """Print the classification results as sub-reports."""
+    for i, t in enumerate(tests):
+        print(f"  Test: {t.test_name}()")
+        print(f"  Clause: {_format_clause(t.clause)}")
+        print(f"  Rationale: {t.rationale or ''}")
+        if i < len(tests) - 1:
+            print("  ----")
 
 
 def _group_tests(tests):
@@ -772,20 +751,15 @@ def _print_summary(  # pylint: disable=too-many-arguments,too-many-positional-ar
             return past
         return f"Would have {past[0].lower()}{past[1:]}"
 
-    n_moved = (sum(len(ts) for _, _, ts in to_create)
-               + sum(len(ts) for _, ts in to_merge))
 
+    print("\n  SUMMARY")
     if not to_create and not to_merge and source_is_target:
         if n_kept:
             print(f"  - {_v('Kept')} {n_kept} tests in"
                   f" {test_name}.cpp because they belong there.")
         if n_removed:
             rem = "to remove" if dry_run else "removed"
-            print(f"\n  Summary: {n_kept} kept,"
-                  f" {n_removed} duplicate(s) {rem}.")
-        else:
-            print(f"\n  Summary: all {n_kept} tests already"
-                  " in correct file.")
+            print(f"  - {n_removed} duplicate(s) {rem}.")
         return
     for filename, _clause, tests in to_create:
         print(f"  - {_v('Created')} {filename}.cpp because"
@@ -809,17 +783,6 @@ def _print_summary(  # pylint: disable=too-many-arguments,too-many-positional-ar
     else:
         print(f"  - {_v('Updated')} CMakeLists.txt because"
               " new test targets were added.")
-    parts = []
-    if n_moved:
-        parts.append(f"{n_moved} moved")
-    if n_kept:
-        parts.append(f"{n_kept} kept")
-    else:
-        parts.append("0 kept")
-    if n_removed:
-        rem = "to remove" if dry_run else "removed"
-        parts.append(f"{n_removed} duplicate(s) {rem}")
-    print(f"\n  Summary: {', '.join(parts)}.")
 
 
 def _run(args):  # pylint: disable=too-many-locals
