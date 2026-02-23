@@ -14,6 +14,26 @@ function(add_unit_test name)
     gtest_discover_tests(${name})
 endfunction()
 
+# add_unit_test(test_elaborator_clause_10_11)  # disabled: failing tests in workflow 22294976044
+# add_unit_test(test_parser_clause_06h)  # disabled: failing tests in workflow 22294976044
+# add_unit_test(test_parser_clause_07d)  # disabled: failing tests in workflow 22294976044
+# add_unit_test(test_parser_clause_07e)  # disabled: failing tests in workflow 22294976044
+# add_unit_test(test_parser_clause_09d)  # disabled: failing tests in workflow 22294976044
+# add_unit_test(test_parser_clause_09g)  # disabled: failing tests in workflow 22294976044
+# add_unit_test(test_parser_clause_09i)  # disabled: failing tests in workflow 22294976044
+# add_unit_test(test_parser_clause_09j)  # disabled: failing tests in workflow 22294976044
+# add_unit_test(test_parser_clause_09k)  # disabled: failing tests in workflow 22294976044
+# add_unit_test(test_parser_clause_10d)  # disabled: failing tests in workflow 22294976044
+# add_unit_test(test_parser_clause_11f)  # disabled: failing tests in workflow 22294976044
+# add_unit_test(test_parser_clause_11g)  # disabled: failing tests in workflow 22294976044
+# add_unit_test(test_parser_clause_13b)  # disabled: failing tests in workflow 22294976044
+# add_unit_test(test_parser_clause_16c)  # disabled: failing tests in workflow 22294976044
+# add_unit_test(test_parser_clause_29_08)  # disabled: failing tests in workflow 22294976044
+# add_unit_test(test_simulator_clause_09c)  # disabled: failing tests in workflow 22294976044
+# add_unit_test(test_simulator_clause_09d)  # disabled: always @* infinite loop (§9.4.2.2)
+# add_unit_test(test_simulator_clause_09e)  # disabled: failing tests in workflow 22294976044
+# add_unit_test(test_simulator_clause_10b)  # disabled: failing tests in workflow 22294976044
+# add_unit_test(test_simulator_clause_11)  # disabled: failing tests in workflow 22294976044
 add_unit_test(test_elaborator_annex_a_06_03)
 add_unit_test(test_elaborator_annex_a_06_04)
 add_unit_test(test_elaborator_annex_a_06_07_01)
@@ -75,7 +95,6 @@ add_unit_test(test_elaborator_clause_10_09_02a)
 add_unit_test(test_elaborator_clause_10_09_02b)
 add_unit_test(test_elaborator_clause_10_09a)
 add_unit_test(test_elaborator_clause_10_09b)
-# add_unit_test(test_elaborator_clause_10_11)  # disabled: failing tests in workflow 22294976044
 add_unit_test(test_elaborator_clause_11_04)
 add_unit_test(test_elaborator_clause_11_04_03)
 add_unit_test(test_elaborator_clause_11_04_05)
@@ -110,6 +129,7 @@ add_unit_test(test_lexer_clause_05_06_01)
 add_unit_test(test_lexer_clause_05_06_03)
 add_unit_test(test_lexer_clause_05_06_04)
 add_unit_test(test_lexer_clause_05_07_01)
+add_unit_test(test_lexer_clause_05_08)
 add_unit_test(test_lexer_clause_05_09)
 add_unit_test(test_lexer_clause_05_09_01)
 add_unit_test(test_lexer_clause_05_12)
@@ -234,7 +254,6 @@ add_unit_test(test_parser_clause_03_14_02_01)
 add_unit_test(test_parser_clause_03_14_02_02)
 add_unit_test(test_parser_clause_03_14_02_03)
 add_unit_test(test_parser_clause_03_14_03)
-add_unit_test(test_parser_clause_03_14a)
 add_unit_test(test_parser_clause_03_14b)
 add_unit_test(test_parser_clause_04_05)
 add_unit_test(test_parser_clause_04_06)
@@ -270,7 +289,6 @@ add_unit_test(test_parser_clause_06d)
 add_unit_test(test_parser_clause_06e)
 add_unit_test(test_parser_clause_06f)
 add_unit_test(test_parser_clause_06g)
-# add_unit_test(test_parser_clause_06h)  # disabled: failing tests in workflow 22294976044
 add_unit_test(test_parser_clause_06i)
 add_unit_test(test_parser_clause_06j)
 add_unit_test(test_parser_clause_07_02)
@@ -278,8 +296,6 @@ add_unit_test(test_parser_clause_07_03)
 add_unit_test(test_parser_clause_07a)
 add_unit_test(test_parser_clause_07b)
 add_unit_test(test_parser_clause_07c)
-# add_unit_test(test_parser_clause_07d)  # disabled: failing tests in workflow 22294976044
-# add_unit_test(test_parser_clause_07e)  # disabled: failing tests in workflow 22294976044
 add_unit_test(test_parser_clause_08_03)
 add_unit_test(test_parser_clause_08_05)
 add_unit_test(test_parser_clause_08_06)
@@ -303,21 +319,15 @@ add_unit_test(test_parser_clause_09_06_02)
 add_unit_test(test_parser_clause_09a)
 add_unit_test(test_parser_clause_09b)
 add_unit_test(test_parser_clause_09c)
-# add_unit_test(test_parser_clause_09d)  # disabled: failing tests in workflow 22294976044
 add_unit_test(test_parser_clause_09e)
 add_unit_test(test_parser_clause_09f)
-# add_unit_test(test_parser_clause_09g)  # disabled: failing tests in workflow 22294976044
 add_unit_test(test_parser_clause_09h)
-# add_unit_test(test_parser_clause_09i)  # disabled: failing tests in workflow 22294976044
-# add_unit_test(test_parser_clause_09j)  # disabled: failing tests in workflow 22294976044
-# add_unit_test(test_parser_clause_09k)  # disabled: failing tests in workflow 22294976044
 add_unit_test(test_parser_clause_10_03a)
 add_unit_test(test_parser_clause_10_03b)
 add_unit_test(test_parser_clause_10_09)
 add_unit_test(test_parser_clause_10a)
 add_unit_test(test_parser_clause_10b)
 add_unit_test(test_parser_clause_10c)
-# add_unit_test(test_parser_clause_10d)  # disabled: failing tests in workflow 22294976044
 add_unit_test(test_parser_clause_11_03)
 add_unit_test(test_parser_clause_11_12)
 add_unit_test(test_parser_clause_11a)
@@ -325,8 +335,6 @@ add_unit_test(test_parser_clause_11b)
 add_unit_test(test_parser_clause_11c)
 add_unit_test(test_parser_clause_11d)
 add_unit_test(test_parser_clause_11e)
-# add_unit_test(test_parser_clause_11f)  # disabled: failing tests in workflow 22294976044
-# add_unit_test(test_parser_clause_11g)  # disabled: failing tests in workflow 22294976044
 add_unit_test(test_parser_clause_12_07_05)
 add_unit_test(test_parser_clause_12_08)
 add_unit_test(test_parser_clause_12a)
@@ -334,13 +342,11 @@ add_unit_test(test_parser_clause_12b)
 add_unit_test(test_parser_clause_13_03)
 add_unit_test(test_parser_clause_13_04)
 add_unit_test(test_parser_clause_13a)
-# add_unit_test(test_parser_clause_13b)  # disabled: failing tests in workflow 22294976044
 add_unit_test(test_parser_clause_14)
 add_unit_test(test_parser_clause_15)
 add_unit_test(test_parser_clause_15_05_02)
 add_unit_test(test_parser_clause_16a)
 add_unit_test(test_parser_clause_16b)
-# add_unit_test(test_parser_clause_16c)  # disabled: failing tests in workflow 22294976044
 add_unit_test(test_parser_clause_17)
 add_unit_test(test_parser_clause_17_02)
 add_unit_test(test_parser_clause_17_03)
@@ -417,7 +423,6 @@ add_unit_test(test_parser_clause_29_03_06)
 add_unit_test(test_parser_clause_29_04)
 add_unit_test(test_parser_clause_29_05)
 add_unit_test(test_parser_clause_29_07)
-# add_unit_test(test_parser_clause_29_08)  # disabled: failing tests in workflow 22294976044
 add_unit_test(test_parser_clause_29_09)
 add_unit_test(test_parser_clause_30_02)
 add_unit_test(test_parser_clause_30_03a)
@@ -498,6 +503,7 @@ add_unit_test(test_simulator_annex_i_03b)
 add_unit_test(test_simulator_annex_k_02)
 add_unit_test(test_simulator_annex_l_02)
 add_unit_test(test_simulator_annex_m_02)
+add_unit_test(test_simulator_clause_03_14)
 add_unit_test(test_simulator_clause_04_02)
 add_unit_test(test_simulator_clause_04_03)
 add_unit_test(test_simulator_clause_04_04)
@@ -645,9 +651,6 @@ add_unit_test(test_simulator_clause_09_06_02)
 add_unit_test(test_simulator_clause_09_06_03)
 add_unit_test(test_simulator_clause_09a)
 add_unit_test(test_simulator_clause_09b)
-# add_unit_test(test_simulator_clause_09c)  # disabled: failing tests in workflow 22294976044
-# add_unit_test(test_simulator_clause_09d)  # disabled: always @* infinite loop (§9.4.2.2)
-# add_unit_test(test_simulator_clause_09e)  # disabled: failing tests in workflow 22294976044
 add_unit_test(test_simulator_clause_10_03)
 add_unit_test(test_simulator_clause_10_04_01a)
 add_unit_test(test_simulator_clause_10_04_01b)
@@ -660,8 +663,6 @@ add_unit_test(test_simulator_clause_10_09)
 add_unit_test(test_simulator_clause_10_09_02)
 add_unit_test(test_simulator_clause_10_10)
 add_unit_test(test_simulator_clause_10a)
-# add_unit_test(test_simulator_clause_10b)  # disabled: failing tests in workflow 22294976044
-# add_unit_test(test_simulator_clause_11)  # disabled: failing tests in workflow 22294976044
 add_unit_test(test_simulator_clause_11_03_06)
 add_unit_test(test_simulator_clause_11_04_01a)
 add_unit_test(test_simulator_clause_11_04_01b)
