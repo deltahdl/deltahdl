@@ -166,8 +166,16 @@ def test_print_classification_table_parentheses(capsys):
     """Test names include parentheses."""
     t = _tb("Foo", prefix="test_parser_", clause="6.1")
     _print_classification_table([t])
+    assert "Foo()" in capsys.readouterr().out
+
+
+def test_print_classification_table_row_separators(capsys):
+    """Multi-row table has separator lines between each row."""
+    t1 = _tb("A", prefix="test_parser_", clause="6.1")
+    t2 = _tb("B", prefix="test_parser_", clause="6.1")
+    _print_classification_table([t1, t2])
     out = capsys.readouterr().out
-    assert "Foo()" in out
+    assert out.count("\u251c") == 2
 
 
 # ---- _print_summary / _print_dry_run_summary ------------------------------
@@ -212,11 +220,10 @@ def test_print_summary_kept(capsys):
 
 
 def test_print_summary_all_correct(capsys):
-    """Live summary prints 'all already in correct file'."""
+    """Live summary prints conclusion line."""
     _print_summary = getattr(split_tests, "_print_summary")
     _print_summary([], [], "test_input", True)
-    out = capsys.readouterr().out
-    assert "all already in correct file" in out
+    assert "Summary: all already in correct file." in capsys.readouterr().out
 
 
 def test_print_dry_run_summary_moved(tmp_path, capsys):
@@ -285,9 +292,9 @@ def test_print_dry_run_summary_kept(capsys):
 
 
 def test_print_dry_run_summary_nothing(capsys):
-    """'all already in correct file' is printed when nothing to do."""
+    """Dry-run prints conclusion line when nothing to do."""
     _print_dry_run_summary([], [], "test_input", True)
-    assert "all already in correct file" in capsys.readouterr().out
+    assert "Summary: all already in correct file." in capsys.readouterr().out
 
 
 # ---- _group_tests ----------------------------------------------------------
@@ -347,25 +354,25 @@ def test_resolve_destinations_duplicates(tmp_path):
 
 
 def test_resolve_destinations_all_dupes(tmp_path, capsys):
-    """Prints removal message for each duplicate."""
+    """Prints removal message with parentheses for each duplicate."""
     f = tmp_path / "test_parser_clause_06_01.cpp"
     f.write_text("TEST(S, T) {\n}\n")
     t = _tb("T", prefix="test_parser_", clause="6.1")
     groups = {("test_parser_", "6.1"): [t]}
     _resolve_destinations(groups, tmp_path)
-    assert "- Removed T" in capsys.readouterr().out
+    assert "- Removed T()" in capsys.readouterr().out
 
 
 def test_resolve_destinations_dry_run_would_have_removed(
     tmp_path, capsys,
 ):
-    """Dry-run prints 'Would have removed' instead of 'Removed'."""
+    """Dry-run prints 'Would have removed' with parentheses."""
     f = tmp_path / "test_parser_clause_06_01.cpp"
     f.write_text("TEST(S, T) {\n}\n")
     t = _tb("T", prefix="test_parser_", clause="6.1")
     groups = {("test_parser_", "6.1"): [t]}
     _resolve_destinations(groups, tmp_path, dry_run=True)
-    assert "- Would have removed T" in capsys.readouterr().out
+    assert "- Would have removed T()" in capsys.readouterr().out
 
 
 def test_resolve_destinations_excludes_source(tmp_path):

@@ -658,8 +658,11 @@ def _print_classification_table(tests):
     print(f"  \u250c\u2500{'\u2500'*tw}\u2500\u252c\u2500{'\u2500'*cw}\u2500\u2510")
     print(f"  \u2502 {'Test':<{tw}} \u2502 {'Clause':<{cw}} \u2502")
     print(f"  \u251c\u2500{'\u2500'*tw}\u2500\u253c\u2500{'\u2500'*cw}\u2500\u2524")
-    for name, clause in rows:
+    sep = f"  \u251c\u2500{'\u2500'*tw}\u2500\u253c\u2500{'\u2500'*cw}\u2500\u2524"
+    for i, (name, clause) in enumerate(rows):
         print(f"  \u2502 {name:<{tw}} \u2502 {clause:<{cw}} \u2502")
+        if i < len(rows) - 1:
+            print(sep)
     print(f"  \u2514\u2500{'\u2500'*tw}\u2500\u2534\u2500{'\u2500'*cw}\u2500\u2518")
     print()
 
@@ -686,8 +689,9 @@ def _resolve_destinations(groups, test_dir,
         verb = "Would have removed" if dry_run else "Removed"
         for d in tests:
             if d.test_name in existing:
-                print(f"  - {verb} {d.test_name} because it belongs"
-                      f" in {target}.cpp where it already exists.")
+                print(f"  - {verb} {d.test_name}() because it"
+                      f" belongs in {target}.cpp where it"
+                      " already exists.")
         if not unique:
             continue
         if exclude_path and exclude_path.stem == target:
@@ -749,7 +753,7 @@ def _print_summary(  # pylint: disable=too-many-arguments,too-many-positional-ar
         return f"Would have {past[0].lower()}{past[1:]}"
 
     if not to_create and not to_merge and source_is_target:
-        print("  all already in correct file.")
+        print("  Summary: all already in correct file.")
         return
     for filename, _clause, tests in to_create:
         print(f"  - {_v('Created')} {filename}.cpp because"
