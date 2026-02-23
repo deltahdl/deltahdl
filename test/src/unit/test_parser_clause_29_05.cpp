@@ -60,3 +60,67 @@ TEST(ParserSection29, UdpCoexistsWithModule) {
   ASSERT_EQ(r.cu->udps.size(), 1);
   ASSERT_EQ(r.cu->modules.size(), 1);
 }
+struct ParseResult307 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit *cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult307 Parse(const std::string &src) {
+  ParseResult307 result;
+  DiagEngine diag(result.mgr);
+  auto fid = result.mgr.AddFile("<test>", src);
+  Preprocessor preproc(result.mgr, diag, {});
+  auto pp = preproc.Preprocess(fid);
+  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
+  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static int CountItemsByKind(const std::vector<ModuleItem *> &items,
+                            ModuleItemKind kind) {
+  int count = 0;
+  for (const auto *item : items)
+    if (item->kind == kind) ++count;
+  return count;
+}
+
+static bool HasGateOfKind(const std::vector<ModuleItem *> &items,
+                          GateKind kind) {
+  for (const auto *item : items)
+    if (item->kind == ModuleItemKind::kGateInst && item->gate_kind == kind)
+      return true;
+  return false;
+}
+
+// §3.7: Sequential UDP with initial statement — timing-accurate modeling
+//        for sequential gate-level circuits.
+TEST(ParserClause03, Cl3_7_SequentialUdp) {
+  auto r = Parse(
+      "primitive udp_latch (output reg q, input d, en);\n"
+      "  initial q = 0;\n"
+      "  table\n"
+      "    1 1 : ? : 1;\n"
+      "    0 1 : ? : 0;\n"
+      "    ? 0 : ? : -;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->udps.size(), 1u);
+  const auto *udp = r.cu->udps[0];
+  EXPECT_EQ(udp->name, "udp_latch");
+  EXPECT_TRUE(udp->is_sequential);
+  EXPECT_TRUE(udp->has_initial);
+  EXPECT_EQ(udp->initial_value, '0');
+  ASSERT_EQ(udp->table.size(), 3u);
+  // Sequential rows have current_state field
+  EXPECT_EQ(udp->table[0].current_state, '?');
+  EXPECT_EQ(udp->table[0].output, '1');
+  EXPECT_EQ(udp->table[2].output, '-');
+}
+
