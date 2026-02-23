@@ -12,6 +12,7 @@
 ---
 CheckOptions:
   # TEST OVERRIDE (src: 15)
+  readability-function-cognitive-complexity.IgnoreMacros: true
   readability-function-cognitive-complexity.Threshold: 25
   # TEST OVERRIDE (src: 200)
   readability-function-size.LineThreshold: 300
