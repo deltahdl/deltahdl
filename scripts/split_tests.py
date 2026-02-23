@@ -708,6 +708,7 @@ def _resolve_destinations(  # pylint: disable=too-many-locals
                 print(f"  - {verb} {d.test_name}() because it"
                       f" belongs in {target}.cpp where it"
                       " already exists.")
+        groups[(prefix, clause)] = unique
         if not unique:
             continue
         if exclude_path and exclude_path.stem == target:
@@ -859,7 +860,8 @@ def _run(args):  # pylint: disable=too-many-locals
     n_kept = sum(1 for (p, c), ts in groups.items()
                  if clause_to_filename(p, c) == test_name
                  for _ in ts)
-    if not to_create and not to_merge and source_is_target:
+    if not to_create and not to_merge and source_is_target \
+            and n_removed == 0:
         _print_summary(to_create, to_merge, test_name,
                        source_is_target, n_kept=n_kept,
                        n_removed=n_removed)

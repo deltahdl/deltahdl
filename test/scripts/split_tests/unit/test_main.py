@@ -664,6 +664,46 @@ def test_run_live_mixed_keeps_cmake_entry(tmp_path, monkeypatch):
     assert "test_non_lrm_aig" in cmake
 
 
+def test_run_live_removes_duplicates_from_source(tmp_path, monkeypatch):
+    """Live run rewrites source to remove tests that already exist elsewhere."""
+    # Source has two tests, both classified as non-lrm:aig
+    src_body = (
+        "#include <gtest/gtest.h>\n\n"
+        "TEST(S, Keep) {\n}\n"
+        "TEST(S, Dup) {\n}\n"
+    )
+    # Pre-create a variant file that already contains Dup
+    variant = tmp_path / "test_non_lrm_aig_a.cpp"
+    variant.write_text(
+        "#include <gtest/gtest.h>\n\nTEST(S, Dup) {\n}\n",
+        encoding="utf-8",
+    )
+    _run_live_non_lrm(
+        tmp_path, monkeypatch, src_body, _self_named_classifier,
+    )
+    src = (tmp_path / "test_non_lrm_aig.cpp").read_text()
+    assert "Dup" not in src
+
+
+def test_run_live_keeps_non_duplicates_when_removing(tmp_path, monkeypatch):
+    """Live run keeps non-duplicate tests when removing duplicates."""
+    src_body = (
+        "#include <gtest/gtest.h>\n\n"
+        "TEST(S, Keep) {\n}\n"
+        "TEST(S, Dup) {\n}\n"
+    )
+    variant = tmp_path / "test_non_lrm_aig_a.cpp"
+    variant.write_text(
+        "#include <gtest/gtest.h>\n\nTEST(S, Dup) {\n}\n",
+        encoding="utf-8",
+    )
+    _run_live_non_lrm(
+        tmp_path, monkeypatch, src_body, _self_named_classifier,
+    )
+    src = (tmp_path / "test_non_lrm_aig.cpp").read_text()
+    assert "Keep" in src
+
+
 # ---- main ------------------------------------------------------------------
 
 
