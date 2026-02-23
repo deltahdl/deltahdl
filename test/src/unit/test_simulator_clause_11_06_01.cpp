@@ -1,77 +1,16 @@
-// §11.4.6: Wildcard equality operators
+// §11.6.1: Rules for expression bit lengths
 
 #include <gtest/gtest.h>
-
-#include <string>
-
+#include <cstring>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
-#include "lexer/lexer.h"
+#include "lexer/token.h"
 #include "parser/ast.h"
-#include "parser/parser.h"
 #include "simulation/eval.h"
-#include "simulation/eval_array.h"
 #include "simulation/sim_context.h"
 
 using namespace delta;
-
-// =============================================================================
-// Helper fixture
-// =============================================================================
-struct AggFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static Expr *MkEq(Arena &arena, std::string_view a, std::string_view b) {
-  auto *expr = arena.Create<Expr>();
-  expr->kind = ExprKind::kBinary;
-  expr->op = TokenKind::kEqEq;
-  auto *lhs = arena.Create<Expr>();
-  lhs->kind = ExprKind::kIdentifier;
-  lhs->text = a;
-  auto *rhs = arena.Create<Expr>();
-  rhs->kind = ExprKind::kIdentifier;
-  rhs->text = b;
-  expr->lhs = lhs;
-  expr->rhs = rhs;
-  return expr;
-}
-
-static void MakeArray4(AggFixture &f, std::string_view name) {
-  f.ctx.RegisterArray(name, {0, 4, 8, false, false, false});
-  for (uint32_t i = 0; i < 4; ++i) {
-    auto tmp = std::string(name) + "[" + std::to_string(i) + "]";
-    auto *s = f.arena.AllocString(tmp.c_str(), tmp.size());
-    auto *v = f.ctx.CreateVariable(std::string_view(s, tmp.size()), 8);
-    v->value = MakeLogic4VecVal(f.arena, 8, static_cast<uint64_t>(i + 1) * 10);
-  }
-}
-namespace {
-
-TEST(ArrayEquality, EqualArrays) {
-  AggFixture f;
-  MakeArray4(f, "a");
-  MakeArray4(f, "b");
-  auto result = EvalExpr(MkEq(f.arena, "a", "b"), f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
-TEST(ArrayEquality, UnequalArrays) {
-  AggFixture f;
-  MakeArray4(f, "a");
-  MakeArray4(f, "b");
-  // Modify b[2] to differ.
-  auto *v = f.ctx.FindVariable("b[2]");
-  ASSERT_NE(v, nullptr);
-  v->value = MakeLogic4VecVal(f.arena, 8, 99);
-  auto result = EvalExpr(MkEq(f.arena, "a", "b"), f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-}
 
 // Shared fixture for expression evaluation tests.
 struct EvalOpXZFixture {
@@ -170,16 +109,47 @@ static Variable *MakeStringVar(EvalOpXZFixture &f, std::string_view name,
   return var;
 }
 
-TEST(EvalOpXZ, WildcardEqLeftX) {
+namespace {
+
+// ==========================================================================
+// Context-determined bit widths — §11.6.1
+// ==========================================================================
+TEST(EvalOpXZ, WidthPropFromContext) {
   EvalOpXZFixture f;
-  // §11.4.6: 4'bx001 ==? 4'b0001 → x (left X in non-wildcard position)
-  MakeVar4(f, "wl", 4, 0b0001, 0b1000);  // bit3=x
-  auto *b = f.ctx.CreateVariable("wr", 4);
-  b->value = MakeLogic4VecVal(f.arena, 4, 0b0001);
-  auto *expr = MakeBinary(f.arena, TokenKind::kEqEqQuestion,
-                          MakeId(f.arena, "wl"), MakeId(f.arena, "wr"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_NE(result.words[0].bval, 0u);  // result is X
+  // 4-bit a + 4-bit b with 8-bit context → 8-bit result (no overflow).
+  auto *va = f.ctx.CreateVariable("wa", 4);
+  va->value = MakeLogic4VecVal(f.arena, 4, 0xF);
+  auto *vb = f.ctx.CreateVariable("wb", 4);
+  vb->value = MakeLogic4VecVal(f.arena, 4, 1);
+  auto *expr = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "wa"),
+                          MakeId(f.arena, "wb"));
+  // Without context width: 4-bit result overflows to 0.
+  auto r1 = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(r1.ToUint64(), 0u);
+  // With context width 8: 8-bit result = 0x10.
+  auto r2 = EvalExpr(expr, f.ctx, f.arena, 8);
+  EXPECT_EQ(r2.ToUint64(), 0x10u);
+  EXPECT_EQ(r2.width, 8u);
+}
+
+TEST(EvalOpXZ, TernaryWidthFromBranches) {
+  EvalOpXZFixture f;
+  // ?: width = max(true_width, false_width)
+  auto *cond = f.ctx.CreateVariable("tc", 1);
+  cond->value = MakeLogic4VecVal(f.arena, 1, 1);
+  auto *tv = f.ctx.CreateVariable("tv", 8);
+  tv->value = MakeLogic4VecVal(f.arena, 8, 0xFF);
+  auto *fv = f.ctx.CreateVariable("fv", 4);
+  fv->value = MakeLogic4VecVal(f.arena, 4, 0xA);
+  auto *tern = f.arena.Create<Expr>();
+  tern->kind = ExprKind::kTernary;
+  tern->condition = MakeId(f.arena, "tc");
+  tern->true_expr = MakeId(f.arena, "tv");
+  tern->false_expr = MakeId(f.arena, "fv");
+  auto result = EvalExpr(tern, f.ctx, f.arena);
+  // Width should be max(8,4) = 8, value 0xFF.
+  EXPECT_EQ(result.width, 8u);
+  EXPECT_EQ(result.ToUint64(), 0xFFu);
 }
 
 }  // namespace

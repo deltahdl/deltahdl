@@ -1,7 +1,7 @@
-// §11.4.9: Reduction operators
+// §11.4.5: Equality operators
 
 #include <gtest/gtest.h>
-
+#include <cstring>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -13,67 +13,6 @@
 using namespace delta;
 
 // Shared fixture for expression evaluation tests.
-struct EvalOpFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-// Helper: build a simple integer literal Expr node.
-static Expr *MakeInt(Arena &arena, uint64_t val) {
-  auto *e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
-
-// Helper: build an identifier Expr node.
-static Expr *MakeId(Arena &arena, std::string_view name) {
-  auto *e = arena.Create<Expr>();
-  e->kind = ExprKind::kIdentifier;
-  e->text = name;
-  return e;
-}
-
-// Helper: build a binary Expr.
-static Expr *MakeBinary(Arena &arena, TokenKind op, Expr *lhs, Expr *rhs) {
-  auto *e = arena.Create<Expr>();
-  e->kind = ExprKind::kBinary;
-  e->op = op;
-  e->lhs = lhs;
-  e->rhs = rhs;
-  return e;
-}
-
-namespace {
-
-TEST(EvalOp, LtLtEq) {
-  EvalOpFixture f;
-  auto *var = f.ctx.CreateVariable("a", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 1);
-
-  auto *expr = MakeBinary(f.arena, TokenKind::kLtLtEq, MakeId(f.arena, "a"),
-                          MakeInt(f.arena, 4));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 16u);
-  EXPECT_EQ(var->value.ToUint64(), 16u);
-}
-
-TEST(EvalOp, GtGtEq) {
-  EvalOpFixture f;
-  auto *var = f.ctx.CreateVariable("a", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 256);
-
-  auto *expr = MakeBinary(f.arena, TokenKind::kGtGtEq, MakeId(f.arena, "a"),
-                          MakeInt(f.arena, 4));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 16u);
-  EXPECT_EQ(var->value.ToUint64(), 16u);
-}
-
-// Shared fixture for expression evaluation tests.
 struct EvalOpXZFixture {
   SourceManager mgr;
   Arena arena;
@@ -82,11 +21,34 @@ struct EvalOpXZFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
+static Expr *MakeInt(Arena &arena, uint64_t val) {
+  auto *e = arena.Create<Expr>();
+  e->kind = ExprKind::kIntegerLiteral;
+  e->int_val = val;
+  return e;
+}
+
+static Expr *MakeId(Arena &arena, std::string_view name) {
+  auto *e = arena.Create<Expr>();
+  e->kind = ExprKind::kIdentifier;
+  e->text = name;
+  return e;
+}
+
 static Expr *MakeUnary(Arena &arena, TokenKind op, Expr *operand) {
   auto *e = arena.Create<Expr>();
   e->kind = ExprKind::kUnary;
   e->op = op;
   e->lhs = operand;
+  return e;
+}
+
+static Expr *MakeBinary(Arena &arena, TokenKind op, Expr *lhs, Expr *rhs) {
+  auto *e = arena.Create<Expr>();
+  e->kind = ExprKind::kBinary;
+  e->op = op;
+  e->lhs = lhs;
+  e->rhs = rhs;
   return e;
 }
 
@@ -147,54 +109,43 @@ static Variable *MakeStringVar(EvalOpXZFixture &f, std::string_view name,
   return var;
 }
 
+namespace {
+
 // ==========================================================================
-// Reduction X/Z propagation — §11.4.9
+// Equality X/Z propagation — §11.4.5, §11.4.6
 // ==========================================================================
-TEST(EvalOpXZ, ReductionAndWithX) {
+TEST(EvalOpXZ, LogicalEqX) {
   EvalOpXZFixture f;
-  // &4'b1x11 → x (not all bits known-1)
-  MakeVar4(f, "ra", 4, 0b1011, 0b0100);  // bit2=x
-  auto *expr = MakeUnary(f.arena, TokenKind::kAmp, MakeId(f.arena, "ra"));
+  // 4'b1x00 == 4'b1100 → x
+  MakeVar4(f, "el", 4, 0b1000, 0b0100);
+  auto *b = f.ctx.CreateVariable("er", 4);
+  b->value = MakeLogic4VecVal(f.arena, 4, 0b1100);
+  auto *expr = MakeBinary(f.arena, TokenKind::kEqEq, MakeId(f.arena, "el"),
+                          MakeId(f.arena, "er"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_NE(result.words[0].bval, 0u);  // result is X
+  EXPECT_NE(result.words[0].bval, 0u);
 }
 
-TEST(EvalOpXZ, ReductionAndWithKnown0) {
+TEST(EvalOpXZ, LogicalNeqX) {
   EvalOpXZFixture f;
-  // &4'b0x11 → 0 (known-0 bit forces result to 0)
-  MakeVar4(f, "rb", 4, 0b0011, 0b0100);  // bit3=0, bit2=x
-  auto *expr = MakeUnary(f.arena, TokenKind::kAmp, MakeId(f.arena, "rb"));
+  // 4'b1x00 != 4'b1100 → x
+  MakeVar4(f, "nl", 4, 0b1000, 0b0100);
+  auto *b = f.ctx.CreateVariable("nr", 4);
+  b->value = MakeLogic4VecVal(f.arena, 4, 0b1100);
+  auto *expr = MakeBinary(f.arena, TokenKind::kBangEq, MakeId(f.arena, "nl"),
+                          MakeId(f.arena, "nr"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.words[0].aval, 0u);
-  EXPECT_EQ(result.words[0].bval, 0u);  // known-0
+  EXPECT_NE(result.words[0].bval, 0u);
 }
 
-TEST(EvalOpXZ, ReductionOrWithKnown1) {
+TEST(EvalOpXZ, CaseEqStillExact) {
   EvalOpXZFixture f;
-  // |4'b1x00 → 1 (known-1 bit forces result to 1)
-  MakeVar4(f, "rc", 4, 0b1000, 0b0100);  // bit3=1, bit2=x
-  auto *expr = MakeUnary(f.arena, TokenKind::kPipe, MakeId(f.arena, "rc"));
+  // === still compares aval+bval exactly, no X propagation
+  auto *expr = MakeBinary(f.arena, TokenKind::kEqEqEq, MakeInt(f.arena, 5),
+                          MakeInt(f.arena, 5));
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.words[0].aval, 1u);
-  EXPECT_EQ(result.words[0].bval, 0u);  // known-1
-}
-
-TEST(EvalOpXZ, ReductionOrWithX) {
-  EvalOpXZFixture f;
-  // |4'b0x00 → x (no known-1, but X could be 1)
-  MakeVar4(f, "rd", 4, 0b0000, 0b0100);  // all 0 except bit2=x
-  auto *expr = MakeUnary(f.arena, TokenKind::kPipe, MakeId(f.arena, "rd"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_NE(result.words[0].bval, 0u);  // result is X
-}
-
-TEST(EvalOpXZ, ReductionXorWithX) {
-  EvalOpXZFixture f;
-  // ^4'b1x10 → x (any X/Z in XOR → X)
-  MakeVar4(f, "re", 4, 0b1010, 0b0100);  // bit2=x
-  auto *expr = MakeUnary(f.arena, TokenKind::kCaret, MakeId(f.arena, "re"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_NE(result.words[0].bval, 0u);  // result is X
+  EXPECT_EQ(result.ToUint64(), 1u);
+  EXPECT_EQ(result.words[0].bval, 0u);
 }
 
 }  // namespace

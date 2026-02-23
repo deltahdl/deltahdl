@@ -1,77 +1,16 @@
-// §11.4.6: Wildcard equality operators
+// §11.4.11: Conditional operator
 
 #include <gtest/gtest.h>
-
-#include <string>
-
+#include <cstring>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
-#include "lexer/lexer.h"
+#include "lexer/token.h"
 #include "parser/ast.h"
-#include "parser/parser.h"
 #include "simulation/eval.h"
-#include "simulation/eval_array.h"
 #include "simulation/sim_context.h"
 
 using namespace delta;
-
-// =============================================================================
-// Helper fixture
-// =============================================================================
-struct AggFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static Expr *MkEq(Arena &arena, std::string_view a, std::string_view b) {
-  auto *expr = arena.Create<Expr>();
-  expr->kind = ExprKind::kBinary;
-  expr->op = TokenKind::kEqEq;
-  auto *lhs = arena.Create<Expr>();
-  lhs->kind = ExprKind::kIdentifier;
-  lhs->text = a;
-  auto *rhs = arena.Create<Expr>();
-  rhs->kind = ExprKind::kIdentifier;
-  rhs->text = b;
-  expr->lhs = lhs;
-  expr->rhs = rhs;
-  return expr;
-}
-
-static void MakeArray4(AggFixture &f, std::string_view name) {
-  f.ctx.RegisterArray(name, {0, 4, 8, false, false, false});
-  for (uint32_t i = 0; i < 4; ++i) {
-    auto tmp = std::string(name) + "[" + std::to_string(i) + "]";
-    auto *s = f.arena.AllocString(tmp.c_str(), tmp.size());
-    auto *v = f.ctx.CreateVariable(std::string_view(s, tmp.size()), 8);
-    v->value = MakeLogic4VecVal(f.arena, 8, static_cast<uint64_t>(i + 1) * 10);
-  }
-}
-namespace {
-
-TEST(ArrayEquality, EqualArrays) {
-  AggFixture f;
-  MakeArray4(f, "a");
-  MakeArray4(f, "b");
-  auto result = EvalExpr(MkEq(f.arena, "a", "b"), f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
-TEST(ArrayEquality, UnequalArrays) {
-  AggFixture f;
-  MakeArray4(f, "a");
-  MakeArray4(f, "b");
-  // Modify b[2] to differ.
-  auto *v = f.ctx.FindVariable("b[2]");
-  ASSERT_NE(v, nullptr);
-  v->value = MakeLogic4VecVal(f.arena, 8, 99);
-  auto result = EvalExpr(MkEq(f.arena, "a", "b"), f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-}
 
 // Shared fixture for expression evaluation tests.
 struct EvalOpXZFixture {
@@ -170,16 +109,66 @@ static Variable *MakeStringVar(EvalOpXZFixture &f, std::string_view name,
   return var;
 }
 
-TEST(EvalOpXZ, WildcardEqLeftX) {
+namespace {
+
+// ==========================================================================
+// Ternary X/Z condition — §11.4.11
+// ==========================================================================
+TEST(EvalOpXZ, TernaryZCond) {
   EvalOpXZFixture f;
-  // §11.4.6: 4'bx001 ==? 4'b0001 → x (left X in non-wildcard position)
-  MakeVar4(f, "wl", 4, 0b0001, 0b1000);  // bit3=x
-  auto *b = f.ctx.CreateVariable("wr", 4);
-  b->value = MakeLogic4VecVal(f.arena, 4, 0b0001);
-  auto *expr = MakeBinary(f.arena, TokenKind::kEqEqQuestion,
-                          MakeId(f.arena, "wl"), MakeId(f.arena, "wr"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_NE(result.words[0].bval, 0u);  // result is X
+  // z ? 4'b1100 : 4'b1010 → same as x condition (bit-by-bit combine)
+  MakeVar4(f, "tz", 1, 0, 1);  // 1'bz (aval=0, bval=1)
+  auto *tv = f.ctx.CreateVariable("zt", 4);
+  tv->value = MakeLogic4VecVal(f.arena, 4, 0b1100);
+  auto *fv = f.ctx.CreateVariable("zf", 4);
+  fv->value = MakeLogic4VecVal(f.arena, 4, 0b1010);
+  auto *ternary = f.arena.Create<Expr>();
+  ternary->kind = ExprKind::kTernary;
+  ternary->condition = MakeId(f.arena, "tz");
+  ternary->true_expr = MakeId(f.arena, "zt");
+  ternary->false_expr = MakeId(f.arena, "zf");
+  auto result = EvalExpr(ternary, f.ctx, f.arena);
+  // Same as TernaryXCondDiff: aval=0b1000, bval=0b0110
+  EXPECT_EQ(result.words[0].aval, 0b1000u);
+  EXPECT_EQ(result.words[0].bval, 0b0110u);
+}
+
+TEST(EvalOpXZ, TernaryXCondSame) {
+  EvalOpXZFixture f;
+  // x ? 5 : 5 → 5 (both branches same → known result)
+  MakeVar4(f, "tc", 1, 0, 1);  // 1'bx
+  auto *ternary = f.arena.Create<Expr>();
+  ternary->kind = ExprKind::kTernary;
+  ternary->condition = MakeId(f.arena, "tc");
+  ternary->true_expr = MakeInt(f.arena, 5);
+  ternary->false_expr = MakeInt(f.arena, 5);
+  auto result = EvalExpr(ternary, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 5u);
+  EXPECT_EQ(result.words[0].bval, 0u);
+}
+
+TEST(EvalOpXZ, TernaryXCondDiff) {
+  EvalOpXZFixture f;
+  // x ? 4'b1100 : 4'b1010 → 4'b1x0x (matching bits kept, differing → X)
+  MakeVar4(f, "td", 1, 0, 1);  // 1'bx
+  auto *tv = f.ctx.CreateVariable("tt", 4);
+  tv->value = MakeLogic4VecVal(f.arena, 4, 0b1100);
+  auto *fv = f.ctx.CreateVariable("tf", 4);
+  fv->value = MakeLogic4VecVal(f.arena, 4, 0b1010);
+  auto *ternary = f.arena.Create<Expr>();
+  ternary->kind = ExprKind::kTernary;
+  ternary->condition = MakeId(f.arena, "td");
+  ternary->true_expr = MakeId(f.arena, "tt");
+  ternary->false_expr = MakeId(f.arena, "tf");
+  auto result = EvalExpr(ternary, f.ctx, f.arena);
+  // 4'b1x0x: bits that match keep value, bits that differ → X
+  //   bit3: 1==1 → 1 (aval=1, bval=0)
+  //   bit2: 1!=0 → x (aval=0, bval=1)
+  //   bit1: 0!=1 → x (aval=0, bval=1)
+  //   bit0: 0==0 → 0 (aval=0, bval=0)
+  // aval=0b1000, bval=0b0110
+  EXPECT_EQ(result.words[0].aval, 0b1000u);
+  EXPECT_EQ(result.words[0].bval, 0b0110u);
 }
 
 }  // namespace
