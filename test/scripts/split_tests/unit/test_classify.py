@@ -93,13 +93,21 @@ def test_build_prompt_contains_test_body(tmp_path):
     assert "TEST(S, MyTest)" in prompt
 
 
-def test_build_prompt_contains_prefixes(tmp_path):
-    """Prompt lists all seven prefixes."""
+def test_build_prompt_contains_parser_prefix(tmp_path):
+    """Prompt lists the parser prefix."""
     t = _tb("X")
     prompt = _build_prompt(
         t, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
     )
     assert "test_parser_" in prompt
+
+
+def test_build_prompt_contains_non_lrm_prefix(tmp_path):
+    """Prompt lists the non-lrm prefix."""
+    t = _tb("X")
+    prompt = _build_prompt(
+        t, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
+    )
     assert "test_non_lrm_" in prompt
 
 
@@ -171,8 +179,7 @@ def test_call_claude_allows_read(monkeypatch):
 
     monkeypatch.setattr(subprocess, "run", capture_run)
     _call_claude("prompt")
-    assert "--allowedTools" in captured_cmd
-    assert "Read" in captured_cmd
+    assert "--allowedTools" in captured_cmd and "Read" in captured_cmd
 
 
 # ---- _apply_classification -------------------------------------------------
