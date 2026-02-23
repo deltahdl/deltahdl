@@ -179,7 +179,13 @@ def test_file_without_tests_reports_error(tmp_path):
 
 def test_dry_run_reports_completion(tmp_path):
     """Dry run output includes the completion banner."""
-    assert "DRY RUN complete" in _run_dry(tmp_path).stdout
+    out = _run_dry(tmp_path).stdout
+    assert "DRY RUN complete" in out
+
+
+def test_dry_run_lists_target_filename(tmp_path):
+    """Dry run output lists the target filename."""
+    assert "CREATE test_parser_clause_06_01.cpp" in _run_dry(tmp_path).stdout
 
 
 def test_dry_run_does_not_create_output(tmp_path):

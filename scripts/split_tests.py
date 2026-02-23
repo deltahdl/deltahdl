@@ -861,9 +861,16 @@ def _run(args):
         groups, test_dir, lrm_titles, exclude_path=filepath,
     )
     if args.dry_run:
-        print(f"\n=== DRY RUN complete. Would create "
-              f"{len(to_create)}, merge into "
-              f"{len(to_merge)} files. ===")
+        print(f"\n=== DRY RUN complete ===")
+        for filename, clause, tests in to_create:
+            names = ", ".join(t.test_name for t in tests)
+            print(f"  CREATE {filename}.cpp ({len(tests)} tests: {names})")
+        for merge_path, tests in to_merge:
+            names = ", ".join(t.test_name for t in tests)
+            print(f"  MERGE  {len(tests)} tests into {merge_path.name}"
+                  f" ({names})")
+        if not to_create and not to_merge:
+            print("  Nothing to do (all tests are duplicates)")
         return
     n_created = len(to_create)
     n_merged = len(to_merge)
