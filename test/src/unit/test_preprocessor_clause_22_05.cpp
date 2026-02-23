@@ -242,3 +242,66 @@ TEST(Preprocessor, Define_EmptyArgUsesDefault) {
       f);
   EXPECT_NE(result.find("1 + 99"), std::string::npos);
 }
+struct ParseResult31201 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit *cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult31201 Parse(const std::string &src) {
+  ParseResult31201 result;
+  DiagEngine diag(result.mgr);
+  auto fid = result.mgr.AddFile("<test>", src);
+  Preprocessor preproc(result.mgr, diag, {});
+  auto pp = preproc.Preprocess(fid);
+  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
+  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static bool ParseOk(const std::string &src) {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<test>", src);
+  Preprocessor preproc(mgr, diag, {});
+  auto pp = preproc.Preprocess(fid);
+  auto pp_fid = mgr.AddFile("<preprocessed>", pp);
+  Lexer lexer(mgr.FileContent(pp_fid), pp_fid, diag);
+  Parser parser(lexer, arena, diag);
+  parser.Parse();
+  return !diag.HasErrors();
+}
+
+static const ModuleItem *FindItemByKindAndName(
+    const std::vector<ModuleItem *> &items, ModuleItemKind kind,
+    const std::string &name) {
+  for (const auto *item : items)
+    if (item->kind == kind && item->name == name) return item;
+  return nullptr;
+}
+
+// 7. Compiler directives apply within a CU only.
+// A `define in one parse (CU) does not leak into a separate parse (CU).
+TEST(ParserClause03, Cl3_12_1_DirectivesLocalToCU) {
+  // First CU: define a macro and use it.
+  auto r1 = Parse(
+      "`define FOO 1\n"
+      "module m1;\n"
+      "  localparam X = `FOO;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r1.has_errors);
+  // Second CU (separate Parse call): macro should NOT be defined.
+  // Using `FOO without defining it should produce a preprocessor error.
+  auto r2 = Parse(
+      "module m2;\n"
+      "  localparam Y = `FOO;\n"
+      "endmodule\n");
+  // The undefined macro should cause an error in the second CU.
+  EXPECT_TRUE(r2.has_errors);
+}
+

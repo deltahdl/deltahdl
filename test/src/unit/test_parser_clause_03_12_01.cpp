@@ -1,5 +1,6 @@
-#include <gtest/gtest.h>
+// §3.12.1: Compilation units
 
+#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -52,10 +53,11 @@ static const ModuleItem *FindItemByKindAndName(
   return nullptr;
 }
 
+namespace {
+
 // =============================================================================
 // LRM §3.12.1 — Compilation units
 // =============================================================================
-
 // 1. Compilation unit definition: a collection of source files compiled
 // together.  A single Parse() call produces one CompilationUnit.
 TEST(ParserClause03, Cl3_12_1_CompilationUnitDefinition) {
@@ -156,26 +158,6 @@ TEST(ParserClause03, Cl3_12_1_CuScopeClassDecl) {
   EXPECT_EQ(r.cu->classes[0]->name, "my_class");
 }
 
-// 7. Compiler directives apply within a CU only.
-// A `define in one parse (CU) does not leak into a separate parse (CU).
-TEST(ParserClause03, Cl3_12_1_DirectivesLocalToCU) {
-  // First CU: define a macro and use it.
-  auto r1 = Parse(
-      "`define FOO 1\n"
-      "module m1;\n"
-      "  localparam X = `FOO;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r1.has_errors);
-  // Second CU (separate Parse call): macro should NOT be defined.
-  // Using `FOO without defining it should produce a preprocessor error.
-  auto r2 = Parse(
-      "module m2;\n"
-      "  localparam Y = `FOO;\n"
-      "endmodule\n");
-  // The undefined macro should cause an error in the second CU.
-  EXPECT_TRUE(r2.has_errors);
-}
-
 // 8. Name resolution: nested scope searched first, then CU scope.
 // A local declaration shadows a CU-scope declaration.
 TEST(ParserClause03, Cl3_12_1_NameResolutionOrder) {
@@ -196,27 +178,6 @@ TEST(ParserClause03, Cl3_12_1_NameResolutionOrder) {
   EXPECT_NE(FindItemByKindAndName(r.cu->modules[0]->items,
                                   ModuleItemKind::kFunctionDecl, "helper"),
             nullptr);
-}
-
-// 9. $unit:: scope resolution operator — used for disambiguation.
-// $unit is lexed as a system identifier; $unit::name is the syntax.
-TEST(ParserClause03, Cl3_12_1_DollarUnitScopeResolution) {
-  // The LRM example: b = 5 + $unit::b;
-  // $unit is a kSystemIdentifier token; :: is kColonColon.
-  // This tests that the lexer correctly produces these tokens.
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag(mgr);
-  auto fid = mgr.AddFile("<test>", "$unit::b");
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  auto t1 = lexer.Next();
-  EXPECT_EQ(t1.kind, TokenKind::kSystemIdentifier);
-  EXPECT_EQ(t1.text, "$unit");
-  auto t2 = lexer.Next();
-  EXPECT_EQ(t2.kind, TokenKind::kColonColon);
-  auto t3 = lexer.Next();
-  EXPECT_EQ(t3.kind, TokenKind::kIdentifier);
-  EXPECT_EQ(t3.text, "b");
 }
 
 // 10. No forward references in CU scope (except task/function names).
@@ -313,3 +274,5 @@ TEST(ParserClause03, Cl3_12_1_CheckerAtCUScope) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->checkers.size(), 1u);
 }
+
+}  // namespace
