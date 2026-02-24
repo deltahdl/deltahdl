@@ -68513,4 +68513,15 @@ TEST(SourceText, ExternModule) {
   EXPECT_TRUE(r.cu->modules[0]->is_extern);
 }
 
+// 19. Hierarchical reference syntax (a.b.c)
+TEST(ParserClause03, Cl3_13_HierarchicalReferenceSyntax) {
+  // Hierarchical names like top.sub.sig are member-access expressions.
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    $display(\"%0d\", top.sub.sig);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
