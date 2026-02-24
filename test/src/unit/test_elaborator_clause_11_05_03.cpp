@@ -67,28 +67,6 @@ TEST(ConstEval, LongestStaticPrefixParamIdx) {
   EXPECT_EQ(LongestStaticPrefix(sel, scope), "m[7]");
 }
 
-static Expr *SensId(Arena &arena, std::string_view name) {
-  auto *e = arena.Create<Expr>();
-  e->kind = ExprKind::kIdentifier;
-  e->text = name;
-  return e;
-}
-
-static Expr *SensSelect(Arena &arena, Expr *base, Expr *index) {
-  auto *e = arena.Create<Expr>();
-  e->kind = ExprKind::kSelect;
-  e->base = base;
-  e->index = index;
-  return e;
-}
-
-static Expr *SensIntLit(Arena &arena, uint64_t val) {
-  auto *e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
-
 TEST(Sensitivity, SelectConstIdxUsesLSP) {
   // a[1] → LSP is "a[1]", sensitivity should include "a[1]" not "a".
   Arena arena;
@@ -97,31 +75,6 @@ TEST(Sensitivity, SelectConstIdxUsesLSP) {
   CollectExprReads(expr, reads);
   EXPECT_TRUE(reads.count("a[1]"));
   EXPECT_FALSE(reads.count("a"));
-}
-
-struct ElabFixture {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
-};
-
-static RtlirDesign *ElaborateSrc(const std::string &src, ElabFixture &f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
-TEST(Sensitivity, SelectVarIdxUsesLSP) {
-  // a[i] → LSP is "a", sensitivity includes "a" and "i".
-  Arena arena;
-  auto *expr = SensSelect(arena, SensId(arena, "a"), SensId(arena, "i"));
-  std::unordered_set<std::string> reads;
-  CollectExprReads(expr, reads);
-  EXPECT_TRUE(reads.count("a"));
-  EXPECT_TRUE(reads.count("i"));
 }
 
 TEST(Sensitivity, NestedSelectUsesLSP) {
