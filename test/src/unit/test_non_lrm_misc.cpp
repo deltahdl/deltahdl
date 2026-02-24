@@ -1052,4 +1052,502 @@ TEST(ParserA210, PropertyListOfArguments_Mixed) {
               "endmodule\n"));
 }
 
+TEST(ParserA211, CovergroupDecl_WithEmptyPortList) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg();\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+TEST(ParserA211, CoverageSpecOrOption_CoverSpec) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x;\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+TEST(ParserA211, CoverPoint_WithDataType) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    cp1: coverpoint x {\n"
+              "      bins low = {[0:3]};\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+TEST(ParserA211, BinsOrEmpty_WithBraces) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins a = {1};\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+// =============================================================================
+// §A.2.11 Production #10: bins_or_options
+// =============================================================================
+TEST(ParserA211, BinsOrOptions_ValueRangeList) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins low = {[0:3]};\n"
+              "      bins mid = {[4:7]};\n"
+              "      bins high = {[8:15]};\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+TEST(ParserA211, BinsOrOptions_AutoSizedArray) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins b[] = {[0:15]};\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+TEST(ParserA211, BinsOrOptions_Default) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins others = default;\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+TEST(ParserA211, BinsOrOptions_DefaultSequence) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins others = default sequence;\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+TEST(ParserA211, BinsOrOptions_SetCovergroupExpr) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins b = x;\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+TEST(ParserA211, BinsOrOptions_WithWithClause) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins b = {[0:15]} with (item > 5);\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+// =============================================================================
+// §A.2.11 Production #11: bins_keyword
+// =============================================================================
+TEST(ParserA211, BinsKeyword_Bins) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins a = {0};\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+TEST(ParserA211, BinsKeyword_IllegalBins) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      illegal_bins bad = {255};\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+TEST(ParserA211, BinsKeyword_IgnoreBins) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      ignore_bins skip = {128};\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+// =============================================================================
+// §A.2.11 Production #12: trans_list
+// =============================================================================
+TEST(ParserA211, TransList_Single) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins t = (1 => 2);\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+TEST(ParserA211, TransList_Multiple) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins t = (1 => 2), (3 => 4);\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+// =============================================================================
+// §A.2.11 Production #13: trans_set
+// =============================================================================
+TEST(ParserA211, TransSet_SingleRange) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins t = (1 => 3);\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+TEST(ParserA211, TransSet_MultipleRanges) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins t = (1 => 3 => 5);\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+// =============================================================================
+// §A.2.11 Production #14: trans_range_list
+// =============================================================================
+TEST(ParserA211, TransRangeList_SimpleItem) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins t = (0 => 1);\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+TEST(ParserA211, TransRangeList_ConsecutiveRepeat) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins t = (1 [* 3]);\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+TEST(ParserA211, TransRangeList_GotoRepeat) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins t = (1 [-> 3]);\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+TEST(ParserA211, TransRangeList_NonConsecutiveRepeat) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins t = (1 [= 3]);\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+// =============================================================================
+// §A.2.11 Production #15: trans_item (alias for covergroup_range_list)
+// =============================================================================
+TEST(ParserA211, TransItem_SingleValue) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins t = (5 => 10);\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+TEST(ParserA211, TransItem_MultipleValues) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins t = (1, 2, 3 => 4, 5);\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+// =============================================================================
+// §A.2.11 Production #16: repeat_range
+// =============================================================================
+TEST(ParserA211, RepeatRange_SingleExpr) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins t = (1 [* 5]);\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+TEST(ParserA211, RepeatRange_Range) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins t = (1 [* 2:5]);\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+// =============================================================================
+// §A.2.11 Production #17: cover_cross
+// =============================================================================
+TEST(ParserA211, CoverCross_Basic) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    cp1: coverpoint a;\n"
+              "    cp2: coverpoint b;\n"
+              "    cross cp1, cp2;\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+TEST(ParserA211, CoverCross_Labeled) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    cp1: coverpoint a;\n"
+              "    cp2: coverpoint b;\n"
+              "    my_cross: cross cp1, cp2;\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+TEST(ParserA211, CoverCross_WithIff) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    cp1: coverpoint a;\n"
+              "    cp2: coverpoint b;\n"
+              "    cross cp1, cp2 iff (enable);\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+TEST(ParserA211, CoverCross_WithBody) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    cp1: coverpoint a;\n"
+              "    cp2: coverpoint b;\n"
+              "    cross cp1, cp2 {\n"
+              "      bins sel = binsof(cp1) intersect {[0:3]};\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+// =============================================================================
+// §A.2.11 Production #18: list_of_cross_items
+// =============================================================================
+TEST(ParserA211, ListOfCrossItems_Two) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    cp1: coverpoint a;\n"
+              "    cp2: coverpoint b;\n"
+              "    cross cp1, cp2;\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+TEST(ParserA211, ListOfCrossItems_Three) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    cp1: coverpoint a;\n"
+              "    cp2: coverpoint b;\n"
+              "    cp3: coverpoint c;\n"
+              "    cross cp1, cp2, cp3;\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+// =============================================================================
+// §A.2.11 Production #19: cross_item
+// =============================================================================
+TEST(ParserA211, CrossItem_CoverPointIdentifier) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    cp_a: coverpoint a;\n"
+              "    cp_b: coverpoint b;\n"
+              "    cross cp_a, cp_b;\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+// =============================================================================
+// §A.2.11 Production #20: cross_body
+// =============================================================================
+TEST(ParserA211, CrossBody_Empty) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    cp1: coverpoint a;\n"
+              "    cp2: coverpoint b;\n"
+              "    cross cp1, cp2;\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+TEST(ParserA211, CrossBody_WithItems) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    cp1: coverpoint a;\n"
+              "    cp2: coverpoint b;\n"
+              "    cross cp1, cp2 {\n"
+              "      bins sel = binsof(cp1);\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+// =============================================================================
+// §A.2.11 Production #21: cross_body_item
+// =============================================================================
+TEST(ParserA211, CrossBodyItem_BinsSelection) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    cp1: coverpoint a;\n"
+              "    cp2: coverpoint b;\n"
+              "    cross cp1, cp2 {\n"
+              "      bins ab = binsof(cp1) intersect {[0:3]};\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+TEST(ParserA211, CrossBodyItem_FunctionDecl) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    cp1: coverpoint a;\n"
+              "    cp2: coverpoint b;\n"
+              "    cross cp1, cp2 {\n"
+              "      function CrossQueueType myFunc(int val);\n"
+              "        return '{val};\n"
+              "      endfunction\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+// =============================================================================
+// §A.2.11 Production #22: bins_selection_or_option
+// =============================================================================
+TEST(ParserA211, BinsSelectionOrOption_CoverageOption) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    cp1: coverpoint a;\n"
+              "    cp2: coverpoint b;\n"
+              "    cross cp1, cp2 {\n"
+              "      option.weight = 5;\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+TEST(ParserA211, BinsSelectionOrOption_BinsSelection) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    cp1: coverpoint a;\n"
+              "    cp2: coverpoint b;\n"
+              "    cross cp1, cp2 {\n"
+              "      bins selected = binsof(cp1);\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+// =============================================================================
+// §A.2.11 Production #23: bins_selection
+// =============================================================================
+TEST(ParserA211, BinsSelection_Basic) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    cp1: coverpoint a;\n"
+              "    cp2: coverpoint b;\n"
+              "    cross cp1, cp2 {\n"
+              "      bins my_bin = binsof(cp1);\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
+TEST(ParserA211, BinsSelection_WithIff) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    cp1: coverpoint a;\n"
+              "    cp2: coverpoint b;\n"
+              "    cross cp1, cp2 {\n"
+              "      bins sel = binsof(cp1) iff (enable);\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
 }  // namespace

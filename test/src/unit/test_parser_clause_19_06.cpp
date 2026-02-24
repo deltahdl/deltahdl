@@ -1,9 +1,7 @@
-// §19.4: Using covergroups in classes
+// §19.6: Defining cross coverage
 
 #include <gtest/gtest.h>
-
 #include <string>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -12,7 +10,6 @@
 
 using namespace delta;
 
-// --- Test helpers ---
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
@@ -29,23 +26,6 @@ ParseResult Parse(const std::string &src) {
   result.cu = parser.Parse();
   result.has_errors = diag.HasErrors();
   return result;
-}
-
-namespace {
-
-// class_item ::= { attribute_instance } covergroup_declaration
-TEST(SourceText, ClassCovergroupDecl) {
-  auto r = Parse(
-      "class C;\n"
-      "  covergroup cg @(posedge clk);\n"
-      "  endgroup\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto &members = r.cu->classes[0]->members;
-  ASSERT_EQ(members.size(), 1u);
-  EXPECT_EQ(members[0]->kind, ClassMemberKind::kCovergroup);
-  EXPECT_EQ(members[0]->name, "cg");
 }
 
 static bool ParseOk(const std::string &src) {
@@ -67,12 +47,17 @@ static ModuleItem *FindItemByKind(const std::vector<ModuleItem *> &items,
   return nullptr;
 }
 
-TEST(ParserA211, CovergroupDecl_InClass) {
+namespace {
+
+TEST(ParserA211, CoverageSpec_CoverCross) {
   EXPECT_TRUE(
-      ParseOk("class c;\n"
+      ParseOk("module m;\n"
               "  covergroup cg;\n"
+              "    cp1: coverpoint a;\n"
+              "    cp2: coverpoint b;\n"
+              "    cross cp1, cp2;\n"
               "  endgroup\n"
-              "endclass\n"));
+              "endmodule\n"));
 }
 
 }  // namespace
