@@ -41493,4 +41493,52 @@ TEST(ParserClause03, Cl3_13_ClassMethodsAndProperties) {
   EXPECT_EQ(cls->members[2]->method->name, "reset");
 }
 
+// class_method ::= { method_qualifier } class_constructor_declaration
+TEST(SourceText, ClassConstructorDecl) {
+  auto r = Parse(
+      "class C;\n"
+      "  function new(int val);\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto &members = r.cu->classes[0]->members;
+  ASSERT_EQ(members.size(), 1u);
+  EXPECT_EQ(members[0]->kind, ClassMemberKind::kMethod);
+  EXPECT_EQ(members[0]->method->name, "new");
+}
+
+TEST(ParserA24, ClassNewWithArgs) {
+  auto r = Parse(
+      "class C;\n"
+      "  function new(int a, int b);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c = new(1, 2);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserA26, FuncBodyConstructorNew) {
+  auto r = Parse(
+      "class C;\n"
+      "  function new();\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserA26, FuncBodyConstructorNewEndLabel) {
+  auto r = Parse(
+      "class C;\n"
+      "  function new(int x);\n"
+      "  endfunction : new\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
