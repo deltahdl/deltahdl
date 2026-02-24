@@ -185,4 +185,58 @@ TEST(ParserAnnexA, A1InterfaceDecl) {
   EXPECT_EQ(r.cu->interfaces[0]->modports.size(), 2u);
 }
 
+// modport_item ::= modport_identifier ( modport_ports_declaration { , ... } )
+TEST(ParserA29, MultipleModportItems) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  logic a, b;\n"
+      "  modport init(output a), tgt(input b);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *iface = r.cu->interfaces[0];
+  ASSERT_EQ(iface->modports.size(), 2u);
+  EXPECT_EQ(iface->modports[0]->name, "init");
+  EXPECT_EQ(iface->modports[1]->name, "tgt");
+}
+
+TEST(ParserA29, AllFourDirections) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  logic a, b, c;\n"
+      "  wire d;\n"
+      "  modport mp(input a, output b, inout c, ref d);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 4u);
+  EXPECT_EQ(mp->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(mp->ports[1].direction, Direction::kOutput);
+  EXPECT_EQ(mp->ports[2].direction, Direction::kInout);
+  EXPECT_EQ(mp->ports[3].direction, Direction::kRef);
+}
+
+// attribute_instance on modport_ports_declaration
+TEST(ParserA29, AttrOnSimplePorts) {
+  EXPECT_TRUE(
+      ParseOk("interface bus;\n"
+              "  logic a;\n"
+              "  modport target((* synthesis *) input a);\n"
+              "endinterface\n"));
+}
+
+// Verify source location is captured on ModportDecl
+TEST(ParserA29, ModportDeclHasSourceLoc) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  logic a;\n"
+      "  modport target(input a);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *mp = r.cu->interfaces[0]->modports[0];
+  EXPECT_TRUE(mp->loc.IsValid());
+}
+
 }  // namespace

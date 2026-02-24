@@ -885,4 +885,145 @@ TEST(ParserA28, TypedefInFunction) {
               "endmodule\n"));
 }
 
+// §A.2.9 modport_declaration ::= modport modport_item { , modport_item } ;
+TEST(ParserA29, BasicModportDecl) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  logic a;\n"
+      "  modport target(input a);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  ASSERT_EQ(r.cu->interfaces[0]->modports.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->modports[0]->name, "target");
+}
+
+// modport_simple_ports_declaration ::=
+//   port_direction modport_simple_port { , modport_simple_port }
+TEST(ParserA29, MultipleSimplePortsSameDir) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  logic a, b, c;\n"
+      "  modport target(input a, b, c);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 3u);
+  EXPECT_EQ(mp->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(mp->ports[1].direction, Direction::kInput);
+  EXPECT_EQ(mp->ports[2].direction, Direction::kInput);
+  EXPECT_EQ(mp->ports[0].name, "a");
+  EXPECT_EQ(mp->ports[1].name, "b");
+  EXPECT_EQ(mp->ports[2].name, "c");
+}
+
+// modport_tf_ports_declaration ::=
+//   import_export modport_tf_port { , modport_tf_port }
+TEST(ParserA29, ImportSingleIdentifier) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  modport target(import Read);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 1u);
+  EXPECT_TRUE(mp->ports[0].is_import);
+  EXPECT_EQ(mp->ports[0].name, "Read");
+}
+
+TEST(ParserA29, ImportMultipleIdentifiers) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  modport target(import Read, Write);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 2u);
+  EXPECT_TRUE(mp->ports[0].is_import);
+  EXPECT_EQ(mp->ports[0].name, "Read");
+  EXPECT_TRUE(mp->ports[1].is_import);
+  EXPECT_EQ(mp->ports[1].name, "Write");
+}
+
+TEST(ParserA29, ImportMultiplePrototypes) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  modport init(\n"
+      "    import task Read(input logic [7:0] raddr),\n"
+      "           task Write(input logic [7:0] waddr)\n"
+      "  );\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 2u);
+  EXPECT_TRUE(mp->ports[0].is_import);
+  EXPECT_EQ(mp->ports[0].prototype->name, "Read");
+  EXPECT_TRUE(mp->ports[1].is_import);
+  EXPECT_EQ(mp->ports[1].prototype->name, "Write");
+}
+
+// Mixed modport_ports_declarations
+TEST(ParserA29, MixedDirImportExport) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  logic req, gnt;\n"
+      "  modport target(\n"
+      "    input req,\n"
+      "    output gnt,\n"
+      "    import Read,\n"
+      "    export Write\n"
+      "  );\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 4u);
+  EXPECT_EQ(mp->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(mp->ports[1].direction, Direction::kOutput);
+  EXPECT_TRUE(mp->ports[2].is_import);
+  EXPECT_TRUE(mp->ports[3].is_export);
+}
+
+TEST(ParserA29, AttrOnImportPort) {
+  EXPECT_TRUE(
+      ParseOk("interface bus;\n"
+              "  modport target((* synthesis *) import Read);\n"
+              "endinterface\n"));
+}
+
+// Direction persists across simple ports (§25.5)
+TEST(ParserA29, DirectionPersistsAcrossPorts) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  logic a, b, c, d;\n"
+      "  modport target(input a, b, output c, d);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 4u);
+  EXPECT_EQ(mp->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(mp->ports[1].direction, Direction::kInput);
+  EXPECT_EQ(mp->ports[2].direction, Direction::kOutput);
+  EXPECT_EQ(mp->ports[3].direction, Direction::kOutput);
+}
+
+// Empty modport (no ports) should parse
+TEST(ParserA29, EmptyModport) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  modport empty();\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *mp = r.cu->interfaces[0]->modports[0];
+  EXPECT_EQ(mp->ports.size(), 0u);
+  EXPECT_EQ(mp->name, "empty");
+}
+
 }  // namespace

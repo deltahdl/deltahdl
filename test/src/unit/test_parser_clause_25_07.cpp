@@ -124,4 +124,91 @@ TEST(ParserA27, TaskPrototypeExternNoPorts) {
   EXPECT_TRUE(item->func_args.empty());
 }
 
+static bool ParseOk(const std::string &src) {
+  SourceManager mgr;
+  Arena arena;
+  auto fid = mgr.AddFile("<test>", src);
+  DiagEngine diag(mgr);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, arena, diag);
+  parser.Parse();
+  return !diag.HasErrors();
+}
+
+TEST(ParserA29, ImportFunctionPrototype) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  modport init(import function int compute(input int a));\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 1u);
+  EXPECT_TRUE(mp->ports[0].is_import);
+  EXPECT_NE(mp->ports[0].prototype, nullptr);
+  EXPECT_EQ(mp->ports[0].prototype->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(mp->ports[0].prototype->name, "compute");
+}
+
+TEST(ParserA29, ImportTaskNoArgs) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  modport target(import task doWork);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 1u);
+  EXPECT_NE(mp->ports[0].prototype, nullptr);
+  EXPECT_EQ(mp->ports[0].prototype->name, "doWork");
+}
+
+TEST(ParserA29, ImportFunctionVoidReturn) {
+  EXPECT_TRUE(
+      ParseOk("interface bus;\n"
+              "  modport init(import function void reset());\n"
+              "endinterface\n"));
+}
+
+// Verify import/export flags are mutually exclusive in AST
+TEST(ParserA29, ImportFlag_NotExport) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  modport target(import Read);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *mp = r.cu->interfaces[0]->modports[0];
+  EXPECT_TRUE(mp->ports[0].is_import);
+  EXPECT_FALSE(mp->ports[0].is_export);
+}
+
+// Verify function prototype return type stored
+TEST(ParserA29, FunctionPrototype_ReturnType) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  modport init(import function int compute(input int a));\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 1u);
+  ASSERT_NE(mp->ports[0].prototype, nullptr);
+  EXPECT_EQ(mp->ports[0].prototype->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(mp->ports[0].prototype->data_type.kind, DataTypeKind::kInt);
+}
+
+// Verify task prototype with arguments stores them
+TEST(ParserA29, TaskPrototype_HasArgs) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  modport init(import task Read(input logic [7:0] raddr));\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_NE(mp->ports[0].prototype, nullptr);
+  EXPECT_FALSE(mp->ports[0].prototype->func_args.empty());
+}
+
 }  // namespace
