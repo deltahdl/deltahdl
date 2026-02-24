@@ -1,0 +1,186 @@
+// §28.3.5: The range specification
+
+#include <gtest/gtest.h>
+#include <cstdint>
+#include <cstdlib>
+
+// --- Local types for gate declaration (§28.3) ---
+enum class GateType : uint8_t {
+  kAnd,
+  kNand,
+  kOr,
+  kNor,
+  kXor,
+  kXnor,
+  kBuf,
+  kNot,
+  kBufif0,
+  kBufif1,
+  kNotif0,
+  kNotif1,
+  kNmos,
+  kPmos,
+  kRnmos,
+  kRpmos,
+  kTran,
+  kRtran,
+  kTranif0,
+  kTranif1,
+  kRtranif0,
+  kRtranif1,
+  kCmos,
+  kRcmos,
+  kPullup,
+  kPulldown,
+};
+
+enum class StrengthLvl : uint8_t {
+  kHighz = 0,
+  kSmall,
+  kMedium,
+  kWeak,
+  kLarge,
+  kPull,
+  kStrong,
+  kSupply
+};
+
+struct GateDeclInfo {
+  GateType type = GateType::kAnd;
+  bool has_strength = false;
+  StrengthLvl strength0 = StrengthLvl::kStrong;
+  StrengthLvl strength1 = StrengthLvl::kStrong;
+  uint32_t delay_count = 0;
+  bool has_name = false;
+  bool has_range = false;
+  int32_t range_lhi = 0;
+  int32_t range_rhi = 0;
+  uint32_t terminal_count = 0;
+};
+
+bool ValidateGateDecl(const GateDeclInfo &info);
+
+bool CanHaveStrengthSpec(GateType type);
+
+uint32_t ComputeArraySize(int32_t lhi, int32_t rhi);
+
+bool ValidateStrengthSpec(StrengthLvl s0, StrengthLvl s1, GateType type);
+
+uint32_t MaxDelays(GateType type);
+
+bool ValidateGateDecl(const GateDeclInfo &info) {
+  return !info.has_range || info.has_name;
+}
+
+bool CanHaveStrengthSpec(GateType type) {
+  switch (type) {
+    case GateType::kAnd:
+    case GateType::kNand:
+    case GateType::kOr:
+    case GateType::kNor:
+    case GateType::kXor:
+    case GateType::kXnor:
+    case GateType::kBuf:
+    case GateType::kNot:
+    case GateType::kBufif0:
+    case GateType::kBufif1:
+    case GateType::kNotif0:
+    case GateType::kNotif1:
+    case GateType::kPullup:
+    case GateType::kPulldown:
+      return true;
+    case GateType::kNmos:
+    case GateType::kPmos:
+    case GateType::kRnmos:
+    case GateType::kRpmos:
+    case GateType::kTran:
+    case GateType::kRtran:
+    case GateType::kTranif0:
+    case GateType::kTranif1:
+    case GateType::kRtranif0:
+    case GateType::kRtranif1:
+    case GateType::kCmos:
+    case GateType::kRcmos:
+      return false;
+  }
+  return false;
+}
+
+uint32_t ComputeArraySize(int32_t lhi, int32_t rhi) {
+  return static_cast<uint32_t>(std::abs(lhi - rhi)) + 1;
+}
+
+bool ValidateStrengthSpec(StrengthLvl s0, StrengthLvl s1, GateType /*type*/) {
+  return s0 != StrengthLvl::kHighz || s1 != StrengthLvl::kHighz;
+}
+
+uint32_t MaxDelays(GateType type) {
+  switch (type) {
+    case GateType::kPullup:
+    case GateType::kPulldown:
+      return 0;
+    case GateType::kAnd:
+    case GateType::kNand:
+    case GateType::kOr:
+    case GateType::kNor:
+    case GateType::kXor:
+    case GateType::kXnor:
+    case GateType::kBuf:
+    case GateType::kNot:
+      return 2;
+    case GateType::kBufif0:
+    case GateType::kBufif1:
+    case GateType::kNotif0:
+    case GateType::kNotif1:
+    case GateType::kNmos:
+    case GateType::kPmos:
+    case GateType::kRnmos:
+    case GateType::kRpmos:
+    case GateType::kCmos:
+    case GateType::kRcmos:
+      return 3;
+    case GateType::kTranif0:
+    case GateType::kTranif1:
+    case GateType::kRtranif0:
+    case GateType::kRtranif1:
+      return 2;
+    case GateType::kTran:
+    case GateType::kRtran:
+      return 0;
+  }
+  return 0;
+}
+
+namespace {
+
+// --- §28.3.5: Range specification ---
+// §28.3.5: "abs(lhi-rhi)+1 instances"
+TEST(GateDecl, ArraySizeComputation) {
+  EXPECT_EQ(ComputeArraySize(0, 3), 4u);
+  EXPECT_EQ(ComputeArraySize(3, 0), 4u);
+  EXPECT_EQ(ComputeArraySize(1, 4), 4u);
+}
+
+// §28.3.5: "lhi is not required to be larger than rhi."
+TEST(GateDecl, LhiNotRequiredLargerThanRhi) {
+  EXPECT_EQ(ComputeArraySize(7, 0), 8u);
+  EXPECT_EQ(ComputeArraySize(0, 7), 8u);
+}
+
+// §28.3.5: "If both constant expressions are equal, only one instance
+//  shall be generated."
+TEST(GateDecl, EqualRangeBoundsOneInstance) {
+  EXPECT_EQ(ComputeArraySize(5, 5), 1u);
+}
+
+// §28.3.5: "If no range specification is given, a single instance
+//  shall be created."
+TEST(GateDecl, NoRangeSingleInstance) {
+  GateDeclInfo info;
+  info.has_range = false;
+  info.has_name = true;
+  info.terminal_count = 3;
+  EXPECT_TRUE(ValidateGateDecl(info));
+}
+
+}  // namespace

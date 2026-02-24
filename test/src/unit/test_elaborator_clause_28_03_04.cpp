@@ -1,7 +1,6 @@
-// §28.2: Overview
+// §28.3.4: The primitive instance identifier
 
 #include <gtest/gtest.h>
-
 #include <cstdint>
 #include <cstdlib>
 
@@ -154,71 +153,6 @@ uint32_t MaxDelays(GateType type) {
 
 namespace {
 
-// =============================================================
-// §28.3: Gate and switch declaration syntax
-// =============================================================
-// §28.3: "Multiple instances of the one type ... shall have the same
-//  drive strength and delay specification."
-// --- §28.3.1: Gate type specification ---
-// §28.3.1: Declaration shall begin with keyword naming the gate type.
-// Table 28-1: all 26 built-in gate/switch types.
-// --- §28.3.2: Drive strength specification ---
-// §28.3.2: Only certain gate types can have drive strength.
-TEST(GateDecl, StrengthSpecValidForNInputGates) {
-  constexpr GateType kNInputGates[] = {
-      GateType::kAnd, GateType::kNand, GateType::kOr,
-      GateType::kNor, GateType::kXor,  GateType::kXnor,
-  };
-  for (auto gate : kNInputGates) {
-    EXPECT_TRUE(CanHaveStrengthSpec(gate));
-  }
-}
-
-TEST(GateDecl, StrengthSpecValidForNOutputGates) {
-  EXPECT_TRUE(CanHaveStrengthSpec(GateType::kBuf));
-  EXPECT_TRUE(CanHaveStrengthSpec(GateType::kNot));
-}
-
-TEST(GateDecl, StrengthSpecValidForEnableGates) {
-  EXPECT_TRUE(CanHaveStrengthSpec(GateType::kBufif0));
-  EXPECT_TRUE(CanHaveStrengthSpec(GateType::kBufif1));
-  EXPECT_TRUE(CanHaveStrengthSpec(GateType::kNotif0));
-  EXPECT_TRUE(CanHaveStrengthSpec(GateType::kNotif1));
-}
-
-TEST(GateDecl, StrengthSpecValidForPullGates) {
-  EXPECT_TRUE(CanHaveStrengthSpec(GateType::kPullup));
-  EXPECT_TRUE(CanHaveStrengthSpec(GateType::kPulldown));
-}
-
-TEST(GateDecl, StrengthSpecInvalidForSwitches) {
-  EXPECT_FALSE(CanHaveStrengthSpec(GateType::kNmos));
-  EXPECT_FALSE(CanHaveStrengthSpec(GateType::kPmos));
-  EXPECT_FALSE(CanHaveStrengthSpec(GateType::kTran));
-  EXPECT_FALSE(CanHaveStrengthSpec(GateType::kCmos));
-}
-
-// §28.3.2: "The strength specifications (highz0, highz1) and
-//  (highz1, highz0) shall be considered invalid."
-TEST(GateDecl, BothHighzStrengthsInvalid) {
-  EXPECT_FALSE(ValidateStrengthSpec(StrengthLvl::kHighz, StrengthLvl::kHighz,
-                                    GateType::kAnd));
-}
-
-// §28.3.2: "In the absence of a strength specification, the instances
-//  shall have the default strengths strong1 and strong0."
-TEST(GateDecl, DefaultStrengthIsStrong) {
-  GateDeclInfo info;
-  info.has_strength = false;
-  EXPECT_TRUE(ValidateGateDecl(info));
-}
-
-// §28.3.2: highz1 → output z instead of 1.
-TEST(GateDecl, Highz1OutputsZInsteadOf1) {
-  EXPECT_TRUE(ValidateStrengthSpec(StrengthLvl::kStrong, StrengthLvl::kHighz,
-                                   GateType::kNor));
-}
-
 // §28.3.3: "Gates and switches in declarations with no delay
 //  specification shall have no propagation delay."
 // --- §28.3.4: Instance identifier ---
@@ -237,36 +171,6 @@ TEST(GateDecl, ArrayWithNameIsValid) {
   info.has_name = true;
   info.range_lhi = 0;
   info.range_rhi = 3;
-  info.terminal_count = 3;
-  EXPECT_TRUE(ValidateGateDecl(info));
-}
-
-// --- §28.3.5: Range specification ---
-// §28.3.5: "abs(lhi-rhi)+1 instances"
-TEST(GateDecl, ArraySizeComputation) {
-  EXPECT_EQ(ComputeArraySize(0, 3), 4u);
-  EXPECT_EQ(ComputeArraySize(3, 0), 4u);
-  EXPECT_EQ(ComputeArraySize(1, 4), 4u);
-}
-
-// §28.3.5: "lhi is not required to be larger than rhi."
-TEST(GateDecl, LhiNotRequiredLargerThanRhi) {
-  EXPECT_EQ(ComputeArraySize(7, 0), 8u);
-  EXPECT_EQ(ComputeArraySize(0, 7), 8u);
-}
-
-// §28.3.5: "If both constant expressions are equal, only one instance
-//  shall be generated."
-TEST(GateDecl, EqualRangeBoundsOneInstance) {
-  EXPECT_EQ(ComputeArraySize(5, 5), 1u);
-}
-
-// §28.3.5: "If no range specification is given, a single instance
-//  shall be created."
-TEST(GateDecl, NoRangeSingleInstance) {
-  GateDeclInfo info;
-  info.has_range = false;
-  info.has_name = true;
   info.terminal_count = 3;
   EXPECT_TRUE(ValidateGateDecl(info));
 }
