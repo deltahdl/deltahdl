@@ -77996,4 +77996,18 @@ TEST(ElabA81, ConstantMultipleConcatInParam) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// § primary — streaming concatenation elaborates
+TEST(ElabA84, PrimaryStreamingConcatElaborates) {
+  ElabA84Fixture f;
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  logic [31:0] a;\n"
+      "  logic [31:0] b;\n"
+      "  initial b = {<< 8 {a}};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
