@@ -1,7 +1,7 @@
+// §16.3: Immediate assertions
+
 #include <gtest/gtest.h>
-
 #include <string>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -15,8 +15,6 @@
 #include "simulation/variable.h"
 
 using namespace delta;
-
-namespace {
 
 struct SimA610Fixture {
   SourceManager mgr;
@@ -35,14 +33,12 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA610Fixture &f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-}  // namespace
+namespace {
 
 // =============================================================================
 // Simulation tests — A.6.10 Assertion statements
 // =============================================================================
-
 // --- simple_immediate_assert_statement ---
-
 // Assert true: pass action executes
 TEST(SimA610, AssertPassAction) {
   SimA610Fixture f;
@@ -149,7 +145,6 @@ TEST(SimA610, AssertElseOnly) {
 }
 
 // --- simple_immediate_assume_statement ---
-
 // Assume true: pass action executes
 TEST(SimA610, AssumePassAction) {
   SimA610Fixture f;
@@ -193,7 +188,6 @@ TEST(SimA610, AssumeFailAction) {
 }
 
 // --- simple_immediate_cover_statement ---
-
 // Cover true: pass action executes
 TEST(SimA610, CoverPassAction) {
   SimA610Fixture f;
@@ -236,31 +230,7 @@ TEST(SimA610, CoverFalseNoAction) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-// --- deferred_immediate_assert_statement ---
-
-// Deferred assert #0 with pass action
-TEST(SimA610, DeferredAssertHash0) {
-  SimA610Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    assert #0 (1) x = 8'd44;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 44u);
-}
-
 // --- action_block with begin/end ---
-
 // Assert with begin/end block as pass action
 TEST(SimA610, AssertBeginEndBlock) {
   SimA610Fixture f;
@@ -283,7 +253,6 @@ TEST(SimA610, AssertBeginEndBlock) {
 }
 
 // --- multiple assertions in sequence ---
-
 TEST(SimA610, MultipleAssertions) {
   SimA610Fixture f;
   auto *design = ElaborateSrc(
@@ -304,3 +273,5 @@ TEST(SimA610, MultipleAssertions) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
+
+}  // namespace
