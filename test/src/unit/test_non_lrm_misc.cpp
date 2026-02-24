@@ -23038,4 +23038,30 @@ TEST(ParserA87, UnbasedUnsizedZ) {
   EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
 }
 
+// =============================================================================
+// A.9 -- General (attributes, identifiers)
+// =============================================================================
+TEST(ParserAnnexA, A9AttributeOnContAssign) {
+  auto r = Parse("module m; wire y; (* synthesis *) assign y = 1; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserAnnexA, A9AttributeWithValue) {
+  auto r = Parse("module m; (* max_fanout = 8 *) wire w; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserAnnexA, A9DefparamDecl) {
+  auto r = Parse("module m; defparam u.WIDTH = 16; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  bool found = false;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kDefparam) found = true;
+  }
+  EXPECT_TRUE(found);
+}
+
 }  // namespace
