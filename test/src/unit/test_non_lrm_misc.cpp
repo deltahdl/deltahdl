@@ -43041,4 +43041,24 @@ TEST(Parser, ModuleWithInitialBlock) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
 }
 
+TEST(Parser, AlwaysFFBlock) {
+  auto r = Parse(
+      "module counter(input logic clk, rst);\n"
+      "  logic [7:0] count;\n"
+      "  always_ff @(posedge clk or posedge rst)\n"
+      "    if (rst) count <= '0;\n"
+      "    else count <= count + 1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto *mod = r.cu->modules[0];
+  bool found_ff = false;
+  for (auto *item : mod->items) {
+    if (item->kind == ModuleItemKind::kAlwaysBlock &&
+        item->always_kind == AlwaysKind::kAlwaysFF) {
+      found_ff = true;
+    }
+  }
+  EXPECT_TRUE(found_ff);
+}
+
 }  // namespace
