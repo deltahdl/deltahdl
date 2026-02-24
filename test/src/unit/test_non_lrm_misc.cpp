@@ -78099,4 +78099,11 @@ TEST(LexerCh5, SourceLocations) {
   }
 }
 
+TEST(LexerCh50603, DollarAloneIsNotSystemIdentifier) {
+  // §5.6.3: Grammar requires >= 1 char after $; bare $ is kDollar.
+  auto tokens = Lex("$");
+  ASSERT_GE(tokens.size(), 2);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kDollar);
+}
+
 }  // namespace
