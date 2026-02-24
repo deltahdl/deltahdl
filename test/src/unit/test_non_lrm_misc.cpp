@@ -23064,4 +23064,49 @@ TEST(ParserAnnexA, A9DefparamDecl) {
   EXPECT_TRUE(found);
 }
 
+// =============================================================================
+// Annex D -- Optional system tasks
+// =============================================================================
+TEST(ParserAnnexD, AnnexDCountdrivers) {
+  auto r = Parse("module m; initial $countdrivers(sig); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto *stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
+  EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
+}
+
+TEST(ParserAnnexD, AnnexDList) {
+  auto r = Parse("module m; initial $list; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto *stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
+  EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
+}
+
+TEST(ParserAnnexD, AnnexDLog) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin $log(\"sim.log\"); $nolog; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+}
+
+TEST(ParserAnnexD, AnnexDSave) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin $save(\"s.sav\"); $restart(\"s.sav\"); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+}
+
+TEST(ParserAnnexD, AnnexDScope) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin $scope(m); $showscopes; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+}
+
 }  // namespace
