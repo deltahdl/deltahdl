@@ -77726,4 +77726,14 @@ TEST(StructType, FieldTypeKindPreserved) {
   EXPECT_EQ(found->fields[1].type_kind, DataTypeKind::kByte);
 }
 
+TEST(Elaboration, HardPackedUnion_DifferentWidth_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  union packed { logic [7:0] a; logic [15:0] b; } u;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 }  // namespace

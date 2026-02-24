@@ -1,7 +1,6 @@
 // §7.3.1: Packed unions
 
 #include <gtest/gtest.h>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -44,16 +43,6 @@ TEST(Elaboration, HardPackedUnion_SameWidth_OK) {
       "endmodule\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(Elaboration, HardPackedUnion_DifferentWidth_Error) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top;\n"
-      "  union packed { logic [7:0] a; logic [15:0] b; } u;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
 }
 
 TEST(Elaboration, SoftPackedUnion_DifferentWidth_OK) {
