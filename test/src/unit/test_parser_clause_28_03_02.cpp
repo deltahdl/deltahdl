@@ -180,4 +180,9 @@ TEST(GateDecl, StrengthSpecValidForEnableGates) {
   EXPECT_TRUE(CanHaveStrengthSpec(GateType::kNotif1));
 }
 
+TEST(GateDecl, StrengthSpecValidForNOutputGates) {
+  EXPECT_TRUE(CanHaveStrengthSpec(GateType::kBuf));
+  EXPECT_TRUE(CanHaveStrengthSpec(GateType::kNot));
+}
+
 }  // namespace

@@ -153,11 +153,6 @@ uint32_t MaxDelays(GateType type) {
 
 namespace {
 
-TEST(GateDecl, StrengthSpecValidForNOutputGates) {
-  EXPECT_TRUE(CanHaveStrengthSpec(GateType::kBuf));
-  EXPECT_TRUE(CanHaveStrengthSpec(GateType::kNot));
-}
-
 TEST(GateDecl, StrengthSpecValidForPullGates) {
   EXPECT_TRUE(CanHaveStrengthSpec(GateType::kPullup));
   EXPECT_TRUE(CanHaveStrengthSpec(GateType::kPulldown));
