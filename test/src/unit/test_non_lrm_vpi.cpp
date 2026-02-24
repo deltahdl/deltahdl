@@ -13,5 +13,10 @@ TEST(NonLrmVpi, DefaultContextIsAvailable) {
   (void)ctx;
 }
 
+TEST(VpiCompatL2, HeaderIncludable) {
+  // Simply including the header should compile.
+  SUCCEED();
+}
+
 }  // namespace
 }  // namespace delta
