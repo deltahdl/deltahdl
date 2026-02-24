@@ -1,4 +1,4 @@
-// §3.14: Simulation time units and precision
+// §3.14.3: Simulation time unit
 
 #include <gtest/gtest.h>
 #include "common/arena.h"
@@ -66,14 +66,15 @@ static bool ParseOk(const std::string &src) {
 
 namespace {
 
-// 11. DelayToTicks covers the full range from seconds to femtoseconds.
-TEST(ParserClause03, Cl3_14_DelayToTicksFullRange) {
-  // 1 second at fs precision = 10^15 ticks.
-  TimeScale ts_s{TimeUnit::kS, 1, TimeUnit::kFs, 1};
-  EXPECT_EQ(DelayToTicks(1, ts_s, TimeUnit::kFs), 1000000000000000ULL);
-  // 1 fs at fs precision = 1 tick.
-  TimeScale ts_fs{TimeUnit::kFs, 1, TimeUnit::kFs, 1};
-  EXPECT_EQ(DelayToTicks(1, ts_fs, TimeUnit::kFs), 1u);
+// 6. Three orders of magnitude: 1, 10, 100.
+// DelayToTicks produces proportionally different tick counts.
+TEST(ParserClause03, Cl3_14_ThreeMagnitudes) {
+  TimeScale ts1{TimeUnit::kNs, 1, TimeUnit::kPs, 1};
+  TimeScale ts10{TimeUnit::kNs, 10, TimeUnit::kPs, 1};
+  TimeScale ts100{TimeUnit::kNs, 100, TimeUnit::kPs, 1};
+  EXPECT_EQ(DelayToTicks(1, ts1, TimeUnit::kPs), 1000u);
+  EXPECT_EQ(DelayToTicks(1, ts10, TimeUnit::kPs), 10000u);
+  EXPECT_EQ(DelayToTicks(1, ts100, TimeUnit::kPs), 100000u);
 }
 
 }  // namespace
