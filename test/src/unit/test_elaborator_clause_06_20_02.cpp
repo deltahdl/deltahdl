@@ -60,4 +60,35 @@ TEST(ElabA83, GenvarExprElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+struct ElabA84Fixture {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag{mgr};
+  bool has_errors = false;
+};
+
+static RtlirDesign *ElaborateSrc(const std::string &src, ElabA84Fixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  auto *design = elab.Elaborate(cu->modules.back()->name);
+  f.has_errors = f.diag.HasErrors();
+  return design;
+}
+
+// § constant_primary — parameter reference elaborates
+TEST(ElabA84, ConstantPrimaryParameterRef) {
+  ElabA84Fixture f;
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  parameter int A = 5;\n"
+      "  parameter int B = A;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
