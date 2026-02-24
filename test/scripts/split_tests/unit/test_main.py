@@ -102,13 +102,13 @@ def test_parse_args_arch(monkeypatch):
 
 
 def test_format_clause_non_lrm():
-    """Non-LRM clause formats as 'Non-LRM: TAG'."""
-    assert _format_clause("non-lrm:aig") == "Non-LRM: AIG"
+    """Non-LRM clause formats as 'Non-LRM TAG'."""
+    assert _format_clause("non-lrm:aig") == "Non-LRM AIG"
 
 
 def test_format_clause_non_lrm_underscore():
     """Non-LRM clause with underscore converts to space."""
-    assert _format_clause("non-lrm:aig_opt") == "Non-LRM: AIG OPT"
+    assert _format_clause("non-lrm:aig_opt") == "Non-LRM AIG OPT"
 
 
 def test_format_clause_regular():
@@ -141,10 +141,10 @@ def test_print_classification_rationale_line(capsys):
 
 
 def test_print_classification_non_lrm_clause(capsys):
-    """Non-LRM clause displays as 'Non-LRM: AIG'."""
+    """Non-LRM clause displays as 'Non-LRM AIG'."""
     t = _tb("T", prefix="test_non_lrm_", clause="non-lrm:aig", rationale="r")
     _print_classification_table([t])
-    assert "Clause: Non-LRM: AIG" in capsys.readouterr().out
+    assert "Clause: Non-LRM AIG" in capsys.readouterr().out
 
 
 def test_print_classification_separator_between(capsys):

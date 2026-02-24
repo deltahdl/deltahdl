@@ -645,7 +645,7 @@ def _format_clause(clause):
     """Format a clause for display."""
     if clause.startswith("non-lrm:"):
         tag = clause[len("non-lrm:"):].upper().replace("_", " ")
-        return f"Non-LRM: {tag}"
+        return f"Non-LRM {tag}"
     return f"\u00a7{clause}"
 
 
