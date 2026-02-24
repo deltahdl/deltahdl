@@ -1,5 +1,6 @@
-#include <gtest/gtest.h>
+// §B
 
+#include <gtest/gtest.h>
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
@@ -13,6 +14,8 @@ static std::vector<Token> Lex(const std::string &src) {
   Lexer lexer(mgr.FileContent(fid), fid, diag);
   return lexer.LexAll();
 }
+
+namespace {
 
 TEST(Lexer, AllAnnexBKeywords) {
   // Every IEEE 1800-2023 Annex B keyword must lex as a keyword, not
@@ -275,3 +278,5 @@ TEST(Lexer, AllAnnexBKeywords) {
         << kw << " should be a keyword, not an identifier";
   }
 }
+
+}  // namespace
