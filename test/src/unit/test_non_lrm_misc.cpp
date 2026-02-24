@@ -73256,4 +73256,22 @@ TEST(Parser, GateBufMultiOutput) {
   EXPECT_EQ(item->gate_terminals.size(), 3);
 }
 
+TEST(ParserSection28, EnableGates) {
+  auto r = Parse(
+      "module m;\n"
+      "  bufif0 (out, in, en);\n"
+      "  bufif1 (out, in, en);\n"
+      "  notif0 (out, in, en);\n"
+      "  notif1 (out, in, en);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto *mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 4);
+  GateKind expected[] = {GateKind::kBufif0, GateKind::kBufif1,
+                         GateKind::kNotif0, GateKind::kNotif1};
+  for (size_t i = 0; i < std::size(expected); ++i) {
+    EXPECT_EQ(mod->items[i]->gate_kind, expected[i]);
+  }
+}
+
 }  // namespace
