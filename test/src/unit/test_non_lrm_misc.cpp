@@ -64232,4 +64232,34 @@ TEST(ParserAnnexA, A1CheckerDecl) {
   EXPECT_EQ(r.cu->checkers[0]->name, "chk");
 }
 
+static const ModuleItem *FindItemOfKind(const std::vector<ModuleItem *> &items,
+                                        ModuleItemKind kind) {
+  for (const auto *item : items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// §17.6 Checker instantiation
+// =============================================================================
+TEST_F(CheckerParseTest, CheckerInstantiatedInModule) {
+  auto *unit = Parse(R"(
+    checker my_checker(input logic clk, input logic data);
+    endchecker
+
+    module top;
+      logic clk, data;
+      my_checker chk_inst(.clk(clk), .data(data));
+    endmodule
+  )");
+  ASSERT_EQ(unit->checkers.size(), 1u);
+  ASSERT_EQ(unit->modules.size(), 1u);
+  const auto *inst =
+      FindItemOfKind(unit->modules[0]->items, ModuleItemKind::kModuleInst);
+  ASSERT_NE(inst, nullptr);
+  EXPECT_EQ(inst->inst_module, "my_checker");
+  EXPECT_EQ(inst->inst_name, "chk_inst");
+}
+
 }  // namespace
