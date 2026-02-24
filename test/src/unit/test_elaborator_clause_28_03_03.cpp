@@ -1,7 +1,6 @@
-// §28.16: Gate and net delays
+// §28.3.3: The delay specification
 
 #include <gtest/gtest.h>
-
 #include <cstdint>
 #include <cstdlib>
 
