@@ -99,4 +99,15 @@ TEST(SourceText, ParamsAndPorts) {
   EXPECT_EQ(r.cu->modules[0]->ports[1].name, "valid");
 }
 
+// =============================================================================
+// A.1 -- Source text productions
+// =============================================================================
+TEST(ParserAnnexA, A1ModuleDecl) {
+  auto r = Parse("module m; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->name, "m");
+  EXPECT_TRUE(r.cu->modules[0]->items.empty());
+}
+
 }  // namespace

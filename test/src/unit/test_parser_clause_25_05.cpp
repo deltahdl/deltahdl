@@ -171,4 +171,18 @@ TEST(ParserClause03, Cl3_13_InterfaceWithModports) {
   EXPECT_EQ(ifc->modports[1]->name, "slave");
 }
 
+TEST(ParserAnnexA, A1InterfaceDecl) {
+  auto r = Parse(
+      "interface bus_if;\n"
+      "  logic [7:0] data;\n"
+      "  modport master(output data);\n"
+      "  modport slave(input data);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->name, "bus_if");
+  EXPECT_EQ(r.cu->interfaces[0]->modports.size(), 2u);
+}
+
 }  // namespace

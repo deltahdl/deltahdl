@@ -344,4 +344,16 @@ TEST(SourceText, PackageEndLabel) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ParserAnnexA, A1PackageDecl) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  parameter int W = 8;\n"
+      "  typedef logic [W-1:0] word_t;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_EQ(r.cu->packages[0]->name, "pkg");
+}
+
 }  // namespace
