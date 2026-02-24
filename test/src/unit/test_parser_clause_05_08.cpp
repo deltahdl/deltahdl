@@ -82,3 +82,47 @@ TEST(ParserCh508, TimeLiteral_Ms) {
 TEST(ParserCh508, TimeLiteral_Fs) {
   EXPECT_TRUE(ParseOk("module m; initial #500fs; endmodule"));
 }
+struct ParseResult {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit *cu = nullptr;
+  bool has_errors = false;
+};
+
+ParseResult Parse(const std::string &src) {
+  ParseResult result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// delay_value: time_literal — time literal (e.g. 10ns) as delay.
+TEST(ParserA223, DelayValueTimeLiteral) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire #10ns w;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  ASSERT_NE(item->net_delay, nullptr);
+  EXPECT_EQ(item->net_delay->kind, ExprKind::kTimeLiteral);
+}
+
+// Time literal variants in delay: fs, ps, ns, us, ms, s.
+TEST(ParserA223, DelayValueAllTimeLiterals) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  wire #1fs w1;\n"
+              "  wire #2ps w2;\n"
+              "  wire #3ns w3;\n"
+              "  wire #4us w4;\n"
+              "  wire #5ms w5;\n"
+              "  wire #6s w6;\n"
+              "endmodule"));
+}
+

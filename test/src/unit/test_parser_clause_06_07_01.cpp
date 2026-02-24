@@ -110,4 +110,58 @@ TEST(ParserA222, DriveStrengthOnWand) {
   EXPECT_EQ(item->drive_strength1, 3u);  // pull1
 }
 
+bool ParseOk(const std::string &src) {
+  auto r = Parse(src);
+  return r.cu && !r.has_errors;
+}
+
+// delay_value: ps_identifier — parameter/specparam identifier as delay.
+TEST(ParserA223, DelayValuePsIdentifier) {
+  auto r = Parse(
+      "module m;\n"
+      "  parameter delay_val = 5;\n"
+      "  wire #delay_val w;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  // items[0] is the parameter, items[1] is the wire
+  auto *item = r.cu->modules[0]->items[1];
+  ASSERT_NE(item->net_delay, nullptr);
+  EXPECT_EQ(item->net_delay->kind, ExprKind::kIdentifier);
+}
+
+// ---------------------------------------------------------------------------
+// delay3 ::= # delay_value
+//          | # ( mintypmax_expression
+//                [, mintypmax_expression [, mintypmax_expression]] )
+// ---------------------------------------------------------------------------
+// --- delay3 on net declarations ---
+// delay3: single value on net declaration (# delay_value form).
+TEST(ParserA223, Delay3NetSingleValue) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire #5 w;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  ASSERT_NE(item->net_delay, nullptr);
+  EXPECT_EQ(item->net_delay->int_val, 5u);
+  EXPECT_EQ(item->net_delay_fall, nullptr);
+  EXPECT_EQ(item->net_delay_decay, nullptr);
+}
+
+// delay3: mintypmax expression in parenthesized form.
+TEST(ParserA223, Delay3NetMintypmax) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire #(1:2:3) w;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  ASSERT_NE(item->net_delay, nullptr);
+  EXPECT_EQ(item->net_delay->kind, ExprKind::kMinTypMax);
+}
+
 }  // namespace
