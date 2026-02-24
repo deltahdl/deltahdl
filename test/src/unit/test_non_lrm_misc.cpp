@@ -73339,4 +73339,13 @@ TEST(ParserSection28, StrengthSpec) {
   EXPECT_EQ(item->gate_inst_name, "g1");
 }
 
+TEST(Parser, GateCmos) {
+  auto r = Parse("module t; cmos (out, in, nctrl, pctrl); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
+  EXPECT_EQ(item->gate_kind, GateKind::kCmos);
+  EXPECT_EQ(item->gate_terminals.size(), 4);
+}
+
 }  // namespace
