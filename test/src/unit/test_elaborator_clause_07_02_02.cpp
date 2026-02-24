@@ -44,4 +44,14 @@ TEST(Elaboration, PackedStructMemberDefault_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+TEST(Elaboration, UnpackedStructMemberDefault_Allowed) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  struct { int a = 1; int b = 2; } s;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
