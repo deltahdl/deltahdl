@@ -1,4 +1,4 @@
-// §6.7: Net declarations
+// §6.3.2.1: Charge strength
 
 #include <gtest/gtest.h>
 #include <cstdint>
@@ -109,32 +109,17 @@ void InitializeTriregNet(Net &net, LocalChargeStrength str, Arena &arena) {
 
 namespace {
 
-// =============================================================
-// §6.7: Net declarations
-// =============================================================
-// --- Charge strength (§6.7, footnote 16) ---
-// §6.7:
-TEST(NetDecl, ChargeStrengthOnlyWithTrireg) {
+TEST(NetDecl, ChargeStrengthOnWireIsError) {
   NetDeclInfo info;
-  info.type = NetType::kTrireg;
+  info.type = NetType::kWire;
   info.has_charge_strength = true;
-  EXPECT_TRUE(ValidateNetDecl(info));
-}
-
-// --- vectored/scalared (§6.7, footnote 16) ---
-// §6.7: "When the vectored or scalared keyword is used, there shall be
-//  at least one packed dimension."
-TEST(NetDecl, VectoredRequiresPackedDimension) {
-  NetDeclInfo info;
-  info.is_vectored = true;
-  info.packed_dim_count = 0;
   EXPECT_FALSE(ValidateNetDecl(info));
 }
 
-TEST(NetDecl, ScalaredRequiresPackedDimension) {
+TEST(NetDecl, ChargeStrengthOnWandIsError) {
   NetDeclInfo info;
-  info.is_scalared = true;
-  info.packed_dim_count = 0;
+  info.type = NetType::kWand;
+  info.has_charge_strength = true;
   EXPECT_FALSE(ValidateNetDecl(info));
 }
 

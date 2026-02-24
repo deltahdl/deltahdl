@@ -1,4 +1,4 @@
-// §6.7: Net declarations
+// §6.9.2: Vector net accessibility
 
 #include <gtest/gtest.h>
 #include <cstdint>
@@ -109,33 +109,18 @@ void InitializeTriregNet(Net &net, LocalChargeStrength str, Arena &arena) {
 
 namespace {
 
-// =============================================================
-// §6.7: Net declarations
-// =============================================================
-// --- Charge strength (§6.7, footnote 16) ---
-// §6.7:
-TEST(NetDecl, ChargeStrengthOnlyWithTrireg) {
+TEST(NetDecl, VectoredWithPackedDimensionOk) {
   NetDeclInfo info;
-  info.type = NetType::kTrireg;
-  info.has_charge_strength = true;
+  info.is_vectored = true;
+  info.packed_dim_count = 1;
   EXPECT_TRUE(ValidateNetDecl(info));
 }
 
-// --- vectored/scalared (§6.7, footnote 16) ---
-// §6.7: "When the vectored or scalared keyword is used, there shall be
-//  at least one packed dimension."
-TEST(NetDecl, VectoredRequiresPackedDimension) {
-  NetDeclInfo info;
-  info.is_vectored = true;
-  info.packed_dim_count = 0;
-  EXPECT_FALSE(ValidateNetDecl(info));
-}
-
-TEST(NetDecl, ScalaredRequiresPackedDimension) {
+TEST(NetDecl, ScalaredWithPackedDimensionOk) {
   NetDeclInfo info;
   info.is_scalared = true;
-  info.packed_dim_count = 0;
-  EXPECT_FALSE(ValidateNetDecl(info));
+  info.packed_dim_count = 1;
+  EXPECT_TRUE(ValidateNetDecl(info));
 }
 
 }  // namespace
