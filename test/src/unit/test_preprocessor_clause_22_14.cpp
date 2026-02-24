@@ -113,4 +113,15 @@ TEST(Preprocessor, BeginKeywords_RestoresAfterEnd) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kKwLogic);
 }
 
+}
+// --- begin_keywords / end_keywords tests (IEEE 1800-2023 §22.14) ---
+TEST(Preprocessor, BeginKeywords_EmitsMarker) {
+  PreprocFixture f;
+  auto result = Preprocess("`begin_keywords \"1364-2001\"\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  // Marker: \x01 + version byte (1 = kVer13642001) + \n
+  std::string expected = {kKeywordMarker, '\x01', '\n'};
+  EXPECT_NE(result.find(expected), std::string::npos);
+}
+
 }  // namespace
