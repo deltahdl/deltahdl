@@ -77061,4 +77061,92 @@ TEST(ParserSection39, AssertionControlSequence) {
   )"));
 }
 
+struct ParseResult40 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit *cu = nullptr;
+};
+
+static ParseResult40 Parse(const std::string &src) {
+  ParseResult40 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+TEST(ParserSection40, CoverageGetSystemCall) {
+  // $coverage_get returns current coverage count
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      initial begin
+        int val;
+        val = $coverage_get(0, 0);
+      end
+    endmodule
+  )"));
+}
+
+TEST(ParserSection40, CoverageMergeSystemCall) {
+  // $coverage_merge merges coverage databases
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      initial $coverage_merge("database.ucdb");
+    endmodule
+  )"));
+}
+
+TEST(ParserSection40, CoverageSaveSystemCall) {
+  // $coverage_save saves coverage data to file
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      initial $coverage_save("coverage.ucdb");
+    endmodule
+  )"));
+}
+
+// =============================================================================
+// LRM section 40.5.2 -- Coverage with assertion and covergroup constructs
+// The VPI coverage API queries are applied to assertion handles and
+// covergroup instances. These tests verify the parser handles the
+// constructs that coverage queries operate on.
+// =============================================================================
+TEST(ParserSection40, CovergroupWithCoverpoint) {
+  // Covergroup with coverpoint -- target of vpi_get(vpiCovered, ...)
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      logic [2:0] addr;
+      covergroup cg @(addr);
+        coverpoint addr;
+      endgroup
+    endmodule
+  )"));
+}
+
+TEST(ParserSection40, CoverPropertyForAssertionCoverage) {
+  // cover property -- target of vpiAssertAttemptCovered/vpiAssertSuccessCovered
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      logic clk, a, b;
+      cover property (@(posedge clk) a |-> ##[1:3] b);
+    endmodule
+  )"));
+}
+
+TEST(ParserSection40, CoverageControlInAlwaysBlock) {
+  // Coverage control calls within procedural context
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      logic clk, reset;
+      always @(posedge clk) begin
+        if (reset) begin
+          $coverage_control(2, 0, 0);
+        end
+      end
+    endmodule
+  )"));
+}
+
 }  // namespace
