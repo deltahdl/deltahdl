@@ -51013,4 +51013,39 @@ TEST(Parser, ContinuousAssignment) {
   EXPECT_TRUE(found_assign);
 }
 
+// ===========================================================================
+// §10.9-10.10: Assignment pattern evaluation
+// ===========================================================================
+TEST(Lexical, AssignmentPattern_DefaultZero) {
+  auto r = Parse(
+      "module top;\n"
+      "  logic [7:0] a;\n"
+      "  initial a = '{default: 0};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  // Should parse without error.
+  ASSERT_EQ(r.cu->modules.size(), 1);
+}
+
+TEST(Lexical, AssignmentPattern_Positional) {
+  auto r = Parse(
+      "module top;\n"
+      "  logic [3:0] a;\n"
+      "  initial a = '{1, 0, 1, 0};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1);
+}
+
+TEST(Lexical, AssignmentPattern_Named) {
+  auto r = Parse(
+      "module top;\n"
+      "  initial begin\n"
+      "    logic [7:0] x;\n"
+      "    x = '{default: 'x};\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+}
+
 }  // namespace
