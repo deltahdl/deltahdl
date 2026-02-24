@@ -1,4 +1,4 @@
-// §25.6: Interfaces and specify blocks
+// Annex A.7.5.3: System timing check event definitions
 
 #include <gtest/gtest.h>
 #include <string>
