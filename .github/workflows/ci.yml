@@ -305,19 +305,31 @@ on:
   pull_request:
     paths-ignore:
       - '**/*.md'
+      - .github/workflows/convert_figures.yml
+      - .github/workflows/convert_tables.yml
       - .github/workflows/markdownlint.yml
       - .github/workflows/split_tests.yml
       - LICENSE
+      - scripts/convert_figures/**
+      - scripts/convert_tables/**
       - scripts/split_tests.py
+      - test/scripts/convert_figures/**
+      - test/scripts/convert_tables/**
       - test/scripts/split_tests/**
   push:
     branches: [main]
     paths-ignore:
       - '**/*.md'
+      - .github/workflows/convert_figures.yml
+      - .github/workflows/convert_tables.yml
       - .github/workflows/markdownlint.yml
       - .github/workflows/split_tests.yml
       - LICENSE
+      - scripts/convert_figures/**
+      - scripts/convert_tables/**
       - scripts/split_tests.py
+      - test/scripts/convert_figures/**
+      - test/scripts/convert_tables/**
       - test/scripts/split_tests/**
   workflow_dispatch:
     inputs:

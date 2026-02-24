@@ -1,0 +1,93 @@
+---
+concurrency:
+  cancel-in-progress: true
+  group: convert_tables-${{ github.ref }}
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-convert_tables-${{
+            hashFiles('.github/workflows/convert_tables.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-convert_tables-
+      - name: Install tools
+        run: |
+          pip install \
+            assert-no-inline-directives \
+            assert-no-linter-config-files \
+            assert-one-assert-per-pytest \
+            mypy pylint pytest pytest-cov
+          npm install -g jscpd
+      - name: Assert no inline lint disables
+        run: >-
+          assert-no-inline-directives
+          --tools pylint,mypy
+          --verbose
+          ${{ github.workspace }}/scripts/convert_tables/**/*
+          ${{ github.workspace }}/test/scripts/convert_tables/**/*
+      - name: Assert no linter config files
+        run: >-
+          assert-no-linter-config-files
+          --linters pylint,mypy
+          --verbose
+          ${{ github.workspace }}
+      - name: Run pylint on source
+        run: >-
+          PYTHONPATH=. python3 -m pylint scripts/convert_tables/
+          --fail-on=C,R,W --fail-under=10.0
+      - name: Run pylint on tests
+        run: >-
+          PYTHONPATH=.:scripts:test/scripts/convert_tables/unit
+          python3 -m pylint --recursive=y test/scripts/convert_tables/
+          --fail-on=C,R,W --fail-under=10.0
+      - name: Run mypy on source
+        run: PYTHONPATH=. python3 -m mypy scripts/convert_tables/
+      - name: Run mypy on tests
+        run: >-
+          MYPYPATH=.:scripts:test/scripts/convert_tables/unit
+          python3 -m mypy --explicit-package-bases
+          test/scripts/convert_tables/
+      - name: Detect copy-paste in source
+        run: >-
+          jscpd --pattern "**/*.py" --threshold 0
+          --reporters console scripts/convert_tables/
+      - name: Detect copy-paste in tests
+        run: >-
+          jscpd --pattern "**/*.py" --threshold 0
+          --reporters console test/scripts/convert_tables/
+      - name: Run unit tests with 100% coverage gate
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/convert_tables/unit/ -v
+          --cov=convert_tables
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
+      - name: Run integration tests
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/convert_tables/integration/ -v
+      - name: Run e2e tests
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/convert_tables/e2e/ -v
+name: convert_tables
+on:
+  pull_request:
+    paths:
+      - .github/workflows/convert_tables.yml
+      - scripts/convert_tables/**
+      - test/scripts/convert_tables/**
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/convert_tables.yml
+      - scripts/convert_tables/**
+      - test/scripts/convert_tables/**
+  workflow_dispatch:
