@@ -71962,4 +71962,127 @@ TEST(ParserAnnexA, A1PackageDecl) {
   EXPECT_EQ(r.cu->packages[0]->name, "pkg");
 }
 
+// 9. Package import with :: operator
+TEST(ParserClause03, Cl3_13_PackageImportExplicit) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  typedef int myint;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import pkg::myint;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *mod = r.cu->modules[0];
+  ASSERT_GE(mod->items.size(), 1u);
+  auto *item = mod->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kImportDecl);
+  EXPECT_EQ(item->import_item.package_name, "pkg");
+  EXPECT_EQ(item->import_item.item_name, "myint");
+  EXPECT_FALSE(item->import_item.is_wildcard);
+}
+
+// 10. Package wildcard import (import pkg::*)
+TEST(ParserClause03, Cl3_13_PackageWildcardImport) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  typedef int myint;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import pkg::*;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *mod = r.cu->modules[0];
+  ASSERT_GE(mod->items.size(), 1u);
+  auto *item = mod->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kImportDecl);
+  EXPECT_EQ(item->import_item.package_name, "pkg");
+  EXPECT_TRUE(item->import_item.is_wildcard);
+}
+
+// 11. Multiple packages imported into same module
+TEST(ParserClause03, Cl3_13_MultiplePackageImports) {
+  auto r = Parse(
+      "package alpha;\n"
+      "  typedef int alpha_t;\n"
+      "endpackage\n"
+      "package beta;\n"
+      "  typedef int beta_t;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import alpha::*;\n"
+      "  import beta::beta_t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 2u);
+  auto *mod = r.cu->modules[0];
+  int import_count = 0;
+  for (auto *item : mod->items) {
+    if (item->kind == ModuleItemKind::kImportDecl) import_count++;
+  }
+  EXPECT_EQ(import_count, 2);
+}
+
+// 20. Package scope resolution (pkg::item)
+TEST(ParserClause03, Cl3_13_PackageScopeResolution) {
+  EXPECT_TRUE(
+      ParseOk("package pkg;\n"
+              "  parameter int WIDTH = 8;\n"
+              "endpackage\n"
+              "module m;\n"
+              "  logic [pkg::WIDTH-1:0] data;\n"
+              "endmodule\n"));
+}
+
+TEST(ParserA213, PackageImportItemStar) {
+  auto r = Parse(
+      "package pkg; endpackage\n"
+      "module m; import pkg::*; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->import_item.package_name, "pkg");
+  EXPECT_TRUE(item->import_item.is_wildcard);
+}
+
+// data_declaration alternative: package_import_declaration
+TEST(ParserA28, ImportInBlock) {
+  EXPECT_TRUE(
+      ParseOk("package pkg;\n"
+              "  int x = 5;\n"
+              "endpackage\n"
+              "module m;\n"
+              "  initial begin\n"
+              "    import pkg::*;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+// import in task body
+TEST(ParserA28, ImportInTask) {
+  EXPECT_TRUE(
+      ParseOk("package pkg;\n"
+              "  int val = 1;\n"
+              "endpackage\n"
+              "module m;\n"
+              "  task my_task();\n"
+              "    import pkg::*;\n"
+              "  endtask\n"
+              "endmodule\n"));
+}
+
+// Multiple imports in one statement in block
+TEST(ParserA28, ImportMultipleInBlock) {
+  EXPECT_TRUE(
+      ParseOk("package p1; int a; endpackage\n"
+              "package p2; int b; endpackage\n"
+              "module m;\n"
+              "  initial begin\n"
+              "    import p1::a, p2::b;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
