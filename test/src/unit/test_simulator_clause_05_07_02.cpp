@@ -222,3 +222,99 @@ TEST(SimCh50702, RealLargeScientific) {
       "module t;\n  real x;\n  initial x = 39e8;\nendmodule\n", "x");
   EXPECT_DOUBLE_EQ(v, 39e8);
 }
+struct SimA87Fixture {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag};
+};
+
+static RtlirDesign *ElaborateSrc(const std::string &src, SimA87Fixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  return elab.Elaborate(cu->modules.back()->name);
+}
+
+static double ToDouble(const Variable *var) {
+  uint64_t bits = var->value.ToUint64();
+  double d = 0.0;
+  std::memcpy(&d, &bits, sizeof(double));
+  return d;
+}
+
+// § real_number — scientific notation simulates
+TEST(SimA87, ScientificNotation) {
+  SimA87Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  real x;\n"
+      "  initial x = 1.5e3;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_DOUBLE_EQ(ToDouble(var), 1500.0);
+}
+
+// § real_number — scientific with positive exponent
+TEST(SimA87, ScientificPositiveExp) {
+  SimA87Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  real x;\n"
+      "  initial x = 1.0e+2;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_DOUBLE_EQ(ToDouble(var), 100.0);
+}
+
+// § real_number — scientific with negative exponent
+TEST(SimA87, ScientificNegativeExp) {
+  SimA87Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  real x;\n"
+      "  initial x = 1.0e-2;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_DOUBLE_EQ(ToDouble(var), 0.01);
+}
+
+// § exp — uppercase E
+TEST(SimA87, ExpUppercase) {
+  SimA87Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  real x;\n"
+      "  initial x = 2.5E2;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_DOUBLE_EQ(ToDouble(var), 250.0);
+}
+
