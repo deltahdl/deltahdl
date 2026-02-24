@@ -203,4 +203,21 @@ TEST(ParserClause03, Cl3_13_GenerateForBlockScope) {
   EXPECT_TRUE(found_gen);
 }
 
+// genvar_declaration: single and multiple identifiers.
+TEST(SourceText, GenvarDeclaration) {
+  auto r = Parse(
+      "module m;\n"
+      "  genvar i;\n"
+      "  genvar j, k, l;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  // genvar i → 1 item; genvar j, k, l → 3 items
+  ASSERT_EQ(r.cu->modules[0]->items.size(), 4u);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->name, "i");
+  EXPECT_EQ(r.cu->modules[0]->items[1]->name, "j");
+  EXPECT_EQ(r.cu->modules[0]->items[2]->name, "k");
+  EXPECT_EQ(r.cu->modules[0]->items[3]->name, "l");
+}
+
 }  // namespace
