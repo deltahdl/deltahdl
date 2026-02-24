@@ -59,4 +59,12 @@ TEST(ConstEval, LongestStaticPrefixNested) {
   EXPECT_EQ(LongestStaticPrefix(outer), "m[1]");
 }
 
+TEST(ConstEval, LongestStaticPrefixParamIdx) {
+  Arena arena;
+  // m[P] where P=7 in scope → prefix is "m[7]".
+  ScopeMap scope = {{"P", 7}};
+  auto* sel = LspSelect(arena, LspId(arena, "m"), LspId(arena, "P"));
+  EXPECT_EQ(LongestStaticPrefix(sel, scope), "m[7]");
+}
+
 }  // namespace

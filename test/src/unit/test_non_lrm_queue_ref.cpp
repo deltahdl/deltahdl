@@ -156,4 +156,57 @@ TEST(QueueRef, WidthMismatchFallsBackToValue) {
   EXPECT_EQ(q->elements[1].ToUint64(), 20u);
 }
 
+static Expr* LspId(Arena& arena, std::string_view name) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kIdentifier;
+  e->text = name;
+  return e;
+}
+
+static Expr* LspSelect(Arena& arena, Expr* base, Expr* index) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kSelect;
+  e->base = base;
+  e->index = index;
+  return e;
+}
+
+static Expr* LspInt(Arena& arena, uint64_t val) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kIntegerLiteral;
+  e->int_val = val;
+  return e;
+}
+
+// Ref outdated by whole-queue assignment.
+TEST(QueueRef, OutdatedByWholeAssign) {
+  QueueRefFixture f;
+  auto* q = MakeQueue(f, "q", {10, 20, 30});
+
+  // function automatic void test_fn(ref int v);
+  //   q = '{100, 200};   // whole-queue assignment
+  //   v = 99;
+  // endfunction
+  //
+  // We simulate the whole-queue assignment as: q.delete(); then push 100, 200.
+  // (A real whole-queue assign goes through stmt_assign.cpp, which is harder to
+  //  invoke from a function body in a unit test. This achieves the same effect:
+  //  all element IDs are replaced → ref is outdated.)
+  RegAutoFunc(f, "test_fn", {{Direction::kRef, false, {}, "v", nullptr, {}}},
+              {MkExprStmt(f.arena, MkMethodCall(f.arena, "q", "delete", {})),
+               MkExprStmt(f.arena, MkMethodCall(f.arena, "q", "push_back",
+                                                {MkIntLit(f.arena, 100)})),
+               MkExprStmt(f.arena, MkMethodCall(f.arena, "q", "push_back",
+                                                {MkIntLit(f.arena, 200)})),
+               MkAssign(f.arena, "v", MkIntLit(f.arena, 99))});
+
+  auto* call = MkCall(f.arena, "test_fn", {MkSelect(f.arena, "q", 1)});
+  EvalExpr(call, f.ctx, f.arena);
+
+  // q now has {100, 200}. All original IDs are gone → ref is outdated.
+  ASSERT_EQ(q->elements.size(), 2u);
+  EXPECT_EQ(q->elements[0].ToUint64(), 100u);
+  EXPECT_EQ(q->elements[1].ToUint64(), 200u);
+}
+
 }  // namespace

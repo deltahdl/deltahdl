@@ -174,4 +174,48 @@ TEST(QueueRef, OutdatedByPopFront) {
   EXPECT_EQ(q->elements[1].ToUint64(), 30u);
 }
 
+static Expr* LspId(Arena& arena, std::string_view name) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kIdentifier;
+  e->text = name;
+  return e;
+}
+
+static Expr* LspSelect(Arena& arena, Expr* base, Expr* index) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kSelect;
+  e->base = base;
+  e->index = index;
+  return e;
+}
+
+static Expr* LspInt(Arena& arena, uint64_t val) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kIntegerLiteral;
+  e->int_val = val;
+  return e;
+}
+
+// Ref survives push_back: push_back never outdates refs.
+TEST(QueueRef, SurvivesPushBack) {
+  QueueRefFixture f;
+  auto* q = MakeQueue(f, "q", {10, 20, 30});
+
+  // function automatic void test_fn(ref int v);
+  //   q.push_back(40);
+  //   v = 99;
+  // endfunction
+  RegAutoFunc(f, "test_fn", {{Direction::kRef, false, {}, "v", nullptr, {}}},
+              {MkExprStmt(f.arena, MkMethodCall(f.arena, "q", "push_back",
+                                                {MkIntLit(f.arena, 40)})),
+               MkAssign(f.arena, "v", MkIntLit(f.arena, 99))});
+
+  auto* call = MkCall(f.arena, "test_fn", {MkSelect(f.arena, "q", 1)});
+  EvalExpr(call, f.ctx, f.arena);
+
+  // q now has {10, 99, 30, 40}. q[1] should be 99 (ref survived push_back).
+  ASSERT_EQ(q->elements.size(), 4u);
+  EXPECT_EQ(q->elements[1].ToUint64(), 99u);
+}
+
 }  // namespace
