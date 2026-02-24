@@ -101,4 +101,44 @@ TEST(SimA604, FunctionStatementExecution) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
+struct SimA605Fixture {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag};
+};
+
+static RtlirDesign *ElaborateSrc(const std::string &src, SimA605Fixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  return elab.Elaborate(cu->modules.back()->name);
+}
+
+// §12.8: return exits function with value
+TEST(SimA605, JumpReturnFromFunction) {
+  SimA605Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  function int get_val();\n"
+      "    return 42;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = get_val();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
 }  // namespace

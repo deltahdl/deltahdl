@@ -1,7 +1,7 @@
-// §15.5: Named events
+// §9.4.2: Event control
 
 #include <gtest/gtest.h>
-
+#include <string>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -10,85 +10,11 @@
 #include "lexer/lexer.h"
 #include "parser/parser.h"
 #include "simulation/lowerer.h"
-#include "simulation/net.h"
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
 #include "simulation/variable.h"
 
 using namespace delta;
-
-struct LowerFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign *ElaborateSrc(const std::string &src, LowerFixture &f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
-namespace {
-
-TEST(Lowerer, NamedEventTriggerAndWait) {
-  LowerFixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  event ev;\n"
-      "  logic [31:0] result;\n"
-      "  initial begin\n"
-      "    @(ev);\n"
-      "    result = 42;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    #5 ->ev;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto *var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 42u);
-}
-
-TEST(Lowerer, NamedEventBareWaitSyntax) {
-  LowerFixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  event ev;\n"
-      "  logic [31:0] result;\n"
-      "  initial begin\n"
-      "    @ev;\n"
-      "    result = 99;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    #3 ->ev;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto *var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 99u);
-}
 
 struct SimA605Fixture {
   SourceManager mgr;
@@ -107,18 +33,21 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA605Fixture &f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-// §15.5.1/§15.5.2: named event trigger and wait
-TEST(SimA605, EventTriggerAndWait) {
+namespace {
+
+// §9.4.2: posedge event control triggers on 0->1 transition
+TEST(SimA605, EventControlPosedge) {
   SimA605Fixture f;
   auto *design = ElaborateSrc(
       "module t;\n"
-      "  event ev;\n"
+      "  logic clk;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
-      "    #5 -> ev;\n"
+      "    clk = 0;\n"
+      "    #5 clk = 1;\n"
       "  end\n"
       "  initial begin\n"
-      "    @(ev) x = 8'd55;\n"
+      "    @(posedge clk) x = 8'd99;\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -128,7 +57,84 @@ TEST(SimA605, EventTriggerAndWait) {
   f.scheduler.Run();
   auto *var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 55u);
+  EXPECT_EQ(var->value.ToUint64(), 99u);
+}
+
+// §9.4.2: negedge event control triggers on 1->0 transition
+TEST(SimA605, EventControlNegedge) {
+  SimA605Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    clk = 1;\n"
+      "    #5 clk = 0;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    @(negedge clk) x = 8'd77;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 77u);
+}
+
+// §9.4.2: any-change event control (no edge specified)
+TEST(SimA605, EventControlAnyChange) {
+  SimA605Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sig;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    sig = 8'd0;\n"
+      "    #5 sig = 8'd5;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    @(sig) x = 8'd33;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 33u);
+}
+
+// §9.4: multiple timing controls in sequence
+TEST(SimA605, MultipleTimingControls) {
+  SimA605Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  logic clk;\n"
+      "  initial begin\n"
+      "    clk = 0;\n"
+      "    #5 clk = 1;\n"
+      "    #5 clk = 0;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    a = 8'd0;\n"
+      "    @(posedge clk) a = 8'd1;\n"
+      "    @(negedge clk) b = 8'd2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 2u);
 }
 
 }  // namespace
