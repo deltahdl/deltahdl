@@ -75755,4 +75755,17 @@ TEST(SourceText, ConfigCellUnqualified) {
   EXPECT_EQ(rule->use_cell, "better_mux");
 }
 
+// description: config_declaration
+TEST(SourceText, DescriptionConfig) {
+  auto r = Parse(
+      "config cfg;\n"
+      "  design work.top;\n"
+      "  default liblist work;\n"
+      "endconfig\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->configs.size(), 1u);
+  EXPECT_EQ(r.cu->configs[0]->name, "cfg");
+}
+
 }  // namespace
