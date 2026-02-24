@@ -1,4 +1,4 @@
-// Annex A.8.4: Primaries
+// §5.7.1: Integer literal constants
 
 #include <gtest/gtest.h>
 #include <string>
@@ -35,84 +35,13 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA84Fixture &f) {
 
 namespace {
 
-// § constant_primary — real literal used in constant expression
-TEST(SimA84, ConstantPrimaryRealLiteral) {
-  SimA84Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  parameter int P = 7;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = P;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 7u);
-}
-
-// § primary — string literal
-TEST(SimA84, PrimaryStringLiteral) {
-  SimA84Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  string s;\n"
-      "  initial s = \"hello\";\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-}
-
-// § primary — hierarchical identifier
-TEST(SimA84, PrimaryIdentifier) {
-  SimA84Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial begin a = 8'd99; b = a; end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("b");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 99u);
-}
-
-// § primary — function call
-TEST(SimA84, PrimaryFunctionCall) {
-  SimA84Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  function int add1(int a); return a + 1; endfunction\n"
-      "  int x;\n"
-      "  initial x = add1(5);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 6u);
-}
-
-// § primary — parenthesized expression
-TEST(SimA84, PrimaryParenthesizedExpr) {
+// § primary — integer literal
+TEST(SimA84, PrimaryIntegerLiteral) {
   SimA84Fixture f;
   auto *design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
-      "  initial x = (3 + 4);\n"
+      "  initial x = 8'hAB;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -121,16 +50,16 @@ TEST(SimA84, PrimaryParenthesizedExpr) {
   f.scheduler.Run();
   auto *var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 7u);
+  EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
-// § primary — octal literal
-TEST(SimA84, PrimaryOctalLiteral) {
+// § primary — unbased_unsized_literal '1
+TEST(SimA84, PrimaryUnbasedUnsized1) {
   SimA84Fixture f;
   auto *design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
-      "  initial x = 8'o77;\n"
+      "  initial x = '1;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -139,7 +68,61 @@ TEST(SimA84, PrimaryOctalLiteral) {
   f.scheduler.Run();
   auto *var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 63u);
+  EXPECT_EQ(var->value.ToUint64(), 0xFFu);
+}
+
+// § primary — unbased_unsized_literal '0
+TEST(SimA84, PrimaryUnbasedUnsized0) {
+  SimA84Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = '0;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+// § primary — hex literal with different bases
+TEST(SimA84, PrimaryHexLiteral) {
+  SimA84Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 8'hA5;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xA5u);
+}
+
+// § primary — binary literal
+TEST(SimA84, PrimaryBinaryLiteral) {
+  SimA84Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 8'b11001100;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xCCu);
 }
 
 }  // namespace

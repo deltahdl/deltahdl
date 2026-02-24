@@ -239,4 +239,97 @@ TEST(SimA83, IndexedPartSelectMinus) {
   EXPECT_EQ(var->value.ToUint64(), 0xAu);
 }
 
+struct SimA84Fixture {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag};
+};
+
+static RtlirDesign *ElaborateSrc(const std::string &src, SimA84Fixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  return elab.Elaborate(cu->modules.back()->name);
+}
+
+// § primary — bit_select
+TEST(SimA84, PrimaryBitSelect) {
+  SimA84Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] data;\n"
+      "  logic x;\n"
+      "  initial begin data = 8'b10101010; x = data[1]; end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// § primary — part_select_range (constant range)
+TEST(SimA84, PrimaryPartSelectRange) {
+  SimA84Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] data;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin data = 16'hABCD; x = data[15:8]; end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xABu);
+}
+
+// § primary — indexed part select (plus)
+TEST(SimA84, PrimaryIndexedPartSelectPlus) {
+  SimA84Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] data;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin data = 16'hABCD; x = data[8+:8]; end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xABu);
+}
+
+// § primary — indexed part select (minus)
+TEST(SimA84, PrimaryIndexedPartSelectMinus) {
+  SimA84Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] data;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin data = 16'hABCD; x = data[15-:8]; end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xABu);
+}
+
 }  // namespace
