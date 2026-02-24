@@ -1,4 +1,4 @@
-// Annex A.8.5: Expression left-side values
+// §10.6.2: The force and release procedural statements
 
 #include <gtest/gtest.h>
 #include <string>
@@ -35,13 +35,13 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA85Fixture &f) {
 
 namespace {
 
-// § variable_lvalue — simple variable blocking assignment
-TEST(SimA85, VarLvalueSimpleBlocking) {
+// § variable_lvalue — force overwrites variable
+TEST(SimA85, VarLvalueForce) {
   SimA85Fixture f;
   auto *design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
-      "  initial x = 8'h42;\n"
+      "  initial begin x = 8'h00; force x = 8'hFF; end\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -50,25 +50,7 @@ TEST(SimA85, VarLvalueSimpleBlocking) {
   f.scheduler.Run();
   auto *var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0x42u);
-}
-
-// § nonrange_variable_lvalue — simple variable simulates
-TEST(SimA85, NonrangeVarLvalueSimple) {
-  SimA85Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  int x;\n"
-      "  initial x = 42;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 42u);
+  EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
 }  // namespace

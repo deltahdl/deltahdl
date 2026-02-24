@@ -1,4 +1,4 @@
-// Annex A.8.5: Expression left-side values
+// §10.4.1: Blocking procedural assignments
 
 #include <gtest/gtest.h>
 #include <string>
@@ -35,13 +35,13 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA85Fixture &f) {
 
 namespace {
 
-// § variable_lvalue — simple variable blocking assignment
-TEST(SimA85, VarLvalueSimpleBlocking) {
+// § variable_lvalue — part select blocking assignment
+TEST(SimA85, VarLvaluePartSelect) {
   SimA85Fixture f;
   auto *design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
-      "  initial x = 8'h42;\n"
+      "  initial begin x = 8'h00; x[7:4] = 4'hF; end\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -50,25 +50,46 @@ TEST(SimA85, VarLvalueSimpleBlocking) {
   f.scheduler.Run();
   auto *var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0x42u);
+  EXPECT_EQ(var->value.ToUint64(), 0xF0u);
 }
 
-// § nonrange_variable_lvalue — simple variable simulates
-TEST(SimA85, NonrangeVarLvalueSimple) {
+// § variable_lvalue — concatenation LHS blocking assignment
+TEST(SimA85, VarLvalueConcatenation) {
   SimA85Fixture f;
   auto *design = ElaborateSrc(
       "module t;\n"
-      "  int x;\n"
-      "  initial x = 42;\n"
+      "  logic [3:0] a, b;\n"
+      "  initial {a, b} = 8'hA5;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto *va = f.ctx.FindVariable("a");
+  auto *vb = f.ctx.FindVariable("b");
+  ASSERT_NE(va, nullptr);
+  ASSERT_NE(vb, nullptr);
+  EXPECT_EQ(va->value.ToUint64(), 0xAu);
+  EXPECT_EQ(vb->value.ToUint64(), 0x5u);
+}
+
+// § variable_lvalue — multi-dimensional array element
+TEST(SimA85, VarLvalueMultiDimArray) {
+  SimA85Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] mem [0:3];\n"
+      "  initial begin mem[0] = 8'h00; mem[2] = 8'hAB; end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("mem[2]");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 42u);
+  EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
 }  // namespace

@@ -1,4 +1,4 @@
-// Annex A.8.5: Expression left-side values
+// §11.4.1: Assignment operators
 
 #include <gtest/gtest.h>
 #include <string>
@@ -35,31 +35,13 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA85Fixture &f) {
 
 namespace {
 
-// § variable_lvalue — simple variable blocking assignment
-TEST(SimA85, VarLvalueSimpleBlocking) {
-  SimA85Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'h42;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0x42u);
-}
-
-// § nonrange_variable_lvalue — simple variable simulates
-TEST(SimA85, NonrangeVarLvalueSimple) {
+// § variable_lvalue — compound assignment +=
+TEST(SimA85, VarLvalueCompoundAdd) {
   SimA85Fixture f;
   auto *design = ElaborateSrc(
       "module t;\n"
       "  int x;\n"
-      "  initial x = 42;\n"
+      "  initial begin x = 10; x += 5; end\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -68,7 +50,7 @@ TEST(SimA85, NonrangeVarLvalueSimple) {
   f.scheduler.Run();
   auto *var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 42u);
+  EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
 }  // namespace
