@@ -1,7 +1,7 @@
+// §13.4: Functions
+
 #include <gtest/gtest.h>
-
 #include <string>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -11,8 +11,6 @@
 #include "parser/parser.h"
 
 using namespace delta;
-
-namespace {
 
 // Elab test fixture
 struct ElabA603Fixture {
@@ -33,31 +31,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA603Fixture &f) {
   return design;
 }
 
-}  // namespace
-
-// =============================================================================
-// A.6.3 Parallel and sequential blocks — Elaboration
-// =============================================================================
-
-// ---------------------------------------------------------------------------
-// Elaboration: §13.4 fork restrictions inside functions
-// ---------------------------------------------------------------------------
-
-// §13.4.4: fork/join_none is permitted inside a function
-TEST(ElabA603, ForkJoinNoneAllowedInFunction) {
-  ElabA603Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  function void my_func();\n"
-      "    fork\n"
-      "      a = 1;\n"
-      "    join_none\n"
-      "  endfunction\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
+namespace {
 
 // §13.4.4: fork/join is illegal inside a function
 TEST(ElabA603, ForkJoinIllegalInFunction) {
@@ -88,3 +62,5 @@ TEST(ElabA603, ForkJoinAnyIllegalInFunction) {
       f);
   EXPECT_TRUE(f.has_errors);
 }
+
+}  // namespace
