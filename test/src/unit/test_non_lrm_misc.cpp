@@ -71212,4 +71212,26 @@ TEST(SourceText, InterfaceParamsAndPorts) {
   EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 1u);
 }
 
+TEST(Parser, InterfaceWithPorts) {
+  auto r = Parse(
+      "interface bus(input logic clk, input logic rst);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->interfaces.size(), 1);
+  EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 2);
+}
+
+// interface_item ::= port_declaration ;
+// Verify that port declarations are accepted in interface ANSI port list.
+TEST(SourceText, InterfaceItemPortDecl) {
+  auto r = Parse(
+      "interface ifc(input logic clk, output logic data);\n"
+      "endinterface\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 2u);
+  EXPECT_EQ(r.cu->interfaces[0]->ports[0].name, "clk");
+  EXPECT_EQ(r.cu->interfaces[0]->ports[1].name, "data");
+}
+
 }  // namespace
