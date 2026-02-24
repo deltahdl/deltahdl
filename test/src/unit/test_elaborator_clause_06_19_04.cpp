@@ -1,4 +1,4 @@
-// §6.19.3: Type checking
+// §6.19.4: Enumerated types in numerical expressions
 
 #include <gtest/gtest.h>
 #include "common/arena.h"
@@ -32,15 +32,16 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabFixture &f) {
 
 namespace {
 
-// --- §6.19.3: Enum strict type checking ---
-TEST(Elaboration, EnumStrictTypeCheck_Error) {
+// --- §6.19.4: Enum arithmetic without cast ---
+TEST(Elaboration, EnumArithNoCast_Error) {
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"
       "  typedef enum {a, b, c, d} e;\n"
       "  initial begin\n"
       "    e val;\n"
-      "    val = 1;\n"
+      "    val = a;\n"
+      "    val += 1;\n"
       "  end\n"
       "endmodule\n",
       f);
