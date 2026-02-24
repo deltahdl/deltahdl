@@ -77149,4 +77149,36 @@ TEST(ParserSection40, CoverageControlInAlwaysBlock) {
   )"));
 }
 
+struct ElabA60701Fixture {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag};
+};
+
+static RtlirDesign *ElaborateSrc(const std::string &src, ElabA60701Fixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  return elab.Elaborate(cu->modules.back()->name);
+}
+
+// §10.9: named assignment pattern elaborates for struct init
+TEST(ElabA60701, StructNamedPatternElaborates) {
+  ElabA60701Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
+      "  pair_t p;\n"
+      "  initial begin\n"
+      "    p = pair_t'{a: 8'd1, b: 8'd2};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+}
+
 }  // namespace
