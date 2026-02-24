@@ -1,10 +1,8 @@
-// §K.2: vpi_user.h source code — constants and struct definitions
+// Annex K.2: Source code
 
 #include <gtest/gtest.h>
-
 #include "simulation/vpi.h"
 
-namespace delta {
 namespace {
 
 TEST(VpiAnnexK2, ValueFormatConstants) {
@@ -41,14 +39,6 @@ TEST(VpiAnnexK2, VpiValueDefaultInit) {
   EXPECT_EQ(val.format, 0);
 }
 
-TEST(VpiAnnexK2, VpiTimeDefaultInit) {
-  s_vpi_time time = {};
-  EXPECT_EQ(time.type, 0);
-  EXPECT_EQ(time.high, 0u);
-  EXPECT_EQ(time.low, 0u);
-  EXPECT_DOUBLE_EQ(time.real, 0.0);
-}
-
 TEST(VpiAnnexK2, VpiCbDataDefaultInit) {
   s_cb_data cb = {};
   EXPECT_EQ(cb.reason, 0);
@@ -67,4 +57,3 @@ TEST(VpiAnnexK2, VpiSystfDataDefaultInit) {
 }
 
 }  // namespace
-}  // namespace delta

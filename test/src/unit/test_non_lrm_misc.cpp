@@ -78906,4 +78906,12 @@ TEST(SimA87, HexValueUnderscores) {
   EXPECT_EQ(var->value.ToUint64(), 0xABCDu);
 }
 
+TEST(VpiAnnexK2, VpiTimeDefaultInit) {
+  s_vpi_time time = {};
+  EXPECT_EQ(time.type, 0);
+  EXPECT_EQ(time.high, 0u);
+  EXPECT_EQ(time.low, 0u);
+  EXPECT_DOUBLE_EQ(time.real, 0.0);
+}
+
 }  // namespace
