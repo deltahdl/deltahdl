@@ -30404,4 +30404,54 @@ TEST(ParserCh505, Operator_WildcardEquality) {
   EXPECT_TRUE(ParseOk("module m; initial x = (a ==? b); endmodule"));
 }
 
+// =========================================================================
+// Section 5.6: Identifiers, keywords, and system names
+// =========================================================================
+struct ParseResult506 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit *cu = nullptr;
+};
+
+static ParseResult506 Parse(const std::string &src) {
+  ParseResult506 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+static ModuleItem *FirstItem(ParseResult506 &r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto &items = r.cu->modules[0]->items;
+  return items.empty() ? nullptr : items[0];
+}
+
+TEST(ParserCh506, Ident_SimpleWithUnderscore) {
+  auto r = Parse("module m; logic _bus3; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto *item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->name, "_bus3");
+}
+
+TEST(ParserCh506, Ident_SimpleWithDollarSign) {
+  EXPECT_TRUE(ParseOk("module m; logic n$657; endmodule"));
+}
+
+TEST(ParserCh506, Ident_CaseSensitive) {
+  // Identifiers are case sensitive: X and x are different.
+  auto r = Parse(
+      "module m;\n"
+      "  logic X;\n"
+      "  logic x;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->name, "X");
+  EXPECT_EQ(r.cu->modules[0]->items[1]->name, "x");
+}
+
 }  // namespace
