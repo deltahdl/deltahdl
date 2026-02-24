@@ -74855,4 +74855,32 @@ TEST(ParserSection28, Sec28_12_MultipleTimingChecksInSpecifyBlock) {
             TimingCheckKind::kRecovery);
 }
 
+TEST_F(SpecifyTest, SetupholdTimingCheck) {
+  auto *cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setuphold(posedge clk, data, 10, 5);\n"
+      "endspecify\n"
+      "endmodule\n");
+  auto *spec = FirstSpecifyBlock(cu);
+  ASSERT_NE(spec, nullptr);
+  auto &tc = spec->specify_items[0]->timing_check;
+  EXPECT_EQ(tc.check_kind, TimingCheckKind::kSetuphold);
+  ASSERT_GE(tc.limits.size(), 2u);
+}
+
+TEST_F(SpecifyTest, RecremTimingCheck) {
+  auto *cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $recrem(posedge clk, rst, 8, 3);\n"
+      "endspecify\n"
+      "endmodule\n");
+  auto *spec = FirstSpecifyBlock(cu);
+  ASSERT_NE(spec, nullptr);
+  auto &tc = spec->specify_items[0]->timing_check;
+  EXPECT_EQ(tc.check_kind, TimingCheckKind::kRecrem);
+  ASSERT_GE(tc.limits.size(), 2u);
+}
+
 }  // namespace
