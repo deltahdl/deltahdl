@@ -1,4 +1,4 @@
-// Annex A.7.3: Specify block terminals
+// §30.4.6: Declaring multiple module paths in a single statement
 
 #include <gtest/gtest.h>
 #include <string>
@@ -35,25 +35,32 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA703Fixture &f) {
 
 namespace {
 
-// Terminal with part-select in specify does not interfere with simulation
-TEST(SimA703, TerminalPartSelectSimulates) {
+// Mixed terminal forms do not interfere with behavioral simulation
+TEST(SimA703, MixedTerminalFormsDoNotInterfere) {
   SimA703Fixture f;
   auto *design = ElaborateSrc(
       "module t;\n"
-      "  logic [7:0] x;\n"
+      "  logic [7:0] a, b;\n"
       "  specify\n"
-      "    (a[7:0] => b[7:0]) = 5;\n"
+      "    (x[3:0], intf.sig *> y[0], z) = 5;\n"
+      "    (posedge clk => (q[0] : d)) = 3;\n"
       "  endspecify\n"
-      "  initial x = 8'd55;\n"
+      "  initial begin\n"
+      "    a = 8'd11;\n"
+      "    b = 8'd22;\n"
+      "  end\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 55u);
+  auto *va = f.ctx.FindVariable("a");
+  auto *vb = f.ctx.FindVariable("b");
+  ASSERT_NE(va, nullptr);
+  ASSERT_NE(vb, nullptr);
+  EXPECT_EQ(va->value.ToUint64(), 11u);
+  EXPECT_EQ(vb->value.ToUint64(), 22u);
 }
 
 }  // namespace

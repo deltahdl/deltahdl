@@ -1,4 +1,4 @@
-// Annex A.7.3: Specify block terminals
+// §25.6: Interfaces and specify blocks
 
 #include <gtest/gtest.h>
 #include <string>
@@ -35,16 +35,16 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA703Fixture &f) {
 
 namespace {
 
-// Terminal with part-select in specify does not interfere with simulation
-TEST(SimA703, TerminalPartSelectSimulates) {
+// Dotted terminals in specify do not interfere with simulation
+TEST(SimA703, DottedTerminalSimulates) {
   SimA703Fixture f;
   auto *design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
-      "    (a[7:0] => b[7:0]) = 5;\n"
+      "    (intf.sig => intf.out) = 5;\n"
       "  endspecify\n"
-      "  initial x = 8'd55;\n"
+      "  initial x = 8'd33;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -53,7 +53,7 @@ TEST(SimA703, TerminalPartSelectSimulates) {
   f.scheduler.Run();
   auto *var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 55u);
+  EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
 }  // namespace
