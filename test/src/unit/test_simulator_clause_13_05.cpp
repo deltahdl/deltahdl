@@ -138,4 +138,65 @@ TEST(SimA609, TaskOutputArg) {
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
+struct SimA82Fixture {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag};
+};
+
+static RtlirDesign *ElaborateSrc(const std::string &src, SimA82Fixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  return elab.Elaborate(cu->modules.back()->name);
+}
+
+// § tf_call — task call modifies variable
+TEST(SimA82, TfCallTaskModifiesVar) {
+  SimA82Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  task set_x;\n"
+      "    x = 8'd42;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    set_x();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
+// § tf_call — function call in expression with binary op
+TEST(SimA82, FunctionCallInBinaryExpr) {
+  SimA82Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  function logic [7:0] five; return 8'd5; endfunction\n"
+      "  function logic [7:0] three; return 8'd3; endfunction\n"
+      "  initial x = five() + three();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 8u);
+}
+
 }  // namespace

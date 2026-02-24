@@ -93,4 +93,39 @@ TEST(SysTask, RealtobitsReinterpretsRealAsBits) {
   EXPECT_EQ(result.ToUint64(), expected_bits);
 }
 
+struct SimA82Fixture {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag};
+};
+
+static RtlirDesign *ElaborateSrc(const std::string &src, SimA82Fixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  return elab.Elaborate(cu->modules.back()->name);
+}
+
+// § system_tf_call — $unsigned
+TEST(SimA82, SystemTfCallUnsigned) {
+  SimA82Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = $unsigned(8'sd5);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 5u);
+}
+
 }  // namespace
