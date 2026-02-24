@@ -43340,4 +43340,66 @@ TEST(ParserA28, NestedBlocksWithDecls) {
               "endmodule\n"));
 }
 
+// 5. Fork-join block creating a subscope
+TEST(ParserClause03, Cl3_13_ForkJoinBlockSubscope) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    fork\n"
+              "      $display(\"a\");\n"
+              "      $display(\"b\");\n"
+              "    join\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+// 24. Named fork-join blocks
+TEST(ParserClause03, Cl3_13_NamedForkJoinBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork : my_fork\n"
+      "      $display(\"a\");\n"
+      "      $display(\"b\");\n"
+      "    join : my_fork\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  ASSERT_NE(item->body, nullptr);
+  ASSERT_GE(item->body->stmts.size(), 1u);
+  auto *fork_stmt = item->body->stmts[0];
+  EXPECT_EQ(fork_stmt->kind, StmtKind::kFork);
+  EXPECT_EQ(fork_stmt->label, "my_fork");
+}
+
+// block_item_declaration in fork/join (§9.3.2)
+TEST(ParserA28, BlockItemInForkJoin) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial fork\n"
+      "    int x;\n"
+      "    x = 5;\n"
+      "  join\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kFork);
+  ASSERT_GE(body->fork_stmts.size(), 1u);
+  EXPECT_EQ(body->fork_stmts[0]->kind, StmtKind::kVarDecl);
+}
+
+// typedef in fork/join
+TEST(ParserA28, TypedefInForkJoin) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial fork\n"
+              "    typedef int my_t;\n"
+              "  join\n"
+              "endmodule\n"));
+}
+
 }  // namespace
