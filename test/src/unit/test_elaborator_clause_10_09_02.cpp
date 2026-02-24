@@ -106,4 +106,19 @@ TEST(StructPattern, MixedPrecedence) {
   EXPECT_EQ(result.ToUint64(), expected);
 }
 
+// §10.9: typed assignment pattern expression elaborates
+TEST(ElabA60701, TypedPatternExpressionElaborates) {
+  ElabA60701Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] x; logic [7:0] y; } coord_t;\n"
+      "  coord_t c;\n"
+      "  initial begin\n"
+      "    c = coord_t'{x: 8'd5, y: 8'd10};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+}
+
 }  // namespace
