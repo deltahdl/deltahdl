@@ -55,4 +55,17 @@ TEST(DpiRuntime, SetAndGetScope) {
   EXPECT_EQ(rt.GetScope(), saved);
 }
 
+// =============================================================================
+// DPI scope functions (Annex I)
+// =============================================================================
+TEST(SvDpi, ScopeGetSetRoundTrip) {
+  svScope old_scope = svGetScope();
+  int dummy = 42;
+  auto new_scope = reinterpret_cast<svScope>(&dummy);
+  svScope prev = svSetScope(new_scope);
+  EXPECT_EQ(prev, old_scope);
+  EXPECT_EQ(svGetScope(), new_scope);
+  svSetScope(old_scope);
+}
+
 }  // namespace
