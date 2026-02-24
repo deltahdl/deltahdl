@@ -1,7 +1,6 @@
-// §9.2.2.2: Combinational logic always_comb procedure
+// §9.2.2.2.1: Implicit always_comb sensitivities
 
 #include <gtest/gtest.h>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
