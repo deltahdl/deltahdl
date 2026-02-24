@@ -13,6 +13,7 @@ import os
 import re
 import subprocess
 import sys
+import textwrap
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
@@ -649,12 +650,21 @@ def _format_clause(clause):
     return f"\u00a7{clause}"
 
 
+def _wrap(label, value):
+    """Wrap a labeled line to 80 chars with 2-space continuation indent."""
+    return textwrap.fill(
+        value, width=80,
+        initial_indent=f"  {label}: ",
+        subsequent_indent="  ",
+    )
+
+
 def _print_classification_table(tests):
     """Print the classification results as sub-reports."""
     for i, t in enumerate(tests):
-        print(f"  Test: {t.test_name}()")
-        print(f"  Clause: {_format_clause(t.clause)}")
-        print(f"  Rationale: {t.rationale or ''}")
+        print(_wrap("Test", f"{t.test_name}()"))
+        print(_wrap("Clause", _format_clause(t.clause)))
+        print(_wrap("Rationale", t.rationale or ""))
         if i < len(tests) - 1:
             print("  ----")
 

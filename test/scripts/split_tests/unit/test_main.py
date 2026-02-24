@@ -171,6 +171,31 @@ def test_print_classification_single_no_separator(capsys):
     assert "----" not in capsys.readouterr().out
 
 
+def test_print_classification_no_line_over_80(capsys):
+    """No output line exceeds 80 characters."""
+    long_rationale = "word " * 20  # 100 chars, will need wrapping
+    t = _tb("T", prefix="test_parser_", clause="6.1",
+            rationale=long_rationale.strip())
+    _print_classification_table([t])
+    out = capsys.readouterr().out
+    assert all(len(line) <= 80 for line in out.splitlines())
+
+
+def test_print_classification_wrap_aligns(capsys):
+    """Wrapped continuation lines align with 2-space indent."""
+    long_rationale = "word " * 20
+    t = _tb("T", prefix="test_parser_", clause="6.1",
+            rationale=long_rationale.strip())
+    _print_classification_table([t])
+    lines = capsys.readouterr().out.splitlines()
+    # Find continuation lines (after Rationale: line, before next label/sep)
+    rationale_idx = next(
+        i for i, l in enumerate(lines) if l.startswith("  Rationale:")
+    )
+    cont = lines[rationale_idx + 1]
+    assert cont.startswith("  ") and not cont.startswith("  ----")
+
+
 # ---- _print_summary / _print_dry_run_summary ------------------------------
 
 
