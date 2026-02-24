@@ -1,4 +1,4 @@
-// §34.5: Protect pragma keywords
+// §34.5.27: key_block
 
 #include <gtest/gtest.h>
 #include "common/diagnostic.h"
@@ -23,22 +23,19 @@ struct ProtectedTest : ::testing::Test {
 namespace {
 
 // =============================================================================
-// §34.5.1/2 Protected envelope begin/end parsing
+// §34.5 Key block recognition
 // =============================================================================
-TEST_F(ProtectedTest, BeginEndEnvelope) {
+TEST_F(ProtectedTest, KeyBlockPragma) {
   auto result = Preprocess(
-      "module m;\n"
-      "`pragma protect begin\n"
-      "  logic secret_wire;\n"
-      "`pragma protect end\n"
-      "endmodule\n");
+      "`pragma protect key_keyowner=\"Acme\"\n"
+      "`pragma protect key_method=\"rsa\"\n"
+      "`pragma protect key_block\n"
+      "base64encodedkeydata\n"
+      "`pragma protect end_protected\n");
   EXPECT_FALSE(diag_.HasErrors());
-  // Non-pragma lines should pass through.
-  EXPECT_NE(result.find("module m;"), std::string::npos);
-  EXPECT_NE(result.find("logic secret_wire;"), std::string::npos);
-  EXPECT_NE(result.find("endmodule"), std::string::npos);
   // Pragma lines consumed.
-  EXPECT_EQ(result.find("pragma"), std::string::npos);
+  EXPECT_EQ(result.find("key_keyowner"), std::string::npos);
+  EXPECT_EQ(result.find("key_method"), std::string::npos);
 }
 
 }  // namespace

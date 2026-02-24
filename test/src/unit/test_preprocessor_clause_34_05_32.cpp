@@ -1,4 +1,4 @@
-// §34.5: Protect pragma keywords
+// §34.5.32: viewport
 
 #include <gtest/gtest.h>
 #include "common/diagnostic.h"
@@ -23,22 +23,16 @@ struct ProtectedTest : ::testing::Test {
 namespace {
 
 // =============================================================================
-// §34.5.1/2 Protected envelope begin/end parsing
+// §34.5 Viewport support
 // =============================================================================
-TEST_F(ProtectedTest, BeginEndEnvelope) {
+TEST_F(ProtectedTest, ViewportPragma) {
   auto result = Preprocess(
+      "`pragma protect viewport=all\n"
       "module m;\n"
-      "`pragma protect begin\n"
-      "  logic secret_wire;\n"
-      "`pragma protect end\n"
       "endmodule\n");
   EXPECT_FALSE(diag_.HasErrors());
-  // Non-pragma lines should pass through.
+  EXPECT_EQ(result.find("viewport"), std::string::npos);
   EXPECT_NE(result.find("module m;"), std::string::npos);
-  EXPECT_NE(result.find("logic secret_wire;"), std::string::npos);
-  EXPECT_NE(result.find("endmodule"), std::string::npos);
-  // Pragma lines consumed.
-  EXPECT_EQ(result.find("pragma"), std::string::npos);
 }
 
 }  // namespace

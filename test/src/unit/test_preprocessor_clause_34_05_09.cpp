@@ -1,4 +1,4 @@
-// §34.5: Protect pragma keywords
+// §34.5.9: encoding
 
 #include <gtest/gtest.h>
 #include "common/diagnostic.h"
@@ -23,22 +23,21 @@ struct ProtectedTest : ::testing::Test {
 namespace {
 
 // =============================================================================
-// §34.5.1/2 Protected envelope begin/end parsing
+// §34.5.3/4 Protected region with encoding (begin_protected/end_protected)
 // =============================================================================
-TEST_F(ProtectedTest, BeginEndEnvelope) {
+TEST_F(ProtectedTest, ProtectedRegionWithEncoding) {
   auto result = Preprocess(
-      "module m;\n"
-      "`pragma protect begin\n"
-      "  logic secret_wire;\n"
-      "`pragma protect end\n"
-      "endmodule\n");
+      "`pragma protect encoding=(enctype=\"raw\")\n"
+      "`pragma protect data_method=\"x-caesar\"\n"
+      "`pragma protect begin_protected\n"
+      "`pragma protect data_block\n"
+      "encrypted_data_here\n"
+      "`pragma protect end_protected\n");
   EXPECT_FALSE(diag_.HasErrors());
-  // Non-pragma lines should pass through.
-  EXPECT_NE(result.find("module m;"), std::string::npos);
-  EXPECT_NE(result.find("logic secret_wire;"), std::string::npos);
-  EXPECT_NE(result.find("endmodule"), std::string::npos);
-  // Pragma lines consumed.
+  // All pragma lines consumed.
   EXPECT_EQ(result.find("pragma"), std::string::npos);
+  // Non-pragma content passes through (encrypted data).
+  EXPECT_NE(result.find("encrypted_data_here"), std::string::npos);
 }
 
 }  // namespace
