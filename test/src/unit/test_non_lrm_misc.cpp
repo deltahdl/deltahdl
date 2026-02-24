@@ -67866,4 +67866,135 @@ TEST(ParserSection22, BeginKeywordsModuleNamePreserved) {
   EXPECT_EQ(r.cu->modules[0]->name, "bar");
 }
 
+// extern_tf_declaration inside a module (interface_or_generate_item applies
+// to modules too via module_or_generate_item).
+TEST(SourceText, ExternFunctionPrototypeInModule) {
+  auto r = Parse(
+      "module m;\n"
+      "  extern function int compute(input int a, input int b);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto *mod = r.cu->modules[0];
+  ASSERT_GE(mod->items.size(), 1u);
+  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(mod->items[0]->name, "compute");
+  EXPECT_TRUE(mod->items[0]->is_extern);
+  EXPECT_TRUE(mod->items[0]->func_body_stmts.empty());
+}
+
+// =============================================================================
+// LRM §3.3 — Modules
+// =============================================================================
+// §3.3 Module with end label
+TEST(ParserClause03, Cl3_3_ModuleEndLabel) {
+  auto r = Parse(
+      "module m;\n"
+      "endmodule : m\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->name, "m");
+}
+
+// §3.3 LRM mux2to1 example (verbatim, with always_comb procedural block).
+TEST(ParserClause03, Cl3_3_Mux2to1LrmExample) {
+  auto r = Parse(
+      "module mux2to1 (input wire a, b, sel,\n"
+      "                output logic y);\n"
+      "  always_comb begin\n"
+      "    if (sel) y = a;\n"
+      "    else     y = b;\n"
+      "  end\n"
+      "endmodule: mux2to1\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->name, "mux2to1");
+  ASSERT_EQ(r.cu->modules[0]->ports.size(), 4u);
+  EXPECT_EQ(r.cu->modules[0]->ports[0].name, "a");
+  EXPECT_EQ(r.cu->modules[0]->ports[3].name, "y");
+  auto *blk = FindItemByKind(r, ModuleItemKind::kAlwaysBlock);
+  ASSERT_NE(blk, nullptr);
+  EXPECT_EQ(blk->always_kind, AlwaysKind::kAlwaysComb);
+}
+
+// §3.3 Data declarations, constants, user-defined types, class definitions
+TEST(ParserClause03, Cl3_3_ModuleDeclarations) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire [7:0] w;\n"
+      "  logic [15:0] v;\n"
+      "  struct packed { logic [3:0] a; logic [3:0] b; } s;\n"
+      "  union packed { logic [7:0] x; logic [7:0] y; } u;\n"
+      "  parameter WIDTH = 8;\n"
+      "  localparam DEPTH = 16;\n"
+      "  typedef logic [7:0] byte_t;\n"
+      "  class my_class; int val; endclass\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kParamDecl));
+  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kTypedef));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kClassDecl));
+  EXPECT_GE(r.cu->modules[0]->items.size(), 7u);
+}
+
+// §3.3 Subroutine definitions and procedural blocks
+TEST(ParserClause03, Cl3_3_SubroutinesAndProceduralBlocks) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic clk, a, b;\n"
+      "  function int add(int a, int b); return a + b; endfunction\n"
+      "  task display_val(input int x); $display(\"%d\", x); endtask\n"
+      "  initial a = 0;\n"
+      "  final $display(\"done\");\n"
+      "  always @(posedge clk) a <= b;\n"
+      "  always_comb b = a;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kFunctionDecl));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kTaskDecl));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kFinalBlock));
+  EXPECT_TRUE(HasAlwaysOfKind(r.cu->modules[0]->items, AlwaysKind::kAlways));
+  EXPECT_TRUE(
+      HasAlwaysOfKind(r.cu->modules[0]->items, AlwaysKind::kAlwaysComb));
+}
+
+// 28. Port names as part of module scope
+TEST(ParserClause03, Cl3_13_PortNamesInModuleScope) {
+  auto r = Parse(
+      "module m (input logic clk, input logic rst_n, output logic [7:0] q);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->ports.size(), 3u);
+  EXPECT_EQ(r.cu->modules[0]->ports[0].name, "clk");
+  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(r.cu->modules[0]->ports[1].name, "rst_n");
+  EXPECT_EQ(r.cu->modules[0]->ports[1].direction, Direction::kInput);
+  EXPECT_EQ(r.cu->modules[0]->ports[2].name, "q");
+  EXPECT_EQ(r.cu->modules[0]->ports[2].direction, Direction::kOutput);
+}
+
+// =============================================================================
+// A.1.2 module_declaration — all forms
+// =============================================================================
+// module_keyword ::= module | macromodule
+TEST(SourceText, ModuleKeywordMacromodule) {
+  auto r = Parse("macromodule m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->name, "m");
+}
+
 }  // namespace
