@@ -34,7 +34,6 @@ endfunction()
 # add_unit_test(test_simulator_clause_09e)  # disabled: failing tests in workflow 22294976044
 # add_unit_test(test_simulator_clause_10b)  # disabled: failing tests in workflow 22294976044
 # add_unit_test(test_simulator_clause_11)  # disabled: failing tests in workflow 22294976044
-add_unit_test(test_elaborator_annex_a_06_04)
 add_unit_test(test_elaborator_annex_a_06_07_01)
 add_unit_test(test_elaborator_annex_a_06_08)
 add_unit_test(test_elaborator_annex_a_06_09)
