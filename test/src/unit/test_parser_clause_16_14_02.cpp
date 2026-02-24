@@ -66,4 +66,18 @@ TEST(ParserA210, AssumeProperty_WithElseAction) {
   EXPECT_NE(item->assert_fail_stmt, nullptr);
 }
 
+// assume_property_statement with no action block
+TEST(ParserA210, AssumeProperty_NoActionBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  assume property (@(posedge clk) req |-> ack);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto *item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssumeProperty);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->assert_pass_stmt, nullptr);
+  EXPECT_EQ(item->assert_fail_stmt, nullptr);
+}
+
 }  // namespace

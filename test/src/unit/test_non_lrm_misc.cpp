@@ -1026,4 +1026,30 @@ TEST(ParserA29, EmptyModport) {
   EXPECT_EQ(mp->name, "empty");
 }
 
+static ModuleItem *FindItemByKind(const std::vector<ModuleItem *> &items,
+                                  ModuleItemKind kind) {
+  for (auto *item : items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
+}
+
+// sequence_expr ::= ( sequence_expr {, sequence_match_item} ) [sequence_abbrev]
+TEST(ParserA210, SequenceExpr_ParenWithMatchItems) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk)\n"
+              "    (a ##1 b, x = c) |-> d);\n"
+              "endmodule\n"));
+}
+
+// property_list_of_arguments — mixed positional + named
+TEST(ParserA210, PropertyListOfArguments_Mixed) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  property p(x, y, z); x |-> y ##1 z; endproperty\n"
+              "  assert property (p(a, .y(b), .z(c)));\n"
+              "endmodule\n"));
+}
+
 }  // namespace

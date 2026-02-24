@@ -1,4 +1,4 @@
-// §16.12.18: Typed formal arguments in property declarations
+// §16.13.6: Sequence methods
 
 #include <gtest/gtest.h>
 #include <string>
@@ -50,34 +50,22 @@ static ModuleItem *FindItemByKind(const std::vector<ModuleItem *> &items,
 namespace {
 
 // =============================================================================
-// §A.2.10 Production #17: property_formal_type
-// property_formal_type ::= sequence_formal_type | property
+// §A.2.10 Production #28: sequence_method_call
+// sequence_method_call ::= sequence_instance . method_identifier
 // =============================================================================
-TEST(ParserA210, PropertyFormalType_Property) {
+TEST(ParserA210, SequenceMethodCall_Triggered) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
-              "  property p(property q);\n"
-              "    q;\n"
-              "  endproperty\n"
+              "  sequence s; a ##1 b; endsequence\n"
+              "  assert property (@(posedge clk) s.triggered |-> c);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, PropertyFormalType_Sequence) {
+TEST(ParserA210, SequenceMethodCall_Matched) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
-              "  property p(sequence s);\n"
-              "    s |-> 1;\n"
-              "  endproperty\n"
-              "endmodule\n"));
-}
-
-// property_formal_type — implicit (no type)
-TEST(ParserA210, PropertyFormalType_Implicit) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  property p(x);\n"
-              "    x;\n"
-              "  endproperty\n"
+              "  sequence s; a ##1 b; endsequence\n"
+              "  assert property (@(posedge clk) s.matched |-> c);\n"
               "endmodule\n"));
 }
 

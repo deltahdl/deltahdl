@@ -1,4 +1,4 @@
-// §16.12.18: Typed formal arguments in property declarations
+// §16.9.9: Conditions over sequences
 
 #include <gtest/gtest.h>
 #include <string>
@@ -49,35 +49,12 @@ static ModuleItem *FindItemByKind(const std::vector<ModuleItem *> &items,
 
 namespace {
 
-// =============================================================================
-// §A.2.10 Production #17: property_formal_type
-// property_formal_type ::= sequence_formal_type | property
-// =============================================================================
-TEST(ParserA210, PropertyFormalType_Property) {
+// sequence_expr ::= expression_or_dist throughout sequence_expr
+TEST(ParserA210, SequenceExpr_Throughout) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
-              "  property p(property q);\n"
-              "    q;\n"
-              "  endproperty\n"
-              "endmodule\n"));
-}
-
-TEST(ParserA210, PropertyFormalType_Sequence) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  property p(sequence s);\n"
-              "    s |-> 1;\n"
-              "  endproperty\n"
-              "endmodule\n"));
-}
-
-// property_formal_type — implicit (no type)
-TEST(ParserA210, PropertyFormalType_Implicit) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  property p(x);\n"
-              "    x;\n"
-              "  endproperty\n"
+              "  assert property (@(posedge clk)\n"
+              "    en throughout (a ##1 b ##1 c));\n"
               "endmodule\n"));
 }
 

@@ -125,4 +125,16 @@ TEST(ParserA210, CoverProperty_WithPassStmt) {
   EXPECT_NE(item->assert_pass_stmt, nullptr);
 }
 
+TEST(ParserA210, CoverSequence_HasAssertExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "  cover sequence (@(posedge clk) a ##1 b);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto *item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kCoverSequence);
+  ASSERT_NE(item, nullptr);
+  EXPECT_NE(item->assert_expr, nullptr);
+}
+
 }  // namespace

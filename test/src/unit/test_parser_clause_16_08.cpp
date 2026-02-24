@@ -63,4 +63,91 @@ TEST(ParserA210, AssertionItemDecl_SequenceDecl) {
   EXPECT_EQ(item->name, "s_handshake");
 }
 
+// =============================================================================
+// §A.2.10 Production #21: sequence_declaration
+// sequence_declaration ::=
+//     sequence sequence_identifier [ ( [sequence_port_list] ) ] ;
+//     { assertion_variable_declaration }
+//     sequence_expr [ ; ]
+//     endsequence [ : sequence_identifier ]
+// =============================================================================
+TEST(ParserA210, SequenceDecl_WithEndLabel) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s_req;\n"
+      "    req ##[1:3] ack;\n"
+      "  endsequence : s_req\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto *item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kSequenceDecl);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->name, "s_req");
+}
+
+TEST(ParserA210, SequenceDecl_WithPortList) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  sequence s(a, b);\n"
+              "    a ##1 b;\n"
+              "  endsequence\n"
+              "endmodule\n"));
+}
+
+TEST(ParserA210, SequenceDecl_SourceLoc) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence my_seq;\n"
+      "    a;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto *item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kSequenceDecl);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->loc.IsValid());
+}
+
+// =============================================================================
+// §A.2.10 Production #31: sequence_list_of_arguments
+// =============================================================================
+TEST(ParserA210, SequenceListOfArguments_Positional) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  sequence s(a, b); a ##1 b; endsequence\n"
+              "  assert property (@(posedge clk) s(x, y));\n"
+              "endmodule\n"));
+}
+
+// =============================================================================
+// §A.2.10 Production #32: sequence_actual_arg
+// sequence_actual_arg ::= event_expression | sequence_expr | $
+// =============================================================================
+TEST(ParserA210, SequenceActualArg_Dollar) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  sequence s(a, b); a ##1 b; endsequence\n"
+              "  assert property (@(posedge clk) s(x, $));\n"
+              "endmodule\n"));
+}
+
+// sequence_list_of_arguments — named arguments
+TEST(ParserA210, SequenceListOfArguments_Named) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  sequence s(a, b); a ##1 b; endsequence\n"
+              "  assert property (@(posedge clk) s(.a(x), .b(y)));\n"
+              "endmodule\n"));
+}
+
+// sequence_port_item with default value
+TEST(ParserA210, SequencePortItem_DefaultValue) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  sequence s(a, b = 1'b1);\n"
+              "    a ##1 b;\n"
+              "  endsequence\n"
+              "endmodule\n"));
+}
+
 }  // namespace

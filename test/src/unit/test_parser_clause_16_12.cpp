@@ -173,4 +173,14 @@ TEST(ParserA210, PropertySpec_NoClockNoDisable) {
               "endmodule\n"));
 }
 
+// property_port_list — empty port list
+TEST(ParserA210, PropertyPortList_Empty) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  property p();\n"
+              "    a |-> b;\n"
+              "  endproperty\n"
+              "endmodule\n"));
+}
+
 }  // namespace

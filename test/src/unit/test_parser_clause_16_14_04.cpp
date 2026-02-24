@@ -85,4 +85,16 @@ TEST(ParserA210, RestrictProperty_WithDisableIff) {
               "endmodule\n"));
 }
 
+TEST(ParserA210, RestrictProperty_HasAssertExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "  restrict property (@(posedge clk) a);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto *item = FindItemByKind(r.cu->modules[0]->items,
+                              ModuleItemKind::kRestrictProperty);
+  ASSERT_NE(item, nullptr);
+  EXPECT_NE(item->assert_expr, nullptr);
+}
+
 }  // namespace

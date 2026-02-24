@@ -65,4 +65,19 @@ TEST(ParserA210, PropertyExpr_NonOverlappedImplication) {
               "endmodule\n"));
 }
 
+// =============================================================================
+// §A.2.10 Production #30: sequence_instance
+// sequence_instance ::=
+//     ps_or_hierarchical_sequence_identifier
+//     [ ( [sequence_list_of_arguments] ) ]
+// =============================================================================
+TEST(ParserA210, SequenceInstance_InProperty) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  sequence s; a ##1 b; endsequence\n"
+              "  property p; s |-> c; endproperty\n"
+              "  assert property (p);\n"
+              "endmodule\n"));
+}
+
 }  // namespace

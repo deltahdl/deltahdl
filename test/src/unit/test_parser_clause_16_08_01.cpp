@@ -1,4 +1,4 @@
-// §16.12.18: Typed formal arguments in property declarations
+// §16.8.1: Typed formal arguments in sequence declarations
 
 #include <gtest/gtest.h>
 #include <string>
@@ -50,34 +50,33 @@ static ModuleItem *FindItemByKind(const std::vector<ModuleItem *> &items,
 namespace {
 
 // =============================================================================
-// §A.2.10 Production #17: property_formal_type
-// property_formal_type ::= sequence_formal_type | property
+// §A.2.10 Production #25: sequence_formal_type
+// sequence_formal_type ::= data_type_or_implicit | sequence | untyped
 // =============================================================================
-TEST(ParserA210, PropertyFormalType_Property) {
+TEST(ParserA210, SequenceFormalType_Sequence) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
-              "  property p(property q);\n"
-              "    q;\n"
-              "  endproperty\n"
+              "  sequence s(sequence sub_seq);\n"
+              "    sub_seq ##1 a;\n"
+              "  endsequence\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, PropertyFormalType_Sequence) {
+TEST(ParserA210, SequenceFormalType_Untyped) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
-              "  property p(sequence s);\n"
-              "    s |-> 1;\n"
-              "  endproperty\n"
+              "  sequence s(untyped x);\n"
+              "    x ##1 a;\n"
+              "  endsequence\n"
               "endmodule\n"));
 }
 
-// property_formal_type — implicit (no type)
-TEST(ParserA210, PropertyFormalType_Implicit) {
+TEST(ParserA210, SequenceFormalType_DataType) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
-              "  property p(x);\n"
-              "    x;\n"
-              "  endproperty\n"
+              "  sequence s(int x);\n"
+              "    x > 0;\n"
+              "  endsequence\n"
               "endmodule\n"));
 }
 
