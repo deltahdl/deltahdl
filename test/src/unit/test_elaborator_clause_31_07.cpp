@@ -167,4 +167,21 @@ TEST(ElabA70503, FullCombinationElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// =============================================================================
+// A.7.5.3 Elab — controlled_timing_check_event
+// =============================================================================
+// $period with controlled_timing_check_event elaborates
+TEST(ElabA70503, ControlledTimingCheckEventPeriodElaborates) {
+  ElabA70503Fixture f;
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    $period(posedge clk, 50);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
