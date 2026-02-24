@@ -71234,4 +71234,127 @@ TEST(SourceText, InterfaceItemPortDecl) {
   EXPECT_EQ(r.cu->interfaces[0]->ports[1].name, "data");
 }
 
+static void VerifyModportPorts(const std::vector<ModportPort> &ports,
+                               const ModportPortExpected expected[],
+                               size_t count) {
+  ASSERT_EQ(ports.size(), count);
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(ports[i].direction, expected[i].dir) << "port " << i;
+    EXPECT_EQ(ports[i].name, expected[i].name) << "port " << i;
+  }
+}
+
+TEST(Parser, InterfaceWithModport) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  logic [7:0] data;\n"
+      "  modport master(output data);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->interfaces[0]->modports.size(), 1);
+  auto *mp = r.cu->interfaces[0]->modports[0];
+  EXPECT_EQ(mp->name, "master");
+  ModportPortExpected expected[] = {{Direction::kOutput, "data"}};
+  VerifyModportPorts(mp->ports, expected, std::size(expected));
+}
+
+TEST(Parser, ModportMultipleGroups) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  logic addr;\n"
+      "  logic data;\n"
+      "  modport slave(input addr, input data);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto *mp = r.cu->interfaces[0]->modports[0];
+  EXPECT_EQ(mp->name, "slave");
+  ASSERT_EQ(mp->ports.size(), 2);
+  EXPECT_EQ(mp->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(mp->ports[1].direction, Direction::kInput);
+}
+
+// non_port_interface_item ::= modport_declaration
+TEST(SourceText, NonPortInterfaceItemModport) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  modport master(input clk, output data);\n"
+      "endinterface\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  ASSERT_EQ(r.cu->interfaces[0]->modports.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->modports[0]->name, "master");
+}
+
+// 16. Interface with modport declarations
+TEST(ParserClause03, Cl3_13_InterfaceWithModports) {
+  auto r = Parse(
+      "interface bus_if;\n"
+      "  logic [7:0] data;\n"
+      "  logic valid, ready;\n"
+      "  modport master (output data, output valid, input ready);\n"
+      "  modport slave (input data, input valid, output ready);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  auto *ifc = r.cu->interfaces[0];
+  EXPECT_EQ(ifc->name, "bus_if");
+  ASSERT_EQ(ifc->modports.size(), 2u);
+  EXPECT_EQ(ifc->modports[0]->name, "master");
+  EXPECT_EQ(ifc->modports[1]->name, "slave");
+}
+
+TEST(ParserAnnexA, A1InterfaceDecl) {
+  auto r = Parse(
+      "interface bus_if;\n"
+      "  logic [7:0] data;\n"
+      "  modport master(output data);\n"
+      "  modport slave(input data);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->name, "bus_if");
+  EXPECT_EQ(r.cu->interfaces[0]->modports.size(), 2u);
+}
+
+TEST(ParserA29, AllFourDirections) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  logic a, b, c;\n"
+      "  wire d;\n"
+      "  modport mp(input a, output b, inout c, ref d);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 4u);
+  EXPECT_EQ(mp->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(mp->ports[1].direction, Direction::kOutput);
+  EXPECT_EQ(mp->ports[2].direction, Direction::kInout);
+  EXPECT_EQ(mp->ports[3].direction, Direction::kRef);
+}
+
+// attribute_instance on modport_ports_declaration
+TEST(ParserA29, AttrOnSimplePorts) {
+  EXPECT_TRUE(
+      ParseOk("interface bus;\n"
+              "  logic a;\n"
+              "  modport target((* synthesis *) input a);\n"
+              "endinterface\n"));
+}
+
+// Verify source location is captured on ModportDecl
+TEST(ParserA29, ModportDeclHasSourceLoc) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  logic a;\n"
+      "  modport target(input a);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *mp = r.cu->interfaces[0]->modports[0];
+  EXPECT_TRUE(mp->loc.IsValid());
+}
+
 }  // namespace
