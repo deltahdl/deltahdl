@@ -1,4 +1,4 @@
-// §7.10.1: Queue operators
+// §7.10.5: Bounded queues
 
 #include <gtest/gtest.h>
 #include <string>
