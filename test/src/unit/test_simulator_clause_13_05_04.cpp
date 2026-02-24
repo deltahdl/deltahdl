@@ -194,4 +194,68 @@ TEST(Functions, DefaultsAndNamedArgsCombined) {
   EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 21u);
 }
 
+struct SimA609Fixture {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag};
+};
+
+static RtlirDesign *ElaborateSrc(const std::string &src, SimA609Fixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  return elab.Elaborate(cu->modules.back()->name);
+}
+
+// --- named argument binding ---
+TEST(SimA609, NamedArgCall) {
+  SimA609Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  function logic [7:0] sub(input logic [7:0] a, input logic [7:0] b);\n"
+      "    return a - b;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = sub(.b(8'd3), .a(8'd10));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 7u);
+}
+
+// --- mixed positional + named arguments ---
+TEST(SimA609, MixedPositionalNamedArgs) {
+  SimA609Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  function logic [7:0] add3(input logic [7:0] a, input logic [7:0] b,\n"
+      "                            input logic [7:0] c);\n"
+      "    return a + b + c;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = add3(8'd1, 8'd2, .c(8'd3));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 6u);
+}
+
 }  // namespace

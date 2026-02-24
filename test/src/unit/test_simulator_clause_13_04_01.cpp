@@ -141,4 +141,68 @@ TEST(SimA605, JumpReturnFromFunction) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
+struct SimA609Fixture {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag};
+};
+
+static RtlirDesign *ElaborateSrc(const std::string &src, SimA609Fixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  return elab.Elaborate(cu->modules.back()->name);
+}
+
+// --- tf_call: function call as expression statement ---
+TEST(SimA609, FunctionCallAsStatement) {
+  SimA609Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  function void set_x;\n"
+      "    x = 8'd77;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    set_x();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 77u);
+}
+
+// --- function return value used in expression ---
+TEST(SimA609, FunctionReturnValue) {
+  SimA609Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  function logic [7:0] add_one(input logic [7:0] v);\n"
+      "    return v + 8'd1;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = add_one(8'd9);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 10u);
+}
+
 }  // namespace
