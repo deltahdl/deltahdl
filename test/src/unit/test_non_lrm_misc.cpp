@@ -67439,4 +67439,111 @@ TEST(ParserSection22, IfndefSelectsElseBranch) {
   EXPECT_EQ(r.cu->modules[0]->name, "reached");
 }
 
+struct ParseResult2207 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit *cu = nullptr;
+};
+
+static ParseResult2207 Parse(const std::string &src) {
+  ParseResult2207 result;
+  DiagEngine diag(result.mgr);
+  auto fid = result.mgr.AddFile("<test>", src);
+  Preprocessor preproc(result.mgr, diag, {});
+  auto pp = preproc.Preprocess(fid);
+  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
+  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+TEST(ParserSection22, TimescaleNsPs) {
+  EXPECT_TRUE(
+      ParseOk("`timescale 1ns/1ps\n"
+              "module t;\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection22, Timescale10ns1ns) {
+  EXPECT_TRUE(
+      ParseOk("`timescale 10ns/1ns\n"
+              "module t;\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection22, Timescale100ns10ns) {
+  EXPECT_TRUE(
+      ParseOk("`timescale 100ns/10ns\n"
+              "module t;\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection22, TimescaleUsNs) {
+  EXPECT_TRUE(
+      ParseOk("`timescale 1us/1ns\n"
+              "module t;\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection22, TimescaleMsUs) {
+  EXPECT_TRUE(
+      ParseOk("`timescale 1ms/1us\n"
+              "module t;\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection22, MultipleTimescales) {
+  EXPECT_TRUE(
+      ParseOk("`timescale 1ns/1ps\n"
+              "module m1;\n"
+              "endmodule\n"
+              "`timescale 10ns/1ns\n"
+              "module m2;\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection22, TimescaleWithDelays) {
+  EXPECT_TRUE(
+      ParseOk("`timescale 1ns/1ps\n"
+              "module t;\n"
+              "  reg clk;\n"
+              "  initial begin\n"
+              "    clk = 0;\n"
+              "    #5 clk = 1;\n"
+              "    #5 clk = 0;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection22, TimescaleModuleNamePreserved) {
+  auto r = Parse(
+      "`timescale 1ns/1ps\n"
+      "module foo;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->name, "foo");
+}
+
+// 35. LRM example: three modules A, B, C with two `timescale directives.
+// §3.14.2.1:
+// `timescale 1ns / 10ps → modules A and B
+// `timescale 1ps / 1ps  → module C
+TEST(ParserClause03, Cl3_14_2_1_LrmExampleThreeModules) {
+  auto r = Parse(
+      "`timescale 1ns / 10ps\n"
+      "module A; endmodule\n"
+      "module B; endmodule\n"
+      "`timescale 1ps / 1ps\n"
+      "module C; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 3u);
+  // All three modules parse; none have explicit timeunit keywords.
+  EXPECT_FALSE(r.cu->modules[0]->has_timeunit);
+  EXPECT_FALSE(r.cu->modules[1]->has_timeunit);
+  EXPECT_FALSE(r.cu->modules[2]->has_timeunit);
+}
+
 }  // namespace
