@@ -41667,4 +41667,26 @@ TEST(ParserA27, TaskPrototypePureVirtual) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// 21. Class scope resolution (cls::member)
+TEST(ParserClause03, Cl3_13_ClassScopeResolution) {
+  EXPECT_TRUE(
+      ParseOk("class base;\n"
+              "  typedef int my_type;\n"
+              "endclass\n"
+              "module m;\n"
+              "  base::my_type x;\n"
+              "endmodule\n"));
+}
+
+// class_type (ps_class_identifier [param] { :: class_identifier [param] })
+TEST(ParserA221, DataTypeClassType) {
+  auto r = Parse(
+      "class my_cls;\n"
+      "  typedef int my_type;\n"
+      "endclass\n"
+      "module m; my_cls::my_type x; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
