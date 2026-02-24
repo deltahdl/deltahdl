@@ -77453,4 +77453,36 @@ TEST(ElabA82, NestedCallsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
+struct ElabA83Fixture {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag{mgr};
+  bool has_errors = false;
+};
+
+static RtlirDesign *ElaborateSrc(const std::string &src, ElabA83Fixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  auto *design = elab.Elaborate(cu->modules.back()->name);
+  f.has_errors = f.diag.HasErrors();
+  return design;
+}
+
+// § inside_expression — inside in initial block elaborates
+TEST(ElabA83, InsideExprElaborates) {
+  ElabA83Fixture f;
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  logic result;\n"
+      "  initial result = x inside {8'd1, 8'd2, 8'd3};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
