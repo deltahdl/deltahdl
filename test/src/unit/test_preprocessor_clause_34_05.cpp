@@ -94,4 +94,23 @@ TEST_F(ProtectedTest, DecryptLicensePragma) {
   EXPECT_EQ(result.find("decrypt_license"), std::string::npos);
 }
 
+// =============================================================================
+// §34.5.1/2 Protected envelope begin/end parsing
+// =============================================================================
+TEST_F(ProtectedTest, BeginEndEnvelope) {
+  auto result = Preprocess(
+      "module m;\n"
+      "`pragma protect begin\n"
+      "  logic secret_wire;\n"
+      "`pragma protect end\n"
+      "endmodule\n");
+  EXPECT_FALSE(diag_.HasErrors());
+  // Non-pragma lines should pass through.
+  EXPECT_NE(result.find("module m;"), std::string::npos);
+  EXPECT_NE(result.find("logic secret_wire;"), std::string::npos);
+  EXPECT_NE(result.find("endmodule"), std::string::npos);
+  // Pragma lines consumed.
+  EXPECT_EQ(result.find("pragma"), std::string::npos);
+}
+
 }  // namespace
