@@ -156,4 +156,87 @@ TEST(EvalOpXZ, PartSelectXAddr) {
   EXPECT_NE(result.words[0].bval, 0u);  // result has x bits
 }
 
+struct SimA83Fixture {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag};
+};
+
+static RtlirDesign *ElaborateSrc(const std::string &src, SimA83Fixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  return elab.Elaborate(cu->modules.back()->name);
+}
+
+// § constant_range — part select
+TEST(SimA83, PartSelectRange) {
+  SimA83Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] data;\n"
+      "  logic [3:0] x;\n"
+      "  initial begin\n"
+      "    data = 8'hA5;\n"
+      "    x = data[3:0];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x5u);
+}
+
+// § indexed_range — plus-colon indexed part select
+TEST(SimA83, IndexedPartSelectPlus) {
+  SimA83Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] data;\n"
+      "  logic [3:0] x;\n"
+      "  initial begin\n"
+      "    data = 8'hA5;\n"
+      "    x = data[0+:4];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x5u);
+}
+
+// § indexed_range — minus-colon indexed part select
+TEST(SimA83, IndexedPartSelectMinus) {
+  SimA83Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] data;\n"
+      "  logic [3:0] x;\n"
+      "  initial begin\n"
+      "    data = 8'hA5;\n"
+      "    x = data[7-:4];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xAu);
+}
+
 }  // namespace
