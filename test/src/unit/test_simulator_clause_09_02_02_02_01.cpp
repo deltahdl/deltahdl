@@ -1,7 +1,6 @@
-// §9.4.1: Delay control
+// §9.2.2.2.1: Implicit always_comb sensitivities
 
 #include <gtest/gtest.h>
-#include <string>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -15,68 +14,6 @@
 #include "simulation/variable.h"
 
 using namespace delta;
-
-struct SimA605Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA605Fixture &f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
-namespace {
-
-// =============================================================================
-// Simulation: timing control execution
-// =============================================================================
-// §9.4.1: delay control advances simulation time
-TEST(SimA605, DelayControlAdvancesTime) {
-  SimA605Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    #10 x = 8'd42;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 42u);
-}
-
-// §9.4.1: chained delays accumulate
-TEST(SimA605, DelayControlChained) {
-  SimA605Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial begin\n"
-      "    #5 a = 8'd10;\n"
-      "    #5 b = 8'd20;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 10u);
-  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 20u);
-}
 
 // ===========================================================================
 // §4.2 Execution of a hardware model and its verification environment
@@ -122,28 +59,31 @@ static uint64_t RunAndGet(const std::string &src, const char *var_name) {
   return var->value.ToUint64();
 }
 
+namespace {
+
 // ---------------------------------------------------------------------------
-// 7. §4.2 Simulation time advances: a delay causes execution at a later
-//    simulation time.
+// 9. §4.2 Process as concurrently scheduled element: always_comb reacts
+//    to changes from an initial block at a later time.
 // ---------------------------------------------------------------------------
-TEST(SimCh4, SimulationTimeAdvances) {
+TEST(SimCh4, AlwaysCombReactsToDelayedChange) {
   SimCh4Fixture f;
   auto *design = ElaborateSrc(
       "module t;\n"
-      "  logic [7:0] x;\n"
+      "  logic [7:0] a, result;\n"
       "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    #10 x = 8'd1;\n"
+      "    a = 8'd0;\n"
+      "    #5 a = 8'd7;\n"
       "  end\n"
+      "  always_comb result = a * 8'd2;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto *var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 1u);
+  EXPECT_EQ(var->value.ToUint64(), 14u);
 }
 
 }  // namespace

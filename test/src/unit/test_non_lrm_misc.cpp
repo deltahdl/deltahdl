@@ -78914,4 +78914,81 @@ TEST(VpiAnnexK2, VpiTimeDefaultInit) {
   EXPECT_DOUBLE_EQ(time.real, 0.0);
 }
 
+// ===========================================================================
+// §4.2 Execution of a hardware model and its verification environment
+//
+// LRM §4.2 establishes the fundamental execution model:
+//   - SystemVerilog is a parallel programming language.
+//   - Certain constructs execute as parallel blocks or processes.
+//   - Understanding guaranteed vs. indeterminate execution order is key.
+//   - Semantics are defined for simulation.
+//
+// These tests verify the simulation-level behaviour of the concepts
+// introduced in §4.2, covering parallel process execution, sequential
+// ordering within processes, and interaction between concurrent elements.
+// ===========================================================================
+struct SimCh4Fixture {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag};
+};
+
+static RtlirDesign *ElaborateSrc(const std::string &src, SimCh4Fixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  return elab.Elaborate(cu->modules.back()->name);
+}
+
+static uint64_t RunAndGet(const std::string &src, const char *var_name) {
+  SimCh4Fixture f;
+  auto *design = ElaborateSrc(src, f);
+  EXPECT_NE(design, nullptr);
+  if (!design) return 0;
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable(var_name);
+  EXPECT_NE(var, nullptr);
+  if (!var) return 0;
+  return var->value.ToUint64();
+}
+
+// ---------------------------------------------------------------------------
+// 29. §4.2 Processes are concurrently scheduled elements: always_comb
+//     re-evaluates when any input changes.
+// ---------------------------------------------------------------------------
+TEST(SimCh4, AlwaysCombReEvaluatesOnChange) {
+  SimCh4Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel, a, b, result;\n"
+      "  initial begin\n"
+      "    a = 8'd10;\n"
+      "    b = 8'd20;\n"
+      "    sel = 8'd0;\n"
+      "    #5 sel = 8'd1;\n"
+      "  end\n"
+      "  always_comb begin\n"
+      "    if (sel)\n"
+      "      result = b;\n"
+      "    else\n"
+      "      result = a;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  // After #5, sel=1 so result=b=20.
+  auto *var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 20u);
+}
+
 }  // namespace

@@ -1,7 +1,6 @@
-// §9.4.1: Delay control
+// §4.5: SystemVerilog simulation reference algorithm
 
 #include <gtest/gtest.h>
-#include <string>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -15,68 +14,6 @@
 #include "simulation/variable.h"
 
 using namespace delta;
-
-struct SimA605Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA605Fixture &f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
-namespace {
-
-// =============================================================================
-// Simulation: timing control execution
-// =============================================================================
-// §9.4.1: delay control advances simulation time
-TEST(SimA605, DelayControlAdvancesTime) {
-  SimA605Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    #10 x = 8'd42;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 42u);
-}
-
-// §9.4.1: chained delays accumulate
-TEST(SimA605, DelayControlChained) {
-  SimA605Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial begin\n"
-      "    #5 a = 8'd10;\n"
-      "    #5 b = 8'd20;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 10u);
-  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 20u);
-}
 
 // ===========================================================================
 // §4.2 Execution of a hardware model and its verification environment
@@ -122,18 +59,20 @@ static uint64_t RunAndGet(const std::string &src, const char *var_name) {
   return var->value.ToUint64();
 }
 
+namespace {
+
 // ---------------------------------------------------------------------------
-// 7. §4.2 Simulation time advances: a delay causes execution at a later
-//    simulation time.
+// 15. §4.2 Simulation-defined semantics: time slot 0 processes all initial
+//     block assignments (simulation is the canonical model).
 // ---------------------------------------------------------------------------
-TEST(SimCh4, SimulationTimeAdvances) {
+TEST(SimCh4, TimeZeroSemantics) {
   SimCh4Fixture f;
   auto *design = ElaborateSrc(
       "module t;\n"
-      "  logic [7:0] x;\n"
+      "  logic [7:0] a, b;\n"
       "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    #10 x = 8'd1;\n"
+      "    a = 8'd1;\n"
+      "    b = a + 8'd1;\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -141,9 +80,65 @@ TEST(SimCh4, SimulationTimeAdvances) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto *va = f.ctx.FindVariable("a");
+  auto *vb = f.ctx.FindVariable("b");
+  ASSERT_NE(va, nullptr);
+  ASSERT_NE(vb, nullptr);
+  EXPECT_EQ(va->value.ToUint64(), 1u);
+  EXPECT_EQ(vb->value.ToUint64(), 2u);
+}
+
+// ---------------------------------------------------------------------------
+// 17. §4.2 Process interaction over multiple time steps: initial block
+//     updates value at different times, always_comb tracks changes.
+// ---------------------------------------------------------------------------
+TEST(SimCh4, ProcessInteractionMultipleTimeSteps) {
+  SimCh4Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, doubled;\n"
+      "  initial begin\n"
+      "    a = 8'd1;\n"
+      "    #5 a = 8'd4;\n"
+      "    #5 a = 8'd8;\n"
+      "  end\n"
+      "  always_comb doubled = a * 8'd2;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("doubled");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 1u);
+  EXPECT_EQ(var->value.ToUint64(), 16u);
+}
+
+// ---------------------------------------------------------------------------
+// 30. §4.2 Simulation semantics are canonical: multiple process types
+//     (initial, always_comb, assign) all produce deterministic results
+//     defined by the simulation model.
+// ---------------------------------------------------------------------------
+TEST(SimCh4, CanonicalSimulationSemantics) {
+  SimCh4Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, c, d;\n"
+      "  initial a = 8'd4;\n"
+      "  assign b = a + 8'd10;\n"
+      "  always_comb c = b - 8'd5;\n"
+      "  assign d = c * 8'd2;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  // a=4, b=14, c=9, d=18
+  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 4u);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 14u);
+  EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 9u);
+  EXPECT_EQ(f.ctx.FindVariable("d")->value.ToUint64(), 18u);
 }
 
 }  // namespace

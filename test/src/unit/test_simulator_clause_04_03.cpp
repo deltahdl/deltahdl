@@ -824,3 +824,154 @@ TEST(SimCh43, AllRegionsDefined) {
   EXPECT_EQ(static_cast<int>(Region::kPostponed), 16);
   EXPECT_EQ(kRegionCount, 17u);
 }
+// ===========================================================================
+// §4.2 Execution of a hardware model and its verification environment
+//
+// LRM §4.2 establishes the fundamental execution model:
+//   - SystemVerilog is a parallel programming language.
+//   - Certain constructs execute as parallel blocks or processes.
+//   - Understanding guaranteed vs. indeterminate execution order is key.
+//   - Semantics are defined for simulation.
+//
+// These tests verify the simulation-level behaviour of the concepts
+// introduced in §4.2, covering parallel process execution, sequential
+// ordering within processes, and interaction between concurrent elements.
+// ===========================================================================
+struct SimCh4Fixture {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag};
+};
+
+static RtlirDesign *ElaborateSrc(const std::string &src, SimCh4Fixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  return elab.Elaborate(cu->modules.back()->name);
+}
+
+static uint64_t RunAndGet(const std::string &src, const char *var_name) {
+  SimCh4Fixture f;
+  auto *design = ElaborateSrc(src, f);
+  EXPECT_NE(design, nullptr);
+  if (!design) return 0;
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable(var_name);
+  EXPECT_NE(var, nullptr);
+  if (!var) return 0;
+  return var->value.ToUint64();
+}
+
+// ---------------------------------------------------------------------------
+// 5. §4.2 Abstraction levels: behavioral (initial block) and dataflow
+//    (continuous assignment) coexist and interact.
+// ---------------------------------------------------------------------------
+TEST(SimCh4, BehavioralAndDataflowCoexist) {
+  SimCh4Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  assign b = a + 8'd1;\n"
+      "  initial a = 8'd5;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *va = f.ctx.FindVariable("a");
+  auto *vb = f.ctx.FindVariable("b");
+  ASSERT_NE(va, nullptr);
+  ASSERT_NE(vb, nullptr);
+  EXPECT_EQ(va->value.ToUint64(), 5u);
+  EXPECT_EQ(vb->value.ToUint64(), 6u);
+}
+
+// ---------------------------------------------------------------------------
+// 8. §4.2 Multiple processes across simulation time: two initial blocks
+//    with different delays both produce correct final values.
+// ---------------------------------------------------------------------------
+TEST(SimCh4, MultipleProcessesAcrossTime) {
+  SimCh4Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 8'd1;\n"
+      "    #5 a = 8'd2;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    b = 8'd10;\n"
+      "    #10 b = 8'd20;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *va = f.ctx.FindVariable("a");
+  auto *vb = f.ctx.FindVariable("b");
+  ASSERT_NE(va, nullptr);
+  ASSERT_NE(vb, nullptr);
+  EXPECT_EQ(va->value.ToUint64(), 2u);
+  EXPECT_EQ(vb->value.ToUint64(), 20u);
+}
+
+// ---------------------------------------------------------------------------
+// 14. §4.2 Cascade of processes: initial sets a, assign b = a + 1,
+//     always_comb c = b * 2. All three execute and propagate.
+// ---------------------------------------------------------------------------
+TEST(SimCh4, CascadeOfProcesses) {
+  SimCh4Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, c;\n"
+      "  initial a = 8'd5;\n"
+      "  assign b = a + 8'd1;\n"
+      "  always_comb c = b * 8'd2;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 5u);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 6u);
+  EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 12u);
+}
+
+// ---------------------------------------------------------------------------
+// 26. §4.2 Parallel processes with time delays: interleaved execution across
+//     simulation time.
+// ---------------------------------------------------------------------------
+TEST(SimCh4, InterleavedTimeExecution) {
+  SimCh4Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    #5 a = 8'd1;\n"
+      "    #10 a = 8'd3;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #10 b = 8'd2;\n"
+      "    #5 b = 8'd4;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  // a: set 1@t5, set 3@t15. b: set 2@t10, set 4@t15.
+  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 3u);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 4u);
+}
+
