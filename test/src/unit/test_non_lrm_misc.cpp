@@ -73283,4 +73283,17 @@ TEST(Parser, GateBufif0) {
   EXPECT_EQ(item->gate_terminals.size(), 3);
 }
 
+TEST(ParserSection28, PullGates) {
+  auto r = Parse(
+      "module m;\n"
+      "  pullup (out);\n"
+      "  pulldown (out);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto *mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 2);
+  EXPECT_EQ(mod->items[0]->gate_kind, GateKind::kPullup);
+  EXPECT_EQ(mod->items[1]->gate_kind, GateKind::kPulldown);
+}
+
 }  // namespace
