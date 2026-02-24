@@ -1,7 +1,6 @@
-// §23.3: Module instances (hierarchy)
+// §23.3.2.2: Connecting module instance ports by name
 
 #include <gtest/gtest.h>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -81,20 +80,6 @@ TEST(Elaboration, PortBinding_Direction) {
     EXPECT_EQ(bindings[i].port_name, kExpected[i].port_name);
     EXPECT_EQ(bindings[i].direction, kExpected[i].direction);
   }
-}
-
-TEST(Elaboration, PortBinding_UnknownModule) {
-  ElabFixture f;
-  auto *design = ElaborateSrc(
-      "module top;\n"
-      "  logic x;\n"
-      "  nonexistent u0(.a(x));\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  auto *mod = design->top_modules[0];
-  ASSERT_EQ(mod->children.size(), 1);
-  EXPECT_EQ(mod->children[0].resolved, nullptr);
 }
 
 TEST(Elaboration, PortBinding_PortMismatch) {
