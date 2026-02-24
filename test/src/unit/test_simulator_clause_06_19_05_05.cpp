@@ -87,12 +87,15 @@ struct EnumFixture {
 
 namespace {
 
-TEST(EnumMethods, NumSingleMember) {
+// =============================================================================
+// §6.19.5.5: num() — returns the number of enum members
+// =============================================================================
+TEST(EnumMethods, NumReturnsCount) {
   EnumFixture f;
-  f.RegisterEnum("flag", "flag_t", {{"ONLY", 42}});
-  auto *call = f.MakeEnumMethodCall("flag", "num");
+  f.RegisterEnum("color", "color_t", {{"RED", 0}, {"GREEN", 1}, {"BLUE", 2}});
+  auto *call = f.MakeEnumMethodCall("color", "num");
   auto result = EvalExpr(call, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
+  EXPECT_EQ(result.ToUint64(), 3u);
 }
 
 }  // namespace
