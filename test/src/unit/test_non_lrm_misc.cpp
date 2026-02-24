@@ -41374,4 +41374,61 @@ TEST(ParserAnnexA, A2ClassDecl) {
   EXPECT_EQ(r.cu->classes[0]->members.size(), 2u);
 }
 
+TEST(Parser, ClassWithProperty) {
+  auto r = Parse("class pkt; int data; endclass");
+  ASSERT_NE(r.cu, nullptr);
+  auto *cls = r.cu->classes[0];
+  ASSERT_EQ(cls->members.size(), 1);
+  EXPECT_EQ(cls->members[0]->kind, ClassMemberKind::kProperty);
+  EXPECT_EQ(cls->members[0]->name, "data");
+  EXPECT_EQ(cls->members[0]->data_type.kind, DataTypeKind::kInt);
+}
+
+// =============================================================================
+// A.1.9 Class items
+// =============================================================================
+// class_item ::= { attribute_instance } class_property (property_qualifier
+// path)
+TEST(SourceText, ClassPropertyWithQualifiers) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  randc bit [3:0] y;\n"
+      "  static int count;\n"
+      "  protected int secret;\n"
+      "  local int hidden;\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto &members = r.cu->classes[0]->members;
+  ASSERT_EQ(members.size(), 5u);
+  EXPECT_TRUE(members[0]->is_rand);
+  EXPECT_EQ(members[0]->name, "x");
+  EXPECT_TRUE(members[1]->is_randc);
+  EXPECT_EQ(members[1]->name, "y");
+  EXPECT_TRUE(members[2]->is_static);
+  EXPECT_TRUE(members[3]->is_protected);
+  EXPECT_TRUE(members[4]->is_local);
+}
+
+// class_item_qualifier / property_qualifier / method_qualifier (footnote 10)
+TEST(SourceText, ClassQualifierCombinations) {
+  auto r = Parse(
+      "class C;\n"
+      "  static local int a;\n"
+      "  protected rand int b;\n"
+      "  static virtual function void sv_fn(); endfunction\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto &members = r.cu->classes[0]->members;
+  ASSERT_EQ(members.size(), 3u);
+  EXPECT_TRUE(members[0]->is_static);
+  EXPECT_TRUE(members[0]->is_local);
+  EXPECT_TRUE(members[1]->is_protected);
+  EXPECT_TRUE(members[1]->is_rand);
+  EXPECT_TRUE(members[2]->is_static);
+  EXPECT_TRUE(members[2]->is_virtual);
+}
+
 }  // namespace
