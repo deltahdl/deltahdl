@@ -132,4 +132,66 @@ TEST(StmtExec, PriorityIfNoMatchNoElseWarning) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
+struct SimA606Fixture {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag};
+};
+
+static RtlirDesign *ElaborateSrc(const std::string &src, SimA606Fixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  return elab.Elaborate(cu->modules.back()->name);
+}
+
+// §12.4.2: unique if — qualifier stored on AST
+TEST(SimA606, UniqueIfQualifierStored) {
+  SimA606Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, x;\n"
+      "  initial begin\n"
+      "    a = 8'd1;\n"
+      "    unique if (a == 8'd0) x = 8'd10;\n"
+      "    else if (a == 8'd1) x = 8'd20;\n"
+      "    else x = 8'd30;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 20u);
+}
+
+// §12.4.2: priority if — executes first matching branch
+TEST(SimA606, PriorityIfFirstMatch) {
+  SimA606Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    priority if (1) x = 8'd10;\n"
+      "    else if (1) x = 8'd20;\n"
+      "    else x = 8'd30;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 10u);
+}
+
 }  // namespace
