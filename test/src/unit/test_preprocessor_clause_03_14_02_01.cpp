@@ -1,4 +1,4 @@
-// §3.14.3: Simulation time unit
+// §3.14.2.1: The `timescale compiler directive
 
 #include <gtest/gtest.h>
 #include "common/arena.h"
