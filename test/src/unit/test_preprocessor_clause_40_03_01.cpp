@@ -1,5 +1,6 @@
-#include <gtest/gtest.h>
+// §40.3.1: Predefined coverage constants in SystemVerilog
 
+#include <gtest/gtest.h>
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "preprocessor/preprocessor.h"
@@ -13,11 +14,16 @@ struct PreprocFixture {
 
 static std::string Preprocess(const std::string &src, PreprocFixture &f,
                               PreprocConfig config = {}) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Preprocessor pp(f.mgr, f.diag, std::move(config));
-  return pp.Preprocess(fid);
-}
 
+  auto fid = f.mgr.AddFile("<test>", src);
+
+  Preprocessor pp(f.mgr, f.diag, std::move(config));
+
+  return pp.Preprocess(fid);
+
+namespace {
+
+}
 // §22 Table 22-2: SV_COV_* predefined coverage macros
 TEST(Preprocessor, SvCovPredefinedMacros) {
   PreprocFixture f;
@@ -42,3 +48,5 @@ TEST(Preprocessor, SvCovErrorValue) {
   auto result = Preprocess("x=`SV_COV_ERROR\n", f);
   EXPECT_NE(result.find("x=-1"), std::string::npos);
 }
+
+}  // namespace
