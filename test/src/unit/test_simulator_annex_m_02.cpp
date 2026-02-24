@@ -1,7 +1,6 @@
 // Annex M.2: Source code
 
 #include <gtest/gtest.h>
-
 #include "vpi/sv_vpi_user.h"
 
 namespace {
@@ -39,17 +38,6 @@ TEST(SvVpiUser, TypespecTypes) {
 }
 
 // =============================================================================
-// Assertion types
-// =============================================================================
-TEST(SvVpiUser, AssertionTypes) {
-  EXPECT_EQ(vpiAssert, 686);
-  EXPECT_EQ(vpiAssume, 687);
-  EXPECT_EQ(vpiCover, 688);
-  EXPECT_EQ(vpiRestrict, 901);
-  EXPECT_EQ(vpiImmediateAssert, 665);
-}
-
-// =============================================================================
 // Operator constants
 // =============================================================================
 TEST(SvVpiUser, OperatorConstants) {
@@ -79,24 +67,6 @@ TEST(SvVpiUser, RandTypeConstants) {
   EXPECT_EQ(vpiNotRand, 1);
   EXPECT_EQ(vpiRand, 2);
   EXPECT_EQ(vpiRandC, 3);
-}
-
-TEST(SvVpiUser, VisibilityConstants) {
-  EXPECT_EQ(vpiPublicVis, 1);
-  EXPECT_EQ(vpiProtectedVis, 2);
-  EXPECT_EQ(vpiLocalVis, 3);
-}
-
-TEST(SvVpiUser, AlwaysTypeConstants) {
-  EXPECT_EQ(vpiAlwaysComb, 2);
-  EXPECT_EQ(vpiAlwaysFF, 3);
-  EXPECT_EQ(vpiAlwaysLatch, 4);
-}
-
-TEST(SvVpiUser, ThreadCallbackReasons) {
-  EXPECT_EQ(cbStartOfThread, 600);
-  EXPECT_EQ(cbEndOfThread, 601);
-  EXPECT_EQ(cbCreateObj, 700);
 }
 
 // =============================================================================

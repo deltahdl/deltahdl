@@ -56,4 +56,27 @@ TEST(VpiAnnexK2, VpiSystfDataDefaultInit) {
   EXPECT_EQ(data.user_data, nullptr);
 }
 
+// =============================================================================
+// Assertion types
+// =============================================================================
+TEST(SvVpiUser, AssertionTypes) {
+  EXPECT_EQ(vpiAssert, 686);
+  EXPECT_EQ(vpiAssume, 687);
+  EXPECT_EQ(vpiCover, 688);
+  EXPECT_EQ(vpiRestrict, 901);
+  EXPECT_EQ(vpiImmediateAssert, 665);
+}
+
+TEST(SvVpiUser, VisibilityConstants) {
+  EXPECT_EQ(vpiPublicVis, 1);
+  EXPECT_EQ(vpiProtectedVis, 2);
+  EXPECT_EQ(vpiLocalVis, 3);
+}
+
+TEST(SvVpiUser, AlwaysTypeConstants) {
+  EXPECT_EQ(vpiAlwaysComb, 2);
+  EXPECT_EQ(vpiAlwaysFF, 3);
+  EXPECT_EQ(vpiAlwaysLatch, 4);
+}
+
 }  // namespace
