@@ -147,4 +147,21 @@ TEST(ElabA70503, TimingCheckEventPosedgeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// =============================================================================
+// A.7.5.3 Elab — timing_check_event with edge controls
+// =============================================================================
+// timing_check_event with no edge elaborates
+TEST(ElabA70503, TimingCheckEventNoEdgeElaborates) {
+  ElabA70503Fixture f;
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    $setup(data, clk, 10);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

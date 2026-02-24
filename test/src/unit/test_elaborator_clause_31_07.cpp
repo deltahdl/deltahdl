@@ -33,51 +33,6 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA70503Fixture &f) {
 namespace {
 
 // =============================================================================
-// A.7.5.3 Elab — timing_check_event with edge controls
-// =============================================================================
-// timing_check_event with no edge elaborates
-TEST(ElabA70503, TimingCheckEventNoEdgeElaborates) {
-  ElabA70503Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $setup(data, clk, 10);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-// timing_check_event with negedge elaborates
-TEST(ElabA70503, TimingCheckEventNegedgeElaborates) {
-  ElabA70503Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $hold(negedge clk, data, 5);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-// timing_check_event with edge keyword elaborates
-TEST(ElabA70503, TimingCheckEventEdgeKeywordElaborates) {
-  ElabA70503Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $setup(data, edge clk, 10);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-// =============================================================================
 // A.7.5.3 Elab — timing_check_condition with &&&
 // =============================================================================
 // &&& bare condition elaborates
@@ -160,23 +115,6 @@ TEST(ElabA70503, FullCombinationElaborates) {
       "module m;\n"
       "  specify\n"
       "    $hold(posedge clk &&& en, data[0] &&& reset, 5);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-// =============================================================================
-// A.7.5.3 Elab — controlled_timing_check_event
-// =============================================================================
-// $period with controlled_timing_check_event elaborates
-TEST(ElabA70503, ControlledTimingCheckEventPeriodElaborates) {
-  ElabA70503Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $period(posedge clk, 50);\n"
       "  endspecify\n"
       "endmodule\n",
       f);

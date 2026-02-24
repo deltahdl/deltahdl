@@ -78058,4 +78058,18 @@ TEST(ElabA701, EmptySpecifyBlockElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// timing_check_event with edge keyword elaborates
+TEST(ElabA70503, TimingCheckEventEdgeKeywordElaborates) {
+  ElabA70503Fixture f;
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    $setup(data, edge clk, 10);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
