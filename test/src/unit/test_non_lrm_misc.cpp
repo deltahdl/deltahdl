@@ -32460,4 +32460,35 @@ TEST(ParserA221, DataTypeString) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kString);
 }
 
+struct StructMemberExpected {
+  const char *name;
+  DataTypeKind type_kind;
+};
+
+struct ModportPortExpected {
+  Direction dir;
+  const char *name;
+};
+
+// --- Named event tests ---
+TEST(Parser, EventDeclaration) {
+  auto r = Parse(
+      "module t;\n"
+      "  event ev;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kEvent);
+  EXPECT_EQ(item->name, "ev");
+}
+
+// event
+TEST(ParserA221, DataTypeEvent) {
+  auto r = Parse("module m; event ev; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kEvent);
+}
+
 }  // namespace
