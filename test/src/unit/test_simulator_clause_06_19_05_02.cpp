@@ -1,11 +1,9 @@
 // §6.19.5.2: Last()
 
 #include <gtest/gtest.h>
-
 #include <string>
 #include <string_view>
 #include <vector>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -86,6 +84,7 @@ struct EnumFixture {
     return lit;
   }
 };
+
 namespace {
 
 // =============================================================================
