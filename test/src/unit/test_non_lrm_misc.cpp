@@ -53885,4 +53885,13 @@ TEST(ParserSection10, Sec10_4_2_RegisterFilePattern) {
   EXPECT_EQ(if_stmt->then_branch->lhs->kind, ExprKind::kSelect);
 }
 
+TEST(Parser, ExpressionPrecedence) {
+  auto r = Parse(
+      "module expr;\n"
+      "  logic a;\n"
+      "  assign a = 1 + 2 * 3;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+}
+
 }  // namespace
