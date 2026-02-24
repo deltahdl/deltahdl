@@ -43030,4 +43030,15 @@ TEST(ParserSection8, ForwardTypedefClassSelfRef) {
   EXPECT_EQ(r.cu->classes[0]->name, "Node");
 }
 
+TEST(Parser, ModuleWithInitialBlock) {
+  auto r = Parse(
+      "module hello;\n"
+      "  initial $display(\"Hello\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1);
+  ASSERT_EQ(r.cu->modules[0]->items.size(), 1);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
+}
+
 }  // namespace
