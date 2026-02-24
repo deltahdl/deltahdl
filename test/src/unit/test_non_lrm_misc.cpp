@@ -41266,4 +41266,112 @@ TEST(ParserSection7, Sec7_2_2_MultipleVarsWithInit) {
               "endmodule\n"));
 }
 
+// --- Class tests ---
+TEST(Parser, EmptyClass) {
+  auto r = Parse("class empty_cls; endclass");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1);
+  EXPECT_EQ(r.cu->classes[0]->name, "empty_cls");
+  EXPECT_FALSE(r.cu->classes[0]->is_virtual);
+}
+
+// class_item ::= { attribute_instance } class_declaration (nested class)
+TEST(SourceText, ClassNestedClass) {
+  auto r = Parse(
+      "class Outer;\n"
+      "  class Inner;\n"
+      "    int val;\n"
+      "  endclass\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto &members = r.cu->classes[0]->members;
+  ASSERT_EQ(members.size(), 1u);
+  EXPECT_EQ(members[0]->kind, ClassMemberKind::kClassDecl);
+  EXPECT_EQ(members[0]->nested_class->name, "Inner");
+}
+
+// class_item ::= local_parameter_declaration ; | parameter_declaration ;
+TEST(SourceText, ClassParameters) {
+  auto r = Parse(
+      "class C;\n"
+      "  localparam int LP = 10;\n"
+      "  parameter int P = 20;\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto &members = r.cu->classes[0]->members;
+  ASSERT_EQ(members.size(), 2u);
+  EXPECT_EQ(members[0]->kind, ClassMemberKind::kProperty);
+  EXPECT_EQ(members[1]->kind, ClassMemberKind::kProperty);
+}
+
+// class_item ::= ; (empty statement)
+TEST(SourceText, ClassEmptyItem) {
+  auto r = Parse(
+      "class C;\n"
+      "  ;\n"
+      "  int x;\n"
+      "  ;\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  // Empty semicolons are consumed, only real members remain.
+  EXPECT_EQ(r.cu->classes[0]->members.size(), 1u);
+}
+
+// 30. Nested class (class within a module -- class in module scope)
+TEST(ParserClause03, Cl3_13_NestedClassInModule) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  class inner_cls;\n"
+              "    int value;\n"
+              "    function void set(int v);\n"
+              "      value = v;\n"
+              "    endfunction\n"
+              "  endclass\n"
+              "endmodule\n"));
+}
+
+// 12. Class scope -- members in class name space
+TEST(ParserClause03, Cl3_13_ClassScopeMembers) {
+  auto r = Parse(
+      "class my_cls;\n"
+      "  int data;\n"
+      "  string name;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto *cls = r.cu->classes[0];
+  EXPECT_EQ(cls->name, "my_cls");
+  ASSERT_GE(cls->members.size(), 2u);
+  EXPECT_EQ(cls->members[0]->kind, ClassMemberKind::kProperty);
+  EXPECT_EQ(cls->members[0]->name, "data");
+  EXPECT_EQ(cls->members[1]->kind, ClassMemberKind::kProperty);
+  EXPECT_EQ(cls->members[1]->name, "name");
+}
+
+// Class with end label.
+TEST(SourceText, ClassEndLabel) {
+  auto r = Parse("class C; endclass : C\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserAnnexA, A2ClassDecl) {
+  auto r = Parse(
+      "class Packet;\n"
+      "  rand bit [7:0] payload;\n"
+      "  function void display();\n"
+      "    $display(\"pkt\");\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->name, "Packet");
+  EXPECT_EQ(r.cu->classes[0]->members.size(), 2u);
+}
+
 }  // namespace
