@@ -67679,4 +67679,13 @@ TEST(ParserSection22, UnconnectedDrivePull0) {
               "`nounconnected_drive\n"));
 }
 
+TEST(ParserSection22, CelldefineEndcelldefine) {
+  EXPECT_TRUE(
+      ParseOk("`celldefine\n"
+              "module inv(output y, input a);\n"
+              "  assign y = ~a;\n"
+              "endmodule\n"
+              "`endcelldefine\n"));
+}
+
 }  // namespace
