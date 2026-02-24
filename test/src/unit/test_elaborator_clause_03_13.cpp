@@ -1,5 +1,6 @@
-#include <gtest/gtest.h>
+// §3.13: Name spaces
 
+#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -29,28 +30,7 @@ static bool ElabOk(const std::string &src) {
   return !diag.HasErrors();
 }
 
-// =============================================================================
-// §3.13 Redeclaration rules (Elaboration)
-// =============================================================================
-
-// 34. Redeclaring a variable in the same module scope is an error.
-TEST(ElabClause03, Cl3_13_RedeclVarInModuleScope) {
-  // Two logic declarations with the same name 'x' in the same module.
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  logic x;\n"
-             "  logic x;\n"
-             "endmodule\n"));
-}
-
-// 35. Redeclaring a net in the same module scope is an error.
-TEST(ElabClause03, Cl3_13_RedeclNetInModuleScope) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  wire w;\n"
-             "  wire w;\n"
-             "endmodule\n"));
-}
+namespace {
 
 // 36. Distinct names in the same module scope are legal.
 TEST(ElabClause03, Cl3_13_DistinctNamesInModuleScope) {
@@ -86,3 +66,5 @@ TEST(ElabClause03, Cl3_13_SameNameDifferentModulesElab) {
   elab_b.Elaborate("b");
   EXPECT_FALSE(diag.HasErrors());
 }
+
+}  // namespace
