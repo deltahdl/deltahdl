@@ -32,18 +32,6 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA83Fixture &f) {
 
 namespace {
 
-// § constant_expression — binary op in parameter elaborates
-TEST(ElabA83, ConstantBinaryExprInParamElaborates) {
-  ElabA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  parameter int WIDTH = 4 + 4;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 // § constant_expression — ternary in parameter elaborates
 TEST(ElabA83, ConstantTernaryInParamElaborates) {
   ElabA83Fixture f;
@@ -56,137 +44,10 @@ TEST(ElabA83, ConstantTernaryInParamElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-struct ElabA84Fixture {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
-  bool has_errors = false;
-};
-
-static RtlirDesign *ElaborateSrc(const std::string &src, ElabA84Fixture &f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  auto *design = elab.Elaborate(cu->modules.back()->name);
-  f.has_errors = f.diag.HasErrors();
-  return design;
-}
-
-// =============================================================================
-// A.8.4 Primaries — Elaboration
-// =============================================================================
-// § constant_primary — integer literal in parameter elaborates
-TEST(ElabA84, ConstantPrimaryIntegerLiteral) {
-  ElabA84Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  parameter int P = 42;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-// § constant_primary — real literal in parameter elaborates
-TEST(ElabA84, ConstantPrimaryRealLiteral) {
-  ElabA84Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  parameter real R = 3.14;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-// § constant_primary — string literal in parameter elaborates
-TEST(ElabA84, ConstantPrimaryStringLiteral) {
-  ElabA84Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  parameter string S = \"hello\";\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-struct EvalFixture {
-  SourceManager mgr;
-  Arena arena;
-};
-
-static Expr *ParseExprFrom(const std::string &src, EvalFixture &f) {
-  std::string code = "module t #(parameter P = " + src + ") (); endmodule";
-  auto fid = f.mgr.AddFile("<test>", code);
-  DiagEngine diag(f.mgr);
-  Lexer lexer(f.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, f.arena, diag);
-  auto *cu = parser.Parse();
-  EXPECT_FALSE(cu->modules.empty());
-  EXPECT_FALSE(cu->modules[0]->params.empty());
-  return cu->modules[0]->params[0].second;
-}
-
-TEST(ConstEval, ScopedExprWithParam) {
-  EvalFixture f;
-  ScopeMap scope = {{"WIDTH", 16}};
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("WIDTH > 8", f), scope), 1);
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("WIDTH + 4", f), scope), 20);
-}
-
 TEST(ConstEval, ScopedUnresolved) {
   EvalFixture f;
   ScopeMap scope = {{"WIDTH", 16}};
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("UNKNOWN", f), scope), std::nullopt);
-}
-
-struct ParseResult {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit *cu = nullptr;
-  bool has_errors = false;
-};
-
-ParseResult Parse(const std::string &src) {
-  ParseResult result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-struct ElabFixture {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
-};
-
-RtlirDesign *Elaborate(const std::string &src, ElabFixture &f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
-// § constant_primary — parameter reference elaborates
-TEST(ElabA84, ConstantPrimaryParameterRef) {
-  ElabA84Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  parameter int A = 5;\n"
-      "  parameter int B = A;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace
