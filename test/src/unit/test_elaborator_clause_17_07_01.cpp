@@ -1,9 +1,7 @@
-// §17.7: Checker variables
+// §17.7.1: Checker variable assignments
 
 #include <gtest/gtest.h>
-
 #include <string>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
