@@ -170,4 +170,31 @@ TEST(ParserClause03, Cl3_13_EnumInModuleScope) {
   EXPECT_TRUE(found_typedef);
 }
 
+// enum [enum_base_type] { ... } {packed_dimension}
+TEST(ParserA221, DataTypeEnum) {
+  auto r = Parse("module m; enum logic [1:0] {A, B, C} x; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kEnum);
+}
+
+TEST(ParserA221, EnumBaseVectorWithDim) {
+  auto r = Parse("module m; enum logic [7:0] {A=0, B=255} x; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_NE(r.cu->modules[0]->items[0]->data_type.packed_dim_left, nullptr);
+}
+
+TEST(ParserA221, EnumBaseTypeIdentifier) {
+  // enum type_identifier { ... }
+  auto r = Parse(
+      "module m;\n"
+      "  typedef logic [3:0] nibble_t;\n"
+      "  enum nibble_t {A, B} x;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

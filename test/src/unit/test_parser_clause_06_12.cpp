@@ -278,3 +278,39 @@ TEST(ParserSection6, ShortrealInPort) {
               "  assign out_val = in_val;\n"
               "endmodule\n"));
 }
+struct ParseResult {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit *cu = nullptr;
+  bool has_errors = false;
+};
+
+ParseResult Parse(const std::string &src) {
+  ParseResult result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// --- non_integer_type ---
+// shortreal | real | realtime
+TEST(ParserA221, NonIntegerTypes) {
+  auto r = Parse(
+      "module m;\n"
+      "  shortreal a;\n"
+      "  real b;\n"
+      "  realtime c;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind,
+            DataTypeKind::kShortreal);
+  EXPECT_EQ(r.cu->modules[0]->items[1]->data_type.kind, DataTypeKind::kReal);
+  EXPECT_EQ(r.cu->modules[0]->items[2]->data_type.kind,
+            DataTypeKind::kRealtime);
+}
+

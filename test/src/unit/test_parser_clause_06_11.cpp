@@ -336,3 +336,49 @@ TEST(ParserSection6, StringInProcedural) {
               "  end\n"
               "endmodule\n"));
 }
+struct ParseResult {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit *cu = nullptr;
+  bool has_errors = false;
+};
+
+ParseResult Parse(const std::string &src) {
+  ParseResult result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// --- interface_class_type ---
+// ps_class_identifier [parameter_value_assignment]
+// (grammatically same as single class_type)
+// --- integer_type ---
+// integer_vector_type | integer_atom_type
+// --- integer_atom_type ---
+// byte | shortint | int | longint | integer | time
+TEST(ParserA221, IntegerAtomTypes) {
+  auto r = Parse(
+      "module m;\n"
+      "  byte a;\n"
+      "  shortint b;\n"
+      "  int c;\n"
+      "  longint d;\n"
+      "  integer e;\n"
+      "  time f;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kByte);
+  EXPECT_EQ(r.cu->modules[0]->items[1]->data_type.kind,
+            DataTypeKind::kShortint);
+  EXPECT_EQ(r.cu->modules[0]->items[2]->data_type.kind, DataTypeKind::kInt);
+  EXPECT_EQ(r.cu->modules[0]->items[3]->data_type.kind, DataTypeKind::kLongint);
+  EXPECT_EQ(r.cu->modules[0]->items[4]->data_type.kind, DataTypeKind::kInteger);
+  EXPECT_EQ(r.cu->modules[0]->items[5]->data_type.kind, DataTypeKind::kTime);
+}
+

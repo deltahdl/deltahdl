@@ -73,4 +73,33 @@ TEST(ParserClause03, Cl3_13_ClassScopeResolution) {
               "endmodule\n"));
 }
 
+struct ParseResult {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit *cu = nullptr;
+  bool has_errors = false;
+};
+
+ParseResult Parse(const std::string &src) {
+  ParseResult result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// class_type (ps_class_identifier [param] { :: class_identifier [param] })
+TEST(ParserA221, DataTypeClassType) {
+  auto r = Parse(
+      "class my_cls;\n"
+      "  typedef int my_type;\n"
+      "endclass\n"
+      "module m; my_cls::my_type x; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

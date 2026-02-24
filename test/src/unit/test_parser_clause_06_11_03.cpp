@@ -1,4 +1,4 @@
-// §6.6.8: Generic interconnect
+// §6.11.3: Signed and unsigned integer types
 
 #include <gtest/gtest.h>
 #include <string>
@@ -30,22 +30,21 @@ ParseResult Parse(const std::string &src) {
 
 namespace {
 
-TEST(ParserA213, NetDeclInterconnect) {
-  auto r = Parse("module m; interconnect net1; endmodule");
+// integer_atom_type [signing]
+TEST(ParserA221, DataTypeIntegerAtom) {
+  auto r = Parse("module m; int unsigned x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
-  EXPECT_TRUE(item->data_type.is_interconnect);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
+  EXPECT_FALSE(item->data_type.is_signed);
 }
 
-TEST(ParserA221, NetPortTypeInterconnect) {
-  // interconnect implicit_data_type
-  // Note: interconnect in ANSI port list requires port-parser extensions;
-  // tested here in module body per A.2.1.3 net_declaration form 3.
-  auto r = Parse("module m; interconnect [7:0] net1; endmodule");
+TEST(ParserA221, SigningUnsigned) {
+  auto r = Parse("module m; integer unsigned x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->modules[0]->items[0]->data_type.is_interconnect);
+  EXPECT_FALSE(r.cu->modules[0]->items[0]->data_type.is_signed);
 }
 
 }  // namespace

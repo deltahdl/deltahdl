@@ -274,4 +274,205 @@ TEST(ParserA213, TypedefStruct) {
   EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kStruct);
 }
 
+// --- data_type --- (12 alternatives)
+// integer_vector_type [signing] {packed_dimension}
+TEST(ParserA221, DataTypeIntegerVector) {
+  auto r = Parse("module m; logic signed [7:0] a; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
+  EXPECT_TRUE(item->data_type.is_signed);
+  EXPECT_NE(item->data_type.packed_dim_left, nullptr);
+}
+
+// struct_union [packed [signing]] { ... } {packed_dimension}
+TEST(ParserA221, DataTypeStructPacked) {
+  auto r = Parse(
+      "module m;\n"
+      "  struct packed signed { logic [7:0] a; logic [7:0] b; } pair;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kStruct);
+  EXPECT_TRUE(item->data_type.is_packed);
+  EXPECT_TRUE(item->data_type.is_signed);
+}
+
+// [class_scope | package_scope] type_identifier {packed_dimension}
+TEST(ParserA221, DataTypeScopedType) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  typedef int my_int_t;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import pkg::*;\n"
+      "  pkg::my_int_t x;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// --- data_type_or_implicit ---
+// data_type | implicit_data_type
+// --- implicit_data_type ---
+// [signing] {packed_dimension}
+TEST(ParserA221, ImplicitDataType) {
+  // Implicit data type with just packed dimension
+  auto r = Parse("module m(input [7:0] d); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto &port = r.cu->modules[0]->ports[0];
+  EXPECT_NE(port.data_type.packed_dim_left, nullptr);
+}
+
+TEST(ParserA221, ImplicitDataTypeSigned) {
+  // signed [7:0]
+  auto r = Parse("module m(input signed [7:0] d); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto &port = r.cu->modules[0]->ports[0];
+  EXPECT_TRUE(port.data_type.is_signed);
+}
+
+// --- enum_base_type ---
+// integer_atom_type [signing] | integer_vector_type [signing] [packed_dim]
+// | type_identifier [packed_dimension]
+TEST(ParserA221, EnumBaseAtomType) {
+  auto r = Parse("module m; enum int {A, B} x; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kEnum);
+}
+
+// --- enum_name_declaration ---
+// enum_id [ [ integral_number [ : integral_number ] ] ] [ = const_expr ]
+TEST(ParserA221, EnumNameBasic) {
+  auto r = Parse("module m; enum {RED, GREEN, BLUE} color; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.enum_members.size(), 3u);
+}
+
+TEST(ParserA221, EnumNameWithRangeColon) {
+  // enum_id [ integral_number : integral_number ]
+  auto r = Parse("module m; enum {A[0:3] = 10} x; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto &member = r.cu->modules[0]->items[0]->data_type.enum_members[0];
+  EXPECT_NE(member.range_start, nullptr);
+  EXPECT_NE(member.range_end, nullptr);
+  EXPECT_NE(member.value, nullptr);
+}
+
+// --- class_scope ---
+// class_type ::
+TEST(ParserA221, ClassScope) {
+  auto r = Parse(
+      "class base_cls;\n"
+      "  typedef int inner_t;\n"
+      "endclass\n"
+      "module m; base_cls::inner_t x; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// --- class_type ---
+// ps_class_identifier [param] { :: class_identifier [param] }
+TEST(ParserA221, ClassTypeParameterized) {
+  auto r = Parse(
+      "class param_cls #(type T = int);\n"
+      "  typedef T value_t;\n"
+      "endclass\n"
+      "module m; param_cls#(int)::value_t x; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// --- simple_type ---
+// integer_type | non_integer_type | ps_type_identifier |
+// ps_parameter_identifier (covered by casting_type and data_type tests above)
+// --- struct_union ---
+// struct | union [soft | tagged]
+TEST(ParserA221, StructUnionStruct) {
+  auto r = Parse(
+      "module m;\n"
+      "  struct { int a; int b; } s;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kStruct);
+}
+
+TEST(ParserA221, StructUnionUnionTagged) {
+  auto r = Parse(
+      "module m;\n"
+      "  union tagged { int a; real b; } u;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kUnion);
+  EXPECT_TRUE(item->data_type.is_tagged);
+}
+
+// --- struct_union_member ---
+// {attribute_instance} [random_qualifier] data_type_or_void
+//   list_of_variable_decl_assignments ;
+TEST(ParserA221, StructMemberBasic) {
+  auto r = Parse(
+      "module m;\n"
+      "  struct { logic [7:0] data; int count; } s;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto &members = r.cu->modules[0]->items[0]->data_type.struct_members;
+  EXPECT_EQ(members.size(), 2u);
+  EXPECT_EQ(members[0].name, "data");
+  EXPECT_EQ(members[1].name, "count");
+}
+
+TEST(ParserA221, StructMemberRand) {
+  // random_qualifier: rand
+  auto r = Parse(
+      "module m;\n"
+      "  struct { rand int a; int b; } s;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto &members = r.cu->modules[0]->items[0]->data_type.struct_members;
+  ASSERT_GE(members.size(), 2u);
+  EXPECT_TRUE(members[0].is_rand);
+  EXPECT_FALSE(members[1].is_rand);
+}
+
+TEST(ParserA221, StructMemberRandc) {
+  // random_qualifier: randc
+  auto r = Parse(
+      "module m;\n"
+      "  struct { randc bit [7:0] x; } s;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto &members = r.cu->modules[0]->items[0]->data_type.struct_members;
+  ASSERT_GE(members.size(), 1u);
+  EXPECT_TRUE(members[0].is_randc);
+}
+
+TEST(ParserA221, StructMemberAttr) {
+  // {attribute_instance} before struct member
+  auto r = Parse(
+      "module m;\n"
+      "  struct { (* mark *) int a; int b; } s;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto &members = r.cu->modules[0]->items[0]->data_type.struct_members;
+  ASSERT_GE(members.size(), 2u);
+  EXPECT_FALSE(members[0].attrs.empty());
+  EXPECT_TRUE(members[1].attrs.empty());
+}
+
 }  // namespace
