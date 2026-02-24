@@ -74351,4 +74351,72 @@ TEST(ParserSection28, Sec28_12_ConditionalFullPath) {
               "endmodule\n"));
 }
 
+// =============================================================================
+// §30.3 Path delay declarations
+// =============================================================================
+TEST_F(SpecifyTest, ParallelPathDelay) {
+  auto *cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  (a => b) = 5;\n"
+      "endspecify\n"
+      "endmodule\n");
+  ASSERT_EQ(cu->modules.size(), 1u);
+  auto *spec = FirstSpecifyBlock(cu);
+  ASSERT_NE(spec, nullptr);
+  ASSERT_EQ(spec->specify_items.size(), 1u);
+  auto *item = spec->specify_items[0];
+  EXPECT_EQ(item->kind, SpecifyItemKind::kPathDecl);
+  EXPECT_EQ(item->path.path_kind, SpecifyPathKind::kParallel);
+  ASSERT_EQ(item->path.src_ports.size(), 1u);
+  EXPECT_EQ(item->path.src_ports[0].name, "a");
+  ASSERT_EQ(item->path.dst_ports.size(), 1u);
+  EXPECT_EQ(item->path.dst_ports[0].name, "b");
+  ASSERT_EQ(item->path.delays.size(), 1u);
+}
+
+TEST_F(SpecifyTest, FullPathDelay) {
+  auto *cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  (a *> b) = 10;\n"
+      "endspecify\n"
+      "endmodule\n");
+  auto *spec = FirstSpecifyBlock(cu);
+  ASSERT_NE(spec, nullptr);
+  ASSERT_EQ(spec->specify_items.size(), 1u);
+  EXPECT_EQ(spec->specify_items[0]->path.path_kind, SpecifyPathKind::kFull);
+}
+
+// =============================================================================
+// §30.3.1 Edge-sensitive paths
+// =============================================================================
+TEST_F(SpecifyTest, PosedgePath) {
+  auto *cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  (posedge clk => q) = 10;\n"
+      "endspecify\n"
+      "endmodule\n");
+  auto *spec = FirstSpecifyBlock(cu);
+  ASSERT_NE(spec, nullptr);
+  ASSERT_EQ(spec->specify_items.size(), 1u);
+  auto *path = spec->specify_items[0];
+  EXPECT_EQ(path->path.edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(path->path.src_ports[0].name, "clk");
+  EXPECT_EQ(path->path.dst_ports[0].name, "q");
+}
+
+TEST_F(SpecifyTest, NegedgePath) {
+  auto *cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  (negedge clk => q) = 8;\n"
+      "endspecify\n"
+      "endmodule\n");
+  auto *spec = FirstSpecifyBlock(cu);
+  ASSERT_NE(spec, nullptr);
+  EXPECT_EQ(spec->specify_items[0]->path.edge, SpecifyEdge::kNegedge);
+}
+
 }  // namespace
