@@ -1,9 +1,7 @@
-// Tests for A.7.4 — Specify path delays — Simulation
+// §30.5.1: Specifying transition delays on module paths
 
 #include <gtest/gtest.h>
-
 #include <string>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -18,8 +16,6 @@
 #include "simulation/variable.h"
 
 using namespace delta;
-
-namespace {
 
 struct SimA704Fixture {
   SourceManager mgr;
@@ -38,12 +34,11 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA704Fixture &f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-}  // namespace
+namespace {
 
 // =============================================================================
 // A.7.4 Simulation — path delays do not interfere
 // =============================================================================
-
 // Module with 6-delay path simulates correctly
 TEST(SimA704, SixDelayPathSimulates) {
   SimA704Fixture f;
@@ -110,7 +105,6 @@ TEST(SimA704, MinTypMaxDelaySimulates) {
 // =============================================================================
 // A.7.4 Runtime PathDelay with delay_count
 // =============================================================================
-
 // PathDelay with delay_count=6 stores 6 transition delays
 TEST(SimA704, RuntimePathDelaySixDelays) {
   SpecifyManager mgr;
@@ -171,3 +165,5 @@ TEST(SimA704, RuntimePathDelaySingleDelay) {
 
   EXPECT_EQ(mgr.GetPathDelay("a", "b"), 10u);
 }
+
+}  // namespace
