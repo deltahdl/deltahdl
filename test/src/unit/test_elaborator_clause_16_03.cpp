@@ -1,7 +1,7 @@
+// §16.3: Immediate assertions
+
 #include <gtest/gtest.h>
-
 #include <string>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -11,8 +11,6 @@
 #include "parser/parser.h"
 
 using namespace delta;
-
-namespace {
 
 struct ElabA610Fixture {
   SourceManager mgr;
@@ -32,12 +30,11 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA610Fixture &f) {
   return design;
 }
 
-}  // namespace
+namespace {
 
 // =============================================================================
 // A.6.10 Assertion statements — Elaboration
 // =============================================================================
-
 // simple_immediate_assert_statement elaborates
 TEST(ElabA610, SimpleAssertElaborates) {
   ElabA610Fixture f;
@@ -74,30 +71,6 @@ TEST(ElabA610, SimpleCoverElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// deferred_immediate_assert_statement elaborates
-TEST(ElabA610, DeferredAssertElaborates) {
-  ElabA610Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  initial assert #0 (1);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-// concurrent assert property at module level elaborates
-TEST(ElabA610, AssertPropertyElaborates) {
-  ElabA610Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  assert property (1);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 // multiple assertion types in same module elaborate
 TEST(ElabA610, MixedAssertionsElaborate) {
   ElabA610Fixture f;
@@ -113,3 +86,5 @@ TEST(ElabA610, MixedAssertionsElaborate) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
+
+}  // namespace
