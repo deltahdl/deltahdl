@@ -64306,4 +64306,45 @@ TEST_F(CheckerParseTest, CheckerWithCovergroup) {
       HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kCovergroupDecl));
 }
 
+// =============================================================================
+// §17.4 Checker variables
+// =============================================================================
+TEST_F(CheckerParseTest, CheckerWithVariables) {
+  auto *unit = Parse(R"(
+    checker var_check;
+      logic a, b;
+      assign a = b;
+    endchecker
+  )");
+  ASSERT_EQ(unit->checkers.size(), 1u);
+  EXPECT_FALSE(unit->checkers[0]->items.empty());
+}
+
+TEST_F(CheckerParseTest, CheckerWithBitVector) {
+  auto *unit = Parse(R"(
+    checker bv_check;
+      logic [7:0] counter;
+    endchecker
+  )");
+  ASSERT_EQ(unit->checkers.size(), 1u);
+  EXPECT_FALSE(unit->checkers[0]->items.empty());
+}
+
+// checker_or_generate_item_declaration ::= [rand] data_declaration
+TEST(SourceText, CheckerRandDataDecl) {
+  auto r = Parse(
+      "checker chk;\n"
+      "  rand bit [3:0] val;\n"
+      "  logic [7:0] data;\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  ASSERT_GE(r.cu->checkers[0]->items.size(), 2u);
+  EXPECT_EQ(r.cu->checkers[0]->items[0]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_TRUE(r.cu->checkers[0]->items[0]->is_rand);
+  EXPECT_EQ(r.cu->checkers[0]->items[1]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_FALSE(r.cu->checkers[0]->items[1]->is_rand);
+}
+
 }  // namespace
