@@ -1,9 +1,7 @@
-// Tests for A.7.5 — System timing checks — Simulation
+// §31.3.1: $setup
 
 #include <gtest/gtest.h>
-
 #include <string>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -18,8 +16,6 @@
 #include "simulation/variable.h"
 
 using namespace delta;
-
-namespace {
 
 struct SimA705Fixture {
   SourceManager mgr;
@@ -38,12 +34,11 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA705Fixture &f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-}  // namespace
+namespace {
 
 // =============================================================================
 // A.7.5 Runtime — TimingCheckEntry kind for each system_timing_check type
 // =============================================================================
-
 // Runtime TimingCheckEntry correctly stores each of the 12 kinds
 TEST(SimA705, RuntimeTimingCheckEntrySetup) {
   SpecifyManager mgr;
@@ -57,46 +52,9 @@ TEST(SimA705, RuntimeTimingCheckEntrySetup) {
   EXPECT_EQ(mgr.GetTimingChecks()[0].kind, TimingCheckKind::kSetup);
 }
 
-TEST(SimA705, RuntimeTimingCheckEntryHold) {
-  SpecifyManager mgr;
-  TimingCheckEntry tc;
-  tc.kind = TimingCheckKind::kHold;
-  tc.ref_signal = "clk";
-  tc.data_signal = "data";
-  tc.limit = 5;
-  mgr.AddTimingCheck(tc);
-  EXPECT_EQ(mgr.GetTimingChecks()[0].kind, TimingCheckKind::kHold);
-}
-
-// All 12 kinds can be stored in SpecifyManager
-TEST(SimA705, RuntimeAllTwelveKinds) {
-  SpecifyManager mgr;
-  TimingCheckKind kinds[] = {
-      TimingCheckKind::kSetup,     TimingCheckKind::kHold,
-      TimingCheckKind::kSetuphold, TimingCheckKind::kRecovery,
-      TimingCheckKind::kRemoval,   TimingCheckKind::kRecrem,
-      TimingCheckKind::kSkew,      TimingCheckKind::kTimeskew,
-      TimingCheckKind::kFullskew,  TimingCheckKind::kPeriod,
-      TimingCheckKind::kWidth,     TimingCheckKind::kNochange,
-  };
-  for (auto kind : kinds) {
-    TimingCheckEntry tc;
-    tc.kind = kind;
-    tc.ref_signal = "clk";
-    tc.data_signal = "data";
-    tc.limit = 10;
-    mgr.AddTimingCheck(tc);
-  }
-  EXPECT_EQ(mgr.TimingCheckCount(), 12u);
-  for (uint32_t i = 0; i < 12; ++i) {
-    EXPECT_EQ(mgr.GetTimingChecks()[i].kind, kinds[i]);
-  }
-}
-
 // =============================================================================
 // A.7.5 End-to-end simulation — timing checks do not interfere
 // =============================================================================
-
 // Module with $setup timing check simulates correctly
 TEST(SimA705, SetupTimingCheckSimulates) {
   SimA705Fixture f;
@@ -116,29 +74,6 @@ TEST(SimA705, SetupTimingCheckSimulates) {
   auto *var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
-}
-
-// Module with multiple timing checks simulates correctly
-TEST(SimA705, MultipleTimingChecksSimulate) {
-  SimA705Fixture f;
-  auto *design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  specify\n"
-      "    $setup(d, posedge clk, 10);\n"
-      "    $hold(posedge clk, d, 5);\n"
-      "    $period(posedge clk, 50);\n"
-      "  endspecify\n"
-      "  initial x = 8'd99;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
 // Module with timing checks and path delays simulates correctly
@@ -162,3 +97,5 @@ TEST(SimA705, TimingChecksWithPathsSimulate) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
+
+}  // namespace
