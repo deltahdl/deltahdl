@@ -300,3 +300,14 @@ TEST(ParserClause03, Cl3_14_2_1_WhitespaceAroundSlash) {
   EXPECT_EQ(r2.timescale.precision, TimeUnit::kPs);
 }
 
+// 43. Delay conversion uses `timescale values.  A delay of 1 under
+// `timescale 10ns/1ns converts to 10 ticks at ns global precision.
+TEST(ParserClause03, Cl3_14_2_1_DelayConversionWithTimescale) {
+  auto r = Preprocess("`timescale 10ns / 1ns\n");
+  EXPECT_FALSE(r.has_errors);
+  // A delay of 3 in this timescale = 3 * 10ns = 30ns = 30 ticks at ns.
+  EXPECT_EQ(DelayToTicks(3, r.timescale, r.global_precision), 30u);
+  // Real delay 1.5 = 1.5 * 10ns = 15ns, rounded to 1ns step = 15 ticks.
+  EXPECT_EQ(RealDelayToTicks(1.5, r.timescale, r.global_precision), 15u);
+}
+
