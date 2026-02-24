@@ -59232,4 +59232,232 @@ TEST(ParserA28, BlockItemInTask) {
   EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kVarDecl);
 }
 
+TEST(Parser, FunctionDecl) {
+  auto r = Parse(
+      "module t;\n"
+      "  function int add(input int a, input int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(item->name, "add");
+  std::string expected[] = {"a", "b"};
+  ASSERT_EQ(item->func_args.size(), std::size(expected));
+  for (size_t i = 0; i < std::size(expected); ++i) {
+    EXPECT_EQ(item->func_args[i].name, expected[i]) << "arg " << i;
+  }
+}
+
+// 29. Function with local variables creating subscope
+TEST(ParserClause03, Cl3_13_FunctionWithLocalVarsSubscope) {
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int compute(int a, int b);\n"
+      "    int temp;\n"
+      "    temp = a + b;\n"
+      "    return temp;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *mod = r.cu->modules[0];
+  ASSERT_GE(mod->items.size(), 1u);
+  auto *func = mod->items[0];
+  EXPECT_EQ(func->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(func->name, "compute");
+  // The function should have body statements (local var + assign + return).
+  EXPECT_FALSE(func->func_body_stmts.empty());
+}
+
+TEST(ParserA23, ListOfTfVariableIdentifiersThree) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int sum3;\n"
+      "    input int x, y, z;\n"
+      "    sum3 = x + y + z;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->func_args.size(), 3u);
+  EXPECT_EQ(item->func_args[0].name, "x");
+  EXPECT_EQ(item->func_args[1].name, "y");
+  EXPECT_EQ(item->func_args[2].name, "z");
+}
+
+TEST(ParserA26, FuncReturnTypeImplicit) {
+  auto r =
+      Parse("module m;\n  function foo(); return 1; endfunction\nendmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(item->return_type.kind, DataTypeKind::kImplicit);
+}
+
+TEST(ParserA26, FuncReturnTypeImplicitSigned) {
+  auto r = Parse(
+      "module m;\n  function signed [7:0] foo();\n"
+      "    return 0;\n  endfunction\nendmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_TRUE(item->return_type.is_signed);
+}
+
+// ---------------------------------------------------------------------------
+// function_body_declaration (new-style ports)
+// ---------------------------------------------------------------------------
+TEST(ParserA26, FuncBodyNewStyleEmptyPorts) {
+  auto r =
+      Parse("module m;\n  function void foo();\n  endfunction\nendmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_TRUE(item->func_args.empty());
+}
+
+TEST(ParserA26, FuncBodyNewStyleWithArgs) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int add(input int a, input int b);\n"
+      "    return a + b;\n"
+      "  endfunction\nendmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->func_args.size(), 2u);
+  EXPECT_EQ(item->func_args[0].name, "a");
+  EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
+  EXPECT_EQ(item->func_args[1].name, "b");
+}
+
+TEST(ParserA26, FuncBodyNewStyleMultipleDirections) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void xfer(input int a, output int b, inout int c, ref int "
+      "d);\n"
+      "  endfunction\nendmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->func_args.size(), 4u);
+  EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
+  EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
+  EXPECT_EQ(item->func_args[2].direction, Direction::kInout);
+  EXPECT_EQ(item->func_args[3].direction, Direction::kRef);
+}
+
+TEST(ParserA26, FuncBodyNewStyleStickyDirection) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void foo(input int a, int b, int c);\n"
+      "  endfunction\nendmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->func_args.size(), 3u);
+  EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
+  EXPECT_EQ(item->func_args[1].direction, Direction::kInput);
+  EXPECT_EQ(item->func_args[2].direction, Direction::kInput);
+}
+
+TEST(ParserA26, FuncBodyWithBlockItemDecl) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int foo(input int x);\n"
+      "    int temp;\n"
+      "    temp = x + 1;\n"
+      "    return temp;\n"
+      "  endfunction\nendmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_GE(item->func_body_stmts.size(), 1u);
+}
+
+TEST(ParserA26, FuncBodyWithEndLabel) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void foo();\n"
+      "  endfunction : foo\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->name, "foo");
+}
+
+TEST(ParserA26, FuncBodyOldStyleOutputPort) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void xfer;\n"
+      "    input int a;\n"
+      "    output int b;\n"
+      "    b = a;\n"
+      "  endfunction\nendmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->func_args.size(), 2u);
+  EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
+}
+
+// ---------------------------------------------------------------------------
+// function_prototype ::=
+//   function [ dynamic_override_specifiers ] data_type_or_void
+//     function_identifier [ ( [ tf_port_list ] ) ]
+// ---------------------------------------------------------------------------
+TEST(ParserA26, FuncPrototypeExtern) {
+  auto r = Parse(
+      "module m;\n"
+      "  extern function int foo(input int x);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_TRUE(item->is_extern);
+  EXPECT_EQ(item->name, "foo");
+  EXPECT_EQ(item->return_type.kind, DataTypeKind::kInt);
+}
+
+// ---------------------------------------------------------------------------
+// function_body_declaration: argument unpacked dimensions (§13.4)
+// ---------------------------------------------------------------------------
+TEST(ParserA26, FuncArgUnpackedDim) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void foo(input int arr [4]);\n"
+      "  endfunction\nendmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->func_args.size(), 1u);
+  EXPECT_EQ(item->func_args[0].unpacked_dims.size(), 1u);
+}
+
+// block_item_declaration in function body (§13.4)
+TEST(ParserA28, BlockItemInFunction) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int foo(input int x);\n"
+      "    int temp;\n"
+      "    temp = x + 1;\n"
+      "    return temp;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
+  ASSERT_GE(item->func_body_stmts.size(), 1u);
+  EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kVarDecl);
+}
+
 }  // namespace
