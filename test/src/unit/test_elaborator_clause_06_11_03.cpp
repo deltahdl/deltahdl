@@ -1,7 +1,6 @@
-// §6.8
+// §6.11.3: Signed and unsigned integer types
 
 #include <gtest/gtest.h>
-
 #include "elaboration/type_eval.h"
 #include "parser/ast.h"
 
