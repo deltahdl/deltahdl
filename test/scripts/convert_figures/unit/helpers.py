@@ -3,6 +3,18 @@
 from convert_figures._models import Edge, Figure, Node
 
 
+def mock_text_block(text, x0, y0, x1, y1):
+    """Build a text-block dict matching pymupdf get_text('dict') format."""
+    return {
+        "type": 0,
+        "bbox": (x0, y0, x1, y1),
+        "lines": [{
+            "bbox": (x0, y0, x1, y1),
+            "spans": [{"text": text, "bbox": (x0, y0, x1, y1)}],
+        }],
+    }
+
+
 def make_node(
     node_id="region_Active",
     label="region: Active",

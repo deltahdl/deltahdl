@@ -2,10 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 import convert_figures._pdf as pdf_mod
-from convert_figures._models import Edge
+from helpers import mock_text_block
 
 _find_figure_bounds = getattr(pdf_mod, "_find_figure_bounds")
 _text_blocks_to_nodes = getattr(pdf_mod, "_text_blocks_to_nodes")
@@ -24,10 +22,11 @@ _build_node_positions = getattr(pdf_mod, "_build_node_positions")
 
 def _mock_doc(pages_text):
     """Build a mock fitz.Document from a dict of {page_idx: text}."""
+    page_count = max(pages_text) + 1 if pages_text else 0
     doc = MagicMock()
-    doc.__len__ = lambda self: max(pages_text) + 1 if pages_text else 0
+    doc.__len__ = lambda _self: page_count
 
-    def getitem(self, idx):
+    def getitem(_self, idx):
         page = MagicMock()
         page.get_text.return_value = pages_text.get(idx, "")
         page.rect = MagicMock()
@@ -39,24 +38,12 @@ def _mock_doc(pages_text):
 
     doc.__getitem__ = getitem
 
-    def doc_iter(self):
-        for i in range(len(self)):
-            yield self[i]
+    def doc_iter(_self):
+        for i in range(page_count):
+            yield _self[i]
 
     doc.__iter__ = doc_iter
     return doc
-
-
-def _mock_text_block(text, x0, y0, x1, y1):
-    """Build a text-block dict matching pymupdf get_text('dict') format."""
-    return {
-        "type": 0,
-        "bbox": (x0, y0, x1, y1),
-        "lines": [{
-            "bbox": (x0, y0, x1, y1),
-            "spans": [{"text": text, "bbox": (x0, y0, x1, y1)}],
-        }],
-    }
 
 
 # ---- open_document ---------------------------------------------------------
@@ -84,7 +71,7 @@ def test_find_clause_pages_single_match():
 def test_find_clause_pages_no_match():
     """find_clause_pages returns empty list when clause is absent."""
     doc = _mock_doc({0: "No matching clause here."})
-    assert pdf_mod.find_clause_pages(doc, "99.1") == []
+    assert not pdf_mod.find_clause_pages(doc, "99.1")
 
 
 def test_find_clause_pages_multiple_pages():
@@ -99,7 +86,7 @@ def test_find_clause_pages_multiple_pages():
 def test_find_clause_pages_ignores_substring():
     """find_clause_pages does not match '4.4' inside '4.4.3'."""
     doc = _mock_doc({0: "4.4.3 PLI regions"})
-    assert pdf_mod.find_clause_pages(doc, "4.4") == []
+    assert not pdf_mod.find_clause_pages(doc, "4.4")
 
 
 # ---- find_figure_captions --------------------------------------------------
@@ -108,7 +95,7 @@ def test_find_clause_pages_ignores_substring():
 def test_find_figure_captions_found():
     """find_figure_captions returns figure data when caption is present."""
     page = MagicMock()
-    blocks = [_mock_text_block(
+    blocks = [mock_text_block(
         "Figure 4-1\u2014Event scheduling regions",
         200, 690, 400, 700,
     )]
@@ -129,7 +116,7 @@ def test_find_figure_captions_extracts_number():
         x0=200, y0=690, x1=400, y1=700,
     )]
     page.get_text.return_value = {
-        "blocks": [_mock_text_block(
+        "blocks": [mock_text_block(
             "Figure 4-1\u2014Title", 200, 690, 400, 700,
         )],
     }
@@ -146,7 +133,7 @@ def test_find_figure_captions_extracts_title():
         x0=200, y0=690, x1=400, y1=700,
     )]
     page.get_text.return_value = {
-        "blocks": [_mock_text_block(
+        "blocks": [mock_text_block(
             "Figure 4-1\u2014Event scheduling regions",
             200, 690, 400, 700,
         )],
@@ -164,7 +151,7 @@ def test_find_figure_captions_no_figure():
     page.get_text.return_value = {"blocks": []}
     doc = MagicMock()
     doc.__getitem__ = lambda self, idx: page
-    assert pdf_mod.find_figure_captions(doc, [0], "99") == []
+    assert not pdf_mod.find_figure_captions(doc, [0], "99")
 
 
 # ---- _find_figure_bounds ---------------------------------------------------
@@ -200,8 +187,8 @@ def test_find_figure_bounds_bottom_at_caption():
 def test_text_blocks_to_nodes_extracts_labels():
     """_text_blocks_to_nodes extracts node labels from text blocks."""
     blocks = [
-        _mock_text_block("Active", 307, 208, 332, 218),
-        _mock_text_block("Inactive", 303, 251, 335, 261),
+        mock_text_block("Active", 307, 208, 332, 218),
+        mock_text_block("Inactive", 303, 251, 335, 261),
     ]
     bounds = (0, 100, 600, 700)
     nodes = _text_blocks_to_nodes(blocks, bounds)
@@ -210,14 +197,14 @@ def test_text_blocks_to_nodes_extracts_labels():
 
 def test_text_blocks_to_nodes_sets_label():
     """_text_blocks_to_nodes preserves the label text."""
-    blocks = [_mock_text_block("Pre-Active", 298, 165, 340, 175)]
+    blocks = [mock_text_block("Pre-Active", 298, 165, 340, 175)]
     nodes = _text_blocks_to_nodes(blocks, (0, 100, 600, 700))
     assert nodes[0].label == "Pre-Active"
 
 
 def test_text_blocks_to_nodes_sets_node_id():
     """_text_blocks_to_nodes derives node_id from label."""
-    blocks = [_mock_text_block("Pre-Active", 298, 165, 340, 175)]
+    blocks = [mock_text_block("Pre-Active", 298, 165, 340, 175)]
     nodes = _text_blocks_to_nodes(blocks, (0, 100, 600, 700))
     assert nodes[0].node_id == "PreActive"
 
@@ -225,8 +212,8 @@ def test_text_blocks_to_nodes_sets_node_id():
 def test_text_blocks_to_nodes_filters_outside_bounds():
     """_text_blocks_to_nodes ignores text outside the figure bounds."""
     blocks = [
-        _mock_text_block("Active", 307, 208, 332, 218),
-        _mock_text_block("Page header", 100, 30, 400, 40),
+        mock_text_block("Active", 307, 208, 332, 218),
+        mock_text_block("Page header", 100, 30, 400, 40),
     ]
     bounds = (0, 100, 600, 700)
     nodes = _text_blocks_to_nodes(blocks, bounds)
@@ -236,8 +223,8 @@ def test_text_blocks_to_nodes_filters_outside_bounds():
 def test_text_blocks_to_nodes_filters_caption():
     """_text_blocks_to_nodes ignores lines starting with 'Figure'."""
     blocks = [
-        _mock_text_block("Active", 307, 208, 332, 218),
-        _mock_text_block("Figure 4-1\u2014Title", 200, 690, 400, 700),
+        mock_text_block("Active", 307, 208, 332, 218),
+        mock_text_block("Figure 4-1\u2014Title", 200, 690, 400, 700),
     ]
     bounds = (0, 100, 600, 750)
     nodes = _text_blocks_to_nodes(blocks, bounds)
@@ -247,8 +234,8 @@ def test_text_blocks_to_nodes_filters_caption():
 def test_text_blocks_to_nodes_filters_legend():
     """_text_blocks_to_nodes ignores 'Legend:' text."""
     blocks = [
-        _mock_text_block("Active", 307, 208, 332, 218),
-        _mock_text_block("Legend:", 139, 256, 175, 267),
+        mock_text_block("Active", 307, 208, 332, 218),
+        mock_text_block("Legend:", 139, 256, 175, 267),
     ]
     bounds = (0, 100, 600, 700)
     nodes = _text_blocks_to_nodes(blocks, bounds)
@@ -317,8 +304,8 @@ def test_extract_figure_returns_figure():
     page = MagicMock()
     page.get_text.return_value = {
         "blocks": [
-            _mock_text_block("Active", 307, 208, 332, 218),
-            _mock_text_block("Inactive", 303, 251, 335, 261),
+            mock_text_block("Active", 307, 208, 332, 218),
+            mock_text_block("Inactive", 303, 251, 335, 261),
         ],
     }
     page.get_drawings.return_value = []
@@ -337,7 +324,7 @@ def test_extract_figure_has_nodes():
     page = MagicMock()
     page.get_text.return_value = {
         "blocks": [
-            _mock_text_block("Active", 307, 208, 332, 218),
+            mock_text_block("Active", 307, 208, 332, 218),
         ],
     }
     page.get_drawings.return_value = []
@@ -355,7 +342,7 @@ def test_extract_figure_graph_name():
     """extract_figure sets graph_name from the figure number."""
     page = MagicMock()
     page.get_text.return_value = {
-        "blocks": [_mock_text_block("A", 300, 200, 340, 210)],
+        "blocks": [mock_text_block("A", 300, 200, 340, 210)],
     }
     page.get_drawings.return_value = []
     page.rect = MagicMock(x0=0, y0=0, x1=612, y1=792)
@@ -374,8 +361,8 @@ def test_extract_figure_graph_name():
 def test_text_blocks_to_nodes_filters_time_slot():
     """_text_blocks_to_nodes ignores 'time slot' text."""
     blocks = [
-        _mock_text_block("Active", 307, 208, 332, 218),
-        _mock_text_block("from previous time slot", 147, 103, 201, 113),
+        mock_text_block("Active", 307, 208, 332, 218),
+        mock_text_block("from previous time slot", 147, 103, 201, 113),
     ]
     bounds = (0, 100, 600, 700)
     nodes = _text_blocks_to_nodes(blocks, bounds)
@@ -386,7 +373,7 @@ def test_text_blocks_to_nodes_skips_image_blocks():
     """_text_blocks_to_nodes skips non-text (image) blocks."""
     blocks = [
         {"type": 1, "bbox": (0, 0, 100, 100)},
-        _mock_text_block("Active", 307, 208, 332, 218),
+        mock_text_block("Active", 307, 208, 332, 218),
     ]
     bounds = (0, 100, 600, 700)
     nodes = _text_blocks_to_nodes(blocks, bounds)
@@ -396,8 +383,8 @@ def test_text_blocks_to_nodes_skips_image_blocks():
 def test_text_blocks_to_nodes_skips_empty_text():
     """_text_blocks_to_nodes skips empty text."""
     blocks = [
-        _mock_text_block("", 307, 208, 332, 218),
-        _mock_text_block("Active", 307, 250, 332, 260),
+        mock_text_block("", 307, 208, 332, 218),
+        mock_text_block("Active", 307, 250, 332, 260),
     ]
     bounds = (0, 100, 600, 700)
     nodes = _text_blocks_to_nodes(blocks, bounds)
@@ -407,9 +394,9 @@ def test_text_blocks_to_nodes_skips_empty_text():
 def test_text_blocks_to_nodes_filters_skip_labels():
     """_text_blocks_to_nodes ignores 'region' and 'PLI region' text."""
     blocks = [
-        _mock_text_block("Active", 307, 208, 332, 218),
-        _mock_text_block("region", 167, 286, 192, 296),
-        _mock_text_block("PLI region", 159, 318, 200, 328),
+        mock_text_block("Active", 307, 208, 332, 218),
+        mock_text_block("region", 167, 286, 192, 296),
+        mock_text_block("PLI region", 159, 318, 200, 328),
     ]
     bounds = (0, 100, 600, 700)
     nodes = _text_blocks_to_nodes(blocks, bounds)
@@ -478,21 +465,21 @@ def test_extract_stems_ignores_no_rect_item():
         "items": [("l", (0, 0), (1, 1))],
         "fill": (0, 0, 0),
     }
-    stems, arrowheads = _extract_stems_and_arrowheads([drawing])
+    stems, _ = _extract_stems_and_arrowheads([drawing])
     assert len(stems) == 0
 
 
 def test_extract_stems_ignores_no_fill():
     """_extract_stems_and_arrowheads skips drawings without fill."""
     drawing = _make_rect_drawing(317.0, 155.0, 319.0, 156.0, None)
-    stems, arrowheads = _extract_stems_and_arrowheads([drawing])
+    _, arrowheads = _extract_stems_and_arrowheads([drawing])
     assert len(arrowheads) == 0
 
 
 def test_extract_stems_ignores_no_rect():
     """_extract_stems_and_arrowheads skips drawings without rect."""
     drawing = {"items": [("re", (0, 0, 1, 1))], "fill": (0, 0, 0)}
-    stems, arrowheads = _extract_stems_and_arrowheads([drawing])
+    stems, _ = _extract_stems_and_arrowheads([drawing])
     assert len(stems) == 0
 
 
@@ -541,7 +528,7 @@ def test_find_figure_captions_skips_non_text_blocks():
     page.get_text.return_value = {
         "blocks": [
             {"type": 1, "bbox": (0, 0, 100, 100)},
-            _mock_text_block(
+            mock_text_block(
                 "Figure 4-1\u2014Title", 200, 690, 400, 700,
             ),
         ],
@@ -560,8 +547,8 @@ def test_find_figure_captions_skips_non_matching_text():
     )]
     page.get_text.return_value = {
         "blocks": [
-            _mock_text_block("Some random text", 200, 200, 400, 210),
-            _mock_text_block(
+            mock_text_block("Some random text", 200, 200, 400, 210),
+            mock_text_block(
                 "Figure 4-1\u2014Title", 200, 690, 400, 700,
             ),
         ],
@@ -591,7 +578,7 @@ def test_extract_figure_skips_image_block_in_positions():
     page = MagicMock()
     page.get_text.return_value = {
         "blocks": [
-            _mock_text_block("Active", 307, 208, 332, 218),
+            mock_text_block("Active", 307, 208, 332, 218),
             {"type": 1, "bbox": (0, 0, 100, 100)},
         ],
     }
@@ -611,8 +598,8 @@ def test_extract_figure_non_node_text_not_in_positions():
     page = MagicMock()
     page.get_text.return_value = {
         "blocks": [
-            _mock_text_block("Active", 307, 208, 332, 218),
-            _mock_text_block("Legend:", 139, 256, 175, 267),
+            mock_text_block("Active", 307, 208, 332, 218),
+            mock_text_block("Legend:", 139, 256, 175, 267),
         ],
     }
     page.get_drawings.return_value = []

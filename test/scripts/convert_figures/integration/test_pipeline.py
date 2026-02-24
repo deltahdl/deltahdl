@@ -3,7 +3,6 @@
 from unittest.mock import MagicMock
 
 from convert_figures._dot import generate_dot
-from convert_figures._models import Edge, Figure, Node
 from convert_figures._pdf import extract_figure
 
 
@@ -14,14 +13,10 @@ def _mock_page(text_blocks, drawings=None):
     """Build a mock fitz.Page with text blocks and optional drawings."""
     blocks = []
     for text, x0, y0, x1, y1 in text_blocks:
-        blocks.append({
-            "type": 0,
-            "bbox": (x0, y0, x1, y1),
-            "lines": [{
-                "bbox": (x0, y0, x1, y1),
-                "spans": [{"text": text, "bbox": (x0, y0, x1, y1)}],
-            }],
-        })
+        bbox = (x0, y0, x1, y1)
+        span = {"text": text, "bbox": bbox}
+        line = {"bbox": bbox, "spans": [span]}
+        blocks.append({"type": 0, "bbox": bbox, "lines": [line]})
     page = MagicMock()
     page.get_text.return_value = {"blocks": blocks}
     page.get_drawings.return_value = drawings or []

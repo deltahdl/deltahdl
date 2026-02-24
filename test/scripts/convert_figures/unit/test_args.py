@@ -1,14 +1,12 @@
 """Unit tests for argument parsing and orchestration in convert_figures."""
 
-import sys
-from io import StringIO
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 import convert_figures
 import convert_figures._pdf as pdf_mod
-from convert_figures._models import Edge, Figure, Node
+from convert_figures._models import Figure, Node
 
 _run = getattr(convert_figures, "_run")
 
@@ -128,7 +126,7 @@ def test_run_prints_dot_to_stdout(tmp_path, monkeypatch, capsys):
         lambda page, figure_number, figure_title, caption_y: fig,
     )
 
-    def getitem(self, idx):
+    def getitem(_self, _idx):
         return mock_page
 
     type(mock_doc).__getitem__ = getitem
