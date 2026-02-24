@@ -1,4 +1,4 @@
-// §6.3.2.1: Charge strength
+// §10.3.4: Continuous assignment strengths
 
 #include <gtest/gtest.h>
 #include <string>
@@ -30,35 +30,20 @@ ParseResult Parse(const std::string &src) {
 
 namespace {
 
-TEST(ParserA213, NetDeclTriregChargeStrength) {
-  auto r = Parse("module m; trireg (medium) net1; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ParserA222, ChargeStrengthMedium) {
-  // trireg (medium)
+// --- Drive strength in continuous assign context ---
+TEST(ParserA222, DriveStrengthContinuousAssign) {
+  // drive_strength used with assign statement
   auto r = Parse(
       "module m;\n"
-      "  trireg (medium) t;\n"
+      "  wire w;\n"
+      "  assign (strong0, pull1) w = 1'b1;\n"
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->data_type.charge_strength, 2u);
-}
-
-// --- Charge strength only on trireg ---
-TEST(ParserA222, ChargeStrengthNoSpecDefault) {
-  // trireg without charge_strength
-  auto r = Parse(
-      "module m;\n"
-      "  trireg t;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->data_type.charge_strength, 0u);
+  auto *item = r.cu->modules[0]->items[1];
+  EXPECT_EQ(item->kind, ModuleItemKind::kContAssign);
+  EXPECT_EQ(item->drive_strength0, 4u);  // strong0 = 4
+  EXPECT_EQ(item->drive_strength1, 3u);  // pull1 = 3
 }
 
 }  // namespace

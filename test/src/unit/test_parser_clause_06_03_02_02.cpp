@@ -1,4 +1,4 @@
-// §6.3.2.1: Charge strength
+// §6.3.2.2: Drive strength
 
 #include <gtest/gtest.h>
 #include <string>
@@ -30,35 +30,17 @@ ParseResult Parse(const std::string &src) {
 
 namespace {
 
-TEST(ParserA213, NetDeclTriregChargeStrength) {
-  auto r = Parse("module m; trireg (medium) net1; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ParserA222, ChargeStrengthMedium) {
-  // trireg (medium)
+TEST(ParserA222, DriveStrengthStr1Highz0) {
+  // ( strength1 , highz0 ): (strong1, highz0)
   auto r = Parse(
       "module m;\n"
-      "  trireg (medium) t;\n"
+      "  wire (strong1, highz0) w;\n"
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->data_type.charge_strength, 2u);
-}
-
-// --- Charge strength only on trireg ---
-TEST(ParserA222, ChargeStrengthNoSpecDefault) {
-  // trireg without charge_strength
-  auto r = Parse(
-      "module m;\n"
-      "  trireg t;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->data_type.charge_strength, 0u);
+  EXPECT_EQ(item->drive_strength0, 1u);  // highz0 = 1
+  EXPECT_EQ(item->drive_strength1, 4u);  // strong1 = 4
 }
 
 }  // namespace

@@ -83,4 +83,31 @@ TEST(ParserA213, NetDeclMultipleAssign) {
   EXPECT_GE(count, 3);
 }
 
+// --- Drive strength on different net types ---
+TEST(ParserA222, DriveStrengthOnTri) {
+  // drive_strength works on tri nets (not just wire)
+  auto r = Parse(
+      "module m;\n"
+      "  tri (strong0, strong1) t;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->drive_strength0, 4u);
+  EXPECT_EQ(item->drive_strength1, 4u);
+}
+
+TEST(ParserA222, DriveStrengthOnWand) {
+  // drive_strength works on wand nets
+  auto r = Parse(
+      "module m;\n"
+      "  wand (pull0, pull1) w;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->drive_strength0, 3u);  // pull0
+  EXPECT_EQ(item->drive_strength1, 3u);  // pull1
+}
+
 }  // namespace

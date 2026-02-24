@@ -70,3 +70,20 @@ TEST(ParserSection28, AllNInputGates) {
     EXPECT_EQ(mod->items[i]->gate_kind, expected[i]);
   }
 }
+// --- Drive strength in gate instantiation context ---
+TEST(ParserA222, DriveStrengthGateInst) {
+  // drive_strength used with gate instantiation
+  auto r = Parse(
+      "module m;\n"
+      "  wire y, a, b;\n"
+      "  and (supply0, supply1) g1(y, a, b);\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  // wire y, a, b creates 3 items; gate is at index 3
+  auto *item = r.cu->modules[0]->items[3];
+  EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
+  EXPECT_EQ(item->drive_strength0, 5u);  // supply0 = 5
+  EXPECT_EQ(item->drive_strength1, 5u);  // supply1 = 5
+}
+

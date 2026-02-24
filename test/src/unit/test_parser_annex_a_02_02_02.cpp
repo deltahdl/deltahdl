@@ -1,7 +1,7 @@
+// Annex A.2.2.2: Strengths
+
 #include <gtest/gtest.h>
-
 #include <string>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -9,8 +9,6 @@
 #include "parser/parser.h"
 
 using namespace delta;
-
-namespace {
 
 struct ParseResult {
   SourceManager mgr;
@@ -30,17 +28,15 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-}  // namespace
+namespace {
 
 // =============================================================================
 // A.2.2.2 Strengths
 // =============================================================================
-
 // --- drive_strength ---
 // ( strength0 , strength1 ) | ( strength1 , strength0 )
 // | ( strength0 , highz1 ) | ( strength1 , highz0 )
 // | ( highz0 , strength1 ) | ( highz1 , strength0 )
-
 TEST(ParserA222, DriveStrengthStr0Str1) {
   // ( strength0 , strength1 ): (strong0, weak1)
   auto r = Parse(
@@ -80,19 +76,6 @@ TEST(ParserA222, DriveStrengthStr0Highz1) {
   EXPECT_EQ(item->drive_strength1, 1u);  // highz1 = 1
 }
 
-TEST(ParserA222, DriveStrengthStr1Highz0) {
-  // ( strength1 , highz0 ): (strong1, highz0)
-  auto r = Parse(
-      "module m;\n"
-      "  wire (strong1, highz0) w;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->drive_strength0, 1u);  // highz0 = 1
-  EXPECT_EQ(item->drive_strength1, 4u);  // strong1 = 4
-}
-
 TEST(ParserA222, DriveStrengthHighz0Str1) {
   // ( highz0 , strength1 ): (highz0, supply1)
   auto r = Parse(
@@ -119,44 +102,8 @@ TEST(ParserA222, DriveStrengthHighz1Str0) {
   EXPECT_EQ(item->drive_strength1, 1u);  // highz1 = 1
 }
 
-// --- Drive strength in continuous assign context ---
-
-TEST(ParserA222, DriveStrengthContinuousAssign) {
-  // drive_strength used with assign statement
-  auto r = Parse(
-      "module m;\n"
-      "  wire w;\n"
-      "  assign (strong0, pull1) w = 1'b1;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[1];
-  EXPECT_EQ(item->kind, ModuleItemKind::kContAssign);
-  EXPECT_EQ(item->drive_strength0, 4u);  // strong0 = 4
-  EXPECT_EQ(item->drive_strength1, 3u);  // pull1 = 3
-}
-
-// --- Drive strength in gate instantiation context ---
-
-TEST(ParserA222, DriveStrengthGateInst) {
-  // drive_strength used with gate instantiation
-  auto r = Parse(
-      "module m;\n"
-      "  wire y, a, b;\n"
-      "  and (supply0, supply1) g1(y, a, b);\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  // wire y, a, b creates 3 items; gate is at index 3
-  auto *item = r.cu->modules[0]->items[3];
-  EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
-  EXPECT_EQ(item->drive_strength0, 5u);  // supply0 = 5
-  EXPECT_EQ(item->drive_strength1, 5u);  // supply1 = 5
-}
-
 // --- strength0 ---
 // supply0 | strong0 | pull0 | weak0
-
 TEST(ParserA222, Strength0AllKeywords) {
   // Verify all 4 strength0 keywords parse and map to correct values
   const struct {
@@ -181,7 +128,6 @@ TEST(ParserA222, Strength0AllKeywords) {
 
 // --- strength1 ---
 // supply1 | strong1 | pull1 | weak1
-
 TEST(ParserA222, Strength1AllKeywords) {
   // Verify all 4 strength1 keywords parse and map to correct values
   const struct {
@@ -206,7 +152,6 @@ TEST(ParserA222, Strength1AllKeywords) {
 
 // --- charge_strength ---
 // ( small ) | ( medium ) | ( large )
-
 TEST(ParserA222, ChargeStrengthSmall) {
   // trireg (small)
   auto r = Parse(
@@ -217,18 +162,6 @@ TEST(ParserA222, ChargeStrengthSmall) {
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->data_type.charge_strength, 1u);
-}
-
-TEST(ParserA222, ChargeStrengthMedium) {
-  // trireg (medium)
-  auto r = Parse(
-      "module m;\n"
-      "  trireg (medium) t;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->data_type.charge_strength, 2u);
 }
 
 TEST(ParserA222, ChargeStrengthLarge) {
@@ -244,7 +177,6 @@ TEST(ParserA222, ChargeStrengthLarge) {
 }
 
 // --- Strength value encoding verification ---
-
 TEST(ParserA222, StrengthValueEncoding) {
   // Verify the full strength encoding: highz=1, weak=2, pull=3, strong=4,
   // supply=5 for both strength0 and strength1
@@ -263,36 +195,7 @@ TEST(ParserA222, StrengthValueEncoding) {
   EXPECT_EQ(w2->drive_strength1, 5u);  // supply1
 }
 
-// --- Drive strength on different net types ---
-
-TEST(ParserA222, DriveStrengthOnTri) {
-  // drive_strength works on tri nets (not just wire)
-  auto r = Parse(
-      "module m;\n"
-      "  tri (strong0, strong1) t;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->drive_strength0, 4u);
-  EXPECT_EQ(item->drive_strength1, 4u);
-}
-
-TEST(ParserA222, DriveStrengthOnWand) {
-  // drive_strength works on wand nets
-  auto r = Parse(
-      "module m;\n"
-      "  wand (pull0, pull1) w;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->drive_strength0, 3u);  // pull0
-  EXPECT_EQ(item->drive_strength1, 3u);  // pull1
-}
-
 // --- No drive strength (default) ---
-
 TEST(ParserA222, NoDriveStrengthDefault) {
   // When no drive_strength specified, both should be 0 (none)
   auto r = Parse(
@@ -306,16 +209,4 @@ TEST(ParserA222, NoDriveStrengthDefault) {
   EXPECT_EQ(item->drive_strength1, 0u);
 }
 
-// --- Charge strength only on trireg ---
-
-TEST(ParserA222, ChargeStrengthNoSpecDefault) {
-  // trireg without charge_strength
-  auto r = Parse(
-      "module m;\n"
-      "  trireg t;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->data_type.charge_strength, 0u);
-}
+}  // namespace
