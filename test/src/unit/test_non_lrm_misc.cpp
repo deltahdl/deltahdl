@@ -43465,4 +43465,18 @@ TEST(Parser, WaitStatement) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
+TEST(Parser, DisableStatement) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    disable blk;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto *stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDisable);
+  EXPECT_NE(stmt->expr, nullptr);
+}
+
 }  // namespace
