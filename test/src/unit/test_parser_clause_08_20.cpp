@@ -94,4 +94,49 @@ TEST(ParserA26, FuncDynamicOverrideExtendsFinal) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ParserA27, TaskDynamicOverrideInitial) {
+  auto r = Parse(
+      "class C;\n"
+      "  virtual task :initial my_task(); endtask\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserA27, TaskDynamicOverrideExtends) {
+  auto r = Parse(
+      "class C;\n"
+      "  virtual task :extends my_task(); endtask\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserA27, TaskDynamicOverrideFinal) {
+  auto r = Parse(
+      "class C;\n"
+      "  virtual task :final my_task(); endtask\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserA27, TaskDynamicOverrideInitialFinal) {
+  auto r = Parse(
+      "class C;\n"
+      "  virtual task :initial :final my_task(); endtask\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserA27, TaskDynamicOverrideExtendsFinal) {
+  auto r = Parse(
+      "class C;\n"
+      "  virtual task :extends :final my_task(); endtask\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

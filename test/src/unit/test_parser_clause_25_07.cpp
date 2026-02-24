@@ -86,4 +86,42 @@ TEST(SourceText, ExternForkjoinTaskPrototype) {
   EXPECT_TRUE(ifc->items[0]->func_body_stmts.empty());
 }
 
+struct ElabFixture {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag{mgr};
+};
+
+RtlirDesign *Elaborate(const std::string &src, ElabFixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  return elab.Elaborate(cu->modules.back()->name);
+}
+
+TEST(ParserA27, TaskBodyInterfaceScope) {
+  auto r = Parse(
+      "interface intf;\n"
+      "  extern task my_task();\n"
+      "endinterface\n"
+      "task intf.my_task();\n"
+      "endtask\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserA27, TaskPrototypeExternNoPorts) {
+  auto r = Parse(
+      "module m;\n"
+      "  extern task run;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_TRUE(item->is_extern);
+  EXPECT_TRUE(item->func_args.empty());
+}
+
 }  // namespace

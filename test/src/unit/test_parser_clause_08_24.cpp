@@ -89,4 +89,30 @@ TEST(ParserA26, FuncBodyOutOfBlockConstructor) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// ---------------------------------------------------------------------------
+// task_body_declaration (scope qualifiers)
+// ---------------------------------------------------------------------------
+TEST(ParserA27, TaskBodyClassScope) {
+  auto r = Parse(
+      "class C;\n"
+      "  extern task my_task(input int x);\n"
+      "endclass\n"
+      "task C::my_task(input int x);\n"
+      "  $display(\"x=%0d\", x);\n"
+      "endtask\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserA27, TaskBodyOutOfBlockMethod) {
+  auto r = Parse(
+      "class C;\n"
+      "  extern task run();\n"
+      "endclass\n"
+      "task C::run();\n"
+      "endtask\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
