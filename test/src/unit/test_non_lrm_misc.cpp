@@ -41541,4 +41541,34 @@ TEST(ParserA26, FuncBodyConstructorNewEndLabel) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(Parser, ClassExtends) {
+  auto r = Parse("class child extends parent; endclass");
+  ASSERT_NE(r.cu, nullptr);
+  auto *cls = r.cu->classes[0];
+  EXPECT_EQ(cls->name, "child");
+  EXPECT_EQ(cls->base_class, "parent");
+}
+
+// Class with extends.
+TEST(SourceText, ClassWithExtends) {
+  auto r = Parse("class Child extends Parent; endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->base_class, "Parent");
+}
+
+// =============================================================================
+// A.1.2 class_declaration — additional forms
+// =============================================================================
+// Class with final_specifier: class :final C;
+TEST(SourceText, ClassWithFinal) {
+  auto r = Parse("class :final C; endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_TRUE(r.cu->classes[0]->is_final);
+  EXPECT_EQ(r.cu->classes[0]->name, "C");
+}
+
 }  // namespace
