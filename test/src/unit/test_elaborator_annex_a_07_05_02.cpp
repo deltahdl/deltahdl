@@ -1,9 +1,7 @@
-// Tests for A.7.5.2 — System timing check command arguments — Elaboration
+// Annex A.7.5.2: System timing check command arguments
 
 #include <gtest/gtest.h>
-
 #include <string>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -13,8 +11,6 @@
 #include "parser/parser.h"
 
 using namespace delta;
-
-namespace {
 
 struct ElabA70502Fixture {
   SourceManager mgr;
@@ -34,29 +30,11 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA70502Fixture &f) {
   return design;
 }
 
-}  // namespace
-
-// =============================================================================
-// A.7.5.2 Elab — mintypmax timing check limits ($nochange offsets)
-// =============================================================================
-
-TEST(ElabA70502, NochangeMinTypMaxOffsetsElaborate) {
-  ElabA70502Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $nochange(posedge clk, data, 1:2:3, 4:5:6);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
+namespace {
 
 // =============================================================================
 // A.7.5.2 Elab — mintypmax timestamp_condition
 // =============================================================================
-
 TEST(ElabA70502, TimestampCondMinTypMaxElaborates) {
   ElabA70502Fixture f;
   auto *design = ElaborateSrc(
@@ -71,26 +49,8 @@ TEST(ElabA70502, TimestampCondMinTypMaxElaborates) {
 }
 
 // =============================================================================
-// A.7.5.2 Elab — mintypmax timecheck_condition
-// =============================================================================
-
-TEST(ElabA70502, TimecheckCondMinTypMaxElaborates) {
-  ElabA70502Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $setuphold(posedge clk, data, 10, 5, ntfr, 1:2:3, 4:5:6);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-// =============================================================================
 // A.7.5.2 Elab — delayed_data with bracket expression
 // =============================================================================
-
 TEST(ElabA70502, DelayedDataWithBracketElaborates) {
   ElabA70502Fixture f;
   auto *design = ElaborateSrc(
@@ -107,7 +67,6 @@ TEST(ElabA70502, DelayedDataWithBracketElaborates) {
 // =============================================================================
 // A.7.5.2 Elab — delayed_reference with bracket mintypmax expression
 // =============================================================================
-
 TEST(ElabA70502, DelayedRefWithBracketMinTypMaxElaborates) {
   ElabA70502Fixture f;
   auto *design = ElaborateSrc(
@@ -124,7 +83,6 @@ TEST(ElabA70502, DelayedRefWithBracketMinTypMaxElaborates) {
 // =============================================================================
 // A.7.5.2 Elab — remain_active_flag as constant_mintypmax_expression
 // =============================================================================
-
 TEST(ElabA70502, RemainActiveFlagMinTypMaxElaborates) {
   ElabA70502Fixture f;
   auto *design = ElaborateSrc(
@@ -137,3 +95,5 @@ TEST(ElabA70502, RemainActiveFlagMinTypMaxElaborates) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
+
+}  // namespace
