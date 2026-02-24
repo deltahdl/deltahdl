@@ -67,4 +67,41 @@ TEST(ElabClause03, Cl3_13_SameNameDifferentModulesElab) {
   EXPECT_FALSE(diag.HasErrors());
 }
 
+struct ElabFixture {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag{mgr};
+};
+
+static RtlirDesign *ElaborateSrc(const std::string &src, ElabFixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  return elab.Elaborate(cu->modules.back()->name);
+}
+
+// =============================================================================
+// §3.13 Redeclaration rules (Elaboration)
+// =============================================================================
+// 34. Redeclaring a variable in the same module scope is an error.
+TEST(ElabClause03, Cl3_13_RedeclVarInModuleScope) {
+  // Two logic declarations with the same name 'x' in the same module.
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  logic x;\n"
+             "  logic x;\n"
+             "endmodule\n"));
+}
+
+// 35. Redeclaring a net in the same module scope is an error.
+TEST(ElabClause03, Cl3_13_RedeclNetInModuleScope) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  wire w;\n"
+             "  wire w;\n"
+             "endmodule\n"));
+}
+
 }  // namespace

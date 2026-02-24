@@ -1,4 +1,4 @@
-// §6.5: for more details.
+// §10.3.2: The continuous assignment statement
 
 #include <gtest/gtest.h>
 #include "common/arena.h"
@@ -32,29 +32,27 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabFixture &f) {
 
 namespace {
 
-// --- §6.5: Variable constraints ---
-TEST(Elaboration, VarRedeclare_Error) {
+TEST(Elaboration, VarMultiContAssign_Error) {
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"
-      "  reg v;\n"
-      "  wire v;\n"
+      "  int v;\n"
+      "  assign v = 12;\n"
+      "  assign v = 13;\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, VarMixedAssign_Error) {
+TEST(Elaboration, VarSingleContAssign_Ok) {
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"
-      "  wire clk = 0;\n"
       "  int v;\n"
       "  assign v = 12;\n"
-      "  always @(posedge clk) v <= ~v;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace
