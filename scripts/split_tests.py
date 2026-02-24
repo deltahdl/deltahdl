@@ -652,6 +652,8 @@ def _parse_args():
 
 def _format_clause(clause):
     """Format a clause for display."""
+    if clause is None:
+        return "(parse error)"
     if clause.startswith("non-lrm:"):
         tag = clause[len("non-lrm:"):].upper().replace("_", " ")
         return f"Non-LRM {tag}"

@@ -147,6 +147,13 @@ def test_print_classification_non_lrm_clause(capsys):
     assert "Clause: Non-LRM AIG" in capsys.readouterr().out
 
 
+def test_print_classification_none_clause(capsys):
+    """None clause displays as '(parse error)'."""
+    t = _tb("T", prefix="test_non_lrm_", clause=None, rationale="r")
+    _print_classification_table([t])
+    assert "Clause: (parse error)" in capsys.readouterr().out
+
+
 def test_print_classification_separator_between(capsys):
     """Multi-test output has ---- separator between sub-reports."""
     t1 = _tb("A", prefix="test_parser_", clause="6.1", rationale="r")

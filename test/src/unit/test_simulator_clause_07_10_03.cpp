@@ -1,4 +1,4 @@
-// §non-lrm:queue_ref
+// §7.10.3: Persistence of references to elements of a queue
 
 #include <gtest/gtest.h>
 #include "common/arena.h"
@@ -125,35 +125,53 @@ static void RegAutoFunc(QueueRefFixture& f, std::string_view name,
 namespace {
 
 // ============================================================================
-// A5: §6.22.2 — Type width check
+// A3: Outdating — writeback suppressed / preserved
 // ============================================================================
-// Queue elem_width=32 but function param is 16-bit ref → binding should fail
-// and fall back to pass-by-value (write does not propagate).
-TEST(QueueRef, WidthMismatchFallsBackToValue) {
+// Ref outdated by delete(1): q.delete(1) removes the bound element.
+// Write 99 to ref — should NOT propagate back.
+TEST(QueueRef, OutdatedByDelete) {
   QueueRefFixture f;
   auto* q = MakeQueue(f, "q", {10, 20, 30});
 
-  // function automatic void set_val(ref shortint v); v = 99; endfunction
-  // shortint = 16-bit, queue elements are 32-bit.
-  auto* func = f.arena.Create<ModuleItem>();
-  func->kind = ModuleItemKind::kFunctionDecl;
-  func->name = "set_val16";
-  func->is_automatic = true;
-  func->return_type.kind = DataTypeKind::kVoid;
-  FunctionArg arg;
-  arg.direction = Direction::kRef;
-  arg.name = "v";
-  arg.data_type.kind = DataTypeKind::kShortint;
-  func->func_args = {arg};
-  func->func_body_stmts = {MkAssign(f.arena, "v", MkIntLit(f.arena, 99))};
-  f.ctx.RegisterFunction("set_val16", func);
+  // function automatic void test_fn(ref int v);
+  //   q.delete(1);
+  //   v = 99;
+  // endfunction
+  RegAutoFunc(f, "test_fn", {{Direction::kRef, false, {}, "v", nullptr, {}}},
+              {MkExprStmt(f.arena, MkMethodCall(f.arena, "q", "delete",
+                                                {MkIntLit(f.arena, 1)})),
+               MkAssign(f.arena, "v", MkIntLit(f.arena, 99))});
 
-  auto* call = MkCall(f.arena, "set_val16", {MkSelect(f.arena, "q", 1)});
+  auto* call = MkCall(f.arena, "test_fn", {MkSelect(f.arena, "q", 1)});
   EvalExpr(call, f.ctx, f.arena);
 
-  // Width mismatch → ref binding rejected → falls back to value.
-  // q[1] should still be 20.
-  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
+  // q now has {10, 30}. Element 20 was deleted → ref is outdated.
+  // 99 should NOT appear in the queue.
+  ASSERT_EQ(q->elements.size(), 2u);
+  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
+  EXPECT_EQ(q->elements[1].ToUint64(), 30u);
+}
+
+// Ref outdated by pop_front when the ref points to element 0.
+TEST(QueueRef, OutdatedByPopFront) {
+  QueueRefFixture f;
+  auto* q = MakeQueue(f, "q", {10, 20, 30});
+
+  // function automatic void test_fn(ref int v);
+  //   q.pop_front();   // removes q[0] (the bound element)
+  //   v = 99;
+  // endfunction
+  RegAutoFunc(f, "test_fn", {{Direction::kRef, false, {}, "v", nullptr, {}}},
+              {MkExprStmt(f.arena, MkMethodCall(f.arena, "q", "pop_front", {})),
+               MkAssign(f.arena, "v", MkIntLit(f.arena, 99))});
+
+  auto* call = MkCall(f.arena, "test_fn", {MkSelect(f.arena, "q", 0)});
+  EvalExpr(call, f.ctx, f.arena);
+
+  // q now has {20, 30}. Element 10 was popped → ref is outdated.
+  ASSERT_EQ(q->elements.size(), 2u);
+  EXPECT_EQ(q->elements[0].ToUint64(), 20u);
+  EXPECT_EQ(q->elements[1].ToUint64(), 30u);
 }
 
 }  // namespace

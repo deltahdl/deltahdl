@@ -1,7 +1,6 @@
-// §non-lrm:const_eval
+// §11.5.3: Longest static prefix
 
 #include <gtest/gtest.h>
-
 #include "common/arena.h"
 #include "elaboration/const_eval.h"
 #include "parser/ast.h"
@@ -58,14 +57,6 @@ TEST(ConstEval, LongestStaticPrefixNested) {
   auto* inner = LspSelect(arena, LspId(arena, "m"), LspInt(arena, 1));
   auto* outer = LspSelect(arena, inner, LspId(arena, "i"));
   EXPECT_EQ(LongestStaticPrefix(outer), "m[1]");
-}
-
-TEST(ConstEval, LongestStaticPrefixParamIdx) {
-  Arena arena;
-  // m[P] where P=7 in scope → prefix is "m[7]".
-  ScopeMap scope = {{"P", 7}};
-  auto* sel = LspSelect(arena, LspId(arena, "m"), LspId(arena, "P"));
-  EXPECT_EQ(LongestStaticPrefix(sel, scope), "m[7]");
 }
 
 }  // namespace

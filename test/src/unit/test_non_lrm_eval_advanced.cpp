@@ -51,4 +51,13 @@ TEST(AdvSim, TwoStateDetectorZeroWidth) {
   EXPECT_TRUE(TwoStateDetector::Is2State(empty));
 }
 
+TEST(AdvSim, EventCoalescerKeepsDistinctTargets) {
+  EventCoalescer coalescer;
+  coalescer.Add(1, 10);
+  coalescer.Add(2, 20);
+  coalescer.Add(3, 30);
+  auto entries = coalescer.Drain();
+  EXPECT_EQ(entries.size(), 3u);
+}
+
 }  // namespace

@@ -1,7 +1,6 @@
-// Non-LRM tests
+// §non-lrm:scheduler
 
 #include <gtest/gtest.h>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -26,21 +25,6 @@ TEST(EventPool, AcquireCreatesNew) {
   EXPECT_EQ(ev->kind, EventKind::kEvaluation);
   EXPECT_EQ(ev->target, nullptr);
   EXPECT_EQ(ev->next, nullptr);
-}
-
-TEST(EventPool, ReleaseAndReuse) {
-  Arena arena;
-  EventPool pool(arena);
-  Event *ev = pool.Acquire();
-  ev->callback = []() {};
-  ev->target = reinterpret_cast<void *>(0x1234);
-  pool.Release(ev);
-  EXPECT_EQ(pool.FreeCount(), 1);
-
-  Event *reused = pool.Acquire();
-  EXPECT_EQ(reused, ev);               // Same pointer returned
-  EXPECT_EQ(reused->target, nullptr);  // Fields cleared
-  EXPECT_EQ(pool.FreeCount(), 0);
 }
 
 TEST(EventPool, FreeCount) {
@@ -75,6 +59,48 @@ TEST(Scheduler, EventPoolIntegration) {
   EXPECT_EQ(pool.FreeCount(), 1);
 }
 
+TEST(Process, MoveSemantics) {
+  SimCoroutine a = MakeTestCoroutine();
+  EXPECT_FALSE(a.Done());
+
+  SimCoroutine *pa = &a;
+  SimCoroutine b = std::move(a);
+  EXPECT_FALSE(b.Done());
+  EXPECT_TRUE(pa->Done());  // Moved-from state check via pre-move pointer.
+}
+
+TEST(Process, ProcessIdAssignment) {
+  Process p1;
+  p1.id = 42;
+  Process p2;
+  p2.id = 43;
+  EXPECT_NE(p1.id, p2.id);
+}
+
+TEST(Process, CoroutineRelease) {
+  SimCoroutine coro = MakeTestCoroutine();
+  auto handle = coro.Release();
+  EXPECT_TRUE(coro.Done());
+  EXPECT_NE(handle, nullptr);
+  // Clean up the released handle.
+  handle.destroy();
+}
+
+TEST(EventPool, ReleaseAndReuse) {
+  Arena arena;
+  EventPool pool(arena);
+  Event *ev = pool.Acquire();
+  ev->callback = []() {};
+  ev->target = reinterpret_cast<void *>(0x1234);
+  pool.Release(ev);
+  EXPECT_EQ(pool.FreeCount(), 1);
+
+  Event *reused = pool.Acquire();
+  EXPECT_EQ(reused, ev);               // Same pointer returned
+  EXPECT_EQ(reused->target, nullptr);  // Fields cleared
+  EXPECT_EQ(pool.FreeCount(), 0);
+}
+
 // =============================================================================
 // EventCoalescer
 // =============================================================================
@@ -89,15 +115,6 @@ TEST(AdvSim, EventCoalescerMergesDuplicates) {
   ASSERT_EQ(entries.size(), 1u);
   EXPECT_EQ(entries[0].target_id, target_id);
   EXPECT_EQ(entries[0].value, 300u);
-}
-
-TEST(AdvSim, EventCoalescerKeepsDistinctTargets) {
-  EventCoalescer coalescer;
-  coalescer.Add(1, 10);
-  coalescer.Add(2, 20);
-  coalescer.Add(3, 30);
-  auto entries = coalescer.Drain();
-  EXPECT_EQ(entries.size(), 3u);
 }
 
 TEST(AdvSim, EventCoalescerDrainClearsState) {
@@ -152,14 +169,6 @@ TEST(MtSim, EmptyPartitioner) {
   EXPECT_TRUE(partitions.empty());
   EXPECT_EQ(part.ProcessCount(), 0u);
 }
-
-struct MtSimFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
 
 // =============================================================================
 // MtScheduler
@@ -257,40 +266,10 @@ TEST(MtSim, RunTimestepMultipleThreads) {
   }
 }
 
-// A real coroutine that produces a SimCoroutine.
-SimCoroutine MakeTestCoroutine() { co_return; }
-
-TEST(Process, MoveSemantics) {
-  SimCoroutine a = MakeTestCoroutine();
-  EXPECT_FALSE(a.Done());
-
-  SimCoroutine *pa = &a;
-  SimCoroutine b = std::move(a);
-  EXPECT_FALSE(b.Done());
-  EXPECT_TRUE(pa->Done());  // Moved-from state check via pre-move pointer.
-}
-
 TEST(Process, ProcessResumeNullSafe) {
   Process p;
   p.Resume();
   EXPECT_TRUE(p.Done());
-}
-
-TEST(Process, ProcessIdAssignment) {
-  Process p1;
-  p1.id = 42;
-  Process p2;
-  p2.id = 43;
-  EXPECT_NE(p1.id, p2.id);
-}
-
-TEST(Process, CoroutineRelease) {
-  SimCoroutine coro = MakeTestCoroutine();
-  auto handle = coro.Release();
-  EXPECT_TRUE(coro.Done());
-  EXPECT_NE(handle, nullptr);
-  // Clean up the released handle.
-  handle.destroy();
 }
 
 TEST(Process, CoroutineDestroyOnScopeExit) {
