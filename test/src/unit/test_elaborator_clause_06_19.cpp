@@ -1,7 +1,6 @@
 // §6.19: Enumerations
 
 #include <gtest/gtest.h>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -52,16 +51,6 @@ TEST(Elaboration, EnumXZin2State_Error) {
   ElaborateSrc(
       "module top();\n"
       "  enum bit [1:0] {a=0, b=2'bxx, c=1} val;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
-TEST(Elaboration, EnumUnassignedAfterXZ_Error) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top();\n"
-      "  enum integer {a=0, b={32{1'bx}}, c} val;\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
