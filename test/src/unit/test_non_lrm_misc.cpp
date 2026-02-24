@@ -72571,4 +72571,84 @@ TEST(ParserSection27, GenerateForWithAlwaysBlock) {
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kAlwaysBlock);
 }
 
+TEST(Parser, GenerateFor) {
+  auto r = Parse(
+      "module t;\n"
+      "  genvar i;\n"
+      "  for (i = 0; i < 4; i = i + 1) begin\n"
+      "    assign a[i] = b[i];\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto *gen =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kGenerateFor);
+  ASSERT_NE(gen, nullptr);
+  EXPECT_NE(gen->gen_init, nullptr);
+  EXPECT_NE(gen->gen_cond, nullptr);
+  EXPECT_NE(gen->gen_step, nullptr);
+  EXPECT_FALSE(gen->gen_body.empty());
+}
+
+// §3.3 Generate blocks
+TEST(ParserClause03, Cl3_3_GenerateBlocks) {
+  EXPECT_TRUE(
+      ParseOk("module m #(parameter N = 4) ();\n"
+              "  genvar i;\n"
+              "  generate\n"
+              "    for (i = 0; i < N; i = i + 1) begin : gen_loop\n"
+              "      logic [7:0] data;\n"
+              "    end\n"
+              "  endgenerate\n"
+              "endmodule\n"));
+}
+
+// 14. Generate block scope (for-generate)
+TEST(ParserClause03, Cl3_13_GenerateForBlockScope) {
+  auto r = Parse(
+      "module m;\n"
+      "  genvar i;\n"
+      "  for (i = 0; i < 4; i = i + 1) begin : gen_blk\n"
+      "    logic [7:0] data;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *mod = r.cu->modules[0];
+  bool found_gen = false;
+  for (auto *item : mod->items) {
+    if (item->kind == ModuleItemKind::kGenerateFor) {
+      found_gen = true;
+      EXPECT_FALSE(item->gen_body.empty());
+    }
+  }
+  EXPECT_TRUE(found_gen);
+}
+
+// --- genvar_declaration ---
+// genvar list_of_genvar_identifiers ;
+TEST(ParserA213, GenvarDeclSingle) {
+  auto r = Parse("module m; genvar i; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->name, "i");
+}
+
+TEST(ParserA213, GenvarDeclMultiple) {
+  auto r = Parse("module m; genvar i, j, k; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 3u);
+}
+
+// --- list_of_genvar_identifiers ---
+// genvar_identifier { , genvar_identifier }
+TEST(ParserA23, ListOfGenvarIdentifiersSingle) {
+  auto r = Parse("module m; genvar i; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->name, "i");
+}
+
 }  // namespace
