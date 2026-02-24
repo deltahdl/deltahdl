@@ -1,18 +1,17 @@
-// §8.24: Out-of-block declarations
+// §8.20: Virtual methods
 
 #include <gtest/gtest.h>
-
 #include <string>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "elaboration/elaborator.h"
+#include "elaboration/rtlir.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
 
 using namespace delta;
 
-// --- Test helpers ---
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
@@ -31,23 +30,6 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-namespace {
-
-// method_prototype ::= task_prototype | function_prototype
-TEST(SourceText, ClassMethodPrototype) {
-  auto r = Parse(
-      "class C;\n"
-      "  extern function int get_val();\n"
-      "  extern task do_work();\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto &members = r.cu->classes[0]->members;
-  ASSERT_EQ(members.size(), 2u);
-  EXPECT_EQ(members[0]->method->name, "get_val");
-  EXPECT_EQ(members[1]->method->name, "do_work");
-}
-
 struct ElabFixture {
   SourceManager mgr;
   Arena arena;
@@ -63,28 +45,51 @@ RtlirDesign *Elaborate(const std::string &src, ElabFixture &f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-// ---------------------------------------------------------------------------
-// function_body_declaration (scope qualifiers)
-// ---------------------------------------------------------------------------
-TEST(ParserA26, FuncBodyClassScope) {
+namespace {
+
+TEST(ParserA26, FuncDynamicOverrideInitial) {
   auto r = Parse(
       "class C;\n"
-      "  extern function int foo();\n"
-      "endclass\n"
-      "function int C::foo();\n"
-      "  return 42;\n"
-      "endfunction\n");
+      "  virtual function :initial int foo(); return 0; endfunction\n"
+      "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA26, FuncBodyOutOfBlockConstructor) {
+TEST(ParserA26, FuncDynamicOverrideExtends) {
   auto r = Parse(
       "class C;\n"
-      "  extern function new();\n"
-      "endclass\n"
-      "function C::new();\n"
-      "endfunction\n");
+      "  virtual function :extends int foo(); return 0; endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserA26, FuncDynamicOverrideFinal) {
+  auto r = Parse(
+      "class C;\n"
+      "  virtual function :final int foo(); return 0; endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserA26, FuncDynamicOverrideInitialFinal) {
+  auto r = Parse(
+      "class C;\n"
+      "  virtual function :initial :final int foo();\n"
+      "    return 0;\n  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserA26, FuncDynamicOverrideExtendsFinal) {
+  auto r = Parse(
+      "class C;\n"
+      "  virtual function :extends :final int foo();\n"
+      "    return 0;\n  endfunction\n"
+      "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }

@@ -68,4 +68,57 @@ TEST(ParserA213, LifetimeInFunction) {
   EXPECT_TRUE(item->is_automatic);
 }
 
+struct ElabFixture {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag{mgr};
+};
+
+RtlirDesign *Elaborate(const std::string &src, ElabFixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  return elab.Elaborate(cu->modules.back()->name);
+}
+
+// ---------------------------------------------------------------------------
+// function_declaration ::=
+//   function [ dynamic_override_specifiers ] [ lifetime ]
+//     function_body_declaration
+// ---------------------------------------------------------------------------
+TEST(ParserA26, FuncLifetimeAutomatic) {
+  auto r = Parse(
+      "module m;\n  function automatic int foo();\n"
+      "    return 1;\n  endfunction\nendmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_TRUE(item->is_automatic);
+  EXPECT_FALSE(item->is_static);
+}
+
+TEST(ParserA26, FuncLifetimeStatic) {
+  auto r = Parse(
+      "module m;\n  function static int foo();\n"
+      "    return 1;\n  endfunction\nendmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_FALSE(item->is_automatic);
+  EXPECT_TRUE(item->is_static);
+}
+
+TEST(ParserA26, FuncLifetimeDefault) {
+  auto r = Parse(
+      "module m;\n  function int foo();\n"
+      "    return 1;\n  endfunction\nendmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_FALSE(item->is_automatic);
+  EXPECT_FALSE(item->is_static);
+}
+
 }  // namespace

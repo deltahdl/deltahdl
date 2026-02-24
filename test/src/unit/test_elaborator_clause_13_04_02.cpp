@@ -1,10 +1,12 @@
-// §13.5.3: Default argument values
+// §13.4.2: Static and automatic functions
 
 #include <gtest/gtest.h>
 #include <string>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "elaboration/elaborator.h"
+#include "elaboration/rtlir.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
 
@@ -28,23 +30,6 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-namespace {
-
-TEST(ParserA23, ListOfTfVariableIdentifiersWithDefaults) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int compute(input int a = 1, input int b = 2);\n"
-      "    compute = a + b;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->func_args.size(), 2u);
-  EXPECT_NE(item->func_args[0].default_value, nullptr);
-  EXPECT_NE(item->func_args[1].default_value, nullptr);
-}
-
 struct ElabFixture {
   SourceManager mgr;
   Arena arena;
@@ -60,17 +45,20 @@ RtlirDesign *Elaborate(const std::string &src, ElabFixture &f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-TEST(ParserA26, FuncBodyNewStyleWithDefaultValue) {
-  auto r = Parse(
+namespace {
+
+TEST(ParserA26, ElabFunctionAutomaticLifetime) {
+  ElabFixture f;
+  auto *design = Elaborate(
       "module m;\n"
-      "  function int foo(input int x = 5);\n"
-      "    return x;\n"
-      "  endfunction\nendmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->func_args.size(), 1u);
-  EXPECT_NE(item->func_args[0].default_value, nullptr);
+      "  function automatic int fact(input int n);\n"
+      "    if (n <= 1) return 1;\n"
+      "    return n;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace

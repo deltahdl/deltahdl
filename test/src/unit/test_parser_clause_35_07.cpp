@@ -1,18 +1,17 @@
-// §8.24: Out-of-block declarations
+// §35.7: Exported functions
 
 #include <gtest/gtest.h>
-
 #include <string>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "elaboration/elaborator.h"
+#include "elaboration/rtlir.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
 
 using namespace delta;
 
-// --- Test helpers ---
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
@@ -31,23 +30,6 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-namespace {
-
-// method_prototype ::= task_prototype | function_prototype
-TEST(SourceText, ClassMethodPrototype) {
-  auto r = Parse(
-      "class C;\n"
-      "  extern function int get_val();\n"
-      "  extern task do_work();\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto &members = r.cu->classes[0]->members;
-  ASSERT_EQ(members.size(), 2u);
-  EXPECT_EQ(members[0]->method->name, "get_val");
-  EXPECT_EQ(members[1]->method->name, "do_work");
-}
-
 struct ElabFixture {
   SourceManager mgr;
   Arena arena;
@@ -63,30 +45,48 @@ RtlirDesign *Elaborate(const std::string &src, ElabFixture &f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
+namespace {
+
 // ---------------------------------------------------------------------------
-// function_body_declaration (scope qualifiers)
+// dpi_import_export: export variants
 // ---------------------------------------------------------------------------
-TEST(ParserA26, FuncBodyClassScope) {
+TEST(ParserA26, DpiExportFunction) {
   auto r = Parse(
-      "class C;\n"
-      "  extern function int foo();\n"
-      "endclass\n"
-      "function int C::foo();\n"
-      "  return 42;\n"
-      "endfunction\n");
+      "module m;\n"
+      "  function void sv_func(); endfunction\n"
+      "  export \"DPI-C\" function sv_func;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[1];
+  EXPECT_EQ(item->kind, ModuleItemKind::kDpiExport);
+  EXPECT_EQ(item->name, "sv_func");
+  EXPECT_FALSE(item->dpi_is_task);
 }
 
-TEST(ParserA26, FuncBodyOutOfBlockConstructor) {
+TEST(ParserA26, DpiExportWithCIdentifier) {
   auto r = Parse(
-      "class C;\n"
-      "  extern function new();\n"
-      "endclass\n"
-      "function C::new();\n"
-      "endfunction\n");
+      "module m;\n"
+      "  function void sv_func(); endfunction\n"
+      "  export \"DPI-C\" c_name = function sv_func;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[1];
+  EXPECT_EQ(item->kind, ModuleItemKind::kDpiExport);
+  EXPECT_EQ(item->dpi_c_name, "c_name");
+  EXPECT_EQ(item->name, "sv_func");
+}
+
+TEST(ParserA26, DpiExportDpiLegacy) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void sv_func(); endfunction\n"
+      "  export \"DPI\" function sv_func;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[1]->kind, ModuleItemKind::kDpiExport);
 }
 
 }  // namespace

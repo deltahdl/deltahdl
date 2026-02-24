@@ -687,4 +687,36 @@ TEST(ParserA25, UnsizedDimWithInitInferSize) {
   EXPECT_EQ(mod->variables[0].unpacked_size, 3u);
 }
 
+// ---------------------------------------------------------------------------
+// function_body_declaration (old-style ports)
+// ---------------------------------------------------------------------------
+TEST(ParserA26, FuncBodyOldStylePorts) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int foo;\n"
+      "    input int a;\n"
+      "    input int b;\n"
+      "    foo = a + b;\n"
+      "  endfunction\nendmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->func_args.size(), 2u);
+  EXPECT_EQ(item->func_args[0].name, "a");
+  EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
+  EXPECT_EQ(item->func_args[1].name, "b");
+}
+
+TEST(ParserA26, FuncPrototypeExternVoid) {
+  auto r = Parse(
+      "module m;\n"
+      "  extern function void bar();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_TRUE(item->is_extern);
+  EXPECT_EQ(item->return_type.kind, DataTypeKind::kVoid);
+}
+
 }  // namespace
