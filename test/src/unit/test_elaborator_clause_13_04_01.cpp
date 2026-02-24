@@ -109,4 +109,38 @@ TEST(ElabA609, VoidCastElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+struct ElabA609Fixture {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag{mgr};
+  bool has_errors = false;
+};
+
+static RtlirDesign *ElaborateSrc(const std::string &src, ElabA609Fixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  auto *design = elab.Elaborate(cu->modules.back()->name);
+  f.has_errors = f.diag.HasErrors();
+  return design;
+}
+
+// § tf_call — function call as expression elaborates
+TEST(ElabA82, TfCallAsExprElaborates) {
+  ElabA82Fixture f;
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  function logic [7:0] add_one(input logic [7:0] v);\n"
+      "    return v + 8'd1;\n"
+      "  endfunction\n"
+      "  initial x = add_one(8'd5);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
