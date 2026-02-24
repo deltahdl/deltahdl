@@ -57,4 +57,17 @@ TEST(ParserA25, PackedDimElaboratesWidth) {
   EXPECT_EQ(mod->variables[0].width, 8u);
 }
 
+// § genvar_expression — genvar in generate for elaborates
+TEST(ElabA83, GenvarExprElaborates) {
+  ElabA83Fixture f;
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  parameter int N = 4;\n"
+      "  logic [N-1:0] w;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
