@@ -1,4 +1,4 @@
-// §30.4.6: Declaring multiple module paths in a single statement
+// §30.4.5: Full connection and parallel connection paths
 
 #include <gtest/gtest.h>
 #include <string>
@@ -32,13 +32,13 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA702Fixture &f) {
 
 namespace {
 
-// Mixed terminal forms together elaborate
-TEST(ElabA703, MixedTerminalFormsElaborate) {
-  ElabA703Fixture f;
+// Simple full path elaborates
+TEST(ElabA702, SimpleFullPathElaborates) {
+  ElabA702Fixture f;
   auto *design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
-      "    (a, b[3], intf.sig[7:0] *> x[0], y, intf2.out) = 5;\n"
+      "    (a, b *> c) = 10;\n"
       "  endspecify\n"
       "endmodule\n",
       f);
