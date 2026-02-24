@@ -73174,4 +73174,25 @@ TEST(ParserSection28, ElaboratePullupGate) {
   EXPECT_EQ(mod->assigns[0].rhs->int_val, 1);
 }
 
+// --- Gate primitive tests ---
+TEST(Parser, GateAndInst) {
+  auto r = Parse("module t; and g1(out, a, b); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
+  EXPECT_EQ(item->gate_kind, GateKind::kAnd);
+  EXPECT_EQ(item->gate_inst_name, "g1");
+  EXPECT_EQ(item->gate_terminals.size(), 3u);
+}
+
+TEST(Parser, GateNandWithDelay) {
+  auto r = Parse("module t; nand #(5) g2(out, a, b); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->gate_kind, GateKind::kNand);
+  EXPECT_EQ(item->gate_inst_name, "g2");
+  EXPECT_NE(item->gate_delay, nullptr);
+  EXPECT_EQ(item->gate_terminals.size(), 3u);
+}
+
 }  // namespace
