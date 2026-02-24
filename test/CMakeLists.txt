@@ -34,7 +34,6 @@ endfunction()
 # add_unit_test(test_simulator_clause_09e)  # disabled: failing tests in workflow 22294976044
 # add_unit_test(test_simulator_clause_10b)  # disabled: failing tests in workflow 22294976044
 # add_unit_test(test_simulator_clause_11)  # disabled: failing tests in workflow 22294976044
-add_unit_test(test_elaborator_annex_a_06_12)
 add_unit_test(test_elaborator_annex_a_07_01)
 add_unit_test(test_elaborator_annex_a_07_02)
 add_unit_test(test_elaborator_annex_a_07_03)
@@ -139,6 +138,10 @@ add_unit_test(test_elaborator_clause_16_14_05)
 add_unit_test(test_elaborator_clause_17_02)
 add_unit_test(test_elaborator_clause_17_03)
 add_unit_test(test_elaborator_clause_17_07)
+add_unit_test(test_elaborator_clause_18_17)
+add_unit_test(test_elaborator_clause_18_17_01)
+add_unit_test(test_elaborator_clause_18_17_05)
+add_unit_test(test_elaborator_clause_18_17_07)
 add_unit_test(test_elaborator_clause_20_06_02)
 add_unit_test(test_elaborator_clause_20_08_01)
 add_unit_test(test_elaborator_clause_20_09)
