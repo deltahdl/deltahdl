@@ -68504,4 +68504,13 @@ TEST(SourceText, NestedModuleDeclaration) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->nested_module_decl->name, "inner");
 }
 
+// Extern module declaration.
+TEST(SourceText, ExternModule) {
+  auto r = Parse("extern module m(input logic a);\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_TRUE(r.cu->modules[0]->is_extern);
+}
+
 }  // namespace
