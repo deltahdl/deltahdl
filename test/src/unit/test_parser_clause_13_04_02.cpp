@@ -57,4 +57,15 @@ TEST(ParserAnnexA, A2FunctionDeclAutomaticProps) {
   EXPECT_EQ(item->func_args.size(), 2u);
 }
 
+TEST(ParserA213, LifetimeInFunction) {
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int calc; return 0; endfunction\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_TRUE(item->is_automatic);
+}
+
 }  // namespace

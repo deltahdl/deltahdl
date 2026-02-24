@@ -59,4 +59,17 @@ TEST(SourceText, PackageExportNamed) {
   EXPECT_GE(r.cu->packages[0]->items.size(), 2u);
 }
 
+TEST(ParserA213, PackageExportSingleItem) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  export other_pkg::some_func;\n"
+      "endpackage");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->packages[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kExportDecl);
+  EXPECT_EQ(item->import_item.package_name, "other_pkg");
+  EXPECT_EQ(item->import_item.item_name, "some_func");
+}
+
 }  // namespace

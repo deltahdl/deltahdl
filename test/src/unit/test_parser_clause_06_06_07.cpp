@@ -64,4 +64,45 @@ TEST(Parser, NettypeUsedInDecl) {
   EXPECT_EQ(item->name, "x");
 }
 
+TEST(ParserA213, DataDeclNettypeDeclaration) {
+  // nettype_declaration alternative
+  auto r = Parse("module m; nettype logic my_net; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
+}
+
+// --- nettype_declaration ---
+// Form 1: nettype data_type nettype_id [with [scope] tf_id] ;
+// Form 2: nettype [scope] nettype_id nettype_id ;
+TEST(ParserA213, NettypeDeclBasic) {
+  auto r = Parse("module m; nettype real my_real_net; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
+  EXPECT_EQ(item->name, "my_real_net");
+}
+
+TEST(ParserA213, NettypeDeclWithResolve) {
+  auto r = Parse("module m; nettype logic my_net with my_resolve; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
+  EXPECT_EQ(item->nettype_resolve_func, "my_resolve");
+}
+
+TEST(ParserA213, NettypeDeclWithScopedResolve) {
+  // with package_scope tf_identifier
+  auto r =
+      Parse("module m; nettype logic my_net with pkg::resolve_fn; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
+  EXPECT_EQ(item->nettype_resolve_func, "resolve_fn");
+}
+
 }  // namespace

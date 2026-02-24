@@ -189,4 +189,89 @@ TEST(ParserA212, RefUnpackedDim) {
   EXPECT_FALSE(port.unpacked_dims.empty());
 }
 
+TEST(ParserA213, DataDeclMultipleAssign) {
+  // list_of_variable_decl_assignments: multiple names
+  auto r = Parse("module m; int a = 1, b = 2; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  int count = 0;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kVarDecl) count++;
+  }
+  EXPECT_GE(count, 2);
+}
+
+TEST(ParserA213, DataDeclPackageImport) {
+  // package_import_declaration alternative
+  auto r = Parse(
+      "package pkg; endpackage\n"
+      "module m; import pkg::*; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// --- package_import_declaration ---
+// import package_import_item { , package_import_item } ;
+TEST(ParserA213, PackageImportSingle) {
+  auto r = Parse(
+      "package pkg; endpackage\n"
+      "module m; import pkg::foo; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kImportDecl);
+  EXPECT_EQ(item->import_item.package_name, "pkg");
+  EXPECT_EQ(item->import_item.item_name, "foo");
+}
+
+TEST(ParserA213, PackageImportMultiple) {
+  // Multiple comma-separated import items
+  auto r = Parse(
+      "package p1; endpackage\n"
+      "package p2; endpackage\n"
+      "module m; import p1::a, p2::b; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  int import_count = 0;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kImportDecl) import_count++;
+  }
+  EXPECT_GE(import_count, 2);
+}
+
+TEST(ParserA213, PackageExportMultipleItems) {
+  // BNF: export package_import_item { , package_import_item } ;
+  auto r = Parse(
+      "package pkg;\n"
+      "  export p1::a, p2::b;\n"
+      "endpackage");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  int export_count = 0;
+  for (auto *item : r.cu->packages[0]->items) {
+    if (item->kind == ModuleItemKind::kExportDecl) export_count++;
+  }
+  EXPECT_GE(export_count, 2);
+}
+
+TEST(ParserA213, TypedefWithDims) {
+  auto r = Parse("module m; typedef int arr_t [4]; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
+  EXPECT_FALSE(item->unpacked_dims.empty());
+}
+
+TEST(ParserA213, TypedefStruct) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct { int a; int b; } pair_t;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kStruct);
+}
+
 }  // namespace

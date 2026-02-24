@@ -1,4 +1,4 @@
-// §6.19.1: Defining new data types as enumerated types
+// §6.20.6: Const constants
 
 #include <gtest/gtest.h>
 #include <string>
@@ -30,23 +30,14 @@ ParseResult Parse(const std::string &src) {
 
 namespace {
 
-TEST(ParserAnnexA, A2TypedefEnumWithBase) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef enum logic [1:0] {IDLE, RUN, DONE} state_t;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kTypedef);
-}
-
-TEST(ParserA213, TypedefEnum) {
-  auto r = Parse("module m; typedef enum {A, B, C} abc_t; endmodule");
+TEST(ParserA213, DataDeclConstVar) {
+  // [const] data_type list
+  auto r = Parse("module m; const int MAX = 100; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
-  EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kEnum);
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_TRUE(item->data_type.is_const);
 }
 
 }  // namespace
