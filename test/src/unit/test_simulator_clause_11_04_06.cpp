@@ -119,4 +119,57 @@ TEST(EvalOpXZ, WildcardEqLeftX) {
   EXPECT_NE(result.words[0].bval, 0u);  // result is X
 }
 
+struct SimA86Fixture {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag};
+};
+
+static RtlirDesign *ElaborateSrc(const std::string &src, SimA86Fixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  return elab.Elaborate(cu->modules.back()->name);
+}
+
+// § binary_operator — ==? (wildcard equality)
+TEST(SimA86, BinaryWildcardEq) {
+  SimA86Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic x;\n"
+      "  initial x = (8'd5 ==? 8'd5);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// § binary_operator — !=? (wildcard inequality)
+TEST(SimA86, BinaryWildcardNeq) {
+  SimA86Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic x;\n"
+      "  initial x = (8'd5 !=? 8'd3);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
 }  // namespace

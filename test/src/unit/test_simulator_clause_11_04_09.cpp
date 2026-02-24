@@ -202,4 +202,149 @@ TEST(SimA83, ReductionOr) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
+struct SimA86Fixture {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag};
+};
+
+static RtlirDesign *ElaborateSrc(const std::string &src, SimA86Fixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  return elab.Elaborate(cu->modules.back()->name);
+}
+
+// § unary_operator — reduction AND
+TEST(SimA86, UnaryReductionAnd) {
+  SimA86Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic x;\n"
+      "  initial x = &8'hFF;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// § unary_operator — reduction NAND
+TEST(SimA86, UnaryReductionNand) {
+  SimA86Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic x;\n"
+      "  initial x = ~&8'hFF;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+// § unary_operator — reduction OR
+TEST(SimA86, UnaryReductionOr) {
+  SimA86Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic x;\n"
+      "  initial x = |8'h00;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+// § unary_operator — reduction NOR
+TEST(SimA86, UnaryReductionNor) {
+  SimA86Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic x;\n"
+      "  initial x = ~|8'h00;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// § unary_operator — reduction XOR
+TEST(SimA86, UnaryReductionXor) {
+  SimA86Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic x;\n"
+      "  initial x = ^8'hA5;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  // A5 = 10100101, popcount=4 (even), XOR reduction = 0
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+// § unary_operator — reduction XNOR (~^)
+TEST(SimA86, UnaryReductionXnor) {
+  SimA86Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic x;\n"
+      "  initial x = ~^8'hA5;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  // ~^(A5) = ~(XOR reduction) = ~0 = 1
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// § unary_operator — reduction XNOR (^~)
+TEST(SimA86, UnaryReductionXnorAlt) {
+  SimA86Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic x;\n"
+      "  initial x = ^~8'hA5;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
 }  // namespace
