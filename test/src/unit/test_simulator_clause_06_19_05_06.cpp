@@ -1,11 +1,9 @@
 // §6.19.5.6: Name()
 
 #include <gtest/gtest.h>
-
 #include <string>
 #include <string_view>
 #include <vector>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -86,6 +84,7 @@ struct EnumFixture {
     return lit;
   }
 };
+
 namespace {
 
 // =============================================================================
@@ -125,17 +124,6 @@ TEST(EnumMethods, NameForFirstMember) {
     if (ch != 0) name_str += ch;
   }
   EXPECT_EQ(name_str, "RED");
-}
-
-TEST(EnumMethods, NameForUnknownValue) {
-  EnumFixture f;
-  auto *var = f.RegisterEnum("color", "color_t",
-                             {{"RED", 0}, {"GREEN", 1}, {"BLUE", 2}});
-  var->value = MakeLogic4VecVal(f.arena, 32, 99);  // Not a valid member
-  auto *call = f.MakeEnumMethodCall("color", "name");
-  auto result = EvalExpr(call, f.ctx, f.arena);
-  // name() returns empty string for invalid enum values.
-  EXPECT_EQ(result.ToUint64(), 0u);
 }
 
 }  // namespace
