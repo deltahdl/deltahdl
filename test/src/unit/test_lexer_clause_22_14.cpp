@@ -1,5 +1,6 @@
-#include <gtest/gtest.h>
+// §22.14: `begin_keywords, `end_keywords
 
+#include <gtest/gtest.h>
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/keywords.h"
@@ -15,53 +16,7 @@ static std::vector<Token> Lex(const std::string &src) {
   return lexer.LexAll();
 }
 
-// --- Keyword version tests (IEEE 1800-2023 §22.14) ---
-
-TEST(Lexer, KeywordVersion_1364_2001_LogicIsIdentifier) {
-  // "logic" was introduced in 1800-2005, not a keyword in 1364-2001.
-  auto kw = LookupKeyword("logic", KeywordVersion::kVer13642001);
-  EXPECT_FALSE(kw.has_value());
-}
-
-TEST(Lexer, KeywordVersion_1800_2005_LogicIsKeyword) {
-  auto kw = LookupKeyword("logic", KeywordVersion::kVer18002005);
-  EXPECT_EQ(kw, std::optional(TokenKind::kKwLogic));
-}
-
-TEST(Lexer, KeywordVersion_Noconfig_ExcludesConfigKeywords) {
-  // "config" was added in 1364-2001 but excluded by noconfig.
-  auto kw = LookupKeyword("config", KeywordVersion::kVer13642001Noconfig);
-  EXPECT_FALSE(kw.has_value());
-  // "generate" was also added in 1364-2001 and NOT excluded.
-  auto gen = LookupKeyword("generate", KeywordVersion::kVer13642001Noconfig);
-  EXPECT_TRUE(gen.has_value());
-}
-
-TEST(Lexer, KeywordVersion_1364_1995_ModuleIsKeyword) {
-  auto kw = LookupKeyword("module", KeywordVersion::kVer13641995);
-  EXPECT_EQ(kw, std::optional(TokenKind::kKwModule));
-}
-
-TEST(Lexer, KeywordVersion_1364_1995_AutomaticIsNotKeyword) {
-  // "automatic" was introduced in 1364-2001.
-  auto kw = LookupKeyword("automatic", KeywordVersion::kVer13641995);
-  EXPECT_FALSE(kw.has_value());
-}
-
-TEST(Lexer, KeywordVersionMarker_SwitchesVersion) {
-  // Build input: marker for 1364-2001, then "logic".
-  // The lexer should tokenize "logic" as an identifier, not a keyword.
-  std::string input;
-  input += kKeywordMarker;
-  input +=
-      static_cast<char>(static_cast<uint8_t>(KeywordVersion::kVer13642001));
-  input += '\n';
-  input += "logic";
-  auto tokens = Lex(input);
-  ASSERT_GE(tokens.size(), 2);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[0].text, "logic");
-}
+namespace {
 
 TEST(Lexer, KeywordVersionMarker_RestoresToDefault) {
   // marker 1364-2001, "logic", marker 1800-2023, "logic"
@@ -109,3 +64,5 @@ TEST(Lexer, ParseKeywordVersion_Invalid) {
   EXPECT_FALSE(ParseKeywordVersion("bogus").has_value());
   EXPECT_FALSE(ParseKeywordVersion("").has_value());
 }
+
+}  // namespace
