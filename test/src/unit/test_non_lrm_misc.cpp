@@ -74016,4 +74016,33 @@ TEST_F(SpecifyParseTest, MultipleSpecparams) {
   EXPECT_EQ(items[1]->name, "tFALL");
 }
 
+TEST_F(SpecifyParseTest, EmptySpecifyBlock) {
+  auto *unit = Parse("module m; specify endspecify endmodule");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto &items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kSpecifyBlock);
+}
+
+TEST_F(SpecifyParseTest, SpecifyBlockWithTimingCheck) {
+  auto *unit = Parse(
+      "module m; specify $setup(data, posedge clk, 10); endspecify "
+      "endmodule");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto &items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kSpecifyBlock);
+}
+
+TEST_F(SpecifyParseTest, SpecifyBlockCoexistsWithOtherItems) {
+  auto *unit =
+      Parse("module m; logic a; specify endspecify assign a = 1; endmodule");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto &items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 3u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(items[1]->kind, ModuleItemKind::kSpecifyBlock);
+  EXPECT_EQ(items[2]->kind, ModuleItemKind::kContAssign);
+}
+
 }  // namespace
