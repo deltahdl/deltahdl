@@ -1,4 +1,4 @@
-// Annex A.8.2: Subroutine calls
+// §13.4.3: Constant functions
 
 #include <gtest/gtest.h>
 #include <string>
@@ -32,12 +32,16 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA82Fixture &f) {
 
 namespace {
 
-// § method_call — method call elaborates
-TEST(ElabA82, MethodCallElaborates) {
+// =============================================================================
+// A.8.2 Subroutine calls — Elaboration
+// =============================================================================
+// § constant_function_call — function call in parameter context
+TEST(ElabA82, ConstantFunctionCallInParam) {
   ElabA82Fixture f;
   auto *design = ElaborateSrc(
       "module m;\n"
-      "  initial begin obj.method(); end\n"
+      "  function int calc(int n); return n * 2; endfunction\n"
+      "  localparam int P = calc(4);\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
