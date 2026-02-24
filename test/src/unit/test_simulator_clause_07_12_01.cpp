@@ -1,9 +1,7 @@
-// §7.12.2: Array ordering methods
+// §7.12.1: Array locator methods
 
 #include <gtest/gtest.h>
-
 #include <string>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
