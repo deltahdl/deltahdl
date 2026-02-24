@@ -1,7 +1,7 @@
 ---
 concurrency:
   cancel-in-progress: true
-  group: tools-${{ github.ref }}
+  group: split_tests-${{ github.ref }}
 jobs:
   test:
     runs-on: ubuntu-24.04
@@ -11,11 +11,11 @@ jobs:
         uses: actions/cache@v4
         with:
           key: >-
-            pip-tools-${{
-            hashFiles('.github/workflows/tools.yml') }}
+            pip-split_tests-${{
+            hashFiles('.github/workflows/split_tests.yml') }}
           path: ~/.cache/pip
           restore-keys: |
-            pip-tools-
+            pip-split_tests-
       - name: Install tools
         run: |
           pip install \
@@ -82,17 +82,17 @@ jobs:
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest
           test/scripts/split_tests/e2e/ -v
-name: Tools
+name: split_tests
 on:
   pull_request:
     paths:
-      - .github/workflows/tools.yml
+      - .github/workflows/split_tests.yml
       - scripts/split_tests.py
       - test/scripts/split_tests/**
   push:
     branches: [main]
     paths:
-      - .github/workflows/tools.yml
+      - .github/workflows/split_tests.yml
       - scripts/split_tests.py
       - test/scripts/split_tests/**
   workflow_dispatch:

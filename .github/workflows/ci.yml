@@ -306,7 +306,7 @@ on:
     paths-ignore:
       - '**/*.md'
       - .github/workflows/markdownlint.yml
-      - .github/workflows/tools.yml
+      - .github/workflows/split_tests.yml
       - LICENSE
       - scripts/split_tests.py
       - test/scripts/split_tests/**
@@ -315,7 +315,7 @@ on:
     paths-ignore:
       - '**/*.md'
       - .github/workflows/markdownlint.yml
-      - .github/workflows/tools.yml
+      - .github/workflows/split_tests.yml
       - LICENSE
       - scripts/split_tests.py
       - test/scripts/split_tests/**
