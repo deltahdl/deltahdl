@@ -70608,4 +70608,108 @@ TEST(Parser, ProgramWithInitial) {
   EXPECT_EQ(r.cu->programs[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
 }
 
+static int CountItemsOfKind(const std::vector<ModuleItem *> &items,
+                            ModuleItemKind kind) {
+  int count = 0;
+  for (const auto *item : items) {
+    if (item->kind == kind) ++count;
+  }
+  return count;
+}
+
+TEST_F(ProgramTestParse, ProgramAutomaticLifetime) {
+  auto *unit = Parse("program automatic auto_prog; endprogram");
+  ASSERT_EQ(unit->programs.size(), 1u);
+  EXPECT_EQ(unit->programs[0]->name, "auto_prog");
+  EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
+}
+
+TEST_F(ProgramTestParse, ProgramWithMultipleInitialBlocks) {
+  auto *unit = Parse(
+      "program p;\n"
+      "  initial $display(\"init1\");\n"
+      "  initial $display(\"init2\");\n"
+      "endprogram\n");
+  ASSERT_EQ(unit->programs.size(), 1u);
+  EXPECT_EQ(
+      CountItemsOfKind(unit->programs[0]->items, ModuleItemKind::kInitialBlock),
+      2);
+}
+
+// =============================================================================
+// §24.4 Program with task/function declarations
+// =============================================================================
+TEST_F(ProgramTestParse, ProgramWithTask) {
+  auto *unit = Parse(
+      "program p;\n"
+      "  task run_test;\n"
+      "    $display(\"running\");\n"
+      "  endtask\n"
+      "endprogram\n");
+  ASSERT_EQ(unit->programs.size(), 1u);
+  ASSERT_GE(unit->programs[0]->items.size(), 1u);
+  EXPECT_EQ(unit->programs[0]->items[0]->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_EQ(unit->programs[0]->items[0]->name, "run_test");
+}
+
+TEST_F(ProgramTestParse, ProgramWithFunction) {
+  auto *unit = Parse(
+      "program p;\n"
+      "  function int compute(int a, int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "endprogram\n");
+  ASSERT_EQ(unit->programs.size(), 1u);
+  ASSERT_GE(unit->programs[0]->items.size(), 1u);
+  EXPECT_EQ(unit->programs[0]->items[0]->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(unit->programs[0]->items[0]->name, "compute");
+}
+
+// =============================================================================
+// §24.6 Program instantiation
+// =============================================================================
+TEST_F(ProgramTestParse, ProgramInstantiatedInModule) {
+  auto *unit = Parse(
+      "program test_prog(input logic clk);\n"
+      "endprogram\n"
+      "module top;\n"
+      "  logic clk;\n"
+      "  test_prog tp(.clk(clk));\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->programs.size(), 1u);
+  ASSERT_EQ(unit->modules.size(), 1u);
+  const auto *inst =
+      FindItemOfKind(unit->modules[0]->items, ModuleItemKind::kModuleInst);
+  ASSERT_NE(inst, nullptr);
+  EXPECT_EQ(inst->inst_module, "test_prog");
+  EXPECT_EQ(inst->inst_name, "tp");
+}
+
+// =============================================================================
+// §24.7 Multiple programs and coexistence
+// =============================================================================
+TEST_F(ProgramTestParse, MultipleProgramsCoexist) {
+  auto *unit = Parse(
+      "program p1; endprogram\n"
+      "program p2; endprogram\n"
+      "module m; endmodule\n");
+  EXPECT_EQ(unit->programs.size(), 2u);
+  EXPECT_EQ(unit->modules.size(), 1u);
+  EXPECT_EQ(unit->programs[0]->name, "p1");
+  EXPECT_EQ(unit->programs[1]->name, "p2");
+}
+
+// =============================================================================
+// §24.8 Program with variable declarations
+// =============================================================================
+TEST_F(ProgramTestParse, ProgramWithVariableDecls) {
+  auto *unit = Parse(
+      "program p;\n"
+      "  logic [31:0] data;\n"
+      "  logic [7:0] addr;\n"
+      "endprogram\n");
+  ASSERT_EQ(unit->programs.size(), 1u);
+  EXPECT_GE(unit->programs[0]->items.size(), 2u);
+}
+
 }  // namespace
