@@ -129,4 +129,75 @@ TEST(StmtExec, CaseInsideNoMatchDefault) {
   EXPECT_EQ(result_var->value.ToUint64(), 77u);
 }
 
+struct SimA607Fixture {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag};
+};
+
+static RtlirDesign *ElaborateSrc(const std::string &src, SimA607Fixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  return elab.Elaborate(cu->modules.back()->name);
+}
+
+// §12.5.2: constant expression as case_expression
+TEST(SimA607, ConstExprAsCaseExpr) {
+  SimA607Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, x;\n"
+      "  initial begin\n"
+      "    a = 8'd1;\n"
+      "    case(1)\n"
+      "      a: x = 8'd10;\n"
+      "      default: x = 8'd20;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 10u);
+}
+
+// §12.5: sequential case statements (both execute)
+TEST(SimA607, SequentialCaseStatements) {
+  SimA607Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x, y;\n"
+      "  initial begin\n"
+      "    case(1)\n"
+      "      1: x = 8'd11;\n"
+      "      default: x = 8'd0;\n"
+      "    endcase\n"
+      "    case(0)\n"
+      "      0: y = 8'd22;\n"
+      "      default: y = 8'd0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *x = f.ctx.FindVariable("x");
+  auto *y = f.ctx.FindVariable("y");
+  ASSERT_NE(x, nullptr);
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(x->value.ToUint64(), 11u);
+  EXPECT_EQ(y->value.ToUint64(), 22u);
+}
+
 }  // namespace
