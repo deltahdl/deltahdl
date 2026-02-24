@@ -77855,4 +77855,71 @@ TEST(StructPattern, DefaultAllFields) {
   EXPECT_EQ(result.ToUint64(), 0xFFFFu);
 }
 
+static Expr *ParseExprFrom(const std::string &src, AggFixture &f) {
+  std::string code = "module t; initial x = " + src + "; endmodule";
+  auto fid = f.mgr.AddFile("<test>", code);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  auto *item = cu->modules[0]->items[0];
+  return item->body->rhs;
+}
+
+TEST(StructPattern, DefaultWithNamedOverride) {
+  // '{a: 1, default: 0} → a=1, b=0
+  AggFixture f;
+  StructTypeInfo info;
+  info.type_name = "pair_t";
+  info.is_packed = true;
+  info.total_width = 16;
+  info.fields.push_back({"a", 8, 8, DataTypeKind::kLogic});
+  info.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
+
+  auto *pat = f.arena.Create<Expr>();
+  pat->kind = ExprKind::kAssignmentPattern;
+  pat->pattern_keys = {"a", "default"};
+  pat->elements = {MakeIntLit(f.arena, 1), MakeIntLit(f.arena, 0)};
+
+  auto result = EvalStructPattern(pat, &info, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0x0100u);
+}
+
+TEST(StructPattern, TypeKeyedInt) {
+  // '{int: 42} on struct { int a; logic [7:0] b; } → a=42, b=0
+  AggFixture f;
+  StructTypeInfo info;
+  info.type_name = "mixed_t";
+  info.is_packed = true;
+  info.total_width = 40;
+  info.fields.push_back({"a", 8, 32, DataTypeKind::kInt});
+  info.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
+
+  auto *pat = f.arena.Create<Expr>();
+  pat->kind = ExprKind::kAssignmentPattern;
+  pat->pattern_keys = {"int"};
+  pat->elements = {MakeIntLit(f.arena, 42)};
+
+  auto result = EvalStructPattern(pat, &info, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), uint64_t{42} << 8);
+}
+
+// =============================================================================
+// §10.9 Assignment pattern evaluation
+// =============================================================================
+TEST(AssignmentPattern, PositionalTwoElements) {
+  // '{a, b} with 8-bit variables → 16-bit packed result
+  AggFixture f;
+  auto *a = f.ctx.CreateVariable("a", 8);
+  auto *b = f.ctx.CreateVariable("b", 8);
+  a->value = MakeLogic4VecVal(f.arena, 8, 5);
+  b->value = MakeLogic4VecVal(f.arena, 8, 10);
+  auto *expr = ParseExprFrom("'{a, b}", f);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kAssignmentPattern);
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  // {a=5, b=10} → MSB-first: 5 in [15:8], 10 in [7:0] = 16'h050A
+  EXPECT_EQ(result.width, 16u);
+  EXPECT_EQ(result.ToUint64(), 0x050Au);
+}
+
 }  // namespace

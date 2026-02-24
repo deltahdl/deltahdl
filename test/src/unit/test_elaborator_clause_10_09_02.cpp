@@ -53,4 +53,57 @@ TEST(ElabA60701, StructPositionalPatternElaborates) {
   ASSERT_NE(design, nullptr);
 }
 
+// =============================================================================
+// Helper fixture
+// =============================================================================
+struct AggFixture {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag};
+};
+
+static Expr *ParseExprFrom(const std::string &src, AggFixture &f) {
+  std::string code = "module t; initial x = " + src + "; endmodule";
+  auto fid = f.mgr.AddFile("<test>", code);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  auto *item = cu->modules[0]->items[0];
+  return item->body->rhs;
+}
+
+static Expr *MakeIntLit(Arena &arena, uint64_t val) {
+  auto *e = arena.Create<Expr>();
+  e->kind = ExprKind::kIntegerLiteral;
+  e->int_val = val;
+  return e;
+}
+
+TEST(StructPattern, MixedPrecedence) {
+  // '{a: 1, byte: 2, default: 3} — member > type > default
+  // struct { byte a; byte b; logic [7:0] c; }
+  // a=1 (explicit member overrides byte key), b=2 (byte type key), c=3
+  // (default)
+  AggFixture f;
+  StructTypeInfo info;
+  info.type_name = "multi_t";
+  info.is_packed = true;
+  info.total_width = 24;
+  info.fields.push_back({"a", 16, 8, DataTypeKind::kByte});
+  info.fields.push_back({"b", 8, 8, DataTypeKind::kByte});
+  info.fields.push_back({"c", 0, 8, DataTypeKind::kLogic});
+
+  auto *pat = f.arena.Create<Expr>();
+  pat->kind = ExprKind::kAssignmentPattern;
+  pat->pattern_keys = {"a", "byte", "default"};
+  pat->elements = {MakeIntLit(f.arena, 1), MakeIntLit(f.arena, 2),
+                   MakeIntLit(f.arena, 3)};
+
+  auto result = EvalStructPattern(pat, &info, f.ctx, f.arena);
+  uint64_t expected = (uint64_t{1} << 16) | (uint64_t{2} << 8) | 3;
+  EXPECT_EQ(result.ToUint64(), expected);
+}
+
 }  // namespace
