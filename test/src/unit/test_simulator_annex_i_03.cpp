@@ -30,4 +30,14 @@ TEST(SvDpi, PartSelectBit) {
   EXPECT_EQ(dst, 0xBCu);
 }
 
+// =============================================================================
+// Canonical 4-value constants (Annex I)
+// =============================================================================
+TEST(SvDpi, CanonicalValueConstants) {
+  EXPECT_EQ(sv_0, 0);
+  EXPECT_EQ(sv_1, 1);
+  EXPECT_EQ(sv_z, 2);
+  EXPECT_EQ(sv_x, 3);
+}
+
 }  // namespace
