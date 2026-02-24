@@ -1,4 +1,4 @@
-// §16.4.1: Deferred assertion reporting
+// §16.4: Deferred assertions
 
 #include <gtest/gtest.h>
 #include <string>
