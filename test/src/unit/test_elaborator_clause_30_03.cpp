@@ -1,9 +1,7 @@
-// Tests for A.7.1 — Specify block declaration — Elaboration
+// §30.3: Specify block declaration
 
 #include <gtest/gtest.h>
-
 #include <string>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -13,8 +11,6 @@
 #include "parser/parser.h"
 
 using namespace delta;
-
-namespace {
 
 struct ElabA701Fixture {
   SourceManager mgr;
@@ -34,62 +30,17 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA701Fixture &f) {
   return design;
 }
 
-}  // namespace
+namespace {
 
 // =============================================================================
 // A.7.1 Specify block declaration — Elaboration
 // =============================================================================
-
 // Empty specify block elaborates without errors
 TEST(ElabA701, EmptySpecifyBlockElaborates) {
   ElabA701Fixture f;
   auto *design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-// Specify block with path declaration elaborates
-TEST(ElabA701, SpecifyBlockWithPathElaborates) {
-  ElabA701Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    (a => b) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-// Specify block with pulsestyle declaration elaborates
-TEST(ElabA701, SpecifyBlockWithPulsestyleElaborates) {
-  ElabA701Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    pulsestyle_onevent out1;\n"
-      "    pulsestyle_ondetect out2;\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-// Specify block with showcancelled declaration elaborates
-TEST(ElabA701, SpecifyBlockWithShowcancelledElaborates) {
-  ElabA701Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    showcancelled out1;\n"
-      "    noshowcancelled out2;\n"
       "  endspecify\n"
       "endmodule\n",
       f);
@@ -114,3 +65,5 @@ TEST(ElabA701, SpecifyBlockWithAllItemKindsElaborates) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
+
+}  // namespace
