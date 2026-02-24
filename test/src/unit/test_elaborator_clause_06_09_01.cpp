@@ -1,4 +1,4 @@
-// §7.4.1: Packed arrays
+// §6.9.1: Specifying vectors
 
 #include <gtest/gtest.h>
 #include <string>
