@@ -77952,4 +77952,17 @@ TEST(AssignmentPattern, SizedLiterals) {
   EXPECT_EQ(result.ToUint64(), expected);
 }
 
+// § empty_unpacked_array_concatenation elaborates
+TEST(ElabA81, EmptyUnpackedArrayConcatElab) {
+  ElabA81Fixture f;
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  initial a = {};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
