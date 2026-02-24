@@ -1,11 +1,9 @@
-// Annex H.12: Open arrays
+// Annex H.12.2: Array querying functions
 
 #include <gtest/gtest.h>
-
 #include <cstdint>
 #include <string>
 #include <vector>
-
 #include "simulation/dpi_runtime.h"
 
 using namespace delta;
