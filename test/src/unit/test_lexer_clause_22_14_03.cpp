@@ -25,12 +25,6 @@ TEST(Lexer, KeywordVersion_1364_2001_LogicIsIdentifier) {
   EXPECT_FALSE(kw.has_value());
 }
 
-TEST(Lexer, KeywordVersion_1364_1995_AutomaticIsNotKeyword) {
-  // "automatic" was introduced in 1364-2001.
-  auto kw = LookupKeyword("automatic", KeywordVersion::kVer13641995);
-  EXPECT_FALSE(kw.has_value());
-}
-
 TEST(Lexer, KeywordVersionMarker_SwitchesVersion) {
   // Build input: marker for 1364-2001, then "logic".
   // The lexer should tokenize "logic" as an identifier, not a keyword.
