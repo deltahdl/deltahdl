@@ -662,4 +662,29 @@ TEST(ParserA24, VarDeclAssignmentWithInit) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
+struct ElabFixture {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag{mgr};
+};
+
+RtlirDesign *Elaborate(const std::string &src, ElabFixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  return elab.Elaborate(cu->modules.back()->name);
+}
+
+TEST(ParserA25, UnsizedDimWithInitInferSize) {
+  ElabFixture f;
+  auto *design = Elaborate("module m; int d [] = '{1,2,3}; endmodule\n", f);
+  ASSERT_NE(design, nullptr);
+  auto *mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_TRUE(mod->variables[0].is_dynamic);
+  EXPECT_EQ(mod->variables[0].unpacked_size, 3u);
+}
+
 }  // namespace

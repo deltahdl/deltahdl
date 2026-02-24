@@ -253,4 +253,27 @@ TEST(ParserA23, ListOfVariablePortIdentifiersWithDim) {
   EXPECT_NE(port.default_value, nullptr);
 }
 
+struct ElabFixture {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag{mgr};
+};
+
+RtlirDesign *Elaborate(const std::string &src, ElabFixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  return elab.Elaborate(cu->modules.back()->name);
+}
+
+TEST(ParserA25, PortWithPackedDim) {
+  auto r = Parse("module m(input logic [15:0] data); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->ports.size(), 1u);
+  ASSERT_NE(r.cu->modules[0]->ports[0].data_type.packed_dim_left, nullptr);
+}
+
 }  // namespace

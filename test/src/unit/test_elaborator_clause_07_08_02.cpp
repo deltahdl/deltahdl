@@ -5,6 +5,8 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "elaboration/elaborator.h"
+#include "elaboration/rtlir.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
 
@@ -28,17 +30,6 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-namespace {
-
-TEST(ParserA24, VarDeclAssignmentAssocArray) {
-  auto r = Parse("module m; int aa [string]; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
-  EXPECT_EQ(item->name, "aa");
-}
-
 struct ElabFixture {
   SourceManager mgr;
   Arena arena;
@@ -54,14 +45,16 @@ RtlirDesign *Elaborate(const std::string &src, ElabFixture &f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-TEST(ParserA25, AssocDimBuiltinType) {
-  auto r = Parse("module m; int aa [string]; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->unpacked_dims.size(), 1u);
-  ASSERT_NE(item->unpacked_dims[0], nullptr);
-  EXPECT_EQ(item->unpacked_dims[0]->text, "string");
+namespace {
+
+TEST(ParserA25, AssocDimElaboratesStringIndex) {
+  ElabFixture f;
+  auto *design = Elaborate("module m; int aa [string]; endmodule\n", f);
+  ASSERT_NE(design, nullptr);
+  auto *mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_TRUE(mod->variables[0].is_assoc);
+  EXPECT_TRUE(mod->variables[0].is_string_index);
 }
 
 }  // namespace

@@ -1,10 +1,12 @@
-// §7.4.2: Unpacked arrays
+// §7.8.1: Wildcard index type
 
 #include <gtest/gtest.h>
 #include <string>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "elaboration/elaborator.h"
+#include "elaboration/rtlir.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
 
@@ -28,18 +30,6 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-namespace {
-
-TEST(ParserA24, VarDeclAssignmentWithDims) {
-  auto r = Parse("module m; int arr [3:0]; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
-  EXPECT_EQ(item->name, "arr");
-  EXPECT_GE(item->unpacked_dims.size(), 1u);
-}
-
 struct ElabFixture {
   SourceManager mgr;
   Arena arena;
@@ -55,35 +45,19 @@ RtlirDesign *Elaborate(const std::string &src, ElabFixture &f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-// =============================================================================
-// A.2.5 Declaration ranges
-// =============================================================================
-// ---------------------------------------------------------------------------
-// unpacked_dimension ::= [ constant_range ] | [ constant_expression ]
-// ---------------------------------------------------------------------------
-TEST(ParserA25, UnpackedDimConstantRange) {
-  auto r = Parse("module m; logic x [7:0]; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
-  EXPECT_EQ(item->name, "x");
-  ASSERT_EQ(item->unpacked_dims.size(), 1u);
-  ASSERT_NE(item->unpacked_dims[0], nullptr);
-  EXPECT_EQ(item->unpacked_dims[0]->kind, ExprKind::kBinary);
-  EXPECT_EQ(item->unpacked_dims[0]->op, TokenKind::kColon);
-}
+namespace {
 
-TEST(ParserA25, UnpackedDimConstantExpression) {
-  auto r = Parse("module m; logic x [8]; endmodule\n");
+// ---------------------------------------------------------------------------
+// associative_dimension ::= [ data_type ] | [ * ]
+// ---------------------------------------------------------------------------
+TEST(ParserA25, AssocDimWildcard) {
+  auto r = Parse("module m; int aa [*]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
-  EXPECT_EQ(item->name, "x");
   ASSERT_EQ(item->unpacked_dims.size(), 1u);
   ASSERT_NE(item->unpacked_dims[0], nullptr);
-  EXPECT_EQ(item->unpacked_dims[0]->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(item->unpacked_dims[0]->text, "*");
 }
 
 }  // namespace

@@ -1,10 +1,12 @@
-// §7.8.2: String index
+// §7.4.4: Multidimensional arrays
 
 #include <gtest/gtest.h>
 #include <string>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "elaboration/elaborator.h"
+#include "elaboration/rtlir.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
 
@@ -28,17 +30,6 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-namespace {
-
-TEST(ParserA24, VarDeclAssignmentAssocArray) {
-  auto r = Parse("module m; int aa [string]; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
-  EXPECT_EQ(item->name, "aa");
-}
-
 struct ElabFixture {
   SourceManager mgr;
   Arena arena;
@@ -54,14 +45,14 @@ RtlirDesign *Elaborate(const std::string &src, ElabFixture &f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-TEST(ParserA25, AssocDimBuiltinType) {
-  auto r = Parse("module m; int aa [string]; endmodule\n");
+namespace {
+
+TEST(ParserA25, UnpackedDimMultiple) {
+  auto r = Parse("module m; logic x [3:0][7:0]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->unpacked_dims.size(), 1u);
-  ASSERT_NE(item->unpacked_dims[0], nullptr);
-  EXPECT_EQ(item->unpacked_dims[0]->text, "string");
+  ASSERT_EQ(item->unpacked_dims.size(), 2u);
 }
 
 }  // namespace

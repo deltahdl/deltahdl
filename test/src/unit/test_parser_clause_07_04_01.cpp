@@ -1,10 +1,12 @@
-// §7.4.2: Unpacked arrays
+// §7.4.1: Packed arrays
 
 #include <gtest/gtest.h>
 #include <string>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "elaboration/elaborator.h"
+#include "elaboration/rtlir.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
 
@@ -28,18 +30,6 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-namespace {
-
-TEST(ParserA24, VarDeclAssignmentWithDims) {
-  auto r = Parse("module m; int arr [3:0]; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
-  EXPECT_EQ(item->name, "arr");
-  EXPECT_GE(item->unpacked_dims.size(), 1u);
-}
-
 struct ElabFixture {
   SourceManager mgr;
   Arena arena;
@@ -55,35 +45,29 @@ RtlirDesign *Elaborate(const std::string &src, ElabFixture &f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-// =============================================================================
-// A.2.5 Declaration ranges
-// =============================================================================
+namespace {
+
 // ---------------------------------------------------------------------------
-// unpacked_dimension ::= [ constant_range ] | [ constant_expression ]
+// packed_dimension ::= [ constant_range ] | unsized_dimension
+// Note 24: unsized_dimension only legal in DPI import declarations.
 // ---------------------------------------------------------------------------
-TEST(ParserA25, UnpackedDimConstantRange) {
-  auto r = Parse("module m; logic x [7:0]; endmodule\n");
+TEST(ParserA25, PackedDimConstantRange) {
+  auto r = Parse("module m; logic [7:0] x; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
-  EXPECT_EQ(item->name, "x");
-  ASSERT_EQ(item->unpacked_dims.size(), 1u);
-  ASSERT_NE(item->unpacked_dims[0], nullptr);
-  EXPECT_EQ(item->unpacked_dims[0]->kind, ExprKind::kBinary);
-  EXPECT_EQ(item->unpacked_dims[0]->op, TokenKind::kColon);
+  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
+  ASSERT_NE(item->data_type.packed_dim_right, nullptr);
 }
 
-TEST(ParserA25, UnpackedDimConstantExpression) {
-  auto r = Parse("module m; logic x [8]; endmodule\n");
+TEST(ParserA25, PackedDimMultiple) {
+  auto r = Parse("module m; logic [3:0][7:0] x; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
-  EXPECT_EQ(item->name, "x");
-  ASSERT_EQ(item->unpacked_dims.size(), 1u);
-  ASSERT_NE(item->unpacked_dims[0], nullptr);
-  EXPECT_EQ(item->unpacked_dims[0]->kind, ExprKind::kIntegerLiteral);
+  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
+  EXPECT_EQ(item->data_type.extra_packed_dims.size(), 1u);
 }
 
 }  // namespace
