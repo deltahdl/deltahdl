@@ -32491,4 +32491,102 @@ TEST(ParserA221, DataTypeEvent) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kEvent);
 }
 
+static void VerifyEnumMemberNames(const std::vector<EnumMember> &members,
+                                  const std::string expected[], size_t count) {
+  ASSERT_EQ(members.size(), count);
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(members[i].name, expected[i]) << "member " << i;
+  }
+}
+
+TEST(Parser, TypedefEnum) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef enum { A, B, C } state_t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
+  EXPECT_EQ(item->name, "state_t");
+  EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kEnum);
+  std::string expected[] = {"A", "B", "C"};
+  VerifyEnumMemberNames(item->typedef_type.enum_members, expected,
+                        std::size(expected));
+}
+
+TEST(Parser, EnumWithValues) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef enum { IDLE=0, RUN=1, STOP=2 } cmd_t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto &members = r.cu->modules[0]->items[0]->typedef_type.enum_members;
+  std::string expected[] = {"IDLE", "RUN", "STOP"};
+  ASSERT_EQ(members.size(), std::size(expected));
+  for (size_t i = 0; i < std::size(expected); ++i) {
+    EXPECT_EQ(members[i].name, expected[i]) << "member " << i;
+    EXPECT_NE(members[i].value, nullptr) << "member " << i;
+  }
+}
+
+TEST(Parser, InlineEnumVar) {
+  auto r = Parse(
+      "module t;\n"
+      "  enum { X, Y } my_var;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(item->name, "my_var");
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kEnum);
+  ASSERT_EQ(item->data_type.enum_members.size(), 2);
+}
+
+// 23. Enum in module scope
+TEST(ParserClause03, Cl3_13_EnumInModuleScope) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef enum logic [1:0] {IDLE, RUN, DONE} state_t;\n"
+      "  state_t current_state;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *mod = r.cu->modules[0];
+  bool found_typedef = false;
+  for (auto *item : mod->items) {
+    if (item->kind == ModuleItemKind::kTypedef) {
+      found_typedef = true;
+      EXPECT_EQ(item->typedef_type.enum_members.size(), 3u);
+    }
+  }
+  EXPECT_TRUE(found_typedef);
+}
+
+// enum [enum_base_type] { ... } {packed_dimension}
+TEST(ParserA221, DataTypeEnum) {
+  auto r = Parse("module m; enum logic [1:0] {A, B, C} x; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kEnum);
+}
+
+TEST(ParserA221, EnumBaseVectorWithDim) {
+  auto r = Parse("module m; enum logic [7:0] {A=0, B=255} x; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_NE(r.cu->modules[0]->items[0]->data_type.packed_dim_left, nullptr);
+}
+
+TEST(ParserA221, EnumBaseTypeIdentifier) {
+  // enum type_identifier { ... }
+  auto r = Parse(
+      "module m;\n"
+      "  typedef logic [3:0] nibble_t;\n"
+      "  enum nibble_t {A, B} x;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
