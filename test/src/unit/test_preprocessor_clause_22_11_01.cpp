@@ -1,5 +1,6 @@
-#include <gtest/gtest.h>
+// §22.11.1: Standard pragmas
 
+#include <gtest/gtest.h>
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "preprocessor/preprocessor.h"
@@ -13,11 +14,16 @@ struct PreprocFixture {
 
 static std::string Preprocess(const std::string &src, PreprocFixture &f,
                               PreprocConfig config = {}) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Preprocessor pp(f.mgr, f.diag, std::move(config));
-  return pp.Preprocess(fid);
-}
 
+  auto fid = f.mgr.AddFile("<test>", src);
+
+  Preprocessor pp(f.mgr, f.diag, std::move(config));
+
+  return pp.Preprocess(fid);
+
+namespace {
+
+}
 TEST(Preprocessor, Pragma_Consumed) {
   PreprocFixture f;
   auto result = Preprocess("`pragma protect begin\ncode\n", f);
@@ -26,3 +32,5 @@ TEST(Preprocessor, Pragma_Consumed) {
   EXPECT_EQ(result.find("pragma"), std::string::npos);
   EXPECT_NE(result.find("code"), std::string::npos);
 }
+
+}  // namespace
