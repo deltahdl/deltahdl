@@ -1,4 +1,4 @@
-// §22.11.1: Standard pragmas
+// §34.5.1: begin
 
 #include <gtest/gtest.h>
 #include "common/diagnostic.h"
