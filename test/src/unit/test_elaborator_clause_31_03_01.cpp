@@ -133,4 +133,18 @@ TEST(ElabA70503, TerminalBitSelectElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// timing_check_event with posedge elaborates
+TEST(ElabA70503, TimingCheckEventPosedgeElaborates) {
+  ElabA70503Fixture f;
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    $setup(data, posedge clk, 10);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
