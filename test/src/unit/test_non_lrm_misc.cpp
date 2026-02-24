@@ -32589,4 +32589,26 @@ TEST(ParserA221, EnumBaseTypeIdentifier) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// 27. Parameter and localparam in module scope
+TEST(ParserClause03, Cl3_13_ParameterAndLocalparamInModule) {
+  auto r = Parse(
+      "module m;\n"
+      "  parameter int WIDTH = 8;\n"
+      "  localparam int DEPTH = 16;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *mod = r.cu->modules[0];
+  bool found_param = false;
+  bool found_localparam = false;
+  for (auto *item : mod->items) {
+    if (item->kind == ModuleItemKind::kParamDecl && item->name == "WIDTH")
+      found_param = true;
+    if (item->kind == ModuleItemKind::kParamDecl && item->name == "DEPTH")
+      found_localparam = true;
+  }
+  EXPECT_TRUE(found_param);
+  EXPECT_TRUE(found_localparam);
+}
+
 }  // namespace
