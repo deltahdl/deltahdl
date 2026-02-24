@@ -75043,4 +75043,37 @@ TEST_F(SpecifyTest, TimeskewWithNotifier) {
   EXPECT_EQ(tc.notifier, "ntfr");
 }
 
+// =============================================================================
+// §31.7 Conditioned events
+// =============================================================================
+TEST_F(SpecifyTest, ConditionedSetup) {
+  auto *cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(data &&& clr, posedge clk, 10);\n"
+      "endspecify\n"
+      "endmodule\n");
+  auto *spec = FirstSpecifyBlock(cu);
+  ASSERT_NE(spec, nullptr);
+  auto &tc = spec->specify_items[0]->timing_check;
+  EXPECT_EQ(tc.check_kind, TimingCheckKind::kSetup);
+  EXPECT_EQ(tc.ref_terminal.name, "data");
+  EXPECT_NE(tc.ref_condition, nullptr);
+}
+
+TEST_F(SpecifyTest, ConditionedHoldBothSignals) {
+  auto *cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $hold(posedge clk &&& en, data &&& reset, 5);\n"
+      "endspecify\n"
+      "endmodule\n");
+  auto *spec = FirstSpecifyBlock(cu);
+  ASSERT_NE(spec, nullptr);
+  auto &tc = spec->specify_items[0]->timing_check;
+  EXPECT_EQ(tc.check_kind, TimingCheckKind::kHold);
+  EXPECT_NE(tc.ref_condition, nullptr);
+  EXPECT_NE(tc.data_condition, nullptr);
+}
+
 }  // namespace
