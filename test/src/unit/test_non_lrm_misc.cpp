@@ -73757,4 +73757,67 @@ TEST(ParserSection29, SequentialCurrentStateField) {
   EXPECT_EQ(udp->table[3].output, '-');
 }
 
+struct SeqUdpRow {
+  std::string inputs;
+  char state;
+  char output;
+};
+
+static void VerifySeqUdpTable(const UdpDecl *udp, const SeqUdpRow expected[],
+                              size_t count) {
+  ASSERT_EQ(udp->table.size(), count);
+  for (size_t i = 0; i < count; ++i) {
+    VerifyUdpRowInputs(udp->table[i], expected[i].inputs);
+    EXPECT_EQ(udp->table[i].current_state, expected[i].state);
+    EXPECT_EQ(udp->table[i].output, expected[i].output);
+  }
+}
+
+TEST(ParserSection29, SequentialUdp) {
+  auto r = Parse(
+      "primitive dff(output reg q, input d, clk);\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "    1 r : ? : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->udps.size(), 1);
+  auto *udp = r.cu->udps[0];
+  EXPECT_EQ(udp->name, "dff");
+  EXPECT_TRUE(udp->is_sequential);
+  EXPECT_EQ(udp->output_name, "q");
+  SeqUdpRow expected[] = {{"0r", '?', '0'}, {"1r", '?', '1'}};
+  VerifySeqUdpTable(udp, expected, std::size(expected));
+}
+
+// §3.7: "Designers can supplement the built-in primitives with user-defined
+//        primitives (UDPs). A UDP is enclosed between the keywords
+//        primitive...endprimitive."
+//        Combinational UDP with truth table for gate-level modeling.
+TEST(ParserClause03, Cl3_7_CombinationalUdp) {
+  auto r = Parse(
+      "primitive udp_or (output out, input a, b);\n"
+      "  table\n"
+      "    0 0 : 0;\n"
+      "    0 1 : 1;\n"
+      "    1 0 : 1;\n"
+      "    1 1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->udps.size(), 1u);
+  const auto *udp = r.cu->udps[0];
+  EXPECT_EQ(udp->name, "udp_or");
+  EXPECT_EQ(udp->output_name, "out");
+  ASSERT_EQ(udp->input_names.size(), 2u);
+  EXPECT_EQ(udp->input_names[0], "a");
+  EXPECT_EQ(udp->input_names[1], "b");
+  EXPECT_FALSE(udp->is_sequential);
+  ASSERT_EQ(udp->table.size(), 4u);
+  EXPECT_EQ(udp->table[0].output, '0');
+  EXPECT_EQ(udp->table[3].output, '1');
+}
+
 }  // namespace
