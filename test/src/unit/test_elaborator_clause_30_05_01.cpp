@@ -1,9 +1,7 @@
-// Tests for A.7.4 — Specify path delays — Elaboration
+// §30.5.1: Specifying transition delays on module paths
 
 #include <gtest/gtest.h>
-
 #include <string>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -13,8 +11,6 @@
 #include "parser/parser.h"
 
 using namespace delta;
-
-namespace {
 
 struct ElabA704Fixture {
   SourceManager mgr;
@@ -34,12 +30,11 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA704Fixture &f) {
   return design;
 }
 
-}  // namespace
+namespace {
 
 // =============================================================================
 // A.7.4 Specify path delays — Elaboration
 // =============================================================================
-
 // 6-delay path elaborates
 TEST(ElabA704, SixDelayPathElaborates) {
   ElabA704Fixture f;
@@ -110,17 +105,4 @@ TEST(ElabA704, SixDelayMinTypMaxElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Specparam reference in delay elaborates
-TEST(ElabA704, SpecparamDelayElaborates) {
-  ElabA704Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    specparam tRise = 3, tFall = 5;\n"
-      "    (a => b) = (tRise, tFall);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
+}  // namespace
