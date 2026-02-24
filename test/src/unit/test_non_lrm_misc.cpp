@@ -30491,4 +30491,15 @@ TEST(ParserCh50601, EscapedIdent_Braces) {
   EXPECT_TRUE(ParseOk("module m; wire \\{a,b} ; endmodule"));
 }
 
+// From test_parser_clause_05b.cpp
+TEST(ParserCh50602, Keyword_EscapedAsIdentifier) {
+  // An escaped keyword should be treated as a user-defined identifier.
+  EXPECT_TRUE(ParseOk("module m; logic \\begin ; endmodule"));
+}
+
+TEST(ParserCh50602, Keyword_AllLowercase) {
+  // Keywords are lowercase only; MODULE is not a keyword, so this fails.
+  EXPECT_FALSE(ParseOk("MODULE m; endmodule"));
+}
+
 }  // namespace
