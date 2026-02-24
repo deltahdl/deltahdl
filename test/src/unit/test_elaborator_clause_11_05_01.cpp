@@ -92,4 +92,32 @@ TEST(ElabA84, PrimaryPartSelectRangeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+struct ElabFixture {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag{mgr};
+};
+
+static RtlirDesign *ElaborateSrc(const std::string &src, ElabFixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  return elab.Elaborate(cu->modules.back()->name);
+}
+
+TEST(Elaboration, RealIndex_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  real a = 0.5;\n"
+      "  wire [3:0] b;\n"
+      "  wire c;\n"
+      "  assign c = b[a];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 }  // namespace
