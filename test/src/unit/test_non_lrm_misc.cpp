@@ -67290,4 +67290,48 @@ TEST(ParserSection22, ResetallBeforeMultipleModules) {
               "endmodule\n"));
 }
 
+TEST(ParserSection22, DefineSimpleMacro) {
+  EXPECT_TRUE(
+      ParseOk("`define WIDTH 8\n"
+              "module t;\n"
+              "  logic [`WIDTH-1:0] data;\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection22, DefineAndUndef) {
+  EXPECT_TRUE(
+      ParseOk("`define FOO 1\n"
+              "module t;\n"
+              "endmodule\n"
+              "`undef FOO\n"));
+}
+
+TEST(ParserSection22, UndefineallDirective) {
+  EXPECT_TRUE(
+      ParseOk("`define A 1\n"
+              "`define B 2\n"
+              "`undefineall\n"
+              "module t;\n"
+              "endmodule\n"));
+}
+
+// 31. Text macro name space (d) — `define introduces names with leading `
+TEST(ParserClause03, Cl3_13_TextMacroNameSpace) {
+  // Macro defined and used; subsequent redefinition overrides previous
+  auto r = Parse(
+      "`define WIDTH 8\n"
+      "`define DEPTH 16\n"
+      "module m;\n"
+      "  logic [`WIDTH-1:0] data;\n"
+      "  logic [`DEPTH-1:0] addr;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  // Macro names are unambiguous with other name spaces (leading ` character)
+  EXPECT_TRUE(
+      ParseOk("`define data 42\n"
+              "module m; logic [7:0] data; endmodule\n"));
+}
+
 }  // namespace
