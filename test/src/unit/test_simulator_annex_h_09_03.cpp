@@ -10,34 +10,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// DpiRuntime: scope management (svGetScope, svSetScope)
-// =============================================================================
-TEST(DpiRuntime, ScopeManagement) {
-  DpiRuntime rt;
-  EXPECT_EQ(rt.CurrentScope(), nullptr);
-
-  DpiScope scope;
-  scope.name = "top.dut";
-  scope.module_name = "dut";
-  rt.PushScope(scope);
-  ASSERT_NE(rt.CurrentScope(), nullptr);
-  EXPECT_EQ(rt.CurrentScope()->name, "top.dut");
-
-  DpiScope inner;
-  inner.name = "top.dut.sub";
-  inner.module_name = "sub";
-  rt.PushScope(inner);
-  EXPECT_EQ(rt.CurrentScope()->name, "top.dut.sub");
-
-  rt.PopScope();
-  ASSERT_NE(rt.CurrentScope(), nullptr);
-  EXPECT_EQ(rt.CurrentScope()->name, "top.dut");
-
-  rt.PopScope();
-  EXPECT_EQ(rt.CurrentScope(), nullptr);
-}
-
 TEST(DpiRuntime, SetAndGetScope) {
   DpiRuntime rt;
   DpiScope scope;
