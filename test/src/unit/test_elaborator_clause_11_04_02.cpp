@@ -61,4 +61,35 @@ TEST(ElabA83, PostfixDecrementElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+struct ElabA86Fixture {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag{mgr};
+  bool has_errors = false;
+};
+
+static RtlirDesign *ElaborateSrc(const std::string &src, ElabA86Fixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  auto *design = elab.Elaborate(cu->modules.back()->name);
+  f.has_errors = f.diag.HasErrors();
+  return design;
+}
+
+// § inc_or_dec_operator — elaborates
+TEST(ElabA86, IncOrDecElaborates) {
+  ElabA86Fixture f;
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  int x;\n"
+      "  initial begin x = 10; ++x; x--; end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
