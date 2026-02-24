@@ -67663,4 +67663,20 @@ TEST(ParserSection22, DefaultNettypeModuleCount) {
   EXPECT_EQ(r.cu->modules[1]->name, "m2");
 }
 
+TEST(ParserSection22, UnconnectedDrivePull1) {
+  EXPECT_TRUE(
+      ParseOk("`unconnected_drive pull1\n"
+              "module t;\n"
+              "endmodule\n"
+              "`nounconnected_drive\n"));
+}
+
+TEST(ParserSection22, UnconnectedDrivePull0) {
+  EXPECT_TRUE(
+      ParseOk("`unconnected_drive pull0\n"
+              "module t;\n"
+              "endmodule\n"
+              "`nounconnected_drive\n"));
+}
+
 }  // namespace
