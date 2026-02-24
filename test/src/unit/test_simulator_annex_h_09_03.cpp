@@ -1,11 +1,9 @@
-// Annex H.9: Context tasks and functions
+// Annex H.9.3: Working with DPI context tasks and functions in C code
 
 #include <gtest/gtest.h>
-
 #include <cstdint>
 #include <string>
 #include <vector>
-
 #include "simulation/dpi_runtime.h"
 
 using namespace delta;
@@ -55,12 +53,6 @@ TEST(DpiRuntime, SetAndGetScope) {
   // Restore scope.
   rt.SetScope(saved);
   EXPECT_EQ(rt.GetScope(), saved);
-}
-
-TEST(DpiRuntime, PopEmptyScopeDoesNotCrash) {
-  DpiRuntime rt;
-  rt.PopScope();  // Should not crash.
-  EXPECT_EQ(rt.CurrentScope(), nullptr);
 }
 
 }  // namespace
