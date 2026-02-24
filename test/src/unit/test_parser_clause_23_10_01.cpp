@@ -117,4 +117,37 @@ TEST(ParserA23, ListOfDefparamAssignmentsMultiple) {
   EXPECT_EQ(item->defparam_assigns.size(), 2u);
 }
 
+// =============================================================================
+// A.2.4 Declaration assignments
+// =============================================================================
+// --- defparam_assignment ---
+// hierarchical_parameter_identifier = constant_mintypmax_expression
+TEST(ParserA24, DefparamAssignmentHierarchical) {
+  auto r = Parse(
+      "module top;\n"
+      "  defparam u0.sub.WIDTH = 16;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kDefparam);
+  ASSERT_EQ(item->defparam_assigns.size(), 1u);
+  // The path expression should be a hierarchical reference
+  EXPECT_NE(item->defparam_assigns[0].first, nullptr);
+  EXPECT_NE(item->defparam_assigns[0].second, nullptr);
+}
+
+TEST(ParserA24, DefparamAssignmentMintypmax) {
+  // constant_mintypmax_expression: expr : expr : expr
+  auto r = Parse(
+      "module top;\n"
+      "  defparam u0.DELAY = 1:2:3;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kDefparam);
+  ASSERT_EQ(item->defparam_assigns.size(), 1u);
+}
+
 }  // namespace

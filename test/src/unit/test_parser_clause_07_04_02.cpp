@@ -1,4 +1,4 @@
-// §6.20.4: Local parameters (localparam)
+// §7.4.2: Unpacked arrays
 
 #include <gtest/gtest.h>
 #include <string>
@@ -10,7 +10,6 @@
 
 using namespace delta;
 
-// --- Test helpers ---
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
@@ -31,22 +30,14 @@ ParseResult Parse(const std::string &src) {
 
 namespace {
 
-// parameter_port_list with localparam (parameter_port_declaration form 2)
-TEST(SourceText, ParamPortLocalparam) {
-  auto r = Parse("module m #(localparam int X = 5); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->params.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->params[0].first, "X");
-}
-
-TEST(ParserA24, LocalparamAssignment) {
-  auto r = Parse("module m; localparam int LP = 42; endmodule\n");
+TEST(ParserA24, VarDeclAssignmentWithDims) {
+  auto r = Parse("module m; int arr [3:0]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto *item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
-  EXPECT_EQ(item->name, "LP");
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(item->name, "arr");
+  EXPECT_GE(item->unpacked_dims.size(), 1u);
 }
 
 }  // namespace

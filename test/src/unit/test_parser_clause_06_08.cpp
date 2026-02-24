@@ -98,4 +98,19 @@ TEST(ParserA23, ListOfVariableDeclAssignmentsMultiple) {
   EXPECT_GE(count, 3);
 }
 
+// --- variable_decl_assignment ---
+// variable_identifier { variable_dimension } [ = expression ]
+// | dynamic_array_variable_identifier unsized_dimension { variable_dimension }
+//   [ = dynamic_array_new ]
+// | class_variable_identifier [ = class_new ]
+TEST(ParserA24, VarDeclAssignmentBasic) {
+  auto r = Parse("module m; int x; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(item->name, "x");
+  EXPECT_EQ(item->init_expr, nullptr);
+}
+
 }  // namespace

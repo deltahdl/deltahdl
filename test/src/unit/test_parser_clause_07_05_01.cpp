@@ -1,4 +1,4 @@
-// §6.20.3: Type parameters
+// §7.5.1: New[ ]
 
 #include <gtest/gtest.h>
 #include <string>
@@ -10,7 +10,6 @@
 
 using namespace delta;
 
-// --- Test helpers ---
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
@@ -31,32 +30,34 @@ ParseResult Parse(const std::string &src) {
 
 namespace {
 
-// parameter_port_list: type parameter (#(type T = int))
-TEST(SourceText, ParamPortTypeParameter) {
-  auto r = Parse("module m #(type T = int); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->params.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->params[0].first, "T");
-}
-
-// --- list_of_type_assignments ---
-// type_assignment { , type_assignment }
-TEST(ParserA23, ListOfTypeAssignmentsSingle) {
-  auto r = Parse("module m; parameter type T = int; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kParamDecl);
-}
-
-TEST(ParserA24, TypeAssignmentNoDefault) {
-  auto r = Parse("module m #(parameter type T); endmodule\n");
+// --- dynamic_array_new ---
+// new [ expression ] [ ( expression ) ]
+TEST(ParserA24, DynamicArrayNewSize) {
+  auto r = Parse(
+      "module m;\n"
+      "  int d[];\n"
+      "  initial d = new[10];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA24, TypeAssignmentComplexType) {
-  auto r = Parse("module m; parameter type T = logic [7:0]; endmodule\n");
+TEST(ParserA24, DynamicArrayNewSizeAndInit) {
+  auto r = Parse(
+      "module m;\n"
+      "  int d[];\n"
+      "  int src [10];\n"
+      "  initial d = new[10](src);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserA24, DynamicArrayDeclWithNew) {
+  auto r = Parse(
+      "module m;\n"
+      "  int d[] = new[5];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }

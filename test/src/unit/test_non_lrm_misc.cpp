@@ -598,4 +598,68 @@ TEST(ParserA23, ListOfVariableDeclAssignmentsWithDims) {
   EXPECT_GE(count, 2);
 }
 
+// --- net_decl_assignment ---
+// net_identifier { unpacked_dimension } [ = expression ]
+TEST(ParserA24, NetDeclAssignmentBasic) {
+  auto r = Parse("module m; wire w; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_EQ(item->name, "w");
+  EXPECT_EQ(item->init_expr, nullptr);  // No initializer
+}
+
+TEST(ParserA24, NetDeclAssignmentWithUnpackedDims) {
+  auto r = Parse("module m; wire w [3:0][7:0]; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_EQ(item->name, "w");
+  EXPECT_GE(item->unpacked_dims.size(), 1u);
+}
+
+TEST(ParserA24, NetDeclAssignmentDimsAndInit) {
+  auto r = Parse("module m; wire [7:0] mem [0:3] = '{0,1,2,3}; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_NE(item->init_expr, nullptr);
+  EXPECT_GE(item->unpacked_dims.size(), 1u);
+}
+
+// --- param_assignment ---
+// parameter_identifier { variable_dimension } [ = constant_param_expression ]
+TEST(ParserA24, ParamAssignmentBasic) {
+  auto r = Parse("module m; parameter WIDTH = 8; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
+  EXPECT_EQ(item->name, "WIDTH");
+  EXPECT_NE(item->init_expr, nullptr);
+}
+
+TEST(ParserA24, ParamAssignmentWithUnpackedDim) {
+  auto r = Parse("module m; parameter int ARR [3:0] = '{1,2,3,4}; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
+  EXPECT_EQ(item->name, "ARR");
+  EXPECT_GE(item->unpacked_dims.size(), 1u);
+}
+
+TEST(ParserA24, VarDeclAssignmentWithInit) {
+  auto r = Parse("module m; int x = 42; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(item->name, "x");
+  EXPECT_NE(item->init_expr, nullptr);
+}
+
 }  // namespace
