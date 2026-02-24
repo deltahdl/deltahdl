@@ -180,4 +180,65 @@ TEST(StructPattern, MixedPrecedence) {
   EXPECT_EQ(result.ToUint64(), expected);
 }
 
+struct SimA60701Fixture {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag};
+};
+
+static RtlirDesign *ElaborateSrc(const std::string &src, SimA60701Fixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  return elab.Elaborate(cu->modules.back()->name);
+}
+
+// §10.9.2: named pattern with default key fills remaining fields
+TEST(SimA60701, NamedStructPatternWithDefault) {
+  SimA60701Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
+      "  pair_t p;\n"
+      "  initial begin\n"
+      "    p = pair_t'{a: 8'd10, default: 8'd99};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("p");
+  ASSERT_NE(var, nullptr);
+  // a=10 (explicit), b=99 (default): (10 << 8) | 99 = 2659
+  EXPECT_EQ(var->value.ToUint64(), 2659u);
+}
+
+// §10.9.2: named pattern with only default key
+TEST(SimA60701, NamedStructPatternOnlyDefault) {
+  SimA60701Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
+      "  pair_t p;\n"
+      "  initial begin\n"
+      "    p = pair_t'{default: 8'd55};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("p");
+  ASSERT_NE(var, nullptr);
+  // Both a=55, b=55: (55 << 8) | 55 = 14135
+  EXPECT_EQ(var->value.ToUint64(), 14135u);
+}
+
 }  // namespace
