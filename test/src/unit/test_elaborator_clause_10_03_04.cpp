@@ -1,16 +1,12 @@
-// §10.3.2: The continuous assignment statement
+// §10.3.4: Continuous assignment strengths
 
 #include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
-#include "common/types.h"
 #include "elaboration/elaborator.h"
 #include "elaboration/rtlir.h"
-#include "elaboration/sensitivity.h"
-#include "elaboration/type_eval.h"
 #include "lexer/lexer.h"
-#include "lexer/token.h"
 #include "parser/parser.h"
 
 using namespace delta;
@@ -32,43 +28,40 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabFixture &f) {
 
 namespace {
 
-TEST(Elaboration, VarMultiContAssign_Error) {
+// =============================================================================
+// §10.3.4 Drive strength — validation
+// =============================================================================
+TEST(ElabClause1003, Validate_IllegalDriveStrengthHighz0Highz1) {
   ElabFixture f;
   ElaborateSrc(
-      "module top();\n"
-      "  int v;\n"
-      "  assign v = 12;\n"
-      "  assign v = 13;\n"
+      "module m;\n"
+      "  wire w;\n"
+      "  assign (highz0, highz1) w = 1'b0;\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, VarSingleContAssign_Ok) {
+TEST(ElabClause1003, Validate_IllegalDriveStrengthHighz1Highz0) {
   ElabFixture f;
   ElaborateSrc(
-      "module top();\n"
-      "  int v;\n"
-      "  assign v = 12;\n"
+      "module m;\n"
+      "  wire w;\n"
+      "  assign (highz1, highz0) w = 1'b0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(ElabClause1003, Validate_LegalDriveStrengthHighz0Strong1) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign (highz0, strong1) w = 1'b0;\n"
       "endmodule\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
-}
-
-// =============================================================================
-// §10.3 Continuous assignments — elaboration
-// =============================================================================
-TEST(ElabClause1003, MultipleContAssigns) {
-  ElabFixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  wire a, b, c, d;\n"
-      "  assign a = b, c = d;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  auto *mod = design->top_modules[0];
-  ASSERT_GE(mod->assigns.size(), 2u);
 }
 
 }  // namespace

@@ -1,5 +1,6 @@
-#include <gtest/gtest.h>
+// §10.3.3: Continuous assignment delays
 
+#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -9,8 +10,6 @@
 #include "parser/parser.h"
 
 using namespace delta;
-
-namespace {
 
 struct ElabFixture {
   SourceManager mgr;
@@ -27,24 +26,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabFixture &f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-}  // namespace
-
-// =============================================================================
-// §10.3 Continuous assignments — elaboration
-// =============================================================================
-
-TEST(ElabClause1003, MultipleContAssigns) {
-  ElabFixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  wire a, b, c, d;\n"
-      "  assign a = b, c = d;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  auto *mod = design->top_modules[0];
-  ASSERT_GE(mod->assigns.size(), 2u);
-}
+namespace {
 
 TEST(ElabClause1003, ContAssignDelayPreserved) {
   ElabFixture f;
@@ -92,39 +74,4 @@ TEST(ElabClause1003, ContAssignDelayThreeValues) {
   EXPECT_NE(mod->assigns[0].delay_decay, nullptr);
 }
 
-// =============================================================================
-// §10.3.4 Drive strength — validation
-// =============================================================================
-
-TEST(ElabClause1003, Validate_IllegalDriveStrengthHighz0Highz1) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  wire w;\n"
-      "  assign (highz0, highz1) w = 1'b0;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
-TEST(ElabClause1003, Validate_IllegalDriveStrengthHighz1Highz0) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  wire w;\n"
-      "  assign (highz1, highz0) w = 1'b0;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
-TEST(ElabClause1003, Validate_LegalDriveStrengthHighz0Strong1) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  wire w;\n"
-      "  assign (highz0, strong1) w = 1'b0;\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
+}  // namespace
