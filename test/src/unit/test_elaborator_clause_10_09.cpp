@@ -1,4 +1,4 @@
-// §10.9.2: Structure assignment patterns
+// §10.9: Assignment patterns
 
 #include <gtest/gtest.h>
 #include <string>
@@ -35,18 +35,15 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA60701Fixture &f) {
 
 namespace {
 
-// =============================================================================
-// A.6.7.1 Patterns — Elaboration tests
-// =============================================================================
-// §10.9: positional assignment pattern elaborates for struct init
-TEST(ElabA60701, StructPositionalPatternElaborates) {
+// §10.9: typed assignment pattern expression elaborates
+TEST(ElabA60701, TypedPatternExpressionElaborates) {
   ElabA60701Fixture f;
   auto *design = ElaborateSrc(
       "module t;\n"
-      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
-      "  pair_t p;\n"
+      "  typedef struct packed { logic [7:0] x; logic [7:0] y; } coord_t;\n"
+      "  coord_t c;\n"
       "  initial begin\n"
-      "    p = '{8'd10, 8'd20};\n"
+      "    c = coord_t'{x: 8'd5, y: 8'd10};\n"
       "  end\n"
       "endmodule\n",
       f);
