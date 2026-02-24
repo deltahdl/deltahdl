@@ -31185,4 +31185,26 @@ TEST(ParserCh510, StructLiteral_MemberNameAndValue) {
               "endmodule"));
 }
 
+TEST(ParserCh511, ArrayLiteral_Nested) {
+  // int n[1:2][1:3] = '{'{0,1,2},'{3{4}}};
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int n[1:2][1:3] = '{'{0,1,2},'{3{4}}};\n"
+              "endmodule"));
+}
+
+TEST(ParserCh511, ArrayLiteral_Simple) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int arr[0:2] = '{10, 20, 30};\n"
+              "endmodule"));
+}
+
+TEST(ParserCh511, ArrayLiteral_DefaultValue) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int arr[0:3] = '{default:0};\n"
+              "endmodule"));
+}
+
 }  // namespace
