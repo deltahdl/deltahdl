@@ -66,4 +66,56 @@ TEST(ElabA701, SpecifyBlockWithAllItemKindsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+struct ElabA705Fixture {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag{mgr};
+  bool has_errors = false;
+};
+
+static RtlirDesign *ElaborateSrc(const std::string &src, ElabA705Fixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  auto *design = elab.Elaborate(cu->modules.back()->name);
+  f.has_errors = f.diag.HasErrors();
+  return design;
+}
+
+// Timing checks mixed with path declarations elaborate
+TEST(ElabA705, TimingChecksMixedWithPathsElaborate) {
+  ElabA705Fixture f;
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b) = 5;\n"
+      "    $setup(d, posedge clk, 10);\n"
+      "    (c *> e) = 10;\n"
+      "    $hold(posedge clk, d, 5);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// Multiple specify blocks with timing checks elaborate
+TEST(ElabA705, MultipleSpecifyBlocksElaborate) {
+  ElabA705Fixture f;
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    $setup(d, posedge clk, 10);\n"
+      "  endspecify\n"
+      "  specify\n"
+      "    $hold(posedge clk, d, 5);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
