@@ -43420,4 +43420,34 @@ TEST(ParserA28, NamedBlockWithDecls) {
   EXPECT_EQ(body->label, "my_block");
 }
 
+TEST(Parser, EventWaitWithParens) {
+  auto r = Parse(
+      "module t;\n"
+      "  event ev;\n"
+      "  initial @(ev) ;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto *item = r.cu->modules[0]->items[1];
+  auto *stmt = item->body;
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  ASSERT_EQ(stmt->events.size(), 1);
+  EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
+  EXPECT_EQ(stmt->events[0].signal->text, "ev");
+}
+
+TEST(Parser, EventWaitBareIdentifier) {
+  auto r = Parse(
+      "module t;\n"
+      "  event ev;\n"
+      "  initial @ev ;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto *item = r.cu->modules[0]->items[1];
+  auto *stmt = item->body;
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  ASSERT_EQ(stmt->events.size(), 1);
+  EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
+  EXPECT_EQ(stmt->events[0].signal->text, "ev");
+}
+
 }  // namespace
