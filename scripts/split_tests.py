@@ -330,6 +330,14 @@ _PROMPT_TEMPLATE = """Classify this test. Determine:
 
 3. NON_LRM_TOPIC — only when clause is "non-lrm". A short snake_case
    topic (e.g. "aig", "arena", "dpi_helpers"). Set to null otherwise.
+
+4. RATIONALE — describe the process you followed to reach your
+   conclusion. Specifically:
+   - Which LRM sections did you Read (use the Read tool) and why?
+   - What did those sections contain that confirmed or ruled them out?
+   - If you concluded non-lrm, explain which sections you checked
+     and why none of them apply.
+   Do NOT just state the conclusion — show your work.
 {topics}
 Project architecture: {arch_path}
 IEEE 1800-2023 LRM: {lrm_path}
