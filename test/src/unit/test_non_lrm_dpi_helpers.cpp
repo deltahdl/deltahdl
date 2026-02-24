@@ -31,4 +31,10 @@ TEST(DpiRuntime, ArgValueInt) {
   EXPECT_EQ(v.AsInt(), 42);
 }
 
+TEST(DpiRuntime, ArgValueString) {
+  auto v = DpiArgValue::FromString("hello");
+  EXPECT_EQ(v.type, DataTypeKind::kString);
+  EXPECT_EQ(v.AsString(), "hello");
+}
+
 }  // namespace
