@@ -1,4 +1,4 @@
-// Annex A.2.3: Declaration lists
+// §29.3.2: UDP port declarations
 
 #include <gtest/gtest.h>
 #include <string>
@@ -30,16 +30,18 @@ ParseResult Parse(const std::string &src) {
 
 namespace {
 
-// --- list_of_variable_port_identifiers ---
-// port_identifier { variable_dimension } [ = constant_expression ]
-//     { , port_identifier { variable_dimension } [ = constant_expression ] }
-TEST(ParserA23, ListOfVariablePortIdentifiersSingle) {
-  auto r = Parse("module m(output logic q = 1'b0); endmodule\n");
+TEST(ParserA23, ListOfUdpPortIdentifiersMultiple) {
+  auto r = Parse(
+      "primitive mux(output out, input a, b, sel);\n"
+      "  table\n"
+      "    0 ? 0 : 0;\n"
+      "    1 ? 0 : 1;\n"
+      "    ? 0 1 : 0;\n"
+      "    ? 1 1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto &port = r.cu->modules[0]->ports[0];
-  EXPECT_EQ(port.direction, Direction::kOutput);
-  EXPECT_NE(port.default_value, nullptr);
 }
 
 }  // namespace

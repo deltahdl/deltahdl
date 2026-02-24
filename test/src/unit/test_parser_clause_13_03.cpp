@@ -64,4 +64,22 @@ TEST(Parser, TaskDecl) {
   ASSERT_EQ(mod->items[0]->func_args.size(), 1);
 }
 
+TEST(ParserA23, ListOfTfVariableIdentifiersTask) {
+  auto r = Parse(
+      "module m;\n"
+      "  task report;\n"
+      "    input int addr, data;\n"
+      "    output int status;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_EQ(item->func_args.size(), 3u);
+  EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
+  EXPECT_EQ(item->func_args[1].direction, Direction::kInput);
+  EXPECT_EQ(item->func_args[2].direction, Direction::kOutput);
+}
+
 }  // namespace

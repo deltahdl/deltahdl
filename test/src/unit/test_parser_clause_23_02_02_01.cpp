@@ -108,4 +108,27 @@ TEST(ParserA212, OutputNonAnsiUnpackedDim) {
   EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kOutput);
 }
 
+// --- list_of_interface_identifiers ---
+// interface_identifier { unpacked_dimension }
+//     { , interface_identifier { unpacked_dimension } }
+// Note: Interface ports parse as non-ANSI when used without direction keyword.
+// Multi-element interface port lists are resolved during semantic analysis.
+TEST(ParserA23, ListOfInterfaceIdentifiersSingle) {
+  auto r = Parse("module m(a); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->ports.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->ports[0].name, "a");
+}
+
+TEST(ParserA23, ListOfPortIdentifiersMultipleNonAnsi) {
+  auto r = Parse("module m(a, b); input wire [7:0] a, b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->ports.size(), 2u);
+  for (auto &port : r.cu->modules[0]->ports) {
+    EXPECT_EQ(port.direction, Direction::kInput);
+  }
+}
+
 }  // namespace

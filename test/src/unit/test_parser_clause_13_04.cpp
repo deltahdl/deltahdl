@@ -138,4 +138,21 @@ TEST(ParserClause03, Cl3_13_FunctionWithLocalVarsSubscope) {
   EXPECT_FALSE(func->func_body_stmts.empty());
 }
 
+TEST(ParserA23, ListOfTfVariableIdentifiersThree) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int sum3;\n"
+      "    input int x, y, z;\n"
+      "    sum3 = x + y + z;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->func_args.size(), 3u);
+  EXPECT_EQ(item->func_args[0].name, "x");
+  EXPECT_EQ(item->func_args[1].name, "y");
+  EXPECT_EQ(item->func_args[2].name, "z");
+}
+
 }  // namespace

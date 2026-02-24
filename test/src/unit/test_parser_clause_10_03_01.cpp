@@ -1,4 +1,4 @@
-// Annex A.2.3: Declaration lists
+// §10.3.1: The net declaration assignment
 
 #include <gtest/gtest.h>
 #include <string>
@@ -30,16 +30,15 @@ ParseResult Parse(const std::string &src) {
 
 namespace {
 
-// --- list_of_variable_port_identifiers ---
-// port_identifier { variable_dimension } [ = constant_expression ]
-//     { , port_identifier { variable_dimension } [ = constant_expression ] }
-TEST(ParserA23, ListOfVariablePortIdentifiersSingle) {
-  auto r = Parse("module m(output logic q = 1'b0); endmodule\n");
+TEST(ParserA23, ListOfNetDeclAssignmentsWithInit) {
+  auto r = Parse("module m; wire a = 1'b0, b = 1'b1; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto &port = r.cu->modules[0]->ports[0];
-  EXPECT_EQ(port.direction, Direction::kOutput);
-  EXPECT_NE(port.default_value, nullptr);
+  int count = 0;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kNetDecl) count++;
+  }
+  EXPECT_GE(count, 2);
 }
 
 }  // namespace

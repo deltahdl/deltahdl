@@ -78,4 +78,24 @@ TEST(ParserA213, DataDeclLifetimeStatic) {
   EXPECT_TRUE(item->is_static);
 }
 
+// --- list_of_variable_decl_assignments ---
+// variable_decl_assignment { , variable_decl_assignment }
+TEST(ParserA23, ListOfVariableDeclAssignmentsSingle) {
+  auto r = Parse("module m; int x; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kVarDecl);
+}
+
+TEST(ParserA23, ListOfVariableDeclAssignmentsMultiple) {
+  auto r = Parse("module m; int a = 1, b = 2, c = 3; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  int count = 0;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kVarDecl) count++;
+  }
+  EXPECT_GE(count, 3);
+}
+
 }  // namespace

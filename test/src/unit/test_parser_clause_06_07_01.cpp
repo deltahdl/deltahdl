@@ -164,4 +164,39 @@ TEST(ParserA223, Delay3NetMintypmax) {
   EXPECT_EQ(item->net_delay->kind, ExprKind::kMinTypMax);
 }
 
+// --- list_of_net_decl_assignments ---
+// net_decl_assignment { , net_decl_assignment }
+TEST(ParserA23, ListOfNetDeclAssignmentsSingle) {
+  auto r = Parse("module m; wire [7:0] data; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  int count = 0;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kNetDecl) count++;
+  }
+  EXPECT_EQ(count, 1);
+}
+
+TEST(ParserA23, ListOfNetDeclAssignmentsMultiple) {
+  auto r = Parse("module m; wire a, b, c; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  int count = 0;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kNetDecl) count++;
+  }
+  EXPECT_GE(count, 3);
+}
+
+TEST(ParserA23, ListOfNetDeclAssignmentsWithUnpackedDim) {
+  auto r = Parse("module m; wire a [3:0], b [7:0]; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  int count = 0;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kNetDecl) count++;
+  }
+  EXPECT_GE(count, 2);
+}
+
 }  // namespace

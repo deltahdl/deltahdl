@@ -475,4 +475,127 @@ TEST(ParserA221, StructMemberAttr) {
   EXPECT_TRUE(members[1].attrs.empty());
 }
 
+TEST(ParserA23, ListOfDefparamAssignmentsThree) {
+  auto r = Parse(
+      "module top;\n"
+      "  defparam u0.A = 1, u0.B = 2, u0.C = 3;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->defparam_assigns.size(), 3u);
+}
+
+TEST(ParserA23, ListOfGenvarIdentifiersMultiple) {
+  auto r = Parse("module m; genvar i, j, k; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 3u);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->name, "i");
+  EXPECT_EQ(r.cu->modules[0]->items[1]->name, "j");
+  EXPECT_EQ(r.cu->modules[0]->items[2]->name, "k");
+}
+
+TEST(ParserA23, ListOfInterfaceIdentifiersMultiple) {
+  auto r = Parse("module m(a, b, c); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->ports.size(), 3u);
+  EXPECT_EQ(r.cu->modules[0]->ports[0].name, "a");
+  EXPECT_EQ(r.cu->modules[0]->ports[1].name, "b");
+  EXPECT_EQ(r.cu->modules[0]->ports[2].name, "c");
+}
+
+TEST(ParserA23, ListOfParamAssignmentsWithDims) {
+  auto r = Parse(
+      "module m;\n"
+      "  parameter int A [2] = '{1, 2}, B [3] = '{3, 4, 5};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  int count = 0;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kParamDecl) count++;
+  }
+  EXPECT_GE(count, 2);
+}
+
+// --- list_of_udp_port_identifiers ---
+// port_identifier { , port_identifier }
+TEST(ParserA23, ListOfUdpPortIdentifiersSingle) {
+  auto r = Parse(
+      "primitive buf_p(output out, input in);\n"
+      "  table 0 : 0; 1 : 1; endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserA23, ListOfSpecparamAssignmentsMultiple) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify specparam tRISE = 100, tFALL = 50, tHOLD = 10; endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// --- list_of_tf_variable_identifiers ---
+// port_identifier { variable_dimension } [ = expression ]
+//     { , port_identifier { variable_dimension } [ = expression ] }
+TEST(ParserA23, ListOfTfVariableIdentifiersSingle) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int f;\n"
+      "    input int a;\n"
+      "    f = a;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(item->func_args.size(), 1u);
+}
+
+TEST(ParserA23, ListOfTfVariableIdentifiersMultiple) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int add;\n"
+      "    input int a, b;\n"
+      "    add = a + b;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(item->func_args.size(), 2u);
+  EXPECT_EQ(item->func_args[0].name, "a");
+  EXPECT_EQ(item->func_args[1].name, "b");
+}
+
+TEST(ParserA23, ListOfTypeAssignmentsMultiple) {
+  auto r = Parse(
+      "module m; parameter type T1 = int, T2 = real, T3 = string; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  int count = 0;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kParamDecl) count++;
+  }
+  EXPECT_GE(count, 3);
+}
+
+TEST(ParserA23, ListOfVariableDeclAssignmentsWithDims) {
+  auto r = Parse("module m; logic [7:0] mem [256], cache [64]; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  int count = 0;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kVarDecl) count++;
+  }
+  EXPECT_GE(count, 2);
+}
+
 }  // namespace

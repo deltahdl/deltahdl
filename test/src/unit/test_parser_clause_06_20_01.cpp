@@ -68,4 +68,24 @@ TEST(ParserAnnexA, A2ParamDecl) {
   EXPECT_EQ(r.cu->modules[0]->items[1]->kind, ModuleItemKind::kParamDecl);
 }
 
+// --- list_of_param_assignments ---
+// param_assignment { , param_assignment }
+TEST(ParserA23, ListOfParamAssignmentsSingle) {
+  auto r = Parse("module m; parameter int A = 1; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kParamDecl);
+}
+
+TEST(ParserA23, ListOfParamAssignmentsMultiple) {
+  auto r = Parse("module m; parameter int A = 1, B = 2, C = 3; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  int count = 0;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kParamDecl) count++;
+  }
+  EXPECT_GE(count, 3);
+}
+
 }  // namespace
