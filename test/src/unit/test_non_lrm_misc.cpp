@@ -64347,4 +64347,36 @@ TEST(SourceText, CheckerRandDataDecl) {
   EXPECT_FALSE(r.cu->checkers[0]->items[1]->is_rand);
 }
 
+// =============================================================================
+// §17.10 Checker with function/task declarations
+// =============================================================================
+TEST_F(CheckerParseTest, CheckerWithFunctionDecl) {
+  auto *unit = Parse(R"(
+    checker func_check;
+      function int get_val;
+        return 42;
+      endfunction
+    endchecker
+  )");
+  ASSERT_EQ(unit->checkers.size(), 1u);
+  EXPECT_TRUE(
+      HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kFunctionDecl));
+}
+
+// checker_or_generate_item_declaration ::= function_declaration
+TEST(SourceText, CheckerFunctionDecl) {
+  auto r = Parse(
+      "checker chk;\n"
+      "  function automatic int add(int a, int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  ASSERT_GE(r.cu->checkers[0]->items.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->items[0]->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(r.cu->checkers[0]->items[0]->name, "add");
+}
+
 }  // namespace
