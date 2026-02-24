@@ -1,4 +1,4 @@
-// §6.9.1: Specifying vectors
+// §7.4.1: Packed arrays
 
 #include <gtest/gtest.h>
 #include <string>
@@ -55,37 +55,6 @@ TEST(ParserA25, PackedDimElaboratesWidth) {
   ASSERT_GE(mod->variables.size(), 1u);
   EXPECT_EQ(mod->variables[0].name, "x");
   EXPECT_EQ(mod->variables[0].width, 8u);
-}
-
-struct ElabA83Fixture {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
-  bool has_errors = false;
-};
-
-static RtlirDesign *ElaborateSrc(const std::string &src, ElabA83Fixture &f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  auto *design = elab.Elaborate(cu->modules.back()->name);
-  f.has_errors = f.diag.HasErrors();
-  return design;
-}
-
-// § genvar_expression — genvar in generate for elaborates
-TEST(ElabA83, GenvarExprElaborates) {
-  ElabA83Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  parameter int N = 4;\n"
-      "  logic [N-1:0] w;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace
