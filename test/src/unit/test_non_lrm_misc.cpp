@@ -74563,4 +74563,86 @@ TEST_F(SpecifyTest, IfnoneConditionalPath) {
   EXPECT_EQ(spec->specify_items[0]->path.condition, nullptr);
 }
 
+TEST(ParserSection28, Sec28_12_PulsestyleOnevent) {
+  auto sp = ParseSpecifySingle(
+      "module m(input a, output b);\n"
+      "  specify\n"
+      "    pulsestyle_onevent b;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(sp.pr.cu, nullptr);
+  EXPECT_FALSE(sp.pr.has_errors);
+  ASSERT_NE(sp.sole_item, nullptr);
+  auto *si = sp.sole_item;
+  EXPECT_EQ(si->kind, SpecifyItemKind::kPulsestyle);
+  EXPECT_FALSE(si->is_ondetect);
+  ASSERT_EQ(si->signal_list.size(), 1u);
+  EXPECT_EQ(si->signal_list[0], "b");
+}
+
+TEST(ParserSection28, Sec28_12_PulsestyleOndetect) {
+  auto sp = ParseSpecifySingle(
+      "module m(input a, output b, c);\n"
+      "  specify\n"
+      "    pulsestyle_ondetect b, c;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(sp.pr.cu, nullptr);
+  EXPECT_FALSE(sp.pr.has_errors);
+  ASSERT_NE(sp.sole_item, nullptr);
+  auto *si = sp.sole_item;
+  EXPECT_EQ(si->kind, SpecifyItemKind::kPulsestyle);
+  EXPECT_TRUE(si->is_ondetect);
+  ASSERT_EQ(si->signal_list.size(), 2u);
+  EXPECT_EQ(si->signal_list[0], "b");
+  EXPECT_EQ(si->signal_list[1], "c");
+}
+
+TEST(ParserSection28, Sec28_12_Showcancelled) {
+  auto sp = ParseSpecifySingle(
+      "module m(input a, output b);\n"
+      "  specify\n"
+      "    showcancelled b;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(sp.pr.cu, nullptr);
+  EXPECT_FALSE(sp.pr.has_errors);
+  ASSERT_NE(sp.sole_item, nullptr);
+  auto *si = sp.sole_item;
+  EXPECT_EQ(si->kind, SpecifyItemKind::kShowcancelled);
+  EXPECT_FALSE(si->is_noshowcancelled);
+  ASSERT_EQ(si->signal_list.size(), 1u);
+  EXPECT_EQ(si->signal_list[0], "b");
+}
+
+TEST(ParserSection28, Sec28_12_Noshowcancelled) {
+  auto sp = ParseSpecifySingle(
+      "module m(input a, output b, c);\n"
+      "  specify\n"
+      "    noshowcancelled b, c;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(sp.pr.cu, nullptr);
+  EXPECT_FALSE(sp.pr.has_errors);
+  ASSERT_NE(sp.sole_item, nullptr);
+  auto *si = sp.sole_item;
+  EXPECT_EQ(si->kind, SpecifyItemKind::kShowcancelled);
+  EXPECT_TRUE(si->is_noshowcancelled);
+  ASSERT_EQ(si->signal_list.size(), 2u);
+}
+
+TEST(ParserSection28, Sec28_12_MixedPathsAndTimingChecks) {
+  EXPECT_TRUE(
+      ParseOk("module m(input a, d, clk, output b);\n"
+              "  specify\n"
+              "    specparam tPD = 10;\n"
+              "    (a => b) = tPD;\n"
+              "    $setup(d, posedge clk, 5);\n"
+              "    $hold(posedge clk, d, 3);\n"
+              "    showcancelled b;\n"
+              "    pulsestyle_onevent b;\n"
+              "  endspecify\n"
+              "endmodule\n"));
+}
+
 }  // namespace
