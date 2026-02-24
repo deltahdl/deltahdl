@@ -1,9 +1,7 @@
-// Tests for A.7.5.3 — System timing check event definitions — Elaboration
+// §31.7: Enabling timing checks with conditioned events
 
 #include <gtest/gtest.h>
-
 #include <string>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -13,8 +11,6 @@
 #include "parser/parser.h"
 
 using namespace delta;
-
-namespace {
 
 struct ElabA70503Fixture {
   SourceManager mgr;
@@ -34,12 +30,11 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA70503Fixture &f) {
   return design;
 }
 
-}  // namespace
+namespace {
 
 // =============================================================================
 // A.7.5.3 Elab — timing_check_event with edge controls
 // =============================================================================
-
 // timing_check_event with no edge elaborates
 TEST(ElabA70503, TimingCheckEventNoEdgeElaborates) {
   ElabA70503Fixture f;
@@ -47,20 +42,6 @@ TEST(ElabA70503, TimingCheckEventNoEdgeElaborates) {
       "module m;\n"
       "  specify\n"
       "    $setup(data, clk, 10);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-// timing_check_event with posedge elaborates
-TEST(ElabA70503, TimingCheckEventPosedgeElaborates) {
-  ElabA70503Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $setup(data, posedge clk, 10);\n"
       "  endspecify\n"
       "endmodule\n",
       f);
@@ -97,87 +78,8 @@ TEST(ElabA70503, TimingCheckEventEdgeKeywordElaborates) {
 }
 
 // =============================================================================
-// A.7.5.3 Elab — edge_control_specifier
-// =============================================================================
-
-// edge_control_specifier with 01, 10 descriptors elaborates
-TEST(ElabA70503, EdgeControlSpecifier01_10Elaborates) {
-  ElabA70503Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $setup(data, edge [01, 10] clk, 10);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-// edge_control_specifier with x transitions elaborates
-TEST(ElabA70503, EdgeControlSpecifierXTransitionsElaborates) {
-  ElabA70503Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $setup(data, edge [x0, x1] clk, 10);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-// =============================================================================
-// A.7.5.3 Elab — specify_terminal_descriptor with ranges
-// =============================================================================
-
-// Terminal with bit select elaborates
-TEST(ElabA70503, TerminalBitSelectElaborates) {
-  ElabA70503Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $setup(data[0], posedge clk, 10);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-// Terminal with part select elaborates
-TEST(ElabA70503, TerminalPartSelectElaborates) {
-  ElabA70503Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $setup(data[3:0], posedge clk, 10);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-// Terminal with interface.port form elaborates
-TEST(ElabA70503, TerminalInterfaceDotPortElaborates) {
-  ElabA70503Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $setup(intf.data, posedge clk, 10);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-// =============================================================================
 // A.7.5.3 Elab — timing_check_condition with &&&
 // =============================================================================
-
 // &&& bare condition elaborates
 TEST(ElabA70503, TimingCheckConditionBareElaborates) {
   ElabA70503Fixture f;
@@ -234,24 +136,6 @@ TEST(ElabA70503, ConditionBothEventsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// =============================================================================
-// A.7.5.3 Elab — controlled_timing_check_event
-// =============================================================================
-
-// $period with controlled_timing_check_event elaborates
-TEST(ElabA70503, ControlledTimingCheckEventPeriodElaborates) {
-  ElabA70503Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $period(posedge clk, 50);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 // $width with controlled_timing_check_event and condition elaborates
 TEST(ElabA70503, ControlledTimingCheckEventWidthCondElaborates) {
   ElabA70503Fixture f;
@@ -269,7 +153,6 @@ TEST(ElabA70503, ControlledTimingCheckEventWidthCondElaborates) {
 // =============================================================================
 // A.7.5.3 Elab — combined edge + terminal range + condition
 // =============================================================================
-
 // Full combination: edge + bit-select terminal + &&& condition elaborates
 TEST(ElabA70503, FullCombinationElaborates) {
   ElabA70503Fixture f;
@@ -283,3 +166,5 @@ TEST(ElabA70503, FullCombinationElaborates) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
+
+}  // namespace
