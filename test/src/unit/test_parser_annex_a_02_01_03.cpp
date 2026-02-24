@@ -30,6 +30,16 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
+// =============================================================================
+// A.2 -- Overview tests
+// =============================================================================
+TEST(ParserAnnexA, A2NetDeclWire) {
+  auto r = Parse("module m; wire [3:0] w; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kNetDecl);
+}
+
 }  // namespace
 
 // =============================================================================

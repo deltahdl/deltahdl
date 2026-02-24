@@ -110,4 +110,47 @@ TEST(SourceText, SpecparamAsModuleItem) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kSpecparam);
 }
 
+TEST(ParserAnnexA, A2VarDeclWithInit) {
+  auto r = Parse("module m; logic [7:0] data = 8'hFF; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_NE(r.cu->modules[0]->items[0]->init_expr, nullptr);
+}
+
+TEST(ParserAnnexA, A2TypedefStructPacked) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct packed {\n"
+      "    logic [7:0] addr;\n"
+      "    logic [31:0] data;\n"
+      "  } req_t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kTypedef);
+}
+
+TEST(ParserAnnexA, A2ClassWithConstraint) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint c1 { x > 0; x < 100; }\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+}
+
+TEST(ParserAnnexA, A2CovergroupDecl) {
+  auto r = Parse(
+      "module m;\n"
+      "  covergroup cg @(posedge clk);\n"
+      "    coverpoint x;\n"
+      "  endgroup\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
