@@ -1,0 +1,102 @@
+---
+concurrency:
+  cancel-in-progress: true
+  group: implement-clause-${{ github.ref }}
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-implement-clause-${{
+            hashFiles('.github/workflows/implement_clause.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-implement-clause-
+      - name: Install tools
+        run: |
+          pip install \
+            assert-no-inline-directives \
+            assert-no-linter-config-files \
+            assert-one-assert-per-pytest \
+            mypy pylint pytest pytest-cov
+          npm install -g jscpd
+      - name: Assert no inline lint disables
+        run: >-
+          assert-no-inline-directives
+          --tools pylint,mypy
+          --verbose
+          ${{ github.workspace }}/scripts/implement_clause/
+          ${{ github.workspace }}/test/scripts/implement_clause/**/*
+      - name: Assert no linter config files
+        run: >-
+          assert-no-linter-config-files
+          --linters pylint,mypy
+          --verbose
+          ${{ github.workspace }}
+      - name: Assert one assert per pytest
+        run: >-
+          assert-one-assert-per-pytest
+          --verbose
+          ${{ github.workspace }}/test/scripts/implement_clause
+      - name: Run pylint on source
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pylint
+          scripts/implement_clause/
+          --fail-on=C,R,W --fail-under=10.0
+      - name: Run pylint on tests
+        run: >-
+          PYTHONPATH=.:scripts:test/scripts/implement_clause/unit
+          python3 -m pylint --recursive=y
+          test/scripts/implement_clause/
+          --fail-on=C,R,W --fail-under=10.0
+      - name: Run mypy on source
+        run: >-
+          PYTHONPATH=.:scripts python3 -m mypy
+          scripts/implement_clause/
+      - name: Run mypy on tests
+        run: >-
+          MYPYPATH=.:scripts:test/scripts/implement_clause/unit
+          python3 -m mypy --explicit-package-bases
+          test/scripts/implement_clause/
+      - name: Detect copy-paste in source
+        run: >-
+          jscpd --pattern "**/*.py" --threshold 0
+          --reporters console scripts/implement_clause/
+      - name: Detect copy-paste in tests
+        run: >-
+          jscpd --pattern "**/*.py" --threshold 0
+          --reporters console test/scripts/implement_clause/
+      - name: Run unit tests with 100% coverage gate
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/implement_clause/unit/ -v
+          --cov=implement_clause
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
+      - name: Run integration tests
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/implement_clause/integration/ -v
+      - name: Run e2e tests
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/implement_clause/e2e/ -v
+name: Implement Clause
+on:
+  pull_request:
+    paths:
+      - .github/workflows/implement_clause.yml
+      - scripts/implement_clause/**
+      - test/scripts/implement_clause/**
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/implement_clause.yml
+      - scripts/implement_clause/**
+      - test/scripts/implement_clause/**
+  workflow_dispatch:
