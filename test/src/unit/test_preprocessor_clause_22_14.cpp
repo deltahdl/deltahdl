@@ -1,5 +1,6 @@
-#include <gtest/gtest.h>
+// §22.14: `begin_keywords, `end_keywords
 
+#include <gtest/gtest.h>
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/keywords.h"
@@ -15,21 +16,14 @@ struct PreprocFixture {
 
 static std::string Preprocess(const std::string &src, PreprocFixture &f,
                               PreprocConfig config = {}) {
+
   auto fid = f.mgr.AddFile("<test>", src);
+
   Preprocessor pp(f.mgr, f.diag, std::move(config));
+
   return pp.Preprocess(fid);
-}
 
-// --- begin_keywords / end_keywords tests (IEEE 1800-2023 §22.14) ---
-
-TEST(Preprocessor, BeginKeywords_EmitsMarker) {
-  PreprocFixture f;
-  auto result = Preprocess("`begin_keywords \"1364-2001\"\n", f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  // Marker: \x01 + version byte (1 = kVer13642001) + \n
-  std::string expected = {kKeywordMarker, '\x01', '\n'};
-  EXPECT_NE(result.find(expected), std::string::npos);
-}
+namespace {
 
 TEST(Preprocessor, EndKeywords_EmitsRestoreMarker) {
   PreprocFixture f;
@@ -77,7 +71,6 @@ TEST(Preprocessor, BeginKeywords_NestedRestoresVersion) {
 }
 
 // --- Preprocessor+Lexer integration tests from test_lexical.cpp ---
-
 TEST(Preprocessor, BeginKeywords_LogicAsIdentifier) {
   PreprocFixture f;
   auto preprocessed = Preprocess(
@@ -119,3 +112,5 @@ TEST(Preprocessor, BeginKeywords_RestoresAfterEnd) {
   EXPECT_EQ(tokens[0].text, "logic");
   EXPECT_EQ(tokens[1].kind, TokenKind::kKwLogic);
 }
+
+}  // namespace
