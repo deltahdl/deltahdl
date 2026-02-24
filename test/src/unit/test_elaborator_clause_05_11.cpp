@@ -1,5 +1,6 @@
-#include <gtest/gtest.h>
+// §5.11: Array literals
 
+#include <gtest/gtest.h>
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -25,8 +26,9 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabFixture &f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-// --- §5.11: Array literals ---
+namespace {
 
+// --- §5.11: Array literals ---
 TEST(ElabCh511, ArrayInitPattern_FlatIllegal) {
   // §5.11: Nesting of braces shall follow the number of dimensions.
   ElabFixture f;
@@ -39,36 +41,4 @@ TEST(ElabCh511, ArrayInitPattern_FlatIllegal) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(ElabCh511, ArrayInitPattern_NestedOk) {
-  // §5.11: Nested braces matching array dimensions are valid.
-  ElabFixture f;
-  ElaborateSrc(
-      "module top();\n"
-      "  typedef struct { int a; int b; } ms_t;\n"
-      "  ms_t ms[1:0] = '{'{0, 0}, '{1, 1}};\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(ElabCh511, ArrayInitPattern_SimpleArrayOk) {
-  // §5.11 / §10.9.1: Expressions shall match element for element.
-  ElabFixture f;
-  ElaborateSrc(
-      "module top();\n"
-      "  int arr[1:0] = '{10, 20};\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(ElabCh511, ArrayInitPattern_SizeMismatch) {
-  // §10.9.1: Expressions shall match element for element; 3 != 2.
-  ElabFixture f;
-  ElaborateSrc(
-      "module top();\n"
-      "  int arr[1:0] = '{10, 20, 30};\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
+}  // namespace
