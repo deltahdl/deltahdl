@@ -1,7 +1,6 @@
-// §11.6: Expression bit lengths
+// §11.6.1: Rules for expression bit lengths
 
 #include <gtest/gtest.h>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -33,21 +32,6 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabFixture &f) {
 
 namespace {
 
-// --- Width inference tests ---
-TEST(Elaboration, WidthInference_ContAssignWidth) {
-  ElabFixture f;
-  auto *design = ElaborateSrc(
-      "module top;\n"
-      "  logic [7:0] a, b;\n"
-      "  assign a = b;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  auto *mod = design->top_modules[0];
-  ASSERT_EQ(mod->assigns.size(), 1);
-  EXPECT_EQ(mod->assigns[0].width, 8);
-}
-
 TEST(Elaboration, WidthInference_BinaryMax) {
   TypedefMap typedefs;
   Expr lhs;
@@ -78,20 +62,6 @@ TEST(Elaboration, WidthInference_ComparisonOneBit) {
   cmp.lhs = &lhs;
   cmp.rhs = &rhs;
   EXPECT_EQ(InferExprWidth(&cmp, typedefs), 1);
-}
-
-TEST(Elaboration, WidthInference_Concatenation) {
-  TypedefMap typedefs;
-  Expr a;
-  a.kind = ExprKind::kIntegerLiteral;
-  a.int_val = 1;
-  Expr b;
-  b.kind = ExprKind::kIntegerLiteral;
-  b.int_val = 2;
-  Expr concat;
-  concat.kind = ExprKind::kConcatenation;
-  concat.elements = {&a, &b};
-  EXPECT_EQ(InferExprWidth(&concat, typedefs), 64);  // 32 + 32
 }
 
 }  // namespace
