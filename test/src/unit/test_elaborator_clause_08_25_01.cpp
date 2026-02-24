@@ -1,7 +1,6 @@
-// §6.25: Parameterized data types
+// §8.25.1: Class scope resolution operator for parameterized classes
 
 #include <gtest/gtest.h>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
