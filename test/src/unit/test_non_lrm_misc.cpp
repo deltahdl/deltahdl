@@ -72110,4 +72110,18 @@ TEST(Parser, ImportWildcard) {
   EXPECT_TRUE(item->import_item.is_wildcard);
 }
 
+// =============================================================================
+// §24.13 Program with import
+// =============================================================================
+TEST_F(ProgramTestParse, ProgramWithImport) {
+  auto *unit = Parse(
+      "program p;\n"
+      "  import pkg::*;\n"
+      "endprogram\n");
+  ASSERT_EQ(unit->programs.size(), 1u);
+  ASSERT_EQ(unit->programs[0]->items.size(), 1u);
+  EXPECT_EQ(unit->programs[0]->items[0]->kind, ModuleItemKind::kImportDecl);
+  EXPECT_TRUE(unit->programs[0]->items[0]->import_item.is_wildcard);
+}
+
 }  // namespace
