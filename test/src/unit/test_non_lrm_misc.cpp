@@ -73380,4 +73380,13 @@ TEST(ParserSection28, StrengthSpecHighz) {
   EXPECT_EQ(item->drive_strength1, 3);  // pull1 = 3
 }
 
+TEST(Parser, GatePullup) {
+  auto r = Parse("module t; pullup (o); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
+  EXPECT_EQ(item->gate_kind, GateKind::kPullup);
+  EXPECT_EQ(item->gate_terminals.size(), 1);
+}
+
 }  // namespace
