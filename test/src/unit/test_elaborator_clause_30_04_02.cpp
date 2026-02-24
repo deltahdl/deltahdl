@@ -46,4 +46,81 @@ TEST(ElabA701, SpecifyBlockWithPathElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+struct ElabA703Fixture {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag{mgr};
+  bool has_errors = false;
+};
+
+static RtlirDesign *ElaborateSrc(const std::string &src, ElabA703Fixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  auto *design = elab.Elaborate(cu->modules.back()->name);
+  f.has_errors = f.diag.HasErrors();
+  return design;
+}
+
+// =============================================================================
+// A.7.3 Specify block terminals — Elaboration
+// =============================================================================
+// Terminal with bit-select elaborates
+TEST(ElabA703, TerminalBitSelectElaborates) {
+  ElabA703Fixture f;
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    (a[3] => b[0]) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// Terminal with part-select range elaborates
+TEST(ElabA703, TerminalPartSelectElaborates) {
+  ElabA703Fixture f;
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    (a[7:0] => b[7:0]) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// Terminal with indexed part-select elaborates
+TEST(ElabA703, TerminalIndexedPartSelectElaborates) {
+  ElabA703Fixture f;
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    (a[0+:4] => b[7-:4]) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// Terminal with dotted interface.port elaborates
+TEST(ElabA703, TerminalDottedElaborates) {
+  ElabA703Fixture f;
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    (intf.sig => intf.out) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

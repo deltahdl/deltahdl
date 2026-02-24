@@ -1,9 +1,7 @@
-// Tests for A.7.3 — Specify block terminals — Elaboration
+// Annex A.7.3: Specify block terminals
 
 #include <gtest/gtest.h>
-
 #include <string>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -13,8 +11,6 @@
 #include "parser/parser.h"
 
 using namespace delta;
-
-namespace {
 
 struct ElabA703Fixture {
   SourceManager mgr;
@@ -34,67 +30,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA703Fixture &f) {
   return design;
 }
 
-}  // namespace
-
-// =============================================================================
-// A.7.3 Specify block terminals — Elaboration
-// =============================================================================
-
-// Terminal with bit-select elaborates
-TEST(ElabA703, TerminalBitSelectElaborates) {
-  ElabA703Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    (a[3] => b[0]) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-// Terminal with part-select range elaborates
-TEST(ElabA703, TerminalPartSelectElaborates) {
-  ElabA703Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    (a[7:0] => b[7:0]) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-// Terminal with indexed part-select elaborates
-TEST(ElabA703, TerminalIndexedPartSelectElaborates) {
-  ElabA703Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    (a[0+:4] => b[7-:4]) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-// Terminal with dotted interface.port elaborates
-TEST(ElabA703, TerminalDottedElaborates) {
-  ElabA703Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    (intf.sig => intf.out) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
+namespace {
 
 // Dotted terminal with range elaborates
 TEST(ElabA703, DottedTerminalWithRangeElaborates) {
@@ -110,16 +46,4 @@ TEST(ElabA703, DottedTerminalWithRangeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Mixed terminal forms together elaborate
-TEST(ElabA703, MixedTerminalFormsElaborate) {
-  ElabA703Fixture f;
-  auto *design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    (a, b[3], intf.sig[7:0] *> x[0], y, intf2.out) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
+}  // namespace

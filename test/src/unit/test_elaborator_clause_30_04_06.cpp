@@ -46,4 +46,36 @@ TEST(ElabA702, SimpleFullPathElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+struct ElabA703Fixture {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag{mgr};
+  bool has_errors = false;
+};
+
+static RtlirDesign *ElaborateSrc(const std::string &src, ElabA703Fixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  auto *design = elab.Elaborate(cu->modules.back()->name);
+  f.has_errors = f.diag.HasErrors();
+  return design;
+}
+
+// Mixed terminal forms together elaborate
+TEST(ElabA703, MixedTerminalFormsElaborate) {
+  ElabA703Fixture f;
+  auto *design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    (a, b[3], intf.sig[7:0] *> x[0], y, intf2.out) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
