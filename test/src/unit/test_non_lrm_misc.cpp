@@ -74934,4 +74934,54 @@ TEST(ParserSection28, Sec28_12_TimingCheckSkew) {
   EXPECT_EQ(si->timing_check.data_terminal.name, "clk2");
 }
 
+TEST_F(SpecifyTest, WidthTimingCheck) {
+  auto *cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $width(posedge clk, 20);\n"
+      "endspecify\n"
+      "endmodule\n");
+  auto *spec = FirstSpecifyBlock(cu);
+  ASSERT_NE(spec, nullptr);
+  auto &tc = spec->specify_items[0]->timing_check;
+  EXPECT_EQ(tc.check_kind, TimingCheckKind::kWidth);
+  EXPECT_EQ(tc.ref_edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(tc.ref_terminal.name, "clk");
+  ASSERT_GE(tc.limits.size(), 1u);
+}
+
+TEST_F(SpecifyTest, TimeskewTimingCheck) {
+  auto *cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $timeskew(posedge clk1, posedge clk2, 5);\n"
+      "endspecify\n"
+      "endmodule\n");
+  auto *spec = FirstSpecifyBlock(cu);
+  ASSERT_NE(spec, nullptr);
+  auto &tc = spec->specify_items[0]->timing_check;
+  EXPECT_EQ(tc.check_kind, TimingCheckKind::kTimeskew);
+  EXPECT_EQ(tc.ref_edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(tc.ref_terminal.name, "clk1");
+  EXPECT_EQ(tc.data_edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(tc.data_terminal.name, "clk2");
+  ASSERT_EQ(tc.limits.size(), 1u);
+}
+
+TEST_F(SpecifyTest, FullskewTimingCheck) {
+  auto *cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $fullskew(posedge clk1, negedge clk2, 4, 6);\n"
+      "endspecify\n"
+      "endmodule\n");
+  auto *spec = FirstSpecifyBlock(cu);
+  ASSERT_NE(spec, nullptr);
+  auto &tc = spec->specify_items[0]->timing_check;
+  EXPECT_EQ(tc.check_kind, TimingCheckKind::kFullskew);
+  EXPECT_EQ(tc.ref_edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(tc.data_edge, SpecifyEdge::kNegedge);
+  ASSERT_GE(tc.limits.size(), 2u);
+}
+
 }  // namespace
