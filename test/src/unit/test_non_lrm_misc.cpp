@@ -41619,4 +41619,52 @@ TEST(SourceText, ClassConstProperty) {
   EXPECT_TRUE(members[1]->is_static);
 }
 
+TEST(Parser, VirtualClass) {
+  auto r = Parse("virtual class base; endclass");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.cu->classes[0]->is_virtual);
+}
+
+// class_method ::= pure virtual { class_item_qualifier } method_prototype ;
+//                | extern { method_qualifier } method_prototype ;
+TEST(SourceText, ClassPureVirtualAndExtern) {
+  auto r = Parse(
+      "class C;\n"
+      "  pure virtual function void pv_fn();\n"
+      "  pure virtual task pv_task();\n"
+      "  extern function void ext_fn();\n"
+      "  extern static task ext_task();\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto &members = r.cu->classes[0]->members;
+  ASSERT_EQ(members.size(), 4u);
+  EXPECT_EQ(members[0]->kind, ClassMemberKind::kMethod);
+  EXPECT_EQ(members[1]->kind, ClassMemberKind::kMethod);
+  EXPECT_EQ(members[2]->kind, ClassMemberKind::kMethod);
+  EXPECT_EQ(members[3]->kind, ClassMemberKind::kMethod);
+  EXPECT_TRUE(members[0]->is_virtual);
+  EXPECT_TRUE(members[1]->is_virtual);
+  EXPECT_EQ(members[2]->method->name, "ext_fn");
+  EXPECT_TRUE(members[3]->is_static);
+}
+
+TEST(ParserA26, FuncPrototypePureVirtual) {
+  auto r = Parse(
+      "class C;\n"
+      "  pure virtual function int compute(input int x);\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserA27, TaskPrototypePureVirtual) {
+  auto r = Parse(
+      "class C;\n"
+      "  pure virtual task do_work(input int x);\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
