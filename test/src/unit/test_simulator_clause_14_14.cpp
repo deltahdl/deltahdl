@@ -70,4 +70,49 @@ TEST(ClockingSim, GlobalClockingBlock) {
   EXPECT_EQ(cmgr.GetGlobalClocking(), "gclk");
 }
 
+struct SimA611Fixture {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag};
+};
+
+void SchedulePosedge(SimA611Fixture &f, Variable *clk, uint64_t time) {
+  auto *ev = f.scheduler.GetEventPool().Acquire();
+  ev->callback = [clk, &f]() {
+    clk->prev_value = clk->value;
+    clk->value = MakeLogic4VecVal(f.arena, 1, 1);
+    clk->NotifyWatchers();
+  };
+  f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
+}
+
+void ScheduleNegedge(SimA611Fixture &f, Variable *clk, uint64_t time) {
+  auto *ev = f.scheduler.GetEventPool().Acquire();
+  ev->callback = [clk, &f]() {
+    clk->prev_value = clk->value;
+    clk->value = MakeLogic4VecVal(f.arena, 1, 0);
+    clk->NotifyWatchers();
+  };
+  f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
+}
+
+// --- clocking_declaration: global clocking ---
+TEST(SimA611, GlobalClocking) {
+  ClockingManager cmgr;
+  ClockingBlock block;
+  block.name = "gclk";
+  block.clock_signal = "clk_global";
+  block.clock_edge = Edge::kPosedge;
+  block.default_input_skew = SimTime{0};
+  block.default_output_skew = SimTime{0};
+  block.is_global = true;
+  cmgr.Register(block);
+
+  cmgr.SetGlobalClocking("gclk");
+  EXPECT_EQ(cmgr.GetGlobalClocking(), "gclk");
+  EXPECT_TRUE(cmgr.Find("gclk")->is_global);
+}
+
 }  // namespace

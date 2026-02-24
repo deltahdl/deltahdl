@@ -78501,4 +78501,65 @@ TEST(SimA60701, ConstPatternInVarDeclInit) {
   EXPECT_EQ(var->value.ToUint64(), 25800u);
 }
 
+struct SimA611Fixture {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag};
+};
+
+void SchedulePosedge(SimA611Fixture &f, Variable *clk, uint64_t time) {
+  auto *ev = f.scheduler.GetEventPool().Acquire();
+  ev->callback = [clk, &f]() {
+    clk->prev_value = clk->value;
+    clk->value = MakeLogic4VecVal(f.arena, 1, 1);
+    clk->NotifyWatchers();
+  };
+  f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
+}
+
+void ScheduleNegedge(SimA611Fixture &f, Variable *clk, uint64_t time) {
+  auto *ev = f.scheduler.GetEventPool().Acquire();
+  ev->callback = [clk, &f]() {
+    clk->prev_value = clk->value;
+    clk->value = MakeLogic4VecVal(f.arena, 1, 0);
+    clk->NotifyWatchers();
+  };
+  f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
+}
+
+// --- clocking_direction: output driving with skew ---
+TEST(SimA611, OutputDrivingWithSkew) {
+  SimA611Fixture f;
+  auto *clk = f.ctx.CreateVariable("clk", 1);
+  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
+  auto *out = f.ctx.CreateVariable("data_out", 8);
+  out->value = MakeLogic4VecVal(f.arena, 8, 0);
+
+  ClockingManager cmgr;
+  ClockingBlock block;
+  block.name = "cb";
+  block.clock_signal = "clk";
+  block.clock_edge = Edge::kPosedge;
+  block.default_input_skew = SimTime{0};
+  block.default_output_skew = SimTime{3};
+
+  ClockingSignal sig;
+  sig.signal_name = "data_out";
+  sig.direction = ClockingDir::kOutput;
+  block.signals.push_back(sig);
+  cmgr.Register(block);
+  cmgr.Attach(f.ctx, f.scheduler);
+
+  auto *ev = f.scheduler.GetEventPool().Acquire();
+  ev->callback = [&cmgr, &f]() {
+    cmgr.ScheduleOutputDrive("cb", "data_out", 0x55, f.ctx, f.scheduler);
+  };
+  f.scheduler.ScheduleEvent(SimTime{10}, Region::kActive, ev);
+  f.scheduler.Run();
+
+  EXPECT_EQ(out->value.ToUint64(), 0x55u);
+}
+
 }  // namespace

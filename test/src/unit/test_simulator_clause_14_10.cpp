@@ -115,4 +115,59 @@ TEST(ClockingSim, EdgeCallbackOnPosedge) {
   EXPECT_EQ(count, 2u);
 }
 
+struct SimA611Fixture {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag};
+};
+
+void SchedulePosedge(SimA611Fixture &f, Variable *clk, uint64_t time) {
+  auto *ev = f.scheduler.GetEventPool().Acquire();
+  ev->callback = [clk, &f]() {
+    clk->prev_value = clk->value;
+    clk->value = MakeLogic4VecVal(f.arena, 1, 1);
+    clk->NotifyWatchers();
+  };
+  f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
+}
+
+void ScheduleNegedge(SimA611Fixture &f, Variable *clk, uint64_t time) {
+  auto *ev = f.scheduler.GetEventPool().Acquire();
+  ev->callback = [clk, &f]() {
+    clk->prev_value = clk->value;
+    clk->value = MakeLogic4VecVal(f.arena, 1, 0);
+    clk->NotifyWatchers();
+  };
+  f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
+}
+
+// --- edge callback registration ---
+TEST(SimA611, EdgeCallbackPosedge) {
+  SimA611Fixture f;
+  auto *clk = f.ctx.CreateVariable("clk", 1);
+  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
+
+  ClockingManager cmgr;
+  ClockingBlock block;
+  block.name = "cb";
+  block.clock_signal = "clk";
+  block.clock_edge = Edge::kPosedge;
+  block.default_input_skew = SimTime{0};
+  block.default_output_skew = SimTime{0};
+  cmgr.Register(block);
+
+  uint32_t count = 0;
+  cmgr.RegisterEdgeCallback("cb", f.ctx, f.scheduler, [&count]() { count++; });
+  cmgr.Attach(f.ctx, f.scheduler);
+
+  SchedulePosedge(f, clk, 10);
+  ScheduleNegedge(f, clk, 15);
+  SchedulePosedge(f, clk, 20);
+  f.scheduler.Run();
+
+  EXPECT_EQ(count, 2u);
+}
+
 }  // namespace
