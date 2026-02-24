@@ -308,4 +308,86 @@ TEST(ParserClause03, Cl3_13_ProgramBlockWithDeclarations) {
   EXPECT_FALSE(r.cu->programs[0]->items.empty());
 }
 
+// description: program_declaration
+TEST(SourceText, DescriptionProgram) {
+  auto r = Parse("program prg; endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->name, "prg");
+}
+
+// =============================================================================
+// A.1.2 program_declaration — all forms
+// =============================================================================
+// Program with lifetime.
+TEST(SourceText, ProgramWithLifetime) {
+  auto r = Parse("program automatic prg; endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+}
+
+// Program with end label.
+TEST(SourceText, ProgramEndLabel) {
+  auto r = Parse("program prg; endprogram : prg\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// Extern program declaration.
+TEST(SourceText, ExternProgram) {
+  auto r = Parse("extern program prg(input logic clk);\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_TRUE(r.cu->programs[0]->is_extern);
+  EXPECT_EQ(r.cu->programs[0]->name, "prg");
+}
+
+// =============================================================================
+// A.1.2 program_declaration — all 5 forms
+// =============================================================================
+// Program with ANSI ports.
+TEST(SourceText, ProgramAnsiHeader) {
+  auto r = Parse("program prg(input logic clk); endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->ports.size(), 1u);
+}
+
+// Program with non-ANSI ports.
+TEST(SourceText, ProgramNonAnsiHeader) {
+  auto r = Parse(
+      "program prg(clk);\n"
+      "  input clk;\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->ports.size(), 1u);
+}
+
+// Program with wildcard ports: program p(.*);
+TEST(SourceText, ProgramWildcardPorts) {
+  auto r = Parse("program prg(.*); endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_TRUE(r.cu->programs[0]->has_wildcard_ports);
+}
+
+// Program parameter port list and ports
+TEST(SourceText, ProgramParamsAndPorts) {
+  auto r = Parse(
+      "program prg #(parameter int N = 10)(input logic clk);\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->params.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->ports.size(), 1u);
+}
+
 }  // namespace

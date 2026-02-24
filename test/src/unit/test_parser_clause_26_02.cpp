@@ -316,4 +316,32 @@ TEST(ParserClause03, Cl3_13_TypedefInPackageScope) {
   EXPECT_EQ(typedef_count, 2);
 }
 
+// =============================================================================
+// A.1.2 package_declaration — with optional lifetime
+// =============================================================================
+// Package with automatic lifetime (A.1.2 gap fix).
+TEST(SourceText, PackageAutomaticLifetime) {
+  auto r = Parse("package automatic pkg; endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_EQ(r.cu->packages[0]->name, "pkg");
+}
+
+// Package with static lifetime.
+TEST(SourceText, PackageStaticLifetime) {
+  auto r = Parse("package static pkg; endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_EQ(r.cu->packages[0]->name, "pkg");
+}
+
+// Package with end label.
+TEST(SourceText, PackageEndLabel) {
+  auto r = Parse("package pkg; endpackage : pkg\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

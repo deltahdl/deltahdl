@@ -167,4 +167,74 @@ TEST(SourceText, InterfaceMultipleItemTypes) {
       HasItemKindNamed(ifc->items, ModuleItemKind::kTaskDecl, "run_parallel"));
 }
 
+// description: interface_declaration
+TEST(SourceText, DescriptionInterface) {
+  auto r = Parse("interface ifc; endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->name, "ifc");
+}
+
+// =============================================================================
+// A.1.2 interface_declaration — all forms
+// =============================================================================
+// Interface with lifetime.
+TEST(SourceText, InterfaceWithLifetime) {
+  auto r = Parse("interface automatic ifc; endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+}
+
+// Interface with end label.
+TEST(SourceText, InterfaceEndLabel) {
+  auto r = Parse("interface ifc; endinterface : ifc\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// Extern interface declaration.
+TEST(SourceText, ExternInterface) {
+  auto r = Parse("extern interface ifc(input logic clk);\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_TRUE(r.cu->interfaces[0]->is_extern);
+  EXPECT_EQ(r.cu->interfaces[0]->name, "ifc");
+}
+
+// =============================================================================
+// A.1.2 interface_declaration — all 5 forms
+// =============================================================================
+// Interface with ANSI ports.
+TEST(SourceText, InterfaceAnsiHeader) {
+  auto r = Parse("interface ifc(input logic clk); endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 1u);
+}
+
+// Interface with wildcard ports: interface i(.*);
+TEST(SourceText, InterfaceWildcardPorts) {
+  auto r = Parse("interface ifc(.*); endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_TRUE(r.cu->interfaces[0]->has_wildcard_ports);
+}
+
+// Interface parameter port list and ports
+TEST(SourceText, InterfaceParamsAndPorts) {
+  auto r = Parse(
+      "interface ifc #(parameter int W = 8)(input logic clk);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->params.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 1u);
+}
+
 }  // namespace

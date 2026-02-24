@@ -314,3 +314,63 @@ TEST(ParserClause03, Cl3_14_2_2_SeparateModulesIndependentScope) {
   EXPECT_EQ(r.cu->modules[1]->time_unit, TimeUnit::kUs);
   EXPECT_EQ(r.cu->modules[1]->time_prec, TimeUnit::kNs);
 }
+// --- Test helpers ---
+struct ParseResult {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit *cu = nullptr;
+  bool has_errors = false;
+};
+
+ParseResult Parse(const std::string &src) {
+  ParseResult result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// A.1.2 timeunits_declaration — all 4 forms
+// =============================================================================
+// Form 1: timeunit time_literal ;
+TEST(SourceText, TimeunitOnly) {
+  auto r = Parse("module m; timeunit 1ns; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
+}
+
+// Form 2: timeprecision time_literal ;
+TEST(SourceText, TimeprecisionOnly) {
+  auto r = Parse("module m; timeprecision 1ps; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
+}
+
+// Form 3: timeunit time_literal / time_literal ;
+TEST(SourceText, TimeunitWithSlash) {
+  auto r = Parse("module m; timeunit 1ns / 1ps; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
+  EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
+}
+
+// Form 4: both timeunit and timeprecision separately.
+TEST(SourceText, TimeunitAndTimeprecisionSeparate) {
+  auto r = Parse(
+      "module m;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
+  EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
+}
+

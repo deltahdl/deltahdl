@@ -187,4 +187,11 @@ TEST(ParserClause03, Cl3_13_ClassScopeMembers) {
   EXPECT_EQ(cls->members[1]->name, "name");
 }
 
+// Class with end label.
+TEST(SourceText, ClassEndLabel) {
+  auto r = Parse("class C; endclass : C\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

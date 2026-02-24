@@ -245,4 +245,16 @@ TEST(ParserClause03, Cl3_13_PortNamesInModuleScope) {
   EXPECT_EQ(r.cu->modules[0]->ports[2].direction, Direction::kOutput);
 }
 
+// =============================================================================
+// A.1.2 module_declaration — all forms
+// =============================================================================
+// module_keyword ::= module | macromodule
+TEST(SourceText, ModuleKeywordMacromodule) {
+  auto r = Parse("macromodule m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->name, "m");
+}
+
 }  // namespace

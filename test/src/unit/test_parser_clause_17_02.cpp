@@ -409,4 +409,25 @@ TEST(SourceText, CheckerMultipleItemTypes) {
   EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kElabSystemTask));
 }
 
+// description: checker_declaration
+TEST(SourceText, DescriptionChecker) {
+  auto r = Parse("checker chk; endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->name, "chk");
+}
+
+// =============================================================================
+// A.1.2 checker_declaration
+// =============================================================================
+// Checker with ports.
+TEST(SourceText, CheckerWithPorts) {
+  auto r = Parse("checker chk(event clk); endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->name, "chk");
+}
+
 }  // namespace

@@ -104,3 +104,18 @@ TEST(ParserSection29, UdpTableSpecialChars) {
   }
   EXPECT_EQ(udp->table[2].output, '-');
 }
+// description: udp_declaration
+TEST(SourceText, DescriptionUdp) {
+  auto r = Parse(
+      "primitive my_udp(output y, input a, input b);\n"
+      "  table\n"
+      "    0 0 : 0 ;\n"
+      "    1 1 : 1 ;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->udps.size(), 1u);
+  EXPECT_EQ(r.cu->udps[0]->name, "my_udp");
+}
+

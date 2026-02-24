@@ -88,3 +88,37 @@ TEST(ParserClause03, AllSevenDesignElements) {
       ParseOk("package p; typedef int myint; endpackage\n"
               "module m; import p::*; endmodule\n"));
 }
+// --- Test helpers ---
+struct ParseResult {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit *cu = nullptr;
+  bool has_errors = false;
+};
+
+ParseResult Parse(const std::string &src) {
+  ParseResult result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// Multiple descriptions in source text.
+TEST(SourceText, MultipleDescriptions) {
+  auto r = Parse(
+      "module m1; endmodule\n"
+      "interface ifc; endinterface\n"
+      "program prg; endprogram\n"
+      "package pkg; endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_EQ(r.cu->packages.size(), 1u);
+}
+

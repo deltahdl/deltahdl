@@ -275,4 +275,34 @@ TEST(ParserClause03, Cl3_12_1_CheckerAtCUScope) {
   ASSERT_EQ(r.cu->checkers.size(), 1u);
 }
 
+// --- Test helpers ---
+struct ParseResult {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit *cu = nullptr;
+  bool has_errors = false;
+};
+
+ParseResult Parse(const std::string &src) {
+  ParseResult result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// A.1.2 source_text ::= [ timeunits_declaration ] { description }
+// =============================================================================
+// Empty source text.
+TEST(SourceText, EmptySourceText) {
+  auto r = Parse("");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->modules.empty());
+}
+
 }  // namespace
