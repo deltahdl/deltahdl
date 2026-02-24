@@ -246,4 +246,45 @@ TEST(StmtExec, ForeachIteratorVariableAccessible) {
   EXPECT_EQ(last->value.ToUint64(), 4u);
 }
 
+struct SimA608Fixture {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag};
+};
+
+static RtlirDesign *ElaborateSrc(const std::string &src, SimA608Fixture &f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto *cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  return elab.Elaborate(cu->modules.back()->name);
+}
+
+// Mixed loop types: repeat inside for
+TEST(SimA608, MixedRepeatInsideFor) {
+  SimA608Fixture f;
+  auto *design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    for (int i = 0; i < 3; i = i + 1) begin\n"
+      "      repeat (2) x = x + 8'd1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto *var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  // 3 outer * 2 inner = 6
+  EXPECT_EQ(var->value.ToUint64(), 6u);
+}
+
 }  // namespace
