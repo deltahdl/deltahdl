@@ -72651,4 +72651,141 @@ TEST(ParserA23, ListOfGenvarIdentifiersSingle) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->name, "i");
 }
 
+static void VerifyGenerateCaseItem(const GenerateCaseItem &ci, size_t idx,
+                                   bool expect_default,
+                                   size_t expect_pattern_count) {
+  EXPECT_EQ(ci.is_default, expect_default) << "case item " << idx;
+  EXPECT_EQ(ci.patterns.size(), expect_pattern_count) << "case item " << idx;
+  EXPECT_FALSE(ci.body.empty()) << "case item " << idx;
+}
+
+TEST(Parser, GenerateIf) {
+  auto r = Parse(
+      "module t;\n"
+      "  if (WIDTH > 8) begin\n"
+      "    assign a = b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto *mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 1);
+  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kGenerateIf);
+  EXPECT_NE(mod->items[0]->gen_cond, nullptr);
+  EXPECT_FALSE(mod->items[0]->gen_body.empty());
+}
+
+TEST(Parser, GenerateIfElse) {
+  auto r = Parse(
+      "module t;\n"
+      "  if (WIDTH > 8) begin\n"
+      "    assign a = b;\n"
+      "  end else begin\n"
+      "    assign a = c;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kGenerateIf);
+  EXPECT_NE(item->gen_else, nullptr);
+}
+
+TEST(Parser, GenerateCase) {
+  auto r = Parse(
+      "module t;\n"
+      "  case (WIDTH)\n"
+      "    1: begin\n"
+      "      assign a = b;\n"
+      "    end\n"
+      "    2: begin\n"
+      "      assign a = c;\n"
+      "    end\n"
+      "  endcase\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto *item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kGenerateCase);
+  EXPECT_NE(item->gen_cond, nullptr);
+  ASSERT_EQ(item->gen_case_items.size(), 2);
+  VerifyGenerateCaseItem(item->gen_case_items[0], 0, false, 1);
+  VerifyGenerateCaseItem(item->gen_case_items[1], 1, false, 1);
+}
+
+TEST(Parser, GenerateCaseDefault) {
+  auto r = Parse(
+      "module t;\n"
+      "  case (WIDTH)\n"
+      "    1: begin\n"
+      "      assign a = b;\n"
+      "    end\n"
+      "    default: begin\n"
+      "      assign a = c;\n"
+      "    end\n"
+      "  endcase\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto *item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->gen_case_items.size(), 2);
+  EXPECT_TRUE(item->gen_case_items[1].is_default);
+}
+
+TEST(Parser, GenerateCaseMultiPattern) {
+  auto r = Parse(
+      "module t;\n"
+      "  case (WIDTH)\n"
+      "    1, 2: begin\n"
+      "      assign a = b;\n"
+      "    end\n"
+      "  endcase\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto *item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->gen_case_items.size(), 1);
+  EXPECT_EQ(item->gen_case_items[0].patterns.size(), 2);
+}
+
+TEST(Parser, GenerateCaseInRegion) {
+  auto r = Parse(
+      "module t;\n"
+      "  generate\n"
+      "    case (WIDTH)\n"
+      "      1: begin\n"
+      "        assign a = b;\n"
+      "      end\n"
+      "    endcase\n"
+      "  endgenerate\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  bool found = false;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kGenerateCase) {
+      found = true;
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+// 15. Labeled generate blocks (if-generate)
+TEST(ParserClause03, Cl3_13_LabeledIfGenerateBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  parameter USE_FAST = 1;\n"
+      "  if (USE_FAST) begin : fast_path\n"
+      "    logic [7:0] result;\n"
+      "  end else begin : slow_path\n"
+      "    logic [15:0] result;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *mod = r.cu->modules[0];
+  bool found_gen_if = false;
+  for (auto *item : mod->items) {
+    if (item->kind == ModuleItemKind::kGenerateIf) {
+      found_gen_if = true;
+      EXPECT_FALSE(item->gen_body.empty());
+    }
+  }
+  EXPECT_TRUE(found_gen_if);
+}
+
 }  // namespace
