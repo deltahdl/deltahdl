@@ -1,5 +1,6 @@
-#include <gtest/gtest.h>
+// §22.5.1: `define
 
+#include <gtest/gtest.h>
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "preprocessor/preprocessor.h"
@@ -13,11 +14,16 @@ struct PreprocFixture {
 
 static std::string Preprocess(const std::string &src, PreprocFixture &f,
                               PreprocConfig config = {}) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Preprocessor pp(f.mgr, f.diag, std::move(config));
-  return pp.Preprocess(fid);
-}
 
+  auto fid = f.mgr.AddFile("<test>", src);
+
+  Preprocessor pp(f.mgr, f.diag, std::move(config));
+
+  return pp.Preprocess(fid);
+
+namespace {
+
+}
 TEST(Preprocessor, BasicFunctionLikeMacro) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -55,7 +61,6 @@ TEST(Preprocessor, ObjectLikeNotConfusedWithFunctionLike) {
 }
 
 // --- Macro default parameter tests (IEEE 1800-2023 §22.5.1) ---
-
 TEST(Preprocessor, MacroDefaultParam) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -93,7 +98,6 @@ TEST(Preprocessor, MacroDefaultParamString) {
 }
 
 // --- Multi-line macro tests (IEEE 1800-2023 §22.5.1) ---
-
 TEST(Preprocessor, MultiLineMacro) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -119,7 +123,6 @@ TEST(Preprocessor, MultiLineMacroContinuation) {
 }
 
 // --- Inline macro expansion ---
-
 TEST(Preprocessor, InlineMacro_ExpandsDefined) {
   PreprocFixture f;
   auto result = Preprocess("`define FOO 42\nint x = `FOO;\n", f);
@@ -151,20 +154,6 @@ TEST(Preprocessor, InlineMacro_CommandLineDefines) {
   config.defines = {{"VAR_1", "2"}, {"VAR_2", "5"}};
   auto result = Preprocess("int a = `VAR_1 + `VAR_2;\n", f, config);
   EXPECT_NE(result.find("int a = 2 + 5;"), std::string::npos);
-}
-
-// --- §22.5.3 `undefineall ---
-
-TEST(Preprocessor, UndefineAll) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define FOO 42\n"
-      "`undefineall\n"
-      "`ifdef FOO\n"
-      "visible\n"
-      "`endif\n",
-      f);
-  EXPECT_EQ(result.find("visible"), std::string::npos);
 }
 
 // §22.5.1: macro expansion preserves trailing text on the line
@@ -214,7 +203,6 @@ TEST(Preprocessor, MacroStringFilename) {
 }
 
 // --- Tests from test_lexical.cpp (LRM §22.5.1) ---
-
 TEST(Preprocessor, Define_WithDefaultArgs) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -242,66 +230,5 @@ TEST(Preprocessor, Define_EmptyArgUsesDefault) {
       f);
   EXPECT_NE(result.find("1 + 99"), std::string::npos);
 }
-struct ParseResult31201 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit *cu = nullptr;
-  bool has_errors = false;
-};
 
-static ParseResult31201 Parse(const std::string &src) {
-  ParseResult31201 result;
-  DiagEngine diag(result.mgr);
-  auto fid = result.mgr.AddFile("<test>", src);
-  Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.Preprocess(fid);
-  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static bool ParseOk(const std::string &src) {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag(mgr);
-  auto fid = mgr.AddFile("<test>", src);
-  Preprocessor preproc(mgr, diag, {});
-  auto pp = preproc.Preprocess(fid);
-  auto pp_fid = mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(mgr.FileContent(pp_fid), pp_fid, diag);
-  Parser parser(lexer, arena, diag);
-  parser.Parse();
-  return !diag.HasErrors();
-}
-
-static const ModuleItem *FindItemByKindAndName(
-    const std::vector<ModuleItem *> &items, ModuleItemKind kind,
-    const std::string &name) {
-  for (const auto *item : items)
-    if (item->kind == kind && item->name == name) return item;
-  return nullptr;
-}
-
-// 7. Compiler directives apply within a CU only.
-// A `define in one parse (CU) does not leak into a separate parse (CU).
-TEST(ParserClause03, Cl3_12_1_DirectivesLocalToCU) {
-  // First CU: define a macro and use it.
-  auto r1 = Parse(
-      "`define FOO 1\n"
-      "module m1;\n"
-      "  localparam X = `FOO;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r1.has_errors);
-  // Second CU (separate Parse call): macro should NOT be defined.
-  // Using `FOO without defining it should produce a preprocessor error.
-  auto r2 = Parse(
-      "module m2;\n"
-      "  localparam Y = `FOO;\n"
-      "endmodule\n");
-  // The undefined macro should cause an error in the second CU.
-  EXPECT_TRUE(r2.has_errors);
-}
-
+}  // namespace
