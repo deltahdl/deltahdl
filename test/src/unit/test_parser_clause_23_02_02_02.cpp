@@ -101,4 +101,90 @@ TEST(ParserAnnexA, A1ModulePortDirections) {
   }
 }
 
+// =============================================================================
+// A.2.1.2 Port declarations
+// =============================================================================
+// --- inout_declaration ---
+// inout net_port_type list_of_port_identifiers
+TEST(ParserA212, InoutWireNetType) {
+  auto r = Parse("module m(inout wire a); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->ports.size(), 1u);
+  auto &port = r.cu->modules[0]->ports[0];
+  EXPECT_EQ(port.direction, Direction::kInout);
+  EXPECT_EQ(port.name, "a");
+}
+
+TEST(ParserA212, InoutPackedDim) {
+  auto r = Parse("module m(inout [7:0] a); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto &port = r.cu->modules[0]->ports[0];
+  EXPECT_EQ(port.direction, Direction::kInout);
+  EXPECT_NE(port.data_type.packed_dim_left, nullptr);
+}
+
+TEST(ParserA212, InputVariablePortTypeVar) {
+  // variable_port_type ::= var_data_type
+  // var_data_type ::= var data_type_or_implicit
+  auto r = Parse("module m(input var logic d); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInput);
+}
+
+// --- output_declaration ---
+// output net_port_type list_of_port_identifiers
+// | output variable_port_type list_of_variable_port_identifiers
+TEST(ParserA212, OutputNetPortType) {
+  auto r = Parse("module m(output wire q); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kOutput);
+}
+
+TEST(ParserA212, OutputVariablePortTypeReg) {
+  auto r = Parse("module m(output reg q); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kOutput);
+}
+
+// --- ref_declaration ---
+// ref variable_port_type list_of_variable_identifiers
+TEST(ParserA212, RefDeclaration) {
+  auto r = Parse("module m(ref logic [7:0] d); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kRef);
+}
+
+// --- net_port_type ---
+// [ net_type ] data_type_or_implicit | interconnect implicit_data_type
+TEST(ParserA212, NetPortTypeTriType) {
+  auto r = Parse("module m(inout tri [7:0] bus); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->ports[0].name, "bus");
+}
+
+// --- variable_port_type ---
+// var_data_type ::= data_type | var data_type_or_implicit
+TEST(ParserA212, VarDataTypeExplicit) {
+  // var_data_type: data_type (integer_vector_type)
+  auto r = Parse("module m(input logic signed [15:0] val); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInput);
+}
+
+TEST(ParserA212, VarDataTypeInt) {
+  // var_data_type: data_type (integer_atom_type)
+  auto r = Parse("module m(input int count); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInput);
+}
+
 }  // namespace

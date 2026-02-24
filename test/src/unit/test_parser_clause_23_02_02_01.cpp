@@ -74,4 +74,38 @@ TEST(SourceText, NonAnsiSharedType) {
   EXPECT_EQ(ports[1].direction, Direction::kInput);
 }
 
+TEST(ParserA212, InoutNonAnsi) {
+  auto r = Parse("module m(a); inout wire [7:0] a; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->ports.size(), 1u);
+  auto &port = r.cu->modules[0]->ports[0];
+  EXPECT_EQ(port.direction, Direction::kInout);
+}
+
+TEST(ParserA212, InputNonAnsiMultiple) {
+  // Non-ANSI: input net_port_type list_of_port_identifiers (comma list)
+  auto r = Parse("module m(a, b); input wire [7:0] a, b; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  for (auto &port : r.cu->modules[0]->ports) {
+    EXPECT_EQ(port.direction, Direction::kInput);
+  }
+}
+
+TEST(ParserA212, OutputNonAnsi) {
+  auto r = Parse("module m(q); output reg q; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kOutput);
+}
+
+TEST(ParserA212, OutputNonAnsiUnpackedDim) {
+  // Non-ANSI: list_of_port_identifiers with unpacked_dimension
+  auto r = Parse("module m(q); output logic q [3:0]; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kOutput);
+}
+
 }  // namespace
