@@ -229,4 +229,61 @@ TEST(ParserLet, DeclInPackage) {
   EXPECT_FALSE(r.has_errors);
 }
 
+struct ParseResult {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit *cu = nullptr;
+  bool has_errors = false;
+};
+
+static bool ParseOk(const std::string &src) {
+  SourceManager mgr;
+  Arena arena;
+  auto fid = mgr.AddFile("<test>", src);
+  DiagEngine diag(mgr);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, arena, diag);
+  parser.Parse();
+  return !diag.HasErrors();
+}
+
+// §A.2.8 block_item_declaration alternative 4: let_declaration
+TEST(ParserA28, LetDeclInBlock) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    let my_add(x, y) = x + y;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+TEST(ParserA28, LetDeclNoArgsInBlock) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    let val = 42;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+// let_declaration in task body
+TEST(ParserA28, LetDeclInTask) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  task my_task();\n"
+              "    let inc(x) = x + 1;\n"
+              "  endtask\n"
+              "endmodule\n"));
+}
+
+// let_declaration in fork/join
+TEST(ParserA28, LetDeclInForkJoin) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial fork\n"
+              "    let val = 99;\n"
+              "  join\n"
+              "endmodule\n"));
+}
+
 }  // namespace

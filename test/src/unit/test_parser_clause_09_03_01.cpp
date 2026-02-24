@@ -248,3 +248,64 @@ TEST(ParserClause03, Cl3_13_MultipleNamedBlocksSameLevel) {
   EXPECT_EQ(body->stmts[1]->label, "block_b");
 }
 
+struct ParseResult {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit *cu = nullptr;
+  bool has_errors = false;
+};
+
+ParseResult Parse(const std::string &src) {
+  ParseResult result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// §A.2.8 block_item_declaration alternative 3: parameter_declaration
+TEST(ParserA28, ParameterInBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    parameter int Y = 10;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  ASSERT_GE(body->stmts.size(), 1u);
+  EXPECT_EQ(body->stmts[0]->var_name, "Y");
+}
+
+// Mixed block items: all 4 alternatives together
+TEST(ParserA28, MixedBlockItems) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    parameter int P = 1;\n"
+              "    localparam int LP = 2;\n"
+              "    int x = 3;\n"
+              "    x = x + P + LP;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+// Nested blocks with declarations
+TEST(ParserA28, NestedBlocksWithDecls) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    int x = 1;\n"
+              "    begin\n"
+              "      int y = 2;\n"
+              "      x = x + y;\n"
+              "    end\n"
+              "  end\n"
+              "endmodule\n"));
+}
+

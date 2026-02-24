@@ -114,4 +114,50 @@ TEST(ParserClause03, Cl3_13_NamedForkJoinBlock) {
   EXPECT_EQ(fork_stmt->label, "my_fork");
 }
 
+struct ParseResult {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit *cu = nullptr;
+  bool has_errors = false;
+};
+
+ParseResult Parse(const std::string &src) {
+  ParseResult result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// block_item_declaration in fork/join (§9.3.2)
+TEST(ParserA28, BlockItemInForkJoin) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial fork\n"
+      "    int x;\n"
+      "    x = 5;\n"
+      "  join\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kFork);
+  ASSERT_GE(body->fork_stmts.size(), 1u);
+  EXPECT_EQ(body->fork_stmts[0]->kind, StmtKind::kVarDecl);
+}
+
+// typedef in fork/join
+TEST(ParserA28, TypedefInForkJoin) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial fork\n"
+              "    typedef int my_t;\n"
+              "  join\n"
+              "endmodule\n"));
+}
+
 }  // namespace

@@ -165,4 +165,42 @@ TEST(ParserA213, PackageImportItemStar) {
   EXPECT_TRUE(item->import_item.is_wildcard);
 }
 
+// data_declaration alternative: package_import_declaration
+TEST(ParserA28, ImportInBlock) {
+  EXPECT_TRUE(
+      ParseOk("package pkg;\n"
+              "  int x = 5;\n"
+              "endpackage\n"
+              "module m;\n"
+              "  initial begin\n"
+              "    import pkg::*;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+// import in task body
+TEST(ParserA28, ImportInTask) {
+  EXPECT_TRUE(
+      ParseOk("package pkg;\n"
+              "  int val = 1;\n"
+              "endpackage\n"
+              "module m;\n"
+              "  task my_task();\n"
+              "    import pkg::*;\n"
+              "  endtask\n"
+              "endmodule\n"));
+}
+
+// Multiple imports in one statement in block
+TEST(ParserA28, ImportMultipleInBlock) {
+  EXPECT_TRUE(
+      ParseOk("package p1; int a; endpackage\n"
+              "package p2; int b; endpackage\n"
+              "module m;\n"
+              "  initial begin\n"
+              "    import p1::a, p2::b;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace

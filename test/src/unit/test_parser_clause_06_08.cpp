@@ -113,4 +113,32 @@ TEST(ParserA24, VarDeclAssignmentBasic) {
   EXPECT_EQ(item->init_expr, nullptr);
 }
 
+static bool ParseOk(const std::string &src) {
+  SourceManager mgr;
+  Arena arena;
+  auto fid = mgr.AddFile("<test>", src);
+  DiagEngine diag(mgr);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, arena, diag);
+  parser.Parse();
+  return !diag.HasErrors();
+}
+
+TEST(ParserA28, DataDeclMultiVarsInBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int a = 1, b = 2, c;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  ASSERT_GE(body->stmts.size(), 3u);
+  EXPECT_EQ(body->stmts[0]->var_name, "a");
+  EXPECT_EQ(body->stmts[1]->var_name, "b");
+  EXPECT_EQ(body->stmts[2]->var_name, "c");
+}
+
 }  // namespace

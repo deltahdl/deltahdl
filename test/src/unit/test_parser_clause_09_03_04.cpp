@@ -147,4 +147,40 @@ TEST(ParserClause03, Cl3_13_MultipleNamedBlocksSameLevel) {
   EXPECT_EQ(body->stmts[1]->label, "block_b");
 }
 
+struct ParseResult {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit *cu = nullptr;
+  bool has_errors = false;
+};
+
+ParseResult Parse(const std::string &src) {
+  ParseResult result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// Named block with declarations
+TEST(ParserA28, NamedBlockWithDecls) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : my_block\n"
+      "    parameter int N = 4;\n"
+      "    int i;\n"
+      "    for (i = 0; i < N; i++) begin\n"
+      "    end\n"
+      "  end : my_block\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto *body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->label, "my_block");
+}
+
 }  // namespace

@@ -92,4 +92,26 @@ TEST(ParserA213, ForwardTypedefUnion) {
   EXPECT_EQ(item->name, "my_union");
 }
 
+static bool ParseOk(const std::string &src) {
+  SourceManager mgr;
+  Arena arena;
+  auto fid = mgr.AddFile("<test>", src);
+  DiagEngine diag(mgr);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, arena, diag);
+  parser.Parse();
+  return !diag.HasErrors();
+}
+
+// data_declaration alternative: type_declaration (typedef)
+TEST(ParserA28, TypedefInBlock) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    typedef int my_int_t;\n"
+              "    my_int_t x = 5;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
