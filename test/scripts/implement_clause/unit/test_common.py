@@ -292,7 +292,7 @@ def test_check_passes_when_figure_ignored(tmp_path):
     ) is None
 
 
-def test_check_passes_when_figure_provided(tmp_path):
+def test_check_passes_when_all_supplementary_provided(tmp_path):
     """Passes when all figures and tables are provided."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text(_LRM_WITH_FIGURES_AND_TABLES)
@@ -315,19 +315,6 @@ def test_check_fails_when_table_missing(tmp_path):
         check_supplementary_args(
             "4", lrm, figures=[fig], tables=[], ignore_figures=[],
         )
-
-
-def test_check_passes_when_table_provided(tmp_path):
-    """Passes when all tables are provided."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text(_LRM_WITH_FIGURES_AND_TABLES)
-    fig = tmp_path / "Figure_4_1.gv"
-    fig.write_text("digraph {}")
-    tbl = tmp_path / "TABLE_4_1.md"
-    tbl.write_text("| col |\n")
-    assert check_supplementary_args(
-        "4", lrm, figures=[fig], tables=[tbl], ignore_figures=[],
-    ) is None
 
 
 def test_check_fails_when_figure_path_missing(tmp_path):
