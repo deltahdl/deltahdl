@@ -1,5 +1,5 @@
-"""Allow running as ``python -m classify_tests_in_file``."""
+"""Allow running as ``python -m classify_tests_in_file``."""  # pragma: no cover
 
-from classify_tests_in_file import main
+from classify_tests_in_file import main  # pragma: no cover
 
-main()
+main()  # pragma: no cover
