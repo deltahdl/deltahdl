@@ -98,5 +98,4 @@ def test_parse_args_accepts_annex_clause(tmp_path):
     args = parse_args([
         "--lrm", str(lrm), "--clause", "B", "--issue", "44",
     ])
-    assert args.clause == "B"
-    assert args.issue == 44
+    assert (args.clause, args.issue) == ("B", 44)

@@ -53,33 +53,41 @@ Glossary
 """
 
 
-def test_load_subclause_titles(tmp_path):
-    """Extracts dot-separated subclause titles like '4.1 General'."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text(_SAMPLE_LRM)
-    titles = load_lrm_titles(lrm)
-    assert titles["3.1"] == "General"
-    assert titles["4.4.3.1"] == "Preponed PLI region"
-    assert titles["A.8.1"] == "Concatenations"
+class TestLoadLrmTitles:
+    """Tests for load_lrm_titles."""
 
+    @pytest.fixture()
+    def titles(self, tmp_path):
+        """Load titles from the sample LRM text."""
+        lrm = tmp_path / "lrm.txt"
+        lrm.write_text(_SAMPLE_LRM)
+        return load_lrm_titles(lrm)
 
-def test_load_top_level_clause_titles(tmp_path):
-    """Extracts top-level numeric clause titles like '4. Scheduling semantics'."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text(_SAMPLE_LRM)
-    titles = load_lrm_titles(lrm)
-    assert titles["3"] == "Design and verification building blocks"
-    assert titles["4"] == "Scheduling semantics"
+    @pytest.mark.parametrize("key, expected", [
+        ("3.1", "General"),
+        ("4.4.3.1", "Preponed PLI region"),
+        ("A.8.1", "Concatenations"),
+    ])
+    def test_subclause_titles(self, titles, key, expected):
+        """Extracts dot-separated subclause titles."""
+        assert titles[key] == expected
 
+    @pytest.mark.parametrize("key, expected", [
+        ("3", "Design and verification building blocks"),
+        ("4", "Scheduling semantics"),
+    ])
+    def test_top_level_clause_titles(self, titles, key, expected):
+        """Extracts top-level numeric clause titles."""
+        assert titles[key] == expected
 
-def test_load_annex_header_titles(tmp_path):
-    """Extracts multi-line annex headers like 'Annex B\\n(normative)\\n\\nKeywords'."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text(_SAMPLE_LRM)
-    titles = load_lrm_titles(lrm)
-    assert titles["A"] == "(normative) Formal syntax"
-    assert titles["B"] == "(normative) Keywords"
-    assert titles["P"] == "(informative) Glossary"
+    @pytest.mark.parametrize("key, expected", [
+        ("A", "(normative) Formal syntax"),
+        ("B", "(normative) Keywords"),
+        ("P", "(informative) Glossary"),
+    ])
+    def test_annex_header_titles(self, titles, key, expected):
+        """Extracts multi-line annex header titles."""
+        assert titles[key] == expected
 
 
 def test_load_missing_file(tmp_path):
@@ -95,87 +103,100 @@ class TestBuildHierarchyNumeric:
     """Tests for numeric (non-annex) clauses."""
 
     def test_depth_1(self):
-        h = build_hierarchy("4")
-        assert h["is_annex"] is False
-        assert h["clause_number"] == "4"
-        assert h["ancestors"] == []
-        assert h["subclause"] == "4"
+        assert build_hierarchy("4") == {
+            "is_annex": False,
+            "clause_number": "4",
+            "ancestors": [],
+            "subclause": "4",
+        }
 
     def test_depth_2(self):
-        h = build_hierarchy("4.1")
-        assert h["is_annex"] is False
-        assert h["clause_number"] == "4"
-        assert h["ancestors"] == []
-        assert h["subclause"] == "4.1"
+        assert build_hierarchy("4.1") == {
+            "is_annex": False,
+            "clause_number": "4",
+            "ancestors": [],
+            "subclause": "4.1",
+        }
 
     def test_depth_3(self):
-        h = build_hierarchy("6.24.1")
-        assert h["is_annex"] is False
-        assert h["clause_number"] == "6"
-        assert h["principle"] == "6.1"
-        assert h["ancestors"] == ["6.24"]
-        assert h["subclause"] == "6.24.1"
+        assert build_hierarchy("6.24.1") == {
+            "is_annex": False,
+            "clause_number": "6",
+            "principle": "6.1",
+            "ancestors": ["6.24"],
+            "subclause": "6.24.1",
+        }
 
     def test_depth_4(self):
-        h = build_hierarchy("4.4.3.1")
-        assert h["is_annex"] is False
-        assert h["clause_number"] == "4"
-        assert h["principle"] == "4.1"
-        assert h["ancestors"] == ["4.4", "4.4.3"]
-        assert h["subclause"] == "4.4.3.1"
+        assert build_hierarchy("4.4.3.1") == {
+            "is_annex": False,
+            "clause_number": "4",
+            "principle": "4.1",
+            "ancestors": ["4.4", "4.4.3"],
+            "subclause": "4.4.3.1",
+        }
 
     def test_depth_5(self):
-        h = build_hierarchy("4.4.3.1.2")
-        assert h["is_annex"] is False
-        assert h["clause_number"] == "4"
-        assert h["principle"] == "4.1"
-        assert h["ancestors"] == ["4.4", "4.4.3", "4.4.3.1"]
-        assert h["subclause"] == "4.4.3.1.2"
+        assert build_hierarchy("4.4.3.1.2") == {
+            "is_annex": False,
+            "clause_number": "4",
+            "principle": "4.1",
+            "ancestors": ["4.4", "4.4.3", "4.4.3.1"],
+            "subclause": "4.4.3.1.2",
+        }
 
 
 class TestBuildHierarchyAnnex:
     """Tests for annex (uppercase letter) clauses."""
 
     def test_depth_1(self):
-        h = build_hierarchy("B")
-        assert h["is_annex"] is True
-        assert h["collection"] == "Annex B"
-        assert h["letter"] == "B"
-        assert h["ancestors"] == []
-        assert h["subclause"] == "B"
+        assert build_hierarchy("B") == {
+            "is_annex": True,
+            "collection": "Annex B",
+            "letter": "B",
+            "ancestors": [],
+            "subclause": "B",
+        }
 
     def test_depth_2(self):
-        h = build_hierarchy("A.8")
-        assert h["is_annex"] is True
-        assert h["collection"] == "Annex A"
-        assert h["letter"] == "A"
-        assert h["principles"] == "A.8"
-        assert h["ancestors"] == []
-        assert h["subclause"] == "A.8"
+        assert build_hierarchy("A.8") == {
+            "is_annex": True,
+            "collection": "Annex A",
+            "letter": "A",
+            "principles": "A.8",
+            "ancestors": [],
+            "subclause": "A.8",
+        }
 
     def test_depth_3(self):
-        h = build_hierarchy("A.8.1")
-        assert h["is_annex"] is True
-        assert h["collection"] == "Annex A"
-        assert h["principles"] == "A.8"
-        assert h["ancestors"] == []
-        assert h["subclause"] == "A.8.1"
+        assert build_hierarchy("A.8.1") == {
+            "is_annex": True,
+            "collection": "Annex A",
+            "letter": "A",
+            "principles": "A.8",
+            "ancestors": [],
+            "subclause": "A.8.1",
+        }
 
     def test_depth_4(self):
-        h = build_hierarchy("A.7.5.3")
-        assert h["is_annex"] is True
-        assert h["collection"] == "Annex A"
-        assert h["principles"] == "A.7"
-        assert h["ancestors"] == ["A.7.5"]
-        assert h["subclause"] == "A.7.5.3"
+        assert build_hierarchy("A.7.5.3") == {
+            "is_annex": True,
+            "collection": "Annex A",
+            "letter": "A",
+            "principles": "A.7",
+            "ancestors": ["A.7.5"],
+            "subclause": "A.7.5.3",
+        }
 
     def test_depth_5(self):
-        h = build_hierarchy("A.7.5.3.1")
-        assert h["is_annex"] is True
-        assert h["collection"] == "Annex A"
-        assert h["principles"] == "A.7"
-        assert h["ancestors"] == ["A.7.5", "A.7.5.3"]
-        assert h["subclause"] == "A.7.5.3.1"
+        assert build_hierarchy("A.7.5.3.1") == {
+            "is_annex": True,
+            "collection": "Annex A",
+            "letter": "A",
+            "principles": "A.7",
+            "ancestors": ["A.7.5", "A.7.5.3"],
+            "subclause": "A.7.5.3.1",
+        }
 
 
 # ---- find_supplementary_files ----------------------------------------------
@@ -216,10 +237,7 @@ def test_find_supplementary_finds_figure(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "implement_clause.common.TABLES_DIR", tmp_path / "no_tables",
     )
-    result = find_supplementary_files("4.4.3.1")
-    assert len(result) == 1
-    assert result[0][0] == "Figure 4-1"
-    assert result[0][1] == gv
+    assert find_supplementary_files("4.4.3.1") == [("Figure 4-1", gv)]
 
 
 def test_find_supplementary_finds_table(tmp_path, monkeypatch):
@@ -232,10 +250,7 @@ def test_find_supplementary_finds_table(tmp_path, monkeypatch):
         "implement_clause.common.FIGURES_DIR", tmp_path / "no_figs",
     )
     monkeypatch.setattr("implement_clause.common.TABLES_DIR", tabs)
-    result = find_supplementary_files("B")
-    assert len(result) == 1
-    assert result[0][0] == "Table B-1"
-    assert result[0][1] == md
+    assert find_supplementary_files("B") == [("Table B-1", md)]
 
 
 def test_find_supplementary_ignores_other_clauses(tmp_path, monkeypatch):
@@ -264,8 +279,7 @@ def test_build_supplementary_lines_with_figure(tmp_path, monkeypatch):
         "implement_clause.common.TABLES_DIR", tmp_path / "no_tables",
     )
     lines = build_supplementary_lines("4")
-    assert "Figure 4-1" in lines
-    assert "DOT GraphViz" in lines
+    assert "Figure 4-1" in lines and "DOT GraphViz" in lines
 
 
 def test_build_supplementary_lines_with_table(tmp_path, monkeypatch):
@@ -279,8 +293,7 @@ def test_build_supplementary_lines_with_table(tmp_path, monkeypatch):
     )
     monkeypatch.setattr("implement_clause.common.TABLES_DIR", tabs)
     lines = build_supplementary_lines("B")
-    assert "Table B-1" in lines
-    assert "Markdown" in lines
+    assert "Table B-1" in lines and "Markdown" in lines
 
 
 def test_build_supplementary_lines_empty_when_none(tmp_path, monkeypatch):
