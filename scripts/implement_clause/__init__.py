@@ -80,7 +80,3 @@ def main(argv=None):
         issue=args.issue, model=args.model,
     )
     run_classify_tests_in_file(args.lrm)
-
-
-if __name__ == "__main__":
-    main()
