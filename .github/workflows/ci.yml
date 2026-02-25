@@ -313,24 +313,29 @@ on:
       - scripts/convert_figure/**
       - scripts/convert_tables/**
       - scripts/classify_tests_in_file/**
+      - scripts/implement_clause/**
       - test/scripts/convert_figure/**
       - test/scripts/convert_tables/**
       - test/scripts/classify_tests_in_file/**
+      - test/scripts/implement_clause/**
   push:
     branches: [main]
     paths-ignore:
       - '**/*.md'
       - .github/workflows/convert_figure.yml
       - .github/workflows/convert_tables.yml
+      - .github/workflows/implement_clause.yml
       - .github/workflows/markdownlint.yml
       - .github/workflows/classify_tests_in_file.yml
       - LICENSE
       - scripts/convert_figure/**
       - scripts/convert_tables/**
       - scripts/classify_tests_in_file/**
+      - scripts/implement_clause/**
       - test/scripts/convert_figure/**
       - test/scripts/convert_tables/**
       - test/scripts/classify_tests_in_file/**
+      - test/scripts/implement_clause/**
   workflow_dispatch:
     inputs:
       force-static-analysis:
