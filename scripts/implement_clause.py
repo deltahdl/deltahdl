@@ -1,5 +1,10 @@
-"""Shared utilities for LRM clause implementation automation."""
+#!/usr/bin/env python3
+"""LRM clause implementation prompt generator.
 
+Dispatches to depth-appropriate prompt builders and invokes Claude CLI.
+"""
+
+import argparse
 import os
 import re
 import subprocess
@@ -8,7 +13,7 @@ from pathlib import Path
 
 
 # ---------------------------------------------------------------------------
-# Supplementary file directories (Figures and Tables)
+# Constants
 # ---------------------------------------------------------------------------
 
 _GDRIVE = Path(
@@ -18,6 +23,8 @@ _GDRIVE = Path(
 )
 FIGURES_DIR = _GDRIVE / "Figures"
 TABLES_DIR = _GDRIVE / "Tables"
+
+CLAUSE_RE = re.compile(r"^(\d+|[A-Z])(\.\d+){0,4}$")
 
 
 # ---------------------------------------------------------------------------
@@ -284,7 +291,7 @@ def run_prompt(
 
 def run_classify_tests_in_file(lrm_path: Path) -> None:
     """Run classify_tests_in_file on any new/modified test files."""
-    repo_root = Path(__file__).resolve().parent.parent.parent
+    repo_root = Path(__file__).resolve().parent.parent
     script = repo_root / "scripts" / "classify_tests_in_file.py"
     test_dir = repo_root / "test" / "src" / "unit"
     arch = repo_root / "docs" / "ARCHITECTURE.md"
@@ -318,3 +325,208 @@ def run_classify_tests_in_file(lrm_path: Path) -> None:
             ],
             check=False,
         )
+
+
+# ---------------------------------------------------------------------------
+# Prompt builders (depth 1-5)
+# ---------------------------------------------------------------------------
+
+def _build_hierarchy_steps(h: dict, titles: dict, lrm: str) -> str:
+    """Build the 'Thoroughly understand' hierarchy lines for depth 4+."""
+    lines = [build_top_level_line(h, titles, lrm)]
+
+    root = h["principles"] if h["is_annex"] else h["principle"]
+    lines.append(
+        f"- Thoroughly understand {root}"
+        f" per LRM in {lrm}",
+    )
+    parent = root
+    for ancestor in h["ancestors"]:
+        lines.append(
+            f"- Thoroughly understand {ancestor}"
+            f" and how it fits within {parent}"
+            f" per LRM in {lrm}",
+        )
+        parent = ancestor
+    lines.append(
+        f"- Thoroughly understand {h['subclause']}"
+        f" and how it fits within {parent}"
+        f" per LRM in {lrm}",
+    )
+
+    return "\n".join(lines) + "\n"
+
+
+def build_prompt_v(
+    clause: str,
+    titles: dict[str, str],
+    lrm: str,
+    *,
+    issue: int,
+    supplementary: str = "",
+) -> str:
+    """Build the implementation prompt for a depth-1 clause."""
+    h = build_hierarchy(clause)
+    top = build_top_level_line(h, titles, lrm)
+    hierarchy = f"{top}\n"
+    return format_prompt(hierarchy, h["subclause"], lrm, issue=issue, supplementary=supplementary)
+
+
+def build_prompt_v_w(
+    clause: str,
+    titles: dict[str, str],
+    lrm: str,
+    *,
+    issue: int,
+    supplementary: str = "",
+) -> str:
+    """Build the implementation prompt for a depth-2 clause."""
+    h = build_hierarchy(clause)
+    top = build_top_level_line(h, titles, lrm)
+    hierarchy = (
+        f"{top}\n"
+        f"- Thoroughly understand {h['subclause']}"
+        f" per LRM in {lrm}\n"
+    )
+    return format_prompt(hierarchy, h["subclause"], lrm, issue=issue, supplementary=supplementary)
+
+
+def build_prompt_v_w_x(
+    clause: str,
+    titles: dict[str, str],
+    lrm: str,
+    *,
+    issue: int,
+    supplementary: str = "",
+) -> str:
+    """Build the implementation prompt for a depth-3 clause."""
+    h = build_hierarchy(clause)
+    top = build_top_level_line(h, titles, lrm)
+
+    if h["is_annex"]:
+        hierarchy = (
+            f"{top}\n"
+            f"- Thoroughly understand {h['principles']}"
+            f" per LRM in {lrm}\n"
+            f"- Thoroughly understand {h['subclause']}"
+            f" and how it fits within {h['principles']}"
+            f" per LRM in {lrm}\n"
+        )
+    else:
+        hierarchy = (
+            f"{top}\n"
+            f"- Thoroughly understand {h['principle']}"
+            f" per LRM in {lrm}\n"
+            f"- Thoroughly understand {h['subclause']}"
+            f" and how it fits within {h['ancestors'][0]}"
+            f" per LRM in {lrm}\n"
+        )
+
+    return format_prompt(hierarchy, h["subclause"], lrm, issue=issue, supplementary=supplementary)
+
+
+def build_prompt_v_w_x_y(
+    clause: str,
+    titles: dict[str, str],
+    lrm: str,
+    *,
+    issue: int,
+    supplementary: str = "",
+) -> str:
+    """Build the implementation prompt for a depth-4 clause."""
+    h = build_hierarchy(clause)
+    hierarchy = _build_hierarchy_steps(h, titles, lrm)
+    return format_prompt(hierarchy, h["subclause"], lrm, issue=issue, supplementary=supplementary)
+
+
+def build_prompt_v_w_x_y_z(
+    clause: str,
+    titles: dict[str, str],
+    lrm: str,
+    *,
+    issue: int,
+    supplementary: str = "",
+) -> str:
+    """Build the implementation prompt for a depth-5 clause."""
+    h = build_hierarchy(clause)
+    hierarchy = _build_hierarchy_steps(h, titles, lrm)
+    return format_prompt(hierarchy, h["subclause"], lrm, issue=issue, supplementary=supplementary)
+
+
+# ---------------------------------------------------------------------------
+# CLI dispatch
+# ---------------------------------------------------------------------------
+
+_HANDLERS = {
+    1: build_prompt_v,
+    2: build_prompt_v_w,
+    3: build_prompt_v_w_x,
+    4: build_prompt_v_w_x_y,
+    5: build_prompt_v_w_x_y_z,
+}
+
+
+def parse_args(argv=None):
+    """Parse command-line arguments for clause implementation."""
+    parser = argparse.ArgumentParser(
+        description="Generate an implementation prompt for a given LRM clause.",
+    )
+    parser.add_argument(
+        "--lrm",
+        type=Path,
+        required=True,
+        help="Path to the LRM text file.",
+    )
+    parser.add_argument(
+        "--clause",
+        type=str,
+        required=True,
+        help="LRM clause number (V, V.W, V.W.X, V.W.X.Y, or V.W.X.Y.Z).",
+    )
+    parser.add_argument(
+        "--issue",
+        type=int,
+        required=True,
+        help="GitHub Issue number to read and correct after implementation.",
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="sonnet",
+        help="Claude model to use (default: sonnet).",
+    )
+    args = parser.parse_args(argv)
+
+    if not args.lrm.is_file():
+        parser.error(f"LRM file not found: {args.lrm}")
+
+    if not CLAUSE_RE.match(args.clause):
+        parser.error(
+            f"Invalid clause format '{args.clause}'. "
+            "Expected V, V.W, V.W.X, V.W.X.Y, or V.W.X.Y.Z "
+            "(V is a number or uppercase letter; remaining parts are numbers)."
+        )
+
+    return args
+
+
+def clause_depth(clause: str) -> int:
+    """Return the nesting depth of a clause string."""
+    return clause.count(".") + 1
+
+
+def main(argv=None):
+    """Parse args, dispatch to the depth-appropriate prompt, and invoke Claude."""
+    args = parse_args(argv)
+    depth = clause_depth(args.clause)
+    handler = _HANDLERS[depth]
+
+    run_prompt(
+        handler, args.lrm, args.clause,
+        issue=args.issue, model=args.model,
+    )
+    run_classify_tests_in_file(args.lrm)
+
+
+if __name__ == "__main__":
+    main()

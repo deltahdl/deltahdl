@@ -1,10 +1,12 @@
 """Unit tests for prompt generation across all clause depths."""
 
-from implement_clause.prompt_v import build_prompt as build_v
-from implement_clause.prompt_v_w import build_prompt as build_v_w
-from implement_clause.prompt_v_w_x import build_prompt as build_v_w_x
-from implement_clause.prompt_v_w_x_y import build_prompt as build_v_w_x_y
-from implement_clause.prompt_v_w_x_y_z import build_prompt as build_v_w_x_y_z
+from implement_clause import (
+    build_prompt_v as build_v,
+    build_prompt_v_w as build_v_w,
+    build_prompt_v_w_x as build_v_w_x,
+    build_prompt_v_w_x_y as build_v_w_x_y,
+    build_prompt_v_w_x_y_z as build_v_w_x_y_z,
+)
 
 
 # ---------------------------------------------------------------------------

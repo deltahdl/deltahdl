@@ -1,5 +1,6 @@
-"""Unit tests for implement_clause.__init__ (arg parsing and dispatch)."""
+"""Unit tests for implement_clause (arg parsing and dispatch)."""
 
+import runpy
 from unittest.mock import patch
 
 import pytest
@@ -130,3 +131,12 @@ def test_main_calls_classify(_mock_run, mock_classify, tmp_path):
     lrm.write_text("")
     main(["--lrm", str(lrm), "--clause", "4.1", "--issue", "8"])
     assert mock_classify.called
+
+
+# ---- __main__ guard --------------------------------------------------------
+
+
+def test_main_guard_invokes_main():
+    """Running as __main__ calls main()."""
+    with pytest.raises(SystemExit):
+        runpy.run_module("implement_clause", run_name="__main__")
