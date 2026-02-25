@@ -123,6 +123,21 @@ def test_main_dispatches_depth_1(_mock_check, mock_run, tmp_path):
     assert mock_run.call_args[1]["model"] == "opus"
 
 
+@patch("implement_clause.run_prompt")
+@patch("implement_clause.check_supplementary_args")
+def test_main_with_figures(_mock_check, mock_run, tmp_path):
+    """main() builds supplementary string when --figures is provided."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text("")
+    gv = tmp_path / "Figure_4_1.gv"
+    gv.write_text("digraph {}")
+    main([
+        "--lrm", str(lrm), "--clause", "4", "--issue", "6",
+        "--figures", str(gv),
+    ])
+    assert "Figure 4-1" in mock_run.call_args[0][0].keywords["supplementary"]
+
+
 # ---- __main__ guard --------------------------------------------------------
 
 
