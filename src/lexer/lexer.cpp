@@ -401,7 +401,9 @@ Token Lexer::LexStringLiteral() {
     }
   } else {
     Advance();  // skip opening "
-    LexQuotedBody();
+    if (!LexQuotedBody()) {
+      diag_.Error(loc, "unterminated string literal");
+    }
   }
   Token tok;
   tok.kind = TokenKind::kStringLiteral;
@@ -410,16 +412,21 @@ Token Lexer::LexStringLiteral() {
   return tok;
 }
 
-void Lexer::LexQuotedBody() {
+bool Lexer::LexQuotedBody() {
   while (!AtEnd() && Current() != '"') {
+    if (Current() == '\n' || Current() == '\r') {
+      // §A.8.8: quoted_string_item excludes newline — unterminated string
+      return false;
+    }
     if (Current() == '\\') {
-      Advance();
+      Advance();  // skip backslash; following char (incl. newline) is the escape
+      if (AtEnd()) return false;
     }
     Advance();
   }
-  if (!AtEnd()) {
-    Advance();  // skip closing "
-  }
+  if (AtEnd()) return false;
+  Advance();  // skip closing "
+  return true;
 }
 
 bool Lexer::LexTripleQuotedBody() {

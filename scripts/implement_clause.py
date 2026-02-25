@@ -461,8 +461,8 @@ def parse_args(argv=None):
     parser.add_argument(
         "--model",
         type=str,
-        default="sonnet",
-        help="Claude model to use (default: sonnet).",
+        default="opus",
+        help="Claude model to use (default: opus).",
     )
     args = parser.parse_args(argv)
 
