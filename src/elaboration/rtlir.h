@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
@@ -9,6 +10,14 @@
 #include "parser/ast.h"
 
 namespace delta {
+
+// --- Resolved attribute (§5.12 / A.9.1) ---
+
+struct ResolvedAttribute {
+  std::string_view name;
+  std::optional<int64_t> resolved_value;  // Constant-evaluated integer value.
+  std::string_view string_value;          // String literal value (if any).
+};
 
 // --- RTLIR node classification ---
 
@@ -42,6 +51,7 @@ struct RtlirPort {
   DataTypeKind type_kind;
   uint32_t width = 1;
   bool is_signed = false;
+  std::vector<ResolvedAttribute> attrs;
 };
 
 // --- Net ---
@@ -54,6 +64,7 @@ struct RtlirNet {
   // §6.6.4: Trireg charge strength and decay time.
   Strength charge_strength = Strength::kMedium;
   uint64_t decay_ticks = 0;
+  std::vector<ResolvedAttribute> attrs;
 };
 
 // --- Variable ---
@@ -79,6 +90,7 @@ struct RtlirVariable {
   uint32_t assoc_index_width = 32;   // §7.9.8: width of assoc index type.
   std::string_view class_type_name;  // §8: class type name for class variables.
   std::string_view enum_type_name;   // §6.19: enum type name for $cast.
+  std::vector<ResolvedAttribute> attrs;
 };
 
 // --- Continuous assignment ---
@@ -92,6 +104,7 @@ struct RtlirContAssign {
   Expr* delay = nullptr;        // §10.3.3: rise delay (or single delay)
   Expr* delay_fall = nullptr;   // §10.3.3: fall delay
   Expr* delay_decay = nullptr;  // §10.3.3: turn-off delay
+  std::vector<ResolvedAttribute> attrs;
 };
 
 // --- Net alias (§10.11) ---
@@ -106,6 +119,7 @@ struct RtlirProcess {
   RtlirProcessKind kind = RtlirProcessKind::kInitial;
   Stmt* body = nullptr;
   std::vector<EventExpr> sensitivity;
+  std::vector<ResolvedAttribute> attrs;
 };
 
 // --- Parameter declaration ---
@@ -135,6 +149,7 @@ struct RtlirModuleInst {
   std::string_view inst_name;
   struct RtlirModule* resolved = nullptr;
   std::vector<RtlirPortBinding> port_bindings;
+  std::vector<ResolvedAttribute> attrs;
 };
 
 // --- Module ---
@@ -147,6 +162,7 @@ struct RtlirEnumMember {
 
 struct RtlirModule {
   std::string_view name;
+  std::vector<ResolvedAttribute> attrs;
 
   std::vector<RtlirPort> ports;
   std::vector<RtlirNet> nets;

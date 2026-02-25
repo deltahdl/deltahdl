@@ -75,7 +75,9 @@ std::vector<Attribute> Parser::ParseAttributes() {
     Consume();  // skip (*
     do {
       Attribute attr;
-      attr.name = Expect(TokenKind::kIdentifier).text;
+      auto tok = Expect(TokenKind::kIdentifier);
+      attr.name = tok.text;
+      attr.loc = tok.loc;
       if (Match(TokenKind::kEq)) {
         attr.value = ParseExpr();
       }
@@ -328,8 +330,14 @@ bool Parser::TryParsePrimaryTopLevel(CompilationUnit* unit) {
 
 void Parser::ParseTopLevel(CompilationUnit* unit) {
   if (Match(TokenKind::kSemicolon)) return;  // null item
-  ParseAttributes();                         // consume optional (* ... *)
-  if (TryParsePrimaryTopLevel(unit)) return;
+  auto top_attrs = ParseAttributes();        // consume optional (* ... *)
+  if (TryParsePrimaryTopLevel(unit)) {
+    // §5.12: Attach attributes to the just-parsed module definition.
+    if (!top_attrs.empty() && !unit->modules.empty()) {
+      unit->modules.back()->attrs = std::move(top_attrs);
+    }
+    return;
+  }
   if (Check(TokenKind::kKwTypedef)) {
     std::vector<ModuleItem*> discard;
     ParseModuleItem(discard);

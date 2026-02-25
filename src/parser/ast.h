@@ -92,6 +92,7 @@ struct Expr {
 struct Attribute {
   std::string_view name;
   Expr* value = nullptr;  // nullptr if no '= expr'
+  SourceLoc loc;           // Location of attr_name for diagnostics.
 };
 
 // --- Data types (must precede Stmt since Stmt uses DataType by value) ---
@@ -669,6 +670,7 @@ struct ModuleDecl {
   bool has_wildcard_ports = false;  // (.* ) port form (A.1.2)
   std::string_view name;
   SourceRange range;
+  std::vector<Attribute> attrs;     // §5.12: Attributes on module definition.
   std::vector<PortDecl> ports;
   std::vector<ModuleItem*> items;
   std::vector<std::pair<std::string_view, Expr*>> params;

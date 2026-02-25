@@ -45,6 +45,48 @@ static NetType DataTypeToNetType(DataTypeKind kind) {
   }
 }
 
+// §5.12: Resolve AST attributes into RTLIR ResolvedAttributes.
+// Deduplicates (last wins) and evaluates constant expressions.
+static std::vector<ResolvedAttribute> ResolveAttributes(
+    const std::vector<Attribute>& attrs, DiagEngine& diag) {
+  std::vector<ResolvedAttribute> result;
+  for (const auto& attr : attrs) {
+    ResolvedAttribute ra;
+    ra.name = attr.name;
+    if (attr.value) {
+      if (attr.value->kind == ExprKind::kStringLiteral) {
+        // Strip surrounding quotes from string literal text.
+        auto txt = attr.value->text;
+        if (txt.size() >= 2 && txt.front() == '"' && txt.back() == '"') {
+          ra.string_value = txt.substr(1, txt.size() - 2);
+        } else {
+          ra.string_value = txt;
+        }
+      } else {
+        ra.resolved_value = ConstEvalInt(attr.value);
+      }
+    } else {
+      // §5.12: default type is bit, value 1.
+      ra.resolved_value = 1;
+    }
+    // §5.12: duplicate name -> last value wins, emit warning.
+    bool replaced = false;
+    for (auto& existing : result) {
+      if (existing.name == ra.name) {
+        diag.Warning(attr.loc, std::format(
+            "duplicate attribute '{}'; last value used", attr.name));
+        existing = ra;
+        replaced = true;
+        break;
+      }
+    }
+    if (!replaced) {
+      result.push_back(ra);
+    }
+  }
+  return result;
+}
+
 Elaborator::Elaborator(Arena& arena, DiagEngine& diag, CompilationUnit* unit)
     : arena_(arena), diag_(diag), unit_(unit) {}
 
@@ -108,6 +150,8 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
                                          const ParamList& params) {
   auto* mod = arena_.Create<RtlirModule>();
   mod->name = decl->name;
+  // §5.12: Resolve attributes on module definition.
+  mod->attrs = ResolveAttributes(decl->attrs, diag_);
 
   for (const auto& [pname, pval] : decl->params) {
     RtlirParamDecl pd;
@@ -184,7 +228,7 @@ static RtlirProcessKind MapAlwaysKind(AlwaysKind ak) {
 }
 
 static void AddProcess(RtlirProcessKind kind, ModuleItem* item,
-                       RtlirModule* mod, Arena& arena) {
+                       RtlirModule* mod, Arena& arena, DiagEngine& diag) {
   RtlirProcess proc;
   proc.kind = kind;
   proc.body = item->body;
@@ -194,6 +238,8 @@ static void AddProcess(RtlirProcessKind kind, ModuleItem* item,
   if (needs_infer && proc.sensitivity.empty()) {
     proc.sensitivity = InferSensitivity(proc.body, arena);
   }
+  // §5.12: Resolve attributes.
+  proc.attrs = ResolveAttributes(item->attrs, diag);
   mod->processes.push_back(proc);
 }
 
@@ -430,6 +476,8 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
     net.decay_ticks =
         static_cast<uint64_t>(ConstEvalInt(item->net_delay_decay).value_or(0));
   }
+  // §5.12: Resolve attributes.
+  net.attrs = ResolveAttributes(item->attrs, diag_);
   mod->nets.push_back(net);
 }
 
@@ -520,6 +568,8 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   // §7.4/§7.5: Compute unpacked array element count.
   ComputeUnpackedDims(item->unpacked_dims, var, typedefs_, class_names_);
   InferDynArraySize(item->unpacked_dims, item->init_expr, var);
+  // §5.12: Resolve attributes.
+  var.attrs = ResolveAttributes(item->attrs, diag_);
   mod->variables.push_back(var);
   ValidateArrayInitPattern(item);
   ValidateStructInitPattern(item);
@@ -595,6 +645,8 @@ void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
   ca.delay = item->assign_delay;
   ca.delay_fall = item->assign_delay_fall;
   ca.delay_decay = item->assign_delay_decay;
+  // §5.12: Resolve attributes.
+  ca.attrs = ResolveAttributes(item->attrs, diag_);
   mod->assigns.push_back(ca);
 }
 
@@ -634,16 +686,16 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       ElaborateContAssign(item, mod);
       break;
     case ModuleItemKind::kInitialBlock:
-      AddProcess(RtlirProcessKind::kInitial, item, mod, arena_);
+      AddProcess(RtlirProcessKind::kInitial, item, mod, arena_, diag_);
       break;
     case ModuleItemKind::kFinalBlock:
-      AddProcess(RtlirProcessKind::kFinal, item, mod, arena_);
+      AddProcess(RtlirProcessKind::kFinal, item, mod, arena_, diag_);
       break;
     case ModuleItemKind::kAlwaysBlock:
     case ModuleItemKind::kAlwaysCombBlock:
     case ModuleItemKind::kAlwaysFFBlock:
     case ModuleItemKind::kAlwaysLatchBlock:
-      AddProcess(MapAlwaysKind(item->always_kind), item, mod, arena_);
+      AddProcess(MapAlwaysKind(item->always_kind), item, mod, arena_, diag_);
       break;
     case ModuleItemKind::kModuleInst:
       ElaborateModuleInst(item, mod);
@@ -784,6 +836,8 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   ParamList child_params;
   inst.resolved = ElaborateModule(child_decl, child_params);
   BindPorts(inst, item, mod);
+  // §5.12: Resolve attributes.
+  inst.attrs = ResolveAttributes(item->attrs, diag_);
   mod->children.push_back(inst);
 }
 
