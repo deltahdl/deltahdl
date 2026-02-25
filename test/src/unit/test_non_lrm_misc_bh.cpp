@@ -1,0 +1,996 @@
+// Non-LRM tests
+
+#include <gtest/gtest.h>
+
+#include <string>
+
+#include "common/arena.h"
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
+#include "lexer/lexer.h"
+#include "parser/parser.h"
+
+using namespace delta;
+
+// --- Test helpers ---
+struct ParseResult {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+ParseResult Parse(const std::string& src) {
+  ParseResult result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+namespace {
+
+
+// 32. Attribute name space (h) — enclosed by (* and *)
+TEST(ParserClause03, Cl3_13_AttributeNameSpace) {
+  auto r = Parse(
+      "module m;\n"
+      "  (* synthesis *) logic flag;\n"
+      "  (* full_case, parallel_case *) logic [1:0] sel;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  // Verify attributes are parsed and attached to declarations
+  EXPECT_TRUE(HasAttrNamed(r.cu->modules[0]->items, "synthesis"));
+  EXPECT_TRUE(HasAttrNamed(r.cu->modules[0]->items, "full_case"));
+}
+
+// --- §5.13 Built-in methods ---
+struct ParseResult513 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult513 Parse(const std::string& src) {
+  ParseResult513 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+static Stmt* FirstInitialStmt(ParseResult513& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) {
+      if (item->body && item->body->kind == StmtKind::kBlock) {
+        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+      }
+      return item->body;
+    }
+  }
+  return nullptr;
+}
+
+// From test_parser_clause_05.cpp
+TEST(ParserCh513, BuiltInMethodCall_Parse) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = arr.size();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kCall);
+}
+
+TEST(ParserCh513, BuiltInMethodCall_Callee) {
+  // The callee_expr should be the full member-access expression.
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = arr.size();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kMemberAccess);
+}
+
+TEST(ParserCh513, BuiltInMethodCall_ChainedAccess) {
+  // Chained member access: obj.arr.size() parses as a call.
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = obj.arr.size();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kCall);
+}
+
+// From test_parser_clause_05b.cpp
+TEST(ParserCh513, BuiltInMethod_NoParens) {
+  // When a method has no arguments the parentheses are optional.
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int q[$];\n"
+              "  initial x = q.size;\n"
+              "endmodule"));
+}
+
+TEST(ParserCh513, BuiltInMethod_ChainedAccess) {
+  // Chained member accesses: a.b.c().
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial x = obj.sub.method();\n"
+              "endmodule"));
+}
+
+TEST(ParserCh513, BuiltInMethod_WithArgs) {
+  // Built-in method with arguments: arr.find with (item > 3).
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int q[$];\n"
+              "  initial q.sort();\n"
+              "endmodule"));
+}
+
+TEST(ParserCh513, BuiltInMethod_Delete) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int q[$];\n"
+              "  initial q.delete();\n"
+              "endmodule"));
+}
+
+TEST(ParserCh513, BuiltInMethod_PushBack) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int q[$];\n"
+              "  initial q.push_back(42);\n"
+              "endmodule"));
+}
+
+static ParseResult Parse(const std::string& src) {
+  ParseResult result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+TEST(Parser, NettypeDeclaration) {
+  auto r = Parse(
+      "module t;\n"
+      "  nettype logic [7:0] mynet;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
+  EXPECT_EQ(item->name, "mynet");
+}
+
+TEST(Parser, NettypeWithResolutionFunction) {
+  auto r = Parse(
+      "module t;\n"
+      "  nettype logic [7:0] mynet with resolve_fn;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
+  EXPECT_EQ(item->name, "mynet");
+  EXPECT_EQ(item->nettype_resolve_func, "resolve_fn");
+}
+
+TEST(Parser, NettypeUsedInDecl) {
+  auto r = Parse(
+      "module t;\n"
+      "  nettype logic [7:0] mynet;\n"
+      "  mynet x;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
+  auto* item = r.cu->modules[0]->items[1];
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(item->name, "x");
+}
+
+TEST(ParserA213, DataDeclNettypeDeclaration) {
+  // nettype_declaration alternative
+  auto r = Parse("module m; nettype logic my_net; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
+}
+
+// --- nettype_declaration ---
+// Form 1: nettype data_type nettype_id [with [scope] tf_id] ;
+// Form 2: nettype [scope] nettype_id nettype_id ;
+TEST(ParserA213, NettypeDeclBasic) {
+  auto r = Parse("module m; nettype real my_real_net; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
+  EXPECT_EQ(item->name, "my_real_net");
+}
+
+TEST(ParserA213, NettypeDeclWithResolve) {
+  auto r = Parse("module m; nettype logic my_net with my_resolve; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
+  EXPECT_EQ(item->nettype_resolve_func, "my_resolve");
+}
+
+TEST(ParserA213, NettypeDeclWithScopedResolve) {
+  // with package_scope tf_identifier
+  auto r =
+      Parse("module m; nettype logic my_net with pkg::resolve_fn; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
+  EXPECT_EQ(item->nettype_resolve_func, "resolve_fn");
+}
+
+struct ParseResult611 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult611 Parse(const std::string& src) {
+  ParseResult611 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static ModuleItem* FirstItem(ParseResult611& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto& items = r.cu->modules[0]->items;
+  return items.empty() ? nullptr : items[0];
+}
+
+// =============================================================================
+// LRM section 6.11 -- Integer data types
+// =============================================================================
+// --- 2-state integer types ---
+TEST(ParserSection6, IntegerTypeByteDecl) {
+  auto r = Parse(
+      "module m;\n"
+      "  byte b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kByte);
+  EXPECT_EQ(item->name, "b");
+}
+
+TEST(ParserSection6, IntegerTypeShortintDecl) {
+  auto r = Parse(
+      "module m;\n"
+      "  shortint si;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kShortint);
+  EXPECT_EQ(item->name, "si");
+}
+
+TEST(ParserSection6, IntegerTypeIntDecl) {
+  auto r = Parse(
+      "module m;\n"
+      "  int i;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
+  EXPECT_EQ(item->name, "i");
+}
+
+TEST(ParserSection6, IntegerTypeLongintDecl) {
+  auto r = Parse(
+      "module m;\n"
+      "  longint li;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLongint);
+  EXPECT_EQ(item->name, "li");
+}
+
+// --- 4-state integer types ---
+TEST(ParserSection6, IntegerTypeIntegerDecl) {
+  // 'integer' is 4-state, 32-bit signed (LRM 6.11)
+  auto r = Parse(
+      "module m;\n"
+      "  integer x;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInteger);
+  EXPECT_EQ(item->name, "x");
+}
+
+TEST(ParserSection6, IntegerTypeLogicDecl) {
+  // 'logic' is 4-state, user-defined width, unsigned (LRM 6.11)
+  auto r = Parse(
+      "module m;\n"
+      "  logic [15:0] data;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
+  EXPECT_EQ(item->name, "data");
+}
+
+TEST(ParserSection6, IntegerTypeRegDecl) {
+  // 'reg' is identical to 'logic' (LRM 6.11.2)
+  auto r = Parse(
+      "module m;\n"
+      "  reg [7:0] r;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kReg);
+  EXPECT_EQ(item->name, "r");
+}
+
+TEST(ParserSection6, IntegerTypeBitDecl) {
+  // 'bit' is 2-state, user-defined width, unsigned (LRM 6.11)
+  auto r = Parse(
+      "module m;\n"
+      "  bit [31:0] val;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kBit);
+  EXPECT_EQ(item->name, "val");
+}
+
+TEST(ParserSection6, IntegerTypeTimeDecl) {
+  // 'time' is 4-state, 64-bit unsigned (LRM 6.11)
+  auto r = Parse(
+      "module m;\n"
+      "  time t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTime);
+  EXPECT_EQ(item->name, "t");
+}
+
+// --- Signed and unsigned qualifiers (LRM 6.11.3) ---
+TEST(ParserSection6, IntUnsignedDecl) {
+  // int unsigned -- explicit unsigned override (LRM 6.11.3)
+  auto r = Parse(
+      "module m;\n"
+      "  int unsigned ui;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
+  EXPECT_FALSE(item->data_type.is_signed);
+  EXPECT_EQ(item->name, "ui");
+}
+
+TEST(ParserSection6, IntSignedDecl) {
+  // int signed -- explicit signed (default for int)
+  auto r = Parse(
+      "module m;\n"
+      "  int signed si;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
+  EXPECT_TRUE(item->data_type.is_signed);
+}
+
+TEST(ParserSection6, LogicSignedDecl) {
+  // logic signed -- unsigned by default, override to signed
+  auto r = Parse(
+      "module m;\n"
+      "  logic signed [7:0] sv;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
+  EXPECT_TRUE(item->data_type.is_signed);
+}
+
+TEST(ParserSection6, RegUnsignedDecl) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg unsigned [3:0] ru;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kReg);
+  EXPECT_FALSE(item->data_type.is_signed);
+}
+
+// --- Multiple integer declarations ---
+TEST(ParserSection6, MultipleIntDeclsCommaSeparated) {
+  auto r = Parse(
+      "module m;\n"
+      "  int a, b, c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 3u);
+}
+
+TEST(ParserSection6, IntWithInitializer) {
+  auto r = Parse(
+      "module m;\n"
+      "  int x = 42;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
+  EXPECT_NE(item->init_expr, nullptr);
+}
+
+TEST(ParserSection6, All2StateTypes) {
+  // Verify all 2-state types parse correctly together
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  byte b;\n"
+              "  shortint si;\n"
+              "  int i;\n"
+              "  longint li;\n"
+              "  bit bv;\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection6, All4StateTypes) {
+  // Verify all 4-state types parse correctly together
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic l;\n"
+              "  reg r;\n"
+              "  integer ig;\n"
+              "  time t;\n"
+              "endmodule\n"));
+}
+
+// --- Mixed types in one module ---
+TEST(ParserSection6, MixedIntegerRealStringTypes) {
+  // All major type families coexisting
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int i;\n"
+              "  real r;\n"
+              "  shortreal sr;\n"
+              "  string s;\n"
+              "  byte b;\n"
+              "  logic [7:0] l;\n"
+              "  integer ig;\n"
+              "  realtime rt;\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection6, IntegerTypesInProcedural) {
+  // All integer types declared inside initial block
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    byte b;\n"
+              "    shortint si;\n"
+              "    int i;\n"
+              "    longint li;\n"
+              "    integer ig;\n"
+              "    bit bv;\n"
+              "    logic l;\n"
+              "    reg r;\n"
+              "    time t;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection6, RealTypesInProcedural) {
+  // All real types declared inside initial block
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    real r;\n"
+              "    shortreal sr;\n"
+              "    realtime rt;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection6, StringInProcedural) {
+  // String declared inside procedural block
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    string s = \"test\";\n"
+              "    $display(s);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+// --- interface_class_type ---
+// ps_class_identifier [parameter_value_assignment]
+// (grammatically same as single class_type)
+// --- integer_type ---
+// integer_vector_type | integer_atom_type
+// --- integer_atom_type ---
+// byte | shortint | int | longint | integer | time
+TEST(ParserA221, IntegerAtomTypes) {
+  auto r = Parse(
+      "module m;\n"
+      "  byte a;\n"
+      "  shortint b;\n"
+      "  int c;\n"
+      "  longint d;\n"
+      "  integer e;\n"
+      "  time f;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kByte);
+  EXPECT_EQ(r.cu->modules[0]->items[1]->data_type.kind,
+            DataTypeKind::kShortint);
+  EXPECT_EQ(r.cu->modules[0]->items[2]->data_type.kind, DataTypeKind::kInt);
+  EXPECT_EQ(r.cu->modules[0]->items[3]->data_type.kind, DataTypeKind::kLongint);
+  EXPECT_EQ(r.cu->modules[0]->items[4]->data_type.kind, DataTypeKind::kInteger);
+  EXPECT_EQ(r.cu->modules[0]->items[5]->data_type.kind, DataTypeKind::kTime);
+}
+
+struct ParseResult612 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult612 Parse(const std::string& src) {
+  ParseResult612 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static ModuleItem* FirstItem(ParseResult612& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto& items = r.cu->modules[0]->items;
+  return items.empty() ? nullptr : items[0];
+}
+
+// =============================================================================
+// LRM section 6.12 -- Real, shortreal, and realtime data types
+// =============================================================================
+TEST(ParserSection6, RealDecl) {
+  // real is same as C double (LRM 6.12)
+  auto r = Parse(
+      "module m;\n"
+      "  real r;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kReal);
+  EXPECT_EQ(item->name, "r");
+}
+
+TEST(ParserSection6, ShortrealDecl) {
+  // shortreal is same as C float (LRM 6.12)
+  auto r = Parse(
+      "module m;\n"
+      "  shortreal sr;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kShortreal);
+  EXPECT_EQ(item->name, "sr");
+}
+
+TEST(ParserSection6, RealtimeDecl) {
+  // realtime is synonymous with real (LRM 6.12)
+  auto r = Parse(
+      "module m;\n"
+      "  realtime rt;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kRealtime);
+  EXPECT_EQ(item->name, "rt");
+}
+
+TEST(ParserSection6, RealWithInitializer) {
+  auto r = Parse(
+      "module m;\n"
+      "  real pi = 3.14159;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kReal);
+  EXPECT_NE(item->init_expr, nullptr);
+}
+
+TEST(ParserSection6, ShortrealWithInitializer) {
+  auto r = Parse(
+      "module m;\n"
+      "  shortreal f = 1.5;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kShortreal);
+  EXPECT_NE(item->init_expr, nullptr);
+}
+
+TEST(ParserSection6, MultipleRealDecls) {
+  auto r = Parse(
+      "module m;\n"
+      "  real a, b, c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 3u);
+}
+
+TEST(ParserSection6, AllRealTypes) {
+  // All three real-family types in one module
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r;\n"
+              "  shortreal sr;\n"
+              "  realtime rt;\n"
+              "endmodule\n"));
+}
+
+// --- Real literals (LRM 5.7/5.8, used with §6.12 types) ---
+TEST(ParserSection6, RealLiteralDecimalPoint) {
+  // Standard decimal point real literal
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r = 1.5;\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection6, RealLiteralScientificNotation) {
+  // Scientific notation: 1.3e2 = 130.0
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r = 1.3e2;\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection6, RealLiteralNegativeExponent) {
+  // Negative exponent: 1.0e-3 = 0.001
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r = 1.0e-3;\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection6, RealLiteralPositiveExponent) {
+  // Explicit positive exponent
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r = 2.5E+4;\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection6, RealLiteralUnderscoresInValue) {
+  // Underscores in real literals for readability
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r = 1_000.000_1;\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection6, RealLiteralZeroPointSomething) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r = 0.123;\n"
+              "endmodule\n"));
+}
+
+// --- Real conversions (LRM 6.12.1) ---
+TEST(ParserSection6, RealToIntAssignment) {
+  // Implicit conversion from real to integer (rounds, not truncates)
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r;\n"
+              "  int i;\n"
+              "  initial begin\n"
+              "    r = 35.7;\n"
+              "    i = r;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection6, IntToRealAssignment) {
+  // Implicit conversion from integer to real
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r;\n"
+              "  int i;\n"
+              "  initial begin\n"
+              "    i = 42;\n"
+              "    r = i;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection6, RealCastExplicit) {
+  // Explicit cast: int'(real_val) (LRM 6.24)
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r = 3.7;\n"
+              "  int i;\n"
+              "  initial i = int'(r);\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection6, RealInExpression) {
+  // Real values in arithmetic expressions
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real a, b, c;\n"
+              "  initial begin\n"
+              "    a = 1.5;\n"
+              "    b = 2.5;\n"
+              "    c = a + b;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+// --- Shortreal specifics (LRM 6.12) ---
+TEST(ParserSection6, ShortrealInModule) {
+  // shortreal is same as C float (LRM 6.12)
+  auto r = Parse(
+      "module m;\n"
+      "  shortreal x = 1.0;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kShortreal);
+}
+
+TEST(ParserSection6, ShortrealInFunctionArg) {
+  // shortreal as function argument type
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function shortreal scale(shortreal val, shortreal factor);\n"
+              "    return val * factor;\n"
+              "  endfunction\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection6, ShortrealCast) {
+  // Cast to shortreal
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int i = 42;\n"
+              "  shortreal sr;\n"
+              "  initial sr = shortreal'(i);\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection6, ShortrealInPort) {
+  // shortreal as port type (LRM 23.2.2)
+  EXPECT_TRUE(
+      ParseOk("module m (input var shortreal in_val,\n"
+              "          output var shortreal out_val);\n"
+              "  assign out_val = in_val;\n"
+              "endmodule\n"));
+}
+
+// --- non_integer_type ---
+// shortreal | real | realtime
+TEST(ParserA221, NonIntegerTypes) {
+  auto r = Parse(
+      "module m;\n"
+      "  shortreal a;\n"
+      "  real b;\n"
+      "  realtime c;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind,
+            DataTypeKind::kShortreal);
+  EXPECT_EQ(r.cu->modules[0]->items[1]->data_type.kind, DataTypeKind::kReal);
+  EXPECT_EQ(r.cu->modules[0]->items[2]->data_type.kind,
+            DataTypeKind::kRealtime);
+}
+
+struct ParseResult616 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult616 Parse(const std::string& src) {
+  ParseResult616 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static ModuleItem* FirstItem(ParseResult616& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto& items = r.cu->modules[0]->items;
+  return items.empty() ? nullptr : items[0];
+}
+
+// =============================================================================
+// LRM section 6.16 -- String data type
+// =============================================================================
+TEST(ParserSection6, StringDeclBasic) {
+  // string variable declaration (LRM 6.16)
+  auto r = Parse(
+      "module m;\n"
+      "  string s;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kString);
+  EXPECT_EQ(item->name, "s");
+}
+
+TEST(ParserSection6, StringDeclWithInitializer) {
+  // string variable with initial value
+  auto r = Parse(
+      "module m;\n"
+      "  string name = \"hello\";\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kString);
+  EXPECT_NE(item->init_expr, nullptr);
+}
+
+TEST(ParserSection6, StringDeclEmptyInit) {
+  // string initialized to empty string
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  string s = \"\";\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection6, StringParameterDecl) {
+  // parameter string (LRM 6.16)
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  parameter string DEFAULT_NAME = \"John Smith\";\n"
+              "  string myName = DEFAULT_NAME;\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection6, StringInFunctionArg) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function void greet(string name);\n"
+              "    $display(\"Hello %s\", name);\n"
+              "  endfunction\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection6, StringFunctionReturn) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function string get_msg();\n"
+              "    return \"ok\";\n"
+              "  endfunction\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection6, StringConcatOp) {
+  // String concatenation using {} operator
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  string a, b, c;\n"
+              "  initial begin\n"
+              "    a = \"hello\";\n"
+              "    b = \" world\";\n"
+              "    c = {a, b};\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection6, StringComparison) {
+  // String comparison operators
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  string a, b;\n"
+              "  initial begin\n"
+              "    a = \"abc\";\n"
+              "    b = \"def\";\n"
+              "    if (a == b) $display(\"equal\");\n"
+              "    if (a != b) $display(\"not equal\");\n"
+              "    if (a < b) $display(\"less\");\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection6, MultipleStringDecls) {
+  auto r = Parse(
+      "module m;\n"
+      "  string x, y, z;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 3u);
+}
+
+}  // namespace

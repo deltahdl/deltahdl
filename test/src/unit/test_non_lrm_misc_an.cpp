@@ -1,0 +1,991 @@
+// Non-LRM tests
+
+#include <gtest/gtest.h>
+
+#include <string>
+
+#include "common/arena.h"
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
+#include "lexer/lexer.h"
+#include "parser/parser.h"
+
+using namespace delta;
+
+// --- Test helpers ---
+struct ParseResult {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+ParseResult Parse(const std::string& src) {
+  ParseResult result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+namespace {
+
+
+// ---------------------------------------------------------------------------
+// event_trigger ::=
+//   -> hierarchical_event_identifier nonrange_select ;
+//   | ->> [ delay_or_event_control ] hierarchical_event_identifier
+//     nonrange_select ;
+// ---------------------------------------------------------------------------
+// §15.5.1: blocking event trigger
+TEST(ParserA605, EventTriggerBlocking) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    -> ev;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventTrigger);
+  EXPECT_NE(stmt->expr, nullptr);
+}
+
+// §15.5.1: nonblocking event trigger
+TEST(ParserA605, EventTriggerNonblocking) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    ->> ev;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNbEventTrigger);
+  EXPECT_NE(stmt->expr, nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// disable_statement ::=
+//   disable hierarchical_task_identifier ;
+//   | disable hierarchical_block_identifier ;
+//   | disable fork ;
+// ---------------------------------------------------------------------------
+// §9.6.2: disable named block
+TEST(ParserA605, DisableBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    disable my_block;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDisable);
+  EXPECT_NE(stmt->expr, nullptr);
+}
+
+// §9.6.3: disable fork
+TEST(ParserA605, DisableFork) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    disable fork;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDisableFork);
+}
+
+// ---------------------------------------------------------------------------
+// edge_identifier ::= posedge | negedge | edge
+// ---------------------------------------------------------------------------
+// §9.4.2: all three edge identifiers parsed correctly
+TEST(ParserA605, EdgeIdentifiers) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge a or negedge b or edge c) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->events.size(), 3u);
+  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
+  EXPECT_EQ(stmt->events[1].edge, Edge::kNegedge);
+  EXPECT_EQ(stmt->events[2].edge, Edge::kEdge);
+}
+
+// =============================================================================
+// A.6.6 Conditional statements
+// =============================================================================
+// ---------------------------------------------------------------------------
+// conditional_statement ::=
+//   [ unique_priority ] if ( cond_predicate ) statement_or_null
+//   { else if ( cond_predicate ) statement_or_null }
+//   [ else statement_or_null ]
+// ---------------------------------------------------------------------------
+// §12.4: basic if statement — true branch only, no else
+TEST(ParserA606, IfOnly) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin if (a) x = 1; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  EXPECT_NE(stmt->condition, nullptr);
+  EXPECT_NE(stmt->then_branch, nullptr);
+  EXPECT_EQ(stmt->else_branch, nullptr);
+}
+
+// §12.4: if-else statement
+TEST(ParserA606, IfElse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin if (a) x = 1; else x = 0; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  EXPECT_NE(stmt->condition, nullptr);
+  EXPECT_NE(stmt->then_branch, nullptr);
+  ASSERT_NE(stmt->else_branch, nullptr);
+  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kBlockingAssign);
+}
+
+// §12.4.1: if-else-if chain with final else
+TEST(ParserA606, IfElseIfElse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (a) x = 1;\n"
+      "    else if (b) x = 2;\n"
+      "    else x = 3;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  // else branch is another if statement
+  ASSERT_NE(stmt->else_branch, nullptr);
+  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kIf);
+  // the inner if has its own else
+  ASSERT_NE(stmt->else_branch->else_branch, nullptr);
+  EXPECT_EQ(stmt->else_branch->else_branch->kind, StmtKind::kBlockingAssign);
+}
+
+// §12.4.1: multi-way if-else-if chain without final else
+TEST(ParserA606, IfElseIfNoFinalElse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (a) x = 1;\n"
+      "    else if (b) x = 2;\n"
+      "    else if (c) x = 3;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  ASSERT_NE(stmt->else_branch, nullptr);
+  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kIf);
+  ASSERT_NE(stmt->else_branch->else_branch, nullptr);
+  EXPECT_EQ(stmt->else_branch->else_branch->kind, StmtKind::kIf);
+  // last else-if has no else
+  EXPECT_EQ(stmt->else_branch->else_branch->else_branch, nullptr);
+}
+
+// §12.4: if with null statement_or_null (semicolon) for then branch
+TEST(ParserA606, IfNullThen) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin if (a) ; else x = 0; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  ASSERT_NE(stmt->then_branch, nullptr);
+  EXPECT_EQ(stmt->then_branch->kind, StmtKind::kNull);
+  ASSERT_NE(stmt->else_branch, nullptr);
+}
+
+// §12.4: if with null else branch
+TEST(ParserA606, IfNullElse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin if (a) x = 1; else ; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  ASSERT_NE(stmt->else_branch, nullptr);
+  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kNull);
+}
+
+// §12.4: if with begin-end block in both branches
+TEST(ParserA606, IfElseWithBlocks) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (cond) begin\n"
+      "      x = 1;\n"
+      "      y = 2;\n"
+      "    end else begin\n"
+      "      x = 3;\n"
+      "      y = 4;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  ASSERT_NE(stmt->then_branch, nullptr);
+  EXPECT_EQ(stmt->then_branch->kind, StmtKind::kBlock);
+  ASSERT_NE(stmt->else_branch, nullptr);
+  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kBlock);
+}
+
+// §12.4: dangling else associates with closest if
+TEST(ParserA606, DanglingElse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (a)\n"
+      "      if (b) x = 1;\n"
+      "      else x = 2;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  // outer if has no else — the else belongs to the inner if
+  EXPECT_EQ(stmt->else_branch, nullptr);
+  // then_branch is the inner if, which has an else
+  ASSERT_NE(stmt->then_branch, nullptr);
+  EXPECT_EQ(stmt->then_branch->kind, StmtKind::kIf);
+  EXPECT_NE(stmt->then_branch->else_branch, nullptr);
+}
+
+// §12.4: forced else association with begin-end
+TEST(ParserA606, ForcedElseWithBeginEnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (a) begin\n"
+      "      if (b) x = 1;\n"
+      "    end\n"
+      "    else x = 2;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  // outer if now has else (because begin-end blocks inner if)
+  ASSERT_NE(stmt->else_branch, nullptr);
+  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kBlockingAssign);
+  // then_branch is a block containing inner if with no else
+  ASSERT_NE(stmt->then_branch, nullptr);
+  EXPECT_EQ(stmt->then_branch->kind, StmtKind::kBlock);
+}
+
+// ---------------------------------------------------------------------------
+// unique_priority ::= unique | unique0 | priority
+// ---------------------------------------------------------------------------
+// §12.4.2: unique if
+TEST(ParserA606, UniqueIf) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique if (a == 0) x = 1;\n"
+      "    else if (a == 1) x = 2;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
+}
+
+// §12.4.2: unique0 if
+TEST(ParserA606, Unique0If) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique0 if (a == 0) x = 1;\n"
+      "    else if (a == 1) x = 2;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
+}
+
+// §12.4.2: priority if
+TEST(ParserA606, PriorityIf) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    priority if (a == 0) x = 1;\n"
+      "    else if (a == 1) x = 2;\n"
+      "    else x = 3;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
+}
+
+// §12.4.2: unique if with else-if chain and final else
+TEST(ParserA606, UniqueIfElseIfElse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique if (a == 0) x = 1;\n"
+      "    else if (a == 1) x = 2;\n"
+      "    else if (a == 2) x = 3;\n"
+      "    else x = 4;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
+  // qualifier only on outermost if; else-if branches are plain if stmts
+  ASSERT_NE(stmt->else_branch, nullptr);
+  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kIf);
+  EXPECT_EQ(stmt->else_branch->qualifier, CaseQualifier::kNone);
+}
+
+// ---------------------------------------------------------------------------
+// cond_predicate ::=
+//   expression_or_cond_pattern { &&& expression_or_cond_pattern }
+// ---------------------------------------------------------------------------
+// §12.6: cond_predicate with &&& operator
+TEST(ParserA606, CondPredicateTripleAnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (a &&& b) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  EXPECT_NE(stmt->condition, nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// expression_or_cond_pattern ::= expression | cond_pattern
+// cond_pattern ::= expression matches pattern
+// ---------------------------------------------------------------------------
+// §12.6: cond_pattern in if condition — expr matches constant
+TEST(ParserA606, CondPatternMatchesConstant) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (x matches 3) y = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  // condition should be a matches binary expression
+  ASSERT_NE(stmt->condition, nullptr);
+  EXPECT_EQ(stmt->condition->kind, ExprKind::kBinary);
+  EXPECT_EQ(stmt->condition->op, TokenKind::kKwMatches);
+}
+
+// §12.6: matches with &&& in cond_predicate
+TEST(ParserA606, CondPatternMatchesWithTripleAnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (x matches 5 &&& en) y = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  EXPECT_NE(stmt->condition, nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// Structural tests: nested conditionals, complex conditions
+// ---------------------------------------------------------------------------
+// §12.4: nested if inside begin-end
+TEST(ParserA606, NestedIfInBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (a) begin\n"
+      "      if (b) x = 1;\n"
+      "      else x = 2;\n"
+      "    end else begin\n"
+      "      if (c) x = 3;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  // both branches are blocks
+  EXPECT_EQ(stmt->then_branch->kind, StmtKind::kBlock);
+  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kBlock);
+}
+
+// §12.4: complex condition expression
+TEST(ParserA606, ComplexCondExpression) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if ((a > 0) && (b < 10) || c) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  EXPECT_NE(stmt->condition, nullptr);
+}
+
+// §12.4: if condition with function call
+TEST(ParserA606, IfCondFunctionCall) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if ($unsigned(a) > 0) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+}
+
+// =============================================================================
+// A.6.7 Case statements
+// =============================================================================
+// ---------------------------------------------------------------------------
+// case_statement ::=
+//   [ unique_priority ] case_keyword ( case_expression )
+//     case_item { case_item } endcase
+// ---------------------------------------------------------------------------
+// §12.5: basic case statement with single items
+TEST(ParserA607, CaseStmtParse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x) 0: y = 1; default: y = 0; endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCase);
+}
+
+// §12.5: case statement items count and default detection
+TEST(ParserA607, CaseStmtItems) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x) 0: y = 1; default: y = 0; endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->case_items.size(), 2u);
+  EXPECT_FALSE(stmt->case_items[0].is_default);
+  EXPECT_TRUE(stmt->case_items[1].is_default);
+}
+
+// §12.5: multiple case_item_expressions per case item (comma-separated)
+TEST(ParserA607, CaseMultipleItemExprs) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(sel)\n"
+      "      0, 1: x = 8'd10;\n"
+      "      2, 3, 4: x = 8'd20;\n"
+      "      default: x = 8'd30;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->case_items.size(), 3u);
+  EXPECT_EQ(stmt->case_items[0].patterns.size(), 2u);
+  EXPECT_EQ(stmt->case_items[1].patterns.size(), 3u);
+  EXPECT_TRUE(stmt->case_items[2].is_default);
+}
+
+// §12.5: default without colon
+TEST(ParserA607, CaseDefaultNoColon) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x) 0: y = 1; default y = 0; endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->case_items.size(), 2u);
+  EXPECT_TRUE(stmt->case_items[1].is_default);
+}
+
+// §12.5: case with no default
+TEST(ParserA607, CaseNoDefault) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x) 0: y = 1; 1: y = 2; endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->case_items.size(), 2u);
+  EXPECT_FALSE(stmt->case_items[0].is_default);
+  EXPECT_FALSE(stmt->case_items[1].is_default);
+}
+
+// §12.5: case with block statement in item body
+TEST(ParserA607, CaseItemWithBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x)\n"
+      "      0: begin y = 1; z = 2; end\n"
+      "      default: begin y = 0; z = 0; end\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->case_items[0].body->kind, StmtKind::kBlock);
+}
+
+// ---------------------------------------------------------------------------
+// case_keyword ::= case | casez | casex
+// ---------------------------------------------------------------------------
+// §12.5.1: casez keyword
+TEST(ParserA607, CasezKeyword) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    casez(sel) 3'b1??: x = 1; default: x = 0; endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasez);
+}
+
+// §12.5.1: casex keyword
+TEST(ParserA607, CasexKeyword) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    casex(sel) 3'b1??: x = 1; default: x = 0; endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasex);
+}
+
+// ---------------------------------------------------------------------------
+// case_statement ::=
+//   [ unique_priority ] case ( case_expression ) inside
+//     case_inside_item { case_inside_item } endcase
+// ---------------------------------------------------------------------------
+// §12.5.4: case-inside variant
+TEST(ParserA607, CaseInsideParse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x) inside\n"
+      "      1, 3: y = 8'd10;\n"
+      "      [4:7]: y = 8'd20;\n"
+      "      default: y = 8'd30;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCase);
+  EXPECT_TRUE(stmt->case_inside);
+}
+
+// ---------------------------------------------------------------------------
+// case_statement ::=
+//   [ unique_priority ] case_keyword ( case_expression ) matches
+//     case_pattern_item { case_pattern_item } endcase
+// ---------------------------------------------------------------------------
+// §12.6.1: case-matches variant
+TEST(ParserA607, CaseMatchesParse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(v) matches\n"
+      "      5: y = 8'd10;\n"
+      "      default: y = 8'd20;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+}
+
+// ---------------------------------------------------------------------------
+// unique_priority with case
+// ---------------------------------------------------------------------------
+// §12.5.3: unique case
+TEST(ParserA607, UniqueCaseParse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique case(x)\n"
+      "      0: y = 1;\n"
+      "      1: y = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
+}
+
+// §12.5.3: unique0 case
+TEST(ParserA607, Unique0CaseParse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique0 case(x)\n"
+      "      0: y = 1;\n"
+      "      1: y = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
+}
+
+// §12.5.3: priority case
+TEST(ParserA607, PriorityCaseParse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    priority case(x)\n"
+      "      0: y = 1;\n"
+      "      1: y = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
+}
+
+// §12.5.3: priority casez
+TEST(ParserA607, PriorityCasezParse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    priority casez(a)\n"
+      "      3'b00?: y = 1;\n"
+      "      3'b0??: y = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
+  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasez);
+}
+
+// §12.5.2: constant expression as case_expression
+TEST(ParserA607, ConstExprCaseExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(1)\n"
+      "      a: y = 1;\n"
+      "      b: y = 2;\n"
+      "      default: y = 3;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_NE(stmt->condition, nullptr);
+}
+
+// §12.5: nested case statements
+TEST(ParserA607, NestedCaseStmt) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(a)\n"
+      "      0: case(b)\n"
+      "           0: x = 1;\n"
+      "           1: x = 2;\n"
+      "         endcase\n"
+      "      1: x = 3;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->case_items[0].body->kind, StmtKind::kCase);
+}
+
+// ---------------------------------------------------------------------------
+// case_inside_item ::=
+//   range_list : statement_or_null
+// range_list ::= value_range { , value_range }
+// ---------------------------------------------------------------------------
+// §12.5.4: case inside with range [lo:hi]
+TEST(ParserA607, CaseInsideRange) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x) inside\n"
+      "      [0:3]: y = 1;\n"
+      "      [4:7]: y = 2;\n"
+      "      default: y = 3;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_TRUE(stmt->case_inside);
+  ASSERT_GE(stmt->case_items.size(), 2u);
+}
+
+// §12.5.4: case inside with multiple value_ranges (comma-separated)
+TEST(ParserA607, CaseInsideMultipleRanges) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x) inside\n"
+      "      1, 3, [5:7]: y = 1;\n"
+      "      default: y = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_TRUE(stmt->case_inside);
+  EXPECT_EQ(stmt->case_items[0].patterns.size(), 3u);
+}
+
+// ---------------------------------------------------------------------------
+// randcase_statement ::= randcase randcase_item { randcase_item } endcase
+// randcase_item ::= expression : statement_or_null
+// ---------------------------------------------------------------------------
+// §18.16: randcase statement
+TEST(ParserA607, RandcaseParse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    randcase\n"
+      "      50: x = 1;\n"
+      "      30: x = 2;\n"
+      "      20: x = 3;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kRandcase);
+  EXPECT_EQ(stmt->randcase_items.size(), 3u);
+}
+
+// §18.16: randcase with block bodies
+TEST(ParserA607, RandcaseWithBlocks) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    randcase\n"
+      "      50: begin x = 1; y = 2; end\n"
+      "      50: begin x = 3; y = 4; end\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kRandcase);
+  EXPECT_EQ(stmt->randcase_items.size(), 2u);
+}
+
+// ---------------------------------------------------------------------------
+// value_range ::= expression
+// value_range ::= [ expression : expression ]
+// ---------------------------------------------------------------------------
+// §11.4.13: value_range as simple expression in case-inside
+TEST(ParserA607, ValueRangeExpression) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x) inside\n"
+      "      5: y = 1;\n"
+      "      10: y = 2;\n"
+      "      default: y = 3;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §11.4.13: value_range with bracket range [lo:hi]
+TEST(ParserA607, ValueRangeBracket) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x) inside\n"
+      "      [0:15]: y = 1;\n"
+      "      default: y = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §12.5: case with null statement body (;)
+TEST(ParserA607, CaseItemNullBody) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x)\n"
+      "      0: ;\n"
+      "      1: y = 1;\n"
+      "      default: ;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->case_items.size(), 3u);
+}
+
+// §12.5: case with expression as case_expression (not just identifier)
+TEST(ParserA607, CaseComplexExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(a + b)\n"
+      "      0: y = 1;\n"
+      "      1: y = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_NE(stmt->condition, nullptr);
+  EXPECT_EQ(stmt->condition->kind, ExprKind::kBinary);
+}
+
+}  // namespace

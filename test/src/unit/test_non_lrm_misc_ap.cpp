@@ -1,0 +1,986 @@
+// Non-LRM tests
+
+#include <gtest/gtest.h>
+
+#include <string>
+
+#include "common/arena.h"
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
+#include "lexer/lexer.h"
+#include "parser/parser.h"
+
+using namespace delta;
+
+// --- Test helpers ---
+struct ParseResult {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+ParseResult Parse(const std::string& src) {
+  ParseResult result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+namespace {
+
+
+// =============================================================================
+// A.6.9 Subroutine call statements — subroutine_call_statement
+// =============================================================================
+// --- subroutine_call_statement: subroutine_call ; ---
+// tf_call with empty parentheses
+TEST(ParserA609, TfCallEmptyParens) {
+  auto r = Parse(
+      "module m;\n"
+      "  task foo; endtask\n"
+      "  initial foo();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCall);
+  EXPECT_EQ(expr->callee, "foo");
+  EXPECT_TRUE(expr->args.empty());
+}
+
+// tf_call without parentheses (task call — footnote 42)
+TEST(ParserA609, TfCallNoParens) {
+  auto r = Parse(
+      "module m;\n"
+      "  task foo; endtask\n"
+      "  initial foo;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
+}
+
+// tf_call with single argument
+TEST(ParserA609, TfCallSingleArg) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin foo(42); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCall);
+  EXPECT_EQ(expr->args.size(), 1u);
+}
+
+// tf_call with multiple positional arguments
+TEST(ParserA609, TfCallMultipleArgs) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin foo(1, 2, 3); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCall);
+  EXPECT_EQ(expr->args.size(), 3u);
+}
+
+// --- subroutine_call_statement: void ' ( function_subroutine_call ) ; ---
+TEST(ParserA609, VoidCastFunctionCall) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int foo(); return 1; endfunction\n"
+      "  initial void'(foo());\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCast);
+  EXPECT_EQ(expr->text, "void");
+  ASSERT_NE(expr->lhs, nullptr);
+  EXPECT_EQ(expr->lhs->kind, ExprKind::kCall);
+  EXPECT_EQ(expr->lhs->callee, "foo");
+}
+
+// void cast with system function call
+TEST(ParserA609, VoidCastSystemCall) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial void'($sformatf(\"hello\"));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCast);
+  EXPECT_EQ(expr->text, "void");
+  ASSERT_NE(expr->lhs, nullptr);
+  EXPECT_EQ(expr->lhs->kind, ExprKind::kSystemCall);
+}
+
+// =============================================================================
+// A.6.9 — system_tf_call
+// =============================================================================
+// system_tf_call without parentheses
+TEST(ParserA609, SystemTfCallNoParens) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial $finish;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kSystemCall);
+  EXPECT_EQ(expr->callee, "$finish");
+  EXPECT_TRUE(expr->args.empty());
+}
+
+// system_tf_call with empty parentheses
+TEST(ParserA609, SystemTfCallEmptyParens) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial $finish();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kSystemCall);
+  EXPECT_EQ(expr->callee, "$finish");
+  EXPECT_TRUE(expr->args.empty());
+}
+
+// system_tf_call with arguments
+TEST(ParserA609, SystemTfCallWithArgs) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  initial $display(\"x=%0d\", x);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kSystemCall);
+  EXPECT_EQ(expr->callee, "$display");
+  EXPECT_EQ(expr->args.size(), 2u);
+}
+
+// system_tf_call with empty positional arguments (commas with no expressions)
+TEST(ParserA609, SystemTfCallEmptyArgs) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial $display(,,1);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kSystemCall);
+  EXPECT_EQ(expr->args.size(), 3u);
+  EXPECT_EQ(expr->args[0], nullptr);
+  EXPECT_EQ(expr->args[1], nullptr);
+  ASSERT_NE(expr->args[2], nullptr);
+}
+
+// =============================================================================
+// A.6.9 — list_of_arguments (named)
+// =============================================================================
+// All named arguments
+TEST(ParserA609, ListOfArgsAllNamed) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin foo(.a(1), .b(2)); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCall);
+  EXPECT_EQ(expr->arg_names.size(), 2u);
+  EXPECT_EQ(expr->arg_names[0], "a");
+  EXPECT_EQ(expr->arg_names[1], "b");
+  EXPECT_EQ(expr->args.size(), 2u);
+}
+
+// Named argument with empty expression
+TEST(ParserA609, ListOfArgsNamedEmpty) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin foo(.a(), .b(1)); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCall);
+  EXPECT_EQ(expr->arg_names.size(), 2u);
+  EXPECT_EQ(expr->args[0], nullptr);
+  ASSERT_NE(expr->args[1], nullptr);
+}
+
+// Mixed positional then named arguments
+TEST(ParserA609, ListOfArgsMixedPositionalThenNamed) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin foo(1, 2, .c(3)); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCall);
+  // Two positional args + one named arg
+  EXPECT_EQ(expr->args.size(), 3u);
+  ASSERT_EQ(expr->arg_names.size(), 1u);
+  EXPECT_EQ(expr->arg_names[0], "c");
+}
+
+// =============================================================================
+// A.6.9 — method_call
+// =============================================================================
+// method_call: method_call_root . method_call_body (no args)
+TEST(ParserA609, MethodCallNoArgs) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin obj.method(); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCall);
+  ASSERT_NE(expr->lhs, nullptr);
+  EXPECT_EQ(expr->lhs->kind, ExprKind::kMemberAccess);
+}
+
+// method_call with arguments
+TEST(ParserA609, MethodCallWithArgs) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin obj.method(1, 2); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCall);
+  EXPECT_EQ(expr->args.size(), 2u);
+}
+
+// method_call with chained member access
+TEST(ParserA609, MethodCallChained) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin a.b.c(); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCall);
+}
+
+// method_call_root: implicit_class_handle (this)
+TEST(ParserA609, ThisMethodCall) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin this.method(); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCall);
+}
+
+// =============================================================================
+// A.6.9 — array_method_name keywords (unique, and, or, xor)
+// =============================================================================
+TEST(ParserA609, ArrayMethodUnique) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin arr.unique(); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCall);
+}
+
+TEST(ParserA609, ArrayMethodAnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin arr.and(); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCall);
+}
+
+TEST(ParserA609, ArrayMethodOr) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin arr.or(); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCall);
+}
+
+TEST(ParserA609, ArrayMethodXor) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin arr.xor(); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCall);
+}
+
+// =============================================================================
+// A.6.9 — array_manipulation_call with 'with' clause
+// =============================================================================
+TEST(ParserA609, ArrayMethodWithClause) {
+  auto r = Parse(
+      "module m;\n"
+      "  int arr[4];\n"
+      "  int result[$];\n"
+      "  initial begin result = arr.find with (item > 5); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+static ModuleItem* FirstModuleItemOfKind(ParseResult& r, ModuleItemKind kind) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// A.6.10 Assertion statements — simple_immediate_assert_statement
+// =============================================================================
+// assert ( expression ) ;
+TEST(ParserA610, SimpleAssertSemicolon) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial assert(1);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
+  ASSERT_NE(stmt->assert_expr, nullptr);
+  EXPECT_EQ(stmt->assert_pass_stmt, nullptr);
+  EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
+  EXPECT_FALSE(stmt->is_deferred);
+}
+
+// assert ( expression ) pass_stmt ;
+TEST(ParserA610, SimpleAssertPassAction) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial assert(1) $display(\"pass\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
+  ASSERT_NE(stmt->assert_pass_stmt, nullptr);
+  EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
+}
+
+// assert ( expression ) pass_stmt else fail_stmt ;
+TEST(ParserA610, SimpleAssertPassElseFail) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial assert(1) $display(\"p\"); else $display(\"f\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
+  ASSERT_NE(stmt->assert_pass_stmt, nullptr);
+  ASSERT_NE(stmt->assert_fail_stmt, nullptr);
+}
+
+// assert ( expression ) else fail_stmt ;
+TEST(ParserA610, SimpleAssertElseOnly) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial assert(1) else $display(\"fail\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
+  EXPECT_EQ(stmt->assert_pass_stmt, nullptr);
+  ASSERT_NE(stmt->assert_fail_stmt, nullptr);
+}
+
+// =============================================================================
+// A.6.10 — simple_immediate_assume_statement
+// =============================================================================
+// assume ( expression ) ;
+TEST(ParserA610, SimpleAssumeSemicolon) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial assume(1);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssumeImmediate);
+  EXPECT_EQ(stmt->assert_pass_stmt, nullptr);
+  EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
+}
+
+// assume ( expression ) pass else fail ;
+TEST(ParserA610, SimpleAssumePassElseFail) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial assume(1) $display(\"p\"); else $display(\"f\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssumeImmediate);
+  ASSERT_NE(stmt->assert_pass_stmt, nullptr);
+  ASSERT_NE(stmt->assert_fail_stmt, nullptr);
+}
+
+// =============================================================================
+// A.6.10 — simple_immediate_cover_statement
+// =============================================================================
+// cover ( expression ) ;
+TEST(ParserA610, SimpleCoverSemicolon) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial cover(1);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCoverImmediate);
+  EXPECT_EQ(stmt->assert_pass_stmt, nullptr);
+  EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
+}
+
+// cover ( expression ) pass_stmt ;
+TEST(ParserA610, SimpleCoverPassAction) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial cover(1) $display(\"hit\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCoverImmediate);
+  ASSERT_NE(stmt->assert_pass_stmt, nullptr);
+  EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
+}
+
+// =============================================================================
+// A.6.10 — deferred_immediate_assert_statement
+// =============================================================================
+// assert #0 ( expression ) ;
+TEST(ParserA610, DeferredAssertHash0) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial assert #0 (1);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
+  EXPECT_TRUE(stmt->is_deferred);
+}
+
+// assert final ( expression ) ;
+TEST(ParserA610, DeferredAssertFinal) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial assert final (1);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
+  EXPECT_TRUE(stmt->is_deferred);
+}
+
+// assert #0 ( expression ) pass else fail ;
+TEST(ParserA610, DeferredAssertHash0ActionBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial assert #0 (1) $display(\"p\"); else $display(\"f\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
+  EXPECT_TRUE(stmt->is_deferred);
+  ASSERT_NE(stmt->assert_pass_stmt, nullptr);
+  ASSERT_NE(stmt->assert_fail_stmt, nullptr);
+}
+
+// =============================================================================
+// A.6.10 — deferred_immediate_assume_statement
+// =============================================================================
+// assume #0 ( expression ) ;
+TEST(ParserA610, DeferredAssumeHash0) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial assume #0 (1);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssumeImmediate);
+  EXPECT_TRUE(stmt->is_deferred);
+}
+
+// assume final ( expression ) ;
+TEST(ParserA610, DeferredAssumeFinal) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial assume final (1);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssumeImmediate);
+  EXPECT_TRUE(stmt->is_deferred);
+}
+
+// =============================================================================
+// A.6.10 — deferred_immediate_cover_statement
+// =============================================================================
+// cover #0 ( expression ) ;
+TEST(ParserA610, DeferredCoverHash0) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial cover #0 (1);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCoverImmediate);
+  EXPECT_TRUE(stmt->is_deferred);
+}
+
+// cover final ( expression ) ;
+TEST(ParserA610, DeferredCoverFinal) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial cover final (1);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCoverImmediate);
+  EXPECT_TRUE(stmt->is_deferred);
+}
+
+// =============================================================================
+// A.6.10 — action_block
+// =============================================================================
+// action_block: begin/end block as pass action
+TEST(ParserA610, ActionBlockBeginEnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial assert(1) begin $display(\"a\"); $display(\"b\"); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
+  ASSERT_NE(stmt->assert_pass_stmt, nullptr);
+  EXPECT_EQ(stmt->assert_pass_stmt->kind, StmtKind::kBlock);
+}
+
+// action_block: [ statement ] else statement_or_null
+TEST(ParserA610, ActionBlockPassFailBlocks) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial assert(1) begin end else begin end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->assert_pass_stmt, nullptr);
+  ASSERT_NE(stmt->assert_fail_stmt, nullptr);
+}
+
+// =============================================================================
+// A.6.10 — concurrent_assertion_statement (module-level)
+// =============================================================================
+// assert_property_statement
+TEST(ParserA610, AssertPropertyModule) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (a |-> b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kAssertProperty);
+  ASSERT_NE(item, nullptr);
+}
+
+// assume_property_statement
+TEST(ParserA610, AssumePropertyModule) {
+  auto r = Parse(
+      "module m;\n"
+      "  assume property (req |-> ack);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kAssumeProperty);
+  ASSERT_NE(item, nullptr);
+}
+
+// cover_property_statement
+TEST(ParserA610, CoverPropertyModule) {
+  auto r = Parse(
+      "module m;\n"
+      "  cover property (a && b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kCoverProperty);
+  ASSERT_NE(item, nullptr);
+}
+
+// cover_sequence_statement
+TEST(ParserA610, CoverSequenceModule) {
+  auto r = Parse(
+      "module m;\n"
+      "  cover sequence (a ##1 b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kCoverSequence);
+  ASSERT_NE(item, nullptr);
+}
+
+// restrict_property_statement
+TEST(ParserA610, RestrictPropertyModule) {
+  auto r = Parse(
+      "module m;\n"
+      "  restrict property (clk);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kRestrictProperty);
+  ASSERT_NE(item, nullptr);
+}
+
+// =============================================================================
+// A.6.10 — deferred_immediate_assertion_item (module-level)
+// =============================================================================
+// assert #0 at module level
+TEST(ParserA610, DeferredAssertHash0Module) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic x;\n"
+      "  assert #0 (x);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// assert final at module level
+TEST(ParserA610, DeferredAssertFinalModule) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic x;\n"
+      "  assert final (x);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// =============================================================================
+// A.6.10 — concurrent assertion with action_block
+// =============================================================================
+// assert property with pass and else actions
+TEST(ParserA610, AssertPropertyActionBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (a) $display(\"pass\"); else $display(\"fail\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kAssertProperty);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->assert_pass_stmt, nullptr);
+  ASSERT_NE(item->assert_fail_stmt, nullptr);
+}
+
+// cover property with pass action only (no else)
+TEST(ParserA610, CoverPropertyPassAction) {
+  auto r = Parse(
+      "module m;\n"
+      "  cover property (a) $display(\"covered\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kCoverProperty);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->assert_pass_stmt, nullptr);
+}
+
+static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
+  size_t count = 0;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kClockingBlock) continue;
+    if (count == idx) return item;
+    ++count;
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// A.6.11 clocking_declaration — plain clocking block
+// =============================================================================
+TEST(ParserA611, ClockingDeclPlain) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlock(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kClockingBlock);
+  EXPECT_EQ(item->name, "cb");
+  EXPECT_FALSE(item->is_default_clocking);
+  EXPECT_FALSE(item->is_global_clocking);
+}
+
+// =============================================================================
+// A.6.11 clocking_declaration — default clocking
+// =============================================================================
+TEST(ParserA611, ClockingDeclDefault) {
+  auto r = Parse(
+      "module m;\n"
+      "  default clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlock(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->is_default_clocking);
+  EXPECT_FALSE(item->is_global_clocking);
+  EXPECT_EQ(item->name, "cb");
+}
+
+// =============================================================================
+// A.6.11 clocking_declaration — global clocking
+// =============================================================================
+TEST(ParserA611, ClockingDeclGlobal) {
+  auto r = Parse(
+      "module m;\n"
+      "  global clocking gclk @(posedge sys_clk);\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlock(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->is_global_clocking);
+  EXPECT_FALSE(item->is_default_clocking);
+  EXPECT_EQ(item->name, "gclk");
+  EXPECT_TRUE(item->clocking_signals.empty());
+}
+
+// =============================================================================
+// A.6.11 clocking_declaration — unnamed default clocking
+// =============================================================================
+TEST(ParserA611, ClockingDeclUnnamed) {
+  auto r = Parse(
+      "module m;\n"
+      "  default clocking @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlock(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->is_default_clocking);
+  EXPECT_TRUE(item->name.empty());
+}
+
+// =============================================================================
+// A.6.11 clocking_declaration — end label
+// =============================================================================
+TEST(ParserA611, ClockingDeclEndLabel) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking : cb\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlock(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->name, "cb");
+}
+
+// =============================================================================
+// A.6.11 clocking_declaration — clocking_event as @identifier
+// =============================================================================
+TEST(ParserA611, ClockingEventBareIdentifier) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @clk;\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlock(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->clocking_event.size(), 1u);
+  EXPECT_EQ(item->clocking_event[0].edge, Edge::kNone);
+}
+
+// =============================================================================
+// A.6.11 clocking_declaration — clocking_event as @(event_expression)
+// =============================================================================
+TEST(ParserA611, ClockingEventParenExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlock(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->clocking_event.size(), 1u);
+  EXPECT_EQ(item->clocking_event[0].edge, Edge::kPosedge);
+}
+
+// =============================================================================
+// A.6.11 clocking_item — default default_skew (input)
+// =============================================================================
+TEST(ParserA611, ClockingItemDefaultSkewInput) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    default input #1;\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlock(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_GE(item->clocking_signals.size(), 1u);
+  EXPECT_EQ(item->clocking_signals[0].name, "data");
+}
+
+// =============================================================================
+// A.6.11 clocking_item — default default_skew (output)
+// =============================================================================
+TEST(ParserA611, ClockingItemDefaultSkewOutput) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    default output #2;\n"
+      "    output ack;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlock(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_GE(item->clocking_signals.size(), 1u);
+  EXPECT_EQ(item->clocking_signals[0].name, "ack");
+}
+
+// =============================================================================
+// A.6.11 clocking_item — default default_skew (input + output)
+// =============================================================================
+TEST(ParserA611, ClockingItemDefaultSkewInputOutput) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    default input #1 output #2;\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlock(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_GE(item->clocking_signals.size(), 1u);
+}
+
+// =============================================================================
+// A.6.11 clocking_direction — input
+// =============================================================================
+TEST(ParserA611, ClockingDirectionInput) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlock(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->clocking_signals.size(), 1u);
+  EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInput);
+  EXPECT_EQ(item->clocking_signals[0].name, "data");
+}
+
+}  // namespace

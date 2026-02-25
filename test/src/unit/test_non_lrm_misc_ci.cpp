@@ -1,0 +1,985 @@
+// Non-LRM tests
+
+#include <gtest/gtest.h>
+
+#include <string>
+
+#include "common/arena.h"
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
+#include "lexer/lexer.h"
+#include "parser/parser.h"
+
+using namespace delta;
+
+// --- Test helpers ---
+struct ParseResult {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+ParseResult Parse(const std::string& src) {
+  ParseResult result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+namespace {
+
+
+// --- Ternary in case expression ---
+TEST(ParserSection11, Sec11_4_6_TernaryInCaseExpr) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    case (sel ? a : b)\n"
+      "      0: x = 1;\n"
+      "      default: x = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  ASSERT_NE(stmt->condition, nullptr);
+  EXPECT_EQ(stmt->condition->kind, ExprKind::kTernary);
+}
+
+// --- Ternary with system call operand ---
+TEST(ParserSection11, Sec11_4_6_TernaryWithSystemCall) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = sel ? $random : 0;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->true_expr, nullptr);
+  EXPECT_EQ(rhs->true_expr->kind, ExprKind::kSystemCall);
+  EXPECT_EQ(rhs->true_expr->callee, "$random");
+  ASSERT_NE(rhs->false_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kIntegerLiteral);
+}
+
+// --- Ternary with unary operands ---
+TEST(ParserSection11, Sec11_4_6_TernaryWithUnaryOperands) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = sel ? ~a : &b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->true_expr, nullptr);
+  EXPECT_EQ(rhs->true_expr->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->true_expr->op, TokenKind::kTilde);
+  ASSERT_NE(rhs->false_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->false_expr->op, TokenKind::kAmp);
+}
+
+// --- Ternary as function argument ---
+TEST(ParserSection11, Sec11_4_6_TernaryAsFunctionArgument) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = func(sel ? a : b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kCall);
+  EXPECT_EQ(rhs->callee, "func");
+  ASSERT_EQ(rhs->args.size(), 1u);
+  ASSERT_NE(rhs->args[0], nullptr);
+  EXPECT_EQ(rhs->args[0]->kind, ExprKind::kTernary);
+}
+
+// --- Ternary with cast operands ---
+TEST(ParserSection11, Sec11_4_6_TernaryWithCast) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = sel ? int'(a) : int'(b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->true_expr, nullptr);
+  EXPECT_EQ(rhs->true_expr->kind, ExprKind::kCast);
+  ASSERT_NE(rhs->false_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kCast);
+}
+
+// --- Ternary with inside condition ---
+TEST(ParserSection11, Sec11_4_6_TernaryWithInsideCondition) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if ((a inside {1, 2}) ? x : y) z = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  ASSERT_NE(stmt->condition, nullptr);
+  EXPECT_EQ(stmt->condition->kind, ExprKind::kTernary);
+  ASSERT_NE(stmt->condition->condition, nullptr);
+  EXPECT_EQ(stmt->condition->condition->kind, ExprKind::kInside);
+}
+
+// --- Verify ExprKind::kTernary kind ---
+TEST(ParserSection11, Sec11_4_6_VerifyExprKindTernary) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = en ? val_a : val_b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+}
+
+// --- Verify condition, true_expr, false_expr fields ---
+TEST(ParserSection11, Sec11_4_6_VerifyTernaryFields) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = cond_sig ? true_val : false_val;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->condition, nullptr);
+  EXPECT_EQ(rhs->condition->kind, ExprKind::kIdentifier);
+  ASSERT_NE(rhs->true_expr, nullptr);
+  EXPECT_EQ(rhs->true_expr->kind, ExprKind::kIdentifier);
+  ASSERT_NE(rhs->false_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kIdentifier);
+}
+
+// --- Ternary in module port connection ---
+TEST(ParserSection11, Sec11_4_6_TernaryInModulePortConnection) {
+  auto r = Parse(
+      "module t;\n"
+      "  sub u1(.out(sel ? a : b));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* inst = FirstModuleInst(r);
+  ASSERT_NE(inst, nullptr);
+  EXPECT_EQ(inst->kind, ModuleItemKind::kModuleInst);
+  ASSERT_EQ(inst->inst_ports.size(), 1u);
+  EXPECT_EQ(inst->inst_ports[0].first, "out");
+  ASSERT_NE(inst->inst_ports[0].second, nullptr);
+  EXPECT_EQ(inst->inst_ports[0].second->kind, ExprKind::kTernary);
+}
+
+// --- Ternary in always_comb ---
+TEST(ParserSection11, Sec11_4_6_TernaryInAlwaysComb) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic sel, a, b, y;\n"
+      "  always_comb y = sel ? a : b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysCombItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(item->body->rhs, nullptr);
+  EXPECT_EQ(item->body->rhs->kind, ExprKind::kTernary);
+}
+
+// --- Ternary in generate if condition ---
+TEST(ParserSection11, Sec11_4_6_TernaryInGenerateIfCondition) {
+  auto r = Parse(
+      "module t;\n"
+      "  parameter A = 1;\n"
+      "  parameter B = 0;\n"
+      "  if (A ? B : 1) begin\n"
+      "    assign x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* gen = FirstGenerateIf(r);
+  ASSERT_NE(gen, nullptr);
+  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateIf);
+  ASSERT_NE(gen->gen_cond, nullptr);
+  EXPECT_EQ(gen->gen_cond->kind, ExprKind::kTernary);
+}
+
+// --- Multiple ternaries in same expression ---
+TEST(ParserSection11, Sec11_4_6_MultipleTernariesInExpr) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = (s1 ? a : b) + (s2 ? c : d);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kPlus);
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->rhs, nullptr);
+  EXPECT_EQ(rhs->rhs->kind, ExprKind::kTernary);
+}
+
+// --- Ternary with string literal operands ---
+TEST(ParserSection11, Sec11_4_6_TernaryWithStringLiterals) {
+  auto r = Parse(
+      "module t;\n"
+      "  string s;\n"
+      "  initial s = sel ? \"yes\" : \"no\";\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->true_expr, nullptr);
+  EXPECT_EQ(rhs->true_expr->kind, ExprKind::kStringLiteral);
+  ASSERT_NE(rhs->false_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kStringLiteral);
+}
+
+// --- Ternary with real literal operands ---
+TEST(ParserSection11, Sec11_4_6_TernaryWithRealLiterals) {
+  auto r = Parse(
+      "module t;\n"
+      "  real r;\n"
+      "  initial r = sel ? 3.14 : 2.71;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->true_expr, nullptr);
+  EXPECT_EQ(rhs->true_expr->kind, ExprKind::kRealLiteral);
+  ASSERT_NE(rhs->false_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kRealLiteral);
+}
+
+// --- Deeply nested ternary (three levels) ---
+TEST(ParserSection11, Sec11_4_6_DeeplyNestedTernary) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = s1 ? a : s2 ? b : s3 ? c : d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+  // s1 ? a : (s2 ? b : (s3 ? c : d))
+  ASSERT_NE(rhs->false_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->false_expr->false_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->false_expr->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->false_expr->false_expr->false_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->false_expr->false_expr->kind,
+            ExprKind::kIdentifier);
+}
+
+// --- Ternary in continuous assignment with complex LHS ---
+TEST(ParserSection11, Sec11_4_6_TernaryContAssignWithBitSelectLhs) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire [7:0] out;\n"
+      "  wire sel, a, b;\n"
+      "  assign out[0] = sel ? a : b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* ca = FirstContAssign(r);
+  ASSERT_NE(ca, nullptr);
+  ASSERT_NE(ca->assign_lhs, nullptr);
+  EXPECT_EQ(ca->assign_lhs->kind, ExprKind::kSelect);
+  ASSERT_NE(ca->assign_rhs, nullptr);
+  EXPECT_EQ(ca->assign_rhs->kind, ExprKind::kTernary);
+}
+
+TEST(Parser, DoWhileStatement) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    do x = x + 1; while (x < 10);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDoWhile);
+  EXPECT_NE(stmt->body, nullptr);
+  EXPECT_NE(stmt->condition, nullptr);
+}
+
+TEST(Parser, BreakStatement) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    break;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBreak);
+}
+
+TEST(Parser, ContinueStatement) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    continue;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kContinue);
+}
+
+TEST(Parser, ReturnStatement) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    return;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kReturn);
+}
+
+TEST(Parser, ReturnWithValue) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    return 42;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kReturn);
+  EXPECT_NE(stmt->expr, nullptr);
+}
+
+// =============================================================================
+// LRM section 12.6 -- Named blocks / block labels
+// =============================================================================
+TEST(ParserSection12, NamedBeginEnd) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin : my_block\n"
+      "    x = 1;\n"
+      "  end : my_block\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kBlock);
+  EXPECT_EQ(body->label, "my_block");
+}
+
+TEST(ParserSection12, NamedBeginEndNoEndLabel) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin : blk\n"
+      "    x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kBlock);
+  EXPECT_EQ(body->label, "blk");
+}
+
+TEST(ParserSection12, NamedForkJoin) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial fork : my_fork\n"
+      "    x = 1;\n"
+      "  join : my_fork\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kFork);
+  EXPECT_EQ(body->label, "my_fork");
+}
+
+TEST(ParserSection12, NamedForkJoinAny) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial fork : par_blk\n"
+      "    x = 1;\n"
+      "  join_any : par_blk\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kFork);
+  EXPECT_EQ(body->label, "par_blk");
+  EXPECT_EQ(body->join_kind, TokenKind::kKwJoinAny);
+}
+
+TEST(ParserSection12, UnlabeledBlockHasEmptyLabel) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kBlock);
+  EXPECT_TRUE(body->label.empty());
+}
+
+TEST(ParserSection12, UniqueCase) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    unique case (sel)\n"
+      "      0: x = 1;\n"
+      "      1: x = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
+}
+
+TEST(ParserSection12, PriorityCase) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    priority case (sel)\n"
+      "      0: x = 1;\n"
+      "      default: x = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
+}
+
+TEST(ParserSection12, PlainCaseHasNoQualifier) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    case (sel)\n"
+      "      0: x = 1;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kNone);
+}
+
+// =============================================================================
+// LRM section 12.5.4 -- case inside
+// =============================================================================
+TEST(ParserSection12, CaseInside) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    case (val) inside\n"
+      "      0: x = 1;\n"
+      "      1: x = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_TRUE(stmt->case_inside);
+}
+
+TEST(ParserSection12, PlainCaseIsNotInside) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    case (val)\n"
+      "      0: x = 1;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_FALSE(stmt->case_inside);
+}
+
+// =============================================================================
+// LRM section 12.7.3 -- foreach loop
+// =============================================================================
+TEST(ParserSection12, ForeachBasicParses) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    foreach (arr[i]) x = arr[i];\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kForeach);
+  EXPECT_NE(stmt->expr, nullptr);
+  EXPECT_NE(stmt->body, nullptr);
+}
+
+TEST(ParserSection12, ForeachBasicVars) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    foreach (arr[i]) x = arr[i];\n"
+      "  end\n"
+      "endmodule\n");
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->foreach_vars.size(), 1u);
+  EXPECT_EQ(stmt->foreach_vars[0], "i");
+}
+
+TEST(ParserSection12, ForeachEmptyVar) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    foreach (arr[, j]) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kForeach);
+  ASSERT_EQ(stmt->foreach_vars.size(), 2u);
+}
+
+TEST(ParserSection12, ForeachEmptyVarValues) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    foreach (arr[, j]) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_TRUE(stmt->foreach_vars[0].empty());
+  EXPECT_EQ(stmt->foreach_vars[1], "j");
+}
+
+TEST(ParserSection12, ForeachWithBlock) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    foreach (arr[i]) begin\n"
+      "      $display(\"%d\", arr[i]);\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kForeach);
+  EXPECT_NE(stmt->body, nullptr);
+  EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
+}
+
+// =============================================================================
+// LRM section 12.7.1 -- for with variable declaration
+// =============================================================================
+TEST(ParserSection12, ForWithIntDeclParses) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 10; i = i + 1) x = i;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFor);
+  EXPECT_NE(stmt->for_init, nullptr);
+  EXPECT_NE(stmt->for_cond, nullptr);
+}
+
+TEST(ParserSection12, ForWithIntDeclParts) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 10; i = i + 1) x = i;\n"
+      "  end\n"
+      "endmodule\n");
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_NE(stmt->for_step, nullptr);
+  EXPECT_NE(stmt->for_body, nullptr);
+  EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kInt);
+}
+
+TEST(ParserSection12, ForWithLogicDecl) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    for (logic [7:0] i = 0; i < 10; i = i + 1) x = i;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFor);
+  EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kLogic);
+}
+
+TEST(ParserSection12, ForWithoutDeclStillWorks) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    for (i = 0; i < 10; i = i + 1) x = i;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFor);
+  EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kImplicit);
+}
+
+// =============================================================================
+// LRM section 12.5.1 -- casex / casez
+// =============================================================================
+TEST(ParserSection12, CasexStatement) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    casex (sel)\n"
+      "      2'b1?: x = 1;\n"
+      "      default: x = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasex);
+  ASSERT_EQ(stmt->case_items.size(), 2u);
+}
+
+TEST(ParserSection12, CasezStatement) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    casez (sel)\n"
+      "      2'b1?: x = 1;\n"
+      "      default: x = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasez);
+  ASSERT_EQ(stmt->case_items.size(), 2u);
+}
+
+TEST(ParserSection12, WhileLoopWithBlock) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    while (x > 0) begin\n"
+      "      x = x - 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kWhile);
+  EXPECT_NE(stmt->body, nullptr);
+  EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
+}
+
+TEST(ParserSection12, DoWhileLoopWithBlock) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    do begin\n"
+      "      x = x + 1;\n"
+      "    end while (x < 10);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDoWhile);
+  EXPECT_NE(stmt->body, nullptr);
+  EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
+}
+
+TEST(ParserSection12, ForeverLoopWithBlock) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    forever begin\n"
+      "      @(posedge clk);\n"
+      "      x = x + 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kForever);
+  EXPECT_NE(stmt->body, nullptr);
+  EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
+}
+
+TEST(ParserSection12, ReturnVoid) {
+  auto r = Parse(
+      "module t;\n"
+      "  function void bar();\n"
+      "    return;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* ret = FindReturnStmt(r);
+  ASSERT_NE(ret, nullptr);
+  EXPECT_EQ(ret->kind, StmtKind::kReturn);
+  EXPECT_EQ(ret->expr, nullptr);
+}
+
+TEST(ParserSection12, BreakStatementParses) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    forever begin\n"
+      "      if (done) break;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kForever);
+}
+
+TEST(ParserSection12, BreakStatementInBody) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    forever begin\n"
+      "      if (done) break;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  // The body contains an if whose then_branch is break.
+  auto* if_stmt = stmt->body->stmts[0];
+  ASSERT_NE(if_stmt, nullptr);
+  EXPECT_EQ(if_stmt->kind, StmtKind::kIf);
+  ASSERT_NE(if_stmt->then_branch, nullptr);
+  EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kBreak);
+}
+
+TEST(ParserSection12, ContinueStatementParses) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 10; i = i + 1) begin\n"
+      "      if (i == 5) continue;\n"
+      "      x = i;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFor);
+  auto* body = stmt->for_body;
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kBlock);
+}
+
+TEST(ParserSection12, ContinueStatementInBody) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 10; i = i + 1) begin\n"
+      "      if (i == 5) continue;\n"
+      "      x = i;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* body = stmt->for_body;
+  ASSERT_NE(body, nullptr);
+  auto* if_stmt = body->stmts[0];
+  EXPECT_EQ(if_stmt->kind, StmtKind::kIf);
+  EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kContinue);
+}
+
+// =============================================================================
+// LRM section 12.9 -- Event trigger (->)
+// =============================================================================
+TEST(ParserSection12, EventTrigger) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    -> done_event;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventTrigger);
+  EXPECT_NE(stmt->expr, nullptr);
+}
+
+// =============================================================================
+// Combined tests -- qualifiers with named blocks
+// =============================================================================
+TEST(ParserSection12, UniqueCasexQualifier) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    unique casex (sel)\n"
+      "      2'b1?: x = 1;\n"
+      "      default: x = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasex);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
+}
+
+// =============================================================================
+// LRM section 12.8 -- Block names and statement labels (additional tests)
+// =============================================================================
+TEST(ParserSection12, StatementLabelOnAssign) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    assign_val: x = 42;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->label, "assign_val");
+}
+
+TEST(ParserSection12, StatementLabelOnForever) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    inf: forever @(posedge clk) x = ~x;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kForever);
+}
+
+TEST(ParserSection12, NestedNamedBlocks) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin : outer\n"
+      "    begin : inner\n"
+      "      x = 1;\n"
+      "    end : inner\n"
+      "  end : outer\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->label, "outer");
+  ASSERT_GE(body->stmts.size(), 1u);
+  EXPECT_EQ(body->stmts[0]->label, "inner");
+}
+
+// =============================================================================
+// LRM section 12.4 -- Conditional if-else statement
+// =============================================================================
+TEST(ParserSection12, BasicIfElse) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (a) x = 1;\n"
+      "    else x = 2;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  EXPECT_NE(stmt->condition, nullptr);
+  ASSERT_NE(stmt->then_branch, nullptr);
+  ASSERT_NE(stmt->else_branch, nullptr);
+}
+
+TEST(ParserSection12, IfWithoutElse) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (a) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  EXPECT_NE(stmt->then_branch, nullptr);
+  EXPECT_EQ(stmt->else_branch, nullptr);
+}
+
+}  // namespace

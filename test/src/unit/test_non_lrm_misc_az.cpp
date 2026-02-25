@@ -1,0 +1,970 @@
+// Non-LRM tests
+
+#include <gtest/gtest.h>
+
+#include <string>
+
+#include "common/arena.h"
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
+#include "lexer/lexer.h"
+#include "parser/parser.h"
+
+using namespace delta;
+
+// --- Test helpers ---
+struct ParseResult {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+ParseResult Parse(const std::string& src) {
+  ParseResult result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+namespace {
+
+
+// =============================================================================
+// Annex H/I - DPI C layer / svdpi.h
+// =============================================================================
+TEST_F(AnnexHParseTest, AnnexHDpiImportFunction) {
+  auto* unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function int c_add(int a, int b);\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
+  EXPECT_EQ(items[0]->name, "c_add");
+  EXPECT_FALSE(items[0]->dpi_is_task);
+  EXPECT_FALSE(items[0]->dpi_is_pure);
+  EXPECT_FALSE(items[0]->dpi_is_context);
+}
+
+TEST_F(AnnexHParseTest, AnnexHDpiImportPure) {
+  auto* unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" pure function real sin_approx(real x);\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
+  EXPECT_EQ(items[0]->name, "sin_approx");
+  EXPECT_TRUE(items[0]->dpi_is_pure);
+  EXPECT_FALSE(items[0]->dpi_is_context);
+  EXPECT_FALSE(items[0]->dpi_is_task);
+}
+
+TEST_F(AnnexHParseTest, AnnexHDpiImportContext) {
+  auto* unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" context function void set_callback();\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
+  EXPECT_EQ(items[0]->name, "set_callback");
+  EXPECT_TRUE(items[0]->dpi_is_context);
+  EXPECT_FALSE(items[0]->dpi_is_pure);
+  EXPECT_FALSE(items[0]->dpi_is_task);
+}
+
+TEST_F(AnnexHParseTest, AnnexHDpiExportFunction) {
+  auto* unit = Parse(
+      "module m;\n"
+      "  export \"DPI-C\" function sv_func;\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiExport);
+  EXPECT_EQ(items[0]->name, "sv_func");
+  EXPECT_FALSE(items[0]->dpi_is_task);
+}
+
+TEST_F(AnnexHParseTest, AnnexHDpiExportTask) {
+  auto* unit = Parse(
+      "module m;\n"
+      "  export \"DPI-C\" task sv_task;\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiExport);
+  EXPECT_EQ(items[0]->name, "sv_task");
+  EXPECT_TRUE(items[0]->dpi_is_task);
+}
+
+TEST_F(AnnexHParseTest, AnnexHDpiImportWithCName) {
+  auto* unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" c_name = function void my_func();\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
+  EXPECT_EQ(items[0]->dpi_c_name, "c_name");
+  EXPECT_EQ(items[0]->name, "my_func");
+  EXPECT_FALSE(items[0]->dpi_is_task);
+}
+
+// =============================================================================
+// Annex G - Std package: process class (§G.1)
+// =============================================================================
+TEST_F(AnnexHParseTest, AnnexGProcessMethodCalls) {
+  // Process method calls (.status, .kill, etc.) parse as member-access calls.
+  auto* unit = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    p.status();\n"
+      "    p.kill();\n"
+      "    p.await();\n"
+      "    p.suspend();\n"
+      "    p.resume();\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  EXPECT_FALSE(diag_.HasErrors());
+  auto& items = unit->modules[0]->items;
+  ASSERT_GE(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kInitialBlock);
+}
+
+TEST_F(AnnexHParseTest, AnnexGProcessScopeResolution) {
+  // process::self() uses scope-resolution syntax at the module-item level.
+  // The parser handles pkg::type as a named type with scope prefix.
+  auto* unit = Parse(
+      "module m;\n"
+      "  process::state_e st;\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  EXPECT_FALSE(diag_.HasErrors());
+  auto& items = unit->modules[0]->items;
+  ASSERT_GE(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(items[0]->data_type.scope_name, "process");
+  EXPECT_EQ(items[0]->data_type.type_name, "state_e");
+}
+
+// =============================================================================
+// Annex G - Std package: semaphore class (§G.2)
+// =============================================================================
+TEST_F(AnnexHParseTest, AnnexGSemaphoreAllMethods) {
+  // Semaphore method calls (get, put, try_get) as member-access expressions.
+  auto* unit = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    sem.get(1);\n"
+      "    sem.put(1);\n"
+      "    if (sem.try_get(1)) begin\n"
+      "      $display(\"acquired\");\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  EXPECT_FALSE(diag_.HasErrors());
+}
+
+// =============================================================================
+// Annex G - Std package: mailbox class (§G.3)
+// =============================================================================
+TEST_F(AnnexHParseTest, AnnexGMailboxAllMethods) {
+  // Mailbox method calls (put, get, peek, try_get, try_peek, try_put, num)
+  // as member-access call expressions inside an initial block.
+  auto* unit = Parse(
+      "module m;\n"
+      "  int val;\n"
+      "  initial begin\n"
+      "    mb.put(42);\n"
+      "    mb.get(val);\n"
+      "    mb.peek(val);\n"
+      "    val = mb.num();\n"
+      "    val = mb.try_get(val);\n"
+      "    val = mb.try_peek(val);\n"
+      "    val = mb.try_put(99);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  EXPECT_FALSE(diag_.HasErrors());
+}
+
+// =============================================================================
+// Annex G - Std package: randomize (§G.4)
+// =============================================================================
+TEST_F(AnnexHParseTest, AnnexGRandomizeCall) {
+  // $urandom and simple randomize() call inside initial block.
+  auto* unit = Parse(
+      "module m;\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    x = $urandom;\n"
+      "    x = $urandom();\n"
+      "    x = $urandom_range(0, 100);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  EXPECT_FALSE(diag_.HasErrors());
+}
+
+TEST_F(AnnexHParseTest, AnnexGStdRandomizePackageImport) {
+  // std::randomize usage via package import at module level.
+  // The parser handles import std_pkg::* for scope-qualified access.
+  auto* unit = Parse(
+      "module m;\n"
+      "  import std_pkg::*;\n"
+      "  int a, b;\n"
+      "  initial begin\n"
+      "    a = $urandom_range(0, 255);\n"
+      "    b = $urandom;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  EXPECT_FALSE(diag_.HasErrors());
+  auto& items = unit->modules[0]->items;
+  ASSERT_GE(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kImportDecl);
+}
+
+// =============================================================================
+// Annex H - DPI import task
+// =============================================================================
+TEST_F(AnnexHParseTest, AnnexHDpiImportTask) {
+  auto* unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" task c_wait(int cycles);\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
+  EXPECT_EQ(items[0]->name, "c_wait");
+  EXPECT_TRUE(items[0]->dpi_is_task);
+  ASSERT_EQ(items[0]->func_args.size(), 1u);
+  EXPECT_EQ(items[0]->func_args[0].name, "cycles");
+}
+
+// =============================================================================
+// Annex H - DPI chandle return type
+// =============================================================================
+TEST_F(AnnexHParseTest, AnnexHDpiImportChandle) {
+  // chandle is the opaque pointer type used for DPI handles.
+  auto* unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function chandle create_handle();\n"
+      "  import \"DPI-C\" function void destroy_handle(chandle h);\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 2u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
+  EXPECT_EQ(items[0]->name, "create_handle");
+  EXPECT_EQ(items[0]->return_type.kind, DataTypeKind::kChandle);
+  EXPECT_EQ(items[1]->kind, ModuleItemKind::kDpiImport);
+  EXPECT_EQ(items[1]->name, "destroy_handle");
+  ASSERT_EQ(items[1]->func_args.size(), 1u);
+  EXPECT_EQ(items[1]->func_args[0].data_type.kind, DataTypeKind::kChandle);
+}
+
+// =============================================================================
+// Annex H - DPI string return type
+// =============================================================================
+TEST_F(AnnexHParseTest, AnnexHDpiImportStringReturn) {
+  auto* unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" pure function string get_version();\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
+  EXPECT_EQ(items[0]->name, "get_version");
+  EXPECT_EQ(items[0]->return_type.kind, DataTypeKind::kString);
+  EXPECT_TRUE(items[0]->dpi_is_pure);
+}
+
+// =============================================================================
+// Annex H - DPI export with C name alias
+// =============================================================================
+TEST_F(AnnexHParseTest, AnnexHDpiExportWithCName) {
+  auto* unit = Parse(
+      "module m;\n"
+      "  export \"DPI-C\" my_c_func = function sv_compute;\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiExport);
+  EXPECT_EQ(items[0]->dpi_c_name, "my_c_func");
+  EXPECT_EQ(items[0]->name, "sv_compute");
+  EXPECT_FALSE(items[0]->dpi_is_task);
+}
+
+// =============================================================================
+// Annex H - DPI import with output/inout arguments
+// =============================================================================
+TEST_F(AnnexHParseTest, AnnexHDpiImportOutputArgs) {
+  auto* unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function void get_data(\n"
+      "    input int addr,\n"
+      "    output int data,\n"
+      "    inout int status\n"
+      "  );\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
+  EXPECT_EQ(items[0]->name, "get_data");
+  ASSERT_EQ(items[0]->func_args.size(), 3u);
+  EXPECT_EQ(items[0]->func_args[0].direction, Direction::kInput);
+  EXPECT_EQ(items[0]->func_args[0].name, "addr");
+  EXPECT_EQ(items[0]->func_args[1].direction, Direction::kOutput);
+  EXPECT_EQ(items[0]->func_args[1].name, "data");
+  EXPECT_EQ(items[0]->func_args[2].direction, Direction::kInout);
+  EXPECT_EQ(items[0]->func_args[2].name, "status");
+}
+
+// =============================================================================
+// Annex H - DPI import with default argument values
+// =============================================================================
+TEST_F(AnnexHParseTest, AnnexHDpiImportDefaultArgs) {
+  auto* unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function int compute(\n"
+      "    int a,\n"
+      "    int b = 0,\n"
+      "    int c = 42\n"
+      "  );\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
+  ASSERT_EQ(items[0]->func_args.size(), 3u);
+  EXPECT_EQ(items[0]->func_args[0].default_value, nullptr);
+  EXPECT_NE(items[0]->func_args[1].default_value, nullptr);
+  EXPECT_NE(items[0]->func_args[2].default_value, nullptr);
+}
+
+// =============================================================================
+// Annex H - DPI import with bit/logic vector arguments
+// =============================================================================
+TEST_F(AnnexHParseTest, AnnexHDpiImportBitLogicArgs) {
+  // DPI functions can take bit and logic vector arguments corresponding to
+  // SvBitVecVal and SvLogicVecVal on the C side.
+  auto* unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function void send_bits(\n"
+      "    input bit [31:0] data,\n"
+      "    input logic [7:0] ctrl\n"
+      "  );\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
+  ASSERT_EQ(items[0]->func_args.size(), 2u);
+  EXPECT_EQ(items[0]->func_args[0].data_type.kind, DataTypeKind::kBit);
+  EXPECT_EQ(items[0]->func_args[0].name, "data");
+  EXPECT_EQ(items[0]->func_args[1].data_type.kind, DataTypeKind::kLogic);
+  EXPECT_EQ(items[0]->func_args[1].name, "ctrl");
+}
+
+// =============================================================================
+// Annex H - DPI context import task with C name
+// =============================================================================
+TEST_F(AnnexHParseTest, AnnexHDpiContextTaskWithCName) {
+  auto* unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" context c_poll = task poll_hardware(int timeout);\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
+  EXPECT_EQ(items[0]->dpi_c_name, "c_poll");
+  EXPECT_EQ(items[0]->name, "poll_hardware");
+  EXPECT_TRUE(items[0]->dpi_is_context);
+  EXPECT_TRUE(items[0]->dpi_is_task);
+}
+
+// =============================================================================
+// Annex H - DPI import no-arg function
+// =============================================================================
+TEST_F(AnnexHParseTest, AnnexHDpiImportNoArgs) {
+  // A DPI import with no argument list at all (valid per LRM).
+  auto* unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function int get_seed;\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
+  EXPECT_EQ(items[0]->name, "get_seed");
+  EXPECT_TRUE(items[0]->func_args.empty());
+}
+
+// =============================================================================
+// Annex J - Foreign language code inclusion
+// =============================================================================
+TEST_F(AnnexHParseTest, AnnexJDpiImportCoexistence) {
+  auto* unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function int c_func();\n"
+      "  logic [7:0] data;\n"
+      "  assign data = 8'hFF;\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 3u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
+  EXPECT_EQ(items[1]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(items[2]->kind, ModuleItemKind::kContAssign);
+}
+
+// =============================================================================
+// Annex K/L/M - VPI headers (VPI-backed system tasks/functions)
+// =============================================================================
+TEST_F(AnnexHParseTest, AnnexKVpiSystemCalls) {
+  auto* unit = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    $vpi_get_time;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_GE(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kInitialBlock);
+}
+
+TEST_F(AnnexHParseTest, AnnexKVpiSysGetValue) {
+  auto* unit = Parse(
+      "module m;\n"
+      "  initial $display($time);\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_GE(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kInitialBlock);
+}
+
+TEST_F(AnnexHParseTest, AnnexMSvVpiCalls) {
+  auto* unit = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    $vpi_iterate;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_GE(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kInitialBlock);
+}
+
+// =============================================================================
+// Annex O - Encryption/decryption
+// =============================================================================
+TEST_F(AnnexHParseTest, AnnexOPragmaProtect) {
+  // pragma protect directives are preprocessor-level and stripped before
+  // parsing. This test confirms the module around them parses correctly.
+  auto* unit = Parse(
+      "module m;\n"
+      "  logic x;\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(items[0]->name, "x");
+}
+
+TEST_F(AnnexHParseTest, AnnexOMultipleDpiDecls) {
+  auto* unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function int c_add(int a, int b);\n"
+      "  import \"DPI-C\" pure function real c_sin(real x);\n"
+      "  export \"DPI-C\" function sv_compute;\n"
+      "  export \"DPI-C\" task sv_run;\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 4u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
+  EXPECT_EQ(items[0]->name, "c_add");
+  EXPECT_EQ(items[1]->kind, ModuleItemKind::kDpiImport);
+  EXPECT_EQ(items[1]->name, "c_sin");
+  EXPECT_TRUE(items[1]->dpi_is_pure);
+  EXPECT_EQ(items[2]->kind, ModuleItemKind::kDpiExport);
+  EXPECT_EQ(items[2]->name, "sv_compute");
+  EXPECT_FALSE(items[2]->dpi_is_task);
+  EXPECT_EQ(items[3]->kind, ModuleItemKind::kDpiExport);
+  EXPECT_EQ(items[3]->name, "sv_run");
+  EXPECT_TRUE(items[3]->dpi_is_task);
+}
+
+struct ParseResult302 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult302 Parse(const std::string& src) {
+  ParseResult302 result;
+  DiagEngine diag(result.mgr);
+  auto fid = result.mgr.AddFile("<test>", src);
+  Preprocessor preproc(result.mgr, diag, {});
+  auto pp = preproc.Preprocess(fid);
+  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
+  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// LRM §3.2 — Design elements
+// =============================================================================
+TEST(ParserClause03, AllSevenDesignElements) {
+  // §3.2: A design element is a module, program, interface, checker,
+  //       package, primitive, or configuration.
+  auto r = Parse(
+      "module m; endmodule\n"
+      "program p; endprogram\n"
+      "interface ifc; endinterface\n"
+      "checker chk; endchecker\n"
+      "package pkg; endpackage\n"
+      "primitive udp_and (output out, input a, b);\n"
+      "  table 0 0 : 0; 0 1 : 0; 1 0 : 0; 1 1 : 1; endtable\n"
+      "endprimitive\n"
+      "config cfg; design m; endconfig\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->name, "m");
+  EXPECT_EQ(r.cu->modules[0]->decl_kind, ModuleDeclKind::kModule);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->name, "p");
+  EXPECT_EQ(r.cu->programs[0]->decl_kind, ModuleDeclKind::kProgram);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->name, "ifc");
+  EXPECT_EQ(r.cu->interfaces[0]->decl_kind, ModuleDeclKind::kInterface);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->name, "chk");
+  EXPECT_EQ(r.cu->checkers[0]->decl_kind, ModuleDeclKind::kChecker);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_EQ(r.cu->packages[0]->name, "pkg");
+  ASSERT_EQ(r.cu->udps.size(), 1u);
+  EXPECT_EQ(r.cu->udps[0]->name, "udp_and");
+  ASSERT_EQ(r.cu->configs.size(), 1u);
+  EXPECT_EQ(r.cu->configs[0]->name, "cfg");
+  // Multiple design elements of same type in one compilation unit
+  EXPECT_TRUE(ParseOk("module a; endmodule\nmodule b; endmodule\n"));
+  // Module + package coexist in same unit with import
+  EXPECT_TRUE(
+      ParseOk("package p; typedef int myint; endpackage\n"
+              "module m; import p::*; endmodule\n"));
+}
+
+// Multiple descriptions in source text.
+TEST(SourceText, MultipleDescriptions) {
+  auto r = Parse(
+      "module m1; endmodule\n"
+      "interface ifc; endinterface\n"
+      "program prg; endprogram\n"
+      "package pkg; endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_EQ(r.cu->packages.size(), 1u);
+}
+
+struct ParseResult304 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult304 Parse(const std::string& src) {
+  ParseResult304 result;
+  DiagEngine diag(result.mgr);
+  auto fid = result.mgr.AddFile("<test>", src);
+  Preprocessor preproc(result.mgr, diag, {});
+  auto pp = preproc.Preprocess(fid);
+  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
+  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static bool HasItemOfKind(const std::vector<ModuleItem*>& items,
+                          ModuleItemKind kind) {
+  for (const auto* item : items)
+    if (item->kind == kind) return true;
+  return false;
+}
+
+// =============================================================================
+// LRM §3.4 — Programs
+// =============================================================================
+// §3.4 LRM example (verbatim) with end label:
+//   program test (input clk, input [16:1] addr, inout [7:0] data);
+//   initial begin ... end
+//   endprogram : test
+TEST(ParserClause03, Cl3_4_LrmExample) {
+  auto r = Parse(
+      "program test (input clk, input [16:1] addr, inout [7:0] data);\n"
+      "  initial begin\n"
+      "  end\n"
+      "endprogram : test\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->name, "test");
+  ASSERT_EQ(r.cu->programs[0]->ports.size(), 3u);
+  EXPECT_EQ(r.cu->programs[0]->ports[0].name, "clk");
+  EXPECT_EQ(r.cu->programs[0]->ports[1].name, "addr");
+  EXPECT_EQ(r.cu->programs[0]->ports[2].name, "data");
+  EXPECT_EQ(r.cu->programs[0]->ports[2].direction, Direction::kInout);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kInitialBlock));
+}
+
+// §3.4:
+TEST(ParserClause03, Cl3_4_DataAndClassDeclarations) {
+  auto r = Parse(
+      "program p;\n"
+      "  logic [7:0] count;\n"
+      "  int status;\n"
+      "  class my_trans; int data; endclass\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_GE(r.cu->programs[0]->items.size(), 3u);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kClassDecl));
+  // §3.4: Multiple programs each create separate scopes
+  EXPECT_TRUE(
+      ParseOk("program p1; logic a; endprogram\n"
+              "program p2; logic b; endprogram\n"));
+}
+
+// §3.4: "A program block can contain ... subroutine definitions ...
+//        initial ... final procedures"
+TEST(ParserClause03, Cl3_4_SubroutinesAndProcedures) {
+  auto r = Parse(
+      "program p;\n"
+      "  function int get_val; return 42; endfunction\n"
+      "  task run_test; endtask\n"
+      "  initial $display(\"test\");\n"
+      "  final $display(\"done\");\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kFunctionDecl));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kTaskDecl));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kInitialBlock));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kFinalBlock));
+}
+
+// §3.4:
+TEST(ParserClause03, Cl3_4_RejectsDisallowedItems) {
+  EXPECT_TRUE(
+      Parse("program p; always @(*) begin end endprogram\n").has_errors);
+  EXPECT_TRUE(
+      Parse("program p; always_comb begin end endprogram\n").has_errors);
+  EXPECT_TRUE(
+      Parse("program p; always_ff @(posedge clk) begin end endprogram\n")
+          .has_errors);
+  EXPECT_TRUE(
+      Parse("program p; always_latch begin end endprogram\n").has_errors);
+  EXPECT_TRUE(Parse("module c; endmodule\n"
+                    "program p; c i(); endprogram\n")
+                  .has_errors);
+  // Interface and program instances hit the same instantiation path.
+  EXPECT_TRUE(Parse("interface ifc; endinterface\n"
+                    "program p; ifc i(); endprogram\n")
+                  .has_errors);
+}
+
+struct ParseResult305 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult305 Parse(const std::string& src) {
+  ParseResult305 result;
+  DiagEngine diag(result.mgr);
+  auto fid = result.mgr.AddFile("<test>", src);
+  Preprocessor preproc(result.mgr, diag, {});
+  auto pp = preproc.Preprocess(fid);
+  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
+  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// LRM §3.5 — Interfaces
+// =============================================================================
+// §3.5 LRM example: simple_bus interface definition.
+// Also covers end label (endinterface : simple_bus) and interface port.
+TEST(ParserClause03, Cl3_5_LrmExample) {
+  auto r = Parse(
+      "interface simple_bus(input logic clk);\n"
+      "  logic req, gnt;\n"
+      "  logic [7:0] addr, data;\n"
+      "  logic [1:0] mode;\n"
+      "  logic start, rdy;\n"
+      "endinterface : simple_bus\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->name, "simple_bus");
+  ASSERT_EQ(r.cu->interfaces[0]->ports.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->ports[0].name, "clk");
+  EXPECT_EQ(r.cu->interfaces[0]->ports[0].direction, Direction::kInput);
+  EXPECT_GE(r.cu->interfaces[0]->items.size(), 5u);
+}
+
+// §3.5:
+TEST(ParserClause03, Cl3_5_ParametersConstantsVariables) {
+  auto r = Parse(
+      "interface ifc #(parameter WIDTH = 8);\n"
+      "  localparam DEPTH = 16;\n"
+      "  logic [WIDTH-1:0] data;\n"
+      "  wire valid;\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_GE(r.cu->interfaces[0]->items.size(), 2u);
+}
+
+// §3.5:
+TEST(ParserClause03, Cl3_5_FunctionsAndTasks) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  function automatic int get_data;\n"
+      "    return 42;\n"
+      "  endfunction\n"
+      "  task automatic send(input int val);\n"
+      "  endtask\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kFunctionDecl));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kTaskDecl));
+}
+
+// §3.5: "an interface can also contain processes (i.e., initial or always
+//        procedures) and continuous assignments"
+TEST(ParserClause03, Cl3_5_ProcessesAndContinuousAssign) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  logic sig_a, sig_b;\n"
+      "  initial sig_a = 0;\n"
+      "  always @(sig_a) sig_b = ~sig_a;\n"
+      "  assign sig_b = sig_a;\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kInitialBlock));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kAlwaysBlock));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kContAssign));
+}
+
+// §3.5: "the modport construct is provided"
+TEST(ParserClause03, Cl3_5_Modport) {
+  auto r = Parse(
+      "interface myif;\n"
+      "  logic [7:0] data;\n"
+      "  logic valid, ready;\n"
+      "  modport master (output data, output valid, input ready);\n"
+      "  modport slave (input data, input valid, output ready);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  ASSERT_EQ(r.cu->interfaces[0]->modports.size(), 2u);
+  EXPECT_EQ(r.cu->interfaces[0]->modports[0]->name, "master");
+  EXPECT_EQ(r.cu->interfaces[0]->modports[1]->name, "slave");
+}
+
+struct ParseResult306 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult306 Parse(const std::string& src) {
+  ParseResult306 result;
+  DiagEngine diag(result.mgr);
+  auto fid = result.mgr.AddFile("<test>", src);
+  Preprocessor preproc(result.mgr, diag, {});
+  auto pp = preproc.Preprocess(fid);
+  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
+  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// LRM §3.6 — Checkers
+// =============================================================================
+// §3.6: Checker encapsulates assertions (assert property, cover property,
+//        property/sequence declarations) — the primary purpose of checkers.
+TEST(ParserClause03, Cl3_6_AssertionsInChecker) {
+  auto r = Parse(
+      "checker req_ack_chk(logic clk, req, ack);\n"
+      "  property req_followed_by_ack;\n"
+      "    @(posedge clk) req |-> ##[1:3] ack;\n"
+      "  endproperty\n"
+      "  assert property (req_followed_by_ack);\n"
+      "  cover property (req_followed_by_ack);\n"
+      "endchecker : req_ack_chk\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->name, "req_ack_chk");
+  ASSERT_GE(r.cu->checkers[0]->ports.size(), 3u);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kPropertyDecl));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kAssertProperty));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kCoverProperty));
+}
+
+// §3.6: Checker also encapsulates "modeling code" — variables, initial blocks,
+//        always blocks used alongside assertions for auxiliary verification.
+TEST(ParserClause03, Cl3_6_ModelingCodeInChecker) {
+  auto r = Parse(
+      "checker model_chk;\n"
+      "  logic flag;\n"
+      "  initial flag = 0;\n"
+      "  always @(flag) flag <= ~flag;\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kInitialBlock));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kAlwaysBlock));
+  EXPECT_GE(r.cu->checkers[0]->items.size(), 3u);  // var + initial + always
+}
+
+struct ParseResult308 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult308 Parse(const std::string& src) {
+  ParseResult308 result;
+  DiagEngine diag(result.mgr);
+  auto fid = result.mgr.AddFile("<test>", src);
+  Preprocessor preproc(result.mgr, diag, {});
+  auto pp = preproc.Preprocess(fid);
+  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
+  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static ModuleItem* FindItemByKind(ParseResult308& r, ModuleItemKind kind) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
+}
+
+static int CountItemsByKind(const std::vector<ModuleItem*>& items,
+                            ModuleItemKind kind) {
+  int count = 0;
+  for (const auto* item : items)
+    if (item->kind == kind) ++count;
+  return count;
+}
+
+static const ModuleItem* FindFunctionByName(
+    const std::vector<ModuleItem*>& items, const std::string& name) {
+  for (const auto* item : items)
+    if (item->kind == ModuleItemKind::kFunctionDecl && item->name == name)
+      return item;
+  return nullptr;
+}
+
+// =============================================================================
+// LRM §3.8 — Subroutines
+// =============================================================================
+// §3.8: "A task is called as a statement. A task can have any number of
+//        input, output, inout, and ref arguments, but does not return a
+//        value. Tasks can block simulation time during execution."
+TEST(ParserClause03, Cl3_8_TaskAllDirectionsAndBlocking) {
+  auto r = Parse(
+      "module m;\n"
+      "  task my_task(input int a, output int b, inout int c, ref int d);\n"
+      "    #10;\n"
+      "    b = a + c;\n"
+      "    c = d;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* task = FindItemByKind(r, ModuleItemKind::kTaskDecl);
+  ASSERT_NE(task, nullptr);
+  EXPECT_EQ(task->name, "my_task");
+  ASSERT_EQ(task->func_args.size(), 4u);
+  EXPECT_EQ(task->func_args[0].direction, Direction::kInput);
+  EXPECT_EQ(task->func_args[1].direction, Direction::kOutput);
+  EXPECT_EQ(task->func_args[2].direction, Direction::kInout);
+  EXPECT_EQ(task->func_args[3].direction, Direction::kRef);
+  // Task has a body with delay (#10 blocks time) + assignments
+  EXPECT_GE(task->func_body_stmts.size(), 1u);
+}
+
+}  // namespace

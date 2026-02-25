@@ -1,0 +1,996 @@
+// Non-LRM tests
+
+#include <gtest/gtest.h>
+
+#include <string>
+
+#include "common/arena.h"
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
+#include "lexer/lexer.h"
+#include "parser/parser.h"
+
+using namespace delta;
+
+// --- Test helpers ---
+struct ParseResult {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+ParseResult Parse(const std::string& src) {
+  ParseResult result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+namespace {
+
+
+TEST(ParserSection8, ClassWithVirtualMethod) {
+  auto r = Parse(
+      "class Base;\n"
+      "  virtual function void display();\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto* cls = r.cu->classes[0];
+  bool found = false;
+  for (auto* m : cls->members) {
+    if (m->kind == ClassMemberKind::kMethod && m->is_virtual) {
+      found = true;
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+// §8.5 — Parameterized classes
+TEST(ParserSection8, ParameterizedClass) {
+  auto r = Parse(
+      "class stack #(parameter int DEPTH = 8);\n"
+      "  int data;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto* cls = r.cu->classes[0];
+  EXPECT_EQ(cls->name, "stack");
+  ASSERT_EQ(cls->params.size(), 1u);
+  EXPECT_EQ(cls->params[0].first, "DEPTH");
+}
+
+TEST(ParserSection8, ParameterizedClassMultipleParams) {
+  auto r = Parse(
+      "class fifo #(parameter int WIDTH = 8, parameter int DEPTH = 16);\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto* cls = r.cu->classes[0];
+  ASSERT_EQ(cls->params.size(), 2u);
+  EXPECT_EQ(cls->params[0].first, "WIDTH");
+  EXPECT_EQ(cls->params[1].first, "DEPTH");
+}
+
+TEST(ParserSection8, ParameterizedClassTypeParam) {
+  auto r = Parse(
+      "class container #(type T = int);\n"
+      "  T data;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto* cls = r.cu->classes[0];
+  ASSERT_EQ(cls->params.size(), 1u);
+  EXPECT_EQ(cls->params[0].first, "T");
+}
+
+// §8.5 — Parameterized class with extends
+TEST(ParserSection8, ParameterizedClassExtendsName) {
+  auto r = Parse(
+      "class Base;\n"
+      "  int x;\n"
+      "endclass\n"
+      "class Derived #(parameter int N = 4) extends Base;\n"
+      "  int y;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 2u);
+  auto* cls = r.cu->classes[1];
+  EXPECT_EQ(cls->name, "Derived");
+  EXPECT_EQ(cls->base_class, "Base");
+}
+
+TEST(ParserSection8, ParameterizedClassExtendsParams) {
+  auto r = Parse(
+      "class Base;\n"
+      "  int x;\n"
+      "endclass\n"
+      "class Derived #(parameter int N = 4) extends Base;\n"
+      "  int y;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 2u);
+  auto* cls = r.cu->classes[1];
+  ASSERT_EQ(cls->params.size(), 1u);
+  EXPECT_EQ(cls->params[0].first, "N");
+}
+
+// §8.13 — Extends with constructor arguments
+TEST(ParserSection8, ExtendsWithArgs) {
+  auto r = Parse(
+      "class Base;\n"
+      "endclass\n"
+      "class Child extends Base(1, 2);\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 2u);
+  EXPECT_EQ(r.cu->classes[1]->base_class, "Base");
+}
+
+// §8.3 — Class inside module
+TEST(ParserSection8, ClassInsideModule) {
+  auto r = Parse(
+      "module m;\n"
+      "  class inner_cls;\n"
+      "    int x;\n"
+      "  endclass\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto* cls = FindClassDeclItem(r.cu->modules[0]->items);
+  ASSERT_NE(cls, nullptr);
+  EXPECT_EQ(cls->name, "inner_cls");
+}
+
+// §8.5 — Parameterized class inside module (the sv-tests TIMEOUT case)
+TEST(ParserSection8, ParameterizedClassInsideModuleName) {
+  auto r = Parse(
+      "module class_tb;\n"
+      "  class test_cls #(parameter a = 12);\n"
+      "  endclass\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto* cls = FindClassDeclItem(r.cu->modules[0]->items);
+  ASSERT_NE(cls, nullptr);
+  EXPECT_EQ(cls->name, "test_cls");
+}
+
+TEST(ParserSection8, ParameterizedClassInsideModuleParams) {
+  auto r = Parse(
+      "module class_tb;\n"
+      "  class test_cls #(parameter a = 12);\n"
+      "  endclass\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto* cls = FindClassDeclItem(r.cu->modules[0]->items);
+  ASSERT_NE(cls, nullptr);
+  ASSERT_EQ(cls->params.size(), 1u);
+  EXPECT_EQ(cls->params[0].first, "a");
+}
+
+// §8.26 — Typedef class (forward declaration)
+TEST(ParserSection8, TypedefClass) {
+  auto r = Parse(
+      "typedef class MyClass;\n"
+      "class MyClass;\n"
+      "  int x;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_GE(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->name, "MyClass");
+}
+
+// §8.3 — Lifetime specifier on class
+TEST(ParserSection8, ClassWithLifetime) {
+  auto r = Parse(
+      "class automatic MyClass;\n"
+      "  int x;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->name, "MyClass");
+}
+
+// §8.15 — Extends with scoped class name
+TEST(ParserSection8, ExtendsScopedName) {
+  auto r = Parse(
+      "class Child extends pkg::Base;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+
+  EXPECT_EQ(r.cu->classes[0]->name, "Child");
+}
+
+// §8.5 — Typedef inside class body (enum, struct)
+TEST(ParserSection8, ClassWithTypedef) {
+  auto r = Parse(
+      "class test_cls;\n"
+      "  typedef enum {A = 10, B = 20} e_type;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->name, "test_cls");
+}
+
+// §8.5 — Parameter inside class body
+TEST(ParserSection8, ClassWithParameter) {
+  auto r = Parse(
+      "class par_cls;\n"
+      "  parameter int b = 23;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->name, "par_cls");
+}
+
+// §8.5 — Localparam inside class body
+TEST(ParserSection8, ClassWithLocalparam) {
+  auto r = Parse(
+      "class my_cls;\n"
+      "  localparam int SIZE = 8;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->name, "my_cls");
+}
+
+// §8.7 — Constructor (function new)
+TEST(ParserSection8, ClassConstructor) {
+  auto r = Parse(
+      "class Packet;\n"
+      "  int data;\n"
+      "  function new();\n"
+      "    data = 0;\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto* m = FindMethodMember(r.cu->classes[0]);
+  ASSERT_NE(m, nullptr);
+  ASSERT_NE(m->method, nullptr);
+  EXPECT_EQ(m->method->name, "new");
+}
+
+// §8.7 — Constructor with parameters
+TEST(ParserSection8, ClassConstructorWithParams) {
+  auto r = Parse(
+      "class Packet;\n"
+      "  int data;\n"
+      "  function new(int val);\n"
+      "    data = val;\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+}
+
+// §8.13 — Super.new() call
+TEST(ParserSection8, ConstructorSuperNew) {
+  auto r = Parse(
+      "class Base;\n"
+      "  function new();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class Child extends Base;\n"
+      "  function new();\n"
+      "    super.new();\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 2u);
+}
+
+// §8.24 — Out-of-block method with scoped name
+TEST(ParserSection8, OutOfBlockMethod) {
+  auto r = Parse(
+      "module m;\n"
+      "  class test_cls;\n"
+      "    int a;\n"
+      "    extern function void test_method(int val);\n"
+      "  endclass\n"
+      "  function void test_cls::test_method(int val);\n"
+      "    a = val;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
+// §8.21 — Pure virtual function (no body)
+TEST(ParserSection8, PureVirtualFunction) {
+  auto r = Parse(
+      "virtual class Base;\n"
+      "  pure virtual function void display();\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+}
+
+// §8.15 — Constructor end label
+TEST(ParserSection8, ConstructorEndLabel) {
+  auto r = Parse(
+      "class Base;\n"
+      "  function new();\n"
+      "  endfunction : new\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+}
+
+// §8.4 — Class instantiation with 'new' expression
+TEST(ParserSection8, NewExpression) {
+  auto r = Parse(
+      "module m;\n"
+      "  class test_cls;\n"
+      "    int a;\n"
+      "  endclass\n"
+      "  test_cls obj;\n"
+      "  initial begin\n"
+      "    obj = new;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
+// §8.4 — Null comparison
+TEST(ParserSection8, NullExpression) {
+  auto r = Parse(
+      "module m;\n"
+      "  class test_cls;\n"
+      "    int a;\n"
+      "  endclass\n"
+      "  test_cls obj;\n"
+      "  initial begin\n"
+      "    if (obj == null) obj = new;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
+// §8.7 — Constructor with arguments
+TEST(ParserSection8, NewWithArgs) {
+  auto r = Parse(
+      "module m;\n"
+      "  class test_cls;\n"
+      "    int a;\n"
+      "    function new(int val);\n"
+      "      a = val;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  test_cls obj;\n"
+      "  initial begin\n"
+      "    obj = new(42);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
+// §8.11 — 'this' keyword
+TEST(ParserSection8, ThisExpression) {
+  auto r = Parse(
+      "class MyClass;\n"
+      "  int data;\n"
+      "  function void set(int data);\n"
+      "    this.data = data;\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+}
+
+// §8.15 — super.new() expression
+TEST(ParserSection8, SuperNewExpression) {
+  auto r = Parse(
+      "class Base;\n"
+      "  function new(int x);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class Child extends Base;\n"
+      "  function new();\n"
+      "    super.new(5);\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 2u);
+}
+
+// §8.25.1 — Parameterized class scope resolution: ClassName#(params)::member
+TEST(ParserSection8, ParameterizedClassScopeResolution) {
+  auto r = Parse(
+      "module m;\n"
+      "  class par_cls #(parameter int a = 25);\n"
+      "    parameter int b = 23;\n"
+      "  endclass\n"
+      "  initial begin\n"
+      "    $display(par_cls#()::b);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
+// §8.8 — Typed constructor with parameterized scope: ClassName#(params)::new
+TEST(ParserSection8, ParameterizedClassScopeNew) {
+  auto r = Parse(
+      "module m;\n"
+      "  class test_cls #(parameter int t = 12);\n"
+      "    int a;\n"
+      "    function new(int def = 42);\n"
+      "      a = def - t;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  test_cls obj;\n"
+      "  initial begin\n"
+      "    obj = test_cls#(.t(23))::new(.def(41));\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
+// §8.26.3 — Interface class with typedef member
+TEST(ParserSection8, InterfaceClassWithTypedef) {
+  auto r = Parse(
+      "interface class ihello;\n"
+      "  typedef int int_t;\n"
+      "  pure virtual function void hello(int_t val);\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->name, "ihello");
+}
+
+// §8.19 — Constant class properties
+TEST(ParserSection8, ConstProperty) {
+  auto r = Parse(
+      "class MyClass;\n"
+      "  const int MAX = 100;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto* cls = r.cu->classes[0];
+  ASSERT_GE(cls->members.size(), 1u);
+  EXPECT_TRUE(cls->members[0]->is_const);
+  EXPECT_EQ(cls->members[0]->name, "MAX");
+}
+
+// §8.26 — Class implements interface class
+TEST(ParserSection8, ClassImplementsInterface) {
+  auto r = Parse(
+      "interface class PutIf;\n"
+      "  pure virtual function void put(int a);\n"
+      "endclass\n"
+      "class Fifo implements PutIf;\n"
+      "  virtual function void put(int a);\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 2u);
+  EXPECT_EQ(r.cu->classes[1]->name, "Fifo");
+}
+
+// §8.26 — Interface class extends multiple interfaces
+TEST(ParserSection8, InterfaceClassExtendsMultiple) {
+  auto r = Parse(
+      "interface class A;\n"
+      "  pure virtual function void fa();\n"
+      "endclass\n"
+      "interface class B;\n"
+      "  pure virtual function void fb();\n"
+      "endclass\n"
+      "interface class C extends A, B;\n"
+      "  pure virtual function void fc();\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 3u);
+  EXPECT_EQ(r.cu->classes[2]->name, "C");
+  EXPECT_EQ(r.cu->classes[2]->base_class, "A");
+}
+
+// §8.12 — Shallow copy with new
+TEST(ParserSection8, ShallowCopy) {
+  auto r = Parse(
+      "module m;\n"
+      "  class Packet;\n"
+      "    int data;\n"
+      "  endclass\n"
+      "  initial begin\n"
+      "    Packet p1, p2;\n"
+      "    p1 = new;\n"
+      "    p2 = new p1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
+// §8.3 — Class inside class (nested class)
+TEST(ParserSection8, NestedClass) {
+  auto r = Parse(
+      "class Outer;\n"
+      "  class Inner;\n"
+      "    int x;\n"
+      "  endclass\n"
+      "  Inner inst;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->name, "Outer");
+}
+
+// §8.3 — Covergroup inside class
+TEST(ParserSection8, CovergroupInClass) {
+  auto r = Parse(
+      "class CoveredClass;\n"
+      "  int x;\n"
+      "  covergroup cg @(posedge clk);\n"
+      "    coverpoint x;\n"
+      "  endgroup\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+}
+
+// §8.3 — Multiple properties on one line (comma-separated)
+TEST(ParserSection8, MultiplePropertiesCommaSeparated) {
+  auto r = Parse(
+      "class MyClass;\n"
+      "  int a, b, c;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto* cls = r.cu->classes[0];
+  ASSERT_EQ(cls->members.size(), 3u);
+  const std::string kExpectedNames[] = {"a", "b", "c"};
+  for (size_t i = 0; i < 3; ++i) {
+    EXPECT_EQ(cls->members[i]->name, kExpectedNames[i]);
+  }
+}
+
+// §8.17 — Chaining constructors with super.new() and default
+TEST(ParserSection8, ConstructorChainingDefault) {
+  auto r = Parse(
+      "class Base;\n"
+      "  function new(int x = 0);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class Child extends Base;\n"
+      "  function new();\n"
+      "    super.new(5);\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 2u);
+}
+
+// §8.3 — Randc qualifier
+TEST(ParserSection8, RandcQualifier) {
+  auto r = Parse(
+      "class Die;\n"
+      "  randc bit [2:0] face;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  ASSERT_GE(r.cu->classes[0]->members.size(), 1u);
+  EXPECT_TRUE(r.cu->classes[0]->members[0]->is_randc);
+}
+
+// §8.18 — Extern constraint declaration
+TEST(ParserSection8, ExternConstraintDecl) {
+  auto r = Parse(
+      "class A;\n"
+      "  rand int x;\n"
+      "  extern constraint c1;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  bool found = false;
+  for (auto* m : r.cu->classes[0]->members) {
+    if (m->kind == ClassMemberKind::kConstraint && m->name == "c1") {
+      found = true;
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+// §8.26.2 — Extends and implements together
+TEST(ParserSection8, ExtendsAndImplements) {
+  auto r = Parse(
+      "interface class Iface;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "class Base;\n"
+      "endclass\n"
+      "class Child extends Base implements Iface;\n"
+      "  virtual function void foo();\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 3u);
+  EXPECT_EQ(r.cu->classes[2]->base_class, "Base");
+}
+
+// §8.9 — Static property with const
+TEST(ParserSection8, StaticConstProperty) {
+  auto r = Parse(
+      "class Config;\n"
+      "  static const int VERSION = 3;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto* cls = r.cu->classes[0];
+  ASSERT_GE(cls->members.size(), 1u);
+  EXPECT_TRUE(cls->members[0]->is_static);
+  EXPECT_TRUE(cls->members[0]->is_const);
+}
+
+// =============================================================================
+// §8.23 -- Class scope resolution operator ::
+// =============================================================================
+TEST(ParserSection8, ClassScopeResolutionStaticMethod) {
+  auto r = Parse(
+      "class Base;\n"
+      "  static function void display();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial Base::display();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
+TEST(ParserSection8, ClassScopeResolutionEnum) {
+  auto r = Parse(
+      "class Base;\n"
+      "  typedef enum {bin, oct, dec, hex} radix;\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial x = Base::bin;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
+TEST(ParserSection8, ClassScopeResolutionTypedef) {
+  auto r = Parse(
+      "class Outer;\n"
+      "  typedef int my_type;\n"
+      "endclass\n"
+      "module m;\n"
+      "  Outer::my_type x;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
+TEST(ParserSection8, ClassScopeResolutionParameter) {
+  auto r = Parse(
+      "class Cfg;\n"
+      "  parameter int WIDTH = 8;\n"
+      "endclass\n"
+      "module m;\n"
+      "  logic [Cfg::WIDTH-1:0] data;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
+// =============================================================================
+// §8.25 -- Parameterized classes (additional tests)
+// =============================================================================
+TEST(ParserSection8, ParameterizedClassSpecialization) {
+  auto r = Parse(
+      "class vector #(int size = 1);\n"
+      "  bit [size-1:0] a;\n"
+      "endclass\n"
+      "module m;\n"
+      "  vector #(10) vten;\n"
+      "  vector #(.size(2)) vtwo;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
+TEST(ParserSection8, ParameterizedClassStackType) {
+  auto r = Parse(
+      "class stack #(type T = int);\n"
+      "  T items[];\n"
+      "  function void push(T a);\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto* cls = r.cu->classes[0];
+  ASSERT_EQ(cls->params.size(), 1u);
+  EXPECT_EQ(cls->params[0].first, "T");
+}
+
+TEST(ParserSection8, ParameterizedClassDefaultInstantiation) {
+  auto r = Parse(
+      "class stack #(type T = int);\n"
+      "  T items[];\n"
+      "endclass\n"
+      "module m;\n"
+      "  stack is_default;\n"
+      "  stack #(real) rs;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
+struct ParseResult8b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult8b Parse(const std::string& src) {
+  ParseResult8b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+static ModuleItem* FirstItem(ParseResult8b& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto& items = r.cu->modules[0]->items;
+  return items.empty() ? nullptr : items[0];
+}
+
+static Stmt* FirstInitialStmt(ParseResult8b& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) {
+      if (item->body && item->body->kind == StmtKind::kBlock) {
+        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+      }
+      return item->body;
+    }
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// Section 8.2 -- Data type syntax
+// =============================================================================
+// Integer vector types with packed dimensions.
+TEST(ParserSection8, DataTypeSyntaxIntegerVector) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] data;\n"
+      "  bit [15:0] addr;\n"
+      "  reg [3:0] nibble;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_GE(items.size(), 3u);
+  EXPECT_EQ(items[0]->data_type.kind, DataTypeKind::kLogic);
+  EXPECT_EQ(items[0]->name, "data");
+  EXPECT_EQ(items[1]->data_type.kind, DataTypeKind::kBit);
+  EXPECT_EQ(items[1]->name, "addr");
+  EXPECT_EQ(items[2]->data_type.kind, DataTypeKind::kReg);
+  EXPECT_EQ(items[2]->name, "nibble");
+}
+
+// Integer atom types.
+TEST(ParserSection8, DataTypeSyntaxIntegerAtom) {
+  auto r = Parse(
+      "module m;\n"
+      "  byte b;\n"
+      "  shortint si;\n"
+      "  int i;\n"
+      "  longint li;\n"
+      "  integer ig;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_GE(items.size(), 5u);
+  EXPECT_EQ(items[0]->data_type.kind, DataTypeKind::kByte);
+  EXPECT_EQ(items[1]->data_type.kind, DataTypeKind::kShortint);
+  EXPECT_EQ(items[2]->data_type.kind, DataTypeKind::kInt);
+  EXPECT_EQ(items[3]->data_type.kind, DataTypeKind::kLongint);
+  EXPECT_EQ(items[4]->data_type.kind, DataTypeKind::kInteger);
+}
+
+// Non-integer types (real, shortreal, realtime).
+TEST(ParserSection8, DataTypeSyntaxNonInteger) {
+  auto r = Parse(
+      "module m;\n"
+      "  real r;\n"
+      "  shortreal sr;\n"
+      "  realtime rt;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_GE(items.size(), 3u);
+  EXPECT_EQ(items[0]->data_type.kind, DataTypeKind::kReal);
+  EXPECT_EQ(items[1]->data_type.kind, DataTypeKind::kShortreal);
+  EXPECT_EQ(items[2]->data_type.kind, DataTypeKind::kRealtime);
+}
+
+// =============================================================================
+// Section 8.6 -- String data type
+// =============================================================================
+// Module-level string variable declaration.
+TEST(ParserSection8, StringTypeModuleLevel) {
+  auto r = Parse(
+      "module m;\n"
+      "  string name;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kString);
+  EXPECT_EQ(item->name, "name");
+}
+
+// String variable with initializer.
+TEST(ParserSection8, StringTypeWithInit) {
+  auto r = Parse(
+      "module m;\n"
+      "  string greeting = \"hello\";\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kString);
+  EXPECT_NE(item->init_expr, nullptr);
+}
+
+// String variable inside block-level declaration.
+TEST(ParserSection8, StringTypeBlockLevel) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    string s;\n"
+      "    s = \"world\";\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(stmt->var_decl_type.kind, DataTypeKind::kString);
+}
+
+// =============================================================================
+// Section 8.10 -- Type parameters
+// =============================================================================
+// Module with type parameter.
+TEST(ParserSection8, TypeParameterModule) {
+  EXPECT_TRUE(
+      ParseOk("module m #(parameter type T = int);\n"
+              "  T data;\n"
+              "endmodule\n"));
+}
+
+// Module with type parameter defaulting to logic vector.
+TEST(ParserSection8, TypeParameterLogicVector) {
+  EXPECT_TRUE(
+      ParseOk("module m #(parameter type T = logic [7:0]);\n"
+              "  T bus;\n"
+              "endmodule\n"));
+}
+
+// Class with type parameter used as member type.
+TEST(ParserSection8, TypeParameterClassMember) {
+  auto r = Parse(
+      "class container #(type T = int);\n"
+      "  T value;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto* cls = r.cu->classes[0];
+  ASSERT_EQ(cls->params.size(), 1u);
+  EXPECT_EQ(cls->params[0].first, "T");
+}
+
+// =============================================================================
+// Section 8.11 -- Type compatibility (this keyword, type(this))
+// =============================================================================
+// Use of 'this' to access class properties.
+TEST(ParserSection8, ThisKeywordPropertyAccess) {
+  EXPECT_TRUE(
+      ParseOk("class MyClass;\n"
+              "  int value;\n"
+              "  function void set_value(int value);\n"
+              "    this.value = value;\n"
+              "  endfunction\n"
+              "endclass\n"));
+}
+
+// Use of type(this) as return type for singleton pattern.
+// =============================================================================
+// Section 8.16 -- Casting
+// =============================================================================
+// $cast system call with class handles.
+TEST(ParserSection8, DynamicCastClassHandles) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  class Base;\n"
+              "    int x;\n"
+              "  endclass\n"
+              "  class Derived extends Base;\n"
+              "    int y;\n"
+              "  endclass\n"
+              "  initial begin\n"
+              "    Base b;\n"
+              "    Derived d;\n"
+              "    d = new;\n"
+              "    b = d;\n"
+              "    $cast(d, b);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+// Static cast with type apostrophe syntax: type'(expr).
+TEST(ParserSection8, StaticCastTypeSyntax) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    int a;\n"
+              "    real r;\n"
+              "    r = 3.14;\n"
+              "    a = int'(r);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+// =============================================================================
+// Section 8.18 -- User-defined types (typedef)
+// =============================================================================
+// Simple typedef of built-in type.
+TEST(ParserSection8, TypedefSimpleBuiltin) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef int my_int;\n"
+      "  my_int x;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_GE(items.size(), 2u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kTypedef);
+  EXPECT_EQ(items[0]->name, "my_int");
+}
+
+// Forward typedef declaration for enum.
+TEST(ParserSection8, TypedefForwardEnum) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef enum my_enum;\n"
+              "  typedef enum {A, B, C} my_enum;\n"
+              "endmodule\n"));
+}
+
+// Typedef of enum with named type for reuse.
+TEST(ParserSection8, TypedefEnumWithMembers) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef enum {RED, GREEN, BLUE} color_t;\n"
+      "  color_t c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_GE(items.size(), 2u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kTypedef);
+  EXPECT_EQ(items[0]->typedef_type.kind, DataTypeKind::kEnum);
+}
+
+}  // namespace
