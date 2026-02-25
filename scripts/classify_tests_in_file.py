@@ -469,6 +469,8 @@ def clause_to_filename(prefix, clause):
         topic = clause.split(":", 1)[1] if ":" in clause else "misc"
         return f"test_non_lrm_{topic}"
     prefix = prefix.rstrip("_")
+    if re.match(r"^[A-Z]$", clause):
+        return f"{prefix}_annex_{clause.lower()}"
     annex_match = re.match(r"^([A-Z])\.(.+)$", clause)
     if annex_match:
         letter = annex_match.group(1).lower()

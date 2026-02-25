@@ -69,6 +69,13 @@ def test_clause_to_filename_annex():
     ) == "test_parser_annex_a_06_03"
 
 
+def test_clause_to_filename_bare_annex():
+    """Bare annex letter produces annex filename."""
+    assert classify_tests_in_file.clause_to_filename(
+        "test_lexer_", "B",
+    ) == "test_lexer_annex_b"
+
+
 def test_clause_to_filename_regular():
     """Regular clause produces clause filename."""
     assert classify_tests_in_file.clause_to_filename(
