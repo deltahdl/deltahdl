@@ -1,25 +1,25 @@
-"""Unit tests for main-flow functions in split_tests."""
+"""Unit tests for main-flow functions in classify_tests_in_file."""
 
 import sys
 from types import SimpleNamespace
 
 import pytest
 
-import split_tests
+import classify_tests_in_file
 from helpers import make_parsed_file as _parsed
 from helpers import make_test_block as _tb
 from helpers import stub_classifier
 
-_parse_args = getattr(split_tests, "_parse_args")
-_format_clause = getattr(split_tests, "_format_clause")
+_parse_args = getattr(classify_tests_in_file, "_parse_args")
+_format_clause = getattr(classify_tests_in_file, "_format_clause")
 _print_classification_table = getattr(
-    split_tests, "_print_classification_table",
+    classify_tests_in_file, "_print_classification_table",
 )
-_print_dry_run_summary = getattr(split_tests, "_print_dry_run_summary")
-_group_tests = getattr(split_tests, "_group_tests")
-_resolve_destinations = getattr(split_tests, "_resolve_destinations")
-_write_files = getattr(split_tests, "_write_files")
-_run = getattr(split_tests, "_run")
+_print_dry_run_summary = getattr(classify_tests_in_file, "_print_dry_run_summary")
+_group_tests = getattr(classify_tests_in_file, "_group_tests")
+_resolve_destinations = getattr(classify_tests_in_file, "_resolve_destinations")
+_write_files = getattr(classify_tests_in_file, "_write_files")
+_run = getattr(classify_tests_in_file, "_run")
 
 
 def _make_input_file(tmp_path):
@@ -208,7 +208,7 @@ def test_print_classification_wrap_aligns(capsys):
 
 def test_print_summary_created(capsys):
     """Live summary prints '- Created'."""
-    _print_summary = getattr(split_tests, "_print_summary")
+    _print_summary = getattr(classify_tests_in_file, "_print_summary")
     t = _tb("T", prefix="test_parser_", clause="6.1")
     to_create = [("test_parser_clause_06_01", "6.1", [t])]
     _print_summary(to_create, [], "test_input", False)
@@ -217,7 +217,7 @@ def test_print_summary_created(capsys):
 
 def test_print_summary_moved(capsys):
     """Live summary prints '- Moved'."""
-    _print_summary = getattr(split_tests, "_print_summary")
+    _print_summary = getattr(classify_tests_in_file, "_print_summary")
     t = _tb("T", prefix="test_parser_", clause="6.1")
     to_create = [("test_parser_clause_06_01", "6.1", [t])]
     _print_summary(to_create, [], "test_input", False)
@@ -226,7 +226,7 @@ def test_print_summary_moved(capsys):
 
 def test_print_summary_deleted(capsys):
     """Live summary prints 'Deleted' when source_is_target is False."""
-    _print_summary = getattr(split_tests, "_print_summary")
+    _print_summary = getattr(classify_tests_in_file, "_print_summary")
     t = _tb("T", prefix="test_parser_", clause="6.1")
     to_create = [("test_parser_clause_06_01", "6.1", [t])]
     _print_summary(to_create, [], "test_input", False)
@@ -236,7 +236,7 @@ def test_print_summary_deleted(capsys):
 
 def test_print_summary_kept(capsys):
     """Live summary prints 'Kept' when source_is_target with n_kept."""
-    _print_summary = getattr(split_tests, "_print_summary")
+    _print_summary = getattr(classify_tests_in_file, "_print_summary")
     t = _tb("T", prefix="test_parser_", clause="6.1")
     to_create = [("test_parser_clause_06_01", "6.1", [t])]
     _print_summary(to_create, [], "test_input", True, n_kept=3)
@@ -246,28 +246,28 @@ def test_print_summary_kept(capsys):
 
 def test_print_summary_all_correct_kept(capsys):
     """All-correct path still prints 'Kept' bullet."""
-    _print_summary = getattr(split_tests, "_print_summary")
+    _print_summary = getattr(classify_tests_in_file, "_print_summary")
     _print_summary([], [], "test_input", True, n_kept=9)
     assert "- Kept 9 tests" in capsys.readouterr().out
 
 
 def test_print_summary_has_summary_header(capsys):
     """Summary section starts with 'SUMMARY'."""
-    _print_summary = getattr(split_tests, "_print_summary")
+    _print_summary = getattr(classify_tests_in_file, "_print_summary")
     _print_summary([], [], "test_input", True, n_kept=9)
     assert "SUMMARY" in capsys.readouterr().out
 
 
 def test_print_summary_all_correct_zero_kept(capsys):
     """All-correct path with n_kept=0 skips Kept bullet."""
-    _print_summary = getattr(split_tests, "_print_summary")
+    _print_summary = getattr(classify_tests_in_file, "_print_summary")
     _print_summary([], [], "test_input", True, n_kept=0)
     assert "Kept" not in capsys.readouterr().out
 
 
 def test_print_summary_not_source_zero_moved(capsys):
     """Non-source path with empty lists has Deleted bullet."""
-    _print_summary = getattr(split_tests, "_print_summary")
+    _print_summary = getattr(classify_tests_in_file, "_print_summary")
     _print_summary([], [], "test_input", False)
     assert "Deleted" in capsys.readouterr().out
 
@@ -529,7 +529,7 @@ def _setup_live_run(tmp_path, monkeypatch):
         encoding="utf-8",
     )
     stub_classifier(monkeypatch, _parser_response())
-    monkeypatch.setattr(split_tests, "CMAKE_PATH", cmake)
+    monkeypatch.setattr(classify_tests_in_file, "CMAKE_PATH", cmake)
     return _run_args(tmp_path)
 
 
@@ -571,13 +571,13 @@ def _run_live_non_lrm(tmp_path, monkeypatch, src_body, classifier):
     src = tmp_path / "test_non_lrm_aig.cpp"
     src.write_text(src_body, encoding="utf-8")
     monkeypatch.setattr(
-        split_tests, "_call_claude", classifier,
+        classify_tests_in_file, "_call_claude", classifier,
     )
     cmake = tmp_path / "CMakeLists.txt"
     cmake.write_text(
         f"# header\nadd_unit_test({src.stem})\n", encoding="utf-8",
     )
-    monkeypatch.setattr(split_tests, "CMAKE_PATH", cmake)
+    monkeypatch.setattr(classify_tests_in_file, "CMAKE_PATH", cmake)
     _run(_run_args(tmp_path, file=str(src)))
 
 
@@ -691,15 +691,15 @@ def test_main(monkeypatch):
     def mock_run(_args):
         ran[0] = True
 
-    monkeypatch.setattr(split_tests, "_run", mock_run)
+    monkeypatch.setattr(classify_tests_in_file, "_run", mock_run)
     monkeypatch.setattr(
-        split_tests, "_parse_args",
+        classify_tests_in_file, "_parse_args",
         lambda: SimpleNamespace(
             file="x", output_dir="/tmp", dry_run=True,
             lrm="/lrm.txt", arch="/arch.md",
         ),
     )
-    split_tests.main()
+    classify_tests_in_file.main()
     assert ran[0] is True
 
 
@@ -711,13 +711,13 @@ def test_main_enables_line_buffering(monkeypatch):
         configured.append(kwargs)
 
     monkeypatch.setattr(sys.stdout, "reconfigure", mock_reconfigure)
-    monkeypatch.setattr(split_tests, "_run", lambda _: None)
+    monkeypatch.setattr(classify_tests_in_file, "_run", lambda _: None)
     monkeypatch.setattr(
-        split_tests, "_parse_args",
+        classify_tests_in_file, "_parse_args",
         lambda: SimpleNamespace(
             file="x", output_dir="/tmp", dry_run=True,
             lrm="/lrm.txt", arch="/arch.md",
         ),
     )
-    split_tests.main()
+    classify_tests_in_file.main()
     assert any(k.get("line_buffering") for k in configured)

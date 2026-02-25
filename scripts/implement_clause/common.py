@@ -221,13 +221,13 @@ def invoke_claude(prompt: str, *, model: str = "sonnet") -> None:
 
 
 # ---------------------------------------------------------------------------
-# Post-implementation: split_tests.py
+# Post-implementation: classify_tests_in_file
 # ---------------------------------------------------------------------------
 
-def run_split_tests(lrm_path: Path) -> None:
-    """Run split_tests.py on any new/modified test files."""
+def run_classify_tests_in_file(lrm_path: Path) -> None:
+    """Run classify_tests_in_file on any new/modified test files."""
     repo_root = Path(__file__).resolve().parent.parent.parent
-    script = repo_root / "scripts" / "split_tests.py"
+    script = repo_root / "scripts" / "classify_tests_in_file"
     test_dir = repo_root / "test" / "src" / "unit"
     arch = repo_root / "docs" / "ARCHITECTURE.md"
 
@@ -249,7 +249,7 @@ def run_split_tests(lrm_path: Path) -> None:
         full_path = repo_root / tf
         if not full_path.exists():
             continue
-        print(f"Running split_tests.py on {tf}...")
+        print(f"Running classify_tests_in_file on {tf}...")
         subprocess.run(
             [
                 sys.executable, str(script),

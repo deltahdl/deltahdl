@@ -1,4 +1,4 @@
-"""End-to-end tests for the split_tests CLI."""
+"""End-to-end tests for the classify_tests_in_file CLI."""
 
 import json
 import os
@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 _SCRIPT = str(
-    Path(__file__).resolve().parents[4] / "scripts" / "split_tests.py",
+    Path(__file__).resolve().parents[4] / "scripts" / "classify_tests_in_file",
 )
 
 
@@ -16,7 +16,7 @@ _SCRIPT = str(
 
 
 def _invoke(*args, cwd=None, env=None):
-    """Run split_tests.py in a child process."""
+    """Run classify_tests_in_file in a child process."""
     return subprocess.run(
         [sys.executable, _SCRIPT, *args],
         capture_output=True,

@@ -46,7 +46,7 @@ jobs:
             exit 0
           fi
           CHANGED=$(git diff --name-only "$BASE" "${{ github.sha }}")
-          FILTERED=$(echo "$CHANGED" | grep -v '^scripts/split_tests\.py$' | grep -v '^test/scripts/split_tests/')
+          FILTERED=$(echo "$CHANGED" | grep -v '^scripts/classify_tests_in_file/' | grep -v '^test/scripts/classify_tests_in_file/')
           PAT='^(lib/|scripts/|test/lib/|test/scripts/)'
           if echo "$FILTERED" | grep -qE "$PAT"; then
             echo "scripts_changed=true" >> "$GITHUB_OUTPUT"
@@ -138,7 +138,7 @@ jobs:
       - name: Run mypy on tests
         run: >-
           MYPYPATH=.:scripts python3 -m mypy
-          --exclude split_tests
+          --exclude classify_tests_in_file
           test/lib/ test/scripts/
       - name: Detect copy-paste in source
         run: >-
@@ -308,14 +308,14 @@ on:
       - .github/workflows/convert_figure.yml
       - .github/workflows/convert_tables.yml
       - .github/workflows/markdownlint.yml
-      - .github/workflows/split_tests.yml
+      - .github/workflows/classify_tests_in_file.yml
       - LICENSE
       - scripts/convert_figure/**
       - scripts/convert_tables/**
-      - scripts/split_tests.py
+      - scripts/classify_tests_in_file/**
       - test/scripts/convert_figure/**
       - test/scripts/convert_tables/**
-      - test/scripts/split_tests/**
+      - test/scripts/classify_tests_in_file/**
   push:
     branches: [main]
     paths-ignore:
@@ -323,14 +323,14 @@ on:
       - .github/workflows/convert_figure.yml
       - .github/workflows/convert_tables.yml
       - .github/workflows/markdownlint.yml
-      - .github/workflows/split_tests.yml
+      - .github/workflows/classify_tests_in_file.yml
       - LICENSE
       - scripts/convert_figure/**
       - scripts/convert_tables/**
-      - scripts/split_tests.py
+      - scripts/classify_tests_in_file/**
       - test/scripts/convert_figure/**
       - test/scripts/convert_tables/**
-      - test/scripts/split_tests/**
+      - test/scripts/classify_tests_in_file/**
   workflow_dispatch:
     inputs:
       force-static-analysis:

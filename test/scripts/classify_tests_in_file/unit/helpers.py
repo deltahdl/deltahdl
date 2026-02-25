@@ -1,13 +1,13 @@
-"""Shared test helpers for split_tests unit tests."""
+"""Shared test helpers for classify_tests_in_file unit tests."""
 
-import split_tests
+import classify_tests_in_file
 
 
 def make_test_block(
     name, prefix=None, clause=None, rationale=None, comments=None,
 ):
     """Shorthand factory for TestBlock."""
-    return split_tests.TestBlock(
+    return classify_tests_in_file.TestBlock(
         suite_name="S",
         test_name=name,
         lines=[f"TEST(S, {name}) {{", "}"],
@@ -22,7 +22,7 @@ def make_parsed_file(
     includes=None, using=None, ns=False, preamble=None, tests=None,
 ):
     """Shorthand factory for ParsedFile."""
-    return split_tests.ParsedFile(
+    return classify_tests_in_file.ParsedFile(
         includes=includes or ["#include <gtest/gtest.h>"],
         using_line=using,
         has_namespace_wrapper=ns,
@@ -35,5 +35,5 @@ def make_parsed_file(
 def stub_classifier(monkeypatch, response):
     """Stub _call_claude for classify_tests."""
     monkeypatch.setattr(
-        split_tests, "_call_claude", lambda p: response,
+        classify_tests_in_file, "_call_claude", lambda p: response,
     )

@@ -73,8 +73,8 @@ def main(argv=None):
 
     handler.run(args.lrm, args.clause, issue=args.issue, model=args.model)
 
-    from .common import run_split_tests
-    run_split_tests(args.lrm)
+    from .common import run_classify_tests_in_file
+    run_classify_tests_in_file(args.lrm)
 
 
 if __name__ == "__main__":

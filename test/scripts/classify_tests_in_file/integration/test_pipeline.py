@@ -1,10 +1,10 @@
-"""Integration tests for the split_tests pipeline."""
+"""Integration tests for the classify_tests_in_file pipeline."""
 
 from types import SimpleNamespace
 
-import split_tests
+import classify_tests_in_file
 
-_run = getattr(split_tests, "_run")
+_run = getattr(classify_tests_in_file, "_run")
 
 
 # ---- Helpers ---------------------------------------------------------------
@@ -49,12 +49,12 @@ def _make_classifier_with_topic(_name, prefix, clause, topic):
 
 def _stub_externals(monkeypatch, tmp_path, classifier):
     """Stub Claude CLI and CMake path."""
-    monkeypatch.setattr(split_tests, "_call_claude", classifier)
+    monkeypatch.setattr(classify_tests_in_file, "_call_claude", classifier)
     cmake = tmp_path / "CMakeLists.txt"
     cmake.write_text(
         "# header\nadd_unit_test(test_input)\n", encoding="utf-8",
     )
-    monkeypatch.setattr(split_tests, "CMAKE_PATH", cmake)
+    monkeypatch.setattr(classify_tests_in_file, "CMAKE_PATH", cmake)
 
 
 def _run_pipeline(tmp_path, dry_run=False):
@@ -303,7 +303,7 @@ def test_output_reparseable(tmp_path, monkeypatch):
         ("Round", "test_parser_", "6.1"),
     ))
     _run_pipeline(tmp_path)
-    assert len(split_tests.parse_file(
+    assert len(classify_tests_in_file.parse_file(
         tmp_path / "test_parser_clause_06_01.cpp",
     ).all_tests) == 1
 

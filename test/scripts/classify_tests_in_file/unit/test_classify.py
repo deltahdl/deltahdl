@@ -1,17 +1,17 @@
-"""Unit tests for classification functions in split_tests."""
+"""Unit tests for classification functions in classify_tests_in_file."""
 
 import subprocess
 from unittest.mock import MagicMock
 
 import pytest
 
-import split_tests
+import classify_tests_in_file
 from helpers import make_test_block as _tb
 
-_build_prompt = getattr(split_tests, "_build_prompt")
-_extract_json = getattr(split_tests, "_extract_json")
-_call_claude = getattr(split_tests, "_call_claude")
-_apply_classification = getattr(split_tests, "_apply_classification")
+_build_prompt = getattr(classify_tests_in_file, "_build_prompt")
+_extract_json = getattr(classify_tests_in_file, "_extract_json")
+_call_claude = getattr(classify_tests_in_file, "_call_claude")
+_apply_classification = getattr(classify_tests_in_file, "_apply_classification")
 
 
 # ---- existing_non_lrm_topics ----------------------------------------------
@@ -19,31 +19,31 @@ _apply_classification = getattr(split_tests, "_apply_classification")
 
 def test_existing_non_lrm_topics_empty(tmp_path):
     """Returns [] when no matching files exist."""
-    assert split_tests.existing_non_lrm_topics(tmp_path) == []
+    assert classify_tests_in_file.existing_non_lrm_topics(tmp_path) == []
 
 
 def test_existing_non_lrm_topics_simple(tmp_path):
     """Returns topic name without letter suffix."""
     (tmp_path / "test_non_lrm_aig.cpp").write_text("")
-    assert split_tests.existing_non_lrm_topics(tmp_path) == ["aig"]
+    assert classify_tests_in_file.existing_non_lrm_topics(tmp_path) == ["aig"]
 
 
 def test_existing_non_lrm_topics_letter_suffix(tmp_path):
     """Strips single letter suffix (e.g., _a) from topic."""
     (tmp_path / "test_non_lrm_arena_a.cpp").write_text("")
-    assert split_tests.existing_non_lrm_topics(tmp_path) == ["arena"]
+    assert classify_tests_in_file.existing_non_lrm_topics(tmp_path) == ["arena"]
 
 
 def test_existing_non_lrm_topics_short_topic(tmp_path):
     """Short topic (1 char) does not trigger suffix stripping."""
     (tmp_path / "test_non_lrm_x.cpp").write_text("")
-    assert split_tests.existing_non_lrm_topics(tmp_path) == ["x"]
+    assert classify_tests_in_file.existing_non_lrm_topics(tmp_path) == ["x"]
 
 
 def test_existing_non_lrm_topics_empty_topic(tmp_path):
     """File whose stem after prefix is empty is skipped."""
     (tmp_path / "test_non_lrm_.cpp").write_text("")
-    assert split_tests.existing_non_lrm_topics(tmp_path) == []
+    assert classify_tests_in_file.existing_non_lrm_topics(tmp_path) == []
 
 
 # ---- _build_prompt ---------------------------------------------------------
@@ -243,10 +243,10 @@ def test_classify_tests_matching(monkeypatch, tmp_path):
         "prefix": "test_parser_", "clause": "6.1", "rationale": "r",
     }
     monkeypatch.setattr(
-        split_tests, "_call_claude", lambda p: response,
+        classify_tests_in_file, "_call_claude", lambda p: response,
     )
     t = _tb("T")
-    split_tests.classify_tests(
+    classify_tests_in_file.classify_tests(
         [t], tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
     )
     assert t.prefix == "test_parser_"
@@ -264,10 +264,10 @@ def test_classify_tests_per_test(monkeypatch, tmp_path):
         }
 
     monkeypatch.setattr(
-        split_tests, "_call_claude", counting_claude,
+        classify_tests_in_file, "_call_claude", counting_claude,
     )
     tests = [_tb("A"), _tb("B"), _tb("C")]
-    split_tests.classify_tests(
+    classify_tests_in_file.classify_tests(
         tests, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
     )
     assert call_count[0] == 3
