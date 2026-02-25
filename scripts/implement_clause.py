@@ -286,48 +286,6 @@ def run_prompt(
 
 
 # ---------------------------------------------------------------------------
-# Post-implementation: classify_tests_in_file
-# ---------------------------------------------------------------------------
-
-def run_classify_tests_in_file(lrm_path: Path) -> None:
-    """Run classify_tests_in_file on any new/modified test files."""
-    repo_root = Path(__file__).resolve().parent.parent
-    script = repo_root / "scripts" / "classify_tests_in_file.py"
-    test_dir = repo_root / "test" / "src" / "unit"
-    arch = repo_root / "docs" / "ARCHITECTURE.md"
-
-    result = subprocess.run(
-        ["git", "diff", "--name-only", "HEAD"],
-        capture_output=True, text=True, check=False,
-    )
-    changed = result.stdout.strip().splitlines()
-    test_files = [
-        f for f in changed
-        if f.startswith("test/src/unit/test_") and f.endswith(".cpp")
-    ]
-
-    if not test_files:
-        print("No new/modified test files to split.")
-        return
-
-    for tf in test_files:
-        full_path = repo_root / tf
-        if not full_path.exists():
-            continue
-        print(f"Running classify_tests_in_file on {tf}...")
-        subprocess.run(
-            [
-                sys.executable, str(script),
-                "--file", str(full_path),
-                "--output-dir", str(test_dir),
-                "--lrm", str(lrm_path),
-                "--arch", str(arch),
-            ],
-            check=False,
-        )
-
-
-# ---------------------------------------------------------------------------
 # Prompt builders (depth 1-5)
 # ---------------------------------------------------------------------------
 
@@ -525,7 +483,6 @@ def main(argv=None):
         handler, args.lrm, args.clause,
         issue=args.issue, model=args.model,
     )
-    run_classify_tests_in_file(args.lrm)
 
 
 if __name__ == "__main__":

@@ -113,24 +113,13 @@ def test_parse_args_accepts_annex_clause(tmp_path):
 # ---- main ------------------------------------------------------------------
 
 
-@patch("implement_clause.run_classify_tests_in_file")
 @patch("implement_clause.run_prompt")
-def test_main_dispatches_depth_1(mock_run, _mock_classify, tmp_path):
+def test_main_dispatches_depth_1(mock_run, tmp_path):
     """main() dispatches depth-1 clause to prompt_v handler."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text("")
     main(["--lrm", str(lrm), "--clause", "4", "--issue", "6", "--model", "opus"])
     assert mock_run.call_args[1]["model"] == "opus"
-
-
-@patch("implement_clause.run_classify_tests_in_file")
-@patch("implement_clause.run_prompt")
-def test_main_calls_classify(_mock_run, mock_classify, tmp_path):
-    """main() calls run_classify_tests_in_file after run_prompt."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text("")
-    main(["--lrm", str(lrm), "--clause", "4.1", "--issue", "8"])
-    assert mock_classify.called
 
 
 # ---- __main__ guard --------------------------------------------------------

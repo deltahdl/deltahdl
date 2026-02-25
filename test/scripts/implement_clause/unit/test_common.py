@@ -12,7 +12,6 @@ from implement_clause import (
     format_prompt,
     invoke_claude,
     load_lrm_titles,
-    run_classify_tests_in_file,
     run_prompt,
 )
 
@@ -426,34 +425,3 @@ def test_run_prompt_appends_supplementary(_mock_invoke, tmp_path, monkeypatch):
     build_fn = MagicMock(return_value="prompt")
     run_prompt(build_fn, lrm, "4", issue=6, model="sonnet")
     assert build_fn.call_args[1]["supplementary"].endswith("\n")
-
-
-# ---- run_classify_tests_in_file -------------------------------------------
-
-
-@patch("implement_clause.subprocess.run")
-def test_classify_no_changed_files(mock_run, tmp_path):
-    """No changed test files prints message and returns."""
-    mock_run.return_value = MagicMock(stdout="README.md\n", returncode=0)
-    run_classify_tests_in_file(tmp_path / "lrm.txt")
-    assert mock_run.call_count == 1
-
-
-@patch("implement_clause.subprocess.run")
-def test_classify_runs_on_changed_test(mock_run):
-    """Changed test file triggers classify_tests_in_file subprocess."""
-    test_file = "test/src/unit/test_elaborator_annex_a_07_03.cpp"
-    git_result = MagicMock(stdout=f"{test_file}\n", returncode=0)
-    mock_run.return_value = git_result
-    run_classify_tests_in_file(Path("/fake/lrm.txt"))
-    assert mock_run.call_count == 2
-
-
-@patch("implement_clause.subprocess.run")
-def test_classify_skips_nonexistent_file(mock_run):
-    """Changed test file that no longer exists on disk is skipped."""
-    fake = "test/src/unit/test_nonexistent_999.cpp"
-    git_result = MagicMock(stdout=f"{fake}\n", returncode=0)
-    mock_run.return_value = git_result
-    run_classify_tests_in_file(Path("/fake/lrm.txt"))
-    assert mock_run.call_count == 1
