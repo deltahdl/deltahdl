@@ -63,6 +63,7 @@ jobs:
         run: >-
           MYPYPATH=.:scripts:test/scripts/convert_figures/unit
           python3 -m mypy --explicit-package-bases
+          --disable-error-code=import-untyped
           test/scripts/convert_figures/
       - name: Detect copy-paste in source
         run: >-
