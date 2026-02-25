@@ -190,4 +190,18 @@ TEST(SynthLower, AssignXorGate) {
   EXPECT_NE(aig->outputs[0], AigGraph::kConstFalse);
 }
 
+TEST(SynthLower, RejectSystemCall) {
+  SynthFixture f;
+  auto *mod = ElaborateSrc(f,
+                           "module m;\n"
+                           "  reg x;\n"
+                           "  always_comb begin x = $random; end\n"
+                           "endmodule");
+  ASSERT_NE(mod, nullptr);
+  SynthLower synth(f.arena, f.diag);
+  auto *aig = synth.Lower(mod);
+  EXPECT_EQ(aig, nullptr);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 }  // namespace
