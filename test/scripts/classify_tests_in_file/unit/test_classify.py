@@ -165,6 +165,24 @@ def test_call_claude_failure(monkeypatch):
         _call_claude("prompt")
 
 
+def test_call_claude_output_format_json(monkeypatch):
+    """CLI command includes --output-format json."""
+    captured_cmd = []
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = '{"prefix": "test_parser_"}'
+    mock_result.stderr = ""
+
+    def capture_run(*args, **_kwargs):
+        captured_cmd.extend(args[0])
+        return mock_result
+
+    monkeypatch.setattr(subprocess, "run", capture_run)
+    _call_claude("prompt")
+    idx = captured_cmd.index("--output-format")
+    assert captured_cmd[idx + 1] == "json"
+
+
 def test_call_claude_allows_read(monkeypatch):
     """CLI command includes --allowedTools Read."""
     captured_cmd = []

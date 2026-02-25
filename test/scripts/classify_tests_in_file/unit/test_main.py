@@ -49,6 +49,7 @@ def _run_args(tmp_path, **overrides):
         "dry_run": False,
         "lrm": str(tmp_path / "lrm.txt"),
         "arch": str(tmp_path / "arch.md"),
+        "max_lines": None,
     }
     defaults.update(overrides)
     return SimpleNamespace(**defaults)
@@ -96,6 +97,27 @@ def test_parse_args_arch(monkeypatch):
          "--lrm", "/lrm.txt", "--arch", "/my/ARCH.md"],
     )
     assert _parse_args().arch == "/my/ARCH.md"
+
+
+def test_parse_args_max_lines(monkeypatch):
+    """Parses --max-lines flag."""
+    monkeypatch.setattr(
+        sys, "argv",
+        ["prog", "--file", "f.cpp", "--output-dir", "/out",
+         "--lrm", "/lrm.txt", "--arch", "/arch.md",
+         "--max-lines", "500"],
+    )
+    assert _parse_args().max_lines == 500
+
+
+def test_parse_args_max_lines_default(monkeypatch):
+    """--max-lines defaults to None."""
+    monkeypatch.setattr(
+        sys, "argv",
+        ["prog", "--file", "f.cpp", "--output-dir", "/out",
+         "--lrm", "/lrm.txt", "--arch", "/arch.md"],
+    )
+    assert _parse_args().max_lines is None
 
 
 # ---- _format_clause --------------------------------------------------------

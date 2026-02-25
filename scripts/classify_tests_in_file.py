@@ -396,7 +396,8 @@ def _call_claude(prompt):
     env = os.environ.copy()
     env.pop("CLAUDECODE", None)
     result = subprocess.run(
-        ["claude", "-p", "--model", "sonnet", "--allowedTools", "Read"],
+        ["claude", "-p", "--model", "sonnet", "--output-format", "json",
+         "--allowedTools", "Read"],
         input=prompt,
         capture_output=True,
         text=True,
@@ -480,6 +481,33 @@ def clause_to_filename(prefix, clause):
     parts = clause.split(".")
     padded = "_".join(p.zfill(2) for p in parts)
     return f"{prefix}_clause_{padded}"
+
+
+def _count_file_lines(path):
+    """Return the number of lines in a file, or 0 if it does not exist."""
+    if not path.exists():
+        return 0
+    return len(path.read_text(encoding="utf-8").splitlines())
+
+
+def _next_suffix_file(target_base, test_dir):
+    """Return the next available single-letter suffix (a, b, c, ...)."""
+    variants = sorted(
+        glob.glob(str(test_dir / f"{target_base}_[a-z].cpp")),
+    )
+    if not variants:
+        return "a"
+    last = Path(variants[-1]).stem[-1]
+    return chr(ord(last) + 1)
+
+
+def _rename_base_to_suffix(target_base, test_dir):
+    """Rename base file to next available suffix; return new path."""
+    suffix = _next_suffix_file(target_base, test_dir)
+    base = test_dir / f"{target_base}.cpp"
+    dest = test_dir / f"{target_base}_{suffix}.cpp"
+    base.rename(dest)
+    return dest
 
 
 def find_merge_target(target_base, test_dir, exclude_path=None):
@@ -568,8 +596,22 @@ def generate_file(clause, title, parsed, tests):
     return "\n".join(out)
 
 
-def append_tests_to_file(filepath, global_preamble, tests):
-    """Append tests to an existing file before closing }  // namespace."""
+def _test_line_count(test):
+    """Return the number of lines a test block will occupy."""
+    count = len(test.lines) + 1  # +1 for trailing blank line
+    for line in test.preceding_comments:
+        if strip_lrm_quotes(line):
+            count += 1
+    return count
+
+
+def append_tests_to_file(filepath, global_preamble, tests,
+                         max_lines=None):
+    """Append tests to an existing file before closing }  // namespace.
+
+    Returns a list of new filenames created by splitting (empty if no
+    splitting occurred).
+    """
     text = filepath.read_text(encoding="utf-8")
     lines = text.splitlines()
     insert_idx = len(lines)
@@ -586,7 +628,43 @@ def append_tests_to_file(filepath, global_preamble, tests):
         if first_code.strip() not in text:
             new_lines.extend(item.lines)
             new_lines.append("")
+
+    # Determine which tests fit in the current file vs overflow.
+    fit = []
+    overflow = []
+    current_len = len(lines) + len(new_lines)
     for t in tests:
+        t_lines = _test_line_count(t)
+        if max_lines and current_len + t_lines > max_lines:
+            overflow.append(t)
+        else:
+            fit.append(t)
+            current_len += t_lines
+
+    if not max_lines or not overflow:
+        # No splitting needed — original behavior.
+        for t in fit:
+            for line in t.preceding_comments:
+                cleaned = strip_lrm_quotes(line)
+                if cleaned:
+                    new_lines.append(cleaned)
+            for line in t.lines:
+                new_lines.append(strip_lrm_quotes(line))
+            new_lines.append("")
+        lines[insert_idx:insert_idx] = new_lines
+        filepath.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return []
+
+    # Splitting needed.
+    new_names = []
+    stem = filepath.stem
+    test_dir = filepath.parent
+    # Strip existing suffix if it's a single letter (e.g., _a).
+    base = re.sub(r"_[a-z]$", "", stem)
+    is_base_file = (stem == base)
+
+    # Write fit tests into current file.
+    for t in fit:
         for line in t.preceding_comments:
             cleaned = strip_lrm_quotes(line)
             if cleaned:
@@ -596,6 +674,60 @@ def append_tests_to_file(filepath, global_preamble, tests):
         new_lines.append("")
     lines[insert_idx:insert_idx] = new_lines
     filepath.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    # If the current file is the base (no suffix), rename it.
+    if is_base_file:
+        renamed = _rename_base_to_suffix(base, test_dir)
+        new_names.append(renamed.stem)
+        filepath = renamed
+
+    # Write overflow tests to new suffix file(s).
+    batch = []
+    batch_lines = 0
+    for t in overflow:
+        t_lines = _test_line_count(t)
+        if batch and max_lines and batch_lines + t_lines > max_lines:
+            suffix = _next_suffix_file(base, test_dir)
+            out_name = f"{base}_{suffix}"
+            outpath = test_dir / f"{out_name}.cpp"
+            _write_overflow_file(outpath, filepath, batch)
+            new_names.append(out_name)
+            batch = []
+            batch_lines = 0
+        batch.append(t)
+        batch_lines += t_lines
+    if batch:
+        suffix = _next_suffix_file(base, test_dir)
+        out_name = f"{base}_{suffix}"
+        outpath = test_dir / f"{out_name}.cpp"
+        _write_overflow_file(outpath, filepath, batch)
+        new_names.append(out_name)
+
+    return new_names
+
+
+def _write_overflow_file(outpath, source_path, tests):
+    """Write overflow tests to a new file, copying the header from source."""
+    source_text = source_path.read_text(encoding="utf-8")
+    source_lines = source_text.splitlines()
+    # Copy everything up to and including "namespace {" + blank line.
+    header = []
+    for line in source_lines:
+        header.append(line)
+        if line.strip() == "namespace {":
+            header.append("")
+            break
+    for t in tests:
+        for line in t.preceding_comments:
+            cleaned = strip_lrm_quotes(line)
+            if cleaned:
+                header.append(cleaned)
+        for line in t.lines:
+            header.append(strip_lrm_quotes(line))
+        header.append("")
+    header.append("}  // namespace")
+    header.append("")
+    outpath.write_text("\n".join(header), encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -646,6 +778,10 @@ def _parse_args():
     parser.add_argument(
         "--arch", required=True,
         help="Path to ARCHITECTURE.md file",
+    )
+    parser.add_argument(
+        "--max-lines", type=int, default=None,
+        help="Maximum lines per output file; splits into _a, _b, ... suffixes",
     )
     parser.add_argument(
         "--dry-run", action="store_true",
@@ -724,20 +860,67 @@ def _resolve_destinations(  # pylint: disable=too-many-locals
     return to_create, to_merge, n_removed
 
 
-def _write_files(to_create, to_merge, parsed, test_dir, lrm_titles):
+def _write_files(to_create, to_merge, parsed, test_dir, lrm_titles,
+                 max_lines=None):
     """Write new files and merge into existing files."""
     new_names = []
     for filename, clause, tests in to_create:
         title = lrm_titles.get(clause, "")
+        if max_lines:
+            _write_split_create(
+                filename, clause, title, parsed, tests,
+                test_dir, max_lines, new_names,
+            )
+        else:
+            content = generate_file(clause, title, parsed, tests)
+            outpath = test_dir / f"{filename}.cpp"
+            outpath.write_text(content, encoding="utf-8")
+            new_names.append(filename)
+    for merge_path, tests in to_merge:
+        split_names = append_tests_to_file(
+            merge_path, parsed.global_preamble, tests,
+            max_lines=max_lines,
+        )
+        new_names.extend(split_names)
+    return new_names
+
+
+def _write_split_create(filename, clause, title, parsed, tests,
+                        test_dir, max_lines, new_names):
+    """Write tests to one or more suffix files when max_lines is set."""
+    # Build batches of tests that each fit within max_lines.
+    # Estimate header overhead by generating a file with zero tests.
+    header_content = generate_file(clause, title, parsed, [])
+    header_lines = len(header_content.splitlines())
+    batches = []
+    current_batch = []
+    current_len = header_lines
+    for t in tests:
+        t_lines = _test_line_count(t)
+        if current_batch and current_len + t_lines > max_lines:
+            batches.append(current_batch)
+            current_batch = []
+            current_len = header_lines
+        current_batch.append(t)
+        current_len += t_lines
+    if current_batch:
+        batches.append(current_batch)
+
+    if len(batches) <= 1:
+        # Everything fits in one file.
         content = generate_file(clause, title, parsed, tests)
         outpath = test_dir / f"{filename}.cpp"
         outpath.write_text(content, encoding="utf-8")
         new_names.append(filename)
-    for merge_path, tests in to_merge:
-        append_tests_to_file(
-            merge_path, parsed.global_preamble, tests,
-        )
-    return new_names
+    else:
+        suffix = "a"
+        for batch in batches:
+            out_name = f"{filename}_{suffix}"
+            content = generate_file(clause, title, parsed, batch)
+            outpath = test_dir / f"{out_name}.cpp"
+            outpath.write_text(content, encoding="utf-8")
+            new_names.append(out_name)
+            suffix = chr(ord(suffix) + 1)
 
 
 def _print_dry_run_summary(  # pylint: disable=too-many-arguments,too-many-positional-arguments
@@ -856,6 +1039,7 @@ def _run(args):  # pylint: disable=too-many-locals
     titles = load_lrm_titles(lrm_path)
     new_names = _write_files(
         to_create, to_merge, parsed, test_dir, titles,
+        max_lines=getattr(args, "max_lines", None),
     )
     if source_is_target:
         n_kept = _rewrite_source(
