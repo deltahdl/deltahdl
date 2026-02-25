@@ -338,8 +338,7 @@ def invoke_claude(prompt: str, *, model: str = "sonnet") -> None:
 
 def run_prompt(
     build_fn, lrm_path: Path, clause: str, *,
-    issue: int, model: str,
-    figures: list[Path], tables: list[Path],
+    issue: int, model: str, supplementary: str = "",
 ) -> None:
     """Load titles, build a prompt via *build_fn*, and invoke Claude."""
     titles = load_lrm_titles(lrm_path)
@@ -347,16 +346,6 @@ def run_prompt(
         f"Loaded {len(titles)} LRM clause titles from {lrm_path}",
         file=sys.stderr,
     )
-    supplementary = build_supplementary_lines(
-        figures=figures, tables=tables,
-    )
-    if supplementary:
-        n_supp = supplementary.count("\n") + 1
-        print(
-            f"Found {n_supp} supplementary files",
-            file=sys.stderr,
-        )
-        supplementary += "\n"
     prompt = build_fn(
         clause, titles, str(lrm_path),
         issue=issue, supplementary=supplementary,
@@ -602,10 +591,21 @@ def main(argv=None):
         ignore_figures=args.ignore_figures,
     )
 
+    supplementary = build_supplementary_lines(
+        figures=args.figures, tables=args.tables,
+    )
+    if supplementary:
+        n_supp = supplementary.count("\n") + 1
+        print(
+            f"Found {n_supp} supplementary files",
+            file=sys.stderr,
+        )
+        supplementary += "\n"
+
     run_prompt(
         handler, args.lrm, args.clause,
         issue=args.issue, model=args.model,
-        figures=args.figures, tables=args.tables,
+        supplementary=supplementary,
     )
 
 

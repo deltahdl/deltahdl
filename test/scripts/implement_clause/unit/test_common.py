@@ -433,23 +433,18 @@ def test_run_prompt_calls_invoke(mock_invoke, tmp_path):
     lrm = tmp_path / "lrm.txt"
     lrm.write_text("4. Scheduling semantics\n4.1 General\n")
     build_fn = MagicMock(return_value="generated prompt")
-    run_prompt(
-        build_fn, lrm, "4.1",
-        issue=6, model="sonnet", figures=[], tables=[],
-    )
+    run_prompt(build_fn, lrm, "4.1", issue=6, model="sonnet")
     assert mock_invoke.call_args[0][0] == "generated prompt"
 
 
 @patch("implement_clause.invoke_claude")
-def test_run_prompt_appends_supplementary(_mock_invoke, tmp_path):
-    """run_prompt appends newline to non-empty supplementary."""
+def test_run_prompt_passes_supplementary(_mock_invoke, tmp_path):
+    """run_prompt forwards supplementary string to the builder."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text("")
-    gv = tmp_path / "Figure_4_1.gv"
-    gv.write_text("digraph {}")
     build_fn = MagicMock(return_value="prompt")
     run_prompt(
         build_fn, lrm, "4",
-        issue=6, model="sonnet", figures=[gv], tables=[],
+        issue=6, model="sonnet", supplementary="- Figure 4-1\n",
     )
-    assert build_fn.call_args[1]["supplementary"].endswith("\n")
+    assert build_fn.call_args[1]["supplementary"] == "- Figure 4-1\n"
