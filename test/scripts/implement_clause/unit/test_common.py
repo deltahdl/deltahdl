@@ -92,8 +92,7 @@ class TestLoadLrmTitles:
 
 def test_load_missing_file(tmp_path):
     """Returns empty dict when file does not exist."""
-    titles = load_lrm_titles(tmp_path / "no_such_file.txt")
-    assert titles == {}
+    assert not load_lrm_titles(tmp_path / "no_such_file.txt")
 
 
 # ---- build_hierarchy --------------------------------------------------------
@@ -103,6 +102,7 @@ class TestBuildHierarchyNumeric:
     """Tests for numeric (non-annex) clauses."""
 
     def test_depth_1(self):
+        """Clause '4' produces depth-1 numeric hierarchy."""
         assert build_hierarchy("4") == {
             "is_annex": False,
             "clause_number": "4",
@@ -111,6 +111,7 @@ class TestBuildHierarchyNumeric:
         }
 
     def test_depth_2(self):
+        """Clause '4.1' produces depth-2 numeric hierarchy."""
         assert build_hierarchy("4.1") == {
             "is_annex": False,
             "clause_number": "4",
@@ -119,6 +120,7 @@ class TestBuildHierarchyNumeric:
         }
 
     def test_depth_3(self):
+        """Clause '6.24.1' produces depth-3 numeric hierarchy."""
         assert build_hierarchy("6.24.1") == {
             "is_annex": False,
             "clause_number": "6",
@@ -128,6 +130,7 @@ class TestBuildHierarchyNumeric:
         }
 
     def test_depth_4(self):
+        """Clause '4.4.3.1' produces depth-4 numeric hierarchy."""
         assert build_hierarchy("4.4.3.1") == {
             "is_annex": False,
             "clause_number": "4",
@@ -137,6 +140,7 @@ class TestBuildHierarchyNumeric:
         }
 
     def test_depth_5(self):
+        """Clause '4.4.3.1.2' produces depth-5 numeric hierarchy."""
         assert build_hierarchy("4.4.3.1.2") == {
             "is_annex": False,
             "clause_number": "4",
@@ -150,6 +154,7 @@ class TestBuildHierarchyAnnex:
     """Tests for annex (uppercase letter) clauses."""
 
     def test_depth_1(self):
+        """Clause 'B' produces depth-1 annex hierarchy."""
         assert build_hierarchy("B") == {
             "is_annex": True,
             "collection": "Annex B",
@@ -159,6 +164,7 @@ class TestBuildHierarchyAnnex:
         }
 
     def test_depth_2(self):
+        """Clause 'A.8' produces depth-2 annex hierarchy."""
         assert build_hierarchy("A.8") == {
             "is_annex": True,
             "collection": "Annex A",
@@ -169,6 +175,7 @@ class TestBuildHierarchyAnnex:
         }
 
     def test_depth_3(self):
+        """Clause 'A.8.1' produces depth-3 annex hierarchy."""
         assert build_hierarchy("A.8.1") == {
             "is_annex": True,
             "collection": "Annex A",
@@ -179,6 +186,7 @@ class TestBuildHierarchyAnnex:
         }
 
     def test_depth_4(self):
+        """Clause 'A.7.5.3' produces depth-4 annex hierarchy."""
         assert build_hierarchy("A.7.5.3") == {
             "is_annex": True,
             "collection": "Annex A",
@@ -189,6 +197,7 @@ class TestBuildHierarchyAnnex:
         }
 
     def test_depth_5(self):
+        """Clause 'A.7.5.3.1' produces depth-5 annex hierarchy."""
         assert build_hierarchy("A.7.5.3.1") == {
             "is_annex": True,
             "collection": "Annex A",
@@ -224,7 +233,7 @@ def test_find_supplementary_empty_when_dirs_missing(tmp_path, monkeypatch):
         "implement_clause.common.TABLES_DIR",
         tmp_path / "no_tables",
     )
-    assert find_supplementary_files("4.4.3.1") == []
+    assert not find_supplementary_files("4.4.3.1")
 
 
 def test_find_supplementary_finds_figure(tmp_path, monkeypatch):
@@ -262,7 +271,7 @@ def test_find_supplementary_ignores_other_clauses(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "implement_clause.common.TABLES_DIR", tmp_path / "no_tables",
     )
-    assert find_supplementary_files("6.24.1") == []
+    assert not find_supplementary_files("6.24.1")
 
 
 # ---- build_supplementary_lines ---------------------------------------------

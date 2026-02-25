@@ -9,26 +9,32 @@ from implement_clause import clause_depth, parse_args
 
 
 def test_clause_depth_1():
+    """Single component has depth 1."""
     assert clause_depth("4") == 1
 
 
 def test_clause_depth_1_annex():
+    """Single letter component has depth 1."""
     assert clause_depth("B") == 1
 
 
 def test_clause_depth_2():
+    """Two components have depth 2."""
     assert clause_depth("4.1") == 2
 
 
 def test_clause_depth_3():
+    """Three components have depth 3."""
     assert clause_depth("6.24.1") == 3
 
 
 def test_clause_depth_4():
+    """Four components have depth 4."""
     assert clause_depth("4.4.3.1") == 4
 
 
 def test_clause_depth_5():
+    """Five components have depth 5."""
     assert clause_depth("4.4.3.1.2") == 5
 
 

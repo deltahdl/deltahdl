@@ -1,6 +1,5 @@
 """Shared utilities for LRM clause implementation automation."""
 
-import glob
 import os
 import re
 import subprocess
@@ -132,6 +131,21 @@ def build_hierarchy(clause: str) -> dict:
     return result
 
 
+def build_top_level_line(h: dict, titles: dict[str, str], lrm: str) -> str:
+    """Return the first hierarchy line for the top-level clause or annex."""
+    if h["is_annex"]:
+        subject = titles.get(h["letter"], "")
+        return (
+            f"- Thoroughly understand that {h['collection']}"
+            f" is about '{subject}' per LRM in {lrm}"
+        )
+    title = titles.get(h["clause_number"], "")
+    return (
+        f"- Thoroughly understand that Clause {h['clause_number']}"
+        f" is about '{title}' per LRM in {lrm}"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Supplementary files (Figures / Tables)
 # ---------------------------------------------------------------------------
@@ -183,6 +197,36 @@ def build_supplementary_lines(clause: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Prompt formatting
+# ---------------------------------------------------------------------------
+
+def format_prompt(
+    hierarchy: str,
+    subclause: str,
+    lrm: str,
+    *,
+    issue: int,
+    supplementary: str = "",
+) -> str:
+    """Assemble the standard implementation prompt from hierarchy steps."""
+    return (
+        "Create and execute a Claude task list."
+        " Each task must be blocked by the preceding task.\n\n"
+        f"{hierarchy}"
+        f"{supplementary}"
+        f"- Implement ALL aspects (not just parsing) of"
+        f" {subclause} per LRM in {lrm}"
+        f" through test-driven development unit tests\n"
+        f"- Prove that the unit tests cover ALL aspects of"
+        f" {subclause} per LRM in {lrm} not just parsing\n"
+        f"- Prove that the implementation covers ALL aspects of"
+        f" {subclause} per LRM in {lrm} not just parsing\n"
+        f"- Read all of Issue {issue}\n"
+        f"- Correct Issue {issue}\n"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Claude CLI invocation
 # ---------------------------------------------------------------------------
 
@@ -200,17 +244,15 @@ def invoke_claude(prompt: str, *, model: str = "sonnet") -> None:
         "--dangerously-skip-permissions",
     ]
 
-    proc = subprocess.Popen(
+    with subprocess.Popen(
         cmd,
         stdin=subprocess.PIPE,
         stdout=sys.stdout,
         stderr=sys.stderr,
         text=True,
         env=env,
-    )
-    proc.stdin.write(prompt)
-    proc.stdin.close()
-    proc.wait()
+    ) as proc:
+        proc.communicate(input=prompt)
 
     if proc.returncode != 0:
         print(
@@ -218,6 +260,22 @@ def invoke_claude(prompt: str, *, model: str = "sonnet") -> None:
             file=sys.stderr,
         )
         sys.exit(1)
+
+
+def run_prompt(
+    build_fn, lrm_path: Path, clause: str, *,
+    issue: int, model: str,
+) -> None:
+    """Load titles, build a prompt via *build_fn*, and invoke Claude."""
+    titles = load_lrm_titles(lrm_path)
+    supplementary = build_supplementary_lines(clause)
+    if supplementary:
+        supplementary += "\n"
+    prompt = build_fn(
+        clause, titles, str(lrm_path),
+        issue=issue, supplementary=supplementary,
+    )
+    invoke_claude(prompt, model=model)
 
 
 # ---------------------------------------------------------------------------

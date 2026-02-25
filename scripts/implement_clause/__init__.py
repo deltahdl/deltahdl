@@ -5,11 +5,23 @@ import argparse
 import re
 from pathlib import Path
 
+from . import prompt_v, prompt_v_w, prompt_v_w_x, prompt_v_w_x_y, prompt_v_w_x_y_z
+from .common import run_classify_tests_in_file, run_prompt
+
 
 CLAUSE_RE = re.compile(r"^(\d+|[A-Z])(\.\d+){0,4}$")
 
+_HANDLERS = {
+    1: prompt_v,
+    2: prompt_v_w,
+    3: prompt_v_w_x,
+    4: prompt_v_w_x_y,
+    5: prompt_v_w_x_y_z,
+}
+
 
 def parse_args(argv=None):
+    """Parse command-line arguments for clause implementation."""
     parser = argparse.ArgumentParser(
         description="Generate an implementation prompt for a given LRM clause.",
     )
@@ -53,27 +65,20 @@ def parse_args(argv=None):
 
 
 def clause_depth(clause: str) -> int:
+    """Return the nesting depth of a clause string."""
     return clause.count(".") + 1
 
 
 def main(argv=None):
+    """Parse args, dispatch to the depth-appropriate prompt, and invoke Claude."""
     args = parse_args(argv)
     depth = clause_depth(args.clause)
+    handler = _HANDLERS[depth]
 
-    if depth == 1:
-        from . import prompt_v as handler
-    elif depth == 2:
-        from . import prompt_v_w as handler
-    elif depth == 3:
-        from . import prompt_v_w_x as handler
-    elif depth == 4:
-        from . import prompt_v_w_x_y as handler
-    else:
-        from . import prompt_v_w_x_y_z as handler
-
-    handler.run(args.lrm, args.clause, issue=args.issue, model=args.model)
-
-    from .common import run_classify_tests_in_file
+    run_prompt(
+        handler.build_prompt, args.lrm, args.clause,
+        issue=args.issue, model=args.model,
+    )
     run_classify_tests_in_file(args.lrm)
 
 

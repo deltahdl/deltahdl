@@ -1,7 +1,5 @@
 """Unit tests for prompt generation across all clause depths."""
 
-import pytest
-
 from implement_clause.prompt_v import build_prompt as build_v
 from implement_clause.prompt_v_w import build_prompt as build_v_w
 from implement_clause.prompt_v_w_x import build_prompt as build_v_w_x
@@ -56,22 +54,27 @@ class TestPromptV:
     """Tests for depth-1 prompt generation."""
 
     def test_numeric_includes_clause_title(self):
+        """Numeric prompt includes clause number and title."""
         prompt = build_v("4", _TITLES, "~/LRM.txt", issue=6)
         assert "Clause 4" in prompt and "Scheduling semantics" in prompt
 
     def test_annex_includes_collection(self):
+        """Annex prompt includes collection name and subject."""
         prompt = build_v("B", _TITLES, "~/LRM.txt", issue=44)
         assert "Annex B" in prompt and "Keywords" in prompt
 
     def test_numeric_has_common_structure(self):
+        """Numeric prompt has TDD, 'not just parsing', issue, subclause."""
         prompt = build_v("4", _TITLES, "~/LRM.txt", issue=6)
         assert not _check_common_structure(prompt, "4", 6)
 
     def test_annex_has_common_structure(self):
+        """Annex prompt has TDD, 'not just parsing', issue, subclause."""
         prompt = build_v("B", _TITLES, "~/LRM.txt", issue=44)
         assert not _check_common_structure(prompt, "B", 44)
 
     def test_uses_short_lrm_path(self):
+        """Prompt embeds the short LRM path."""
         prompt = build_v("B", _TITLES, "~/LRM.txt", issue=44)
         assert "~/LRM.txt" in prompt
 
@@ -85,14 +88,17 @@ class TestPromptVW:
     """Tests for depth-2 prompt generation."""
 
     def test_numeric_includes_clause_and_subclause(self):
+        """Numeric prompt mentions both clause and subclause."""
         prompt = build_v_w("4.1", _TITLES, "~/LRM.txt", issue=6)
         assert "Clause 4" in prompt and "4.1" in prompt
 
     def test_annex_includes_collection_and_subclause(self):
+        """Annex prompt mentions both collection and subclause."""
         prompt = build_v_w("A.8", _TITLES, "~/LRM.txt", issue=44)
         assert "Annex A" in prompt and "A.8" in prompt
 
     def test_numeric_has_common_structure(self):
+        """Numeric prompt has TDD, 'not just parsing', issue, subclause."""
         prompt = build_v_w("4.1", _TITLES, "~/LRM.txt", issue=6)
         assert not _check_common_structure(prompt, "4.1", 6)
 
@@ -106,6 +112,7 @@ class TestPromptVWX:
     """Tests for depth-3 prompt generation."""
 
     def test_numeric_walks_hierarchy(self):
+        """Numeric prompt includes clause, principle, ancestor, subclause."""
         prompt = build_v_w_x("6.24.1", _TITLES, "~/LRM.txt", issue=8)
         assert all(
             s in prompt
@@ -113,20 +120,24 @@ class TestPromptVWX:
         )
 
     def test_annex_walks_hierarchy(self):
+        """Annex prompt includes collection, principles, subclause."""
         prompt = build_v_w_x("A.8.1", _TITLES, "~/LRM.txt", issue=44)
         assert all(
             s in prompt for s in ["Annex A", "A.8", "A.8.1"]
         )
 
     def test_numeric_has_common_structure(self):
+        """Numeric prompt has TDD, 'not just parsing', issue, subclause."""
         prompt = build_v_w_x("6.24.1", _TITLES, "~/LRM.txt", issue=8)
         assert not _check_common_structure(prompt, "6.24.1", 8)
 
     def test_annex_has_common_structure(self):
+        """Annex prompt has TDD, 'not just parsing', issue, subclause."""
         prompt = build_v_w_x("A.8.1", _TITLES, "~/LRM.txt", issue=44)
         assert not _check_common_structure(prompt, "A.8.1", 44)
 
     def test_supplementary_lines_included(self):
+        """Supplementary lines appear in the prompt."""
         prompt = build_v_w_x(
             "6.24.1", _TITLES, "~/LRM.txt", issue=8,
             supplementary="- Acknowledge Table 6-1\n",
@@ -143,6 +154,7 @@ class TestPromptVWXY:
     """Tests for depth-4 prompt generation."""
 
     def test_numeric_walks_full_hierarchy(self):
+        """Numeric prompt includes clause, principle, ancestors, subclause."""
         prompt = build_v_w_x_y("4.4.3.1", _TITLES, "~/LRM.txt", issue=6)
         assert all(
             s in prompt
@@ -150,6 +162,7 @@ class TestPromptVWXY:
         )
 
     def test_annex_walks_full_hierarchy(self):
+        """Annex prompt includes collection, principles, ancestors, subclause."""
         prompt = build_v_w_x_y("A.7.5.3", _TITLES, "~/LRM.txt", issue=44)
         assert all(
             s in prompt
@@ -167,6 +180,7 @@ class TestPromptVWXY:
         assert i_clause < i_principle < i_parent < i_ref < i_sub
 
     def test_has_common_structure(self):
+        """Prompt has TDD, 'not just parsing', issue, subclause."""
         prompt = build_v_w_x_y("4.4.3.1", _TITLES, "~/LRM.txt", issue=6)
         assert not _check_common_structure(prompt, "4.4.3.1", 6)
 
@@ -180,6 +194,7 @@ class TestPromptVWXYZ:
     """Tests for depth-5 prompt generation."""
 
     def test_numeric_walks_full_hierarchy(self):
+        """Numeric prompt includes all hierarchy levels."""
         prompt = build_v_w_x_y_z(
             "4.4.3.1.2", _TITLES, "~/LRM.txt", issue=6,
         )
@@ -191,6 +206,7 @@ class TestPromptVWXYZ:
         )
 
     def test_annex_walks_full_hierarchy(self):
+        """Annex prompt includes all hierarchy levels."""
         prompt = build_v_w_x_y_z(
             "A.7.5.3.1", _TITLES, "~/LRM.txt", issue=44,
         )
@@ -200,6 +216,7 @@ class TestPromptVWXYZ:
         )
 
     def test_has_common_structure(self):
+        """Prompt has TDD, 'not just parsing', issue, subclause."""
         prompt = build_v_w_x_y_z(
             "4.4.3.1.2", _TITLES, "~/LRM.txt", issue=6,
         )
