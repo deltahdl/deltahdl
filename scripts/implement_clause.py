@@ -251,6 +251,7 @@ def invoke_claude(prompt: str, *, model: str = "sonnet") -> None:
         "--dangerously-skip-permissions",
     ]
 
+    print(f"Invoking Claude ({model})...", file=sys.stderr)
     with subprocess.Popen(
         cmd,
         stdin=subprocess.PIPE,
@@ -275,13 +276,23 @@ def run_prompt(
 ) -> None:
     """Load titles, build a prompt via *build_fn*, and invoke Claude."""
     titles = load_lrm_titles(lrm_path)
+    print(
+        f"Loaded {len(titles)} LRM clause titles from {lrm_path}",
+        file=sys.stderr,
+    )
     supplementary = build_supplementary_lines(clause)
     if supplementary:
+        n_supp = supplementary.count("\n") + 1
+        print(
+            f"Found {n_supp} supplementary files",
+            file=sys.stderr,
+        )
         supplementary += "\n"
     prompt = build_fn(
         clause, titles, str(lrm_path),
         issue=issue, supplementary=supplementary,
     )
+    print(f"Built prompt ({len(prompt)} characters)", file=sys.stderr)
     invoke_claude(prompt, model=model)
 
 
@@ -478,6 +489,11 @@ def main(argv=None):
     args = parse_args(argv)
     depth = clause_depth(args.clause)
     handler = _HANDLERS[depth]
+    print(
+        f"Clause {args.clause} (depth {depth}),"
+        f" issue #{args.issue}, model {args.model}",
+        file=sys.stderr,
+    )
 
     run_prompt(
         handler, args.lrm, args.clause,
