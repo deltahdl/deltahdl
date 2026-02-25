@@ -677,27 +677,24 @@ def test_append_renames_base_returns_both_names(tmp_path):
     assert "test_parser_clause_06_01_a" in new_names
 
 
+def _do_multi_batch_overflow(tmp_path):
+    """Set up multi-batch overflow: 3 tests into near-limit file."""
+    f = _near_limit_file(tmp_path, "test_parser_clause_06_01_a.cpp")
+    tests = [_make_large_test(f"Ov{i}", 20) for i in range(3)]
+    classify_tests_in_file.append_tests_to_file(
+        f, [], tests, max_lines=50,
+    )
+
+
 def test_append_overflow_multi_batch_creates_b(tmp_path):
     """Multi-batch overflow creates _b suffix file."""
-    f = _near_limit_file(tmp_path, "test_parser_clause_06_01_a.cpp")
-    t1 = _make_large_test("Ov1", 20)
-    t2 = _make_large_test("Ov2", 20)
-    t3 = _make_large_test("Ov3", 20)
-    classify_tests_in_file.append_tests_to_file(
-        f, [], [t1, t2, t3], max_lines=50,
-    )
+    _do_multi_batch_overflow(tmp_path)
     assert (tmp_path / "test_parser_clause_06_01_b.cpp").exists()
 
 
 def test_append_overflow_multi_batch_creates_c(tmp_path):
     """Third overflow batch creates _c suffix file."""
-    f = _near_limit_file(tmp_path, "test_parser_clause_06_01_a.cpp")
-    t1 = _make_large_test("Ov1", 20)
-    t2 = _make_large_test("Ov2", 20)
-    t3 = _make_large_test("Ov3", 20)
-    classify_tests_in_file.append_tests_to_file(
-        f, [], [t1, t2, t3], max_lines=50,
-    )
+    _do_multi_batch_overflow(tmp_path)
     assert (tmp_path / "test_parser_clause_06_01_c.cpp").exists()
 
 

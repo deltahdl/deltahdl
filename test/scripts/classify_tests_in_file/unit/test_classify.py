@@ -165,8 +165,8 @@ def test_call_claude_failure(monkeypatch):
         _call_claude("prompt")
 
 
-def test_call_claude_output_format_json(monkeypatch):
-    """CLI command includes --output-format json."""
+def _capture_claude_cmd(monkeypatch):
+    """Run _call_claude and return the captured subprocess command."""
     captured_cmd = []
     mock_result = MagicMock()
     mock_result.returncode = 0
@@ -179,25 +179,20 @@ def test_call_claude_output_format_json(monkeypatch):
 
     monkeypatch.setattr(subprocess, "run", capture_run)
     _call_claude("prompt")
-    idx = captured_cmd.index("--output-format")
-    assert captured_cmd[idx + 1] == "json"
+    return captured_cmd
+
+
+def test_call_claude_output_format_json(monkeypatch):
+    """CLI command includes --output-format json."""
+    cmd = _capture_claude_cmd(monkeypatch)
+    idx = cmd.index("--output-format")
+    assert cmd[idx + 1] == "json"
 
 
 def test_call_claude_allows_read(monkeypatch):
     """CLI command includes --allowedTools Read."""
-    captured_cmd = []
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = '{"prefix": "test_parser_"}'
-    mock_result.stderr = ""
-
-    def capture_run(*args, **_kwargs):
-        captured_cmd.extend(args[0])
-        return mock_result
-
-    monkeypatch.setattr(subprocess, "run", capture_run)
-    _call_claude("prompt")
-    assert "--allowedTools" in captured_cmd and "Read" in captured_cmd
+    cmd = _capture_claude_cmd(monkeypatch)
+    assert "--allowedTools" in cmd and "Read" in cmd
 
 
 # ---- _apply_classification -------------------------------------------------
