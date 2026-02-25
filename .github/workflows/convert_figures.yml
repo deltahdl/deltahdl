@@ -60,6 +60,7 @@ jobs:
           --disable-error-code=import-untyped
           scripts/convert_figures/
       - name: Run mypy on tests
+        # Tests transitively import _pdf.py which imports fitz (pymupdf).
         run: >-
           MYPYPATH=.:scripts:test/scripts/convert_figures/unit
           python3 -m mypy --explicit-package-bases
