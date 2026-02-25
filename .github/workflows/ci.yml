@@ -311,7 +311,7 @@ on:
       - LICENSE
       - scripts/convert_figure.py
       - scripts/convert_table.py
-      - scripts/classify_tests_in_file.py
+      - scripts/classify_tests_in_file/**
       - scripts/implement_clause.py
       - test/scripts/convert_figure/**
       - test/scripts/convert_table/**
@@ -329,7 +329,7 @@ on:
       - LICENSE
       - scripts/convert_figure.py
       - scripts/convert_table.py
-      - scripts/classify_tests_in_file.py
+      - scripts/classify_tests_in_file/**
       - scripts/implement_clause.py
       - test/scripts/convert_figure/**
       - test/scripts/convert_table/**

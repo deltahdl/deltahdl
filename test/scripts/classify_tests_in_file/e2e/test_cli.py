@@ -7,9 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-_SCRIPT = str(
-    Path(__file__).resolve().parents[4]
-    / "scripts" / "classify_tests_in_file.py",
+_SCRIPTS_DIR = str(
+    Path(__file__).resolve().parents[4] / "scripts",
 )
 
 
@@ -18,12 +17,17 @@ _SCRIPT = str(
 
 def _invoke(*args, cwd=None, env=None):
     """Run classify_tests_in_file in a child process."""
+    run_env = (env or os.environ).copy()
+    pypath = run_env.get("PYTHONPATH", "")
+    run_env["PYTHONPATH"] = (
+        _SCRIPTS_DIR + os.pathsep + pypath if pypath else _SCRIPTS_DIR
+    )
     return subprocess.run(
-        [sys.executable, _SCRIPT, *args],
+        [sys.executable, "-m", "classify_tests_in_file", *args],
         capture_output=True,
         text=True,
         cwd=cwd,
-        env=env,
+        env=run_env,
         check=False,
     )
 

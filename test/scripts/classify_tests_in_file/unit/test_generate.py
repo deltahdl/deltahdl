@@ -546,7 +546,7 @@ def test_write_files_no_split_under_max_lines(tmp_path):
     parsed = _parsed()
     t = _tb("Small", comments=[])
     to_create = [("test_parser_clause_06_01", "6.1", [t])]
-    names = _write_files(
+    _write_files(
         to_create, [], parsed, tmp_path, {}, max_lines=500,
     )
     assert (tmp_path / "test_parser_clause_06_01.cpp").exists()
@@ -634,7 +634,7 @@ def test_append_no_split_returns_empty(tmp_path):
     new_names = classify_tests_in_file.append_tests_to_file(
         f, [], [t], max_lines=500,
     )
-    assert new_names == []
+    assert not new_names
 
 
 def test_append_renames_base_to_a(tmp_path):
@@ -675,6 +675,105 @@ def test_append_renames_base_returns_both_names(tmp_path):
         f, [], [t], max_lines=50,
     )
     assert "test_parser_clause_06_01_a" in new_names
+
+
+def test_append_overflow_multi_batch_creates_b(tmp_path):
+    """Multi-batch overflow creates _b suffix file."""
+    f = _near_limit_file(tmp_path, "test_parser_clause_06_01_a.cpp")
+    t1 = _make_large_test("Ov1", 20)
+    t2 = _make_large_test("Ov2", 20)
+    t3 = _make_large_test("Ov3", 20)
+    classify_tests_in_file.append_tests_to_file(
+        f, [], [t1, t2, t3], max_lines=50,
+    )
+    assert (tmp_path / "test_parser_clause_06_01_b.cpp").exists()
+
+
+def test_append_overflow_multi_batch_creates_c(tmp_path):
+    """Third overflow batch creates _c suffix file."""
+    f = _near_limit_file(tmp_path, "test_parser_clause_06_01_a.cpp")
+    t1 = _make_large_test("Ov1", 20)
+    t2 = _make_large_test("Ov2", 20)
+    t3 = _make_large_test("Ov3", 20)
+    classify_tests_in_file.append_tests_to_file(
+        f, [], [t1, t2, t3], max_lines=50,
+    )
+    assert (tmp_path / "test_parser_clause_06_01_c.cpp").exists()
+
+
+def test_append_overflow_includes_preceding_comments(tmp_path):
+    """Overflow file includes preceding comments from tests."""
+    f = _near_limit_file(tmp_path, "test_parser_clause_06_01_a.cpp")
+    t = classify_tests_in_file.TestBlock(
+        suite_name="S", test_name="Commented",
+        lines=["TEST(S, Commented) {"]
+        + [f"  int x{i} = {i};" for i in range(18)]
+        + ["}"],
+        preceding_comments=["// important comment"],
+    )
+    classify_tests_in_file.append_tests_to_file(
+        f, [], [t], max_lines=50,
+    )
+    overflow = tmp_path / "test_parser_clause_06_01_b.cpp"
+    assert "// important comment" in overflow.read_text(encoding="utf-8")
+
+
+# ---- _write_overflow_file edge cases ----------------------------------------
+
+_write_overflow_file = getattr(
+    classify_tests_in_file, "_write_overflow_file",
+)
+
+
+def test_write_overflow_file_strips_empty_comment(tmp_path):
+    """Stripped LRM-quote comment is omitted from overflow file."""
+    source = tmp_path / "source.cpp"
+    source.write_text(
+        "#include <gtest/gtest.h>\n\nnamespace {\n}  // namespace\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "overflow.cpp"
+    t = classify_tests_in_file.TestBlock(
+        suite_name="S", test_name="T",
+        lines=["TEST(S, T) {", "}"],
+        preceding_comments=['// "All modules are..."'],
+    )
+    _write_overflow_file(out, source, [t])
+    assert "All modules" not in out.read_text(encoding="utf-8")
+
+
+def test_write_overflow_file_no_namespace(tmp_path):
+    """Copies entire source when no 'namespace {' found."""
+    source = tmp_path / "source.cpp"
+    source.write_text(
+        "#include <gtest/gtest.h>\nint x = 0;\n", encoding="utf-8",
+    )
+    out = tmp_path / "overflow.cpp"
+    t = _tb("T", comments=[])
+    _write_overflow_file(out, source, [t])
+    assert "int x = 0;" in out.read_text(encoding="utf-8")
+
+
+# ---- _batch_tests edge cases ------------------------------------------------
+
+_batch_tests = getattr(classify_tests_in_file, "_batch_tests")
+
+
+def test_batch_tests_empty():
+    """Empty tests list produces empty batches."""
+    assert not _batch_tests([], 10, 50)
+
+
+# ---- _flush_overflow edge cases ---------------------------------------------
+
+_flush_overflow = getattr(classify_tests_in_file, "_flush_overflow")
+
+
+def test_flush_overflow_empty(tmp_path):
+    """Empty overflow list returns empty names."""
+    source = tmp_path / "source.cpp"
+    source.write_text("namespace {\n}  // namespace\n", encoding="utf-8")
+    assert not _flush_overflow([], "base", tmp_path, source, 50)
 
 
 # ---- update_cmake ----------------------------------------------------------
