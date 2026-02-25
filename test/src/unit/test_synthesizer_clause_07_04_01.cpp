@@ -1,7 +1,6 @@
-// §23.2: Module definitions
+// §7.4.1: Packed arrays
 
 #include <gtest/gtest.h>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -33,20 +32,6 @@ static const RtlirModule *ElaborateSrc(SynthFixture &f,
 }
 
 namespace {
-
-TEST(SynthLower, PortInputsMappedToAigInputs) {
-  SynthFixture f;
-  auto *mod = ElaborateSrc(f,
-                           "module m(input a, input b, output y);\n"
-                           "  assign y = a;\n"
-                           "endmodule");
-  ASSERT_NE(mod, nullptr);
-  SynthLower synth(f.arena, f.diag);
-  auto *aig = synth.Lower(mod);
-  ASSERT_NE(aig, nullptr);
-  EXPECT_EQ(aig->inputs.size(), 2);
-  EXPECT_EQ(aig->outputs.size(), 1);
-}
 
 TEST(SynthLower, MultiBitPortMapping) {
   SynthFixture f;
