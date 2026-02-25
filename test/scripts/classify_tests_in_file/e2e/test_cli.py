@@ -9,7 +9,7 @@ from pathlib import Path
 
 _SCRIPT = str(
     Path(__file__).resolve().parents[4]
-    / "scripts" / "classify_tests_in_file" / "__init__.py",
+    / "scripts" / "classify_tests_in_file.py",
 )
 
 

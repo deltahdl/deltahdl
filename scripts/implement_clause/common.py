@@ -285,7 +285,7 @@ def run_prompt(
 def run_classify_tests_in_file(lrm_path: Path) -> None:
     """Run classify_tests_in_file on any new/modified test files."""
     repo_root = Path(__file__).resolve().parent.parent.parent
-    script = repo_root / "scripts" / "classify_tests_in_file"
+    script = repo_root / "scripts" / "classify_tests_in_file.py"
     test_dir = repo_root / "test" / "src" / "unit"
     arch = repo_root / "docs" / "ARCHITECTURE.md"
 
