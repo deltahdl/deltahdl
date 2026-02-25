@@ -134,23 +134,43 @@ def test_next_suffix_file_multiple(tmp_path):
 _rename_base_to_suffix = getattr(classify_tests_in_file, "_rename_base_to_suffix")
 
 
-def test_rename_base_to_suffix(tmp_path):
-    """Renames base file to _a when no suffixes exist."""
+def test_rename_base_to_suffix_returns_a(tmp_path):
+    """Returned path has _a suffix when no suffixes exist."""
     f = tmp_path / "foo.cpp"
     f.write_text("content")
     result = _rename_base_to_suffix("foo", tmp_path)
     assert result.name == "foo_a.cpp"
+
+
+def test_rename_base_to_suffix_removes_base(tmp_path):
+    """Base file no longer exists after rename."""
+    f = tmp_path / "foo.cpp"
+    f.write_text("content")
+    _rename_base_to_suffix("foo", tmp_path)
     assert not f.exists()
+
+
+def test_rename_base_to_suffix_creates_target(tmp_path):
+    """Target _a file exists after rename."""
+    f = tmp_path / "foo.cpp"
+    f.write_text("content")
+    _rename_base_to_suffix("foo", tmp_path)
     assert (tmp_path / "foo_a.cpp").exists()
 
 
-def test_rename_base_to_suffix_already_has_variants(tmp_path):
-    """Renames base to next available suffix when variants exist."""
+def test_rename_base_to_suffix_skips_existing_variant(tmp_path):
+    """Renames base to _b when _a already exists."""
     (tmp_path / "foo.cpp").write_text("base")
     (tmp_path / "foo_a.cpp").write_text("variant a")
     result = _rename_base_to_suffix("foo", tmp_path)
     assert result.name == "foo_b.cpp"
-    assert not (tmp_path / "foo.cpp").exists()
+
+
+def test_rename_base_to_suffix_preserves_content(tmp_path):
+    """Renamed file preserves original content."""
+    (tmp_path / "foo.cpp").write_text("base")
+    (tmp_path / "foo_a.cpp").write_text("variant a")
+    _rename_base_to_suffix("foo", tmp_path)
     assert (tmp_path / "foo_b.cpp").read_text() == "base"
 
 
@@ -486,20 +506,39 @@ def _make_large_test(name, n_lines):
     )
 
 
-def test_write_files_splits_when_over_max_lines(tmp_path):
-    """Creates _a and _b suffix files when content exceeds max_lines."""
+def _do_split_write(tmp_path):
+    """Helper: write two large tests with max_lines=50."""
     parsed = _parsed()
     t1 = _make_large_test("Big1", 40)
     t2 = _make_large_test("Big2", 40)
     to_create = [("test_parser_clause_06_01", "6.1", [t1, t2])]
-    names = _write_files(
+    return _write_files(
         to_create, [], parsed, tmp_path, {}, max_lines=50,
     )
+
+
+def test_write_files_split_creates_a(tmp_path):
+    """Splitting creates _a suffix file."""
+    _do_split_write(tmp_path)
     assert (tmp_path / "test_parser_clause_06_01_a.cpp").exists()
+
+
+def test_write_files_split_creates_b(tmp_path):
+    """Splitting creates _b suffix file."""
+    _do_split_write(tmp_path)
     assert (tmp_path / "test_parser_clause_06_01_b.cpp").exists()
+
+
+def test_write_files_split_no_base(tmp_path):
+    """Splitting does not create unsuffixed base file."""
+    _do_split_write(tmp_path)
     assert not (tmp_path / "test_parser_clause_06_01.cpp").exists()
+
+
+def test_write_files_split_returns_names(tmp_path):
+    """Splitting returns both suffix names."""
+    names = _do_split_write(tmp_path)
     assert "test_parser_clause_06_01_a" in names
-    assert "test_parser_clause_06_01_b" in names
 
 
 def test_write_files_no_split_under_max_lines(tmp_path):
@@ -511,6 +550,16 @@ def test_write_files_no_split_under_max_lines(tmp_path):
         to_create, [], parsed, tmp_path, {}, max_lines=500,
     )
     assert (tmp_path / "test_parser_clause_06_01.cpp").exists()
+
+
+def test_write_files_no_split_returns_name(tmp_path):
+    """No-split returns the base name."""
+    parsed = _parsed()
+    t = _tb("Small", comments=[])
+    to_create = [("test_parser_clause_06_01", "6.1", [t])]
+    names = _write_files(
+        to_create, [], parsed, tmp_path, {}, max_lines=500,
+    )
     assert "test_parser_clause_06_01" in names
 
 
@@ -520,35 +569,62 @@ def test_write_files_no_split_when_no_max_lines(tmp_path):
     t1 = _make_large_test("Big1", 40)
     t2 = _make_large_test("Big2", 40)
     to_create = [("test_parser_clause_06_01", "6.1", [t1, t2])]
-    names = _write_files(
+    _write_files(
         to_create, [], parsed, tmp_path, {}, max_lines=None,
     )
     assert (tmp_path / "test_parser_clause_06_01.cpp").exists()
-    assert "test_parser_clause_06_01" in names
 
 
 # ---- append_tests_to_file splitting ----------------------------------------
 
 
-def test_append_splits_when_over_max_lines(tmp_path):
-    """Overflow tests go to next suffix file."""
-    f = tmp_path / "test_parser_clause_06_01_a.cpp"
-    # Write a file near the limit
+def _near_limit_file(tmp_path, name):
+    """Create a file near the 50-line limit and return its path."""
+    f = tmp_path / name
     lines = ["#include <gtest/gtest.h>", "", "namespace {", ""]
     for i in range(40):
         lines.append(f"// line {i}")
     lines.extend(["", "}  // namespace", ""])
     f.write_text("\n".join(lines), encoding="utf-8")
+    return f
+
+
+def test_append_splits_creates_overflow_file(tmp_path):
+    """Overflow tests go to next suffix file."""
+    f = _near_limit_file(tmp_path, "test_parser_clause_06_01_a.cpp")
+    t = _make_large_test("Overflow", 20)
+    classify_tests_in_file.append_tests_to_file(
+        f, [], [t], max_lines=50,
+    )
+    assert (tmp_path / "test_parser_clause_06_01_b.cpp").exists()
+
+
+def test_append_splits_returns_new_name(tmp_path):
+    """Overflow append returns the new suffix filename."""
+    f = _near_limit_file(tmp_path, "test_parser_clause_06_01_a.cpp")
     t = _make_large_test("Overflow", 20)
     new_names = classify_tests_in_file.append_tests_to_file(
         f, [], [t], max_lines=50,
     )
-    assert (tmp_path / "test_parser_clause_06_01_b.cpp").exists()
     assert "test_parser_clause_06_01_b" in new_names
 
 
-def test_append_no_split_under_max_lines(tmp_path):
+def test_append_no_split_keeps_in_file(tmp_path):
     """Append stays in same file when under limit."""
+    f = tmp_path / "existing.cpp"
+    f.write_text(
+        "namespace {\n\nTEST(S, Old) {\n}\n\n}  // namespace\n",
+        encoding="utf-8",
+    )
+    t = _tb("New", comments=[])
+    classify_tests_in_file.append_tests_to_file(
+        f, [], [t], max_lines=500,
+    )
+    assert "TEST(S, New)" in f.read_text(encoding="utf-8")
+
+
+def test_append_no_split_returns_empty(tmp_path):
+    """No-split append returns empty list."""
     f = tmp_path / "existing.cpp"
     f.write_text(
         "namespace {\n\nTEST(S, Old) {\n}\n\n}  // namespace\n",
@@ -558,28 +634,47 @@ def test_append_no_split_under_max_lines(tmp_path):
     new_names = classify_tests_in_file.append_tests_to_file(
         f, [], [t], max_lines=500,
     )
-    text = f.read_text(encoding="utf-8")
-    assert "TEST(S, New)" in text
     assert new_names == []
 
 
-def test_append_renames_base_when_splitting(tmp_path):
-    """Base file renamed to _a, overflow goes to _b."""
-    f = tmp_path / "test_parser_clause_06_01.cpp"
-    lines = ["#include <gtest/gtest.h>", "", "namespace {", ""]
-    for i in range(40):
-        lines.append(f"// line {i}")
-    lines.extend(["", "}  // namespace", ""])
-    f.write_text("\n".join(lines), encoding="utf-8")
+def test_append_renames_base_to_a(tmp_path):
+    """Base file renamed to _a when splitting."""
+    f = _near_limit_file(tmp_path, "test_parser_clause_06_01.cpp")
+    t = _make_large_test("Overflow", 20)
+    classify_tests_in_file.append_tests_to_file(
+        f, [], [t], max_lines=50,
+    )
+    assert (tmp_path / "test_parser_clause_06_01_a.cpp").exists()
+
+
+def test_append_renames_base_creates_overflow(tmp_path):
+    """Overflow goes to _b when base renamed to _a."""
+    f = _near_limit_file(tmp_path, "test_parser_clause_06_01.cpp")
+    t = _make_large_test("Overflow", 20)
+    classify_tests_in_file.append_tests_to_file(
+        f, [], [t], max_lines=50,
+    )
+    assert (tmp_path / "test_parser_clause_06_01_b.cpp").exists()
+
+
+def test_append_renames_base_removes_original(tmp_path):
+    """Original base file no longer exists after rename."""
+    f = _near_limit_file(tmp_path, "test_parser_clause_06_01.cpp")
+    t = _make_large_test("Overflow", 20)
+    classify_tests_in_file.append_tests_to_file(
+        f, [], [t], max_lines=50,
+    )
+    assert not (tmp_path / "test_parser_clause_06_01.cpp").exists()
+
+
+def test_append_renames_base_returns_both_names(tmp_path):
+    """Returns both _a and _b names when base is renamed."""
+    f = _near_limit_file(tmp_path, "test_parser_clause_06_01.cpp")
     t = _make_large_test("Overflow", 20)
     new_names = classify_tests_in_file.append_tests_to_file(
         f, [], [t], max_lines=50,
     )
-    assert (tmp_path / "test_parser_clause_06_01_a.cpp").exists()
-    assert (tmp_path / "test_parser_clause_06_01_b.cpp").exists()
-    assert not (tmp_path / "test_parser_clause_06_01.cpp").exists()
     assert "test_parser_clause_06_01_a" in new_names
-    assert "test_parser_clause_06_01_b" in new_names
 
 
 # ---- update_cmake ----------------------------------------------------------
