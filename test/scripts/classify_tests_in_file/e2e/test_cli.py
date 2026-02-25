@@ -8,7 +8,8 @@ import sys
 from pathlib import Path
 
 _SCRIPT = str(
-    Path(__file__).resolve().parents[4] / "scripts" / "classify_tests_in_file",
+    Path(__file__).resolve().parents[4]
+    / "scripts" / "classify_tests_in_file" / "__init__.py",
 )
 
 
