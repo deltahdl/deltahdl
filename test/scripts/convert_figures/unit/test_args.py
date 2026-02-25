@@ -134,13 +134,19 @@ def test_run_prints_dot_to_stdout(tmp_path, monkeypatch, capsys):
     assert "digraph" in capsys.readouterr().out
 
 
-def test_run_no_figures_exits(tmp_path, monkeypatch):
-    """_run exits with error when no figures are found."""
+def _setup_run(tmp_path, monkeypatch):
+    """Create a dummy LRM and patch open_document."""
     lrm = tmp_path / "lrm.pdf"
     lrm.write_bytes(b"")
     mock_doc = MagicMock()
-    mock_doc.__len__ = lambda self: 1
+    mock_doc.__len__ = lambda _self: 1
     monkeypatch.setattr(pdf_mod, "open_document", lambda p: mock_doc)
+    return lrm, mock_doc
+
+
+def test_run_no_figures_exits(tmp_path, monkeypatch):
+    """_run exits with error when no figures are found."""
+    lrm, _ = _setup_run(tmp_path, monkeypatch)
     monkeypatch.setattr(
         pdf_mod, "find_clause_pages", lambda d, c: [0],
     )
@@ -153,11 +159,7 @@ def test_run_no_figures_exits(tmp_path, monkeypatch):
 
 def test_run_no_pages_exits(tmp_path, monkeypatch):
     """_run exits with error when no clause pages are found."""
-    lrm = tmp_path / "lrm.pdf"
-    lrm.write_bytes(b"")
-    mock_doc = MagicMock()
-    mock_doc.__len__ = lambda self: 1
-    monkeypatch.setattr(pdf_mod, "open_document", lambda p: mock_doc)
+    lrm, _ = _setup_run(tmp_path, monkeypatch)
     monkeypatch.setattr(
         pdf_mod, "find_clause_pages", lambda d, c: [],
     )

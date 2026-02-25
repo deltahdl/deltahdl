@@ -46,6 +46,32 @@ def _mock_doc(pages_text):
     return doc
 
 
+def _find_captions(blocks):
+    """Set up a mock doc/page and call find_figure_captions."""
+    page = MagicMock()
+    page.search_for.return_value = [MagicMock(
+        x0=200, y0=690, x1=400, y1=700,
+    )]
+    page.get_text.return_value = {"blocks": blocks}
+    doc = MagicMock()
+    doc.__getitem__ = lambda _self, _idx: page
+    return pdf_mod.find_figure_captions(doc, [0], "4")
+
+
+def _extract(blocks, **kwargs):
+    """Set up a mock page and call extract_figure."""
+    page = MagicMock()
+    page.get_text.return_value = {"blocks": blocks}
+    page.get_drawings.return_value = kwargs.get("drawings", [])
+    page.rect = MagicMock(x0=0, y0=0, x1=612, y1=792)
+    return pdf_mod.extract_figure(
+        page=page,
+        figure_number=kwargs.get("figure_number", "4-1"),
+        figure_title=kwargs.get("figure_title", "T"),
+        caption_y=kwargs.get("caption_y", 690.0),
+    )
+
+
 # ---- open_document ---------------------------------------------------------
 
 
@@ -94,54 +120,28 @@ def test_find_clause_pages_ignores_substring():
 
 def test_find_figure_captions_found():
     """find_figure_captions returns figure data when caption is present."""
-    page = MagicMock()
     blocks = [mock_text_block(
         "Figure 4-1\u2014Event scheduling regions",
         200, 690, 400, 700,
     )]
-    page.get_text.return_value = {"blocks": blocks}
-    page.search_for.return_value = [MagicMock(
-        x0=200, y0=690, x1=400, y1=700,
-    )]
-    doc = MagicMock()
-    doc.__getitem__ = lambda self, idx: page
-    result = pdf_mod.find_figure_captions(doc, [0], "4")
-    assert len(result) == 1
+    assert len(_find_captions(blocks)) == 1
 
 
 def test_find_figure_captions_extracts_number():
     """find_figure_captions extracts the figure number."""
-    page = MagicMock()
-    page.search_for.return_value = [MagicMock(
-        x0=200, y0=690, x1=400, y1=700,
+    blocks = [mock_text_block(
+        "Figure 4-1\u2014Title", 200, 690, 400, 700,
     )]
-    page.get_text.return_value = {
-        "blocks": [mock_text_block(
-            "Figure 4-1\u2014Title", 200, 690, 400, 700,
-        )],
-    }
-    doc = MagicMock()
-    doc.__getitem__ = lambda self, idx: page
-    result = pdf_mod.find_figure_captions(doc, [0], "4")
-    assert result[0][1] == "4-1"
+    assert _find_captions(blocks)[0][1] == "4-1"
 
 
 def test_find_figure_captions_extracts_title():
     """find_figure_captions extracts the figure title."""
-    page = MagicMock()
-    page.search_for.return_value = [MagicMock(
-        x0=200, y0=690, x1=400, y1=700,
+    blocks = [mock_text_block(
+        "Figure 4-1\u2014Event scheduling regions",
+        200, 690, 400, 700,
     )]
-    page.get_text.return_value = {
-        "blocks": [mock_text_block(
-            "Figure 4-1\u2014Event scheduling regions",
-            200, 690, 400, 700,
-        )],
-    }
-    doc = MagicMock()
-    doc.__getitem__ = lambda self, idx: page
-    result = pdf_mod.find_figure_captions(doc, [0], "4")
-    assert result[0][2] == "Event scheduling regions"
+    assert _find_captions(blocks)[0][2] == "Event scheduling regions"
 
 
 def test_find_figure_captions_no_figure():
@@ -150,7 +150,7 @@ def test_find_figure_captions_no_figure():
     page.search_for.return_value = []
     page.get_text.return_value = {"blocks": []}
     doc = MagicMock()
-    doc.__getitem__ = lambda self, idx: page
+    doc.__getitem__ = lambda _self, _idx: page
     assert not pdf_mod.find_figure_captions(doc, [0], "99")
 
 
@@ -301,58 +301,23 @@ def test_arrowheads_to_targets_picks_nearest():
 
 def test_extract_figure_returns_figure():
     """extract_figure returns a Figure with nodes and edges."""
-    page = MagicMock()
-    page.get_text.return_value = {
-        "blocks": [
-            mock_text_block("Active", 307, 208, 332, 218),
-            mock_text_block("Inactive", 303, 251, 335, 261),
-        ],
-    }
-    page.get_drawings.return_value = []
-    page.rect = MagicMock(x0=0, y0=0, x1=612, y1=792)
-    fig = pdf_mod.extract_figure(
-        page=page,
-        figure_number="4-1",
-        figure_title="Event scheduling regions",
-        caption_y=690.0,
-    )
-    assert fig.number == "4-1"
+    blocks = [
+        mock_text_block("Active", 307, 208, 332, 218),
+        mock_text_block("Inactive", 303, 251, 335, 261),
+    ]
+    assert _extract(blocks, figure_title="Event scheduling regions").number == "4-1"
 
 
 def test_extract_figure_has_nodes():
     """extract_figure populates nodes from text blocks."""
-    page = MagicMock()
-    page.get_text.return_value = {
-        "blocks": [
-            mock_text_block("Active", 307, 208, 332, 218),
-        ],
-    }
-    page.get_drawings.return_value = []
-    page.rect = MagicMock(x0=0, y0=0, x1=612, y1=792)
-    fig = pdf_mod.extract_figure(
-        page=page,
-        figure_number="4-1",
-        figure_title="T",
-        caption_y=690.0,
-    )
-    assert len(fig.nodes) == 1
+    blocks = [mock_text_block("Active", 307, 208, 332, 218)]
+    assert len(_extract(blocks).nodes) == 1
 
 
 def test_extract_figure_graph_name():
     """extract_figure sets graph_name from the figure number."""
-    page = MagicMock()
-    page.get_text.return_value = {
-        "blocks": [mock_text_block("A", 300, 200, 340, 210)],
-    }
-    page.get_drawings.return_value = []
-    page.rect = MagicMock(x0=0, y0=0, x1=612, y1=792)
-    fig = pdf_mod.extract_figure(
-        page=page,
-        figure_number="4-1",
-        figure_title="T",
-        caption_y=690.0,
-    )
-    assert fig.graph_name == "Figure_4_1"
+    blocks = [mock_text_block("A", 300, 200, 340, 210)]
+    assert _extract(blocks).graph_name == "Figure_4_1"
 
 
 # ---- _text_blocks_to_nodes edge cases -------------------------------------
@@ -521,42 +486,20 @@ def test_stems_to_edges_same_source_and_target():
 
 def test_find_figure_captions_skips_non_text_blocks():
     """find_figure_captions ignores image blocks."""
-    page = MagicMock()
-    page.search_for.return_value = [MagicMock(
-        x0=200, y0=690, x1=400, y1=700,
-    )]
-    page.get_text.return_value = {
-        "blocks": [
-            {"type": 1, "bbox": (0, 0, 100, 100)},
-            mock_text_block(
-                "Figure 4-1\u2014Title", 200, 690, 400, 700,
-            ),
-        ],
-    }
-    doc = MagicMock()
-    doc.__getitem__ = lambda self, idx: page
-    result = pdf_mod.find_figure_captions(doc, [0], "4")
-    assert len(result) == 1
+    blocks = [
+        {"type": 1, "bbox": (0, 0, 100, 100)},
+        mock_text_block("Figure 4-1\u2014Title", 200, 690, 400, 700),
+    ]
+    assert len(_find_captions(blocks)) == 1
 
 
 def test_find_figure_captions_skips_non_matching_text():
     """find_figure_captions ignores text not matching figure pattern."""
-    page = MagicMock()
-    page.search_for.return_value = [MagicMock(
-        x0=200, y0=690, x1=400, y1=700,
-    )]
-    page.get_text.return_value = {
-        "blocks": [
-            mock_text_block("Some random text", 200, 200, 400, 210),
-            mock_text_block(
-                "Figure 4-1\u2014Title", 200, 690, 400, 700,
-            ),
-        ],
-    }
-    doc = MagicMock()
-    doc.__getitem__ = lambda self, idx: page
-    result = pdf_mod.find_figure_captions(doc, [0], "4")
-    assert len(result) == 1
+    blocks = [
+        mock_text_block("Some random text", 200, 200, 400, 210),
+        mock_text_block("Figure 4-1\u2014Title", 200, 690, 400, 700),
+    ]
+    assert len(_find_captions(blocks)) == 1
 
 
 # ---- _arrowheads_to_targets edge cases ------------------------------------
@@ -575,39 +518,17 @@ def test_arrowheads_to_targets_no_match():
 
 def test_extract_figure_skips_image_block_in_positions():
     """extract_figure skips image blocks when building node positions."""
-    page = MagicMock()
-    page.get_text.return_value = {
-        "blocks": [
-            mock_text_block("Active", 307, 208, 332, 218),
-            {"type": 1, "bbox": (0, 0, 100, 100)},
-        ],
-    }
-    page.get_drawings.return_value = []
-    page.rect = MagicMock(x0=0, y0=0, x1=612, y1=792)
-    fig = pdf_mod.extract_figure(
-        page=page,
-        figure_number="4-1",
-        figure_title="T",
-        caption_y=690.0,
-    )
-    assert len(fig.nodes) == 1
+    blocks = [
+        mock_text_block("Active", 307, 208, 332, 218),
+        {"type": 1, "bbox": (0, 0, 100, 100)},
+    ]
+    assert len(_extract(blocks).nodes) == 1
 
 
 def test_extract_figure_non_node_text_not_in_positions():
     """extract_figure excludes filtered text from node positions."""
-    page = MagicMock()
-    page.get_text.return_value = {
-        "blocks": [
-            mock_text_block("Active", 307, 208, 332, 218),
-            mock_text_block("Legend:", 139, 256, 175, 267),
-        ],
-    }
-    page.get_drawings.return_value = []
-    page.rect = MagicMock(x0=0, y0=0, x1=612, y1=792)
-    fig = pdf_mod.extract_figure(
-        page=page,
-        figure_number="4-1",
-        figure_title="T",
-        caption_y=690.0,
-    )
-    assert len(fig.nodes) == 1
+    blocks = [
+        mock_text_block("Active", 307, 208, 332, 218),
+        mock_text_block("Legend:", 139, 256, 175, 267),
+    ]
+    assert len(_extract(blocks).nodes) == 1
