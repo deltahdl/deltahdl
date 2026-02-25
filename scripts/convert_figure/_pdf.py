@@ -5,8 +5,8 @@ from pathlib import Path
 
 import fitz
 
-from convert_figures._dot import figure_number_to_graph_name
-from convert_figures._models import Edge, Figure, Node, label_to_node_id
+from convert_figure._dot import figure_number_to_graph_name
+from convert_figure._models import Edge, Figure, Node, label_to_node_id
 
 _CAPTION_RE = re.compile(
     r"Figure\s+(\d+[A-Z]?-\d+)\s*\u2014\s*(.+)",

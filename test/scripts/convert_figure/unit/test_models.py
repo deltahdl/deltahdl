@@ -1,8 +1,8 @@
-"""Unit tests for convert_figures data model."""
+"""Unit tests for convert_figure data model."""
 
 import pytest
 
-from convert_figures._models import Edge, Figure, Node, label_to_node_id
+from convert_figure._models import Edge, Figure, Node, label_to_node_id
 
 
 # ---- Node ------------------------------------------------------------------

@@ -5,8 +5,8 @@ import re
 import sys
 from pathlib import Path
 
-from convert_figures import _pdf
-from convert_figures._dot import generate_dot
+from convert_figure import _pdf
+from convert_figure._dot import generate_dot
 
 _CLAUSE_RE = re.compile(
     r"^([1-9][0-9]*|[A-Z])"  # V: positive non-zero integer or uppercase letter

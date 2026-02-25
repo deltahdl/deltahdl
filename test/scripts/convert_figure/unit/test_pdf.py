@@ -1,8 +1,8 @@
-"""Unit tests for PDF extraction in convert_figures."""
+"""Unit tests for PDF extraction in convert_figure."""
 
 from unittest.mock import MagicMock, patch
 
-import convert_figures._pdf as pdf_mod
+import convert_figure._pdf as pdf_mod
 from helpers import mock_text_block
 
 _find_figure_bounds = getattr(pdf_mod, "_find_figure_bounds")

@@ -1,6 +1,6 @@
-"""Unit tests for DOT generation in convert_figures."""
+"""Unit tests for DOT generation in convert_figure."""
 
-from convert_figures._dot import (
+from convert_figure._dot import (
     figure_number_to_graph_name,
     format_edge,
     format_node,
@@ -23,12 +23,30 @@ def test_format_node_quoted_label():
     assert 'label="say \\"hello\\""' in format_node(node)
 
 
+def test_format_node_special_id_quoted():
+    """format_node quotes node IDs containing special characters."""
+    node = make_node(node_id="trdy_(high)", label="trdy (high)")
+    assert format_node(node) == '  "trdy_(high)" [label="trdy (high)"];'
+
+
+def test_format_node_plain_id_unquoted():
+    """format_node does not quote simple alphanumeric node IDs."""
+    node = make_node(node_id="data_phase", label="data_phase")
+    assert format_node(node) == '  data_phase [label="data_phase"];'
+
+
 # ---- format_edge -----------------------------------------------------------
 
 
 def test_format_edge_basic():
     """format_edge produces source -> target syntax."""
     assert format_edge(make_edge()) == "  region_Active -> region_Inactive;"
+
+
+def test_format_edge_special_ids_quoted():
+    """format_edge quotes node IDs containing special characters."""
+    edge = make_edge(source="[1:2]", target="trdy_(high)")
+    assert format_edge(edge) == '  "[1:2]" -> "trdy_(high)";'
 
 
 # ---- figure_number_to_graph_name -------------------------------------------

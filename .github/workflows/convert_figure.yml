@@ -1,7 +1,7 @@
 ---
 concurrency:
   cancel-in-progress: true
-  group: convert_figures-${{ github.ref }}
+  group: convert_figure-${{ github.ref }}
 jobs:
   test:
     runs-on: ubuntu-24.04
@@ -11,11 +11,11 @@ jobs:
         uses: actions/cache@v4
         with:
           key: >-
-            pip-convert_figures-${{
-            hashFiles('.github/workflows/convert_figures.yml') }}
+            pip-convert_figure-${{
+            hashFiles('.github/workflows/convert_figure.yml') }}
           path: ~/.cache/pip
           restore-keys: |
-            pip-convert_figures-
+            pip-convert_figure-
       - name: Install tools
         run: |
           pip install \
@@ -29,8 +29,8 @@ jobs:
           assert-no-inline-directives
           --tools pylint,mypy
           --verbose
-          ${{ github.workspace }}/scripts/convert_figures/**/*
-          ${{ github.workspace }}/test/scripts/convert_figures/**/*
+          ${{ github.workspace }}/scripts/convert_figure/**/*
+          ${{ github.workspace }}/test/scripts/convert_figure/**/*
       - name: Assert no linter config files
         run: >-
           assert-no-linter-config-files
@@ -41,15 +41,15 @@ jobs:
         run: >-
           assert-one-assert-per-pytest
           --verbose
-          ${{ github.workspace }}/test/scripts/convert_figures
+          ${{ github.workspace }}/test/scripts/convert_figure
       - name: Run pylint on source
         run: >-
-          PYTHONPATH=. python3 -m pylint scripts/convert_figures/
+          PYTHONPATH=. python3 -m pylint scripts/convert_figure/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run pylint on tests
         run: >-
-          PYTHONPATH=.:scripts:test/scripts/convert_figures/unit
-          python3 -m pylint --recursive=y test/scripts/convert_figures/
+          PYTHONPATH=.:scripts:test/scripts/convert_figure/unit
+          python3 -m pylint --recursive=y test/scripts/convert_figure/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run mypy on source
         # pymupdf ships without py.typed and pymupdf-stubs is incomplete
@@ -58,49 +58,49 @@ jobs:
         run: >-
           PYTHONPATH=. python3 -m mypy
           --disable-error-code=import-untyped
-          scripts/convert_figures/
+          scripts/convert_figure/
       - name: Run mypy on tests
         # Tests transitively import _pdf.py which imports fitz (pymupdf).
         run: >-
-          MYPYPATH=.:scripts:test/scripts/convert_figures/unit
+          MYPYPATH=.:scripts:test/scripts/convert_figure/unit
           python3 -m mypy --explicit-package-bases
           --disable-error-code=import-untyped
-          test/scripts/convert_figures/
+          test/scripts/convert_figure/
       - name: Detect copy-paste in source
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
-          --reporters console scripts/convert_figures/
+          --reporters console scripts/convert_figure/
       - name: Detect copy-paste in tests
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
-          --reporters console test/scripts/convert_figures/
+          --reporters console test/scripts/convert_figure/
       - name: Run unit tests with 100% coverage gate
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/convert_figures/unit/ -v
-          --cov=convert_figures
+          test/scripts/convert_figure/unit/ -v
+          --cov=convert_figure
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
       - name: Run integration tests
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/convert_figures/integration/ -v
+          test/scripts/convert_figure/integration/ -v
       - name: Run e2e tests
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/convert_figures/e2e/ -v
-name: convert_figures
+          test/scripts/convert_figure/e2e/ -v
+name: convert_figure
 on:
   pull_request:
     paths:
-      - .github/workflows/convert_figures.yml
-      - scripts/convert_figures/**
-      - test/scripts/convert_figures/**
+      - .github/workflows/convert_figure.yml
+      - scripts/convert_figure/**
+      - test/scripts/convert_figure/**
   push:
     branches: [main]
     paths:
-      - .github/workflows/convert_figures.yml
-      - scripts/convert_figures/**
-      - test/scripts/convert_figures/**
+      - .github/workflows/convert_figure.yml
+      - scripts/convert_figure/**
+      - test/scripts/convert_figure/**
   workflow_dispatch:

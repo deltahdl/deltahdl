@@ -1,9 +1,9 @@
-"""Integration tests for the convert_figures pipeline."""
+"""Integration tests for the convert_figure pipeline."""
 
 from unittest.mock import MagicMock
 
-from convert_figures._dot import generate_dot
-from convert_figures._pdf import extract_figure
+from convert_figure._dot import generate_dot
+from convert_figure._pdf import extract_figure
 
 
 # ---- Pipeline: mocked page -> Figure -> DOT --------------------------------

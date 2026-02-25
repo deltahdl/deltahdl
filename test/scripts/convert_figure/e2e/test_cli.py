@@ -1,11 +1,11 @@
-"""End-to-end tests for the convert_figures CLI."""
+"""End-to-end tests for the convert_figure CLI."""
 
 import subprocess
 import sys
 from pathlib import Path
 
 _PACKAGE = str(
-    Path(__file__).resolve().parents[4] / "scripts" / "convert_figures",
+    Path(__file__).resolve().parents[4] / "scripts" / "convert_figure",
 )
 
 
@@ -13,9 +13,9 @@ _PACKAGE = str(
 
 
 def _invoke(*args):
-    """Run convert_figures as a child process."""
+    """Run convert_figure as a child process."""
     return subprocess.run(
-        [sys.executable, "-m", "convert_figures", *args],
+        [sys.executable, "-m", "convert_figure", *args],
         capture_output=True,
         text=True,
         check=False,

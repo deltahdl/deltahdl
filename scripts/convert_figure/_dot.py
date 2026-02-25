@@ -1,17 +1,27 @@
 """Generate DOT Graphviz output from the figure data model."""
 
-from convert_figures._models import Edge, Figure, Node
+import re
+
+from convert_figure._models import Edge, Figure, Node
+
+
+def _quote_id(node_id: str) -> str:
+    """Quote a DOT identifier if it contains special characters."""
+    if re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", node_id):
+        return node_id
+    escaped = node_id.replace('"', '\\"')
+    return f'"{escaped}"'
 
 
 def format_node(node: Node) -> str:
     """Format a single node as a DOT statement."""
     escaped = node.label.replace('"', '\\"')
-    return f'  {node.node_id} [label="{escaped}"];'
+    return f'  {_quote_id(node.node_id)} [label="{escaped}"];'
 
 
 def format_edge(edge: Edge) -> str:
     """Format a single edge as a DOT statement."""
-    return f"  {edge.source} -> {edge.target};"
+    return f"  {_quote_id(edge.source)} -> {_quote_id(edge.target)};"
 
 
 def figure_number_to_graph_name(number: str) -> str:
