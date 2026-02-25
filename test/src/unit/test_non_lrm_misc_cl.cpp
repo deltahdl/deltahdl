@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // Task with inout port direction.
 TEST(ParserSection13, TaskWithInoutPort) {
   auto r = Parse(

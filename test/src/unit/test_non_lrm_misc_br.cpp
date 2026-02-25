@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // 16. Array of structs with assignment pattern.
 TEST(ParserSection7, Sec7_2_2_ArrayOfStructsPattern) {
   EXPECT_TRUE(

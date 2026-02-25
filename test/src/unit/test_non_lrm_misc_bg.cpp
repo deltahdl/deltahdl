@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 TEST(ParserCh50603, SystemTask_FinishNoArgs) {
   // $finish with no arguments and no parentheses.
   EXPECT_TRUE(ParseOk("module m; initial $finish; endmodule"));

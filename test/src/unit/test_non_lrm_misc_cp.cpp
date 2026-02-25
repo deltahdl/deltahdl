@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 TEST_F(VerifyParseTest, CheckerWithCovergroupAndClocking) {
   auto* unit = Parse(R"(
     checker my_check(logic clk, active);

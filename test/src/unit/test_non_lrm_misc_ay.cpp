@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // § octal_digit — 0 through 7
 TEST(ParserA87, OctalDigitAll) {
   auto r =

@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 TEST(ParserSection6, TypesNotEquivalentDifferentSign) {
   DataType a;
   a.kind = DataTypeKind::kInt;

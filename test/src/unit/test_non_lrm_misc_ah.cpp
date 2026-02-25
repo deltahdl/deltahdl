@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // --- udp_ansi_declaration: multiple inputs with shared input keyword ---
 TEST(ParserAnnexA051, AnsiSharedInputKeyword) {
   auto r = Parse(

@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 TEST(ParserA29, AttrOnImportPort) {
   EXPECT_TRUE(
       ParseOk("interface bus;\n"

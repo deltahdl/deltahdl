@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 TEST(ParserSection12, NestedIfElse) {
   auto r = Parse(
       "module t;\n"

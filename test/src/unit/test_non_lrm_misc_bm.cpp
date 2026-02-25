@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // §6.7.1: Net with drive strength using reversed order (pull1, strong0).
 TEST(ParserSection6, Sec6_7_1_WireDriveStrengthReversedOrder) {
   auto r = Parse(

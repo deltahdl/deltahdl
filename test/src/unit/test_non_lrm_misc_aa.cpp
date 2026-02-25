@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // description: package_declaration
 TEST(SourceText, DescriptionPackage) {
   auto r = Parse("package pkg; endpackage\n");

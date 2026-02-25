@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 TEST(ParserSection9, Sec9_3_1_BlockWithCaseStatement) {
   auto r = Parse(
       "module m;\n"

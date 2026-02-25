@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // ---------------------------------------------------------------------------
 // event_trigger ::=
 //   -> hierarchical_event_identifier nonrange_select ;

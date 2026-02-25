@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 TEST(ParserA602, AlwaysConstruct_AlwaysFF) {
   auto r = Parse(
       "module m;\n"

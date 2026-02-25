@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // §14.1 overview: clocking block with multiple direction groups.
 TEST(ParserSection14, OverviewMixedDirectionSignals) {
   auto r = Parse(

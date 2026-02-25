@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // =============================================================================
 // A.6.9 Subroutine call statements — subroutine_call_statement
 // =============================================================================

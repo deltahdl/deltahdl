@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // Attribute on input declaration
 TEST(ParserAnnexA052, AttrOnInputDecl) {
   auto r = Parse(

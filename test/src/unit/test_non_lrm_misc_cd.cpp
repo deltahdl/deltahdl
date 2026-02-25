@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // --- 28. Assign in task body ---
 TEST(ParserSection10, Sec10_6_1_AssignInTaskBody) {
   EXPECT_TRUE(

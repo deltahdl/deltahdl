@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // § primary — assignment_pattern_expression
 TEST(ParserA84, PrimaryAssignmentPattern) {
   auto r = Parse(

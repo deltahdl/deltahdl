@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // --- Elaborator resolves program instantiation with port bindings ---
 TEST(ParserAnnexA0413, ElaborationProgramInstPortBindings) {
   ElabFixture f;

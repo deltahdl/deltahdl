@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // =============================================================================
 // LRM section 9.2.3 -- Final procedures
 // Final blocks with begin/end and multiple statements.

@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // ---------------------------------------------------------------------------
 // iff guard with comma-separated events at statement level
 // ---------------------------------------------------------------------------

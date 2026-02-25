@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 TEST(ParserSection11, InsideBasicListCondition) {
   auto r = Parse(
       "module t;\n"

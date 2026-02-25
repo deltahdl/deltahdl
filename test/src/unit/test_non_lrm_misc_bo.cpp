@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // 2. wire addressT w1; — user-defined type after net keyword (§6.7.1 example).
 TEST(ParserSection6, Sec6_7_1_WireWithUserDefinedType) {
   auto r = Parse(

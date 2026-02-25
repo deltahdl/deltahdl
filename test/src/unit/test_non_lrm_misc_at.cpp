@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // system_timing_check ::= $skew_timing_check
 TEST(ParserA705, SystemTimingCheckSkew) {
   auto r = Parse(

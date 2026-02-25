@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // ---------------------------------------------------------------------------
 // 19. always_comb with variable declarations in begin-end block.
 // ---------------------------------------------------------------------------

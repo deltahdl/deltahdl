@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // Bind with parameterized instantiation.
 TEST(SourceText, BindDirectiveParameterized) {
   auto r = Parse("bind target_mod my_checker #(8) chk_i(.clk(clk));\n");

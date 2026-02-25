@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // =============================================================================
 // 26. Variable declaration with assignment in block
 // =============================================================================

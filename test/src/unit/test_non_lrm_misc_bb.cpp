@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // 21. Per-element accuracy: each design element rounds to its own precision,
 // independent of finer precision specified elsewhere in the design.
 TEST(ParserClause03, Cl3_14_1_PerElementAccuracy) {

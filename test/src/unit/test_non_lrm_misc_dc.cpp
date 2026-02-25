@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 TEST_F(DpiParseTest, ExportTask) {
   auto* unit = Parse(R"(
     module m;

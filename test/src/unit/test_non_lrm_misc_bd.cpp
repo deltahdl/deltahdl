@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // =============================================================================
 // §4.6: unique case statement — exactly one match expected
 // =============================================================================

@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 TEST(ParserA602, Integration_InitialFinalCoexistence) {
   // initial and final blocks coexist
   auto r = Parse(

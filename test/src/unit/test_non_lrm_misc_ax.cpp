@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // § binary_operator ::= /
 TEST(ParserA86, BinaryDiv) {
   auto r = Parse("module m; initial x = a / b; endmodule\n");

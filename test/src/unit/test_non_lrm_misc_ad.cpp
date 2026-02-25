@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 TEST(ParserA301, GateInst_Notif0Basic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

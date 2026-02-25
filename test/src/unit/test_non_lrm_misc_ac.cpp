@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 TEST(ParserA211, CoverGroup_PortsWithBody) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

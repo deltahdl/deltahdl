@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // Case item with default
 TEST(ParserA612, RsCaseItemDefault) {
   auto r = Parse(

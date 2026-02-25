@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // --- Additional all-operator coverage ---
 TEST(ParserSection11, Sec11_1_AllBinaryOperatorsParse) {
   EXPECT_TRUE(

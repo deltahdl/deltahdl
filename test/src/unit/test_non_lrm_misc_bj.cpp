@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 TEST(ParserSection6, ClassVarDecl_VarType) {
   auto r = Parse(
       "class MyClass;\n"

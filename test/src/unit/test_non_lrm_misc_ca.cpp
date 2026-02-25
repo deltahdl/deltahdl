@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // ---------------------------------------------------------------------------
 // 30. Three always_latch blocks in same module, counting them all.
 // ---------------------------------------------------------------------------

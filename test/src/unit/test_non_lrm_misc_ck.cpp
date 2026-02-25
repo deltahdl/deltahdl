@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // ---------------------------------------------------------------------------
 // task_prototype ::=
 //   task [ dynamic_override_specifiers ] task_identifier

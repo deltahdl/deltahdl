@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 TEST(ParserSection7c, QueueInsertAndDelete) {
   auto r = Parse(
       "module m;\n"

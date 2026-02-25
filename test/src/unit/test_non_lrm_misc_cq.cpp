@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 TEST(ParserSection18, StdRandomizeWithConstraint) {
   auto r = Parse(
       "module top;\n"

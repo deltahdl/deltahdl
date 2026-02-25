@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // scalar_timing_check_condition ::= ~ expression
 TEST(ParserA70503, ScalarTimingCheckCondNegation) {
   auto r = Parse(

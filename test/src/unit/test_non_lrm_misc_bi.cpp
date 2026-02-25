@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 TEST(ParserA212, VarDataTypeString) {
   // var_data_type: data_type (non_integer_type)
   auto r = Parse("module m(input string name); endmodule");

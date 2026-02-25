@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // §12.3: statements with attributes execute normally
 TEST(SimA604, AttributedStatementExecutes) {
   SimA604Fixture f;

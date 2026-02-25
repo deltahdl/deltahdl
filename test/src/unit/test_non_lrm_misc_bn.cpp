@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // 3. Reg variable declaration produces kVarDecl.
 TEST(ParserSection6, Sec6_5_RegVarDeclKind) {
   auto r = Parse(

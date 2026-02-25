@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // if (expr) simple_path_declaration — full
 TEST(ParserA702, StateDependentIfSimpleFull) {
   auto r = Parse(

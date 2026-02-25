@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 TEST(ParserSection10, OperatorAssignSlashEq) {
   auto r = Parse(
       "module m;\n"

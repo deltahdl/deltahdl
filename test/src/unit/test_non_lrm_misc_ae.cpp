@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 TEST(ParserA302, PulldownStrength_SingleWeak0) {
   auto r = Parse(
       "module m;\n"

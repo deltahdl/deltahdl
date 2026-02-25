@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // §3.8: Function returning value, void function, all 4 argument directions.
 TEST(ParserClause03, Cl3_8_FunctionReturnAndVoidAndDirections) {
   auto r = Parse(

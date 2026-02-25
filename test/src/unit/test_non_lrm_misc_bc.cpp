@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // 21. Global precision considers `timescale precision.
 TEST(ParserClause03, Cl3_14_3_ConsidersTimescalePrec) {
   auto r = Parse(

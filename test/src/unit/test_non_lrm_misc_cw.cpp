@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // Program parameter port list and ports
 TEST(SourceText, ProgramParamsAndPorts) {
   auto r = Parse(

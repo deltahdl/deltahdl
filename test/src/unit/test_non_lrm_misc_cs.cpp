@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 TEST(ParserSection21, MonitorOnOff) {
   EXPECT_TRUE(
       ParseOk("module t;\n"

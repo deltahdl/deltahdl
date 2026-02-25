@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // §9.4.2: procedural_timing_control_statement (event control)
 TEST(ParserA604, StmtItemProceduralTimingControlEvent) {
   auto r = Parse(

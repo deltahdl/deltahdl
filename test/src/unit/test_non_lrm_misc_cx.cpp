@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 TEST(ParserSection26, PackageWithParameter) {
   auto r = Parse(
       "package cfg_pkg;\n"

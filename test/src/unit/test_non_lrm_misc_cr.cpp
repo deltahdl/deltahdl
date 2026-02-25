@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // Clocking block within a program.
 TEST(ParserSection19, ClockingBlock_InProgram) {
   EXPECT_TRUE(

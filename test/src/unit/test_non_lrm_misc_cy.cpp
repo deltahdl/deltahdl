@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // =============================================================================
 // LRM section 27.1 -- General (generate constructs overview)
 // =============================================================================

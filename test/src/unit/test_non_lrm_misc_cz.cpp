@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // delay2: two values on n_input gate (rise, fall).
 TEST(ParserA223, Delay2NInputGateTwoValues) {
   auto r = Parse(

@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // --- 9. Nonblocking to concatenation LHS: {q1, q2} <= {d1, d2} ---
 TEST(ParserSection10, Sec10_4_2_ConcatenationLhsRhs) {
   auto r = Parse(

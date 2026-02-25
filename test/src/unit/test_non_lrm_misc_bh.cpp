@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // 32. Attribute name space (h) — enclosed by (* and *)
 TEST(ParserClause03, Cl3_13_AttributeNameSpace) {
   auto r = Parse(

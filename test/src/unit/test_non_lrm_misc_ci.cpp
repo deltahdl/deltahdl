@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // --- Ternary in case expression ---
 TEST(ParserSection11, Sec11_4_6_TernaryInCaseExpr) {
   auto r = Parse(

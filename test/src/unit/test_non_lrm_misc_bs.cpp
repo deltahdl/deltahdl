@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 TEST(ParserSection8, ClassWithVirtualMethod) {
   auto r = Parse(
       "class Base;\n"

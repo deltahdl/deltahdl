@@ -33,7 +33,6 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-
 // Simulation: '-' keeps current output
 TEST(ParserAnnexA053, NextState_SimDashKeepsState) {
   auto r = Parse(
