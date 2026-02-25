@@ -42,15 +42,15 @@ struct NetDeclInfo {
   NetDataTypeKind data_kind = NetDataTypeKind::k4StateIntegral;
 };
 
-bool ValidateNetDecl(const NetDeclInfo &info);
+bool ValidateNetDecl(const NetDeclInfo& info);
 
 bool ValidateNetDataType(NetDataTypeKind kind);
 
-void InitializeNet(Net &net, NetType type, Arena &arena);
+void InitializeNet(Net& net, NetType type, Arena& arena);
 
-void InitializeTriregNet(Net &net, LocalChargeStrength str, Arena &arena);
+void InitializeTriregNet(Net& net, LocalChargeStrength str, Arena& arena);
 
-static bool ValidateInterconnectDecl(const NetDeclInfo &info) {
+static bool ValidateInterconnectDecl(const NetDeclInfo& info) {
   if (info.has_data_type) return false;
   if (info.has_drive_strength) return false;
   if (info.has_charge_strength) return false;
@@ -58,7 +58,7 @@ static bool ValidateInterconnectDecl(const NetDeclInfo &info) {
   return info.delay_count <= 1;
 }
 
-bool ValidateNetDecl(const NetDeclInfo &info) {
+bool ValidateNetDecl(const NetDeclInfo& info) {
   // Charge strength only allowed on trireg.
   if (info.has_charge_strength && info.type != NetType::kTrireg &&
       !info.is_interconnect)
@@ -85,7 +85,7 @@ bool ValidateNetDataType(NetDataTypeKind kind) {
   return false;
 }
 
-void InitializeNet(Net &net, NetType type, Arena &arena) {
+void InitializeNet(Net& net, NetType type, Arena& arena) {
   (void)type;
   (void)arena;
   if (!net.drivers.empty()) {
@@ -100,7 +100,7 @@ void InitializeNet(Net &net, NetType type, Arena &arena) {
   }
 }
 
-void InitializeTriregNet(Net &net, LocalChargeStrength str, Arena &arena) {
+void InitializeTriregNet(Net& net, LocalChargeStrength str, Arena& arena) {
   (void)str;
   (void)arena;
   // Set value to x: aval=0, bval=1.
@@ -111,22 +111,22 @@ void InitializeTriregNet(Net &net, LocalChargeStrength str, Arena &arena) {
 }
 
 using ResolutionFn =
-    std::function<Logic4Vec(Arena &, const std::vector<Logic4Vec> &)>;
+    std::function<Logic4Vec(Arena&, const std::vector<Logic4Vec>&)>;
 
 struct UserNettype {
   uint32_t bit_width = 1;
   ResolutionFn resolution;
 };
 
-void ActivateResolutionAtTimeZero(Net &net, const UserNettype &nt,
-                                  Arena &arena) {
+void ActivateResolutionAtTimeZero(Net& net, const UserNettype& nt,
+                                  Arena& arena) {
   if (nt.resolution) {
     Logic4Vec result = nt.resolution(arena, net.drivers);
     net.resolved->value = result;
   }
 }
 
-void SetUserNettypeInitialValue(Net &net, const UserNettype &nt, Arena &arena) {
+void SetUserNettypeInitialValue(Net& net, const UserNettype& nt, Arena& arena) {
   net.resolved->value = MakeLogic4Vec(arena, nt.bit_width);
   // Default for logic is X: aval=0, bval=all-ones.
   for (uint32_t i = 0; i < net.resolved->value.nwords; ++i) {
@@ -135,7 +135,7 @@ void SetUserNettypeInitialValue(Net &net, const UserNettype &nt, Arena &arena) {
 }
 
 // --- Helpers ---
-static uint8_t ValOf(const Variable &v) {
+static uint8_t ValOf(const Variable& v) {
   uint8_t a = v.value.words[0].aval & 1;
   uint8_t b = v.value.words[0].bval & 1;
   return static_cast<uint8_t>((b << 1) | a);
@@ -149,7 +149,7 @@ namespace {
 //  shall be activated at time zero at least once."
 TEST(NetDecl, UserDefinedResolutionActivatedAtTimeZero) {
   Arena arena;
-  auto *var = arena.Create<Variable>();
+  auto* var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 1);
   Net net;
   net.type = NetType::kWire;
@@ -157,7 +157,7 @@ TEST(NetDecl, UserDefinedResolutionActivatedAtTimeZero) {
 
   bool activated = false;
   UserNettype nt;
-  nt.resolution = [&](Arena &a, const std::vector<Logic4Vec> &) -> Logic4Vec {
+  nt.resolution = [&](Arena& a, const std::vector<Logic4Vec>&) -> Logic4Vec {
     activated = true;
     return MakeLogic4Vec(a, 1);
   };
@@ -169,7 +169,7 @@ TEST(NetDecl, UserDefinedResolutionActivatedAtTimeZero) {
 // §6.7.3:
 TEST(NetDecl, UserDefinedResolutionAtTimeZeroEvenNoDrivers) {
   Arena arena;
-  auto *var = arena.Create<Variable>();
+  auto* var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 1);
   Net net;
   net.type = NetType::kWire;
@@ -178,8 +178,8 @@ TEST(NetDecl, UserDefinedResolutionAtTimeZeroEvenNoDrivers) {
 
   bool activated = false;
   UserNettype nt;
-  nt.resolution = [&](Arena &a,
-                      const std::vector<Logic4Vec> &drivers) -> Logic4Vec {
+  nt.resolution = [&](Arena& a,
+                      const std::vector<Logic4Vec>& drivers) -> Logic4Vec {
     activated = true;
     EXPECT_TRUE(drivers.empty());
     return MakeLogic4Vec(a, 1);
@@ -194,7 +194,7 @@ TEST(NetDecl, UserDefinedResolutionAtTimeZeroEvenNoDrivers) {
 // NOTE: default for logic is x, not z.
 TEST(NetDecl, UserDefinedNettypeDefaultIsDataTypeDefault) {
   Arena arena;
-  auto *var = arena.Create<Variable>();
+  auto* var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 1);
   Net net;
   net.type = NetType::kWire;

@@ -21,7 +21,7 @@ TEST(DpiRuntime, RegisterImportAndCall) {
   func.c_name = "c_add";
   func.sv_name = "sv_add";
   func.return_type = DataTypeKind::kInt;
-  func.impl = [](const std::vector<DpiArgValue> &args) -> DpiArgValue {
+  func.impl = [](const std::vector<DpiArgValue>& args) -> DpiArgValue {
     return DpiArgValue::FromInt(args[0].AsInt() + args[1].AsInt());
   };
   rt.RegisterImport(func);
@@ -47,7 +47,7 @@ TEST(DpiRuntime, ImportWithRealArgs) {
   func.c_name = "c_mul_real";
   func.sv_name = "sv_mul_real";
   func.return_type = DataTypeKind::kReal;
-  func.impl = [](const std::vector<DpiArgValue> &args) -> DpiArgValue {
+  func.impl = [](const std::vector<DpiArgValue>& args) -> DpiArgValue {
     return DpiArgValue::FromReal(args[0].AsReal() * args[1].AsReal());
   };
   rt.RegisterImport(func);
@@ -63,7 +63,7 @@ TEST(DpiRuntime, ImportWithStringArg) {
   func.c_name = "c_strlen";
   func.sv_name = "sv_strlen";
   func.return_type = DataTypeKind::kInt;
-  func.impl = [](const std::vector<DpiArgValue> &args) -> DpiArgValue {
+  func.impl = [](const std::vector<DpiArgValue>& args) -> DpiArgValue {
     return DpiArgValue::FromInt(
         static_cast<int32_t>(args[0].AsString().size()));
   };
@@ -79,7 +79,7 @@ TEST(DpiRuntime, ImportWithChandleArg) {
   func.c_name = "c_identity";
   func.sv_name = "sv_identity";
   func.return_type = DataTypeKind::kChandle;
-  func.impl = [](const std::vector<DpiArgValue> &args) -> DpiArgValue {
+  func.impl = [](const std::vector<DpiArgValue>& args) -> DpiArgValue {
     return DpiArgValue::FromChandle(args[0].AsChandle());
   };
   rt.RegisterImport(func);

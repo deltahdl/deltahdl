@@ -1,7 +1,9 @@
 // §30.4.6: Declaring multiple module paths in a single statement
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -24,11 +26,11 @@ struct SimA703Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA703Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA703Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -38,7 +40,7 @@ namespace {
 // Mixed terminal forms do not interfere with behavioral simulation
 TEST(SimA703, MixedTerminalFormsDoNotInterfere) {
   SimA703Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  specify\n"
@@ -55,8 +57,8 @@ TEST(SimA703, MixedTerminalFormsDoNotInterfere) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *va = f.ctx.FindVariable("a");
-  auto *vb = f.ctx.FindVariable("b");
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
   ASSERT_NE(va, nullptr);
   ASSERT_NE(vb, nullptr);
   EXPECT_EQ(va->value.ToUint64(), 11u);

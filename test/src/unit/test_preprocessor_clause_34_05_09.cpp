@@ -1,6 +1,7 @@
 // §34.5.9: encoding
 
 #include <gtest/gtest.h>
+
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "preprocessor/preprocessor.h"
@@ -9,7 +10,7 @@ using namespace delta;
 
 struct ProtectedTest : ::testing::Test {
  protected:
-  std::string Preprocess(const std::string &src) {
+  std::string Preprocess(const std::string& src) {
     auto fid = mgr_.AddFile("<test>", src);
     Preprocessor pp(mgr_, diag_, config_);
     return pp.Preprocess(fid);

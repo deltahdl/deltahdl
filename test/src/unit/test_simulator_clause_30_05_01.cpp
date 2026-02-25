@@ -1,7 +1,9 @@
 // §30.5.1: Specifying transition delays on module paths
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -25,11 +27,11 @@ struct SimA704Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA704Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA704Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -42,7 +44,7 @@ namespace {
 // Module with 6-delay path simulates correctly
 TEST(SimA704, SixDelayPathSimulates) {
   SimA704Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
@@ -55,7 +57,7 @@ TEST(SimA704, SixDelayPathSimulates) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -63,7 +65,7 @@ TEST(SimA704, SixDelayPathSimulates) {
 // Module with 12-delay path simulates correctly
 TEST(SimA704, TwelveDelayPathSimulates) {
   SimA704Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
@@ -76,7 +78,7 @@ TEST(SimA704, TwelveDelayPathSimulates) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
@@ -84,7 +86,7 @@ TEST(SimA704, TwelveDelayPathSimulates) {
 // Module with min:typ:max delay simulates correctly
 TEST(SimA704, MinTypMaxDelaySimulates) {
   SimA704Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
@@ -97,7 +99,7 @@ TEST(SimA704, MinTypMaxDelaySimulates) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
@@ -124,7 +126,7 @@ TEST(SimA704, RuntimePathDelaySixDelays) {
   EXPECT_EQ(mgr.GetPathDelay("a", "b"), 1u);
   EXPECT_EQ(mgr.PathDelayCount(), 1u);
 
-  auto &delays = mgr.GetPathDelays();
+  auto& delays = mgr.GetPathDelays();
   ASSERT_EQ(delays.size(), 1u);
   EXPECT_EQ(delays[0].delay_count, 6u);
   EXPECT_EQ(delays[0].delays[0], 1u);
@@ -145,7 +147,7 @@ TEST(SimA704, RuntimePathDelayTwelveDelays) {
   mgr.AddPathDelay(pd);
 
   EXPECT_TRUE(mgr.HasPathDelay("in", "out"));
-  auto &delays = mgr.GetPathDelays();
+  auto& delays = mgr.GetPathDelays();
   ASSERT_EQ(delays.size(), 1u);
   EXPECT_EQ(delays[0].delay_count, 12u);
   for (int i = 0; i < 12; ++i) {

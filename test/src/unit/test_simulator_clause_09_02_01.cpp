@@ -25,11 +25,11 @@ struct LowerFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, LowerFixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, LowerFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -38,7 +38,7 @@ namespace {
 
 TEST(Lowerer, InitialBlockSchedulesEvent) {
   LowerFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  initial begin end\n"
       "endmodule\n",
@@ -53,7 +53,7 @@ TEST(Lowerer, InitialBlockSchedulesEvent) {
 
 TEST(Lowerer, InitialBlockExecutes) {
   LowerFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] x;\n"
       "  initial x = 42;\n"
@@ -65,14 +65,14 @@ TEST(Lowerer, InitialBlockExecutes) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 TEST(Lowerer, SensitivityMapEmpty) {
   LowerFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] x;\n"
       "  initial x = 1;\n"
@@ -84,7 +84,7 @@ TEST(Lowerer, SensitivityMapEmpty) {
   lowerer.Lower(design);
 
   // Initial blocks don't contribute to sensitivity map.
-  const auto &procs = f.ctx.GetSensitiveProcesses("x");
+  const auto& procs = f.ctx.GetSensitiveProcesses("x");
   EXPECT_TRUE(procs.empty());
 }
 
@@ -109,24 +109,24 @@ struct SimCh4Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimCh4Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimCh4Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-static uint64_t RunAndGet(const std::string &src, const char *var_name) {
+static uint64_t RunAndGet(const std::string& src, const char* var_name) {
   SimCh4Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable(var_name);
+  auto* var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
   if (!var) return 0;
   return var->value.ToUint64();
@@ -149,7 +149,7 @@ TEST(SimCh4, ParallelInitialBlocks) {
 
 TEST(SimCh4, ParallelInitialBlocksBothComplete) {
   SimCh4Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  initial a = 8'd42;\n"
@@ -160,8 +160,8 @@ TEST(SimCh4, ParallelInitialBlocksBothComplete) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *va = f.ctx.FindVariable("a");
-  auto *vb = f.ctx.FindVariable("b");
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
   ASSERT_NE(va, nullptr);
   ASSERT_NE(vb, nullptr);
   EXPECT_EQ(va->value.ToUint64(), 42u);
@@ -174,7 +174,7 @@ TEST(SimCh4, ParallelInitialBlocksBothComplete) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, EmptyProcessNoInterference) {
   SimCh4Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a;\n"
       "  initial begin end\n"
@@ -194,7 +194,7 @@ TEST(SimCh4, EmptyProcessNoInterference) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, FiveParallelInitialBlocks) {
   SimCh4Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, c, d, e;\n"
       "  initial a = 8'd1;\n"

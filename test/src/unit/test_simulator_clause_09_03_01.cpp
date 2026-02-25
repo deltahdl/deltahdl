@@ -1,7 +1,9 @@
 // §9.3.1: Sequential blocks
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -25,11 +27,11 @@ struct SimA603Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA603Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA603Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -45,7 +47,7 @@ namespace {
 // Sequential statements execute in order (second overrides first)
 TEST(SimA603, SeqBlockExecutionOrder) {
   SimA603Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -58,7 +60,7 @@ TEST(SimA603, SeqBlockExecutionOrder) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
@@ -66,7 +68,7 @@ TEST(SimA603, SeqBlockExecutionOrder) {
 // Sequential block: value from first assignment used in second
 TEST(SimA603, SeqBlockValuePropagation) {
   SimA603Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  initial begin\n"
@@ -79,7 +81,7 @@ TEST(SimA603, SeqBlockValuePropagation) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("b");
+  auto* var = f.ctx.FindVariable("b");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
@@ -105,24 +107,24 @@ struct SimCh4Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimCh4Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimCh4Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-static uint64_t RunAndGet(const std::string &src, const char *var_name) {
+static uint64_t RunAndGet(const std::string& src, const char* var_name) {
   SimCh4Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable(var_name);
+  auto* var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
   if (!var) return 0;
   return var->value.ToUint64();

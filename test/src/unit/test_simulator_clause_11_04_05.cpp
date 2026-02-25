@@ -102,11 +102,11 @@ struct SimA83Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA83Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA83Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -114,7 +114,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA83Fixture &f) {
 // § expression — equality comparison
 TEST(SimA83, EqualityTrue) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
       "  initial x = (8'd5 == 8'd5);\n"
@@ -124,7 +124,7 @@ TEST(SimA83, EqualityTrue) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -132,7 +132,7 @@ TEST(SimA83, EqualityTrue) {
 // § expression — inequality comparison
 TEST(SimA83, InequalityTrue) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
       "  initial x = (8'd5 != 8'd3);\n"
@@ -142,7 +142,7 @@ TEST(SimA83, InequalityTrue) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -155,11 +155,11 @@ struct SimA86Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA86Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA86Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -170,7 +170,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA86Fixture &f) {
 // § binary_operator — == (true)
 TEST(SimA86, BinaryEqTrue) {
   SimA86Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
       "  initial x = (8'd10 == 8'd10);\n"
@@ -180,7 +180,7 @@ TEST(SimA86, BinaryEqTrue) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -188,7 +188,7 @@ TEST(SimA86, BinaryEqTrue) {
 // § binary_operator — != (true)
 TEST(SimA86, BinaryNeqTrue) {
   SimA86Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
       "  initial x = (8'd10 != 8'd5);\n"
@@ -198,7 +198,7 @@ TEST(SimA86, BinaryNeqTrue) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -206,7 +206,7 @@ TEST(SimA86, BinaryNeqTrue) {
 // § binary_operator — === (case equality)
 TEST(SimA86, BinaryCaseEq) {
   SimA86Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
       "  initial x = (8'd7 === 8'd7);\n"
@@ -216,7 +216,7 @@ TEST(SimA86, BinaryCaseEq) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -224,7 +224,7 @@ TEST(SimA86, BinaryCaseEq) {
 // § binary_operator — !== (case inequality)
 TEST(SimA86, BinaryCaseNeq) {
   SimA86Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
       "  initial x = (8'd7 !== 8'd3);\n"
@@ -234,7 +234,7 @@ TEST(SimA86, BinaryCaseNeq) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }

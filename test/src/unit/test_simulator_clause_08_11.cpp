@@ -26,10 +26,10 @@ struct ClassFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 // Build a simple ClassTypeInfo and register it with the context.
-static ClassTypeInfo *MakeClassType(
-    ClassFixture &f, std::string_view name,
-    const std::vector<std::string_view> &props) {
-  auto *info = f.arena.Create<ClassTypeInfo>();
+static ClassTypeInfo* MakeClassType(
+    ClassFixture& f, std::string_view name,
+    const std::vector<std::string_view>& props) {
+  auto* info = f.arena.Create<ClassTypeInfo>();
   info->name = name;
   for (auto p : props) {
     info->properties.push_back({p, 32, false});
@@ -39,12 +39,12 @@ static ClassTypeInfo *MakeClassType(
 }
 
 // Allocate a ClassObject of the given type, returning (handle_id, object*).
-static std::pair<uint64_t, ClassObject *> MakeObj(ClassFixture &f,
-                                                  ClassTypeInfo *type) {
-  auto *obj = f.arena.Create<ClassObject>();
+static std::pair<uint64_t, ClassObject*> MakeObj(ClassFixture& f,
+                                                 ClassTypeInfo* type) {
+  auto* obj = f.arena.Create<ClassObject>();
   obj->type = type;
   // Initialize properties to 0.
-  for (const auto &p : type->properties) {
+  for (const auto& p : type->properties) {
     obj->properties[std::string(p.name)] =
         MakeLogic4VecVal(f.arena, p.width, 0);
   }
@@ -59,7 +59,7 @@ namespace {
 // =============================================================================
 TEST(ClassSim, ThisPushPop) {
   ClassFixture f;
-  auto *type = MakeClassType(f, "Foo", {"x"});
+  auto* type = MakeClassType(f, "Foo", {"x"});
   auto [handle, obj] = MakeObj(f, type);
 
   EXPECT_EQ(f.ctx.CurrentThis(), nullptr);
@@ -71,7 +71,7 @@ TEST(ClassSim, ThisPushPop) {
 
 TEST(ClassSim, NestedThisScoping) {
   ClassFixture f;
-  auto *type = MakeClassType(f, "Foo", {"x"});
+  auto* type = MakeClassType(f, "Foo", {"x"});
   auto [h1, obj1] = MakeObj(f, type);
   auto [h2, obj2] = MakeObj(f, type);
 

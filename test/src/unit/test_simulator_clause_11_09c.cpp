@@ -34,7 +34,7 @@ namespace {
 // =============================================================================
 TEST(TaggedUnion, SetAndGetTag) {
   AggFixture f;
-  auto *var = f.ctx.CreateVariable("u", 32);
+  auto* var = f.ctx.CreateVariable("u", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
   f.ctx.SetVariableTag("u", "field_a");

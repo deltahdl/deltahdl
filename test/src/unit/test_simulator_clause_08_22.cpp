@@ -26,10 +26,10 @@ struct ClassFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 // Build a simple ClassTypeInfo and register it with the context.
-static ClassTypeInfo *MakeClassType(
-    ClassFixture &f, std::string_view name,
-    const std::vector<std::string_view> &props) {
-  auto *info = f.arena.Create<ClassTypeInfo>();
+static ClassTypeInfo* MakeClassType(
+    ClassFixture& f, std::string_view name,
+    const std::vector<std::string_view>& props) {
+  auto* info = f.arena.Create<ClassTypeInfo>();
   info->name = name;
   for (auto p : props) {
     info->properties.push_back({p, 32, false});
@@ -39,12 +39,12 @@ static ClassTypeInfo *MakeClassType(
 }
 
 // Allocate a ClassObject of the given type, returning (handle_id, object*).
-static std::pair<uint64_t, ClassObject *> MakeObj(ClassFixture &f,
-                                                  ClassTypeInfo *type) {
-  auto *obj = f.arena.Create<ClassObject>();
+static std::pair<uint64_t, ClassObject*> MakeObj(ClassFixture& f,
+                                                 ClassTypeInfo* type) {
+  auto* obj = f.arena.Create<ClassObject>();
   obj->type = type;
   // Initialize properties to 0.
-  for (const auto &p : type->properties) {
+  for (const auto& p : type->properties) {
     obj->properties[std::string(p.name)] =
         MakeLogic4VecVal(f.arena, p.width, 0);
   }
@@ -56,16 +56,16 @@ namespace {
 
 TEST(ClassSim, PolymorphicVTableMultiLevel) {
   ClassFixture f;
-  auto *base = MakeClassType(f, "A", {});
-  auto *mid = MakeClassType(f, "B", {});
+  auto* base = MakeClassType(f, "A", {});
+  auto* mid = MakeClassType(f, "B", {});
   mid->parent = base;
-  auto *leaf = MakeClassType(f, "C", {});
+  auto* leaf = MakeClassType(f, "C", {});
   leaf->parent = mid;
 
-  auto *m_base = f.arena.Create<ModuleItem>();
+  auto* m_base = f.arena.Create<ModuleItem>();
   m_base->kind = ModuleItemKind::kFunctionDecl;
   m_base->name = "f";
-  auto *m_leaf = f.arena.Create<ModuleItem>();
+  auto* m_leaf = f.arena.Create<ModuleItem>();
   m_leaf->kind = ModuleItemKind::kFunctionDecl;
   m_leaf->name = "f";
 

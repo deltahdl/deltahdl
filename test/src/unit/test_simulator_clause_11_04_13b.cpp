@@ -22,8 +22,8 @@ struct EvalOpFixture {
 };
 
 // Helper: build an identifier Expr node.
-static Expr *MakeId(Arena &arena, std::string_view name) {
-  auto *e = arena.Create<Expr>();
+static Expr* MakeId(Arena& arena, std::string_view name) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
   e->text = name;
   return e;
@@ -37,10 +37,10 @@ namespace {
 TEST(EvalOp, StreamingLeftShift) {
   EvalOpFixture f;
   // {<<{8'hAB}} — reverse bit order of 0xAB
-  auto *var = f.ctx.CreateVariable("sv", 8);
+  auto* var = f.ctx.CreateVariable("sv", 8);
   var->value = MakeLogic4VecVal(f.arena, 8, 0xAB);
 
-  auto *sc = f.arena.Create<Expr>();
+  auto* sc = f.arena.Create<Expr>();
   sc->kind = ExprKind::kStreamingConcat;
   sc->op = TokenKind::kLtLt;
   sc->elements.push_back(MakeId(f.arena, "sv"));
@@ -53,10 +53,10 @@ TEST(EvalOp, StreamingLeftShift) {
 TEST(EvalOp, StreamingRightShift) {
   EvalOpFixture f;
   // {>>{8'hAB}} — same order (no reversal)
-  auto *var = f.ctx.CreateVariable("sv2", 8);
+  auto* var = f.ctx.CreateVariable("sv2", 8);
   var->value = MakeLogic4VecVal(f.arena, 8, 0xAB);
 
-  auto *sc = f.arena.Create<Expr>();
+  auto* sc = f.arena.Create<Expr>();
   sc->kind = ExprKind::kStreamingConcat;
   sc->op = TokenKind::kGtGt;
   sc->elements.push_back(MakeId(f.arena, "sv2"));

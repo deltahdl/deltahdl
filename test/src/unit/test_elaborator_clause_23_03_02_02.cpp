@@ -1,6 +1,7 @@
 // §23.3.2.2: Connecting module instance ports by name
 
 #include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -21,11 +22,11 @@ struct ElabFixture {
   DiagEngine diag{mgr};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, ElabFixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -35,7 +36,7 @@ namespace {
 // --- Port binding tests ---
 TEST(Elaboration, PortBinding_ResolvesChild) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module child(input logic a, output logic b);\n"
       "  assign b = a;\n"
       "endmodule\n"
@@ -45,7 +46,7 @@ TEST(Elaboration, PortBinding_ResolvesChild) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   ASSERT_EQ(mod->children.size(), 1);
   EXPECT_NE(mod->children[0].resolved, nullptr);
   EXPECT_EQ(mod->children[0].resolved->name, "child");
@@ -54,7 +55,7 @@ TEST(Elaboration, PortBinding_ResolvesChild) {
 
 TEST(Elaboration, PortBinding_Direction) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module child(input logic a, output logic b);\n"
       "  assign b = a;\n"
       "endmodule\n"
@@ -64,13 +65,13 @@ TEST(Elaboration, PortBinding_Direction) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   ASSERT_EQ(mod->children.size(), 1);
-  const auto &bindings = mod->children[0].port_bindings;
+  const auto& bindings = mod->children[0].port_bindings;
   ASSERT_EQ(bindings.size(), 2);
 
   struct {
-    const char *port_name;
+    const char* port_name;
     Direction direction;
   } const kExpected[] = {
       {"a", Direction::kInput},
@@ -84,7 +85,7 @@ TEST(Elaboration, PortBinding_Direction) {
 
 TEST(Elaboration, PortBinding_PortMismatch) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module child(input logic a);\n"
       "endmodule\n"
       "module top;\n"
@@ -93,7 +94,7 @@ TEST(Elaboration, PortBinding_PortMismatch) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   ASSERT_EQ(mod->children.size(), 1);
   // Port binding still created, but with warning.
   EXPECT_EQ(mod->children[0].port_bindings.size(), 1);

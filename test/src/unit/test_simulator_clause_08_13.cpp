@@ -27,26 +27,26 @@ struct ClassFixture {
 };
 
 // AST helper: make an identifier expression.
-static Expr *MkId(Arena &a, std::string_view name) {
-  auto *e = a.Create<Expr>();
+static Expr* MkId(Arena& a, std::string_view name) {
+  auto* e = a.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
   e->text = name;
   return e;
 }
 
 // AST helper: make a return statement.
-static Stmt *MkReturn(Arena &a, Expr *expr) {
-  auto *s = a.Create<Stmt>();
+static Stmt* MkReturn(Arena& a, Expr* expr) {
+  auto* s = a.Create<Stmt>();
   s->kind = StmtKind::kReturn;
   s->expr = expr;
   return s;
 }
 
 // Build a simple ClassTypeInfo and register it with the context.
-static ClassTypeInfo *MakeClassType(
-    ClassFixture &f, std::string_view name,
-    const std::vector<std::string_view> &props) {
-  auto *info = f.arena.Create<ClassTypeInfo>();
+static ClassTypeInfo* MakeClassType(
+    ClassFixture& f, std::string_view name,
+    const std::vector<std::string_view>& props) {
+  auto* info = f.arena.Create<ClassTypeInfo>();
   info->name = name;
   for (auto p : props) {
     info->properties.push_back({p, 32, false});
@@ -56,12 +56,12 @@ static ClassTypeInfo *MakeClassType(
 }
 
 // Allocate a ClassObject of the given type, returning (handle_id, object*).
-static std::pair<uint64_t, ClassObject *> MakeObj(ClassFixture &f,
-                                                  ClassTypeInfo *type) {
-  auto *obj = f.arena.Create<ClassObject>();
+static std::pair<uint64_t, ClassObject*> MakeObj(ClassFixture& f,
+                                                 ClassTypeInfo* type) {
+  auto* obj = f.arena.Create<ClassObject>();
   obj->type = type;
   // Initialize properties to 0.
-  for (const auto &p : type->properties) {
+  for (const auto& p : type->properties) {
     obj->properties[std::string(p.name)] =
         MakeLogic4VecVal(f.arena, p.width, 0);
   }
@@ -76,8 +76,8 @@ namespace {
 // =============================================================================
 TEST(ClassSim, InheritanceParentLink) {
   ClassFixture f;
-  auto *base = MakeClassType(f, "Base", {"x"});
-  auto *derived = MakeClassType(f, "Derived", {"y"});
+  auto* base = MakeClassType(f, "Base", {"x"});
+  auto* derived = MakeClassType(f, "Derived", {"y"});
   derived->parent = base;
 
   EXPECT_EQ(derived->parent, base);
@@ -86,30 +86,30 @@ TEST(ClassSim, InheritanceParentLink) {
 
 TEST(ClassSim, InheritedMethodResolution) {
   ClassFixture f;
-  auto *base = MakeClassType(f, "Base", {"x"});
+  auto* base = MakeClassType(f, "Base", {"x"});
 
-  auto *method = f.arena.Create<ModuleItem>();
+  auto* method = f.arena.Create<ModuleItem>();
   method->kind = ModuleItemKind::kFunctionDecl;
   method->name = "get_x";
   method->func_body_stmts.push_back(MkReturn(f.arena, MkId(f.arena, "x")));
   base->methods["get_x"] = method;
 
-  auto *derived = MakeClassType(f, "Derived", {"y"});
+  auto* derived = MakeClassType(f, "Derived", {"y"});
   derived->parent = base;
 
   auto [handle, obj] = MakeObj(f, derived);
   // Should find get_x from base class.
-  auto *resolved = obj->ResolveMethod("get_x");
+  auto* resolved = obj->ResolveMethod("get_x");
   EXPECT_NE(resolved, nullptr);
   EXPECT_EQ(resolved->name, "get_x");
 }
 
 TEST(ClassSim, InheritanceChainPropertyAccess) {
   ClassFixture f;
-  auto *grand = MakeClassType(f, "Grand", {"a"});
-  auto *parent = MakeClassType(f, "Parent", {"b"});
+  auto* grand = MakeClassType(f, "Grand", {"a"});
+  auto* parent = MakeClassType(f, "Parent", {"b"});
   parent->parent = grand;
-  auto *child = MakeClassType(f, "Child", {"c"});
+  auto* child = MakeClassType(f, "Child", {"c"});
   child->parent = parent;
 
   auto [handle, obj] = MakeObj(f, child);
@@ -124,20 +124,20 @@ TEST(ClassSim, InheritanceChainPropertyAccess) {
 
 TEST(ClassSim, MethodResolutionWalksChain) {
   ClassFixture f;
-  auto *base = MakeClassType(f, "Base", {});
-  auto *mid = MakeClassType(f, "Mid", {});
+  auto* base = MakeClassType(f, "Base", {});
+  auto* mid = MakeClassType(f, "Mid", {});
   mid->parent = base;
-  auto *leaf = MakeClassType(f, "Leaf", {});
+  auto* leaf = MakeClassType(f, "Leaf", {});
   leaf->parent = mid;
 
   // Only base defines the method.
-  auto *m = f.arena.Create<ModuleItem>();
+  auto* m = f.arena.Create<ModuleItem>();
   m->kind = ModuleItemKind::kFunctionDecl;
   m->name = "deep_method";
   base->methods["deep_method"] = m;
 
   auto [handle, obj] = MakeObj(f, leaf);
-  auto *resolved = obj->ResolveMethod("deep_method");
+  auto* resolved = obj->ResolveMethod("deep_method");
   EXPECT_EQ(resolved, m);
 }
 

@@ -178,11 +178,11 @@ struct SimA83Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA83Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA83Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -190,7 +190,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA83Fixture &f) {
 // § expression — binary addition
 TEST(SimA83, BinaryAddition) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'd3 + 8'd7;\n"
@@ -200,7 +200,7 @@ TEST(SimA83, BinaryAddition) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
@@ -208,7 +208,7 @@ TEST(SimA83, BinaryAddition) {
 // § expression — binary subtraction
 TEST(SimA83, BinarySubtraction) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'd10 - 8'd3;\n"
@@ -218,7 +218,7 @@ TEST(SimA83, BinarySubtraction) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
@@ -226,7 +226,7 @@ TEST(SimA83, BinarySubtraction) {
 // § expression — binary multiplication
 TEST(SimA83, BinaryMultiplication) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'd5 * 8'd6;\n"
@@ -236,7 +236,7 @@ TEST(SimA83, BinaryMultiplication) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
@@ -244,7 +244,7 @@ TEST(SimA83, BinaryMultiplication) {
 // § expression — unary bitwise NOT
 TEST(SimA83, UnaryNegate) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = -8'd1;\n"
@@ -254,7 +254,7 @@ TEST(SimA83, UnaryNegate) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
@@ -267,11 +267,11 @@ struct SimA86Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA86Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA86Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -282,7 +282,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA86Fixture &f) {
 // § unary_operator — unary plus (identity)
 TEST(SimA86, UnaryPlus) {
   SimA86Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = +8'd42;\n"
@@ -292,7 +292,7 @@ TEST(SimA86, UnaryPlus) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -300,7 +300,7 @@ TEST(SimA86, UnaryPlus) {
 // § unary_operator — unary minus (negate)
 TEST(SimA86, UnaryMinus) {
   SimA86Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = -8'd1;\n"
@@ -310,7 +310,7 @@ TEST(SimA86, UnaryMinus) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
@@ -321,7 +321,7 @@ TEST(SimA86, UnaryMinus) {
 // § binary_operator — addition
 TEST(SimA86, BinaryAdd) {
   SimA86Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'd10 + 8'd20;\n"
@@ -331,7 +331,7 @@ TEST(SimA86, BinaryAdd) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
@@ -339,7 +339,7 @@ TEST(SimA86, BinaryAdd) {
 // § binary_operator — subtraction
 TEST(SimA86, BinarySub) {
   SimA86Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'd30 - 8'd12;\n"
@@ -349,7 +349,7 @@ TEST(SimA86, BinarySub) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 18u);
 }
@@ -357,7 +357,7 @@ TEST(SimA86, BinarySub) {
 // § binary_operator — multiplication
 TEST(SimA86, BinaryMul) {
   SimA86Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'd7 * 8'd6;\n"
@@ -367,7 +367,7 @@ TEST(SimA86, BinaryMul) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -375,7 +375,7 @@ TEST(SimA86, BinaryMul) {
 // § binary_operator — division
 TEST(SimA86, BinaryDiv) {
   SimA86Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'd100 / 8'd5;\n"
@@ -385,7 +385,7 @@ TEST(SimA86, BinaryDiv) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
@@ -393,7 +393,7 @@ TEST(SimA86, BinaryDiv) {
 // § binary_operator — modulo
 TEST(SimA86, BinaryMod) {
   SimA86Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'd17 % 8'd5;\n"
@@ -403,7 +403,7 @@ TEST(SimA86, BinaryMod) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
@@ -411,7 +411,7 @@ TEST(SimA86, BinaryMod) {
 // § binary_operator — power
 TEST(SimA86, BinaryPower) {
   SimA86Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'd2 ** 8'd5;\n"
@@ -421,7 +421,7 @@ TEST(SimA86, BinaryPower) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 32u);
 }

@@ -1,7 +1,9 @@
 // §25.7.2: Example of using tasks in modports
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -13,11 +15,11 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-ParseResult Parse(const std::string &src) {
+ParseResult Parse(const std::string& src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -28,7 +30,7 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-static bool ParseOk(const std::string &src) {
+static bool ParseOk(const std::string& src) {
   SourceManager mgr;
   Arena arena;
   auto fid = mgr.AddFile("<test>", src);
@@ -49,7 +51,7 @@ TEST(ParserA29, ImportThenDirectionPorts) {
       "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *mp = r.cu->interfaces[0]->modports[0];
+  auto* mp = r.cu->interfaces[0]->modports[0];
   ASSERT_EQ(mp->ports.size(), 2u);
   EXPECT_TRUE(mp->ports[0].is_import);
   EXPECT_EQ(mp->ports[0].name, "Read");

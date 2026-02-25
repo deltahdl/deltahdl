@@ -26,7 +26,7 @@ class VpiClause3823Test : public ::testing::Test {
 // §38.23: vpi_iterate / §38.40: vpi_scan
 
 TEST_F(VpiClause3823Test, IterateModuleChildPorts) {
-  auto *mod = vpi_ctx_.CreateModule("top", "top");
+  auto* mod = vpi_ctx_.CreateModule("top", "top");
   vpi_ctx_.CreatePort("p0", kVpiInput, mod);
   vpi_ctx_.CreatePort("p1", kVpiOutput, mod);
 

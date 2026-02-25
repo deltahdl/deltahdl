@@ -30,19 +30,19 @@ struct SimCh13Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimCh13Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimCh13Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
 
 // Helper: elaborate + lower + run, then return FindVariable result.
-static Variable *RunAndFind(const std::string &src, SimCh13Fixture &f,
-                            const char *var_name) {
-  auto *design = ElaborateSrc(src, f);
+static Variable* RunAndFind(const std::string& src, SimCh13Fixture& f,
+                            const char* var_name) {
+  auto* design = ElaborateSrc(src, f);
   if (!design) return nullptr;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -58,7 +58,7 @@ static Variable *RunAndFind(const std::string &src, SimCh13Fixture &f,
 // §13.8: Virtual class flag maps to is_abstract in ClassTypeInfo.
 TEST(SimCh13, VirtualClassIsAbstract) {
   SimCh13Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  virtual class C #(parameter W = 8);\n"
       "    static function int get_w; get_w = W; endfunction\n"
@@ -69,7 +69,7 @@ TEST(SimCh13, VirtualClassIsAbstract) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
 
-  auto *info = f.ctx.FindClassType("C");
+  auto* info = f.ctx.FindClassType("C");
   ASSERT_NE(info, nullptr);
   EXPECT_TRUE(info->is_abstract);
 }
@@ -77,7 +77,7 @@ TEST(SimCh13, VirtualClassIsAbstract) {
 // §13.8: ClassTypeInfo preserves ClassDecl with params.
 TEST(SimCh13, ClassParamsPreserved) {
   SimCh13Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  class C #(parameter A = 1, parameter B = 2);\n"
       "    static function int f; f = A; endfunction\n"
@@ -88,7 +88,7 @@ TEST(SimCh13, ClassParamsPreserved) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
 
-  auto *info = f.ctx.FindClassType("C");
+  auto* info = f.ctx.FindClassType("C");
   ASSERT_NE(info, nullptr);
   ASSERT_NE(info->decl, nullptr);
   EXPECT_EQ(info->decl->params.size(), 2u);
@@ -99,7 +99,7 @@ TEST(SimCh13, ClassParamsPreserved) {
 // §13.8: Static method is registered in ClassTypeInfo.methods.
 TEST(SimCh13, StaticMethodRegistered) {
   SimCh13Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  virtual class C #(parameter W = 8);\n"
       "    static function int get_w; get_w = W; endfunction\n"
@@ -110,7 +110,7 @@ TEST(SimCh13, StaticMethodRegistered) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
 
-  auto *info = f.ctx.FindClassType("C");
+  auto* info = f.ctx.FindClassType("C");
   ASSERT_NE(info, nullptr);
   auto it = info->methods.find("get_w");
   ASSERT_NE(it, info->methods.end());
@@ -120,7 +120,7 @@ TEST(SimCh13, StaticMethodRegistered) {
 // §13.8: Multiple static methods registered in same class.
 TEST(SimCh13, MultipleStaticMethodsRegistered) {
   SimCh13Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  virtual class C #(parameter W = 8);\n"
       "    static function int alpha; alpha = W; endfunction\n"
@@ -132,7 +132,7 @@ TEST(SimCh13, MultipleStaticMethodsRegistered) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
 
-  auto *info = f.ctx.FindClassType("C");
+  auto* info = f.ctx.FindClassType("C");
   ASSERT_NE(info, nullptr);
   EXPECT_NE(info->methods.find("alpha"), info->methods.end());
   EXPECT_NE(info->methods.find("beta"), info->methods.end());
@@ -141,7 +141,7 @@ TEST(SimCh13, MultipleStaticMethodsRegistered) {
 // §13.8: Non-virtual parameterized class also works.
 TEST(SimCh13, NonVirtualParameterizedClass) {
   SimCh13Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  class C #(parameter W = 8);\n"
       "    static function int get_w; get_w = W; endfunction\n"
@@ -152,7 +152,7 @@ TEST(SimCh13, NonVirtualParameterizedClass) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
 
-  auto *info = f.ctx.FindClassType("C");
+  auto* info = f.ctx.FindClassType("C");
   ASSERT_NE(info, nullptr);
   EXPECT_FALSE(info->is_abstract);
   EXPECT_NE(info->methods.find("get_w"), info->methods.end());
@@ -165,7 +165,7 @@ TEST(SimCh13, NonVirtualParameterizedClass) {
 // §13.8: Static method returns parameter value via C#(16)::get_w().
 TEST(SimCh13, SimpleParameterReturn) {
   SimCh13Fixture f;
-  auto *var = RunAndFind(
+  auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter W = 8);\n"
       "    static function int get_w; get_w = W; endfunction\n"
@@ -181,7 +181,7 @@ TEST(SimCh13, SimpleParameterReturn) {
 // §13.8: Default parameter used when only first param specified.
 TEST(SimCh13, DefaultParameterValue) {
   SimCh13Fixture f;
-  auto *var = RunAndFind(
+  auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter A = 10, parameter B = 5);\n"
       "    static function int get_b; get_b = B; endfunction\n"
@@ -198,7 +198,7 @@ TEST(SimCh13, DefaultParameterValue) {
 // §13.8: Default parameter using $clog2 of another parameter.
 TEST(SimCh13, DefaultParamClog2) {
   SimCh13Fixture f;
-  auto *var = RunAndFind(
+  auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter DECODE_W = 8,\n"
       "                     parameter ENCODE_W = $clog2(DECODE_W));\n"
@@ -218,7 +218,7 @@ TEST(SimCh13, DefaultParamClog2) {
 // §13.8: Multiple specializations in same module give different results.
 TEST(SimCh13, MultipleSpecializations) {
   SimCh13Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  virtual class C #(parameter W = 8);\n"
       "    static function int get_w; get_w = W; endfunction\n"
@@ -235,8 +235,8 @@ TEST(SimCh13, MultipleSpecializations) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *r1 = f.ctx.FindVariable("r1");
-  auto *r2 = f.ctx.FindVariable("r2");
+  auto* r1 = f.ctx.FindVariable("r1");
+  auto* r2 = f.ctx.FindVariable("r2");
   ASSERT_NE(r1, nullptr);
   ASSERT_NE(r2, nullptr);
   EXPECT_EQ(r1->value.ToUint64(), 8u);
@@ -246,7 +246,7 @@ TEST(SimCh13, MultipleSpecializations) {
 // §13.8: Two parameters, both provided explicitly at call site.
 TEST(SimCh13, TwoParametersExplicit) {
   SimCh13Fixture f;
-  auto *var = RunAndFind(
+  auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter A = 1, parameter B = 2);\n"
       "    static function int sum; sum = A + B; endfunction\n"
@@ -262,7 +262,7 @@ TEST(SimCh13, TwoParametersExplicit) {
 // §13.8: Parameter used in arithmetic expression.
 TEST(SimCh13, ParameterArithmetic) {
   SimCh13Fixture f;
-  auto *var = RunAndFind(
+  auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter W = 8);\n"
       "    static function int doubled; doubled = W * 2; endfunction\n"
@@ -278,7 +278,7 @@ TEST(SimCh13, ParameterArithmetic) {
 // §13.8: Parameter used in bitmask computation: (1 << W) - 1.
 TEST(SimCh13, ParameterBitmask) {
   SimCh13Fixture f;
-  auto *var = RunAndFind(
+  auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter W = 8);\n"
       "    static function int mask;\n"
@@ -297,7 +297,7 @@ TEST(SimCh13, ParameterBitmask) {
 // §13.8: Parameter in if-else condition.
 TEST(SimCh13, ParameterIfElse) {
   SimCh13Fixture f;
-  auto *var = RunAndFind(
+  auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter W = 8);\n"
       "    static function int classify;\n"
@@ -317,7 +317,7 @@ TEST(SimCh13, ParameterIfElse) {
 // §13.8: Static method with input argument.
 TEST(SimCh13, MethodWithInputArg) {
   SimCh13Fixture f;
-  auto *var = RunAndFind(
+  auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter W = 8);\n"
       "    static function int add_w(input int x);\n"
@@ -336,7 +336,7 @@ TEST(SimCh13, MethodWithInputArg) {
 // §13.8: Static method with two input arguments.
 TEST(SimCh13, MethodWithTwoArgs) {
   SimCh13Fixture f;
-  auto *var = RunAndFind(
+  auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter W = 0);\n"
       "    static function int weighted_sum(input int a, input int b);\n"
@@ -355,7 +355,7 @@ TEST(SimCh13, MethodWithTwoArgs) {
 // §13.8: Two different static methods in same class.
 TEST(SimCh13, TwoMethodsSameClass) {
   SimCh13Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  virtual class C #(parameter W = 8);\n"
       "    static function int get_w; get_w = W; endfunction\n"
@@ -375,8 +375,8 @@ TEST(SimCh13, TwoMethodsSameClass) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *r1 = f.ctx.FindVariable("r1");
-  auto *r2 = f.ctx.FindVariable("r2");
+  auto* r1 = f.ctx.FindVariable("r1");
+  auto* r2 = f.ctx.FindVariable("r2");
   ASSERT_NE(r1, nullptr);
   ASSERT_NE(r2, nullptr);
   EXPECT_EQ(r1->value.ToUint64(), 10u);
@@ -386,7 +386,7 @@ TEST(SimCh13, TwoMethodsSameClass) {
 // §13.8: Parameterized scope call in continuous assignment.
 TEST(SimCh13, ContinuousAssignCall) {
   SimCh13Fixture f;
-  auto *var = RunAndFind(
+  auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter W = 8);\n"
       "    static function int get_w; get_w = W; endfunction\n"
@@ -402,7 +402,7 @@ TEST(SimCh13, ContinuousAssignCall) {
 // §13.8: Parameterized scope call in always_comb.
 TEST(SimCh13, AlwaysCombCall) {
   SimCh13Fixture f;
-  auto *var = RunAndFind(
+  auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter W = 8);\n"
       "    static function int get_w; get_w = W; endfunction\n"
@@ -418,7 +418,7 @@ TEST(SimCh13, AlwaysCombCall) {
 // §13.8: Different specializations produce different results.
 TEST(SimCh13, DifferentSpecsDifferentResults) {
   SimCh13Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  virtual class C #(parameter W = 0);\n"
       "    static function int mask;\n"
@@ -437,8 +437,8 @@ TEST(SimCh13, DifferentSpecsDifferentResults) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *r4 = f.ctx.FindVariable("r4");
-  auto *r8 = f.ctx.FindVariable("r8");
+  auto* r4 = f.ctx.FindVariable("r4");
+  auto* r8 = f.ctx.FindVariable("r8");
   ASSERT_NE(r4, nullptr);
   ASSERT_NE(r8, nullptr);
   EXPECT_EQ(r4->value.ToUint64(), 15u);   // (1<<4)-1
@@ -448,7 +448,7 @@ TEST(SimCh13, DifferentSpecsDifferentResults) {
 // §13.8: Parameter subtraction.
 TEST(SimCh13, ParameterSubtract) {
   SimCh13Fixture f;
-  auto *var = RunAndFind(
+  auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter W = 8);\n"
       "    static function int max_idx;\n"
@@ -466,7 +466,7 @@ TEST(SimCh13, ParameterSubtract) {
 // §13.8: Chained parameter expression: (W + 1) * 2.
 TEST(SimCh13, ChainedParamExpr) {
   SimCh13Fixture f;
-  auto *var = RunAndFind(
+  auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter W = 0);\n"
       "    static function int compute;\n"
@@ -485,7 +485,7 @@ TEST(SimCh13, ChainedParamExpr) {
 // §13.8: Parameter used in shift: val << W.
 TEST(SimCh13, ParameterShift) {
   SimCh13Fixture f;
-  auto *var = RunAndFind(
+  auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter W = 0);\n"
       "    static function int shift_up(input int val);\n"
@@ -504,7 +504,7 @@ TEST(SimCh13, ParameterShift) {
 // §13.8: Calling same method twice with same specialization.
 TEST(SimCh13, MultipleCallsSameSpec) {
   SimCh13Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  virtual class C #(parameter W = 0);\n"
       "    static function int add_w(input int x);\n"
@@ -523,8 +523,8 @@ TEST(SimCh13, MultipleCallsSameSpec) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *r1 = f.ctx.FindVariable("r1");
-  auto *r2 = f.ctx.FindVariable("r2");
+  auto* r1 = f.ctx.FindVariable("r1");
+  auto* r2 = f.ctx.FindVariable("r2");
   ASSERT_NE(r1, nullptr);
   ASSERT_NE(r2, nullptr);
   EXPECT_EQ(r1->value.ToUint64(), 11u);
@@ -534,7 +534,7 @@ TEST(SimCh13, MultipleCallsSameSpec) {
 // §13.8: Zero parameter value edge case.
 TEST(SimCh13, ZeroParamValue) {
   SimCh13Fixture f;
-  auto *var = RunAndFind(
+  auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter W = 8);\n"
       "    static function int get_w; get_w = W; endfunction\n"
@@ -550,7 +550,7 @@ TEST(SimCh13, ZeroParamValue) {
 // §13.8: Nested if using parameter in static method.
 TEST(SimCh13, ParameterNestedIf) {
   SimCh13Fixture f;
-  auto *var = RunAndFind(
+  auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter W = 0);\n"
       "    static function int encode_size;\n"
@@ -576,7 +576,7 @@ TEST(SimCh13, ParameterNestedIf) {
 // §13.8: For loop in static method with parameter as bound.
 TEST(SimCh13, ForLoopWithParam) {
   SimCh13Fixture f;
-  auto *var = RunAndFind(
+  auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter N = 4);\n"
       "    static function int sum_to_n;\n"
@@ -597,7 +597,7 @@ TEST(SimCh13, ForLoopWithParam) {
 // §13.8: For loop with different specializations.
 TEST(SimCh13, ForLoopDifferentSpecs) {
   SimCh13Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  virtual class C #(parameter N = 4);\n"
       "    static function int sum_to_n;\n"
@@ -618,8 +618,8 @@ TEST(SimCh13, ForLoopDifferentSpecs) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *r3 = f.ctx.FindVariable("r3");
-  auto *r4 = f.ctx.FindVariable("r4");
+  auto* r3 = f.ctx.FindVariable("r3");
+  auto* r4 = f.ctx.FindVariable("r4");
   ASSERT_NE(r3, nullptr);
   ASSERT_NE(r4, nullptr);
   EXPECT_EQ(r3->value.ToUint64(), 6u);   // 1+2+3
@@ -630,7 +630,7 @@ TEST(SimCh13, ForLoopDifferentSpecs) {
 // DECODER_f sets bit EncodeIn to 1: result[3] = 1 → 4'b1000 = 8.
 TEST(SimCh13, DecoderFunction) {
   SimCh13Fixture f;
-  auto *var = RunAndFind(
+  auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter DECODE_W = 4,\n"
       "                     parameter ENCODE_W = $clog2(DECODE_W));\n"
@@ -652,7 +652,7 @@ TEST(SimCh13, DecoderFunction) {
 // Finds the last set bit in DecodeIn using a for loop bounded by DECODE_W.
 TEST(SimCh13, EncoderFunction) {
   SimCh13Fixture f;
-  auto *var = RunAndFind(
+  auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter DECODE_W = 8,\n"
       "                     parameter ENCODE_W = $clog2(DECODE_W));\n"
@@ -676,7 +676,7 @@ TEST(SimCh13, EncoderFunction) {
 // §13.8 LRM example: Both encoder and decoder in same class.
 TEST(SimCh13, EncoderDecoderSameClass) {
   SimCh13Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  virtual class C #(parameter DECODE_W = 8,\n"
       "                     parameter ENCODE_W = $clog2(DECODE_W));\n"
@@ -702,8 +702,8 @@ TEST(SimCh13, EncoderDecoderSameClass) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *enc = f.ctx.FindVariable("enc_out");
-  auto *dec = f.ctx.FindVariable("dec_out");
+  auto* enc = f.ctx.FindVariable("enc_out");
+  auto* dec = f.ctx.FindVariable("dec_out");
   ASSERT_NE(enc, nullptr);
   ASSERT_NE(dec, nullptr);
   EXPECT_EQ(enc->value.ToUint64(), 6u);  // bit 6 of 64
@@ -723,7 +723,7 @@ TEST(SimCh13, ParserPreservesParams) {
                            "endmodule\n");
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   ASSERT_NE(cu, nullptr);
   EXPECT_FALSE(cu->modules.empty());
   // Parse succeeds — the parameterized scope expression was accepted.

@@ -1,7 +1,9 @@
 // §6.23: Type operator
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -13,11 +15,11 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-ParseResult Parse(const std::string &src) {
+ParseResult Parse(const std::string& src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -42,7 +44,7 @@ TEST(ParserA221, DataTypeTypeReference) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
-  auto *item = r.cu->modules[0]->items[1];
+  auto* item = r.cu->modules[0]->items[1];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_NE(item->data_type.type_ref_expr, nullptr);
 }

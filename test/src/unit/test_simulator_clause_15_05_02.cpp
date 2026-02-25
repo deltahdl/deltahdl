@@ -60,12 +60,12 @@ TEST(IpcSync, EventTriggeredDifferentNames) {
 TEST(IpcSync, EventTriggerSetsTriggeredState) {
   SyncFixture f;
   // Create named event variable.
-  auto *ev = f.ctx.CreateVariable("my_event", 1);
+  auto* ev = f.ctx.CreateVariable("my_event", 1);
   ev->is_event = true;
   ev->value = MakeLogic4VecVal(f.arena, 1, 0);
 
   // Build event trigger statement: ->my_event
-  auto *trigger_stmt = f.arena.Create<Stmt>();
+  auto* trigger_stmt = f.arena.Create<Stmt>();
   trigger_stmt->kind = StmtKind::kEventTrigger;
   trigger_stmt->expr = f.arena.Create<Expr>();
   trigger_stmt->expr->kind = ExprKind::kIdentifier;
@@ -75,8 +75,8 @@ TEST(IpcSync, EventTriggerSetsTriggeredState) {
   struct DriverResult {
     StmtResult value = StmtResult::kDone;
   };
-  auto driver = [](const Stmt *stmt, SimContext &ctx, Arena &arena,
-                   DriverResult *out) -> SimCoroutine {
+  auto driver = [](const Stmt* stmt, SimContext& ctx, Arena& arena,
+                   DriverResult* out) -> SimCoroutine {
     out->value = co_await ExecStmt(stmt, ctx, arena);
   };
   DriverResult result;

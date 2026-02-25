@@ -1,6 +1,7 @@
 // §28.3.5: The range specification
 
 #include <gtest/gtest.h>
+
 #include <cstdint>
 #include <cstdlib>
 
@@ -58,7 +59,7 @@ struct GateDeclInfo {
   uint32_t terminal_count = 0;
 };
 
-bool ValidateGateDecl(const GateDeclInfo &info);
+bool ValidateGateDecl(const GateDeclInfo& info);
 
 bool CanHaveStrengthSpec(GateType type);
 
@@ -68,7 +69,7 @@ bool ValidateStrengthSpec(StrengthLvl s0, StrengthLvl s1, GateType type);
 
 uint32_t MaxDelays(GateType type);
 
-bool ValidateGateDecl(const GateDeclInfo &info) {
+bool ValidateGateDecl(const GateDeclInfo& info) {
   return !info.has_range || info.has_name;
 }
 

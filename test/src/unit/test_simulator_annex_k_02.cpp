@@ -1,6 +1,7 @@
 // Annex K.2: Source code
 
 #include <gtest/gtest.h>
+
 #include "simulation/vpi.h"
 
 namespace {

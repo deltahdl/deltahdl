@@ -15,11 +15,11 @@ namespace {
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-ParseResult Parse(const std::string &src) {
+ParseResult Parse(const std::string& src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -44,7 +44,7 @@ TEST(ParserA211, LocalparamExplicitType) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
   EXPECT_EQ(item->name, "X");
 }
@@ -53,7 +53,7 @@ TEST(ParserA211, LocalparamImplicitType) {
   auto r = Parse("module m; localparam X = 42; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
   EXPECT_EQ(item->name, "X");
 }
@@ -62,7 +62,7 @@ TEST(ParserA211, LocalparamPackedDimImplicit) {
   auto r = Parse("module m; localparam [7:0] MASK = 8'hFF; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
   EXPECT_NE(item->data_type.packed_dim_left, nullptr);
 }
@@ -73,7 +73,7 @@ TEST(ParserA211, LocalparamTypeParam) {
   auto r = Parse("module m; localparam type T = int; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kVoid);
 }
@@ -85,7 +85,7 @@ TEST(ParserA211, ParameterExplicitType) {
   auto r = Parse("module m; parameter int WIDTH = 8; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
   EXPECT_EQ(item->name, "WIDTH");
 }
@@ -94,7 +94,7 @@ TEST(ParserA211, ParameterImplicitType) {
   auto r = Parse("module m; parameter SIZE = 16; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
 }
 
@@ -102,7 +102,7 @@ TEST(ParserA211, ParameterPackedDim) {
   auto r = Parse("module m; parameter [31:0] ADDR = 0; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_NE(item->data_type.packed_dim_left, nullptr);
 }
 
@@ -112,7 +112,7 @@ TEST(ParserA211, ParameterTypeParam) {
   auto r = Parse("module m; parameter type BusType = logic [7:0]; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kVoid);
 }
 
@@ -137,7 +137,7 @@ TEST(ParserA211, TypeParamForwardEnum) {
   auto r = Parse("module m; parameter type enum E = my_enum_t; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
   EXPECT_EQ(item->name, "E");
 }
@@ -180,7 +180,7 @@ TEST(ParserA211, ListOfParamAssignments) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   int param_count = 0;
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kParamDecl) param_count++;
   }
   EXPECT_GE(param_count, 3);
@@ -191,7 +191,7 @@ TEST(ParserA211, ListOfLocalparamAssignments) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   int param_count = 0;
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kParamDecl) param_count++;
   }
   EXPECT_GE(param_count, 2);
@@ -204,7 +204,7 @@ TEST(ParserA211, ListOfTypeAssignments) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   int param_count = 0;
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kParamDecl) param_count++;
   }
   EXPECT_GE(param_count, 2);

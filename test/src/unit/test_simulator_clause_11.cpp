@@ -22,11 +22,11 @@ struct SimCh11Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimCh11Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimCh11Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -34,7 +34,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimCh11Fixture &f) {
 // §11.4.6: Basic ternary with true condition selects true branch.
 TEST(SimCh11, TernaryBasicTrue) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  int result;\n"
       "  initial begin\n"
@@ -48,7 +48,7 @@ TEST(SimCh11, TernaryBasicTrue) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
@@ -56,7 +56,7 @@ TEST(SimCh11, TernaryBasicTrue) {
 // §11.4.6: Basic ternary with false condition selects false branch.
 TEST(SimCh11, TernaryBasicFalse) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  int result;\n"
       "  initial begin\n"
@@ -70,7 +70,7 @@ TEST(SimCh11, TernaryBasicFalse) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
@@ -78,7 +78,7 @@ TEST(SimCh11, TernaryBasicFalse) {
 // §11.4.6: Ternary with a variable condition (nonzero is true).
 TEST(SimCh11, TernaryVariableCondition) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  int cond;\n"
       "  int result;\n"
@@ -94,7 +94,7 @@ TEST(SimCh11, TernaryVariableCondition) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -102,7 +102,7 @@ TEST(SimCh11, TernaryVariableCondition) {
 // §11.4.6: Ternary with comparison condition implements max(a, b).
 TEST(SimCh11, TernaryComparisonMax) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  int a, b, result;\n"
       "  initial begin\n"
@@ -118,7 +118,7 @@ TEST(SimCh11, TernaryComparisonMax) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 50u);
 }
@@ -126,7 +126,7 @@ TEST(SimCh11, TernaryComparisonMax) {
 // §11.4.6: Ternary with equality condition.
 TEST(SimCh11, TernaryEqualityCondition) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  int a, result;\n"
       "  initial begin\n"
@@ -141,7 +141,7 @@ TEST(SimCh11, TernaryEqualityCondition) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -149,7 +149,7 @@ TEST(SimCh11, TernaryEqualityCondition) {
 // §11.4.6: Nested ternary — right-to-left associativity: a ? b ? 1 : 2 : 3.
 TEST(SimCh11, TernaryNested) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  int a, b, result;\n"
       "  initial begin\n"
@@ -165,7 +165,7 @@ TEST(SimCh11, TernaryNested) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   // a=1 → inner: b=0 → 2.
   EXPECT_EQ(var->value.ToUint64(), 2u);
@@ -174,7 +174,7 @@ TEST(SimCh11, TernaryNested) {
 // §11.4.6: Chained ternary as priority encoder: sel==0 ? a : sel==1 ? b : c.
 TEST(SimCh11, TernaryChainedPriorityEncoder) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  int sel, a, b, c, result;\n"
       "  initial begin\n"
@@ -192,7 +192,7 @@ TEST(SimCh11, TernaryChainedPriorityEncoder) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
@@ -200,7 +200,7 @@ TEST(SimCh11, TernaryChainedPriorityEncoder) {
 // §11.4.6: Ternary in continuous assignment.
 TEST(SimCh11, TernaryContinuousAssign) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic sel;\n"
       "  logic [7:0] a, b;\n"
@@ -219,7 +219,7 @@ TEST(SimCh11, TernaryContinuousAssign) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *net = f.ctx.FindNet("y");
+  auto* net = f.ctx.FindNet("y");
   ASSERT_NE(net, nullptr);
   ASSERT_NE(net->resolved, nullptr);
   EXPECT_EQ(net->resolved->value.ToUint64(), 55u);
@@ -228,7 +228,7 @@ TEST(SimCh11, TernaryContinuousAssign) {
 // §11.4.6: Ternary in blocking assignment.
 TEST(SimCh11, TernaryBlockingAssign) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  int x, result;\n"
       "  initial begin\n"
@@ -243,7 +243,7 @@ TEST(SimCh11, TernaryBlockingAssign) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 100u);
 }
@@ -251,7 +251,7 @@ TEST(SimCh11, TernaryBlockingAssign) {
 // §11.4.6: Ternary in nonblocking assignment.
 TEST(SimCh11, TernaryNonblockingAssign) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] sel, result;\n"
       "  initial begin\n"
@@ -266,7 +266,7 @@ TEST(SimCh11, TernaryNonblockingAssign) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   // sel=0 → false branch → 22.
   EXPECT_EQ(var->value.ToUint64(), 22u);
@@ -275,7 +275,7 @@ TEST(SimCh11, TernaryNonblockingAssign) {
 // §11.4.6: Ternary with bitwise AND in condition.
 TEST(SimCh11, TernaryBitwiseCondition) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  int result;\n"
@@ -292,7 +292,7 @@ TEST(SimCh11, TernaryBitwiseCondition) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   // 0xF0 & 0x0F = 0x00 → false → 0.
   EXPECT_EQ(var->value.ToUint64(), 0u);
@@ -301,7 +301,7 @@ TEST(SimCh11, TernaryBitwiseCondition) {
 // §11.4.6: Ternary with logical OR in condition.
 TEST(SimCh11, TernaryLogicalOrCondition) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  int a, b, result;\n"
       "  initial begin\n"
@@ -317,7 +317,7 @@ TEST(SimCh11, TernaryLogicalOrCondition) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   // (0 || 1) is true → 7.
   EXPECT_EQ(var->value.ToUint64(), 7u);
@@ -326,7 +326,7 @@ TEST(SimCh11, TernaryLogicalOrCondition) {
 // §11.4.6: Ternary with concatenation as result.
 TEST(SimCh11, TernaryConcatResult) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] hi, lo;\n"
       "  logic [15:0] result;\n"
@@ -343,7 +343,7 @@ TEST(SimCh11, TernaryConcatResult) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABCDu);
 }
@@ -351,7 +351,7 @@ TEST(SimCh11, TernaryConcatResult) {
 // §11.4.6: Ternary with function call in branches.
 TEST(SimCh11, TernaryFunctionCallBranch) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  function int double_it(int x);\n"
       "    return x * 2;\n"
@@ -369,7 +369,7 @@ TEST(SimCh11, TernaryFunctionCallBranch) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   // sel=1 → double_it(5) = 10.
   EXPECT_EQ(var->value.ToUint64(), 10u);
@@ -378,7 +378,7 @@ TEST(SimCh11, TernaryFunctionCallBranch) {
 // §11.4.6: Ternary with different-width operands (wider result).
 TEST(SimCh11, TernaryDifferentWidthOperands) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] narrow;\n"
       "  logic [7:0] wide;\n"
@@ -396,7 +396,7 @@ TEST(SimCh11, TernaryDifferentWidthOperands) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 8u);
   EXPECT_EQ(var->value.ToUint64(), 0xAAu);
@@ -405,7 +405,7 @@ TEST(SimCh11, TernaryDifferentWidthOperands) {
 // §11.4.6: Ternary with signed operands preserves signedness.
 TEST(SimCh11, TernarySignedOperands) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  int a, b, result;\n"
       "  initial begin\n"
@@ -421,7 +421,7 @@ TEST(SimCh11, TernarySignedOperands) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   // -5 as 32-bit unsigned = 0xFFFFFFFB.
   auto neg5_u32 = static_cast<uint32_t>(-5);
@@ -431,7 +431,7 @@ TEST(SimCh11, TernarySignedOperands) {
 // §11.4.6: Ternary selecting between constants.
 TEST(SimCh11, TernarySelectConstants) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] result;\n"
       "  initial begin\n"
@@ -445,7 +445,7 @@ TEST(SimCh11, TernarySelectConstants) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 100u);
 }
@@ -453,7 +453,7 @@ TEST(SimCh11, TernarySelectConstants) {
 // §11.4.6: Ternary in always_comb block.
 TEST(SimCh11, TernaryAlwaysComb) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic sel;\n"
       "  logic [7:0] a, b, y;\n"
@@ -473,7 +473,7 @@ TEST(SimCh11, TernaryAlwaysComb) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("y");
+  auto* var = f.ctx.FindVariable("y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
@@ -481,7 +481,7 @@ TEST(SimCh11, TernaryAlwaysComb) {
 // §11.4.6: Ternary result used as function argument.
 TEST(SimCh11, TernaryAsFunctionArgument) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  function int add_one(int x);\n"
       "    return x + 1;\n"
@@ -499,7 +499,7 @@ TEST(SimCh11, TernaryAsFunctionArgument) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   // sel=0 → 20, add_one(20) = 21.
   EXPECT_EQ(var->value.ToUint64(), 21u);
@@ -508,7 +508,7 @@ TEST(SimCh11, TernaryAsFunctionArgument) {
 // §11.4.6: Ternary with arithmetic in branches: sel ? (a+b) : (a-b).
 TEST(SimCh11, TernaryArithmeticBranches) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  int sel, a, b, result;\n"
       "  initial begin\n"
@@ -525,7 +525,7 @@ TEST(SimCh11, TernaryArithmeticBranches) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   // sel=1 → a+b = 20.
   EXPECT_EQ(var->value.ToUint64(), 20u);
@@ -534,7 +534,7 @@ TEST(SimCh11, TernaryArithmeticBranches) {
 // §11.4.6: Ternary with unary NOT in condition: !sel ? a : b.
 TEST(SimCh11, TernaryUnaryNotCondition) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  int sel, result;\n"
       "  initial begin\n"
@@ -549,7 +549,7 @@ TEST(SimCh11, TernaryUnaryNotCondition) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   // !0 = 1 → true branch → 77.
   EXPECT_EQ(var->value.ToUint64(), 77u);
@@ -558,7 +558,7 @@ TEST(SimCh11, TernaryUnaryNotCondition) {
 // §11.4.6: Multiple ternaries combined in one expression.
 TEST(SimCh11, TernaryMultipleInExpression) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  int a, b, result;\n"
       "  initial begin\n"
@@ -574,7 +574,7 @@ TEST(SimCh11, TernaryMultipleInExpression) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   // (1?10:20) + (0?30:40) = 10 + 40 = 50.
   EXPECT_EQ(var->value.ToUint64(), 50u);
@@ -583,7 +583,7 @@ TEST(SimCh11, TernaryMultipleInExpression) {
 // §11.4.6: Ternary result used in further computation.
 TEST(SimCh11, TernaryResultInComputation) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  int sel, result;\n"
       "  initial begin\n"
@@ -598,7 +598,7 @@ TEST(SimCh11, TernaryResultInComputation) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   // (1?6:3) * 7 = 6 * 7 = 42.
   EXPECT_EQ(var->value.ToUint64(), 42u);
@@ -607,7 +607,7 @@ TEST(SimCh11, TernaryResultInComputation) {
 // §11.4.6: Ternary with bit-select condition.
 TEST(SimCh11, TernaryBitSelectCondition) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] flags;\n"
       "  int result;\n"
@@ -623,7 +623,7 @@ TEST(SimCh11, TernaryBitSelectCondition) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   // flags[2] = 1 → true → 1.
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -632,7 +632,7 @@ TEST(SimCh11, TernaryBitSelectCondition) {
 // §11.4.6: Ternary with part-select operands.
 TEST(SimCh11, TernaryPartSelectOperands) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] data;\n"
       "  logic [7:0] result;\n"
@@ -648,7 +648,7 @@ TEST(SimCh11, TernaryPartSelectOperands) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   // True branch: data[15:8] = 0xAB.
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
@@ -657,7 +657,7 @@ TEST(SimCh11, TernaryPartSelectOperands) {
 // §11.4.6: Verify .width on ternary result with 8-bit operands.
 TEST(SimCh11, TernaryResultWidth8Bit) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, result;\n"
       "  initial begin\n"
@@ -673,7 +673,7 @@ TEST(SimCh11, TernaryResultWidth8Bit) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 8u);
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
@@ -682,7 +682,7 @@ TEST(SimCh11, TernaryResultWidth8Bit) {
 // §11.4.6: Verify .width and .ToUint64() on ternary result with 32-bit int.
 TEST(SimCh11, TernaryResultWidth32Bit) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  int result;\n"
       "  initial begin\n"
@@ -696,7 +696,7 @@ TEST(SimCh11, TernaryResultWidth32Bit) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 32u);
   EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFu);
@@ -705,7 +705,7 @@ TEST(SimCh11, TernaryResultWidth32Bit) {
 // §11.4.6: Nested ternary — outer false, inner not reached.
 TEST(SimCh11, TernaryNestedOuterFalse) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  int result;\n"
       "  initial begin\n"
@@ -719,7 +719,7 @@ TEST(SimCh11, TernaryNestedOuterFalse) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   // Outer condition 0 → false branch → 30.
   EXPECT_EQ(var->value.ToUint64(), 30u);
@@ -728,7 +728,7 @@ TEST(SimCh11, TernaryNestedOuterFalse) {
 // §11.4.6: Chained ternary selects last default when no match.
 TEST(SimCh11, TernaryChainedDefault) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  int sel, result;\n"
       "  initial begin\n"
@@ -745,7 +745,7 @@ TEST(SimCh11, TernaryChainedDefault) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   // No match → default 999.
   EXPECT_EQ(var->value.ToUint64(), 999u);
@@ -754,7 +754,7 @@ TEST(SimCh11, TernaryChainedDefault) {
 // §11.4.6: Ternary with logical AND in condition.
 TEST(SimCh11, TernaryLogicalAndCondition) {
   SimCh11Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  int a, b, result;\n"
       "  initial begin\n"
@@ -770,7 +770,7 @@ TEST(SimCh11, TernaryLogicalAndCondition) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   // (3 && 4) is true → 55.
   EXPECT_EQ(var->value.ToUint64(), 55u);

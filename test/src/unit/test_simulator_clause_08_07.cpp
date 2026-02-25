@@ -27,16 +27,16 @@ struct ClassFixture {
 };
 
 // AST helper: make an identifier expression.
-static Expr *MkId(Arena &a, std::string_view name) {
-  auto *e = a.Create<Expr>();
+static Expr* MkId(Arena& a, std::string_view name) {
+  auto* e = a.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
   e->text = name;
   return e;
 }
 
 // AST helper: make a blocking assignment statement.
-static Stmt *MkAssign(Arena &a, std::string_view lhs_name, Expr *rhs) {
-  auto *s = a.Create<Stmt>();
+static Stmt* MkAssign(Arena& a, std::string_view lhs_name, Expr* rhs) {
+  auto* s = a.Create<Stmt>();
   s->kind = StmtKind::kBlockingAssign;
   s->lhs = MkId(a, lhs_name);
   s->rhs = rhs;
@@ -44,10 +44,10 @@ static Stmt *MkAssign(Arena &a, std::string_view lhs_name, Expr *rhs) {
 }
 
 // Build a simple ClassTypeInfo and register it with the context.
-static ClassTypeInfo *MakeClassType(
-    ClassFixture &f, std::string_view name,
-    const std::vector<std::string_view> &props) {
-  auto *info = f.arena.Create<ClassTypeInfo>();
+static ClassTypeInfo* MakeClassType(
+    ClassFixture& f, std::string_view name,
+    const std::vector<std::string_view>& props) {
+  auto* info = f.arena.Create<ClassTypeInfo>();
   info->name = name;
   for (auto p : props) {
     info->properties.push_back({p, 32, false});
@@ -57,12 +57,12 @@ static ClassTypeInfo *MakeClassType(
 }
 
 // Allocate a ClassObject of the given type, returning (handle_id, object*).
-static std::pair<uint64_t, ClassObject *> MakeObj(ClassFixture &f,
-                                                  ClassTypeInfo *type) {
-  auto *obj = f.arena.Create<ClassObject>();
+static std::pair<uint64_t, ClassObject*> MakeObj(ClassFixture& f,
+                                                 ClassTypeInfo* type) {
+  auto* obj = f.arena.Create<ClassObject>();
   obj->type = type;
   // Initialize properties to 0.
-  for (const auto &p : type->properties) {
+  for (const auto& p : type->properties) {
     obj->properties[std::string(p.name)] =
         MakeLogic4VecVal(f.arena, p.width, 0);
   }
@@ -77,12 +77,12 @@ namespace {
 // =============================================================================
 TEST(ClassSim, ConstructorMethodRegistered) {
   ClassFixture f;
-  auto *type = MakeClassType(f, "Packet", {"header", "payload"});
+  auto* type = MakeClassType(f, "Packet", {"header", "payload"});
 
   // function new(input int h, input int p);
   //   header = h; payload = p;
   // endfunction
-  auto *ctor = f.arena.Create<ModuleItem>();
+  auto* ctor = f.arena.Create<ModuleItem>();
   ctor->kind = ModuleItemKind::kFunctionDecl;
   ctor->name = "new";
   ctor->return_type.kind = DataTypeKind::kVoid;
@@ -96,16 +96,16 @@ TEST(ClassSim, ConstructorMethodRegistered) {
       MkAssign(f.arena, "payload", MkId(f.arena, "p")));
   type->methods["new"] = ctor;
 
-  auto *resolved = type->methods["new"];
+  auto* resolved = type->methods["new"];
   ASSERT_NE(resolved, nullptr);
   EXPECT_EQ(resolved->func_args.size(), 2u);
 }
 
 TEST(ClassSim, ConstructorBodyExecutesStatements) {
   ClassFixture f;
-  auto *type = MakeClassType(f, "Init", {"val"});
+  auto* type = MakeClassType(f, "Init", {"val"});
 
-  auto *ctor = f.arena.Create<ModuleItem>();
+  auto* ctor = f.arena.Create<ModuleItem>();
   ctor->kind = ModuleItemKind::kFunctionDecl;
   ctor->name = "new";
   ctor->return_type.kind = DataTypeKind::kVoid;
@@ -118,9 +118,9 @@ TEST(ClassSim, ConstructorBodyExecutesStatements) {
   f.ctx.PushThis(obj);
   f.ctx.PushScope();
 
-  auto *arg_var = f.ctx.CreateLocalVariable("v", 32);
+  auto* arg_var = f.ctx.CreateLocalVariable("v", 32);
   arg_var->value = MakeLogic4VecVal(f.arena, 32, 77);
-  auto *val_var = f.ctx.CreateLocalVariable("val", 32);
+  auto* val_var = f.ctx.CreateLocalVariable("val", 32);
   val_var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
   // Execute: val = v

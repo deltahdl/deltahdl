@@ -1,7 +1,9 @@
 // §12.7.1: The for-loop
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -24,11 +26,11 @@ struct SimA608Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA608Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA608Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -39,7 +41,7 @@ namespace {
 // §12.7.1: for loop — basic accumulation
 TEST(SimA608, ForBasic) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] total;\n"
       "  initial begin\n"
@@ -53,7 +55,7 @@ TEST(SimA608, ForBasic) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("total");
+  auto* var = f.ctx.FindVariable("total");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
@@ -61,7 +63,7 @@ TEST(SimA608, ForBasic) {
 // §12.7.1: for with typed init — variable used in body
 TEST(SimA608, ForTypedInit) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] sum;\n"
       "  initial begin\n"
@@ -75,7 +77,7 @@ TEST(SimA608, ForTypedInit) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("sum");
+  auto* var = f.ctx.FindVariable("sum");
   ASSERT_NE(var, nullptr);
   // 1 + 2 + 3 + 4 = 10
   EXPECT_EQ(var->value.ToUint64(), 10u);
@@ -84,7 +86,7 @@ TEST(SimA608, ForTypedInit) {
 // §12.7.1: for with empty init/cond/step — for(;;) with break
 TEST(SimA608, ForAllEmptyWithBreak) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -100,7 +102,7 @@ TEST(SimA608, ForAllEmptyWithBreak) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
@@ -108,7 +110,7 @@ TEST(SimA608, ForAllEmptyWithBreak) {
 // §12.7.1: for_step with inc_or_dec_expression (i++)
 TEST(SimA608, ForStepIncrement) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -122,7 +124,7 @@ TEST(SimA608, ForStepIncrement) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
@@ -148,24 +150,24 @@ struct SimCh4Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimCh4Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimCh4Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-static uint64_t RunAndGet(const std::string &src, const char *var_name) {
+static uint64_t RunAndGet(const std::string& src, const char* var_name) {
   SimCh4Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable(var_name);
+  auto* var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
   if (!var) return 0;
   return var->value.ToUint64();

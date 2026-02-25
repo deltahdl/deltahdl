@@ -26,10 +26,10 @@ struct ClassFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 // Build a simple ClassTypeInfo and register it with the context.
-static ClassTypeInfo *MakeClassType(
-    ClassFixture &f, std::string_view name,
-    const std::vector<std::string_view> &props) {
-  auto *info = f.arena.Create<ClassTypeInfo>();
+static ClassTypeInfo* MakeClassType(
+    ClassFixture& f, std::string_view name,
+    const std::vector<std::string_view>& props) {
+  auto* info = f.arena.Create<ClassTypeInfo>();
   info->name = name;
   for (auto p : props) {
     info->properties.push_back({p, 32, false});
@@ -39,12 +39,12 @@ static ClassTypeInfo *MakeClassType(
 }
 
 // Allocate a ClassObject of the given type, returning (handle_id, object*).
-static std::pair<uint64_t, ClassObject *> MakeObj(ClassFixture &f,
-                                                  ClassTypeInfo *type) {
-  auto *obj = f.arena.Create<ClassObject>();
+static std::pair<uint64_t, ClassObject*> MakeObj(ClassFixture& f,
+                                                 ClassTypeInfo* type) {
+  auto* obj = f.arena.Create<ClassObject>();
   obj->type = type;
   // Initialize properties to 0.
-  for (const auto &p : type->properties) {
+  for (const auto& p : type->properties) {
     obj->properties[std::string(p.name)] =
         MakeLogic4VecVal(f.arena, p.width, 0);
   }
@@ -59,7 +59,7 @@ namespace {
 // =============================================================================
 TEST(ClassSim, AllocateNewObject) {
   ClassFixture f;
-  auto *type = MakeClassType(f, "Packet", {"header", "payload"});
+  auto* type = MakeClassType(f, "Packet", {"header", "payload"});
   auto [handle, obj] = MakeObj(f, type);
 
   EXPECT_NE(handle, kNullClassHandle);
@@ -69,7 +69,7 @@ TEST(ClassSim, AllocateNewObject) {
 
 TEST(ClassSim, NewReturnsUniqueHandles) {
   ClassFixture f;
-  auto *type = MakeClassType(f, "MyClass", {"x"});
+  auto* type = MakeClassType(f, "MyClass", {"x"});
   auto [h1, _1] = MakeObj(f, type);
   auto [h2, _2] = MakeObj(f, type);
 
@@ -78,10 +78,10 @@ TEST(ClassSim, NewReturnsUniqueHandles) {
 
 TEST(ClassSim, HandleToObjectLookup) {
   ClassFixture f;
-  auto *type = MakeClassType(f, "Foo", {"val"});
+  auto* type = MakeClassType(f, "Foo", {"val"});
   auto [handle, obj] = MakeObj(f, type);
 
-  auto *retrieved = f.ctx.GetClassObject(handle);
+  auto* retrieved = f.ctx.GetClassObject(handle);
   EXPECT_EQ(retrieved, obj);
 }
 
@@ -92,30 +92,30 @@ TEST(ClassSim, NullHandleIsZero) { EXPECT_EQ(kNullClassHandle, 0u); }
 
 TEST(ClassSim, GetClassObjectNullReturnsNullptr) {
   ClassFixture f;
-  auto *obj = f.ctx.GetClassObject(kNullClassHandle);
+  auto* obj = f.ctx.GetClassObject(kNullClassHandle);
   EXPECT_EQ(obj, nullptr);
 }
 
 TEST(ClassSim, GetClassObjectInvalidReturnsNullptr) {
   ClassFixture f;
-  auto *obj = f.ctx.GetClassObject(99999);
+  auto* obj = f.ctx.GetClassObject(99999);
   EXPECT_EQ(obj, nullptr);
 }
 
 TEST(ClassSim, ClassTypeRegistryLookup) {
   ClassFixture f;
-  auto *type = MakeClassType(f, "Registry", {"x"});
+  auto* type = MakeClassType(f, "Registry", {"x"});
 
-  auto *found = f.ctx.FindClassType("Registry");
+  auto* found = f.ctx.FindClassType("Registry");
   EXPECT_EQ(found, type);
 
-  auto *notfound = f.ctx.FindClassType("Nonexistent");
+  auto* notfound = f.ctx.FindClassType("Nonexistent");
   EXPECT_EQ(notfound, nullptr);
 }
 
 TEST(ClassSim, MultipleObjectsSameType) {
   ClassFixture f;
-  auto *type = MakeClassType(f, "Widget", {"value"});
+  auto* type = MakeClassType(f, "Widget", {"value"});
 
   auto [h1, o1] = MakeObj(f, type);
   auto [h2, o2] = MakeObj(f, type);

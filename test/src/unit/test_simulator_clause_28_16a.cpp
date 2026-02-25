@@ -24,13 +24,13 @@ struct MinTypMax {
 
 enum class ChargeDecayState : uint8_t { kIdle, kDecaying, kDone };
 
-uint64_t ComputePropagationDelay(const DelaySpec &spec, Val4 from, Val4 to);
+uint64_t ComputePropagationDelay(const DelaySpec& spec, Val4 from, Val4 to);
 
-uint64_t SelectMinTypMax(const MinTypMax &mtm, uint8_t selector);
+uint64_t SelectMinTypMax(const MinTypMax& mtm, uint8_t selector);
 
-bool ValidateTriregChargeDecaySpec(const DelaySpec &spec);
+bool ValidateTriregChargeDecaySpec(const DelaySpec& spec);
 
-uint64_t ComputePropagationDelay(const DelaySpec &spec, Val4 from, Val4 to) {
+uint64_t ComputePropagationDelay(const DelaySpec& spec, Val4 from, Val4 to) {
   if (spec.count == 0) return 0;
   if (spec.count == 1) return spec.d1;
   if (from == to) return 0;
@@ -59,7 +59,7 @@ uint64_t ComputePropagationDelay(const DelaySpec &spec, Val4 from, Val4 to) {
   return 0;
 }
 
-uint64_t SelectMinTypMax(const MinTypMax &mtm, uint8_t selector) {
+uint64_t SelectMinTypMax(const MinTypMax& mtm, uint8_t selector) {
   switch (selector) {
     case 0:
       return mtm.min_val;
@@ -72,7 +72,7 @@ uint64_t SelectMinTypMax(const MinTypMax &mtm, uint8_t selector) {
   }
 }
 
-bool ValidateTriregChargeDecaySpec(const DelaySpec &spec) {
+bool ValidateTriregChargeDecaySpec(const DelaySpec& spec) {
   return spec.count == 3;
 }
 

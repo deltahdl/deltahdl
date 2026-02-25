@@ -25,11 +25,11 @@ struct SimCh513Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimCh513Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimCh513Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -47,7 +47,7 @@ TEST(SimCh513, BuiltinMethodCallWithParens) {
       "  end\n"
       "endmodule\n";
   SimCh513Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -66,7 +66,7 @@ TEST(SimCh513, BuiltinMethodNoParens) {
       "  end\n"
       "endmodule\n";
   SimCh513Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -85,7 +85,7 @@ TEST(SimCh513, BuiltinMethodInExpr) {
       "  end\n"
       "endmodule\n";
   SimCh513Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -106,7 +106,7 @@ TEST(SimCh513, BuiltinMethodOnQueue) {
       "  end\n"
       "endmodule\n";
   SimCh513Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -126,12 +126,12 @@ TEST(SimCh513, BuiltinMethodWithArg) {
       "  end\n"
       "endmodule\n";
   SimCh513Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *q = f.ctx.FindQueue("q");
+  auto* q = f.ctx.FindQueue("q");
   ASSERT_NE(q, nullptr);
   ASSERT_EQ(q->elements.size(), 3u);
   EXPECT_EQ(q->elements[0].ToUint64(), 0x42u);
@@ -150,7 +150,7 @@ TEST(SimCh513, BuiltinMethodReduction) {
       "  end\n"
       "endmodule\n";
   SimCh513Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -168,7 +168,7 @@ TEST(SimCh513, BuiltinMethodMutating) {
       "  end\n"
       "endmodule\n";
   SimCh513Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -188,7 +188,7 @@ TEST(SimCh513, BuiltinMethodMutatingNoParens) {
       "  end\n"
       "endmodule\n";
   SimCh513Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -209,7 +209,7 @@ TEST(SimCh513, BuiltinMethodDynArray) {
       "  end\n"
       "endmodule\n";
   SimCh513Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -232,13 +232,13 @@ TEST(SimCh513, BuiltinMethodQueuePopFront) {
       "  end\n"
       "endmodule\n";
   SimCh513Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
   EXPECT_EQ(f.ctx.FindVariable("s")->value.ToUint64(), 2u);
-  auto *q = f.ctx.FindQueue("q");
+  auto* q = f.ctx.FindQueue("q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->elements[0].ToUint64(), 0x20u);
   EXPECT_EQ(q->elements[1].ToUint64(), 0x30u);

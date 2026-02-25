@@ -25,11 +25,11 @@ struct LowerFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, LowerFixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, LowerFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -38,7 +38,7 @@ namespace {
 
 TEST(Lowerer, AlwaysCombRetrigger) {
   LowerFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] a, b;\n"
       "  always_comb b = a + 1;\n"
@@ -54,7 +54,7 @@ TEST(Lowerer, AlwaysCombRetrigger) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *b = f.ctx.FindVariable("b");
+  auto* b = f.ctx.FindVariable("b");
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(b->value.ToUint64(), 6u);
 }
@@ -62,7 +62,7 @@ TEST(Lowerer, AlwaysCombRetrigger) {
 TEST(Lowerer, AlwaysCombAutoTriggerTimeZero) {
   // IEEE §9.2: always_comb auto-triggers once at time zero.
   LowerFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] b;\n"
       "  always_comb b = 42;\n"
@@ -75,14 +75,14 @@ TEST(Lowerer, AlwaysCombAutoTriggerTimeZero) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *b = f.ctx.FindVariable("b");
+  auto* b = f.ctx.FindVariable("b");
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(b->value.ToUint64(), 42u);
 }
 
 TEST(Lowerer, SensitivityMapPopulated) {
   LowerFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] a, b;\n"
       "  always_comb b = a + 1;\n"
@@ -94,7 +94,7 @@ TEST(Lowerer, SensitivityMapPopulated) {
   lowerer.Lower(design);
 
   // Sensitivity map should have signal 'a' mapped to a process.
-  const auto &procs = f.ctx.GetSensitiveProcesses("a");
+  const auto& procs = f.ctx.GetSensitiveProcesses("a");
   EXPECT_FALSE(procs.empty());
 }
 
@@ -119,24 +119,24 @@ struct SimCh4Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimCh4Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimCh4Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-static uint64_t RunAndGet(const std::string &src, const char *var_name) {
+static uint64_t RunAndGet(const std::string& src, const char* var_name) {
   SimCh4Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable(var_name);
+  auto* var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
   if (!var) return 0;
   return var->value.ToUint64();
@@ -148,7 +148,7 @@ static uint64_t RunAndGet(const std::string &src, const char *var_name) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, InitialAndAlwaysCombConcurrent) {
   SimCh4Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, result;\n"
       "  initial a = 8'd10;\n"
@@ -159,7 +159,7 @@ TEST(SimCh4, InitialAndAlwaysCombConcurrent) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 11u);
 }
@@ -170,7 +170,7 @@ TEST(SimCh4, InitialAndAlwaysCombConcurrent) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, CombAndSequentialAbstractions) {
   SimCh4Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, sum;\n"
       "  initial begin\n"
@@ -184,7 +184,7 @@ TEST(SimCh4, CombAndSequentialAbstractions) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("sum");
+  auto* var = f.ctx.FindVariable("sum");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
@@ -195,7 +195,7 @@ TEST(SimCh4, CombAndSequentialAbstractions) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, ConcurrentAlwaysCombBlocks) {
   SimCh4Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, r1, r2;\n"
       "  initial a = 8'd10;\n"
@@ -217,7 +217,7 @@ TEST(SimCh4, ConcurrentAlwaysCombBlocks) {
 // ---------------------------------------------------------------------------
 TEST(SimCh4, AlwaysCombWithBeginEnd) {
   SimCh4Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, r1, r2;\n"
       "  initial a = 8'd5;\n"

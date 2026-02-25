@@ -1,6 +1,7 @@
 // Annex I.3: Source code
 
 #include <gtest/gtest.h>
+
 #include "vpi/svdpi.h"
 
 namespace {

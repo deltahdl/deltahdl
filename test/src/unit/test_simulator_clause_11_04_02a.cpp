@@ -23,23 +23,23 @@ struct EvalAdvFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static Expr *MakeId(Arena &arena, std::string_view name) {
-  auto *e = arena.Create<Expr>();
+static Expr* MakeId(Arena& arena, std::string_view name) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
   e->text = name;
   return e;
 }
 
-static double AdvToDouble(const Logic4Vec &v) {
+static double AdvToDouble(const Logic4Vec& v) {
   double d = 0.0;
   uint64_t bits = v.ToUint64();
   std::memcpy(&d, &bits, sizeof(double));
   return d;
 }
 
-static Variable *MakeRealVarAdv(EvalAdvFixture &f, std::string_view name,
+static Variable* MakeRealVarAdv(EvalAdvFixture& f, std::string_view name,
                                 double val) {
-  auto *var = f.ctx.CreateVariable(name, 64);
+  auto* var = f.ctx.CreateVariable(name, 64);
   uint64_t bits = 0;
   std::memcpy(&bits, &val, sizeof(double));
   var->value = MakeLogic4VecVal(f.arena, 64, bits);
@@ -53,7 +53,7 @@ TEST(EvalAdv, RealIncrementBy1Point0) {
   EvalAdvFixture f;
   // §11.4.2: ++real_var should increment by 1.0, not by integer 1.
   MakeRealVarAdv(f, "rv", 2.5);
-  auto *inc = f.arena.Create<Expr>();
+  auto* inc = f.arena.Create<Expr>();
   inc->kind = ExprKind::kUnary;
   inc->op = TokenKind::kPlusPlus;
   inc->lhs = MakeId(f.arena, "rv");

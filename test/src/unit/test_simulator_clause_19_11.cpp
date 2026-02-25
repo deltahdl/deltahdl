@@ -14,8 +14,8 @@ namespace {
 
 TEST(Coverage, AutoBinSampleAndCoverage) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "x");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "x");
   cp->auto_bin_count = 4;
   CoverageDB::AutoCreateBins(cp, 0, 3);
 
@@ -33,7 +33,7 @@ TEST(Coverage, AutoBinSampleAndCoverage) {
 // =============================================================================
 TEST(Coverage, EmptyGroupCoverageIsZero) {
   CoverageDB db;
-  auto *g = db.CreateGroup("empty");
+  auto* g = db.CreateGroup("empty");
   EXPECT_DOUBLE_EQ(CoverageDB::GetCoverage(g), 0.0);
 }
 
@@ -48,15 +48,15 @@ TEST(Coverage, PointCoverageWithNoBinsIs100) {
 // =============================================================================
 TEST(Coverage, MultipleCoverpointsAveraged) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
+  auto* g = db.CreateGroup("cg");
 
-  auto *cp1 = CoverageDB::AddCoverPoint(g, "a");
+  auto* cp1 = CoverageDB::AddCoverPoint(g, "a");
   CoverBin b1;
   b1.name = "b0";
   b1.values = {0};
   CoverageDB::AddBin(cp1, b1);
 
-  auto *cp2 = CoverageDB::AddCoverPoint(g, "b");
+  auto* cp2 = CoverageDB::AddCoverPoint(g, "b");
   CoverBin b2;
   b2.name = "b0";
   b2.values = {0};

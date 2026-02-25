@@ -1,6 +1,7 @@
 // §36.12.2.1: Mechanism 1: Compile-based binding to a compatibility mode
 
 #include <gtest/gtest.h>
+
 #include "vpi/vpi_compatibility.h"
 
 namespace {

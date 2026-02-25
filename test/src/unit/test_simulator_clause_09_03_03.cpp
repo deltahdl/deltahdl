@@ -1,7 +1,9 @@
 // §9.3.3: Statement block start and finish times
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -25,11 +27,11 @@ struct SimA603Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA603Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA603Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -39,7 +41,7 @@ namespace {
 // Nested sequential blocks execute sequentially
 TEST(SimA603, NestedSeqBlockExecution) {
   SimA603Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] r;\n"
       "  initial begin\n"
@@ -57,7 +59,7 @@ TEST(SimA603, NestedSeqBlockExecution) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("r");
+  auto* var = f.ctx.FindVariable("r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }

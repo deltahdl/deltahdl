@@ -1,7 +1,9 @@
 // §12.7.1: The for-loop
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -19,13 +21,13 @@ struct ElabA608Fixture {
   bool has_errors = false;
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, ElabA608Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, ElabA608Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
-  auto *design = elab.Elaborate(cu->modules.back()->name);
+  auto* design = elab.Elaborate(cu->modules.back()->name);
   f.has_errors = f.diag.HasErrors();
   return design;
 }
@@ -38,7 +40,7 @@ namespace {
 // §12.7.1: for loop with typed init elaborates without error
 TEST(ElabA608, ForLoopTypedInit) {
   ElabA608Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -53,7 +55,7 @@ TEST(ElabA608, ForLoopTypedInit) {
 // §12.7.1: for loop without typed init elaborates without error
 TEST(ElabA608, ForLoopUntypedInit) {
   ElabA608Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] x;\n"
       "  integer i;\n"
@@ -69,7 +71,7 @@ TEST(ElabA608, ForLoopUntypedInit) {
 // Nested loops elaborate without error
 TEST(ElabA608, NestedLoops) {
   ElabA608Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"

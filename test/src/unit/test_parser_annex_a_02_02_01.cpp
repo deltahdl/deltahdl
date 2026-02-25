@@ -1,7 +1,9 @@
 // Annex A.2.2.1: Net and variable types
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -13,11 +15,11 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-ParseResult Parse(const std::string &src) {
+ParseResult Parse(const std::string& src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -74,7 +76,7 @@ TEST(ParserA221, NetTypeVariants) {
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto &items = r.cu->modules[0]->items;
+  auto& items = r.cu->modules[0]->items;
   EXPECT_EQ(items[0]->data_type.kind, DataTypeKind::kSupply0);
   EXPECT_EQ(items[1]->data_type.kind, DataTypeKind::kSupply1);
   EXPECT_EQ(items[2]->data_type.kind, DataTypeKind::kTri);

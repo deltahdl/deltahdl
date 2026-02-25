@@ -1,6 +1,7 @@
 // §3.14.2.1: The `timescale compiler directive
 
 #include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -20,7 +21,7 @@ struct PreprocResult3140201 {
   bool has_errors;
 };
 
-static PreprocResult3140201 Preprocess(const std::string &src) {
+static PreprocResult3140201 Preprocess(const std::string& src) {
   PreprocResult3140201 result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
@@ -37,11 +38,11 @@ static PreprocResult3140201 Preprocess(const std::string &src) {
 struct ParseResult3140201 {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult3140201 Parse(const std::string &src) {
+static ParseResult3140201 Parse(const std::string& src) {
   ParseResult3140201 result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
@@ -77,8 +78,8 @@ struct PreprocFixture {
   DiagEngine diag{mgr};
 };
 
-static std::string PreprocessWithPP(const std::string &src, PreprocFixture &f,
-                                    Preprocessor &pp) {
+static std::string PreprocessWithPP(const std::string& src, PreprocFixture& f,
+                                    Preprocessor& pp) {
   auto fid = f.mgr.AddFile("<test>", src);
   return pp.Preprocess(fid);
 }

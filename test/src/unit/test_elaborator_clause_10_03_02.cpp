@@ -1,6 +1,7 @@
 // §10.3.2: The continuous assignment statement
 
 #include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -21,11 +22,11 @@ struct ElabFixture {
   DiagEngine diag{mgr};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, ElabFixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -60,14 +61,14 @@ TEST(Elaboration, VarSingleContAssign_Ok) {
 // =============================================================================
 TEST(ElabClause1003, MultipleContAssigns) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  wire a, b, c, d;\n"
       "  assign a = b, c = d;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   ASSERT_GE(mod->assigns.size(), 2u);
 }
 

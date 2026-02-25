@@ -1,7 +1,9 @@
 // §16.14.3: Cover statement
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -13,11 +15,11 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-ParseResult Parse(const std::string &src) {
+ParseResult Parse(const std::string& src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -28,7 +30,7 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-static bool ParseOk(const std::string &src) {
+static bool ParseOk(const std::string& src) {
   SourceManager mgr;
   Arena arena;
   auto fid = mgr.AddFile("<test>", src);
@@ -39,9 +41,9 @@ static bool ParseOk(const std::string &src) {
   return !diag.HasErrors();
 }
 
-static ModuleItem *FindItemByKind(const std::vector<ModuleItem *> &items,
+static ModuleItem* FindItemByKind(const std::vector<ModuleItem*>& items,
                                   ModuleItemKind kind) {
-  for (auto *item : items) {
+  for (auto* item : items) {
     if (item->kind == kind) return item;
   }
   return nullptr;
@@ -55,7 +57,7 @@ TEST(ParserA210, ConcurrentAssertionItem_CoverProperty) {
       "  cover property (@(posedge clk) a ##1 b);\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto *item =
+  auto* item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kCoverProperty);
   ASSERT_NE(item, nullptr);
 }
@@ -72,7 +74,7 @@ TEST(ParserA210, CoverSequence_Basic) {
       "  cover sequence (@(posedge clk) a ##1 b);\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto *item =
+  auto* item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kCoverSequence);
   ASSERT_NE(item, nullptr);
 }
@@ -84,7 +86,7 @@ TEST(ParserA210, CoverSequence_WithPassAction) {
       "    $display(\"seq covered\");\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto *item =
+  auto* item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kCoverSequence);
   ASSERT_NE(item, nullptr);
   EXPECT_NE(item->assert_pass_stmt, nullptr);
@@ -103,7 +105,7 @@ TEST(ParserA210, CoverSequence_Kind) {
       "  cover sequence (a ##1 b);\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto *item =
+  auto* item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kCoverSequence);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kCoverSequence);
@@ -119,7 +121,7 @@ TEST(ParserA210, CoverProperty_WithPassStmt) {
       "    $display(\"covered\");\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto *item =
+  auto* item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kCoverProperty);
   ASSERT_NE(item, nullptr);
   EXPECT_NE(item->assert_pass_stmt, nullptr);
@@ -131,7 +133,7 @@ TEST(ParserA210, CoverSequence_HasAssertExpr) {
       "  cover sequence (@(posedge clk) a ##1 b);\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto *item =
+  auto* item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kCoverSequence);
   ASSERT_NE(item, nullptr);
   EXPECT_NE(item->assert_expr, nullptr);

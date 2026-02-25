@@ -1,6 +1,7 @@
 // Annex H.10.1.2: Canonical representation of packed arrays
 
 #include <gtest/gtest.h>
+
 #include "vpi/svdpi.h"
 
 namespace {

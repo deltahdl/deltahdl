@@ -29,7 +29,8 @@ static CompilationUnit* ParseSrc(const std::string& src, ParseFixture& f) {
 }
 
 // ===========================================================================
-// §A.9.3: hierarchical_identifier ::= [ $root . ] { identifier constant_bit_select . } identifier
+// §A.9.3: hierarchical_identifier ::= [ $root . ] { identifier
+// constant_bit_select . } identifier
 // ===========================================================================
 
 TEST(ParserA93, SimpleIdentInExpr) {
@@ -217,7 +218,8 @@ TEST(ParserA93, DpiImportPureFunction) {
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
-      "  import \"DPI-C\" pure function int compute(input int a, input int b);\n"
+      "  import \"DPI-C\" pure function int compute(input int a, input int "
+      "b);\n"
       "endmodule\n",
       f);
   ASSERT_NE(cu, nullptr);

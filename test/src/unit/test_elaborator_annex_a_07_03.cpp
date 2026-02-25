@@ -1,7 +1,9 @@
 // Annex A.7.3: Specify block terminals
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -19,13 +21,13 @@ struct ElabA703Fixture {
   bool has_errors = false;
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, ElabA703Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, ElabA703Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
-  auto *design = elab.Elaborate(cu->modules.back()->name);
+  auto* design = elab.Elaborate(cu->modules.back()->name);
   f.has_errors = f.diag.HasErrors();
   return design;
 }
@@ -35,7 +37,7 @@ namespace {
 // Dotted terminal with range elaborates
 TEST(ElabA703, DottedTerminalWithRangeElaborates) {
   ElabA703Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
       "    (intf.sig[3:0] => intf.out[7:0]) = 5;\n"

@@ -25,24 +25,24 @@ struct SimCh50603Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimCh50603Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimCh50603Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-static uint64_t RunAndGet(const std::string &src, const char *var_name) {
+static uint64_t RunAndGet(const std::string& src, const char* var_name) {
   SimCh50603Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable(var_name);
+  auto* var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
   if (!var) return 0;
   return var->value.ToUint64();
@@ -53,7 +53,7 @@ TEST(SimCh50603, SystemTaskDoesNotConsumeTime) {
   // $display executes at time 0; result assigned after it proves no time
   // passes.
   SimCh50603Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] result;\n"
       "  initial begin\n"
@@ -69,7 +69,7 @@ TEST(SimCh50603, SystemTaskDoesNotConsumeTime) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   // All three assignments complete without any time advancement.
   EXPECT_EQ(var->value.ToUint64(), 7u);

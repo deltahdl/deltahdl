@@ -17,8 +17,8 @@ namespace {
 // =============================================================================
 TEST(Coverage, TransitionBinNotMatchedByScalar) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "sig");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "sig");
   CoverBin tbin;
   tbin.name = "t_01";
   tbin.kind = CoverBinKind::kTransition;

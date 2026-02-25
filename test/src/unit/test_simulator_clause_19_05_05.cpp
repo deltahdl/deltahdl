@@ -16,8 +16,8 @@ namespace {
 // =============================================================================
 TEST(Coverage, WildcardBinMatchesValues) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "data");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "data");
   CoverBin wbin;
   wbin.name = "w_even";
   wbin.kind = CoverBinKind::kWildcard;

@@ -1,7 +1,9 @@
 // Annex A.7.5.3: System timing check event definitions
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -25,11 +27,11 @@ struct SimA70503Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA70503Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA70503Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -73,7 +75,7 @@ TEST(SimA70503, RuntimeTimingCheckEntryEdgeKw) {
 // Terminal with bit select simulates
 TEST(SimA70503, TerminalBitSelectSimulates) {
   SimA70503Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
@@ -86,7 +88,7 @@ TEST(SimA70503, TerminalBitSelectSimulates) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
@@ -94,7 +96,7 @@ TEST(SimA70503, TerminalBitSelectSimulates) {
 // Terminal with part select simulates
 TEST(SimA70503, TerminalPartSelectSimulates) {
   SimA70503Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
@@ -107,7 +109,7 @@ TEST(SimA70503, TerminalPartSelectSimulates) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
@@ -118,7 +120,7 @@ TEST(SimA70503, TerminalPartSelectSimulates) {
 // Timing check with &&& condition simulates
 TEST(SimA70503, TimingCheckConditionSimulates) {
   SimA70503Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
@@ -131,7 +133,7 @@ TEST(SimA70503, TimingCheckConditionSimulates) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
@@ -142,7 +144,7 @@ TEST(SimA70503, TimingCheckConditionSimulates) {
 // $period with controlled event simulates
 TEST(SimA70503, ControlledTimingCheckEventPeriodSimulates) {
   SimA70503Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
@@ -155,7 +157,7 @@ TEST(SimA70503, ControlledTimingCheckEventPeriodSimulates) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
@@ -163,7 +165,7 @@ TEST(SimA70503, ControlledTimingCheckEventPeriodSimulates) {
 // Full combination: edge control + bit-select + condition simulates
 TEST(SimA70503, FullCombinationSimulates) {
   SimA70503Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
@@ -176,7 +178,7 @@ TEST(SimA70503, FullCombinationSimulates) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 11u);
 }

@@ -16,8 +16,8 @@ namespace {
 // =============================================================================
 TEST(Coverage, IgnoreBinsNotSampled) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "data");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "data");
   CoverBin ign;
   ign.name = "skip_zero";
   ign.kind = CoverBinKind::kIgnore;
@@ -30,8 +30,8 @@ TEST(Coverage, IgnoreBinsNotSampled) {
 
 TEST(Coverage, IgnoreBinsExcludedFromCoverage) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "x");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "x");
 
   CoverBin good;
   good.name = "valid";

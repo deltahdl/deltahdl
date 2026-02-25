@@ -22,24 +22,24 @@ struct EvalOpFixture {
 };
 
 // Helper: build a simple integer literal Expr node.
-static Expr *MakeInt(Arena &arena, uint64_t val) {
-  auto *e = arena.Create<Expr>();
+static Expr* MakeInt(Arena& arena, uint64_t val) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
   e->int_val = val;
   return e;
 }
 
 // Helper: build an identifier Expr node.
-static Expr *MakeId(Arena &arena, std::string_view name) {
-  auto *e = arena.Create<Expr>();
+static Expr* MakeId(Arena& arena, std::string_view name) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
   e->text = name;
   return e;
 }
 
-static Variable *MakeVar4(EvalOpFixture &f, std::string_view name,
+static Variable* MakeVar4(EvalOpFixture& f, std::string_view name,
                           uint32_t width, uint64_t aval, uint64_t bval) {
-  auto *var = f.ctx.CreateVariable(name, width);
+  auto* var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4Vec(f.arena, width);
   var->value.words[0].aval = aval;
   var->value.words[0].bval = bval;
@@ -53,10 +53,10 @@ namespace {
 TEST(EvalOp, Replicate3Times) {
   EvalOpFixture f;
   // {3{4'b1010}} = 12'b1010_1010_1010 = 0xAAA
-  auto *var = f.ctx.CreateVariable("v", 4);
+  auto* var = f.ctx.CreateVariable("v", 4);
   var->value = MakeLogic4VecVal(f.arena, 4, 0xA);
 
-  auto *rep = f.arena.Create<Expr>();
+  auto* rep = f.arena.Create<Expr>();
   rep->kind = ExprKind::kReplicate;
   rep->repeat_count = MakeInt(f.arena, 3);
   rep->elements.push_back(MakeId(f.arena, "v"));
@@ -69,7 +69,7 @@ TEST(EvalOp, Replicate3Times) {
 TEST(EvalOp, ReplicateOnce) {
   EvalOpFixture f;
   // {1{8'd42}} = 42
-  auto *rep = f.arena.Create<Expr>();
+  auto* rep = f.arena.Create<Expr>();
   rep->kind = ExprKind::kReplicate;
   rep->repeat_count = MakeInt(f.arena, 1);
   rep->elements.push_back(MakeInt(f.arena, 42));
@@ -86,10 +86,10 @@ TEST(EvalOp, ConcatXZPropagation) {
   // a = 4'b1x0z: aval=0b1001, bval=0b0101
   MakeVar4(f, "ca", 4, 0b1001, 0b0101);
   // b = 4'b0101: aval=0b0101, bval=0b0000
-  auto *bv = f.ctx.CreateVariable("cb", 4);
+  auto* bv = f.ctx.CreateVariable("cb", 4);
   bv->value = MakeLogic4VecVal(f.arena, 4, 0b0101);
 
-  auto *concat = f.arena.Create<Expr>();
+  auto* concat = f.arena.Create<Expr>();
   concat->kind = ExprKind::kConcatenation;
   concat->elements.push_back(MakeId(f.arena, "ca"));
   concat->elements.push_back(MakeId(f.arena, "cb"));
@@ -110,7 +110,7 @@ TEST(EvalOp, ReplicateXZPropagation) {
   // 4'b1x0z: aval=0b1001, bval=0b0101
   MakeVar4(f, "rv", 4, 0b1001, 0b0101);
 
-  auto *rep = f.arena.Create<Expr>();
+  auto* rep = f.arena.Create<Expr>();
   rep->kind = ExprKind::kReplicate;
   rep->repeat_count = MakeInt(f.arena, 2);
   rep->elements.push_back(MakeId(f.arena, "rv"));
@@ -132,11 +132,11 @@ struct SimA81Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA81Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA81Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -144,7 +144,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA81Fixture &f) {
 // § concatenation as LHS (unpacking)
 TEST(SimA81, ConcatAsLHS) {
   SimA81Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] a, b;\n"
       "  initial {a, b} = 8'hC3;\n"
@@ -154,8 +154,8 @@ TEST(SimA81, ConcatAsLHS) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *va = f.ctx.FindVariable("a");
-  auto *vb = f.ctx.FindVariable("b");
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
   ASSERT_NE(va, nullptr);
   ASSERT_NE(vb, nullptr);
   EXPECT_EQ(va->value.ToUint64(), 0xCu);
@@ -170,11 +170,11 @@ struct SimA85Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA85Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA85Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -182,7 +182,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA85Fixture &f) {
 // § net_lvalue — concatenation LHS in continuous assignment (procedural)
 TEST(SimA85, NetLvalueConcatProcedural) {
   SimA85Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] a, b;\n"
       "  initial {a, b} = 8'hA5;\n"
@@ -192,8 +192,8 @@ TEST(SimA85, NetLvalueConcatProcedural) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *va = f.ctx.FindVariable("a");
-  auto *vb = f.ctx.FindVariable("b");
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
   ASSERT_NE(va, nullptr);
   ASSERT_NE(vb, nullptr);
   EXPECT_EQ(va->value.ToUint64(), 0xAu);

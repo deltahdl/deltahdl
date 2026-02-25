@@ -24,24 +24,24 @@ struct SimCh506Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimCh506Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimCh506Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-static uint64_t RunAndGet(const std::string &src, const char *var_name) {
+static uint64_t RunAndGet(const std::string& src, const char* var_name) {
   SimCh506Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable(var_name);
+  auto* var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
   if (!var) return 0;
   return var->value.ToUint64();
@@ -85,7 +85,7 @@ TEST(SimCh506, IdentifierStartingWithUnderscore) {
 TEST(SimCh506, IdentifiersCaseSensitive) {
   // §5.6: Identifiers are case sensitive.
   SimCh506Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] data, Data, DATA;\n"
       "  initial begin\n"
@@ -99,9 +99,9 @@ TEST(SimCh506, IdentifiersCaseSensitive) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *v1 = f.ctx.FindVariable("data");
-  auto *v2 = f.ctx.FindVariable("Data");
-  auto *v3 = f.ctx.FindVariable("DATA");
+  auto* v1 = f.ctx.FindVariable("data");
+  auto* v2 = f.ctx.FindVariable("Data");
+  auto* v3 = f.ctx.FindVariable("DATA");
   ASSERT_NE(v1, nullptr);
   ASSERT_NE(v2, nullptr);
   ASSERT_NE(v3, nullptr);
@@ -149,7 +149,7 @@ TEST(SimCh506, IdentifierWithDigits) {
 TEST(SimCh506, IdentifierReferencesObject) {
   // §5.6: An identifier gives an object a unique name for referencing.
   SimCh506Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] source, sink;\n"
       "  initial begin\n"
@@ -162,7 +162,7 @@ TEST(SimCh506, IdentifierReferencesObject) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("sink");
+  auto* var = f.ctx.FindVariable("sink");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 66u);
 }
@@ -173,7 +173,7 @@ TEST(SimCh506, IdentifierReferencesObject) {
 TEST(SimCh506, IdentifierMixedCharClasses) {
   // §5.6: Identifiers use letters, digits, $, _ in combination.
   SimCh506Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] _start, mid$dle, end_99, result;\n"
       "  initial begin\n"
@@ -188,7 +188,7 @@ TEST(SimCh506, IdentifierMixedCharClasses) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }

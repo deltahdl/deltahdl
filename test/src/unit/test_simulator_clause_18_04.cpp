@@ -35,7 +35,7 @@ TEST(Constraint, RandVariableBasic) {
 
 TEST(Constraint, RandVariableMultiple) {
   ConstraintSolver solver(42);
-  for (const auto &name : {"a", "b", "c"}) {
+  for (const auto& name : {"a", "b", "c"}) {
     RandVariable v;
     v.name = name;
     v.min_val = 0;
@@ -43,7 +43,7 @@ TEST(Constraint, RandVariableMultiple) {
     solver.AddVariable(v);
   }
   ASSERT_TRUE(solver.Solve());
-  for (const auto &name : {"a", "b", "c"}) {
+  for (const auto& name : {"a", "b", "c"}) {
     int64_t val = solver.GetValue(name);
     EXPECT_GE(val, 0);
     EXPECT_LE(val, 255);

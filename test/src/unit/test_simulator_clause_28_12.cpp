@@ -14,7 +14,7 @@ namespace {
 // --- Strength resolution (IEEE §28.12) ---
 TEST(StrengthResolution, StrongerDriverWins) {
   Arena arena;
-  auto *var = arena.Create<Variable>();
+  auto* var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 1);
   Net net;
   net.type = NetType::kWire;
@@ -32,7 +32,7 @@ TEST(StrengthResolution, StrongerDriverWins) {
 
 TEST(StrengthResolution, WeakerDriverLoses) {
   Arena arena;
-  auto *var = arena.Create<Variable>();
+  auto* var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 1);
   Net net;
   net.type = NetType::kWire;
@@ -50,7 +50,7 @@ TEST(StrengthResolution, WeakerDriverLoses) {
 
 TEST(StrengthResolution, EqualStrengthConflictProducesX) {
   Arena arena;
-  auto *var = arena.Create<Variable>();
+  auto* var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 1);
   Net net;
   net.type = NetType::kWire;
@@ -69,7 +69,7 @@ TEST(StrengthResolution, EqualStrengthConflictProducesX) {
 
 TEST(StrengthResolution, HighzDriverIgnored) {
   Arena arena;
-  auto *var = arena.Create<Variable>();
+  auto* var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 1);
   Net net;
   net.type = NetType::kWire;
@@ -90,7 +90,7 @@ TEST(StrengthResolution, HighzDriverIgnored) {
 
 TEST(StrengthResolution, AllHighzProducesZ) {
   Arena arena;
-  auto *var = arena.Create<Variable>();
+  auto* var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 1);
   Net net;
   net.type = NetType::kWire;
@@ -111,7 +111,7 @@ TEST(StrengthResolution, AllHighzProducesZ) {
 
 TEST(StrengthResolution, MultiBitMixed) {
   Arena arena;
-  auto *var = arena.Create<Variable>();
+  auto* var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 8);
   Net net;
   net.type = NetType::kWire;

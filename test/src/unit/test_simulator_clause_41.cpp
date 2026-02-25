@@ -89,7 +89,7 @@ TEST(Api, DataReadValueChangeCallback) {
   int cb_new_val = 0;
   api.RegisterValueChangeCb("sig",
                             [&cb_fired, &cb_new_val](std::string_view /*name*/,
-                                                     const DataReadValue &val) {
+                                                     const DataReadValue& val) {
                               cb_fired = true;
                               cb_new_val = val.int_val;
                             });

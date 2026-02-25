@@ -87,7 +87,7 @@ TEST(NetResolution, WorXWithOne) {
 
 TEST(NetResolution, ResolveWandNet) {
   Arena arena;
-  auto *var = arena.Create<Variable>();
+  auto* var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 8);
   Net net;
   net.type = NetType::kWand;
@@ -102,7 +102,7 @@ TEST(NetResolution, ResolveWandNet) {
 
 TEST(NetResolution, ResolveWorNet) {
   Arena arena;
-  auto *var = arena.Create<Variable>();
+  auto* var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 8);
   Net net;
   net.type = NetType::kWor;

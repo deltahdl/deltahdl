@@ -1,7 +1,10 @@
-// §6.8: on variable initialization). This is roughly equivalent to a C automatic variable.
+// §6.8: on variable initialization). This is roughly equivalent to a C
+// automatic variable.
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -13,11 +16,11 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-ParseResult Parse(const std::string &src) {
+ParseResult Parse(const std::string& src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -44,7 +47,7 @@ TEST(ParserA213, DataDeclBasicVar) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(item->name, "data");
 }
@@ -54,7 +57,7 @@ TEST(ParserA213, DataDeclVarPrefix) {
   auto r = Parse("module m; var logic x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
 }
 
@@ -63,7 +66,7 @@ TEST(ParserA213, DataDeclLifetimeAutomatic) {
   auto r = Parse("module m; automatic int counter; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_TRUE(item->is_automatic);
 }
@@ -73,7 +76,7 @@ TEST(ParserA213, DataDeclLifetimeStatic) {
   auto r = Parse("module m; static int counter; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_TRUE(item->is_static);
 }
@@ -92,7 +95,7 @@ TEST(ParserA23, ListOfVariableDeclAssignmentsMultiple) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   int count = 0;
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kVarDecl) count++;
   }
   EXPECT_GE(count, 3);
@@ -107,13 +110,13 @@ TEST(ParserA24, VarDeclAssignmentBasic) {
   auto r = Parse("module m; int x; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(item->name, "x");
   EXPECT_EQ(item->init_expr, nullptr);
 }
 
-static bool ParseOk(const std::string &src) {
+static bool ParseOk(const std::string& src) {
   SourceManager mgr;
   Arena arena;
   auto fid = mgr.AddFile("<test>", src);
@@ -133,7 +136,7 @@ TEST(ParserA28, DataDeclMultiVarsInBlock) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *body = r.cu->modules[0]->items[0]->body;
+  auto* body = r.cu->modules[0]->items[0]->body;
   ASSERT_NE(body, nullptr);
   ASSERT_GE(body->stmts.size(), 3u);
   EXPECT_EQ(body->stmts[0]->var_name, "a");

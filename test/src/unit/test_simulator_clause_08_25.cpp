@@ -26,12 +26,12 @@ struct ClassFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 // Allocate a ClassObject of the given type, returning (handle_id, object*).
-static std::pair<uint64_t, ClassObject *> MakeObj(ClassFixture &f,
-                                                  ClassTypeInfo *type) {
-  auto *obj = f.arena.Create<ClassObject>();
+static std::pair<uint64_t, ClassObject*> MakeObj(ClassFixture& f,
+                                                 ClassTypeInfo* type) {
+  auto* obj = f.arena.Create<ClassObject>();
   obj->type = type;
   // Initialize properties to 0.
-  for (const auto &p : type->properties) {
+  for (const auto& p : type->properties) {
     obj->properties[std::string(p.name)] =
         MakeLogic4VecVal(f.arena, p.width, 0);
   }
@@ -48,19 +48,19 @@ TEST(ClassSim, ParameterizedClassDifferentWidths) {
   ClassFixture f;
 
   // Simulate Stack#(8) — 8-bit data property.
-  auto *type8 = f.arena.Create<ClassTypeInfo>();
+  auto* type8 = f.arena.Create<ClassTypeInfo>();
   type8->name = "Stack_8";
   type8->properties.push_back({"data", 8, false});
   f.ctx.RegisterClassType("Stack_8", type8);
 
   // Simulate Stack#(32) — 32-bit data property.
-  auto *type32 = f.arena.Create<ClassTypeInfo>();
+  auto* type32 = f.arena.Create<ClassTypeInfo>();
   type32->name = "Stack_32";
   type32->properties.push_back({"data", 32, false});
   f.ctx.RegisterClassType("Stack_32", type32);
 
-  auto *t8 = f.ctx.FindClassType("Stack_8");
-  auto *t32 = f.ctx.FindClassType("Stack_32");
+  auto* t8 = f.ctx.FindClassType("Stack_8");
+  auto* t32 = f.ctx.FindClassType("Stack_32");
   ASSERT_NE(t8, nullptr);
   ASSERT_NE(t32, nullptr);
   EXPECT_EQ(t8->properties[0].width, 8u);
@@ -70,7 +70,7 @@ TEST(ClassSim, ParameterizedClassDifferentWidths) {
 TEST(ClassSim, ParameterizedClassInstantiation) {
   ClassFixture f;
 
-  auto *type = f.arena.Create<ClassTypeInfo>();
+  auto* type = f.arena.Create<ClassTypeInfo>();
   type->name = "Pair_int";
   type->properties.push_back({"first", 32, false});
   type->properties.push_back({"second", 32, false});

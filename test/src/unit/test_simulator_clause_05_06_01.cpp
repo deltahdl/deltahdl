@@ -25,24 +25,24 @@ struct SimCh50601Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimCh50601Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimCh50601Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-static uint64_t RunAndGet(const std::string &src, const char *var_name) {
+static uint64_t RunAndGet(const std::string& src, const char* var_name) {
   SimCh50601Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable(var_name);
+  auto* var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
   if (!var) return 0;
   return var->value.ToUint64();
@@ -84,7 +84,7 @@ TEST(SimCh50601, EscapedKeywordAsVariable) {
 TEST(SimCh50601, EscapedIdentMultipleVars) {
   // §5.6.1: Multiple escaped identifiers in the same module.
   SimCh50601Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] \\a+b , \\c-d ;\n"
       "  initial begin\n"
@@ -97,8 +97,8 @@ TEST(SimCh50601, EscapedIdentMultipleVars) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *v1 = f.ctx.FindVariable("\\a+b");
-  auto *v2 = f.ctx.FindVariable("\\c-d");
+  auto* v1 = f.ctx.FindVariable("\\a+b");
+  auto* v2 = f.ctx.FindVariable("\\c-d");
   ASSERT_NE(v1, nullptr);
   ASSERT_NE(v2, nullptr);
   EXPECT_EQ(v1->value.ToUint64(), 10u);
@@ -108,7 +108,7 @@ TEST(SimCh50601, EscapedIdentMultipleVars) {
 TEST(SimCh50601, EscapedIdentInExpression) {
   // §5.6.1: Escaped identifiers used in expressions.
   SimCh50601Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] \\x! , result;\n"
       "  initial begin\n"
@@ -121,7 +121,7 @@ TEST(SimCh50601, EscapedIdentInExpression) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }

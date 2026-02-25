@@ -99,7 +99,7 @@ TEST(SimCh442, AllSimulationRegionsExecute) {
   int count = 0;
 
   for (auto r : kSimulationRegions) {
-    auto *ev = sched.GetEventPool().Acquire();
+    auto* ev = sched.GetEventPool().Acquire();
     ev->callback = [&count]() { count++; };
     sched.ScheduleEvent({0}, r, ev);
   }
@@ -119,7 +119,7 @@ TEST(SimCh442, AllPLIRegionsExecute) {
   int count = 0;
 
   for (auto r : kPLIRegions) {
-    auto *ev = sched.GetEventPool().Acquire();
+    auto* ev = sched.GetEventPool().Acquire();
     ev->callback = [&count]() { count++; };
     sched.ScheduleEvent({0}, r, ev);
   }
@@ -140,7 +140,7 @@ TEST(SimCh442, SimulationRegionsExecuteInOrder) {
   std::vector<int> order;
 
   for (size_t i = 0; i < kSimulationRegionCount; ++i) {
-    auto *ev = sched.GetEventPool().Acquire();
+    auto* ev = sched.GetEventPool().Acquire();
     int id = static_cast<int>(i);
     ev->callback = [&order, id]() { order.push_back(id); };
     sched.ScheduleEvent({0}, kSimulationRegions[i], ev);
@@ -176,7 +176,7 @@ TEST(SimCh442, MixedSimAndPLIRegionsExecuteInOrder) {
 
   // Schedule one event in every region.
   for (int r = 0; r < static_cast<int>(Region::kCOUNT); ++r) {
-    auto *ev = sched.GetEventPool().Acquire();
+    auto* ev = sched.GetEventPool().Acquire();
     ev->callback = [&order, r]() { order.push_back(r); };
     sched.ScheduleEvent({0}, static_cast<Region>(r), ev);
   }

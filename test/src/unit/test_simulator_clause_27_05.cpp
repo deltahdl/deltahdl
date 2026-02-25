@@ -25,11 +25,11 @@ struct LowerFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, LowerFixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, LowerFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -38,7 +38,7 @@ namespace {
 
 TEST(Elaborator, GenerateIfTrueBranch) {
   LowerFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t #(parameter N = 1) ();\n"
       "  logic [31:0] x;\n"
       "  generate\n"
@@ -56,14 +56,14 @@ TEST(Elaborator, GenerateIfTrueBranch) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 TEST(Elaborator, GenerateIfFalseBranch) {
   LowerFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t #(parameter N = 0) ();\n"
       "  logic [31:0] x;\n"
       "  generate\n"
@@ -81,14 +81,14 @@ TEST(Elaborator, GenerateIfFalseBranch) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
 TEST(Elaborator, GenerateCaseMatch) {
   LowerFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t #(parameter MODE = 2) ();\n"
       "  logic [31:0] x;\n"
       "  generate\n"
@@ -106,14 +106,14 @@ TEST(Elaborator, GenerateCaseMatch) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
 TEST(Elaborator, GenerateCaseDefault) {
   LowerFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t #(parameter MODE = 99) ();\n"
       "  logic [31:0] x;\n"
       "  generate\n"
@@ -131,7 +131,7 @@ TEST(Elaborator, GenerateCaseDefault) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }

@@ -1,9 +1,11 @@
 // §non-lrm:dpi_helpers
 
 #include <gtest/gtest.h>
+
 #include <cstdint>
 #include <string>
 #include <vector>
+
 #include "simulation/dpi_runtime.h"
 
 using namespace delta;

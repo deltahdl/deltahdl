@@ -27,9 +27,9 @@ struct AggFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static void MakeDynArray(AggFixture &f, std::string_view name,
-                         const std::vector<uint64_t> &vals) {
-  auto *q = f.ctx.CreateQueue(name, 32);
+static void MakeDynArray(AggFixture& f, std::string_view name,
+                         const std::vector<uint64_t>& vals) {
+  auto* q = f.ctx.CreateQueue(name, 32);
   for (auto v : vals) {
     q->elements.push_back(MakeLogic4VecVal(f.arena, 32, v));
   }

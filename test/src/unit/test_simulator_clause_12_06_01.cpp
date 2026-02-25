@@ -1,7 +1,9 @@
 // §12.6.1: Pattern matching in case statements
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -24,11 +26,11 @@ struct SimA60701Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA60701Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA60701Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -41,7 +43,7 @@ namespace {
 // §12.6.1: case-matches selects matching constant pattern
 TEST(SimA60701, CaseMatchesConstantMatch) {
   SimA60701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] sel, x;\n"
       "  initial begin\n"
@@ -59,7 +61,7 @@ TEST(SimA60701, CaseMatchesConstantMatch) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
@@ -67,7 +69,7 @@ TEST(SimA60701, CaseMatchesConstantMatch) {
 // §12.6.1: case-matches falls through to default
 TEST(SimA60701, CaseMatchesDefaultFallthrough) {
   SimA60701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] sel, x;\n"
       "  initial begin\n"
@@ -84,7 +86,7 @@ TEST(SimA60701, CaseMatchesDefaultFallthrough) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
@@ -92,7 +94,7 @@ TEST(SimA60701, CaseMatchesDefaultFallthrough) {
 // §12.6.1: case-matches first match wins
 TEST(SimA60701, CaseMatchesFirstMatchWins) {
   SimA60701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] sel, x;\n"
       "  initial begin\n"
@@ -109,7 +111,7 @@ TEST(SimA60701, CaseMatchesFirstMatchWins) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }

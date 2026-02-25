@@ -419,7 +419,8 @@ bool Lexer::LexQuotedBody() {
       return false;
     }
     if (Current() == '\\') {
-      Advance();  // skip backslash; following char (incl. newline) is the escape
+      Advance();  // skip backslash; following char (incl. newline) is the
+                  // escape
       if (AtEnd()) return false;
     }
     Advance();

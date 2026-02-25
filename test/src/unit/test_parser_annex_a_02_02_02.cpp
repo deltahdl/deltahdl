@@ -1,7 +1,9 @@
 // Annex A.2.2.2: Strengths
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -13,11 +15,11 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-ParseResult Parse(const std::string &src) {
+ParseResult Parse(const std::string& src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -45,7 +47,7 @@ TEST(ParserA222, DriveStrengthStr0Str1) {
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->drive_strength0, 4u);  // strong0 = 4
   EXPECT_EQ(item->drive_strength1, 2u);  // weak1 = 2
 }
@@ -58,7 +60,7 @@ TEST(ParserA222, DriveStrengthStr1Str0) {
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->drive_strength0, 5u);  // supply0 = 5
   EXPECT_EQ(item->drive_strength1, 3u);  // pull1 = 3
 }
@@ -71,7 +73,7 @@ TEST(ParserA222, DriveStrengthStr0Highz1) {
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->drive_strength0, 3u);  // pull0 = 3
   EXPECT_EQ(item->drive_strength1, 1u);  // highz1 = 1
 }
@@ -84,7 +86,7 @@ TEST(ParserA222, DriveStrengthHighz0Str1) {
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->drive_strength0, 1u);  // highz0 = 1
   EXPECT_EQ(item->drive_strength1, 5u);  // supply1 = 5
 }
@@ -97,7 +99,7 @@ TEST(ParserA222, DriveStrengthHighz1Str0) {
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->drive_strength0, 2u);  // weak0 = 2
   EXPECT_EQ(item->drive_strength1, 1u);  // highz1 = 1
 }
@@ -107,7 +109,7 @@ TEST(ParserA222, DriveStrengthHighz1Str0) {
 TEST(ParserA222, Strength0AllKeywords) {
   // Verify all 4 strength0 keywords parse and map to correct values
   const struct {
-    const char *keyword;
+    const char* keyword;
     uint8_t expected;
   } kCases[] = {
       {"supply0", 5},
@@ -115,13 +117,13 @@ TEST(ParserA222, Strength0AllKeywords) {
       {"pull0", 3},
       {"weak0", 2},
   };
-  for (const auto &c : kCases) {
+  for (const auto& c : kCases) {
     auto src = std::string("module m;\n  wire (") + c.keyword +
                ", strong1) w;\nendmodule";
     auto r = Parse(src);
     ASSERT_NE(r.cu, nullptr) << "Failed for " << c.keyword;
     EXPECT_FALSE(r.has_errors) << "Failed for " << c.keyword;
-    auto *item = r.cu->modules[0]->items[0];
+    auto* item = r.cu->modules[0]->items[0];
     EXPECT_EQ(item->drive_strength0, c.expected) << "Failed for " << c.keyword;
   }
 }
@@ -131,7 +133,7 @@ TEST(ParserA222, Strength0AllKeywords) {
 TEST(ParserA222, Strength1AllKeywords) {
   // Verify all 4 strength1 keywords parse and map to correct values
   const struct {
-    const char *keyword;
+    const char* keyword;
     uint8_t expected;
   } kCases[] = {
       {"supply1", 5},
@@ -139,13 +141,13 @@ TEST(ParserA222, Strength1AllKeywords) {
       {"pull1", 3},
       {"weak1", 2},
   };
-  for (const auto &c : kCases) {
+  for (const auto& c : kCases) {
     auto src = std::string("module m;\n  wire (strong0, ") + c.keyword +
                ") w;\nendmodule";
     auto r = Parse(src);
     ASSERT_NE(r.cu, nullptr) << "Failed for " << c.keyword;
     EXPECT_FALSE(r.has_errors) << "Failed for " << c.keyword;
-    auto *item = r.cu->modules[0]->items[0];
+    auto* item = r.cu->modules[0]->items[0];
     EXPECT_EQ(item->drive_strength1, c.expected) << "Failed for " << c.keyword;
   }
 }
@@ -160,7 +162,7 @@ TEST(ParserA222, ChargeStrengthSmall) {
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->data_type.charge_strength, 1u);
 }
 
@@ -172,7 +174,7 @@ TEST(ParserA222, ChargeStrengthLarge) {
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->data_type.charge_strength, 4u);
 }
 
@@ -187,10 +189,10 @@ TEST(ParserA222, StrengthValueEncoding) {
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *w1 = r.cu->modules[0]->items[0];
+  auto* w1 = r.cu->modules[0]->items[0];
   EXPECT_EQ(w1->drive_strength0, 2u);  // weak0
   EXPECT_EQ(w1->drive_strength1, 3u);  // pull1
-  auto *w2 = r.cu->modules[0]->items[1];
+  auto* w2 = r.cu->modules[0]->items[1];
   EXPECT_EQ(w2->drive_strength0, 5u);  // supply0
   EXPECT_EQ(w2->drive_strength1, 5u);  // supply1
 }
@@ -204,7 +206,7 @@ TEST(ParserA222, NoDriveStrengthDefault) {
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->drive_strength0, 0u);
   EXPECT_EQ(item->drive_strength1, 0u);
 }

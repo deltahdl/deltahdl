@@ -27,26 +27,26 @@ struct ClassFixture {
 };
 
 // AST helper: make an identifier expression.
-static Expr *MkId(Arena &a, std::string_view name) {
-  auto *e = a.Create<Expr>();
+static Expr* MkId(Arena& a, std::string_view name) {
+  auto* e = a.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
   e->text = name;
   return e;
 }
 
 // AST helper: make a return statement.
-static Stmt *MkReturn(Arena &a, Expr *expr) {
-  auto *s = a.Create<Stmt>();
+static Stmt* MkReturn(Arena& a, Expr* expr) {
+  auto* s = a.Create<Stmt>();
   s->kind = StmtKind::kReturn;
   s->expr = expr;
   return s;
 }
 
 // Build a simple ClassTypeInfo and register it with the context.
-static ClassTypeInfo *MakeClassType(
-    ClassFixture &f, std::string_view name,
-    const std::vector<std::string_view> &props) {
-  auto *info = f.arena.Create<ClassTypeInfo>();
+static ClassTypeInfo* MakeClassType(
+    ClassFixture& f, std::string_view name,
+    const std::vector<std::string_view>& props) {
+  auto* info = f.arena.Create<ClassTypeInfo>();
   info->name = name;
   for (auto p : props) {
     info->properties.push_back({p, 32, false});
@@ -56,12 +56,12 @@ static ClassTypeInfo *MakeClassType(
 }
 
 // Allocate a ClassObject of the given type, returning (handle_id, object*).
-static std::pair<uint64_t, ClassObject *> MakeObj(ClassFixture &f,
-                                                  ClassTypeInfo *type) {
-  auto *obj = f.arena.Create<ClassObject>();
+static std::pair<uint64_t, ClassObject*> MakeObj(ClassFixture& f,
+                                                 ClassTypeInfo* type) {
+  auto* obj = f.arena.Create<ClassObject>();
   obj->type = type;
   // Initialize properties to 0.
-  for (const auto &p : type->properties) {
+  for (const auto& p : type->properties) {
     obj->properties[std::string(p.name)] =
         MakeLogic4VecVal(f.arena, p.width, 0);
   }
@@ -76,10 +76,10 @@ namespace {
 // =============================================================================
 TEST(ClassSim, ExternMethodRegisteredSeparately) {
   ClassFixture f;
-  auto *type = MakeClassType(f, "MyClass", {"val"});
+  auto* type = MakeClassType(f, "MyClass", {"val"});
 
   // Extern method body defined outside class.
-  auto *extern_method = f.arena.Create<ModuleItem>();
+  auto* extern_method = f.arena.Create<ModuleItem>();
   extern_method->kind = ModuleItemKind::kFunctionDecl;
   extern_method->name = "get_val";
   extern_method->func_body_stmts.push_back(
@@ -89,7 +89,7 @@ TEST(ClassSim, ExternMethodRegisteredSeparately) {
   type->methods["get_val"] = extern_method;
 
   auto [handle, obj] = MakeObj(f, type);
-  auto *resolved = obj->ResolveMethod("get_val");
+  auto* resolved = obj->ResolveMethod("get_val");
   EXPECT_NE(resolved, nullptr);
   EXPECT_EQ(resolved->name, "get_val");
 }

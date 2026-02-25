@@ -27,13 +27,13 @@ struct AggFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static Expr *ParseExprFrom(const std::string &src, AggFixture &f) {
+static Expr* ParseExprFrom(const std::string& src, AggFixture& f) {
   std::string code = "module t; initial x = " + src + "; endmodule";
   auto fid = f.mgr.AddFile("<test>", code);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
-  auto *item = cu->modules[0]->items[0];
+  auto* cu = parser.Parse();
+  auto* item = cu->modules[0]->items[0];
   return item->body->rhs;
 }
 
@@ -45,7 +45,7 @@ namespace {
 TEST(Matches, ExactMatchTrue) {
   // 42 matches 42 should be 1
   AggFixture f;
-  auto *expr = ParseExprFrom("42 matches 42", f);
+  auto* expr = ParseExprFrom("42 matches 42", f);
   ASSERT_NE(expr, nullptr);
   EXPECT_EQ(expr->kind, ExprKind::kBinary);
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -55,16 +55,16 @@ TEST(Matches, ExactMatchTrue) {
 TEST(Matches, ExactMatchFalse) {
   // 42 matches 99 should be 0
   AggFixture f;
-  auto *expr = ParseExprFrom("42 matches 99", f);
+  auto* expr = ParseExprFrom("42 matches 99", f);
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
 TEST(Matches, VariableMatch) {
   AggFixture f;
-  auto *var = f.ctx.CreateVariable("sig", 8);
+  auto* var = f.ctx.CreateVariable("sig", 8);
   var->value = MakeLogic4VecVal(f.arena, 8, 0xAB);
-  auto *expr = ParseExprFrom("sig matches 8'hAB", f);
+  auto* expr = ParseExprFrom("sig matches 8'hAB", f);
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }

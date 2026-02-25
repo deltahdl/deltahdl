@@ -1,7 +1,9 @@
 // §10.3.3: Continuous assignment delays
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -13,11 +15,11 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-ParseResult Parse(const std::string &src) {
+ParseResult Parse(const std::string& src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -34,14 +36,14 @@ TEST(ParserAnnexA, A2ContinuousAssignWithDelay) {
   auto r = Parse("module m; wire y; assign #5 y = a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
       EXPECT_NE(item->assign_delay, nullptr);
     }
   }
 }
 
-bool ParseOk(const std::string &src) {
+bool ParseOk(const std::string& src) {
   auto r = Parse(src);
   return r.cu && !r.has_errors;
 }
@@ -56,7 +58,7 @@ TEST(ParserA223, Delay3AssignSingleValue) {
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[2];
+  auto* item = r.cu->modules[0]->items[2];
   ASSERT_NE(item->assign_delay, nullptr);
   EXPECT_EQ(item->assign_delay->int_val, 5u);
   EXPECT_EQ(item->assign_delay_fall, nullptr);
@@ -72,7 +74,7 @@ TEST(ParserA223, Delay3AssignThreeValues) {
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[2];
+  auto* item = r.cu->modules[0]->items[2];
   ASSERT_NE(item->assign_delay, nullptr);
   EXPECT_EQ(item->assign_delay->int_val, 10u);
   ASSERT_NE(item->assign_delay_fall, nullptr);
@@ -90,7 +92,7 @@ TEST(ParserA223, Delay2ParenSingleValue) {
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[2];
+  auto* item = r.cu->modules[0]->items[2];
   ASSERT_NE(item->assign_delay, nullptr);
   EXPECT_EQ(item->assign_delay->int_val, 5u);
 }

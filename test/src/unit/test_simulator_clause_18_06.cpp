@@ -122,7 +122,7 @@ TEST(Constraint, GetValuesMap) {
   solver.AddVariable(vb);
 
   ASSERT_TRUE(solver.Solve());
-  const auto &vals = solver.GetValues();
+  const auto& vals = solver.GetValues();
   EXPECT_EQ(vals.size(), 2u);
   EXPECT_TRUE(vals.count("a"));
   EXPECT_TRUE(vals.count("b"));

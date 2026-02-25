@@ -68,7 +68,7 @@ TEST_F(VcdClause21070203Test, RegistersSignal) {
   {
     VcdWriter vcd(tmp_path_);
     vcd.WriteHeader("1ns");
-    auto *var = arena_.Create<Variable>();
+    auto* var = arena_.Create<Variable>();
     var->value = MakeLogic4VecVal(arena_, 1, 0);
     vcd.RegisterSignal("clk", 1, var);
     vcd.EndDefinitions();

@@ -1,7 +1,9 @@
 // §35.5.4: Import declarations
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -15,11 +17,11 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-ParseResult Parse(const std::string &src) {
+ParseResult Parse(const std::string& src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -36,11 +38,11 @@ struct ElabFixture {
   DiagEngine diag{mgr};
 };
 
-RtlirDesign *Elaborate(const std::string &src, ElabFixture &f) {
+RtlirDesign* Elaborate(const std::string& src, ElabFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -63,7 +65,7 @@ TEST(ParserA26, DpiImportFunction) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kDpiImport);
   EXPECT_EQ(item->name, "c_add");
   EXPECT_FALSE(item->dpi_is_task);
@@ -78,7 +80,7 @@ TEST(ParserA26, DpiImportTask) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kDpiImport);
   EXPECT_TRUE(item->dpi_is_task);
   EXPECT_EQ(item->name, "c_do_work");
@@ -117,7 +119,7 @@ TEST(ParserA26, DpiFunctionImportPure) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_TRUE(item->dpi_is_pure);
   EXPECT_FALSE(item->dpi_is_context);
 }
@@ -129,7 +131,7 @@ TEST(ParserA26, DpiFunctionImportContext) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_TRUE(item->dpi_is_context);
   EXPECT_FALSE(item->dpi_is_pure);
 }
@@ -144,7 +146,7 @@ TEST(ParserA26, DpiTaskImportContext) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_TRUE(item->dpi_is_context);
   EXPECT_TRUE(item->dpi_is_task);
 }
@@ -159,7 +161,7 @@ TEST(ParserA26, DpiImportWithCIdentifier) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kDpiImport);
   EXPECT_EQ(item->dpi_c_name, "c_my_func");
   EXPECT_EQ(item->name, "my_func");
@@ -172,7 +174,7 @@ TEST(ParserA26, DpiImportTaskWithCIdentifier) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->dpi_c_name, "c_work");
   EXPECT_EQ(item->name, "do_work");
   EXPECT_TRUE(item->dpi_is_task);
@@ -185,7 +187,7 @@ TEST(ParserA26, DpiImportPureWithCIdentifier) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_TRUE(item->dpi_is_pure);
   EXPECT_EQ(item->dpi_c_name, "c_fn");
   EXPECT_EQ(item->name, "fn");
@@ -201,7 +203,7 @@ TEST(ParserA26, DpiFuncProtoNoArgs) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_TRUE(item->func_args.empty());
 }
 
@@ -213,7 +215,7 @@ TEST(ParserA26, DpiFuncProtoMultipleArgs) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   ASSERT_EQ(item->func_args.size(), 3u);
 }
 
@@ -225,7 +227,7 @@ TEST(ParserA26, DpiTaskProtoWithArgs) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_TRUE(item->dpi_is_task);
   ASSERT_EQ(item->func_args.size(), 2u);
   EXPECT_EQ(item->func_args[0].direction, Direction::kInput);

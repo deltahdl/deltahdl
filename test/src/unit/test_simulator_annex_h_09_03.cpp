@@ -1,9 +1,11 @@
 // Annex H.9.3: Working with DPI context tasks and functions in C code
 
 #include <gtest/gtest.h>
+
 #include <cstdint>
 #include <string>
 #include <vector>
+
 #include "simulation/dpi_runtime.h"
 
 using namespace delta;
@@ -16,7 +18,7 @@ TEST(DpiRuntime, SetAndGetScope) {
   scope.name = "top.mod";
   rt.PushScope(scope);
 
-  const DpiScope *saved = rt.GetScope();
+  const DpiScope* saved = rt.GetScope();
   ASSERT_NE(saved, nullptr);
 
   rt.PopScope();

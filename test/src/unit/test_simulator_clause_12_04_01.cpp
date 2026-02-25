@@ -1,7 +1,9 @@
 // §12.4.1: if–else–if construct
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -24,11 +26,11 @@ struct SimA606Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA606Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA606Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -38,7 +40,7 @@ namespace {
 // §12.4.1: if-else-if chain selects correct branch
 TEST(SimA606, IfElseIfChainSelectsCorrectBranch) {
   SimA606Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, x;\n"
       "  initial begin\n"
@@ -54,7 +56,7 @@ TEST(SimA606, IfElseIfChainSelectsCorrectBranch) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
@@ -62,7 +64,7 @@ TEST(SimA606, IfElseIfChainSelectsCorrectBranch) {
 // §12.4.1: if-else-if chain falls through to final else
 TEST(SimA606, IfElseIfFallsToElse) {
   SimA606Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, x;\n"
       "  initial begin\n"
@@ -77,7 +79,7 @@ TEST(SimA606, IfElseIfFallsToElse) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }

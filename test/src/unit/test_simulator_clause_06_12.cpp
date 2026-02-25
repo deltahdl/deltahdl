@@ -19,7 +19,7 @@ using namespace delta;
 // =============================================================================
 // Helper: extract double from a Logic4Vec stored as IEEE 754 bits
 // =============================================================================
-static double VecToDouble(const Logic4Vec &vec) {
+static double VecToDouble(const Logic4Vec& vec) {
   uint64_t bits = vec.ToUint64();
   double d = 0.0;
   std::memcpy(&d, &bits, sizeof(double));
@@ -36,22 +36,22 @@ struct RealFixture {
   DiagEngine diag{mgr};
   SimContext ctx{scheduler, arena, diag};
 
-  Expr *MakeRealLiteral(double val) {
-    auto *lit = arena.Create<Expr>();
+  Expr* MakeRealLiteral(double val) {
+    auto* lit = arena.Create<Expr>();
     lit->kind = ExprKind::kRealLiteral;
     lit->real_val = val;
     return lit;
   }
 
-  Expr *MakeIntLiteral(uint64_t val) {
-    auto *lit = arena.Create<Expr>();
+  Expr* MakeIntLiteral(uint64_t val) {
+    auto* lit = arena.Create<Expr>();
     lit->kind = ExprKind::kIntegerLiteral;
     lit->int_val = val;
     return lit;
   }
 
-  Variable *CreateRealVar(std::string_view name, double val) {
-    auto *var = ctx.CreateVariable(name, 64);
+  Variable* CreateRealVar(std::string_view name, double val) {
+    auto* var = ctx.CreateVariable(name, 64);
     uint64_t bits = 0;
     std::memcpy(&bits, &val, sizeof(double));
     var->value = MakeLogic4VecVal(arena, 64, bits);
@@ -66,21 +66,21 @@ namespace {
 // =============================================================================
 TEST(RealTypes, RealLiteralEval) {
   RealFixture f;
-  auto *lit = f.MakeRealLiteral(3.14);
+  auto* lit = f.MakeRealLiteral(3.14);
   auto result = EvalExpr(lit, f.ctx, f.arena);
   EXPECT_NEAR(VecToDouble(result), 3.14, 1e-10);
 }
 
 TEST(RealTypes, RealLiteralZero) {
   RealFixture f;
-  auto *lit = f.MakeRealLiteral(0.0);
+  auto* lit = f.MakeRealLiteral(0.0);
   auto result = EvalExpr(lit, f.ctx, f.arena);
   EXPECT_EQ(VecToDouble(result), 0.0);
 }
 
 TEST(RealTypes, RealLiteralNegative) {
   RealFixture f;
-  auto *lit = f.MakeRealLiteral(-2.5);
+  auto* lit = f.MakeRealLiteral(-2.5);
   auto result = EvalExpr(lit, f.ctx, f.arena);
   EXPECT_NEAR(VecToDouble(result), -2.5, 1e-10);
 }
@@ -91,7 +91,7 @@ TEST(RealTypes, RealLiteralNegative) {
 TEST(RealTypes, RealVarStorage) {
   RealFixture f;
   f.CreateRealVar("x", 1.5);
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_NEAR(VecToDouble(var->value), 1.5, 1e-10);
 }
@@ -112,16 +112,16 @@ struct SimA87Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA87Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA87Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-static double ToDouble(const Variable *var) {
+static double ToDouble(const Variable* var) {
   uint64_t bits = var->value.ToUint64();
   double d = 0.0;
   std::memcpy(&d, &bits, sizeof(double));
@@ -131,7 +131,7 @@ static double ToDouble(const Variable *var) {
 // § number — real_number simulates
 TEST(SimA87, NumberReal) {
   SimA87Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  real x;\n"
       "  initial x = 3.14;\n"
@@ -141,7 +141,7 @@ TEST(SimA87, NumberReal) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_DOUBLE_EQ(ToDouble(var), 3.14);
 }

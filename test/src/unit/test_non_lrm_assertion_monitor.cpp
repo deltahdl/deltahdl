@@ -25,7 +25,7 @@ TEST(Assertion, CustomCheckFunction) {
   monitor.AddProperty(prop);
 
   monitor.Evaluate("p_custom", 10);
-  auto *entry = const_cast<AssertionEntry *>(monitor.FindEntry("p_custom"));
+  auto* entry = const_cast<AssertionEntry*>(monitor.FindEntry("p_custom"));
   entry->cycle_count = 1;
 
   auto r1 = monitor.Evaluate("p_custom", 20);

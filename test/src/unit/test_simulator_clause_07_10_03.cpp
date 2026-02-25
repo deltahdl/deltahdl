@@ -1,6 +1,7 @@
 // §7.10.3: Persistence of references to elements of a queue
 
 #include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"

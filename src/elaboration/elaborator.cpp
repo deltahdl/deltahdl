@@ -73,8 +73,9 @@ static std::vector<ResolvedAttribute> ResolveAttributes(
     bool replaced = false;
     for (auto& existing : result) {
       if (existing.name == ra.name) {
-        diag.Warning(attr.loc, std::format(
-            "duplicate attribute '{}'; last value used", attr.name));
+        diag.Warning(attr.loc,
+                     std::format("duplicate attribute '{}'; last value used",
+                                 attr.name));
         existing = ra;
         replaced = true;
         break;

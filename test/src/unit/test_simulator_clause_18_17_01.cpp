@@ -1,7 +1,9 @@
 // §18.17.1: Random production weights
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -24,11 +26,11 @@ struct SimA612Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA612Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA612Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -38,7 +40,7 @@ namespace {
 // Weighted alternatives: both are reachable (statistical test)
 TEST(SimA612, WeightedAlternativesReachable) {
   SimA612Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -55,7 +57,7 @@ TEST(SimA612, WeightedAlternativesReachable) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   // One of the alternatives was chosen
   EXPECT_TRUE(var->value.ToUint64() == 1u || var->value.ToUint64() == 2u);

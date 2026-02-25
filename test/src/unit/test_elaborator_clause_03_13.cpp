@@ -1,6 +1,7 @@
 // §3.13: Name spaces
 
 #include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -13,7 +14,7 @@ using namespace delta;
 
 // Returns true if elaboration of the last module in src succeeds with no
 // errors.
-static bool ElabOk(const std::string &src) {
+static bool ElabOk(const std::string& src) {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);
@@ -23,7 +24,7 @@ static bool ElabOk(const std::string &src) {
   auto pp_fid = mgr.AddFile("<preprocessed>", pp);
   Lexer lexer(mgr.FileContent(pp_fid), pp_fid, diag);
   Parser parser(lexer, arena, diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   if (diag.HasErrors() || cu->modules.empty()) return false;
   Elaborator elab(arena, diag, cu);
   elab.Elaborate(cu->modules.back()->name);
@@ -56,7 +57,7 @@ TEST(ElabClause03, Cl3_13_SameNameDifferentModulesElab) {
   auto pp_fid = mgr.AddFile("<preprocessed>", pp);
   Lexer lexer(mgr.FileContent(pp_fid), pp_fid, diag);
   Parser parser(lexer, arena, diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   ASSERT_FALSE(diag.HasErrors());
   // Elaborate both modules — neither should produce a redeclaration error.
   Elaborator elab_a(arena, diag, cu);
@@ -73,11 +74,11 @@ struct ElabFixture {
   DiagEngine diag{mgr};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, ElabFixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }

@@ -1,6 +1,7 @@
 // §K
 
 #include <gtest/gtest.h>
+
 #include "vpi/sv_vpi_user.h"
 
 namespace {

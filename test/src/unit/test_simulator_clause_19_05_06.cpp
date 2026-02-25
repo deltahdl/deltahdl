@@ -16,8 +16,8 @@ namespace {
 // =============================================================================
 TEST(Coverage, IllegalBinsNotSampled) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "addr");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "addr");
   CoverBin ib;
   ib.name = "bad_addr";
   ib.kind = CoverBinKind::kIllegal;
@@ -31,8 +31,8 @@ TEST(Coverage, IllegalBinsNotSampled) {
 
 TEST(Coverage, IllegalBinsExcludedFromCoverage) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "x");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "x");
 
   CoverBin good;
   good.name = "valid";

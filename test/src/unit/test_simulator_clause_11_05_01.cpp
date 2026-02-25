@@ -23,23 +23,23 @@ struct EvalAdvFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static Expr *MakeInt(Arena &arena, uint64_t val) {
-  auto *e = arena.Create<Expr>();
+static Expr* MakeInt(Arena& arena, uint64_t val) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
   e->int_val = val;
   return e;
 }
 
-static Expr *MakeId(Arena &arena, std::string_view name) {
-  auto *e = arena.Create<Expr>();
+static Expr* MakeId(Arena& arena, std::string_view name) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
   e->text = name;
   return e;
 }
 
-static Variable *MakeVar(EvalAdvFixture &f, std::string_view name,
+static Variable* MakeVar(EvalAdvFixture& f, std::string_view name,
                          uint32_t width, uint64_t val) {
-  auto *var = f.ctx.CreateVariable(name, width);
+  auto* var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4VecVal(f.arena, width, val);
   return var;
 }
@@ -53,7 +53,7 @@ TEST(EvalAdv, PartSelectPartialOOB) {
   EvalAdvFixture f;
   // §11.5.1: v[6 +: 4] on 8-bit var → bits 6,7 valid, bits 8,9 OOB → X.
   MakeVar(f, "ov", 8, 0xFF);
-  auto *sel = f.arena.Create<Expr>();
+  auto* sel = f.arena.Create<Expr>();
   sel->kind = ExprKind::kSelect;
   sel->base = MakeId(f.arena, "ov");
   sel->index = MakeInt(f.arena, 6);
@@ -82,16 +82,16 @@ TEST(EvalAdv, ArrayXZAddrReturnsX) {
   f.ctx.RegisterArray("arr4", info);
 
   // arr4[x] — X address should return X.
-  auto *sel = f.arena.Create<Expr>();
+  auto* sel = f.arena.Create<Expr>();
   sel->kind = ExprKind::kSelect;
   sel->base = MakeId(f.arena, "arr4");
   // Create an X-valued index.
-  auto *idx = MakeInt(f.arena, 0);
+  auto* idx = MakeInt(f.arena, 0);
   sel->index = idx;
   // Manually set bval to make it X.
   // Evaluate: since we can't directly set bval on a literal,
   // create a variable with X value and use it.
-  auto *xvar = f.ctx.CreateVariable("xidx", 8);
+  auto* xvar = f.ctx.CreateVariable("xidx", 8);
   xvar->value = MakeLogic4Vec(f.arena, 8);
   xvar->value.words[0].aval = 1;
   xvar->value.words[0].bval = 1;  // aval=1, bval=1 → X
@@ -112,9 +112,9 @@ struct EvalOpXZFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static Variable *MakeVar4(EvalOpXZFixture &f, std::string_view name,
+static Variable* MakeVar4(EvalOpXZFixture& f, std::string_view name,
                           uint32_t width, uint64_t aval, uint64_t bval) {
-  auto *var = f.ctx.CreateVariable(name, width);
+  auto* var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4Vec(f.arena, width);
   var->value.words[0].aval = aval;
   var->value.words[0].bval = bval;
@@ -127,10 +127,10 @@ static Variable *MakeVar4(EvalOpXZFixture &f, std::string_view name,
 TEST(EvalOpXZ, BitSelectXAddr) {
   EvalOpXZFixture f;
   // v[x] should return 1'bx when index is unknown.
-  auto *v = f.ctx.CreateVariable("bsv", 8);
+  auto* v = f.ctx.CreateVariable("bsv", 8);
   v->value = MakeLogic4VecVal(f.arena, 8, 0xAB);
   MakeVar4(f, "bsi", 4, 0, 1);  // 4'bx (unknown index)
-  auto *sel = f.arena.Create<Expr>();
+  auto* sel = f.arena.Create<Expr>();
   sel->kind = ExprKind::kSelect;
   sel->base = MakeId(f.arena, "bsv");
   sel->index = MakeId(f.arena, "bsi");
@@ -142,10 +142,10 @@ TEST(EvalOpXZ, BitSelectXAddr) {
 TEST(EvalOpXZ, PartSelectXAddr) {
   EvalOpXZFixture f;
   // v[x +: 4] should return all-x when base index is unknown.
-  auto *v = f.ctx.CreateVariable("psv", 8);
+  auto* v = f.ctx.CreateVariable("psv", 8);
   v->value = MakeLogic4VecVal(f.arena, 8, 0xAB);
   MakeVar4(f, "psi", 4, 0, 1);  // unknown index
-  auto *sel = f.arena.Create<Expr>();
+  auto* sel = f.arena.Create<Expr>();
   sel->kind = ExprKind::kSelect;
   sel->base = MakeId(f.arena, "psv");
   sel->index = MakeId(f.arena, "psi");
@@ -164,11 +164,11 @@ struct SimA83Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA83Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA83Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -176,7 +176,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA83Fixture &f) {
 // § constant_range — part select
 TEST(SimA83, PartSelectRange) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] data;\n"
       "  logic [3:0] x;\n"
@@ -190,7 +190,7 @@ TEST(SimA83, PartSelectRange) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x5u);
 }
@@ -198,7 +198,7 @@ TEST(SimA83, PartSelectRange) {
 // § indexed_range — plus-colon indexed part select
 TEST(SimA83, IndexedPartSelectPlus) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] data;\n"
       "  logic [3:0] x;\n"
@@ -212,7 +212,7 @@ TEST(SimA83, IndexedPartSelectPlus) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x5u);
 }
@@ -220,7 +220,7 @@ TEST(SimA83, IndexedPartSelectPlus) {
 // § indexed_range — minus-colon indexed part select
 TEST(SimA83, IndexedPartSelectMinus) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] data;\n"
       "  logic [3:0] x;\n"
@@ -234,7 +234,7 @@ TEST(SimA83, IndexedPartSelectMinus) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xAu);
 }
@@ -247,11 +247,11 @@ struct SimA84Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA84Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA84Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -259,7 +259,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA84Fixture &f) {
 // § primary — bit_select
 TEST(SimA84, PrimaryBitSelect) {
   SimA84Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] data;\n"
       "  logic x;\n"
@@ -270,7 +270,7 @@ TEST(SimA84, PrimaryBitSelect) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -278,7 +278,7 @@ TEST(SimA84, PrimaryBitSelect) {
 // § primary — part_select_range (constant range)
 TEST(SimA84, PrimaryPartSelectRange) {
   SimA84Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] data;\n"
       "  logic [7:0] x;\n"
@@ -289,7 +289,7 @@ TEST(SimA84, PrimaryPartSelectRange) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
@@ -297,7 +297,7 @@ TEST(SimA84, PrimaryPartSelectRange) {
 // § primary — indexed part select (plus)
 TEST(SimA84, PrimaryIndexedPartSelectPlus) {
   SimA84Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] data;\n"
       "  logic [7:0] x;\n"
@@ -308,7 +308,7 @@ TEST(SimA84, PrimaryIndexedPartSelectPlus) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
@@ -316,7 +316,7 @@ TEST(SimA84, PrimaryIndexedPartSelectPlus) {
 // § primary — indexed part select (minus)
 TEST(SimA84, PrimaryIndexedPartSelectMinus) {
   SimA84Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] data;\n"
       "  logic [7:0] x;\n"
@@ -327,7 +327,7 @@ TEST(SimA84, PrimaryIndexedPartSelectMinus) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
@@ -340,11 +340,11 @@ struct SimA85Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA85Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA85Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -352,7 +352,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA85Fixture &f) {
 // § variable_lvalue — bit select blocking assignment
 TEST(SimA85, VarLvalueBitSelect) {
   SimA85Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin x = 8'h00; x[3] = 1; end\n"
@@ -362,7 +362,7 @@ TEST(SimA85, VarLvalueBitSelect) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x08u);
 }
@@ -370,7 +370,7 @@ TEST(SimA85, VarLvalueBitSelect) {
 // § variable_lvalue — indexed part select + blocking assignment
 TEST(SimA85, VarLvalueIndexedPartSelectPlus) {
   SimA85Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] x;\n"
       "  initial begin x = 16'h0000; x[8+:8] = 8'hAB; end\n"
@@ -380,7 +380,7 @@ TEST(SimA85, VarLvalueIndexedPartSelectPlus) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xAB00u);
 }
@@ -388,7 +388,7 @@ TEST(SimA85, VarLvalueIndexedPartSelectPlus) {
 // § variable_lvalue — indexed part select - blocking assignment
 TEST(SimA85, VarLvalueIndexedPartSelectMinus) {
   SimA85Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] x;\n"
       "  initial begin x = 16'h0000; x[15-:8] = 8'hCD; end\n"
@@ -398,7 +398,7 @@ TEST(SimA85, VarLvalueIndexedPartSelectMinus) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xCD00u);
 }

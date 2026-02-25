@@ -17,11 +17,11 @@ namespace {
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult Parse(const std::string &src) {
+static ParseResult Parse(const std::string& src) {
   ParseResult r;
   auto fid = r.mgr.AddFile("<test>", src);
   DiagEngine diag(r.mgr);
@@ -76,7 +76,8 @@ TEST(ParseA88, QuotedStringWithEscapeSeqAnyAscii) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// § quoted_string — contains string_escape_seq (\one_to_three_digit_octal_number)
+// § quoted_string — contains string_escape_seq
+// (\one_to_three_digit_octal_number)
 TEST(ParseA88, QuotedStringWithEscapeSeqOctal) {
   auto r = Parse(
       "module m;\n"
@@ -98,7 +99,8 @@ TEST(ParseA88, QuotedStringWithEscapeSeqHex) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// § triple_quoted_string — contains triple_quoted_string_item (including newline)
+// § triple_quoted_string — contains triple_quoted_string_item (including
+// newline)
 TEST(ParseA88, TripleQuotedStringItemIncludingNewline) {
   auto r = Parse(
       "module m;\n"
@@ -109,7 +111,8 @@ TEST(ParseA88, TripleQuotedStringItemIncludingNewline) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// § triple_quoted_string — contains triple_quoted_string_item (including double-quote)
+// § triple_quoted_string — contains triple_quoted_string_item (including
+// double-quote)
 TEST(ParseA88, TripleQuotedStringItemIncludingDoubleQuote) {
   auto r = Parse(
       "module m;\n"

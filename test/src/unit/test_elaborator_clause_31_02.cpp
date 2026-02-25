@@ -1,7 +1,9 @@
 // §31.2: Overview
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -19,13 +21,13 @@ struct ElabA705Fixture {
   bool has_errors = false;
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, ElabA705Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, ElabA705Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
-  auto *design = elab.Elaborate(cu->modules.back()->name);
+  auto* design = elab.Elaborate(cu->modules.back()->name);
   f.has_errors = f.diag.HasErrors();
   return design;
 }
@@ -35,7 +37,7 @@ namespace {
 // All 12 system_timing_check alternatives in one specify block
 TEST(ElabA705, AllTwelveCheckTypesElaborate) {
   ElabA705Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
       "    $setup(d, posedge clk, 10);\n"

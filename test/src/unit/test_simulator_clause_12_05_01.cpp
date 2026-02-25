@@ -31,25 +31,25 @@ struct StmtFixture {
 };
 
 // Helper to create a simple identifier expression.
-Expr *MakeIdent(Arena &arena, std::string_view name) {
-  auto *e = arena.Create<Expr>();
+Expr* MakeIdent(Arena& arena, std::string_view name) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
   e->text = name;
   return e;
 }
 
 // Helper to create an integer literal expression.
-Expr *MakeIntLit(Arena &arena, uint64_t val) {
-  auto *e = arena.Create<Expr>();
+Expr* MakeIntLit(Arena& arena, uint64_t val) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
   e->int_val = val;
   return e;
 }
 
 // Helper to create a blocking assignment statement: lhs = rhs_val.
-Stmt *MakeBlockAssign(Arena &arena, std::string_view lhs_name,
+Stmt* MakeBlockAssign(Arena& arena, std::string_view lhs_name,
                       uint64_t rhs_val) {
-  auto *s = arena.Create<Stmt>();
+  auto* s = arena.Create<Stmt>();
   s->kind = StmtKind::kBlockingAssign;
   s->lhs = MakeIdent(arena, lhs_name);
   s->rhs = MakeIntLit(arena, rhs_val);
@@ -61,14 +61,14 @@ struct DriverResult {
   StmtResult value = StmtResult::kDone;
 };
 
-SimCoroutine DriverCoroutine(const Stmt *stmt, SimContext &ctx, Arena &arena,
-                             DriverResult *out) {
+SimCoroutine DriverCoroutine(const Stmt* stmt, SimContext& ctx, Arena& arena,
+                             DriverResult* out) {
   out->value = co_await ExecStmt(stmt, ctx, arena);
 }
 
 // Helper to run ExecStmt synchronously (for non-suspending statements).
 // Creates a wrapper coroutine, resumes it, and returns the result.
-StmtResult RunStmt(const Stmt *stmt, SimContext &ctx, Arena &arena) {
+StmtResult RunStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   DriverResult result;
   auto coro = DriverCoroutine(stmt, ctx, arena, &result);
   coro.Resume();
@@ -81,14 +81,14 @@ namespace {
 // =============================================================================
 TEST(StmtExec, CasexMatchesIgnoringXZ) {
   StmtFixture f;
-  auto *result_var = f.ctx.CreateVariable("cx", 32);
+  auto* result_var = f.ctx.CreateVariable("cx", 32);
   result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
   // casex (selector)
   //   2'b1x : cx = 1;    // pattern with X bit
   //   default: cx = 99;
   // endcase
-  auto *stmt = f.arena.Create<Stmt>();
+  auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kCase;
   stmt->case_kind = TokenKind::kKwCasex;
   // Selector: 2'b10 => value 2
@@ -110,10 +110,10 @@ TEST(StmtExec, CasexMatchesIgnoringXZ) {
 
 TEST(StmtExec, CasexNoMatchFallsToDefault) {
   StmtFixture f;
-  auto *result_var = f.ctx.CreateVariable("cxd", 32);
+  auto* result_var = f.ctx.CreateVariable("cxd", 32);
   result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  auto *stmt = f.arena.Create<Stmt>();
+  auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kCase;
   stmt->case_kind = TokenKind::kKwCasex;
   stmt->condition = MakeIntLit(f.arena, 5);
@@ -137,10 +137,10 @@ TEST(StmtExec, CasexNoMatchFallsToDefault) {
 // =============================================================================
 TEST(StmtExec, CasezExactMatchWorks) {
   StmtFixture f;
-  auto *result_var = f.ctx.CreateVariable("cz", 32);
+  auto* result_var = f.ctx.CreateVariable("cz", 32);
   result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  auto *stmt = f.arena.Create<Stmt>();
+  auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kCase;
   stmt->case_kind = TokenKind::kKwCasez;
   stmt->condition = MakeIntLit(f.arena, 3);
@@ -161,10 +161,10 @@ TEST(StmtExec, CasezExactMatchWorks) {
 
 TEST(StmtExec, CasezNoMatchFallsToDefault) {
   StmtFixture f;
-  auto *result_var = f.ctx.CreateVariable("czd", 32);
+  auto* result_var = f.ctx.CreateVariable("czd", 32);
   result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  auto *stmt = f.arena.Create<Stmt>();
+  auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kCase;
   stmt->case_kind = TokenKind::kKwCasez;
   stmt->condition = MakeIntLit(f.arena, 7);
@@ -188,16 +188,16 @@ TEST(StmtExec, CasezNoMatchFallsToDefault) {
 // =============================================================================
 TEST(StmtExec, CasexWithXZInSelector) {
   StmtFixture f;
-  auto *result_var = f.ctx.CreateVariable("cxz", 32);
+  auto* result_var = f.ctx.CreateVariable("cxz", 32);
   result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
   // Create a variable with X bits (bval != 0).
-  auto *sel_var = f.ctx.CreateVariable("sel_xz", 8);
+  auto* sel_var = f.ctx.CreateVariable("sel_xz", 8);
   sel_var->value = MakeLogic4Vec(f.arena, 8);
   sel_var->value.words[0].aval = 0x02;  // Pattern: 0b10 in lower bits
   sel_var->value.words[0].bval = 0x01;  // LSB is X
 
-  auto *stmt = f.arena.Create<Stmt>();
+  auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kCase;
   stmt->case_kind = TokenKind::kKwCasex;
   stmt->condition = MakeIdent(f.arena, "sel_xz");
@@ -222,16 +222,16 @@ TEST(StmtExec, CasexWithXZInSelector) {
 // =============================================================================
 TEST(StmtExec, CasezWithZInSelector) {
   StmtFixture f;
-  auto *result_var = f.ctx.CreateVariable("czz", 32);
+  auto* result_var = f.ctx.CreateVariable("czz", 32);
   result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
   // Create a variable with Z bit: aval=1,bval=1 => Z.
-  auto *sel_var = f.ctx.CreateVariable("sel_z", 8);
+  auto* sel_var = f.ctx.CreateVariable("sel_z", 8);
   sel_var->value = MakeLogic4Vec(f.arena, 8);
   sel_var->value.words[0].aval = 0x03;  // 0b11
   sel_var->value.words[0].bval = 0x01;  // LSB is Z (aval=1,bval=1)
 
-  auto *stmt = f.arena.Create<Stmt>();
+  auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kCase;
   stmt->case_kind = TokenKind::kKwCasez;
   stmt->condition = MakeIdent(f.arena, "sel_z");

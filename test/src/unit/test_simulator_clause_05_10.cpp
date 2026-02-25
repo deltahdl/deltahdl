@@ -25,24 +25,24 @@ struct SimCh510Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimCh510Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimCh510Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-static uint64_t RunAndGet(const std::string &src, const char *var_name) {
+static uint64_t RunAndGet(const std::string& src, const char* var_name) {
   SimCh510Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable(var_name);
+  auto* var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
   if (!var) return 0;
   return var->value.ToUint64();
@@ -165,7 +165,7 @@ TEST(SimCh510, StructLitPositionalThree) {
 TEST(SimCh510, StructLitFieldAccess) {
   // §5.10: After assigning via struct literal, individual fields are readable.
   SimCh510Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  typedef struct packed { logic [7:0] x; logic [7:0] y; } pt_t;\n"
       "  pt_t p;\n"
@@ -182,8 +182,8 @@ TEST(SimCh510, StructLitFieldAccess) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *vrx = f.ctx.FindVariable("rx");
-  auto *vry = f.ctx.FindVariable("ry");
+  auto* vrx = f.ctx.FindVariable("rx");
+  auto* vry = f.ctx.FindVariable("ry");
   EXPECT_NE(vrx, nullptr);
   EXPECT_NE(vry, nullptr);
   if (!vrx || !vry) return;

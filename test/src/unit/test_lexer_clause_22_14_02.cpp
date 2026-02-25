@@ -1,6 +1,7 @@
 // §22.14.2: IEEE Std 1364-1995 keywords
 
 #include <gtest/gtest.h>
+
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/keywords.h"
@@ -8,7 +9,7 @@
 
 using namespace delta;
 
-static std::vector<Token> Lex(const std::string &src) {
+static std::vector<Token> Lex(const std::string& src) {
   static SourceManager mgr;
   auto fid = mgr.AddFile("<test>", src);
   DiagEngine diag(mgr);

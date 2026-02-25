@@ -22,11 +22,11 @@ struct ElabFixture {
   DiagEngine diag{mgr};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, ElabFixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -49,7 +49,7 @@ TEST(Elaboration, InterconnectContAssign_Error) {
 TEST(Elaboration, InterconnectDecl_OK) {
   // §6.6.8: interconnect declaration is legal.
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module top;\n"
       "  interconnect bus;\n"
       "endmodule\n",
@@ -59,9 +59,9 @@ TEST(Elaboration, InterconnectDecl_OK) {
 
   // Check that bus is created as a net.
   ASSERT_FALSE(design->top_modules.empty());
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   bool found = false;
-  for (const auto &n : mod->nets) {
+  for (const auto& n : mod->nets) {
     if (n.name == "bus") found = true;
   }
   EXPECT_TRUE(found);

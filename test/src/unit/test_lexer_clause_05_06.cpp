@@ -1,7 +1,9 @@
 // §5.6: Identifiers, keywords, and system names
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"

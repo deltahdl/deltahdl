@@ -24,11 +24,11 @@ namespace {
 
 TEST(Eval, VariableLookup) {
   ExprFixture f;
-  auto *var = f.ctx.CreateVariable("myvar", 32);
+  auto* var = f.ctx.CreateVariable("myvar", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 123);
 
   // Create an identifier expression manually.
-  auto *expr = f.arena.Create<Expr>();
+  auto* expr = f.arena.Create<Expr>();
   expr->kind = ExprKind::kIdentifier;
   expr->text = "myvar";
   auto result = EvalExpr(expr, f.ctx, f.arena);

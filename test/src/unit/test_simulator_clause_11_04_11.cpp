@@ -116,11 +116,11 @@ struct SimA83Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA83Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA83Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -128,7 +128,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA83Fixture &f) {
 // § conditional_expression — ternary true branch
 TEST(SimA83, TernaryTrueBranch) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 1 ? 8'd10 : 8'd20;\n"
@@ -138,7 +138,7 @@ TEST(SimA83, TernaryTrueBranch) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
@@ -146,7 +146,7 @@ TEST(SimA83, TernaryTrueBranch) {
 // § conditional_expression — ternary false branch
 TEST(SimA83, TernaryFalseBranch) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 0 ? 8'd10 : 8'd20;\n"
@@ -156,7 +156,7 @@ TEST(SimA83, TernaryFalseBranch) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
@@ -164,7 +164,7 @@ TEST(SimA83, TernaryFalseBranch) {
 // § conditional_expression — nested ternary
 TEST(SimA83, NestedTernary) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 1 ? (0 ? 8'd1 : 8'd2) : 8'd3;\n"
@@ -174,7 +174,7 @@ TEST(SimA83, NestedTernary) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }

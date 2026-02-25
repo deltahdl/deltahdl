@@ -16,13 +16,13 @@ struct EvalFixture {
   Arena arena;
 };
 
-static Expr *ParseExprFrom(const std::string &src, EvalFixture &f) {
+static Expr* ParseExprFrom(const std::string& src, EvalFixture& f) {
   std::string code = "module t #(parameter P = " + src + ") (); endmodule";
   auto fid = f.mgr.AddFile("<test>", code);
   DiagEngine diag(f.mgr);
   Lexer lexer(f.mgr.FileContent(fid), fid, diag);
   Parser parser(lexer, f.arena, diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   EXPECT_FALSE(cu->modules.empty());
   EXPECT_FALSE(cu->modules[0]->params.empty());
   return cu->modules[0]->params[0].second;
@@ -33,14 +33,14 @@ namespace {
 TEST(ConstEval, Comparison) {
   EvalFixture f;
   struct Case {
-    const char *expr;
+    const char* expr;
     int64_t expected;
   };
   const Case kCases[] = {
       {"3 < 5", 1},  {"5 < 3", 0},  {"5 > 3", 1},  {"3 >= 3", 1},
       {"3 <= 3", 1}, {"3 == 3", 1}, {"3 != 4", 1},
   };
-  for (const auto &c : kCases) {
+  for (const auto& c : kCases) {
     EXPECT_EQ(ConstEvalInt(ParseExprFrom(c.expr, f)), c.expected) << c.expr;
   }
 }
@@ -52,13 +52,13 @@ struct ElabA86Fixture {
   bool has_errors = false;
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, ElabA86Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, ElabA86Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
-  auto *design = elab.Elaborate(cu->modules.back()->name);
+  auto* design = elab.Elaborate(cu->modules.back()->name);
   f.has_errors = f.diag.HasErrors();
   return design;
 }
@@ -66,7 +66,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA86Fixture &f) {
 // § binary_operator — equality operators elaborate
 TEST(ElabA86, BinaryCaseEqElaborates) {
   ElabA86Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  logic x;\n"
       "  initial x = (8'd5 === 8'd5);\n"
@@ -78,7 +78,7 @@ TEST(ElabA86, BinaryCaseEqElaborates) {
 
 TEST(ElabA86, BinaryCaseNeqElaborates) {
   ElabA86Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  logic x;\n"
       "  initial x = (8'd5 !== 8'd3);\n"

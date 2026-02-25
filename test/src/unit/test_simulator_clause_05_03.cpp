@@ -25,24 +25,24 @@ struct SimCh503Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimCh503Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimCh503Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-static uint64_t RunAndGet(const std::string &src, const char *var_name) {
+static uint64_t RunAndGet(const std::string& src, const char* var_name) {
   SimCh503Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable(var_name);
+  auto* var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
   if (!var) return 0;
   return var->value.ToUint64();
@@ -173,7 +173,7 @@ TEST(SimCh503, WhitespaceStringLiteralPreserved) {
   // §5.3: blanks and tabs are significant in string literals.
   // Assign a string with spaces to a wide variable and verify encoding.
   SimCh503Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [63:0] s;\n"
       "  initial s = \"a b\";\n"
@@ -183,7 +183,7 @@ TEST(SimCh503, WhitespaceStringLiteralPreserved) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("s");
+  auto* var = f.ctx.FindVariable("s");
   ASSERT_NE(var, nullptr);
   // "a b" is 3 bytes: 'a'=0x61, ' '=0x20, 'b'=0x62
   // Stored MSB first: 0x61_20_62 = 6365282
@@ -197,7 +197,7 @@ TEST(SimCh503, WhitespaceStringLiteralTabPreserved) {
   // §5.3: tabs are significant in string literals.
   // Use a literal tab character inside the SV string literal.
   SimCh503Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [63:0] s;\n"
       "  initial s = \"a\tb\";\n"
@@ -207,7 +207,7 @@ TEST(SimCh503, WhitespaceStringLiteralTabPreserved) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("s");
+  auto* var = f.ctx.FindVariable("s");
   ASSERT_NE(var, nullptr);
   // "a<TAB>b" is 3 bytes: 'a'=0x61, '\t'=0x09, 'b'=0x62
   uint64_t val = var->value.ToUint64();
@@ -284,7 +284,7 @@ TEST(SimCh503, WhitespaceAroundTernary) {
 // ---------------------------------------------------------------------------
 TEST(SimCh503, WhitespaceMultipleStatements) {
   SimCh503Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  initial begin\n"
@@ -296,8 +296,8 @@ TEST(SimCh503, WhitespaceMultipleStatements) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *a = f.ctx.FindVariable("a");
-  auto *b = f.ctx.FindVariable("b");
+  auto* a = f.ctx.FindVariable("a");
+  auto* b = f.ctx.FindVariable("b");
   ASSERT_NE(a, nullptr);
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 10u);

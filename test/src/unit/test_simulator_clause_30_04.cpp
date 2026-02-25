@@ -17,7 +17,7 @@ using namespace delta;
 // =============================================================================
 struct SpecifyTest : ::testing::Test {
  protected:
-  CompilationUnit *Parse(const std::string &src) {
+  CompilationUnit* Parse(const std::string& src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
     parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
@@ -25,8 +25,8 @@ struct SpecifyTest : ::testing::Test {
   }
 
   // Helper: get first specify block from first module.
-  ModuleItem *FirstSpecifyBlock(CompilationUnit *cu) {
-    for (auto *item : cu->modules[0]->items) {
+  ModuleItem* FirstSpecifyBlock(CompilationUnit* cu) {
+    for (auto* item : cu->modules[0]->items) {
       if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
     }
     return nullptr;
@@ -70,11 +70,11 @@ struct SimA702Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA702Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA702Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -82,7 +82,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA702Fixture &f) {
 // Path declarations do not interfere with behavioral initial block
 TEST(SimA702, PathDeclsDoNotInterfereBehavioral) {
   SimA702Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  specify\n"
@@ -101,8 +101,8 @@ TEST(SimA702, PathDeclsDoNotInterfereBehavioral) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *va = f.ctx.FindVariable("a");
-  auto *vb = f.ctx.FindVariable("b");
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
   ASSERT_NE(va, nullptr);
   ASSERT_NE(vb, nullptr);
   EXPECT_EQ(va->value.ToUint64(), 11u);

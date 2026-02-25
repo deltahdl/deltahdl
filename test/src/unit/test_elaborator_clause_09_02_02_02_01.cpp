@@ -1,6 +1,7 @@
 // §9.2.2.2.1: Implicit always_comb sensitivities
 
 #include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -21,11 +22,11 @@ struct ElabFixture {
   DiagEngine diag{mgr};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, ElabFixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -35,7 +36,7 @@ namespace {
 // --- Sensitivity inference ---
 TEST(Elaborator, AlwaysCombSensitivityInferred) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] a, b;\n"
       "  always_comb b = a + 1;\n"
@@ -43,14 +44,14 @@ TEST(Elaborator, AlwaysCombSensitivityInferred) {
       f);
   ASSERT_NE(design, nullptr);
 
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   ASSERT_FALSE(mod->processes.empty());
-  const auto &proc = mod->processes[0];
+  const auto& proc = mod->processes[0];
   EXPECT_EQ(proc.kind, RtlirProcessKind::kAlwaysComb);
   EXPECT_FALSE(proc.sensitivity.empty());
 
   bool found_a = false;
-  for (const auto &ev : proc.sensitivity) {
+  for (const auto& ev : proc.sensitivity) {
     if (ev.signal && ev.signal->text == "a") found_a = true;
   }
   EXPECT_TRUE(found_a);
@@ -81,7 +82,7 @@ static Expr* LspInt(Arena& arena, uint64_t val) {
 TEST(Sensitivity, SelectVarIdxUsesLSP) {
   // a[i] → LSP is "a", sensitivity includes "a" and "i".
   Arena arena;
-  auto *expr = SensSelect(arena, SensId(arena, "a"), SensId(arena, "i"));
+  auto* expr = SensSelect(arena, SensId(arena, "a"), SensId(arena, "i"));
   std::unordered_set<std::string> reads;
   CollectExprReads(expr, reads);
   EXPECT_TRUE(reads.count("a"));

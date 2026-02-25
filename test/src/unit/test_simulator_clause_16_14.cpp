@@ -36,7 +36,7 @@ TEST(Assertion, AddPropertyAndCount) {
 
 TEST(Assertion, AttachEvaluatesOnSignalChange) {
   AssertionSimFixture f;
-  auto *sig = f.ctx.CreateVariable("sig", 1);
+  auto* sig = f.ctx.CreateVariable("sig", 1);
   sig->value = MakeLogic4VecVal(f.arena, 1, 0);
 
   AssertionMonitor monitor;
@@ -49,14 +49,14 @@ TEST(Assertion, AttachEvaluatesOnSignalChange) {
   monitor.Attach(f.ctx, f.scheduler);
 
   // Schedule: at t=0 set sig=0 (init), at t=10 set sig=1.
-  auto *ev0 = f.scheduler.GetEventPool().Acquire();
+  auto* ev0 = f.scheduler.GetEventPool().Acquire();
   ev0->callback = [&sig, &f]() {
     sig->value = MakeLogic4VecVal(f.arena, 1, 0);
     sig->NotifyWatchers();
   };
   f.scheduler.ScheduleEvent(SimTime{0}, Region::kActive, ev0);
 
-  auto *ev1 = f.scheduler.GetEventPool().Acquire();
+  auto* ev1 = f.scheduler.GetEventPool().Acquire();
   ev1->callback = [&sig, &f]() {
     sig->value = MakeLogic4VecVal(f.arena, 1, 1);
     sig->NotifyWatchers();
@@ -71,7 +71,7 @@ TEST(Assertion, AttachEvaluatesOnSignalChange) {
 
 TEST(Assertion, AttachDetectsFailure) {
   AssertionSimFixture f;
-  auto *sig = f.ctx.CreateVariable("sig", 32);
+  auto* sig = f.ctx.CreateVariable("sig", 32);
   sig->value = MakeLogic4VecVal(f.arena, 32, 5);
 
   AssertionMonitor monitor;
@@ -83,14 +83,14 @@ TEST(Assertion, AttachDetectsFailure) {
 
   monitor.Attach(f.ctx, f.scheduler);
 
-  auto *ev0 = f.scheduler.GetEventPool().Acquire();
+  auto* ev0 = f.scheduler.GetEventPool().Acquire();
   ev0->callback = [&sig, &f]() {
     sig->value = MakeLogic4VecVal(f.arena, 32, 5);
     sig->NotifyWatchers();
   };
   f.scheduler.ScheduleEvent(SimTime{0}, Region::kActive, ev0);
 
-  auto *ev1 = f.scheduler.GetEventPool().Acquire();
+  auto* ev1 = f.scheduler.GetEventPool().Acquire();
   ev1->callback = [&sig, &f]() {
     sig->value = MakeLogic4VecVal(f.arena, 32, 10);
     sig->NotifyWatchers();

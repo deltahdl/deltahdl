@@ -17,7 +17,7 @@ using namespace delta;
 // =============================================================================
 struct SpecifyTest : ::testing::Test {
  protected:
-  CompilationUnit *Parse(const std::string &src) {
+  CompilationUnit* Parse(const std::string& src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
     parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
@@ -25,8 +25,8 @@ struct SpecifyTest : ::testing::Test {
   }
 
   // Helper: get first specify block from first module.
-  ModuleItem *FirstSpecifyBlock(CompilationUnit *cu) {
-    for (auto *item : cu->modules[0]->items) {
+  ModuleItem* FirstSpecifyBlock(CompilationUnit* cu) {
+    for (auto* item : cu->modules[0]->items) {
       if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
     }
     return nullptr;

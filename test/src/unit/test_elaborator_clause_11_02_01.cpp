@@ -1,7 +1,9 @@
 // §11.2.1: Constant expressions
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -19,13 +21,13 @@ struct ElabA83Fixture {
   bool has_errors = false;
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, ElabA83Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, ElabA83Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
-  auto *design = elab.Elaborate(cu->modules.back()->name);
+  auto* design = elab.Elaborate(cu->modules.back()->name);
   f.has_errors = f.diag.HasErrors();
   return design;
 }
@@ -35,7 +37,7 @@ namespace {
 // § constant_expression — ternary in parameter elaborates
 TEST(ElabA83, ConstantTernaryInParamElaborates) {
   ElabA83Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  parameter int P = 1 ? 10 : 20;\n"
       "endmodule\n",

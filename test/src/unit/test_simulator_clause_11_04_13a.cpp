@@ -23,23 +23,23 @@ struct EvalAdvFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static Expr *MakeInt(Arena &arena, uint64_t val) {
-  auto *e = arena.Create<Expr>();
+static Expr* MakeInt(Arena& arena, uint64_t val) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
   e->int_val = val;
   return e;
 }
 
-static Expr *MakeId(Arena &arena, std::string_view name) {
-  auto *e = arena.Create<Expr>();
+static Expr* MakeId(Arena& arena, std::string_view name) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
   e->text = name;
   return e;
 }
 
-static Expr *MakeRange(Arena &arena, Expr *lo, Expr *hi,
+static Expr* MakeRange(Arena& arena, Expr* lo, Expr* hi,
                        TokenKind op = TokenKind::kEof) {
-  auto *r = arena.Create<Expr>();
+  auto* r = arena.Create<Expr>();
   r->kind = ExprKind::kSelect;
   r->index = lo;
   r->index_end = hi;
@@ -47,8 +47,8 @@ static Expr *MakeRange(Arena &arena, Expr *lo, Expr *hi,
   return r;
 }
 
-static Expr *MakeDollar(Arena &arena) {
-  auto *e = arena.Create<Expr>();
+static Expr* MakeDollar(Arena& arena) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
   e->text = "$";
   return e;
@@ -57,9 +57,9 @@ namespace {
 
 TEST(EvalAdv, InsideDollarLowerBound) {
   EvalAdvFixture f;
-  auto *var = f.ctx.CreateVariable("dv", 8);
+  auto* var = f.ctx.CreateVariable("dv", 8);
   var->value = MakeLogic4VecVal(f.arena, 8, 5);
-  auto *inside = f.arena.Create<Expr>();
+  auto* inside = f.arena.Create<Expr>();
   inside->kind = ExprKind::kInside;
   inside->lhs = MakeId(f.arena, "dv");
   inside->elements.push_back(
@@ -70,9 +70,9 @@ TEST(EvalAdv, InsideDollarLowerBound) {
 
 TEST(EvalAdv, InsideDollarUpperBound) {
   EvalAdvFixture f;
-  auto *var = f.ctx.CreateVariable("du", 8);
+  auto* var = f.ctx.CreateVariable("du", 8);
   var->value = MakeLogic4VecVal(f.arena, 8, 200);
-  auto *inside = f.arena.Create<Expr>();
+  auto* inside = f.arena.Create<Expr>();
   inside->kind = ExprKind::kInside;
   inside->lhs = MakeId(f.arena, "du");
   inside->elements.push_back(

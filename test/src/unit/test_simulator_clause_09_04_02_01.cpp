@@ -22,9 +22,9 @@ struct VarRef {
 };
 
 std::vector<std::string> ComputeImplicitSensitivity(
-    const std::vector<VarRef> &refs) {
+    const std::vector<VarRef>& refs) {
   std::vector<std::string> result;
-  for (const auto &ref : refs) {
+  for (const auto& ref : refs) {
     switch (ref.role) {
       case ExprRole::kRHS:
       case ExprRole::kSubroutineArg:

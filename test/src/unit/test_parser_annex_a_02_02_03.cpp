@@ -1,7 +1,9 @@
 // Annex A.2.2.3: Delays
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -13,11 +15,11 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-ParseResult Parse(const std::string &src) {
+ParseResult Parse(const std::string& src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -28,7 +30,7 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-bool ParseOk(const std::string &src) {
+bool ParseOk(const std::string& src) {
   auto r = Parse(src);
   return r.cu && !r.has_errors;
 }
@@ -50,7 +52,7 @@ TEST(ParserA223, DelayValueUnsignedNumber) {
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   ASSERT_NE(item->net_delay, nullptr);
   EXPECT_EQ(item->net_delay->kind, ExprKind::kIntegerLiteral);
   EXPECT_EQ(item->net_delay->int_val, 10u);
@@ -64,7 +66,7 @@ TEST(ParserA223, DelayValueRealNumber) {
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   ASSERT_NE(item->net_delay, nullptr);
   EXPECT_EQ(item->net_delay->kind, ExprKind::kRealLiteral);
 }
@@ -77,7 +79,7 @@ TEST(ParserA223, Delay3NetTwoValues) {
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   ASSERT_NE(item->net_delay, nullptr);
   EXPECT_EQ(item->net_delay->int_val, 10u);
   ASSERT_NE(item->net_delay_fall, nullptr);
@@ -93,7 +95,7 @@ TEST(ParserA223, Delay3NetThreeValues) {
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   ASSERT_NE(item->net_delay, nullptr);
   EXPECT_EQ(item->net_delay->int_val, 10u);
   ASSERT_NE(item->net_delay_fall, nullptr);
@@ -113,7 +115,7 @@ TEST(ParserA223, Delay3GateSingleValue) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   // wire y, a, b creates 3 items; gate is items[3]
-  auto *item = r.cu->modules[0]->items[3];
+  auto* item = r.cu->modules[0]->items[3];
   ASSERT_NE(item->gate_delay, nullptr);
   EXPECT_EQ(item->gate_delay->int_val, 5u);
   EXPECT_EQ(item->gate_delay_fall, nullptr);
@@ -129,7 +131,7 @@ TEST(ParserA223, Delay3GateTwoValues) {
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[3];
+  auto* item = r.cu->modules[0]->items[3];
   ASSERT_NE(item->gate_delay, nullptr);
   EXPECT_EQ(item->gate_delay->int_val, 10u);
   ASSERT_NE(item->gate_delay_fall, nullptr);
@@ -146,7 +148,7 @@ TEST(ParserA223, Delay3AssignTwoValues) {
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[2];
+  auto* item = r.cu->modules[0]->items[2];
   ASSERT_NE(item->assign_delay, nullptr);
   EXPECT_EQ(item->assign_delay->int_val, 10u);
   ASSERT_NE(item->assign_delay_fall, nullptr);
@@ -167,7 +169,7 @@ TEST(ParserA223, Delay2NInputGateSingleValue) {
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[3];
+  auto* item = r.cu->modules[0]->items[3];
   ASSERT_NE(item->gate_delay, nullptr);
   EXPECT_EQ(item->gate_delay->int_val, 7u);
 }
@@ -180,7 +182,7 @@ TEST(ParserA223, NoDelayDefault) {
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->net_delay, nullptr);
   EXPECT_EQ(item->net_delay_fall, nullptr);
   EXPECT_EQ(item->net_delay_decay, nullptr);

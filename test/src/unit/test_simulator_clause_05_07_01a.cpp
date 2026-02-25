@@ -24,24 +24,24 @@ struct SimCh50701Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimCh50701Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimCh50701Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-static uint64_t RunAndGet(const std::string &src, const char *var_name) {
+static uint64_t RunAndGet(const std::string& src, const char* var_name) {
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable(var_name);
+  auto* var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
   if (!var) return 0;
   return var->value.ToUint64();
@@ -184,7 +184,7 @@ TEST(SimCh50701, NegativeTwosComplement) {
 TEST(SimCh50701, HexDigitsCaseInsensitive) {
   // §5.7.1: Hex digits a-f are case insensitive.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] a, b;\n"
       "  initial begin\n"
@@ -197,8 +197,8 @@ TEST(SimCh50701, HexDigitsCaseInsensitive) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *va = f.ctx.FindVariable("a");
-  auto *vb = f.ctx.FindVariable("b");
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
   ASSERT_NE(va, nullptr);
   ASSERT_NE(vb, nullptr);
   EXPECT_EQ(va->value.ToUint64(), vb->value.ToUint64());
@@ -211,7 +211,7 @@ TEST(SimCh50701, HexDigitsCaseInsensitive) {
 TEST(SimCh50701, UnderscoreInNumber) {
   // §5.7.1: Underscores are legal anywhere in a number except as first char.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] a, b, c;\n"
       "  initial begin\n"
@@ -225,9 +225,9 @@ TEST(SimCh50701, UnderscoreInNumber) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *va = f.ctx.FindVariable("a");
-  auto *vb = f.ctx.FindVariable("b");
-  auto *vc = f.ctx.FindVariable("c");
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
+  auto* vc = f.ctx.FindVariable("c");
   ASSERT_NE(va, nullptr);
   ASSERT_NE(vb, nullptr);
   ASSERT_NE(vc, nullptr);
@@ -270,7 +270,7 @@ TEST(SimCh50701, TruncationFromLeft) {
 TEST(SimCh50701, XValueInHexLiteral) {
   // §5.7.1: x sets 4 bits to unknown in hex base.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [11:0] x;\n"
       "  initial x = 12'hx;\n"
@@ -280,7 +280,7 @@ TEST(SimCh50701, XValueInHexLiteral) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_NE(var->value.words[0].bval, 0u);
 }
@@ -291,7 +291,7 @@ TEST(SimCh50701, XValueInHexLiteral) {
 TEST(SimCh50701, ZValueInHexLiteral) {
   // §5.7.1: z sets 4 bits to high-impedance in hex base.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] x;\n"
       "  initial x = 16'hz;\n"
@@ -301,7 +301,7 @@ TEST(SimCh50701, ZValueInHexLiteral) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   // z encoding: aval=0, bval=1 per bit; left-padded to full width.
   uint16_t mask = 0xFFFF;
@@ -315,7 +315,7 @@ TEST(SimCh50701, ZValueInHexLiteral) {
 TEST(SimCh50701, XInBinaryLiteral) {
   // §5.7.1: x sets 1 bit to unknown in binary base.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [2:0] x;\n"
       "  initial x = 3'b01x;\n"
@@ -325,7 +325,7 @@ TEST(SimCh50701, XInBinaryLiteral) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   // x encoding: aval=1, bval=1 per bit.
   EXPECT_EQ(var->value.words[0].aval & 0x7, 0b011u);
@@ -338,7 +338,7 @@ TEST(SimCh50701, XInBinaryLiteral) {
 TEST(SimCh50701, QuestionMarkAsZ) {
   // §5.7.1: ? is an alternative for the z character.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] a, b;\n"
       "  initial begin\n"
@@ -351,8 +351,8 @@ TEST(SimCh50701, QuestionMarkAsZ) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *va = f.ctx.FindVariable("a");
-  auto *vb = f.ctx.FindVariable("b");
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
   ASSERT_NE(va, nullptr);
   ASSERT_NE(vb, nullptr);
   EXPECT_EQ(va->value.words[0].aval & 0xF, vb->value.words[0].aval & 0xF);
@@ -365,7 +365,7 @@ TEST(SimCh50701, QuestionMarkAsZ) {
 TEST(SimCh50701, UnbasedUnsizedLiteral01) {
   // §5.7.1: Unbased unsized literals — all bits set to specified value.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] a, b;\n"
       "  initial begin\n"
@@ -378,8 +378,8 @@ TEST(SimCh50701, UnbasedUnsizedLiteral01) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *va = f.ctx.FindVariable("a");
-  auto *vb = f.ctx.FindVariable("b");
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
   ASSERT_NE(va, nullptr);
   ASSERT_NE(vb, nullptr);
   EXPECT_EQ(va->value.ToUint64(), 0u);
@@ -392,7 +392,7 @@ TEST(SimCh50701, UnbasedUnsizedLiteral01) {
 TEST(SimCh50701, UnbasedUnsizedLiteralXZ) {
   // §5.7.1: Unbased unsized x and z set all bits to x or z.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] a, b;\n"
       "  initial begin\n"
@@ -405,8 +405,8 @@ TEST(SimCh50701, UnbasedUnsizedLiteralXZ) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *va = f.ctx.FindVariable("a");
-  auto *vb = f.ctx.FindVariable("b");
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
   ASSERT_NE(va, nullptr);
   ASSERT_NE(vb, nullptr);
   // x: aval=1, bval=1; z: aval=0, bval=1. All bits filled.
@@ -423,7 +423,7 @@ TEST(SimCh50701, UnbasedUnsizedLiteralXZ) {
 TEST(SimCh50701, LeftPadWithX) {
   // §5.7.1: Leftmost x causes x-padding to the left.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [11:0] x;\n"
       "  initial x = 'hx;\n"
@@ -433,7 +433,7 @@ TEST(SimCh50701, LeftPadWithX) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   // x encoding: aval=1, bval=1 per bit; left-padded to full width.
   uint16_t mask = 0xFFF;
@@ -447,7 +447,7 @@ TEST(SimCh50701, LeftPadWithX) {
 TEST(SimCh50701, LeftPadWithZ) {
   // §5.7.1: Leftmost z causes z-padding to the left.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [11:0] x;\n"
       "  initial x = 'hz;\n"
@@ -457,7 +457,7 @@ TEST(SimCh50701, LeftPadWithZ) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   // z encoding: aval=0, bval=1 per bit; left-padded to full width.
   uint16_t mask = 0xFFF;
@@ -486,7 +486,7 @@ TEST(SimCh50701, SignedBasedLiteral) {
 TEST(SimCh50701, SignedDesignatorBitPattern) {
   // §5.7.1: The s designator affects interpretation, not the bit pattern.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] a, b;\n"
       "  initial begin\n"
@@ -499,8 +499,8 @@ TEST(SimCh50701, SignedDesignatorBitPattern) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *va = f.ctx.FindVariable("a");
-  auto *vb = f.ctx.FindVariable("b");
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
   ASSERT_NE(va, nullptr);
   ASSERT_NE(vb, nullptr);
   EXPECT_EQ(va->value.words[0].aval & 0xF, 0xFu);
@@ -514,7 +514,7 @@ TEST(SimCh50701, SignedDesignatorBitPattern) {
 TEST(SimCh50701, XZCaseInsensitive) {
   // §5.7.1: x and z are case insensitive in number values.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] a, b;\n"
       "  initial begin\n"
@@ -527,8 +527,8 @@ TEST(SimCh50701, XZCaseInsensitive) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *va = f.ctx.FindVariable("a");
-  auto *vb = f.ctx.FindVariable("b");
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
   ASSERT_NE(va, nullptr);
   ASSERT_NE(vb, nullptr);
   EXPECT_EQ(va->value.words[0].aval & 0xF, vb->value.words[0].aval & 0xF);
@@ -541,7 +541,7 @@ TEST(SimCh50701, XZCaseInsensitive) {
 TEST(SimCh50701, XInOctalLiteral) {
   // §5.7.1: x sets 3 bits to unknown in octal base.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [5:0] x;\n"
       "  initial x = 6'o7x;\n"
@@ -551,7 +551,7 @@ TEST(SimCh50701, XInOctalLiteral) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.words[0].aval & 0x38, 0x38u);
   EXPECT_EQ(var->value.words[0].bval & 0x07, 0x07u);
@@ -563,7 +563,7 @@ TEST(SimCh50701, XInOctalLiteral) {
 TEST(SimCh50701, BaseFormatCaseInsensitive) {
   // §5.7.1: Base format letter is case insensitive.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, c, d;\n"
       "  initial begin\n"
@@ -578,10 +578,10 @@ TEST(SimCh50701, BaseFormatCaseInsensitive) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *va = f.ctx.FindVariable("a");
-  auto *vb = f.ctx.FindVariable("b");
-  auto *vc = f.ctx.FindVariable("c");
-  auto *vd = f.ctx.FindVariable("d");
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
+  auto* vc = f.ctx.FindVariable("c");
+  auto* vd = f.ctx.FindVariable("d");
   ASSERT_NE(va, nullptr);
   ASSERT_NE(vb, nullptr);
   ASSERT_NE(vc, nullptr);
@@ -612,7 +612,7 @@ TEST(SimCh50701, WhiteSpaceSizeAndBase) {
 TEST(SimCh50701, LeftPadKnownHex) {
   // §5.7.1: Known value with x in low nibble — yields 03x.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [11:0] x;\n"
       "  initial x = 'h3x;\n"
@@ -622,7 +622,7 @@ TEST(SimCh50701, LeftPadKnownHex) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   // x: aval=1, bval=1. Lower nibble = x, middle = 3, upper = 0-pad.
   EXPECT_EQ(var->value.words[0].aval & 0xFFF, 0x03Fu);
@@ -636,7 +636,7 @@ TEST(SimCh50701, LeftPadKnownHex) {
 TEST(SimCh50701, DecimalSingleDigitX) {
   // §5.7.1: Decimal literal allows single x/z/? digit only.
   SimCh50701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'dx;\n"
@@ -646,7 +646,7 @@ TEST(SimCh50701, DecimalSingleDigitX) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   uint8_t mask = 0xFF;
   EXPECT_EQ(var->value.words[0].bval & mask, mask);

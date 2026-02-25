@@ -23,7 +23,7 @@ using namespace delta;
 // =============================================================================
 struct ProgramTestParse : ::testing::Test {
  protected:
-  CompilationUnit *Parse(const std::string &src) {
+  CompilationUnit* Parse(const std::string& src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
     parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);

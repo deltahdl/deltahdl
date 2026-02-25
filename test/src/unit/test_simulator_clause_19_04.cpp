@@ -18,7 +18,7 @@ TEST(Coverage, CoverGroupAsClassMember) {
   // Simulates a covergroup embedded in a class: just a struct.
   struct MyClass {
     CoverageDB db;
-    CoverGroup *cg = nullptr;
+    CoverGroup* cg = nullptr;
     void Init() { cg = db.CreateGroup("cg_in_class"); }
   };
   MyClass obj;

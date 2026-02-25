@@ -25,11 +25,11 @@ struct LowerFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, LowerFixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, LowerFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -38,7 +38,7 @@ namespace {
 
 TEST(Lowerer, FinalBlockExecutesAfterRun) {
   LowerFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] x;\n"
       "  final x = 77;\n"
@@ -51,7 +51,7 @@ TEST(Lowerer, FinalBlockExecutesAfterRun) {
   f.scheduler.Run();
 
   // Before RunFinalBlocks, x should still have default value.
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 
@@ -61,7 +61,7 @@ TEST(Lowerer, FinalBlockExecutesAfterRun) {
 
 TEST(Lowerer, FinalBlockNotScheduledAtTimeZero) {
   LowerFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] x;\n"
       "  initial x = 10;\n"
@@ -75,14 +75,14 @@ TEST(Lowerer, FinalBlockNotScheduledAtTimeZero) {
   f.scheduler.Run();
 
   // After scheduler, initial ran (x=10) but final didn't.
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
 TEST(Lowerer, FinalBlocksFIFOOrder) {
   LowerFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] x;\n"
       "  final x = 10;\n"
@@ -96,7 +96,7 @@ TEST(Lowerer, FinalBlocksFIFOOrder) {
   f.scheduler.Run();
   f.ctx.RunFinalBlocks();
 
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   // Second final block overwrites first, so x == 20.
   EXPECT_EQ(var->value.ToUint64(), 20u);

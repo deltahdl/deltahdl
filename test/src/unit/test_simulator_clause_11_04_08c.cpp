@@ -19,14 +19,14 @@ TEST(Types, Logic4WordAnd) {
     Logic4Word b;
     uint64_t exp_aval;
     uint64_t exp_bval;
-    const char *label;
+    const char* label;
   };
   const Case kCases[] = {
       {one, one, 1, 0, "1 & 1 = 1"},
       {one, zero, 0, 0, "1 & 0 = 0"},
       {zero, x_val, 0, 0, "0 & x = 0"},
   };
-  for (const auto &c : kCases) {
+  for (const auto& c : kCases) {
     auto r = Logic4And(c.a, c.b);
     EXPECT_EQ(r.aval, c.exp_aval) << c.label;
     EXPECT_EQ(r.bval, c.exp_bval) << c.label;
@@ -47,14 +47,14 @@ TEST(Types, Logic4WordOr) {
     Logic4Word b;
     uint64_t exp_aval;
     uint64_t exp_bval;
-    const char *label;
+    const char* label;
   };
   const Case kCases[] = {
       {zero, zero, 0, 0, "0 | 0 = 0"},
       {one, zero, 1, 0, "1 | 0 = 1"},
       {one, x_val, 1, 0, "1 | x = 1"},
   };
-  for (const auto &c : kCases) {
+  for (const auto& c : kCases) {
     auto r = Logic4Or(c.a, c.b);
     EXPECT_EQ(r.aval, c.exp_aval) << c.label;
     EXPECT_EQ(r.bval, c.exp_bval) << c.label;

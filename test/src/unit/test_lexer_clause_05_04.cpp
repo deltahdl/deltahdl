@@ -8,7 +8,7 @@
 
 using namespace delta;
 
-static std::vector<Token> Lex(const std::string &src) {
+static std::vector<Token> Lex(const std::string& src) {
   static SourceManager mgr;
   auto fid = mgr.AddFile("<test>", src);
   DiagEngine diag(mgr);
@@ -22,7 +22,7 @@ struct LexResult {
   bool has_errors;
 };
 
-static LexResult LexWithDiag(const std::string &src) {
+static LexResult LexWithDiag(const std::string& src) {
   SourceManager mgr;
   DiagEngine diag(mgr);
   auto fid = mgr.AddFile("<test>", src);
@@ -75,7 +75,8 @@ TEST(LexerCh504, MultipleConsecutiveLineComments) {
 }
 
 TEST(LexerCh504, BlockCommentTokensInsideLineComment) {
-  // §5.4: /* and */ shall not have any special meaning inside a one-line comment.
+  // §5.4: /* and */ shall not have any special meaning inside a one-line
+  // comment.
   auto tokens = Lex("a // /* not a block comment */ still line comment\nb");
   ASSERT_EQ(tokens.size(), 3);
   EXPECT_EQ(tokens[0].text, "a");
@@ -161,8 +162,9 @@ TEST(LexerCh504, SlashesInsideBlockComment) {
 // ---------------------------------------------------------------------------
 
 TEST(LexerCh504, BlockCommentsDoNotNest) {
-  // §5.4: The first */ ends the block comment. The second /* inside is just text.
-  // "a /* outer /* inner */ b" => the /* inner is ignored, */ closes comment.
+  // §5.4: The first */ ends the block comment. The second /* inside is just
+  // text. "a /* outer /* inner */ b" => the /* inner is ignored, */ closes
+  // comment.
   auto tokens = Lex("a /* outer /* inner */ b");
   ASSERT_EQ(tokens.size(), 3);
   EXPECT_EQ(tokens[0].text, "a");
@@ -218,11 +220,11 @@ TEST(LexerCh504, BlockCommentFollowedByLineComment) {
 }
 
 TEST(LexerCh504, MixedCommentsMultipleLines) {
-  auto tokens = Lex(
-      "a // line comment\n"
-      "/* block spanning\n"
-      "   multiple lines */\n"
-      "b // trailing\n");
+  auto tokens =
+      Lex("a // line comment\n"
+          "/* block spanning\n"
+          "   multiple lines */\n"
+          "b // trailing\n");
   ASSERT_EQ(tokens.size(), 3);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
@@ -358,7 +360,8 @@ TEST(LexerCh504, BlockCommentContainingNewlines) {
 TEST(LexerCh504, SlashStarSlashIsValidBlockComment) {
   // "/*/" has no closing — only one char of text then EOF.
   auto [tokens, errors] = LexWithDiag("/*/");
-  EXPECT_TRUE(errors);  // unterminated: the comment is "/* /" with no closing */
+  EXPECT_TRUE(
+      errors);  // unterminated: the comment is "/* /" with no closing */
 }
 
 TEST(LexerCh504, SlashStarStarSlashIsMinimalBlockComment) {

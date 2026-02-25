@@ -21,7 +21,7 @@ TEST(Scheduler, ScheduleAndRunSingleEvent) {
   Arena arena;
   Scheduler sched(arena);
   bool executed = false;
-  auto *ev = sched.GetEventPool().Acquire();
+  auto* ev = sched.GetEventPool().Acquire();
   ev->callback = [&executed]() { executed = true; };
   sched.ScheduleEvent({0}, Region::kActive, ev);
   EXPECT_TRUE(sched.HasEvents());

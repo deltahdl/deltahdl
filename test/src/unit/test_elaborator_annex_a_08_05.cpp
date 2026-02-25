@@ -23,13 +23,13 @@ struct ElabA85Fixture {
   bool has_errors = false;
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, ElabA85Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, ElabA85Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
-  auto *design = elab.Elaborate(cu->modules.back()->name);
+  auto* design = elab.Elaborate(cu->modules.back()->name);
   f.has_errors = f.diag.HasErrors();
   return design;
 }
@@ -44,7 +44,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA85Fixture &f) {
 
 TEST(ElabA85, NetLvalueSimpleContAssign) {
   ElabA85Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  wire a, b;\n"
       "  assign a = b;\n"
@@ -58,7 +58,7 @@ TEST(ElabA85, NetLvalueSimpleContAssign) {
 
 TEST(ElabA85, NetLvalueBitSelectContAssign) {
   ElabA85Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  wire [7:0] a;\n"
       "  wire b;\n"
@@ -73,7 +73,7 @@ TEST(ElabA85, NetLvalueBitSelectContAssign) {
 
 TEST(ElabA85, NetLvalueConcatContAssign) {
   ElabA85Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  wire [3:0] a, b;\n"
       "  wire [7:0] c;\n"
@@ -88,7 +88,7 @@ TEST(ElabA85, NetLvalueConcatContAssign) {
 
 TEST(ElabA85, VarLvalueSimpleProceduralAssign) {
   ElabA85Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  logic x;\n"
       "  initial x = 1;\n"
@@ -102,7 +102,7 @@ TEST(ElabA85, VarLvalueSimpleProceduralAssign) {
 
 TEST(ElabA85, VarLvalueBitSelectProcedural) {
   ElabA85Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] x;\n"
       "  initial x[3] = 1;\n"
@@ -116,7 +116,7 @@ TEST(ElabA85, VarLvalueBitSelectProcedural) {
 
 TEST(ElabA85, VarLvaluePartSelectProcedural) {
   ElabA85Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] x;\n"
       "  initial x[7:4] = 4'hF;\n"
@@ -130,7 +130,7 @@ TEST(ElabA85, VarLvaluePartSelectProcedural) {
 
 TEST(ElabA85, VarLvalueConcatProcedural) {
   ElabA85Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [3:0] a, b;\n"
       "  logic [7:0] c;\n"
@@ -145,7 +145,7 @@ TEST(ElabA85, VarLvalueConcatProcedural) {
 
 TEST(ElabA85, VarLvalueMemberAccessProcedural) {
   ElabA85Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  typedef struct packed { logic [7:0] hi; logic [7:0] lo; } pair_t;\n"
       "  pair_t p;\n"
@@ -160,7 +160,7 @@ TEST(ElabA85, VarLvalueMemberAccessProcedural) {
 
 TEST(ElabA85, VarLvalueNonblockingElaborates) {
   ElabA85Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  logic x;\n"
       "  initial x <= 1;\n"
@@ -174,7 +174,7 @@ TEST(ElabA85, VarLvalueNonblockingElaborates) {
 
 TEST(ElabA85, VarLvalueForceReleaseElaborates) {
   ElabA85Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  logic x;\n"
       "  initial begin force x = 1; release x; end\n"
@@ -188,7 +188,7 @@ TEST(ElabA85, VarLvalueForceReleaseElaborates) {
 
 TEST(ElabA85, VarLvalueStreamingConcatElaborates) {
   ElabA85Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [31:0] a, b;\n"
       "  initial {>> {a}} = b;\n"
@@ -202,7 +202,7 @@ TEST(ElabA85, VarLvalueStreamingConcatElaborates) {
 
 TEST(ElabA85, NonrangeVarLvalueElaborates) {
   ElabA85Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  int x;\n"
       "  initial x = 42;\n"

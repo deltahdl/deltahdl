@@ -16,7 +16,7 @@ namespace {
 // =============================================================================
 TEST(Coverage, SampleCountIncremented) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
+  auto* g = db.CreateGroup("cg");
   CoverageDB::AddCoverPoint(g, "x");
 
   EXPECT_EQ(g->sample_count, 0u);
@@ -28,8 +28,8 @@ TEST(Coverage, SampleCountIncremented) {
 
 TEST(Coverage, GetCoveragePercentage) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "x");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "x");
   CoverBin b1;
   b1.name = "b0";
   b1.values = {0};
@@ -47,8 +47,8 @@ TEST(Coverage, GetCoveragePercentage) {
 
 TEST(Coverage, GetInstCoverageMatchesGetCoverage) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "x");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "x");
   CoverBin b;
   b.name = "b0";
   b.values = {0};

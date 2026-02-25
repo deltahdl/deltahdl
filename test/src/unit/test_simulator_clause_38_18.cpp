@@ -26,8 +26,8 @@ class VpiClause3818Test : public ::testing::Test {
 // §38.18: vpi_handle
 
 TEST_F(VpiClause3818Test, HandleReturnsParentModule) {
-  auto *mod = vpi_ctx_.CreateModule("top", "top");
-  auto *port = vpi_ctx_.CreatePort("clk", kVpiInput, mod);
+  auto* mod = vpi_ctx_.CreateModule("top", "top");
+  auto* port = vpi_ctx_.CreatePort("clk", kVpiInput, mod);
 
   vpiHandle result = VpiHandleC(vpiModule, port);
   ASSERT_NE(result, nullptr);
@@ -40,7 +40,7 @@ TEST_F(VpiClause3818Test, HandleReturnsNullptrForNullRef) {
 }
 
 TEST_F(VpiClause3818Test, HandleReturnsNullptrForNoMatch) {
-  auto *mod = vpi_ctx_.CreateModule("top", "top");
+  auto* mod = vpi_ctx_.CreateModule("top", "top");
   // Module has no net children, so asking for vpiNet should fail.
   vpiHandle result = VpiHandleC(vpiNet, mod);
   EXPECT_EQ(result, nullptr);

@@ -26,9 +26,9 @@ class VpiClause3819Test : public ::testing::Test {
 // §38.19: vpi_handle_by_index
 
 TEST_F(VpiClause3819Test, HandleByIndexReturnCorrectChild) {
-  auto *mod = vpi_ctx_.CreateModule("top", "top");
+  auto* mod = vpi_ctx_.CreateModule("top", "top");
   vpi_ctx_.CreatePort("a", kVpiInput, mod);
-  auto *port_b = vpi_ctx_.CreatePort("b", kVpiOutput, mod);
+  auto* port_b = vpi_ctx_.CreatePort("b", kVpiOutput, mod);
 
   vpiHandle result = VpiHandleByIndexC(mod, 1);
   ASSERT_NE(result, nullptr);
@@ -41,7 +41,7 @@ TEST_F(VpiClause3819Test, HandleByIndexNullParentReturnsNullptr) {
 }
 
 TEST_F(VpiClause3819Test, HandleByIndexOutOfRangeReturnsNullptr) {
-  auto *mod = vpi_ctx_.CreateModule("top", "top");
+  auto* mod = vpi_ctx_.CreateModule("top", "top");
   vpiHandle result = VpiHandleByIndexC(mod, 99);
   EXPECT_EQ(result, nullptr);
 }

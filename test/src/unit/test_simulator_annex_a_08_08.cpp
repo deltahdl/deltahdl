@@ -28,24 +28,24 @@ struct SimA88Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA88Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA88Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-static uint64_t RunAndGet(const std::string &src, const char *var_name) {
+static uint64_t RunAndGet(const std::string& src, const char* var_name) {
   SimA88Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable(var_name);
+  auto* var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
   if (!var) return 0;
   return var->value.ToUint64();
@@ -141,7 +141,8 @@ TEST(SimA88, EscapeSeqOctalTwoDigits) {
   EXPECT_EQ(v, 0x3Fu);
 }
 
-// § string_escape_seq — \one_to_three_digit_octal_number: three digits \101 → 0x41 ('A')
+// § string_escape_seq — \one_to_three_digit_octal_number: three digits \101 →
+// 0x41 ('A')
 TEST(SimA88, EscapeSeqOctalThreeDigits) {
   auto v = RunAndGet(
       "module t;\n"
@@ -152,7 +153,8 @@ TEST(SimA88, EscapeSeqOctalThreeDigits) {
   EXPECT_EQ(v, 0x41u);
 }
 
-// § string_escape_seq — \x one_to_two_digit_hex_number: one hex digit \xA → 0x0A
+// § string_escape_seq — \x one_to_two_digit_hex_number: one hex digit \xA →
+// 0x0A
 TEST(SimA88, EscapeSeqHexOneDigit) {
   auto v = RunAndGet(
       "module t;\n"
@@ -163,7 +165,8 @@ TEST(SimA88, EscapeSeqHexOneDigit) {
   EXPECT_EQ(v, 0x0Au);
 }
 
-// § string_escape_seq — \x one_to_two_digit_hex_number: two hex digits \x41 → 0x41 ('A')
+// § string_escape_seq — \x one_to_two_digit_hex_number: two hex digits \x41 →
+// 0x41 ('A')
 TEST(SimA88, EscapeSeqHexTwoDigits) {
   auto v = RunAndGet(
       "module t;\n"
@@ -186,7 +189,8 @@ TEST(SimA88, TripleQuotedStringItemNewlineIsLiteral) {
   EXPECT_EQ(v, 0x410A42u);
 }
 
-// § triple_quoted_string_item — double-quote is a literal character (0x22 in result)
+// § triple_quoted_string_item — double-quote is a literal character (0x22 in
+// result)
 TEST(SimA88, TripleQuotedStringItemDoubleQuoteIsLiteral) {
   // """A"B""" where " is a literal double-quote character
   auto v = RunAndGet(
@@ -198,7 +202,8 @@ TEST(SimA88, TripleQuotedStringItemDoubleQuoteIsLiteral) {
   EXPECT_EQ(v, 0x412242u);
 }
 
-// § string_escape_seq in triple_quoted_string — same semantics as in quoted_string
+// § string_escape_seq in triple_quoted_string — same semantics as in
+// quoted_string
 TEST(SimA88, TripleQuotedStringEscapeSeq) {
   // """\n""" → newline (0x0A)
   auto v = RunAndGet(

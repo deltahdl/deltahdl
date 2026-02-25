@@ -22,11 +22,11 @@ struct SimCh9eFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimCh9eFixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimCh9eFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -34,7 +34,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimCh9eFixture &f) {
 // §9.4.2.4: posedge clk iff enable=1 fires the event, body executes.
 TEST(SimCh9e, PosedgeIffEnableTrue) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk, enable;\n"
       "  logic [31:0] count;\n"
@@ -53,7 +53,7 @@ TEST(SimCh9e, PosedgeIffEnableTrue) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("count");
+  auto* var = f.ctx.FindVariable("count");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -61,7 +61,7 @@ TEST(SimCh9e, PosedgeIffEnableTrue) {
 // §9.4.2.4: posedge clk iff enable=0 suppresses the event.
 TEST(SimCh9e, PosedgeIffEnableFalse) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk, enable;\n"
       "  logic [31:0] count;\n"
@@ -80,7 +80,7 @@ TEST(SimCh9e, PosedgeIffEnableFalse) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("count");
+  auto* var = f.ctx.FindVariable("count");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
@@ -88,7 +88,7 @@ TEST(SimCh9e, PosedgeIffEnableFalse) {
 // §9.4.2.4: negedge clk iff enable=1 fires the event.
 TEST(SimCh9e, NegedgeIffEnableTrue) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk, enable;\n"
       "  logic [31:0] count;\n"
@@ -107,7 +107,7 @@ TEST(SimCh9e, NegedgeIffEnableTrue) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("count");
+  auto* var = f.ctx.FindVariable("count");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -115,7 +115,7 @@ TEST(SimCh9e, NegedgeIffEnableTrue) {
 // §9.4.2.4: negedge clk iff enable=0 suppresses the event.
 TEST(SimCh9e, NegedgeIffEnableFalse) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk, enable;\n"
       "  logic [31:0] count;\n"
@@ -134,7 +134,7 @@ TEST(SimCh9e, NegedgeIffEnableFalse) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("count");
+  auto* var = f.ctx.FindVariable("count");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
@@ -142,7 +142,7 @@ TEST(SimCh9e, NegedgeIffEnableFalse) {
 // §9.4.2.4: iff with logical-AND complex condition (a && b).
 TEST(SimCh9e, IffComplexAndCondition) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk, a, b;\n"
       "  logic [31:0] count;\n"
@@ -161,7 +161,7 @@ TEST(SimCh9e, IffComplexAndCondition) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("count");
+  auto* var = f.ctx.FindVariable("count");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -169,7 +169,7 @@ TEST(SimCh9e, IffComplexAndCondition) {
 // §9.4.2.4: iff with logical-AND when one operand is false.
 TEST(SimCh9e, IffComplexAndConditionOneFalse) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk, a, b;\n"
       "  logic [31:0] count;\n"
@@ -188,7 +188,7 @@ TEST(SimCh9e, IffComplexAndConditionOneFalse) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("count");
+  auto* var = f.ctx.FindVariable("count");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
@@ -196,7 +196,7 @@ TEST(SimCh9e, IffComplexAndConditionOneFalse) {
 // §9.4.2.4: iff with comparison condition (count_val > 0).
 TEST(SimCh9e, IffComparisonGreaterThanZero) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk;\n"
       "  logic [31:0] count_val, result;\n"
@@ -215,7 +215,7 @@ TEST(SimCh9e, IffComparisonGreaterThanZero) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -223,7 +223,7 @@ TEST(SimCh9e, IffComparisonGreaterThanZero) {
 // §9.4.2.4: iff with comparison when condition is false (count_val == 0).
 TEST(SimCh9e, IffComparisonZeroSuppresses) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk;\n"
       "  logic [31:0] count_val, result;\n"
@@ -242,7 +242,7 @@ TEST(SimCh9e, IffComparisonZeroSuppresses) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
@@ -250,7 +250,7 @@ TEST(SimCh9e, IffComparisonZeroSuppresses) {
 // §9.4.2.4: iff with bitwise-AND condition.
 TEST(SimCh9e, IffBitwiseAndCondition) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] mask, enable;\n"
@@ -270,7 +270,7 @@ TEST(SimCh9e, IffBitwiseAndCondition) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
@@ -278,7 +278,7 @@ TEST(SimCh9e, IffBitwiseAndCondition) {
 // §9.4.2.4: iff with logical negation (!reset).
 TEST(SimCh9e, IffLogicalNegation) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk, reset;\n"
       "  logic [31:0] result;\n"
@@ -297,7 +297,7 @@ TEST(SimCh9e, IffLogicalNegation) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
@@ -305,7 +305,7 @@ TEST(SimCh9e, IffLogicalNegation) {
 // §9.4.2.4: iff with !reset when reset=1 suppresses.
 TEST(SimCh9e, IffLogicalNegationSuppresses) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk, reset;\n"
       "  logic [31:0] result;\n"
@@ -324,7 +324,7 @@ TEST(SimCh9e, IffLogicalNegationSuppresses) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
@@ -332,7 +332,7 @@ TEST(SimCh9e, IffLogicalNegationSuppresses) {
 // §9.4.2.4: Multiple events with different iff conditions.
 TEST(SimCh9e, MultipleEventsWithDifferentIff) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk, rst, en_clk, en_rst;\n"
       "  logic [31:0] result;\n"
@@ -351,7 +351,7 @@ TEST(SimCh9e, MultipleEventsWithDifferentIff) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   // Only posedge clk fires (en_clk=1), negedge rst suppressed (en_rst=0).
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -360,7 +360,7 @@ TEST(SimCh9e, MultipleEventsWithDifferentIff) {
 // §9.4.2.4: iff guard on both posedge and negedge in same list.
 TEST(SimCh9e, IffOnBothEdgesInList) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk, en_pos, en_neg;\n"
       "  logic [31:0] result;\n"
@@ -380,7 +380,7 @@ TEST(SimCh9e, IffOnBothEdgesInList) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   // posedge at t=1 fires (en_pos=1), negedge at t=2 fires (en_neg=1).
   EXPECT_EQ(var->value.ToUint64(), 2u);
@@ -389,7 +389,7 @@ TEST(SimCh9e, IffOnBothEdgesInList) {
 // §9.4.2.4: iff guard on posedge fires, negedge suppressed.
 TEST(SimCh9e, IffPosedgeFiresNegedgeSuppressed) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk, en_pos, en_neg;\n"
       "  logic [31:0] result;\n"
@@ -409,7 +409,7 @@ TEST(SimCh9e, IffPosedgeFiresNegedgeSuppressed) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   // Only posedge fires (en_pos=1), negedge suppressed (en_neg=0).
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -418,7 +418,7 @@ TEST(SimCh9e, IffPosedgeFiresNegedgeSuppressed) {
 // §9.4.2.4: iff condition variable changes between edges.
 TEST(SimCh9e, IffConditionChanges) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk, enable;\n"
       "  logic [31:0] count;\n"
@@ -440,7 +440,7 @@ TEST(SimCh9e, IffConditionChanges) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("count");
+  auto* var = f.ctx.FindVariable("count");
   ASSERT_NE(var, nullptr);
   // First posedge at t=1: enable=0, suppressed.
   // Second posedge at t=4: enable=1, fires.
@@ -450,7 +450,7 @@ TEST(SimCh9e, IffConditionChanges) {
 // §9.4.2.4: always_ff @(posedge clk iff en) with register update.
 TEST(SimCh9e, AlwaysFFIffRegisterUpdate) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk, en;\n"
       "  logic [31:0] d, q;\n"
@@ -469,7 +469,7 @@ TEST(SimCh9e, AlwaysFFIffRegisterUpdate) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("q");
+  auto* var = f.ctx.FindVariable("q");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
@@ -477,7 +477,7 @@ TEST(SimCh9e, AlwaysFFIffRegisterUpdate) {
 // §9.4.2.4: always_ff @(posedge clk iff en) suppressed when en=0.
 TEST(SimCh9e, AlwaysFFIffSuppressed) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk, en;\n"
       "  logic [31:0] d, q;\n"
@@ -496,7 +496,7 @@ TEST(SimCh9e, AlwaysFFIffSuppressed) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("q");
+  auto* var = f.ctx.FindVariable("q");
   ASSERT_NE(var, nullptr);
   // en=0 at posedge, so q should remain 0.
   EXPECT_EQ(var->value.ToUint64(), 0u);
@@ -505,7 +505,7 @@ TEST(SimCh9e, AlwaysFFIffSuppressed) {
 // §9.4.2.4: iff guard in always block with begin/end body.
 TEST(SimCh9e, IffGuardAlwaysBlockBeginEnd) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk, en;\n"
       "  logic [31:0] a, b;\n"
@@ -526,8 +526,8 @@ TEST(SimCh9e, IffGuardAlwaysBlockBeginEnd) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *a = f.ctx.FindVariable("a");
-  auto *b = f.ctx.FindVariable("b");
+  auto* a = f.ctx.FindVariable("a");
+  auto* b = f.ctx.FindVariable("b");
   ASSERT_NE(a, nullptr);
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 10u);
@@ -537,7 +537,7 @@ TEST(SimCh9e, IffGuardAlwaysBlockBeginEnd) {
 // §9.4.2.4: iff with edge on data signal (not just clock).
 TEST(SimCh9e, IffEdgeOnDataSignal) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic data, valid;\n"
       "  logic [31:0] result;\n"
@@ -556,7 +556,7 @@ TEST(SimCh9e, IffEdgeOnDataSignal) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
@@ -564,7 +564,7 @@ TEST(SimCh9e, IffEdgeOnDataSignal) {
 // §9.4.2.4: iff condition evaluated at time of edge (not earlier).
 TEST(SimCh9e, IffConditionEvaluatedAtEdgeTime) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk, enable;\n"
       "  logic [31:0] result;\n"
@@ -584,7 +584,7 @@ TEST(SimCh9e, IffConditionEvaluatedAtEdgeTime) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   // enable=0 at time of posedge, so event should be suppressed.
   EXPECT_EQ(var->value.ToUint64(), 0u);
@@ -593,7 +593,7 @@ TEST(SimCh9e, IffConditionEvaluatedAtEdgeTime) {
 // §9.4.2.4: iff with equality comparison (reset == 0).
 TEST(SimCh9e, IffEqualityComparison) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk, reset;\n"
       "  logic [31:0] result;\n"
@@ -612,7 +612,7 @@ TEST(SimCh9e, IffEqualityComparison) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 66u);
 }
@@ -620,7 +620,7 @@ TEST(SimCh9e, IffEqualityComparison) {
 // §9.4.2.4: Multiple signals, only some with iff guards.
 TEST(SimCh9e, MixedIffAndNoIff) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk, rst_n, en;\n"
       "  logic [31:0] result;\n"
@@ -639,7 +639,7 @@ TEST(SimCh9e, MixedIffAndNoIff) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   // posedge clk never occurs. negedge rst_n fires (no iff guard on it).
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -648,7 +648,7 @@ TEST(SimCh9e, MixedIffAndNoIff) {
 // §9.4.2.4: iff with bit-select condition (enable[0]).
 TEST(SimCh9e, IffBitSelectCondition) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] enable;\n"
@@ -668,7 +668,7 @@ TEST(SimCh9e, IffBitSelectCondition) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 44u);
 }
@@ -676,7 +676,7 @@ TEST(SimCh9e, IffBitSelectCondition) {
 // §9.4.2.4: iff with bit-select zero suppresses.
 TEST(SimCh9e, IffBitSelectZeroSuppresses) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] enable;\n"
@@ -696,7 +696,7 @@ TEST(SimCh9e, IffBitSelectZeroSuppresses) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   // enable[0] = 0, so event suppressed.
   EXPECT_EQ(var->value.ToUint64(), 0u);
@@ -705,7 +705,7 @@ TEST(SimCh9e, IffBitSelectZeroSuppresses) {
 // §9.4.2.4: iff guard preserves previous value when suppressed.
 TEST(SimCh9e, IffPreservesPreviousValueWhenSuppressed) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk, en;\n"
       "  logic [31:0] q;\n"
@@ -727,7 +727,7 @@ TEST(SimCh9e, IffPreservesPreviousValueWhenSuppressed) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("q");
+  auto* var = f.ctx.FindVariable("q");
   ASSERT_NE(var, nullptr);
   // First posedge (t=1, en=1): q = 0+10 = 10.
   // Second posedge (t=4, en=0): suppressed, q stays 10.
@@ -737,7 +737,7 @@ TEST(SimCh9e, IffPreservesPreviousValueWhenSuppressed) {
 // §9.4.2.4: Verify result .width is correct after iff-guarded update.
 TEST(SimCh9e, ResultWidthAfterIffUpdate) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk, en;\n"
       "  logic [15:0] result;\n"
@@ -756,7 +756,7 @@ TEST(SimCh9e, ResultWidthAfterIffUpdate) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 16u);
   EXPECT_EQ(var->value.ToUint64(), 0xABCDu);
@@ -765,7 +765,7 @@ TEST(SimCh9e, ResultWidthAfterIffUpdate) {
 // §9.4.2.4: Verify .width and .ToUint64() on 8-bit result.
 TEST(SimCh9e, ResultWidth8BitAfterIffUpdate) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk, en;\n"
       "  logic [7:0] result;\n"
@@ -784,7 +784,7 @@ TEST(SimCh9e, ResultWidth8BitAfterIffUpdate) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 8u);
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
@@ -793,7 +793,7 @@ TEST(SimCh9e, ResultWidth8BitAfterIffUpdate) {
 // §9.4.2.4: iff with logical-OR condition.
 TEST(SimCh9e, IffLogicalOrCondition) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk, a, b;\n"
       "  logic [31:0] result;\n"
@@ -812,7 +812,7 @@ TEST(SimCh9e, IffLogicalOrCondition) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
@@ -820,7 +820,7 @@ TEST(SimCh9e, IffLogicalOrCondition) {
 // §9.4.2.4: iff with not-equal comparison (state != 0).
 TEST(SimCh9e, IffNotEqualComparison) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk;\n"
       "  logic [1:0] state;\n"
@@ -840,7 +840,7 @@ TEST(SimCh9e, IffNotEqualComparison) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 22u);
 }
@@ -848,7 +848,7 @@ TEST(SimCh9e, IffNotEqualComparison) {
 // §9.4.2.4: iff in always block with nonblocking assignment.
 TEST(SimCh9e, IffAlwaysBlockNba) {
   SimCh9eFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk, en;\n"
       "  logic [31:0] q;\n"
@@ -867,7 +867,7 @@ TEST(SimCh9e, IffAlwaysBlockNba) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *var = f.ctx.FindVariable("q");
+  auto* var = f.ctx.FindVariable("q");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 123u);
 }

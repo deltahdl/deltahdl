@@ -141,7 +141,8 @@ TEST(ElabA91, ParserMultipleSeparateInstances) {
 // --- Parser level: attr_name ::= identifier ---
 
 TEST(ElabA91, AttrNameIsIdentifier) {
-  // §A.9.1: attr_name ::= identifier — any valid identifier can be an attr name.
+  // §A.9.1: attr_name ::= identifier — any valid identifier can be an attr
+  // name.
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"

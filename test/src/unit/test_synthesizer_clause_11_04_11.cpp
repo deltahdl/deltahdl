@@ -1,6 +1,7 @@
 // §11.4.11: Conditional operator
 
 #include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -18,15 +19,15 @@ struct SynthFixture {
   Arena arena;
 };
 
-static const RtlirModule *ElaborateSrc(SynthFixture &f,
-                                       const std::string &src) {
+static const RtlirModule* ElaborateSrc(SynthFixture& f,
+                                       const std::string& src) {
   auto fid = f.src_mgr.AddFile("<test>", src);
   Lexer lexer(f.src_mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   if (!cu || cu->modules.empty()) return nullptr;
   Elaborator elab(f.arena, f.diag, cu);
-  auto *design = elab.Elaborate(cu->modules.back()->name);
+  auto* design = elab.Elaborate(cu->modules.back()->name);
   if (!design || design->top_modules.empty()) return nullptr;
   return design->top_modules[0];
 }
@@ -35,13 +36,13 @@ namespace {
 
 TEST(SynthLower, AssignTernaryMux) {
   SynthFixture f;
-  auto *mod = ElaborateSrc(f,
+  auto* mod = ElaborateSrc(f,
                            "module m(input sel, input a, input b, output y);\n"
                            "  assign y = sel ? a : b;\n"
                            "endmodule");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
-  auto *aig = synth.Lower(mod);
+  auto* aig = synth.Lower(mod);
   ASSERT_NE(aig, nullptr);
   EXPECT_EQ(aig->inputs.size(), 3);
   EXPECT_EQ(aig->outputs.size(), 1);

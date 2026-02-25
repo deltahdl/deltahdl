@@ -1,6 +1,7 @@
 // §3.14.1: Time value rounding
 
 #include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -19,7 +20,7 @@ struct LexResult {
   Token token;
 };
 
-static LexResult LexOne(const std::string &src) {
+static LexResult LexOne(const std::string& src) {
   LexResult result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
@@ -32,11 +33,11 @@ static LexResult LexOne(const std::string &src) {
 struct ParseResult314 {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult314 Parse(const std::string &src) {
+static ParseResult314 Parse(const std::string& src) {
   ParseResult314 result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
@@ -50,7 +51,7 @@ static ParseResult314 Parse(const std::string &src) {
   return result;
 }
 
-static bool ParseOk(const std::string &src) {
+static bool ParseOk(const std::string& src) {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);

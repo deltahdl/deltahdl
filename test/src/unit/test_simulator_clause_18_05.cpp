@@ -140,7 +140,7 @@ TEST(Constraint, CustomConstraintCallback) {
   block.name = "c_custom";
   ConstraintExpr c;
   c.kind = ConstraintKind::kCustom;
-  c.eval_fn = [](const std::unordered_map<std::string, int64_t> &vals) {
+  c.eval_fn = [](const std::unordered_map<std::string, int64_t>& vals) {
     auto ita = vals.find("a");
     auto itb = vals.find("b");
     if (ita == vals.end() || itb == vals.end()) return true;

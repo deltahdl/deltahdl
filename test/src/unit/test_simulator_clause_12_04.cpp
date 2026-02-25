@@ -22,45 +22,45 @@ namespace {
 
 TEST(CompiledSim, ExecuteIfElse) {
   CompiledSimFixture f;
-  auto *sel = f.ctx.CreateVariable("sel", 1);
+  auto* sel = f.ctx.CreateVariable("sel", 1);
   sel->value = MakeLogic4VecVal(f.arena, 1, 1);
-  auto *out = f.ctx.CreateVariable("out", 32);
+  auto* out = f.ctx.CreateVariable("out", 32);
   out->value = MakeLogic4VecVal(f.arena, 32, 0);
 
   // AST: if (sel) out = 1; else out = 0;
-  auto *cond = f.arena.Create<Expr>();
+  auto* cond = f.arena.Create<Expr>();
   cond->kind = ExprKind::kIdentifier;
   cond->text = "sel";
 
-  auto *then_lhs = f.arena.Create<Expr>();
+  auto* then_lhs = f.arena.Create<Expr>();
   then_lhs->kind = ExprKind::kIdentifier;
   then_lhs->text = "out";
-  auto *one = f.arena.Create<Expr>();
+  auto* one = f.arena.Create<Expr>();
   one->kind = ExprKind::kIntegerLiteral;
   one->int_val = 1;
-  auto *then_stmt = f.arena.Create<Stmt>();
+  auto* then_stmt = f.arena.Create<Stmt>();
   then_stmt->kind = StmtKind::kBlockingAssign;
   then_stmt->lhs = then_lhs;
   then_stmt->rhs = one;
 
-  auto *else_lhs = f.arena.Create<Expr>();
+  auto* else_lhs = f.arena.Create<Expr>();
   else_lhs->kind = ExprKind::kIdentifier;
   else_lhs->text = "out";
-  auto *zero = f.arena.Create<Expr>();
+  auto* zero = f.arena.Create<Expr>();
   zero->kind = ExprKind::kIntegerLiteral;
   zero->int_val = 0;
-  auto *else_stmt = f.arena.Create<Stmt>();
+  auto* else_stmt = f.arena.Create<Stmt>();
   else_stmt->kind = StmtKind::kBlockingAssign;
   else_stmt->lhs = else_lhs;
   else_stmt->rhs = zero;
 
-  auto *if_stmt = f.arena.Create<Stmt>();
+  auto* if_stmt = f.arena.Create<Stmt>();
   if_stmt->kind = StmtKind::kIf;
   if_stmt->condition = cond;
   if_stmt->then_branch = then_stmt;
   if_stmt->else_branch = else_stmt;
 
-  auto *block = f.arena.Create<Stmt>();
+  auto* block = f.arena.Create<Stmt>();
   block->kind = StmtKind::kBlock;
   block->stmts.push_back(if_stmt);
 
@@ -82,11 +82,11 @@ struct SimA606Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA606Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA606Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -97,7 +97,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA606Fixture &f) {
 // §12.4: if true takes then branch
 TEST(SimA606, IfTrueTakesThenBranch) {
   SimA606Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -110,7 +110,7 @@ TEST(SimA606, IfTrueTakesThenBranch) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -118,7 +118,7 @@ TEST(SimA606, IfTrueTakesThenBranch) {
 // §12.4: if false takes else branch
 TEST(SimA606, IfFalseTakesElseBranch) {
   SimA606Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -131,7 +131,7 @@ TEST(SimA606, IfFalseTakesElseBranch) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
@@ -139,7 +139,7 @@ TEST(SimA606, IfFalseTakesElseBranch) {
 // §12.4: if false with no else — no change
 TEST(SimA606, IfFalseNoElse) {
   SimA606Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -152,7 +152,7 @@ TEST(SimA606, IfFalseNoElse) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
@@ -160,7 +160,7 @@ TEST(SimA606, IfFalseNoElse) {
 // §12.4: nonzero value is truthy
 TEST(SimA606, IfNonzeroIsTruthy) {
   SimA606Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -173,7 +173,7 @@ TEST(SimA606, IfNonzeroIsTruthy) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -181,7 +181,7 @@ TEST(SimA606, IfNonzeroIsTruthy) {
 // §12.4: nested if — both levels evaluated
 TEST(SimA606, NestedIfBothLevels) {
   SimA606Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -198,7 +198,7 @@ TEST(SimA606, NestedIfBothLevels) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
@@ -206,7 +206,7 @@ TEST(SimA606, NestedIfBothLevels) {
 // §12.4: nested if — outer true, inner false takes inner else
 TEST(SimA606, NestedIfOuterTrueInnerFalse) {
   SimA606Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -223,7 +223,7 @@ TEST(SimA606, NestedIfOuterTrueInnerFalse) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
@@ -231,7 +231,7 @@ TEST(SimA606, NestedIfOuterTrueInnerFalse) {
 // §12.4: if inside for loop
 TEST(SimA606, IfInsideForLoop) {
   SimA606Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] count;\n"
       "  initial begin\n"
@@ -246,7 +246,7 @@ TEST(SimA606, IfInsideForLoop) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("count");
+  auto* var = f.ctx.FindVariable("count");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);  // i=3 and i=4
 }
@@ -254,7 +254,7 @@ TEST(SimA606, IfInsideForLoop) {
 // §12.4: sequential if statements (not chained)
 TEST(SimA606, SequentialIfStatements) {
   SimA606Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -269,7 +269,7 @@ TEST(SimA606, SequentialIfStatements) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);  // 0 + 1 + 2 = 3
 }

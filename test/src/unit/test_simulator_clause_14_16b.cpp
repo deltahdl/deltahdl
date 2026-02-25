@@ -23,9 +23,9 @@ namespace {
 
 TEST(Clocking, ScheduleOutputDrive) {
   ClockingSimFixture f;
-  auto *clk = f.ctx.CreateVariable("clk", 1);
+  auto* clk = f.ctx.CreateVariable("clk", 1);
   clk->value = MakeLogic4VecVal(f.arena, 1, 0);
-  auto *data_out = f.ctx.CreateVariable("data_out", 8);
+  auto* data_out = f.ctx.CreateVariable("data_out", 8);
   data_out->value = MakeLogic4VecVal(f.arena, 8, 0);
 
   ClockingManager mgr;
@@ -44,7 +44,7 @@ TEST(Clocking, ScheduleOutputDrive) {
   mgr.Attach(f.ctx, f.scheduler);
 
   // At t=10, drive output value 0x55.
-  auto *ev = f.scheduler.GetEventPool().Acquire();
+  auto* ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [&mgr, &f]() {
     mgr.ScheduleOutputDrive("cb", "data_out", 0x55, f.ctx, f.scheduler);
   };

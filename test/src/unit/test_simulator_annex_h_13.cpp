@@ -1,6 +1,7 @@
 // Annex H.13: Time and timescale
 
 #include <gtest/gtest.h>
+
 #include "vpi/svdpi.h"
 
 namespace {

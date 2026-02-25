@@ -31,25 +31,25 @@ struct StmtFixture {
 };
 
 // Helper to create a simple identifier expression.
-Expr *MakeIdent(Arena &arena, std::string_view name) {
-  auto *e = arena.Create<Expr>();
+Expr* MakeIdent(Arena& arena, std::string_view name) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
   e->text = name;
   return e;
 }
 
 // Helper to create an integer literal expression.
-Expr *MakeIntLit(Arena &arena, uint64_t val) {
-  auto *e = arena.Create<Expr>();
+Expr* MakeIntLit(Arena& arena, uint64_t val) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
   e->int_val = val;
   return e;
 }
 
 // Helper to create a blocking assignment statement: lhs = rhs_val.
-Stmt *MakeBlockAssign(Arena &arena, std::string_view lhs_name,
+Stmt* MakeBlockAssign(Arena& arena, std::string_view lhs_name,
                       uint64_t rhs_val) {
-  auto *s = arena.Create<Stmt>();
+  auto* s = arena.Create<Stmt>();
   s->kind = StmtKind::kBlockingAssign;
   s->lhs = MakeIdent(arena, lhs_name);
   s->rhs = MakeIntLit(arena, rhs_val);
@@ -61,14 +61,14 @@ struct DriverResult {
   StmtResult value = StmtResult::kDone;
 };
 
-SimCoroutine DriverCoroutine(const Stmt *stmt, SimContext &ctx, Arena &arena,
-                             DriverResult *out) {
+SimCoroutine DriverCoroutine(const Stmt* stmt, SimContext& ctx, Arena& arena,
+                             DriverResult* out) {
   out->value = co_await ExecStmt(stmt, ctx, arena);
 }
 
 // Helper to run ExecStmt synchronously (for non-suspending statements).
 // Creates a wrapper coroutine, resumes it, and returns the result.
-StmtResult RunStmt(const Stmt *stmt, SimContext &ctx, Arena &arena) {
+StmtResult RunStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   DriverResult result;
   auto coro = DriverCoroutine(stmt, ctx, arena, &result);
   coro.Resume();
@@ -81,10 +81,10 @@ namespace {
 // =============================================================================
 TEST(StmtExec, UniqueCaseExactMatch) {
   StmtFixture f;
-  auto *result_var = f.ctx.CreateVariable("uc", 32);
+  auto* result_var = f.ctx.CreateVariable("uc", 32);
   result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  auto *stmt = f.arena.Create<Stmt>();
+  auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kCase;
   stmt->qualifier = CaseQualifier::kUnique;
   stmt->condition = MakeIntLit(f.arena, 2);
@@ -105,10 +105,10 @@ TEST(StmtExec, UniqueCaseExactMatch) {
 
 TEST(StmtExec, PriorityCaseNoMatchNoDefaultWarning) {
   StmtFixture f;
-  auto *result_var = f.ctx.CreateVariable("pcw", 32);
+  auto* result_var = f.ctx.CreateVariable("pcw", 32);
   result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  auto *stmt = f.arena.Create<Stmt>();
+  auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kCase;
   stmt->qualifier = CaseQualifier::kPriority;
   stmt->condition = MakeIntLit(f.arena, 99);
@@ -129,10 +129,10 @@ TEST(StmtExec, PriorityCaseNoMatchNoDefaultWarning) {
 // =============================================================================
 TEST(StmtExec, CaseExactMatchBaseline) {
   StmtFixture f;
-  auto *result_var = f.ctx.CreateVariable("ce", 32);
+  auto* result_var = f.ctx.CreateVariable("ce", 32);
   result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  auto *stmt = f.arena.Create<Stmt>();
+  auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kCase;
   stmt->case_kind = TokenKind::kKwCase;
   stmt->condition = MakeIntLit(f.arena, 3);
@@ -161,10 +161,10 @@ TEST(StmtExec, CaseExactMatchBaseline) {
 // =============================================================================
 TEST(StmtExec, CaseMultiplePatterns) {
   StmtFixture f;
-  auto *result_var = f.ctx.CreateVariable("cmp", 32);
+  auto* result_var = f.ctx.CreateVariable("cmp", 32);
   result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  auto *stmt = f.arena.Create<Stmt>();
+  auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kCase;
   stmt->case_kind = TokenKind::kKwCase;
   stmt->condition = MakeIntLit(f.arena, 5);
@@ -193,11 +193,11 @@ struct SimA607Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA607Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA607Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -208,7 +208,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA607Fixture &f) {
 // §12.5: case statement — first matching item
 TEST(SimA607, CaseFirstMatch) {
   SimA607Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] sel, x;\n"
       "  initial begin\n"
@@ -225,7 +225,7 @@ TEST(SimA607, CaseFirstMatch) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
@@ -233,7 +233,7 @@ TEST(SimA607, CaseFirstMatch) {
 // §12.5: case falls to default when no item matches
 TEST(SimA607, CaseDefaultFallthrough) {
   SimA607Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] sel, x;\n"
       "  initial begin\n"
@@ -250,7 +250,7 @@ TEST(SimA607, CaseDefaultFallthrough) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
@@ -258,7 +258,7 @@ TEST(SimA607, CaseDefaultFallthrough) {
 // §12.5: no default, no match — no change
 TEST(SimA607, CaseNoDefaultNoMatch) {
   SimA607Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] sel, x;\n"
       "  initial begin\n"
@@ -275,7 +275,7 @@ TEST(SimA607, CaseNoDefaultNoMatch) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -283,7 +283,7 @@ TEST(SimA607, CaseNoDefaultNoMatch) {
 // §12.5: case inside for loop
 TEST(SimA607, CaseInsideForLoop) {
   SimA607Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] total;\n"
       "  initial begin\n"
@@ -302,7 +302,7 @@ TEST(SimA607, CaseInsideForLoop) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("total");
+  auto* var = f.ctx.FindVariable("total");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 111u);
 }
@@ -310,7 +310,7 @@ TEST(SimA607, CaseInsideForLoop) {
 // §12.5: nested case statements
 TEST(SimA607, NestedCaseExecution) {
   SimA607Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, x;\n"
       "  initial begin\n"
@@ -331,7 +331,7 @@ TEST(SimA607, NestedCaseExecution) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
@@ -339,7 +339,7 @@ TEST(SimA607, NestedCaseExecution) {
 // §12.5: case with block body in item
 TEST(SimA607, CaseWithBlockBody) {
   SimA607Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x, y;\n"
       "  initial begin\n"
@@ -354,8 +354,8 @@ TEST(SimA607, CaseWithBlockBody) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *x = f.ctx.FindVariable("x");
-  auto *y = f.ctx.FindVariable("y");
+  auto* x = f.ctx.FindVariable("x");
+  auto* y = f.ctx.FindVariable("y");
   ASSERT_NE(x, nullptr);
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(x->value.ToUint64(), 5u);

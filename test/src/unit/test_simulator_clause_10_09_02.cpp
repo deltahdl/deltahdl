@@ -27,8 +27,8 @@ struct AggFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static Expr *MakeIntLit(Arena &arena, uint64_t val) {
-  auto *e = arena.Create<Expr>();
+static Expr* MakeIntLit(Arena& arena, uint64_t val) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
   e->int_val = val;
   return e;
@@ -45,7 +45,7 @@ TEST(StructPattern, NamedMemberTwoFields) {
   info.fields.push_back({"x", 8, 8, DataTypeKind::kLogic});
   info.fields.push_back({"y", 0, 8, DataTypeKind::kLogic});
 
-  auto *pat = f.arena.Create<Expr>();
+  auto* pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"x", "y"};
   pat->elements = {MakeIntLit(f.arena, 5), MakeIntLit(f.arena, 10)};
@@ -65,7 +65,7 @@ TEST(StructPattern, NamedMemberReversedOrder) {
   info.fields.push_back({"x", 8, 8, DataTypeKind::kLogic});
   info.fields.push_back({"y", 0, 8, DataTypeKind::kLogic});
 
-  auto *pat = f.arena.Create<Expr>();
+  auto* pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"y", "x"};
   pat->elements = {MakeIntLit(f.arena, 10), MakeIntLit(f.arena, 5)};
@@ -85,7 +85,7 @@ TEST(StructPattern, NamedMemberThreeFields) {
   info.fields.push_back({"g", 8, 8, DataTypeKind::kLogic});
   info.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
 
-  auto *pat = f.arena.Create<Expr>();
+  auto* pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"r", "g", "b"};
   pat->elements = {MakeIntLit(f.arena, 0xFF), MakeIntLit(f.arena, 0x80),
@@ -108,7 +108,7 @@ TEST(StructPattern, DefaultAllFields) {
   info.fields.push_back({"a", 8, 8, DataTypeKind::kLogic});
   info.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
 
-  auto *pat = f.arena.Create<Expr>();
+  auto* pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"default"};
   pat->elements = {MakeIntLit(f.arena, 0xFF)};
@@ -127,7 +127,7 @@ TEST(StructPattern, DefaultWithNamedOverride) {
   info.fields.push_back({"a", 8, 8, DataTypeKind::kLogic});
   info.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
 
-  auto *pat = f.arena.Create<Expr>();
+  auto* pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"a", "default"};
   pat->elements = {MakeIntLit(f.arena, 1), MakeIntLit(f.arena, 0)};
@@ -146,7 +146,7 @@ TEST(StructPattern, TypeKeyedInt) {
   info.fields.push_back({"a", 8, 32, DataTypeKind::kInt});
   info.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
 
-  auto *pat = f.arena.Create<Expr>();
+  auto* pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"int"};
   pat->elements = {MakeIntLit(f.arena, 42)};
@@ -169,7 +169,7 @@ TEST(StructPattern, MixedPrecedence) {
   info.fields.push_back({"b", 8, 8, DataTypeKind::kByte});
   info.fields.push_back({"c", 0, 8, DataTypeKind::kLogic});
 
-  auto *pat = f.arena.Create<Expr>();
+  auto* pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"a", "byte", "default"};
   pat->elements = {MakeIntLit(f.arena, 1), MakeIntLit(f.arena, 2),
@@ -188,11 +188,11 @@ struct SimA60701Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA60701Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA60701Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -200,7 +200,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA60701Fixture &f) {
 // §10.9.2: named pattern with default key fills remaining fields
 TEST(SimA60701, NamedStructPatternWithDefault) {
   SimA60701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
       "  pair_t p;\n"
@@ -213,7 +213,7 @@ TEST(SimA60701, NamedStructPatternWithDefault) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("p");
+  auto* var = f.ctx.FindVariable("p");
   ASSERT_NE(var, nullptr);
   // a=10 (explicit), b=99 (default): (10 << 8) | 99 = 2659
   EXPECT_EQ(var->value.ToUint64(), 2659u);
@@ -222,7 +222,7 @@ TEST(SimA60701, NamedStructPatternWithDefault) {
 // §10.9.2: named pattern with only default key
 TEST(SimA60701, NamedStructPatternOnlyDefault) {
   SimA60701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
       "  pair_t p;\n"
@@ -235,7 +235,7 @@ TEST(SimA60701, NamedStructPatternOnlyDefault) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("p");
+  auto* var = f.ctx.FindVariable("p");
   ASSERT_NE(var, nullptr);
   // Both a=55, b=55: (55 << 8) | 55 = 14135
   EXPECT_EQ(var->value.ToUint64(), 14135u);

@@ -12,7 +12,7 @@ using namespace delta;
 
 // Returns true if elaboration of the last module in src succeeds with no
 // errors.
-static bool ElabOk(const std::string &src) {
+static bool ElabOk(const std::string& src) {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);
@@ -22,7 +22,7 @@ static bool ElabOk(const std::string &src) {
   auto pp_fid = mgr.AddFile("<preprocessed>", pp);
   Lexer lexer(mgr.FileContent(pp_fid), pp_fid, diag);
   Parser parser(lexer, arena, diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   if (diag.HasErrors() || cu->modules.empty()) return false;
   Elaborator elab(arena, diag, cu);
   elab.Elaborate(cu->modules.back()->name);

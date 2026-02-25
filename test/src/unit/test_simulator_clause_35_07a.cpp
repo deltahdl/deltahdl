@@ -20,7 +20,7 @@ TEST(DpiRuntime, RegisterExportAndCall) {
   DpiRtExport exp;
   exp.c_name = "c_callback";
   exp.sv_name = "sv_callback";
-  exp.impl = [](const std::vector<DpiArgValue> &args) -> DpiArgValue {
+  exp.impl = [](const std::vector<DpiArgValue>& args) -> DpiArgValue {
     return DpiArgValue::FromInt(args[0].AsInt() * 2);
   };
   rt.RegisterExport(exp);

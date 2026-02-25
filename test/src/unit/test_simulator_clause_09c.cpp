@@ -22,11 +22,11 @@ struct SimCh9cFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimCh9cFixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimCh9cFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -39,7 +39,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimCh9cFixture &f) {
 // 1. always_latch body executes at time 0 with default variable values.
 TEST(SimCh9c, ExecutesAtTimeZero) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
       "  logic [7:0] d, q;\n"
@@ -54,7 +54,7 @@ TEST(SimCh9c, ExecutesAtTimeZero) {
   f.scheduler.Run();
 
   // en defaults to 0, so q should retain its default value of 0.
-  auto *q = f.ctx.FindVariable("q");
+  auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.width, 8u);
   EXPECT_EQ(q->value.ToUint64(), 0u);
@@ -63,7 +63,7 @@ TEST(SimCh9c, ExecutesAtTimeZero) {
 // 2. always_latch with unconditional assignment sets output at time 0.
 TEST(SimCh9c, UnconditionalAssignAtTimeZero) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] q;\n"
       "  always_latch\n"
@@ -76,7 +76,7 @@ TEST(SimCh9c, UnconditionalAssignAtTimeZero) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *q = f.ctx.FindVariable("q");
+  auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 0xABu);
 }
@@ -89,7 +89,7 @@ TEST(SimCh9c, UnconditionalAssignAtTimeZero) {
 // 3. if-without-else: enable low retains default (zero) value.
 TEST(SimCh9c, IfWithoutElseRetainsDefault) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
       "  logic [7:0] d, q;\n"
@@ -107,7 +107,7 @@ TEST(SimCh9c, IfWithoutElseRetainsDefault) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *q = f.ctx.FindVariable("q");
+  auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   // en=0, so always_latch does not assign q; q retains 0.
   EXPECT_EQ(q->value.ToUint64(), 0u);
@@ -116,7 +116,7 @@ TEST(SimCh9c, IfWithoutElseRetainsDefault) {
 // 4. if-without-else: enable high passes data through.
 TEST(SimCh9c, EnableHighPassesData) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
       "  logic [7:0] d, q;\n"
@@ -134,7 +134,7 @@ TEST(SimCh9c, EnableHighPassesData) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *q = f.ctx.FindVariable("q");
+  auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 0x42u);
 }
@@ -142,7 +142,7 @@ TEST(SimCh9c, EnableHighPassesData) {
 // 5. Enable low retains previous value set by initial block ordering.
 TEST(SimCh9c, EnableLowRetainsPreviousValue) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
       "  logic [7:0] d, q;\n"
@@ -160,7 +160,7 @@ TEST(SimCh9c, EnableLowRetainsPreviousValue) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *q = f.ctx.FindVariable("q");
+  auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   // en=1, d=0xBB, so q = 0xBB.
   EXPECT_EQ(q->value.ToUint64(), 0xBBu);
@@ -173,7 +173,7 @@ TEST(SimCh9c, EnableLowRetainsPreviousValue) {
 // 6. Two independent latches in one always_latch begin/end block.
 TEST(SimCh9c, MultipleLatchesInOneBlock) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
       "  logic [7:0] d1, d2, q1, q2;\n"
@@ -194,8 +194,8 @@ TEST(SimCh9c, MultipleLatchesInOneBlock) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *q1 = f.ctx.FindVariable("q1");
-  auto *q2 = f.ctx.FindVariable("q2");
+  auto* q1 = f.ctx.FindVariable("q1");
+  auto* q2 = f.ctx.FindVariable("q2");
   ASSERT_NE(q1, nullptr);
   ASSERT_NE(q2, nullptr);
   EXPECT_EQ(q1->value.ToUint64(), 0xAAu);
@@ -205,7 +205,7 @@ TEST(SimCh9c, MultipleLatchesInOneBlock) {
 // 7. Multiple latches with enable low: both retain default 0.
 TEST(SimCh9c, MultipleLatchesEnableLow) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
       "  logic [7:0] d1, d2, q1, q2;\n"
@@ -226,8 +226,8 @@ TEST(SimCh9c, MultipleLatchesEnableLow) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *q1 = f.ctx.FindVariable("q1");
-  auto *q2 = f.ctx.FindVariable("q2");
+  auto* q1 = f.ctx.FindVariable("q1");
+  auto* q2 = f.ctx.FindVariable("q2");
   ASSERT_NE(q1, nullptr);
   ASSERT_NE(q2, nullptr);
   EXPECT_EQ(q1->value.ToUint64(), 0u);
@@ -241,7 +241,7 @@ TEST(SimCh9c, MultipleLatchesEnableLow) {
 // 8. Incomplete case (no default) retains value for unmatched selectors.
 TEST(SimCh9c, IncompleteCaseRetainsValue) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [1:0] sel;\n"
       "  logic [7:0] q;\n"
@@ -259,7 +259,7 @@ TEST(SimCh9c, IncompleteCaseRetainsValue) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *q = f.ctx.FindVariable("q");
+  auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   // sel=0 matches no case item; q retains default 0.
   EXPECT_EQ(q->value.ToUint64(), 0u);
@@ -268,7 +268,7 @@ TEST(SimCh9c, IncompleteCaseRetainsValue) {
 // 9. Incomplete case with matching selector assigns value.
 TEST(SimCh9c, IncompleteCaseMatchAssigns) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [1:0] sel;\n"
       "  logic [7:0] q;\n"
@@ -286,7 +286,7 @@ TEST(SimCh9c, IncompleteCaseMatchAssigns) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *q = f.ctx.FindVariable("q");
+  auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 0xAAu);
 }
@@ -294,7 +294,7 @@ TEST(SimCh9c, IncompleteCaseMatchAssigns) {
 // 10. Incomplete case matching second arm.
 TEST(SimCh9c, IncompleteCaseSecondArm) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [1:0] sel;\n"
       "  logic [7:0] q;\n"
@@ -312,7 +312,7 @@ TEST(SimCh9c, IncompleteCaseSecondArm) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *q = f.ctx.FindVariable("q");
+  auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 0xBBu);
 }
@@ -324,7 +324,7 @@ TEST(SimCh9c, IncompleteCaseSecondArm) {
 // 11. always_latch with logic type.
 TEST(SimCh9c, LatchLogicType) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
       "  logic [3:0] d, q;\n"
@@ -342,7 +342,7 @@ TEST(SimCh9c, LatchLogicType) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *q = f.ctx.FindVariable("q");
+  auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.width, 4u);
   EXPECT_EQ(q->value.ToUint64(), 0xCu);
@@ -351,7 +351,7 @@ TEST(SimCh9c, LatchLogicType) {
 // 12. always_latch with int type (32-bit).
 TEST(SimCh9c, LatchIntType) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
       "  int d, q;\n"
@@ -369,7 +369,7 @@ TEST(SimCh9c, LatchIntType) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *q = f.ctx.FindVariable("q");
+  auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.width, 32u);
   EXPECT_EQ(q->value.ToUint64(), 12345u);
@@ -378,7 +378,7 @@ TEST(SimCh9c, LatchIntType) {
 // 13. always_latch with byte type (8-bit).
 TEST(SimCh9c, LatchByteType) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
       "  byte d, q;\n"
@@ -396,7 +396,7 @@ TEST(SimCh9c, LatchByteType) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *q = f.ctx.FindVariable("q");
+  auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.width, 8u);
   EXPECT_EQ(q->value.ToUint64(), 0xFEu);
@@ -409,7 +409,7 @@ TEST(SimCh9c, LatchByteType) {
 // 14. Bit-select on RHS within always_latch.
 TEST(SimCh9c, BitSelectRHS) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
       "  logic [7:0] d;\n"
@@ -428,7 +428,7 @@ TEST(SimCh9c, BitSelectRHS) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *q = f.ctx.FindVariable("q");
+  auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   // d = 0xA5 = 0b10100101; d[0] = 1.
   EXPECT_EQ(q->value.ToUint64(), 1u);
@@ -437,7 +437,7 @@ TEST(SimCh9c, BitSelectRHS) {
 // 15. Bit-select on a different bit position.
 TEST(SimCh9c, BitSelectHighBit) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
       "  logic [7:0] d;\n"
@@ -456,7 +456,7 @@ TEST(SimCh9c, BitSelectHighBit) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *q = f.ctx.FindVariable("q");
+  auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   // d = 0xA5 = 0b10100101; d[7] = 1.
   EXPECT_EQ(q->value.ToUint64(), 1u);
@@ -469,7 +469,7 @@ TEST(SimCh9c, BitSelectHighBit) {
 // 16. Part-select extracting lower nibble.
 TEST(SimCh9c, PartSelectLowerNibble) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
       "  logic [7:0] d;\n"
@@ -488,7 +488,7 @@ TEST(SimCh9c, PartSelectLowerNibble) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *q = f.ctx.FindVariable("q");
+  auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.width, 4u);
   // d = 0xAB; d[3:0] = 0xB.
@@ -498,7 +498,7 @@ TEST(SimCh9c, PartSelectLowerNibble) {
 // 17. Part-select extracting upper nibble.
 TEST(SimCh9c, PartSelectUpperNibble) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
       "  logic [7:0] d;\n"
@@ -517,7 +517,7 @@ TEST(SimCh9c, PartSelectUpperNibble) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *q = f.ctx.FindVariable("q");
+  auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.width, 4u);
   // d = 0xAB; d[7:4] = 0xA.
@@ -531,7 +531,7 @@ TEST(SimCh9c, PartSelectUpperNibble) {
 // 18. Concatenation on RHS within always_latch.
 TEST(SimCh9c, ConcatenationRHS) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
       "  logic [3:0] a, b;\n"
@@ -551,7 +551,7 @@ TEST(SimCh9c, ConcatenationRHS) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *q = f.ctx.FindVariable("q");
+  auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   // {4'hA, 4'h5} = 8'hA5.
   EXPECT_EQ(q->value.ToUint64(), 0xA5u);
@@ -560,7 +560,7 @@ TEST(SimCh9c, ConcatenationRHS) {
 // 19. Concatenation retained when enable is low.
 TEST(SimCh9c, ConcatenationRetainedWhenLow) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
       "  logic [3:0] a, b;\n"
@@ -580,7 +580,7 @@ TEST(SimCh9c, ConcatenationRetainedWhenLow) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *q = f.ctx.FindVariable("q");
+  auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   // en=0, q retains default 0.
   EXPECT_EQ(q->value.ToUint64(), 0u);
@@ -593,7 +593,7 @@ TEST(SimCh9c, ConcatenationRetainedWhenLow) {
 // 20. Ternary operator in always_latch selects first operand.
 TEST(SimCh9c, TernarySelectsFirst) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic sel;\n"
       "  logic [7:0] a, b, q;\n"
@@ -612,7 +612,7 @@ TEST(SimCh9c, TernarySelectsFirst) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *q = f.ctx.FindVariable("q");
+  auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 0xCAu);
 }
@@ -620,7 +620,7 @@ TEST(SimCh9c, TernarySelectsFirst) {
 // 21. Ternary operator in always_latch selects second operand.
 TEST(SimCh9c, TernarySelectsSecond) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic sel;\n"
       "  logic [7:0] a, b, q;\n"
@@ -639,7 +639,7 @@ TEST(SimCh9c, TernarySelectsSecond) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *q = f.ctx.FindVariable("q");
+  auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 0xFEu);
 }
@@ -651,7 +651,7 @@ TEST(SimCh9c, TernarySelectsSecond) {
 // 22. Nested if-else: outer condition true, inner condition true.
 TEST(SimCh9c, NestedIfElseBothTrue) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en, sel;\n"
       "  logic [7:0] a, b, q;\n"
@@ -674,7 +674,7 @@ TEST(SimCh9c, NestedIfElseBothTrue) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *q = f.ctx.FindVariable("q");
+  auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 0x11u);
 }
@@ -682,7 +682,7 @@ TEST(SimCh9c, NestedIfElseBothTrue) {
 // 23. Nested if-else: outer condition true, inner condition false.
 TEST(SimCh9c, NestedIfElseInnerFalse) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en, sel;\n"
       "  logic [7:0] a, b, q;\n"
@@ -705,7 +705,7 @@ TEST(SimCh9c, NestedIfElseInnerFalse) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *q = f.ctx.FindVariable("q");
+  auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 0x22u);
 }
@@ -713,7 +713,7 @@ TEST(SimCh9c, NestedIfElseInnerFalse) {
 // 24. Nested if-else: outer condition false, output retains value.
 TEST(SimCh9c, NestedIfElseOuterFalse) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en, sel;\n"
       "  logic [7:0] a, b, q;\n"
@@ -736,7 +736,7 @@ TEST(SimCh9c, NestedIfElseOuterFalse) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *q = f.ctx.FindVariable("q");
+  auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   // en=0 means outer if not taken; q retains default 0.
   EXPECT_EQ(q->value.ToUint64(), 0u);
@@ -749,7 +749,7 @@ TEST(SimCh9c, NestedIfElseOuterFalse) {
 // 25. Multiple outputs assigned from different data sources.
 TEST(SimCh9c, MultipleOutputsDifferentSources) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
       "  logic [7:0] d1, d2, d3, q1, q2, q3;\n"
@@ -774,9 +774,9 @@ TEST(SimCh9c, MultipleOutputsDifferentSources) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *q1 = f.ctx.FindVariable("q1");
-  auto *q2 = f.ctx.FindVariable("q2");
-  auto *q3 = f.ctx.FindVariable("q3");
+  auto* q1 = f.ctx.FindVariable("q1");
+  auto* q2 = f.ctx.FindVariable("q2");
+  auto* q3 = f.ctx.FindVariable("q3");
   ASSERT_NE(q1, nullptr);
   ASSERT_NE(q2, nullptr);
   ASSERT_NE(q3, nullptr);
@@ -788,7 +788,7 @@ TEST(SimCh9c, MultipleOutputsDifferentSources) {
 // 26. Multiple outputs with independent enable conditions.
 TEST(SimCh9c, MultipleOutputsIndependentEnables) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en1, en2;\n"
       "  logic [7:0] d1, d2, q1, q2;\n"
@@ -810,8 +810,8 @@ TEST(SimCh9c, MultipleOutputsIndependentEnables) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *q1 = f.ctx.FindVariable("q1");
-  auto *q2 = f.ctx.FindVariable("q2");
+  auto* q1 = f.ctx.FindVariable("q1");
+  auto* q2 = f.ctx.FindVariable("q2");
   ASSERT_NE(q1, nullptr);
   ASSERT_NE(q2, nullptr);
   // en1=1, so q1=d1=0xDE. en2=0, so q2 retains default 0.
@@ -826,7 +826,7 @@ TEST(SimCh9c, MultipleOutputsIndependentEnables) {
 // 27. Output is available after scheduler.Run() completes.
 TEST(SimCh9c, OutputAvailableAfterRun) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
       "  logic [15:0] d, q;\n"
@@ -844,7 +844,7 @@ TEST(SimCh9c, OutputAvailableAfterRun) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *q = f.ctx.FindVariable("q");
+  auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.width, 16u);
   EXPECT_EQ(q->value.ToUint64(), 0xBEEFu);
@@ -853,7 +853,7 @@ TEST(SimCh9c, OutputAvailableAfterRun) {
 // 28. Verify .width on always_latch output with 1-bit result.
 TEST(SimCh9c, WidthVerificationSingleBit) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
       "  logic d, q;\n"
@@ -871,7 +871,7 @@ TEST(SimCh9c, WidthVerificationSingleBit) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *q = f.ctx.FindVariable("q");
+  auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.width, 1u);
   EXPECT_EQ(q->value.ToUint64(), 1u);
@@ -884,7 +884,7 @@ TEST(SimCh9c, WidthVerificationSingleBit) {
 // 29. 32-bit always_latch output verifies width and value.
 TEST(SimCh9c, Width32BitAndToUint64) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
       "  logic [31:0] d, q;\n"
@@ -902,7 +902,7 @@ TEST(SimCh9c, Width32BitAndToUint64) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *q = f.ctx.FindVariable("q");
+  auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.width, 32u);
   EXPECT_EQ(q->value.ToUint64(), 0xDEADBEEFu);
@@ -911,7 +911,7 @@ TEST(SimCh9c, Width32BitAndToUint64) {
 // 30. always_latch with begin/end block and arithmetic on RHS.
 TEST(SimCh9c, BeginEndBlockWithArithmetic) {
   SimCh9cFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
       "  logic [7:0] a, b, q;\n"
@@ -931,7 +931,7 @@ TEST(SimCh9c, BeginEndBlockWithArithmetic) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *q = f.ctx.FindVariable("q");
+  auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.width, 8u);
   // 0x10 + 0x20 = 0x30.

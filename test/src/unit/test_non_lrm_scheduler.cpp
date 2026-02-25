@@ -1,6 +1,7 @@
 // §non-lrm:scheduler
 
 #include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -20,7 +21,7 @@ namespace {
 TEST(EventPool, AcquireCreatesNew) {
   Arena arena;
   EventPool pool(arena);
-  Event *ev = pool.Acquire();
+  Event* ev = pool.Acquire();
   ASSERT_NE(ev, nullptr);
   EXPECT_EQ(ev->kind, EventKind::kEvaluation);
   EXPECT_EQ(ev->target, nullptr);
@@ -32,8 +33,8 @@ TEST(EventPool, FreeCount) {
   EventPool pool(arena);
   EXPECT_EQ(pool.FreeCount(), 0);
 
-  Event *ev1 = pool.Acquire();
-  Event *ev2 = pool.Acquire();
+  Event* ev1 = pool.Acquire();
+  Event* ev2 = pool.Acquire();
   pool.Release(ev1);
   pool.Release(ev2);
   EXPECT_EQ(pool.FreeCount(), 2);
@@ -45,10 +46,10 @@ TEST(EventPool, FreeCount) {
 TEST(Scheduler, EventPoolIntegration) {
   Arena arena;
   Scheduler sched(arena);
-  auto &pool = sched.GetEventPool();
+  auto& pool = sched.GetEventPool();
   EXPECT_EQ(pool.FreeCount(), 0);
 
-  auto *ev = pool.Acquire();
+  auto* ev = pool.Acquire();
   bool ran = false;
   ev->callback = [&ran]() { ran = true; };
   sched.ScheduleEvent({0}, Region::kActive, ev);
@@ -63,7 +64,7 @@ TEST(Process, MoveSemantics) {
   SimCoroutine a = MakeTestCoroutine();
   EXPECT_FALSE(a.Done());
 
-  SimCoroutine *pa = &a;
+  SimCoroutine* pa = &a;
   SimCoroutine b = std::move(a);
   EXPECT_FALSE(b.Done());
   EXPECT_TRUE(pa->Done());  // Moved-from state check via pre-move pointer.
@@ -89,13 +90,13 @@ TEST(Process, CoroutineRelease) {
 TEST(EventPool, ReleaseAndReuse) {
   Arena arena;
   EventPool pool(arena);
-  Event *ev = pool.Acquire();
+  Event* ev = pool.Acquire();
   ev->callback = []() {};
-  ev->target = reinterpret_cast<void *>(0x1234);
+  ev->target = reinterpret_cast<void*>(0x1234);
   pool.Release(ev);
   EXPECT_EQ(pool.FreeCount(), 1);
 
-  Event *reused = pool.Acquire();
+  Event* reused = pool.Acquire();
   EXPECT_EQ(reused, ev);               // Same pointer returned
   EXPECT_EQ(reused->target, nullptr);  // Fields cleared
   EXPECT_EQ(pool.FreeCount(), 0);
@@ -193,19 +194,19 @@ TEST(MtSim, MtSchedulerSetPartitions) {
 
 TEST(MtSim, RunTimestepExecutesProcesses) {
   MtSimFixture f;
-  auto *a = f.ctx.CreateVariable("a", 32);
+  auto* a = f.ctx.CreateVariable("a", 32);
   a->value = MakeLogic4VecVal(f.arena, 32, 0);
-  auto *b = f.ctx.CreateVariable("b", 32);
+  auto* b = f.ctx.CreateVariable("b", 32);
   b->value = MakeLogic4VecVal(f.arena, 32, 0);
 
   // Two compiled processes: proc0 sets a=42, proc1 sets b=99.
   std::vector<CompiledProcess> processes;
-  processes.emplace_back(0, [](SimContext &ctx) {
-    auto *var = ctx.FindVariable("a");
+  processes.emplace_back(0, [](SimContext& ctx) {
+    auto* var = ctx.FindVariable("a");
     if (var) var->value.words[0].aval = 42;
   });
-  processes.emplace_back(1, [](SimContext &ctx) {
-    auto *var = ctx.FindVariable("b");
+  processes.emplace_back(1, [](SimContext& ctx) {
+    auto* var = ctx.FindVariable("b");
     if (var) var->value.words[0].aval = 99;
   });
 
@@ -232,10 +233,10 @@ TEST(MtSim, RunTimestepMultipleThreads) {
   MtSimFixture f;
 
   // Use string literals for stable string_view keys.
-  const char *names[] = {"v0", "v1", "v2", "v3"};
-  std::vector<Variable *> vars;
+  const char* names[] = {"v0", "v1", "v2", "v3"};
+  std::vector<Variable*> vars;
   for (int i = 0; i < 4; ++i) {
-    auto *var = f.ctx.CreateVariable(names[i], 32);
+    auto* var = f.ctx.CreateVariable(names[i], 32);
     var->value = MakeLogic4VecVal(f.arena, 32, 0);
     vars.push_back(var);
   }
@@ -244,8 +245,8 @@ TEST(MtSim, RunTimestepMultipleThreads) {
   std::vector<CompiledProcess> processes;
   processes.reserve(4);
   for (uint32_t i = 0; i < 4; ++i) {
-    processes.emplace_back(i, [i, &names](SimContext &ctx) {
-      auto *var = ctx.FindVariable(names[i]);
+    processes.emplace_back(i, [i, &names](SimContext& ctx) {
+      auto* var = ctx.FindVariable(names[i]);
       if (var) var->value.words[0].aval += 1;
     });
   }
@@ -285,7 +286,7 @@ struct LexResult {
   Token token;
 };
 
-static LexResult LexOne(const std::string &src) {
+static LexResult LexOne(const std::string& src) {
   LexResult result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
@@ -298,11 +299,11 @@ static LexResult LexOne(const std::string &src) {
 struct ParseResult314 {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult314 Parse(const std::string &src) {
+static ParseResult314 Parse(const std::string& src) {
   ParseResult314 result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
@@ -316,7 +317,7 @@ static ParseResult314 Parse(const std::string &src) {
   return result;
 }
 
-static bool ParseOk(const std::string &src) {
+static bool ParseOk(const std::string& src) {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);

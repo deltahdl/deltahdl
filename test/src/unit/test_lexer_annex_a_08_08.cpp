@@ -12,7 +12,7 @@ using namespace delta;
 
 namespace {
 
-static std::vector<Token> Lex(const std::string &src) {
+static std::vector<Token> Lex(const std::string& src) {
   static SourceManager mgr;
   auto fid = mgr.AddFile("<test>", src);
   DiagEngine diag(mgr);
@@ -20,7 +20,7 @@ static std::vector<Token> Lex(const std::string &src) {
   return lexer.LexAll();
 }
 
-static bool LexHasErrors(const std::string &src) {
+static bool LexHasErrors(const std::string& src) {
   SourceManager mgr;
   auto fid = mgr.AddFile("<test>", src);
   DiagEngine diag(mgr);
@@ -61,14 +61,16 @@ TEST(LexA88, QuotedStringEmpty) {
   EXPECT_EQ(tokens[0].text, "\"\"");
 }
 
-// § triple_quoted_string_item — newline is allowed (not excluded like in quoted_string)
+// § triple_quoted_string_item — newline is allowed (not excluded like in
+// quoted_string)
 TEST(LexA88, TripleQuotedStringItemNewline) {
   auto tokens = Lex("\"\"\"line1\nline2\"\"\"");
   ASSERT_GE(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
 }
 
-// § triple_quoted_string_item — double-quote allowed inside triple-quoted string
+// § triple_quoted_string_item — double-quote allowed inside triple-quoted
+// string
 TEST(LexA88, TripleQuotedStringItemDoubleQuote) {
   auto tokens = Lex("\"\"\"say \\\"hi\\\"\"\"\"");
   ASSERT_GE(tokens.size(), 1u);

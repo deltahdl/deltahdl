@@ -26,10 +26,10 @@ struct ClassFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 // Build a simple ClassTypeInfo and register it with the context.
-static ClassTypeInfo *MakeClassType(
-    ClassFixture &f, std::string_view name,
-    const std::vector<std::string_view> &props) {
-  auto *info = f.arena.Create<ClassTypeInfo>();
+static ClassTypeInfo* MakeClassType(
+    ClassFixture& f, std::string_view name,
+    const std::vector<std::string_view>& props) {
+  auto* info = f.arena.Create<ClassTypeInfo>();
   info->name = name;
   for (auto p : props) {
     info->properties.push_back({p, 32, false});
@@ -39,12 +39,12 @@ static ClassTypeInfo *MakeClassType(
 }
 
 // Allocate a ClassObject of the given type, returning (handle_id, object*).
-static std::pair<uint64_t, ClassObject *> MakeObj(ClassFixture &f,
-                                                  ClassTypeInfo *type) {
-  auto *obj = f.arena.Create<ClassObject>();
+static std::pair<uint64_t, ClassObject*> MakeObj(ClassFixture& f,
+                                                 ClassTypeInfo* type) {
+  auto* obj = f.arena.Create<ClassObject>();
   obj->type = type;
   // Initialize properties to 0.
-  for (const auto &p : type->properties) {
+  for (const auto& p : type->properties) {
     obj->properties[std::string(p.name)] =
         MakeLogic4VecVal(f.arena, p.width, 0);
   }
@@ -59,12 +59,12 @@ namespace {
 // =============================================================================
 TEST(ClassSim, HandleAssignmentSharesObject) {
   ClassFixture f;
-  auto *type = MakeClassType(f, "Data", {"val"});
+  auto* type = MakeClassType(f, "Data", {"val"});
   auto [handle, obj] = MakeObj(f, type);
   obj->SetProperty("val", MakeLogic4VecVal(f.arena, 32, 10));
 
   // Simulate handle copy: both variables hold same handle ID.
-  auto *retrieved = f.ctx.GetClassObject(handle);
+  auto* retrieved = f.ctx.GetClassObject(handle);
   EXPECT_EQ(retrieved, obj);
   EXPECT_EQ(retrieved->GetProperty("val", f.arena).ToUint64(), 10u);
 
@@ -75,7 +75,7 @@ TEST(ClassSim, HandleAssignmentSharesObject) {
 
 TEST(ClassSim, HandleNullAssignment) {
   ClassFixture f;
-  auto *type = MakeClassType(f, "Foo", {"x"});
+  auto* type = MakeClassType(f, "Foo", {"x"});
   auto [handle, obj] = MakeObj(f, type);
 
   // The valid handle works.

@@ -65,7 +65,7 @@ TEST_F(VpiClause3836Test, RemoveCbNullReturnsZero) {
 }
 
 TEST_F(VpiClause3836Test, CbValueChangeWithWatcherFires) {
-  auto *var = sim_ctx_.CreateVariable("sig", 1);
+  auto* var = sim_ctx_.CreateVariable("sig", 1);
   var->value = MakeLogic4VecVal(arena_, 1, 0);
   vpi_ctx_.Attach(sim_ctx_);
 

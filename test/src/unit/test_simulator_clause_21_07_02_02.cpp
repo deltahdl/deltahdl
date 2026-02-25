@@ -41,7 +41,7 @@ TEST_F(VcdClause21070202Test, FourValueScalar) {
   {
     VcdWriter vcd(tmp_path_);
     vcd.WriteHeader("1ns");
-    auto *var = arena_.Create<Variable>();
+    auto* var = arena_.Create<Variable>();
     var->value = MakeLogic4Vec(arena_, 1);
     var->value.words[0].aval = 0;
     var->value.words[0].bval = 1;
@@ -58,10 +58,10 @@ TEST_F(VcdClause21070202Test, DumpChangedValuesOnlyEmitsChanged) {
   {
     VcdWriter vcd(tmp_path_);
     vcd.WriteHeader("1ns");
-    auto *var_a = arena_.Create<Variable>();
+    auto* var_a = arena_.Create<Variable>();
     var_a->value = MakeLogic4VecVal(arena_, 1, 0);
     var_a->prev_value = MakeLogic4VecVal(arena_, 1, 0);
-    auto *var_b = arena_.Create<Variable>();
+    auto* var_b = arena_.Create<Variable>();
     var_b->value = MakeLogic4VecVal(arena_, 1, 1);
     var_b->prev_value = MakeLogic4VecVal(arena_, 1, 0);
     vcd.RegisterSignal("a", 1, var_a);

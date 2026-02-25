@@ -27,18 +27,18 @@ struct ForceInfo {
   bool has_mixed_assignments = false;
 };
 
-bool ValidateForceTarget(const ForceInfo &info);
+bool ValidateForceTarget(const ForceInfo& info);
 
-void ForceVariable(Variable &var, const Logic4Vec &value);
+void ForceVariable(Variable& var, const Logic4Vec& value);
 
-void ReleaseVariable(Variable &var, bool has_continuous_driver,
-                     const Logic4Vec *continuous_value, Arena &arena);
+void ReleaseVariable(Variable& var, bool has_continuous_driver,
+                     const Logic4Vec* continuous_value, Arena& arena);
 
-void ForceNet(Net &net, const Logic4Vec &value, Arena &arena);
+void ForceNet(Net& net, const Logic4Vec& value, Arena& arena);
 
-void ReleaseNet(Net &net, Arena &arena);
+void ReleaseNet(Net& net, Arena& arena);
 
-bool ValidateForceTarget(const ForceInfo &info) {
+bool ValidateForceTarget(const ForceInfo& info) {
   if (info.has_mixed_assignments) return false;
   switch (info.target) {
     case ForceTarget::kSingularVariable:
@@ -55,10 +55,10 @@ bool ValidateForceTarget(const ForceInfo &info) {
   return false;
 }
 
-void ForceVariable(Variable &var, const Logic4Vec &value) { var.value = value; }
+void ForceVariable(Variable& var, const Logic4Vec& value) { var.value = value; }
 
-void ReleaseVariable(Variable &var, bool has_continuous_driver,
-                     const Logic4Vec *continuous_value, Arena &arena) {
+void ReleaseVariable(Variable& var, bool has_continuous_driver,
+                     const Logic4Vec* continuous_value, Arena& arena) {
   (void)arena;
   if (has_continuous_driver && continuous_value) {
     var.value = *continuous_value;
@@ -66,12 +66,12 @@ void ReleaseVariable(Variable &var, bool has_continuous_driver,
   // Otherwise keep current value.
 }
 
-void ForceNet(Net &net, const Logic4Vec &value, Arena &arena) {
+void ForceNet(Net& net, const Logic4Vec& value, Arena& arena) {
   (void)arena;
   net.resolved->value = value;
 }
 
-void ReleaseNet(Net &net, Arena &arena) {
+void ReleaseNet(Net& net, Arena& arena) {
   (void)arena;
   if (!net.drivers.empty()) {
     net.resolved->value = net.drivers[0];
@@ -85,7 +85,7 @@ void ReleaseNet(Net &net, Arena &arena) {
 }
 
 // --- Helpers ---
-static uint8_t ValOf(const Variable &v) {
+static uint8_t ValOf(const Variable& v) {
   uint8_t a = v.value.words[0].aval & 1;
   uint8_t b = v.value.words[0].bval & 1;
   return static_cast<uint8_t>((b << 1) | a);
@@ -162,7 +162,7 @@ TEST(ForceRelease, IllegalMixedAssignmentTarget) {
 //  assignment to the variable."
 TEST(ForceRelease, ForceVariableOverridesValue) {
   Arena arena;
-  auto *var = arena.Create<Variable>();
+  auto* var = arena.Create<Variable>();
   var->value = MakeLogic4VecVal(arena, 1, 1);
   EXPECT_EQ(ValOf(*var), kVal1);
 
@@ -175,7 +175,7 @@ TEST(ForceRelease, ForceVariableOverridesValue) {
 //  value and shall maintain its current value."
 TEST(ForceRelease, ReleaseUndrivenVariableHoldsValue) {
   Arena arena;
-  auto *var = arena.Create<Variable>();
+  auto* var = arena.Create<Variable>();
   var->value = MakeLogic4VecVal(arena, 1, 0);
 
   ForceVariable(*var, MakeLogic4VecVal(arena, 1, 1));
@@ -190,7 +190,7 @@ TEST(ForceRelease, ReleaseUndrivenVariableHoldsValue) {
 //  assignment ... shall reestablish that assignment."
 TEST(ForceRelease, ReleaseContinuouslyDrivenVariableReestablishes) {
   Arena arena;
-  auto *var = arena.Create<Variable>();
+  auto* var = arena.Create<Variable>();
   var->value = MakeLogic4VecVal(arena, 1, 0);
 
   // Continuous driver has value 0.
@@ -210,7 +210,7 @@ TEST(ForceRelease, ReleaseContinuouslyDrivenVariableReestablishes) {
 //  assignments."
 TEST(ForceRelease, ForceNetOverridesAllDrivers) {
   Arena arena;
-  auto *var = arena.Create<Variable>();
+  auto* var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 1);
 
   Net net;
@@ -226,7 +226,7 @@ TEST(ForceRelease, ForceNetOverridesAllDrivers) {
 //  value determined by the drivers of the net."
 TEST(ForceRelease, ReleaseNetImmediatelyRestoresDriverValue) {
   Arena arena;
-  auto *var = arena.Create<Variable>();
+  auto* var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 1);
 
   Net net;
@@ -248,9 +248,9 @@ TEST(ForceRelease, ReleaseNetImmediatelyRestoresDriverValue) {
 // to driver values (0).
 TEST(ForceRelease, NormativeExampleForceAndRelease_InitialState) {
   Arena arena;
-  auto *vd = arena.Create<Variable>();
+  auto* vd = arena.Create<Variable>();
   vd->value = MakeLogic4Vec(arena, 1);
-  auto *ve = arena.Create<Variable>();
+  auto* ve = arena.Create<Variable>();
   ve->value = MakeLogic4Vec(arena, 1);
 
   Net net_d;
@@ -272,9 +272,9 @@ TEST(ForceRelease, NormativeExampleForceAndRelease_InitialState) {
 
 TEST(ForceRelease, NormativeExampleForceAndRelease_ForceAndRelease) {
   Arena arena;
-  auto *vd = arena.Create<Variable>();
+  auto* vd = arena.Create<Variable>();
   vd->value = MakeLogic4Vec(arena, 1);
-  auto *ve = arena.Create<Variable>();
+  auto* ve = arena.Create<Variable>();
   ve->value = MakeLogic4Vec(arena, 1);
 
   Net net_d;

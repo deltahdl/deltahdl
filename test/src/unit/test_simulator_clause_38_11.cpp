@@ -30,7 +30,7 @@ TEST_F(VpiClause3811Test, GetStrNameForModule) {
   vpiHandle h = vpi_handle_by_name("top_mod", nullptr);
   ASSERT_NE(h, nullptr);
 
-  const char *name = vpi_get_str(vpiName, h);
+  const char* name = vpi_get_str(vpiName, h);
   ASSERT_NE(name, nullptr);
   EXPECT_STREQ(name, "top_mod");
 }
@@ -40,7 +40,7 @@ TEST_F(VpiClause3811Test, GetStrFullNameForModule) {
   vpiHandle h = vpi_handle_by_name("top_mod", nullptr);
   ASSERT_NE(h, nullptr);
 
-  const char *full = vpi_get_str(vpiFullName, h);
+  const char* full = vpi_get_str(vpiFullName, h);
   ASSERT_NE(full, nullptr);
   EXPECT_STREQ(full, "lib.top_mod");
 }
@@ -49,7 +49,7 @@ TEST_F(VpiClause3811Test, GetStrDefNameForModule) {
   vpi_ctx_.CreateModule("dut", "dut");
   vpiHandle h = vpi_handle_by_name("dut", nullptr);
   ASSERT_NE(h, nullptr);
-  const char *def = vpi_get_str(vpiDefName, h);
+  const char* def = vpi_get_str(vpiDefName, h);
   ASSERT_NE(def, nullptr);
   EXPECT_STREQ(def, "dut");
 }

@@ -22,8 +22,8 @@ struct EvalOpFixture {
 };
 
 // Helper: build a simple integer literal Expr node.
-static Expr *MakeInt(Arena &arena, uint64_t val) {
-  auto *e = arena.Create<Expr>();
+static Expr* MakeInt(Arena& arena, uint64_t val) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
   e->int_val = val;
   return e;
@@ -38,7 +38,7 @@ TEST(EvalOp, CastTruncate) {
   EvalOpFixture f;
   // Cast a 32-bit value to a narrower type (truncate).
   // We test by evaluating the inner expression and checking the result.
-  auto *cast = f.arena.Create<Expr>();
+  auto* cast = f.arena.Create<Expr>();
   cast->kind = ExprKind::kCast;
   cast->text = "byte";                  // 8-bit type
   cast->lhs = MakeInt(f.arena, 0x1FF);  // 511
@@ -52,7 +52,7 @@ TEST(EvalOp, CastTruncate) {
 TEST(EvalOp, CastWiden) {
   EvalOpFixture f;
   // Cast to int (32-bit) — value should be preserved.
-  auto *cast = f.arena.Create<Expr>();
+  auto* cast = f.arena.Create<Expr>();
   cast->kind = ExprKind::kCast;
   cast->text = "int";
   cast->lhs = MakeInt(f.arena, 42);
@@ -64,7 +64,7 @@ TEST(EvalOp, CastWiden) {
 
 TEST(EvalOp, CastShortint) {
   EvalOpFixture f;
-  auto *cast = f.arena.Create<Expr>();
+  auto* cast = f.arena.Create<Expr>();
   cast->kind = ExprKind::kCast;
   cast->text = "shortint";  // 16-bit type
   cast->lhs = MakeInt(f.arena, 0x1ABCD);

@@ -31,25 +31,25 @@ struct StmtFixture {
 };
 
 // Helper to create a simple identifier expression.
-Expr *MakeIdent(Arena &arena, std::string_view name) {
-  auto *e = arena.Create<Expr>();
+Expr* MakeIdent(Arena& arena, std::string_view name) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
   e->text = name;
   return e;
 }
 
 // Helper to create an integer literal expression.
-Expr *MakeIntLit(Arena &arena, uint64_t val) {
-  auto *e = arena.Create<Expr>();
+Expr* MakeIntLit(Arena& arena, uint64_t val) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
   e->int_val = val;
   return e;
 }
 
 // Helper to create a blocking assignment statement: lhs = rhs_val.
-Stmt *MakeBlockAssign(Arena &arena, std::string_view lhs_name,
+Stmt* MakeBlockAssign(Arena& arena, std::string_view lhs_name,
                       uint64_t rhs_val) {
-  auto *s = arena.Create<Stmt>();
+  auto* s = arena.Create<Stmt>();
   s->kind = StmtKind::kBlockingAssign;
   s->lhs = MakeIdent(arena, lhs_name);
   s->rhs = MakeIntLit(arena, rhs_val);
@@ -61,14 +61,14 @@ struct DriverResult {
   StmtResult value = StmtResult::kDone;
 };
 
-SimCoroutine DriverCoroutine(const Stmt *stmt, SimContext &ctx, Arena &arena,
-                             DriverResult *out) {
+SimCoroutine DriverCoroutine(const Stmt* stmt, SimContext& ctx, Arena& arena,
+                             DriverResult* out) {
   out->value = co_await ExecStmt(stmt, ctx, arena);
 }
 
 // Helper to run ExecStmt synchronously (for non-suspending statements).
 // Creates a wrapper coroutine, resumes it, and returns the result.
-StmtResult RunStmt(const Stmt *stmt, SimContext &ctx, Arena &arena) {
+StmtResult RunStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   DriverResult result;
   auto coro = DriverCoroutine(stmt, ctx, arena, &result);
   coro.Resume();
@@ -81,11 +81,11 @@ namespace {
 // =============================================================================
 TEST(StmtExec, UniqueIfMatchingBranch) {
   StmtFixture f;
-  auto *result_var = f.ctx.CreateVariable("ui", 32);
+  auto* result_var = f.ctx.CreateVariable("ui", 32);
   result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
   // unique if (1) ui = 10; else ui = 20;
-  auto *stmt = f.arena.Create<Stmt>();
+  auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kIf;
   stmt->qualifier = CaseQualifier::kUnique;
   stmt->condition = MakeIntLit(f.arena, 1);
@@ -98,11 +98,11 @@ TEST(StmtExec, UniqueIfMatchingBranch) {
 
 TEST(StmtExec, PriorityIfFirstMatchTaken) {
   StmtFixture f;
-  auto *result_var = f.ctx.CreateVariable("pi", 32);
+  auto* result_var = f.ctx.CreateVariable("pi", 32);
   result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
   // priority if (1) pi = 30;
-  auto *stmt = f.arena.Create<Stmt>();
+  auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kIf;
   stmt->qualifier = CaseQualifier::kPriority;
   stmt->condition = MakeIntLit(f.arena, 1);
@@ -114,12 +114,12 @@ TEST(StmtExec, PriorityIfFirstMatchTaken) {
 
 TEST(StmtExec, PriorityIfNoMatchNoElseWarning) {
   StmtFixture f;
-  auto *result_var = f.ctx.CreateVariable("piw", 32);
+  auto* result_var = f.ctx.CreateVariable("piw", 32);
   result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
   // priority if (0) piw = 30;
   // No else branch => should emit warning but not crash.
-  auto *stmt = f.arena.Create<Stmt>();
+  auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kIf;
   stmt->qualifier = CaseQualifier::kPriority;
   stmt->condition = MakeIntLit(f.arena, 0);
@@ -140,11 +140,11 @@ struct SimA606Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA606Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA606Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -152,7 +152,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA606Fixture &f) {
 // §12.4.2: unique if — qualifier stored on AST
 TEST(SimA606, UniqueIfQualifierStored) {
   SimA606Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, x;\n"
       "  initial begin\n"
@@ -167,7 +167,7 @@ TEST(SimA606, UniqueIfQualifierStored) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
@@ -175,7 +175,7 @@ TEST(SimA606, UniqueIfQualifierStored) {
 // §12.4.2: priority if — executes first matching branch
 TEST(SimA606, PriorityIfFirstMatch) {
   SimA606Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -189,7 +189,7 @@ TEST(SimA606, PriorityIfFirstMatch) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }

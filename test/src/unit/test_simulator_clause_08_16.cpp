@@ -26,10 +26,10 @@ struct ClassFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 // Build a simple ClassTypeInfo and register it with the context.
-static ClassTypeInfo *MakeClassType(
-    ClassFixture &f, std::string_view name,
-    const std::vector<std::string_view> &props) {
-  auto *info = f.arena.Create<ClassTypeInfo>();
+static ClassTypeInfo* MakeClassType(
+    ClassFixture& f, std::string_view name,
+    const std::vector<std::string_view>& props) {
+  auto* info = f.arena.Create<ClassTypeInfo>();
   info->name = name;
   for (auto p : props) {
     info->properties.push_back({p, 32, false});
@@ -45,14 +45,14 @@ namespace {
 // =============================================================================
 TEST(ClassSim, IsASameType) {
   ClassFixture f;
-  auto *type = MakeClassType(f, "Foo", {});
+  auto* type = MakeClassType(f, "Foo", {});
   EXPECT_TRUE(type->IsA(type));
 }
 
 TEST(ClassSim, IsADerivedFromBase) {
   ClassFixture f;
-  auto *base = MakeClassType(f, "Base", {});
-  auto *derived = MakeClassType(f, "Derived", {});
+  auto* base = MakeClassType(f, "Base", {});
+  auto* derived = MakeClassType(f, "Derived", {});
   derived->parent = base;
 
   EXPECT_TRUE(derived->IsA(base));
@@ -61,10 +61,10 @@ TEST(ClassSim, IsADerivedFromBase) {
 
 TEST(ClassSim, IsADeepHierarchy) {
   ClassFixture f;
-  auto *grand = MakeClassType(f, "Grand", {});
-  auto *parent = MakeClassType(f, "Parent", {});
+  auto* grand = MakeClassType(f, "Grand", {});
+  auto* parent = MakeClassType(f, "Parent", {});
   parent->parent = grand;
-  auto *child = MakeClassType(f, "Child", {});
+  auto* child = MakeClassType(f, "Child", {});
   child->parent = parent;
 
   EXPECT_TRUE(child->IsA(grand));
@@ -74,8 +74,8 @@ TEST(ClassSim, IsADeepHierarchy) {
 
 TEST(ClassSim, IsAUnrelated) {
   ClassFixture f;
-  auto *type_a = MakeClassType(f, "A", {});
-  auto *type_b = MakeClassType(f, "B", {});
+  auto* type_a = MakeClassType(f, "A", {});
+  auto* type_b = MakeClassType(f, "B", {});
 
   EXPECT_FALSE(type_a->IsA(type_b));
   EXPECT_FALSE(type_b->IsA(type_a));

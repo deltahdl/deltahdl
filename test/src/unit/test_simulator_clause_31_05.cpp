@@ -1,7 +1,9 @@
 // §31.5: Edge-control specifiers
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -25,11 +27,11 @@ struct SimA70503Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA70503Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA70503Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -55,7 +57,7 @@ TEST(SimA70503, RuntimeTimingCheckEntryNegedge) {
 // Module with timing check using edge keyword simulates
 TEST(SimA70503, EdgeKeywordSimulates) {
   SimA70503Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
@@ -68,7 +70,7 @@ TEST(SimA70503, EdgeKeywordSimulates) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -76,7 +78,7 @@ TEST(SimA70503, EdgeKeywordSimulates) {
 // Module with edge_control_specifier simulates
 TEST(SimA70503, EdgeControlSpecifierSimulates) {
   SimA70503Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
@@ -89,7 +91,7 @@ TEST(SimA70503, EdgeControlSpecifierSimulates) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }

@@ -27,8 +27,8 @@ struct ClockingSimFixture {
 };
 
 // Schedule posedge at a given time through the scheduler.
-void SchedulePosedge(ClockingSimFixture &f, Variable *clk, uint64_t time) {
-  auto *ev = f.scheduler.GetEventPool().Acquire();
+void SchedulePosedge(ClockingSimFixture& f, Variable* clk, uint64_t time) {
+  auto* ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [clk, &f]() {
     clk->prev_value = clk->value;
     clk->value = MakeLogic4VecVal(f.arena, 1, 1);
@@ -38,8 +38,8 @@ void SchedulePosedge(ClockingSimFixture &f, Variable *clk, uint64_t time) {
 }
 
 // Schedule negedge at a given time through the scheduler.
-void ScheduleNegedge(ClockingSimFixture &f, Variable *clk, uint64_t time) {
-  auto *ev = f.scheduler.GetEventPool().Acquire();
+void ScheduleNegedge(ClockingSimFixture& f, Variable* clk, uint64_t time) {
+  auto* ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [clk, &f]() {
     clk->prev_value = clk->value;
     clk->value = MakeLogic4VecVal(f.arena, 1, 0);
@@ -55,7 +55,7 @@ namespace {
 // =============================================================================
 TEST(ClockingSim, ClockingBlockEvent) {
   ClockingSimFixture f;
-  auto *clk = f.ctx.CreateVariable("clk", 1);
+  auto* clk = f.ctx.CreateVariable("clk", 1);
   clk->value = MakeLogic4VecVal(f.arena, 1, 0);
 
   ClockingManager cmgr;
@@ -67,7 +67,7 @@ TEST(ClockingSim, ClockingBlockEvent) {
   block.default_output_skew = SimTime{0};
   cmgr.Register(block);
 
-  auto *cb_event = f.ctx.CreateVariable("__cb_event", 1);
+  auto* cb_event = f.ctx.CreateVariable("__cb_event", 1);
   cb_event->is_event = true;
   cmgr.SetBlockEventVar("cb", cb_event);
 
@@ -90,7 +90,7 @@ TEST(ClockingSim, ClockingBlockEvent) {
 // =============================================================================
 TEST(ClockingSim, EdgeCallbackOnPosedge) {
   ClockingSimFixture f;
-  auto *clk = f.ctx.CreateVariable("clk", 1);
+  auto* clk = f.ctx.CreateVariable("clk", 1);
   clk->value = MakeLogic4VecVal(f.arena, 1, 0);
 
   ClockingManager cmgr;
@@ -123,8 +123,8 @@ struct SimA611Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-void SchedulePosedge(SimA611Fixture &f, Variable *clk, uint64_t time) {
-  auto *ev = f.scheduler.GetEventPool().Acquire();
+void SchedulePosedge(SimA611Fixture& f, Variable* clk, uint64_t time) {
+  auto* ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [clk, &f]() {
     clk->prev_value = clk->value;
     clk->value = MakeLogic4VecVal(f.arena, 1, 1);
@@ -133,8 +133,8 @@ void SchedulePosedge(SimA611Fixture &f, Variable *clk, uint64_t time) {
   f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
 }
 
-void ScheduleNegedge(SimA611Fixture &f, Variable *clk, uint64_t time) {
-  auto *ev = f.scheduler.GetEventPool().Acquire();
+void ScheduleNegedge(SimA611Fixture& f, Variable* clk, uint64_t time) {
+  auto* ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [clk, &f]() {
     clk->prev_value = clk->value;
     clk->value = MakeLogic4VecVal(f.arena, 1, 0);
@@ -146,7 +146,7 @@ void ScheduleNegedge(SimA611Fixture &f, Variable *clk, uint64_t time) {
 // --- edge callback registration ---
 TEST(SimA611, EdgeCallbackPosedge) {
   SimA611Fixture f;
-  auto *clk = f.ctx.CreateVariable("clk", 1);
+  auto* clk = f.ctx.CreateVariable("clk", 1);
   clk->value = MakeLogic4VecVal(f.arena, 1, 0);
 
   ClockingManager cmgr;

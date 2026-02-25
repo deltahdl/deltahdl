@@ -26,7 +26,7 @@ TEST(Dpi, RegisterImport) {
   func.c_name = "c_add";
   func.sv_name = "sv_add";
   func.return_type = DataTypeKind::kInt;
-  func.impl = [](const std::vector<uint64_t> &args) -> uint64_t {
+  func.impl = [](const std::vector<uint64_t>& args) -> uint64_t {
     return args[0] + args[1];
   };
   ctx.RegisterImport(func);
@@ -44,7 +44,7 @@ TEST(Dpi, FindImport) {
   func.return_type = DataTypeKind::kInt;
   ctx.RegisterImport(func);
 
-  const auto *found = ctx.FindImport("sv_mul");
+  const auto* found = ctx.FindImport("sv_mul");
   ASSERT_NE(found, nullptr);
   EXPECT_EQ(found->c_name, "c_mul");
 

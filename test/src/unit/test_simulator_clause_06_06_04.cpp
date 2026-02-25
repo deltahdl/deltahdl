@@ -9,7 +9,7 @@
 
 using namespace delta;
 
-static Logic4Vec MakeAllZ(Arena &arena, uint32_t width) {
+static Logic4Vec MakeAllZ(Arena& arena, uint32_t width) {
   auto vec = MakeLogic4Vec(arena, width);
   for (uint32_t w = 0; w < vec.nwords; ++w) {
     vec.words[w].aval = ~uint64_t{0};
@@ -22,7 +22,7 @@ namespace {
 // --- §6.6.4: Trireg charge retention ---
 TEST(NetResolution, TriregRetainsPrevValue) {
   Arena arena;
-  auto *var = arena.Create<Variable>();
+  auto* var = arena.Create<Variable>();
   // First set the variable to a known value (simulating previous driven state).
   var->value = MakeLogic4VecVal(arena, 8, 42);
   Net net;
@@ -39,7 +39,7 @@ TEST(NetResolution, TriregRetainsPrevValue) {
 
 TEST(NetResolution, TriregDrivenNormally) {
   Arena arena;
-  auto *var = arena.Create<Variable>();
+  auto* var = arena.Create<Variable>();
   var->value = MakeLogic4VecVal(arena, 8, 42);
   Net net;
   net.type = NetType::kTrireg;
@@ -54,7 +54,7 @@ TEST(NetResolution, TriregDrivenNormally) {
 TEST(ChargeDecay, DecayChangesValueToX) {
   Arena arena;
   Scheduler sched(arena);
-  auto *var = arena.Create<Variable>();
+  auto* var = arena.Create<Variable>();
   var->value = MakeLogic4VecVal(arena, 8, 42);
   Net net;
   net.type = NetType::kTrireg;
@@ -73,7 +73,7 @@ TEST(ChargeDecay, DecayChangesValueToX) {
 TEST(ChargeDecay, NoDecayWhenDecayTicksZero) {
   Arena arena;
   Scheduler sched(arena);
-  auto *var = arena.Create<Variable>();
+  auto* var = arena.Create<Variable>();
   var->value = MakeLogic4VecVal(arena, 8, 42);
   Net net;
   net.type = NetType::kTrireg;
@@ -88,7 +88,7 @@ TEST(ChargeDecay, NoDecayWhenDecayTicksZero) {
 TEST(ChargeDecay, DecayCancelledWhenDriverReturns) {
   Arena arena;
   Scheduler sched(arena);
-  auto *var = arena.Create<Variable>();
+  auto* var = arena.Create<Variable>();
   var->value = MakeLogic4VecVal(arena, 8, 42);
   Net net;
   net.type = NetType::kTrireg;
@@ -108,7 +108,7 @@ TEST(ChargeDecay, DecayCancelledWhenDriverReturns) {
 
 TEST(ChargeDecay, NoDecayScheduledWithoutScheduler) {
   Arena arena;
-  auto *var = arena.Create<Variable>();
+  auto* var = arena.Create<Variable>();
   var->value = MakeLogic4VecVal(arena, 8, 42);
   Net net;
   net.type = NetType::kTrireg;
@@ -123,7 +123,7 @@ TEST(ChargeDecay, NoDecayScheduledWithoutScheduler) {
 // --- §6.6.4.1: Capacitive network propagation ---
 TEST(CapacitiveNetwork, LargerOverridesSmaller) {
   Arena arena;
-  auto *var_a = arena.Create<Variable>();
+  auto* var_a = arena.Create<Variable>();
   var_a->value = MakeLogic4VecVal(arena, 8, 1);
   Net a;
   a.type = NetType::kTrireg;
@@ -131,7 +131,7 @@ TEST(CapacitiveNetwork, LargerOverridesSmaller) {
   a.charge_strength = Strength::kLarge;
   a.drivers.push_back(MakeAllZ(arena, 8));
 
-  auto *var_b = arena.Create<Variable>();
+  auto* var_b = arena.Create<Variable>();
   var_b->value = MakeLogic4VecVal(arena, 8, 0);
   Net b;
   b.type = NetType::kTrireg;
@@ -146,7 +146,7 @@ TEST(CapacitiveNetwork, LargerOverridesSmaller) {
 
 TEST(CapacitiveNetwork, EqualStrengthDifferentValuesToX) {
   Arena arena;
-  auto *var_a = arena.Create<Variable>();
+  auto* var_a = arena.Create<Variable>();
   var_a->value = MakeLogic4VecVal(arena, 8, 1);
   Net a;
   a.type = NetType::kTrireg;
@@ -154,7 +154,7 @@ TEST(CapacitiveNetwork, EqualStrengthDifferentValuesToX) {
   a.charge_strength = Strength::kMedium;
   a.drivers.push_back(MakeAllZ(arena, 8));
 
-  auto *var_b = arena.Create<Variable>();
+  auto* var_b = arena.Create<Variable>();
   var_b->value = MakeLogic4VecVal(arena, 8, 0);
   Net b;
   b.type = NetType::kTrireg;
@@ -172,7 +172,7 @@ TEST(CapacitiveNetwork, EqualStrengthDifferentValuesToX) {
 
 TEST(CapacitiveNetwork, EqualStrengthSameValueRetained) {
   Arena arena;
-  auto *var_a = arena.Create<Variable>();
+  auto* var_a = arena.Create<Variable>();
   var_a->value = MakeLogic4VecVal(arena, 8, 55);
   Net a;
   a.type = NetType::kTrireg;
@@ -180,7 +180,7 @@ TEST(CapacitiveNetwork, EqualStrengthSameValueRetained) {
   a.charge_strength = Strength::kMedium;
   a.drivers.push_back(MakeAllZ(arena, 8));
 
-  auto *var_b = arena.Create<Variable>();
+  auto* var_b = arena.Create<Variable>();
   var_b->value = MakeLogic4VecVal(arena, 8, 55);
   Net b;
   b.type = NetType::kTrireg;
@@ -195,7 +195,7 @@ TEST(CapacitiveNetwork, EqualStrengthSameValueRetained) {
 
 TEST(CapacitiveNetwork, OnlyWhenBothCapacitive) {
   Arena arena;
-  auto *var_a = arena.Create<Variable>();
+  auto* var_a = arena.Create<Variable>();
   var_a->value = MakeLogic4VecVal(arena, 8, 1);
   Net a;
   a.type = NetType::kTrireg;
@@ -203,7 +203,7 @@ TEST(CapacitiveNetwork, OnlyWhenBothCapacitive) {
   a.charge_strength = Strength::kLarge;
   a.drivers.push_back(MakeAllZ(arena, 8));  // Capacitive.
 
-  auto *var_b = arena.Create<Variable>();
+  auto* var_b = arena.Create<Variable>();
   var_b->value = MakeLogic4VecVal(arena, 8, 0);
   Net b;
   b.type = NetType::kTrireg;

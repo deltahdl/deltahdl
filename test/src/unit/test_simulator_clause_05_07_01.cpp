@@ -1,7 +1,9 @@
 // §5.7.1: Integer literal constants
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -24,11 +26,11 @@ struct SimA84Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA84Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA84Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -38,7 +40,7 @@ namespace {
 // § primary — integer literal
 TEST(SimA84, PrimaryIntegerLiteral) {
   SimA84Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'hAB;\n"
@@ -48,7 +50,7 @@ TEST(SimA84, PrimaryIntegerLiteral) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
@@ -56,7 +58,7 @@ TEST(SimA84, PrimaryIntegerLiteral) {
 // § primary — unbased_unsized_literal '1
 TEST(SimA84, PrimaryUnbasedUnsized1) {
   SimA84Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = '1;\n"
@@ -66,7 +68,7 @@ TEST(SimA84, PrimaryUnbasedUnsized1) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
@@ -74,7 +76,7 @@ TEST(SimA84, PrimaryUnbasedUnsized1) {
 // § primary — unbased_unsized_literal '0
 TEST(SimA84, PrimaryUnbasedUnsized0) {
   SimA84Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = '0;\n"
@@ -84,7 +86,7 @@ TEST(SimA84, PrimaryUnbasedUnsized0) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
@@ -92,7 +94,7 @@ TEST(SimA84, PrimaryUnbasedUnsized0) {
 // § primary — hex literal with different bases
 TEST(SimA84, PrimaryHexLiteral) {
   SimA84Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'hA5;\n"
@@ -102,7 +104,7 @@ TEST(SimA84, PrimaryHexLiteral) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xA5u);
 }
@@ -110,7 +112,7 @@ TEST(SimA84, PrimaryHexLiteral) {
 // § primary — binary literal
 TEST(SimA84, PrimaryBinaryLiteral) {
   SimA84Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'b11001100;\n"
@@ -120,7 +122,7 @@ TEST(SimA84, PrimaryBinaryLiteral) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xCCu);
 }
@@ -133,16 +135,16 @@ struct SimA87Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA87Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA87Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-static double ToDouble(const Variable *var) {
+static double ToDouble(const Variable* var) {
   uint64_t bits = var->value.ToUint64();
   double d = 0.0;
   std::memcpy(&d, &bits, sizeof(double));
@@ -155,7 +157,7 @@ static double ToDouble(const Variable *var) {
 // § number — integral_number simulates
 TEST(SimA87, NumberIntegral) {
   SimA87Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 42;\n"
@@ -165,7 +167,7 @@ TEST(SimA87, NumberIntegral) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -173,7 +175,7 @@ TEST(SimA87, NumberIntegral) {
 // § integral_number — decimal_number (unsized)
 TEST(SimA87, DecimalUnsized) {
   SimA87Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  int x;\n"
       "  initial x = 255;\n"
@@ -183,7 +185,7 @@ TEST(SimA87, DecimalUnsized) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 255u);
 }
@@ -191,7 +193,7 @@ TEST(SimA87, DecimalUnsized) {
 // § integral_number — binary_number
 TEST(SimA87, BinaryNumber) {
   SimA87Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'b10101010;\n"
@@ -201,7 +203,7 @@ TEST(SimA87, BinaryNumber) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xAAu);
 }
@@ -209,7 +211,7 @@ TEST(SimA87, BinaryNumber) {
 // § integral_number — hex_number
 TEST(SimA87, HexNumber) {
   SimA87Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'hFF;\n"
@@ -219,7 +221,7 @@ TEST(SimA87, HexNumber) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
@@ -227,7 +229,7 @@ TEST(SimA87, HexNumber) {
 // § decimal_number — [size] decimal_base unsigned_number
 TEST(SimA87, DecimalSizedBase) {
   SimA87Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'd200;\n"
@@ -237,7 +239,7 @@ TEST(SimA87, DecimalSizedBase) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 200u);
 }
@@ -245,7 +247,7 @@ TEST(SimA87, DecimalSizedBase) {
 // § decimal_number — [size] decimal_base z_digit (all z)
 TEST(SimA87, DecimalZDigitAllBits) {
   SimA87Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'dz;\n"
@@ -255,7 +257,7 @@ TEST(SimA87, DecimalZDigitAllBits) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   // z: aval=0, bval=set
   EXPECT_NE(var->value.words[0].bval, 0u);
@@ -264,7 +266,7 @@ TEST(SimA87, DecimalZDigitAllBits) {
 // § size — 16-bit literal
 TEST(SimA87, Size16Bit) {
   SimA87Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] x;\n"
       "  initial x = 16'hBEEF;\n"
@@ -274,7 +276,7 @@ TEST(SimA87, Size16Bit) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xBEEFu);
 }
@@ -282,7 +284,7 @@ TEST(SimA87, Size16Bit) {
 // § unsigned_number — with underscores
 TEST(SimA87, UnsignedNumberUnderscores) {
   SimA87Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  int x;\n"
       "  initial x = 1_000;\n"
@@ -292,7 +294,7 @@ TEST(SimA87, UnsignedNumberUnderscores) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1000u);
 }
@@ -300,7 +302,7 @@ TEST(SimA87, UnsignedNumberUnderscores) {
 // § binary_value — with underscores
 TEST(SimA87, BinaryValueUnderscores) {
   SimA87Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'b1010_1010;\n"
@@ -310,7 +312,7 @@ TEST(SimA87, BinaryValueUnderscores) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xAAu);
 }
@@ -318,7 +320,7 @@ TEST(SimA87, BinaryValueUnderscores) {
 // § decimal_base — 'D (uppercase)
 TEST(SimA87, DecimalBaseUpper) {
   SimA87Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'D99;\n"
@@ -328,7 +330,7 @@ TEST(SimA87, DecimalBaseUpper) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
@@ -336,7 +338,7 @@ TEST(SimA87, DecimalBaseUpper) {
 // § binary_base — 'B (uppercase)
 TEST(SimA87, BinaryBaseUpper) {
   SimA87Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] x;\n"
       "  initial x = 4'B1111;\n"
@@ -346,7 +348,7 @@ TEST(SimA87, BinaryBaseUpper) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFu);
 }
@@ -354,7 +356,7 @@ TEST(SimA87, BinaryBaseUpper) {
 // § octal_base — 'O (uppercase)
 TEST(SimA87, OctalBaseUpper) {
   SimA87Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'O77;\n"
@@ -364,7 +366,7 @@ TEST(SimA87, OctalBaseUpper) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 077u);
 }
@@ -372,7 +374,7 @@ TEST(SimA87, OctalBaseUpper) {
 // § hex_base — 'H (uppercase)
 TEST(SimA87, HexBaseUpper) {
   SimA87Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'HAB;\n"
@@ -382,7 +384,7 @@ TEST(SimA87, HexBaseUpper) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
@@ -390,7 +392,7 @@ TEST(SimA87, HexBaseUpper) {
 // § signed bases — 'sd simulates
 TEST(SimA87, SignedDecimal) {
   SimA87Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'sd99;\n"
@@ -400,7 +402,7 @@ TEST(SimA87, SignedDecimal) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
@@ -408,7 +410,7 @@ TEST(SimA87, SignedDecimal) {
 // § signed bases — 'sb simulates
 TEST(SimA87, SignedBinary) {
   SimA87Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] x;\n"
       "  initial x = 4'sb1010;\n"
@@ -418,7 +420,7 @@ TEST(SimA87, SignedBinary) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xAu);
 }
@@ -426,7 +428,7 @@ TEST(SimA87, SignedBinary) {
 // § signed bases — 'sh simulates
 TEST(SimA87, SignedHex) {
   SimA87Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'shAB;\n"
@@ -436,7 +438,7 @@ TEST(SimA87, SignedHex) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
@@ -444,7 +446,7 @@ TEST(SimA87, SignedHex) {
 // § x_digit — hex x fills 4 bits
 TEST(SimA87, XDigitInHex) {
   SimA87Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'h0x;\n"
@@ -454,7 +456,7 @@ TEST(SimA87, XDigitInHex) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   // Low nibble is x: aval bits 0-3 set, bval bits 0-3 set
   uint64_t aval = var->value.words[0].aval;
@@ -466,7 +468,7 @@ TEST(SimA87, XDigitInHex) {
 // § z_digit — hex z fills 4 bits
 TEST(SimA87, ZDigitInHex) {
   SimA87Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'h0z;\n"
@@ -476,7 +478,7 @@ TEST(SimA87, ZDigitInHex) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   // Low nibble is z: aval bits 0-3 clear, bval bits 0-3 set
   uint64_t aval = var->value.words[0].aval;
@@ -488,7 +490,7 @@ TEST(SimA87, ZDigitInHex) {
 // § z_digit — ? synonym for z in binary
 TEST(SimA87, QuestionMarkAsZ) {
   SimA87Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] x;\n"
       "  initial x = 4'b0?0?;\n"
@@ -498,7 +500,7 @@ TEST(SimA87, QuestionMarkAsZ) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   // bits 0 and 2 are z: bval has those bits set
   uint64_t bval = var->value.words[0].bval;
@@ -508,7 +510,7 @@ TEST(SimA87, QuestionMarkAsZ) {
 // § unbased_unsized_literal — '0
 TEST(SimA87, UnbasedUnsizedZero) {
   SimA87Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = '0;\n"
@@ -518,7 +520,7 @@ TEST(SimA87, UnbasedUnsizedZero) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
@@ -526,7 +528,7 @@ TEST(SimA87, UnbasedUnsizedZero) {
 // § unbased_unsized_literal — '1
 TEST(SimA87, UnbasedUnsizedOne) {
   SimA87Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = '1;\n"
@@ -536,7 +538,7 @@ TEST(SimA87, UnbasedUnsizedOne) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64() & 0xFFu, 0xFFu);
 }
@@ -544,7 +546,7 @@ TEST(SimA87, UnbasedUnsizedOne) {
 // § unbased_unsized_literal — 'x (fills all bits with x)
 TEST(SimA87, UnbasedUnsizedX) {
   SimA87Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 'x;\n"
@@ -554,7 +556,7 @@ TEST(SimA87, UnbasedUnsizedX) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   // x: both aval and bval set
   EXPECT_NE(var->value.words[0].aval, 0u);
@@ -564,7 +566,7 @@ TEST(SimA87, UnbasedUnsizedX) {
 // § unbased_unsized_literal — 'z (fills all bits with z)
 TEST(SimA87, UnbasedUnsizedZ) {
   SimA87Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 'z;\n"
@@ -574,7 +576,7 @@ TEST(SimA87, UnbasedUnsizedZ) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   // z: aval=0, bval=set
   EXPECT_NE(var->value.words[0].bval, 0u);
@@ -583,7 +585,7 @@ TEST(SimA87, UnbasedUnsizedZ) {
 // § hex_digit — uppercase A-F
 TEST(SimA87, HexDigitUppercase) {
   SimA87Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [23:0] x;\n"
       "  initial x = 24'hABCDEF;\n"
@@ -593,7 +595,7 @@ TEST(SimA87, HexDigitUppercase) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABCDEFu);
 }

@@ -25,38 +25,38 @@ struct SimCh50702Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimCh50702Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimCh50702Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-static uint64_t RunAndGet(const std::string &src, const char *var_name) {
+static uint64_t RunAndGet(const std::string& src, const char* var_name) {
   SimCh50702Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable(var_name);
+  auto* var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
   if (!var) return 0;
   return var->value.ToUint64();
 }
 
-static double RunAndGetReal(const std::string &src, const char *var_name) {
+static double RunAndGetReal(const std::string& src, const char* var_name) {
   SimCh50702Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0.0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable(var_name);
+  auto* var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
   if (!var) return 0.0;
   double d = 0.0;
@@ -230,16 +230,16 @@ struct SimA87Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA87Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA87Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-static double ToDouble(const Variable *var) {
+static double ToDouble(const Variable* var) {
   uint64_t bits = var->value.ToUint64();
   double d = 0.0;
   std::memcpy(&d, &bits, sizeof(double));
@@ -249,7 +249,7 @@ static double ToDouble(const Variable *var) {
 // § real_number — scientific notation simulates
 TEST(SimA87, ScientificNotation) {
   SimA87Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  real x;\n"
       "  initial x = 1.5e3;\n"
@@ -259,7 +259,7 @@ TEST(SimA87, ScientificNotation) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_DOUBLE_EQ(ToDouble(var), 1500.0);
 }
@@ -267,7 +267,7 @@ TEST(SimA87, ScientificNotation) {
 // § real_number — scientific with positive exponent
 TEST(SimA87, ScientificPositiveExp) {
   SimA87Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  real x;\n"
       "  initial x = 1.0e+2;\n"
@@ -277,7 +277,7 @@ TEST(SimA87, ScientificPositiveExp) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_DOUBLE_EQ(ToDouble(var), 100.0);
 }
@@ -285,7 +285,7 @@ TEST(SimA87, ScientificPositiveExp) {
 // § real_number — scientific with negative exponent
 TEST(SimA87, ScientificNegativeExp) {
   SimA87Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  real x;\n"
       "  initial x = 1.0e-2;\n"
@@ -295,7 +295,7 @@ TEST(SimA87, ScientificNegativeExp) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_DOUBLE_EQ(ToDouble(var), 0.01);
 }
@@ -303,7 +303,7 @@ TEST(SimA87, ScientificNegativeExp) {
 // § exp — uppercase E
 TEST(SimA87, ExpUppercase) {
   SimA87Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  real x;\n"
       "  initial x = 2.5E2;\n"
@@ -313,8 +313,7 @@ TEST(SimA87, ExpUppercase) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_DOUBLE_EQ(ToDouble(var), 250.0);
 }
-

@@ -1,6 +1,7 @@
 // §annex_l.2
 
 #include <gtest/gtest.h>
+
 #include "vpi/vpi_compatibility.h"
 
 namespace {

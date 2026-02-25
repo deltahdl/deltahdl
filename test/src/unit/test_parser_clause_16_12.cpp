@@ -1,7 +1,9 @@
 // §16.12: Declaring properties
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -13,11 +15,11 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-ParseResult Parse(const std::string &src) {
+ParseResult Parse(const std::string& src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -28,7 +30,7 @@ ParseResult Parse(const std::string &src) {
   return result;
 }
 
-static bool ParseOk(const std::string &src) {
+static bool ParseOk(const std::string& src) {
   SourceManager mgr;
   Arena arena;
   auto fid = mgr.AddFile("<test>", src);
@@ -39,9 +41,9 @@ static bool ParseOk(const std::string &src) {
   return !diag.HasErrors();
 }
 
-static ModuleItem *FindItemByKind(const std::vector<ModuleItem *> &items,
+static ModuleItem* FindItemByKind(const std::vector<ModuleItem*>& items,
                                   ModuleItemKind kind) {
-  for (auto *item : items) {
+  for (auto* item : items) {
     if (item->kind == kind) return item;
   }
   return nullptr;
@@ -78,7 +80,7 @@ TEST(ParserA210, AssertionItemDecl_PropertyDecl) {
       "  endproperty\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto *item =
+  auto* item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kPropertyDecl);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "p_req");
@@ -100,7 +102,7 @@ TEST(ParserA210, PropertyDecl_WithEndLabel) {
       "  endproperty : p_req\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto *item =
+  auto* item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kPropertyDecl);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "p_req");
@@ -123,7 +125,7 @@ TEST(ParserA210, PropertyDecl_SourceLoc) {
       "  endproperty\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto *item =
+  auto* item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kPropertyDecl);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->loc.IsValid());

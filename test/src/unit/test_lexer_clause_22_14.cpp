@@ -1,6 +1,7 @@
 // §22.14: `begin_keywords, `end_keywords
 
 #include <gtest/gtest.h>
+
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/keywords.h"
@@ -8,7 +9,7 @@
 
 using namespace delta;
 
-static std::vector<Token> Lex(const std::string &src) {
+static std::vector<Token> Lex(const std::string& src) {
   static SourceManager mgr;
   auto fid = mgr.AddFile("<test>", src);
   DiagEngine diag(mgr);
@@ -40,7 +41,7 @@ TEST(Lexer, KeywordVersionMarker_RestoresToDefault) {
 TEST(Lexer, ParseKeywordVersion_ValidVersions) {
   // §22.14: all nine version specifiers
   struct Case {
-    const char *input;
+    const char* input;
     KeywordVersion expected;
   };
   const Case kCases[] = {
@@ -54,7 +55,7 @@ TEST(Lexer, ParseKeywordVersion_ValidVersions) {
       {"1800-2017", KeywordVersion::kVer18002017},
       {"1800-2023", KeywordVersion::kVer18002023},
   };
-  for (const auto &c : kCases) {
+  for (const auto& c : kCases) {
     EXPECT_EQ(ParseKeywordVersion(c.input), std::optional(c.expected))
         << c.input;
   }

@@ -25,11 +25,11 @@ struct LowerFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, LowerFixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, LowerFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -38,7 +38,7 @@ namespace {
 
 TEST(Lowerer, NetCreatedFromDecl) {
   LowerFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  wire [7:0] w;\n"
       "  assign w = 55;\n"
@@ -50,10 +50,10 @@ TEST(Lowerer, NetCreatedFromDecl) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *net = f.ctx.FindNet("w");
+  auto* net = f.ctx.FindNet("w");
   ASSERT_NE(net, nullptr);
   EXPECT_EQ(net->type, NetType::kWire);
-  auto *var = f.ctx.FindVariable("w");
+  auto* var = f.ctx.FindVariable("w");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }

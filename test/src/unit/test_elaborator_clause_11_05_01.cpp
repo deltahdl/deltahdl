@@ -1,7 +1,9 @@
 // §11.5.1: Vector bit-select and part-select addressing
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -19,13 +21,13 @@ struct ElabA83Fixture {
   bool has_errors = false;
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, ElabA83Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, ElabA83Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
-  auto *design = elab.Elaborate(cu->modules.back()->name);
+  auto* design = elab.Elaborate(cu->modules.back()->name);
   f.has_errors = f.diag.HasErrors();
   return design;
 }
@@ -35,7 +37,7 @@ namespace {
 // § part_select_range — indexed part select elaborates
 TEST(ElabA83, IndexedPartSelectElaborates) {
   ElabA83Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [15:0] data;\n"
       "  logic [7:0] x;\n"
@@ -49,7 +51,7 @@ TEST(ElabA83, IndexedPartSelectElaborates) {
 // § constant_range — packed dimension range elaborates
 TEST(ElabA83, ConstantRangePackedDimElaborates) {
   ElabA83Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [31:0] data;\n"
       "  logic [7:0] x;\n"
@@ -67,13 +69,13 @@ struct ElabA84Fixture {
   bool has_errors = false;
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, ElabA84Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, ElabA84Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
-  auto *design = elab.Elaborate(cu->modules.back()->name);
+  auto* design = elab.Elaborate(cu->modules.back()->name);
   f.has_errors = f.diag.HasErrors();
   return design;
 }
@@ -81,7 +83,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA84Fixture &f) {
 // § primary_literal — part select range elaborates
 TEST(ElabA84, PrimaryPartSelectRangeElaborates) {
   ElabA84Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [31:0] data;\n"
       "  logic [7:0] x;\n"
@@ -98,11 +100,11 @@ struct ElabFixture {
   DiagEngine diag{mgr};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, ElabFixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }

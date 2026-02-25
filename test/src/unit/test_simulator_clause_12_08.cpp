@@ -1,7 +1,9 @@
 // §12.8: Jump statements
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -24,11 +26,11 @@ struct SimA605Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA605Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA605Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -38,7 +40,7 @@ namespace {
 // §12.8: break exits loop in simulation
 TEST(SimA605, JumpBreakExitsLoop) {
   SimA605Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -54,7 +56,7 @@ TEST(SimA605, JumpBreakExitsLoop) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
@@ -62,7 +64,7 @@ TEST(SimA605, JumpBreakExitsLoop) {
 // §12.8: continue skips to next iteration
 TEST(SimA605, JumpContinueSkipsIteration) {
   SimA605Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -78,7 +80,7 @@ TEST(SimA605, JumpContinueSkipsIteration) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 4u);  // 5 iterations minus 1 skipped
 }
@@ -86,7 +88,7 @@ TEST(SimA605, JumpContinueSkipsIteration) {
 // §12.8: return without value exits void function
 TEST(SimA605, JumpReturnVoidFunction) {
   SimA605Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  function void set_x();\n"
@@ -103,7 +105,7 @@ TEST(SimA605, JumpReturnVoidFunction) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);  // 20 not reached due to return
 }
@@ -116,11 +118,11 @@ struct SimA608Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA608Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA608Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -128,7 +130,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA608Fixture &f) {
 // §12.7.7: forever with continue skips to next iteration
 TEST(SimA608, ForeverContinue) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x, count;\n"
       "  initial begin\n"
@@ -147,7 +149,7 @@ TEST(SimA608, ForeverContinue) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *count = f.ctx.FindVariable("count");
+  auto* count = f.ctx.FindVariable("count");
   ASSERT_NE(count, nullptr);
   // x goes 1,2,3,...,10. Even values (2,4,6,8) reach count increment = 4
   EXPECT_EQ(count->value.ToUint64(), 4u);
@@ -156,7 +158,7 @@ TEST(SimA608, ForeverContinue) {
 // §12.7.6: repeat with break exits early
 TEST(SimA608, RepeatBreak) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -172,7 +174,7 @@ TEST(SimA608, RepeatBreak) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
@@ -180,7 +182,7 @@ TEST(SimA608, RepeatBreak) {
 // §12.7.6: repeat with continue skips remainder
 TEST(SimA608, RepeatContinue) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x, count;\n"
       "  initial begin\n"
@@ -198,7 +200,7 @@ TEST(SimA608, RepeatContinue) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *count = f.ctx.FindVariable("count");
+  auto* count = f.ctx.FindVariable("count");
   ASSERT_NE(count, nullptr);
   // 5 iterations, skip iteration 3 => count = 4
   EXPECT_EQ(count->value.ToUint64(), 4u);
@@ -207,7 +209,7 @@ TEST(SimA608, RepeatContinue) {
 // §12.7.4: while with break exits early
 TEST(SimA608, WhileBreak) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -223,7 +225,7 @@ TEST(SimA608, WhileBreak) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
@@ -231,7 +233,7 @@ TEST(SimA608, WhileBreak) {
 // §12.7.1: for with break exits early
 TEST(SimA608, ForBreak) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -247,7 +249,7 @@ TEST(SimA608, ForBreak) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
@@ -255,7 +257,7 @@ TEST(SimA608, ForBreak) {
 // §12.7.1: for with continue skips to step
 TEST(SimA608, ForContinue) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] count;\n"
       "  initial begin\n"
@@ -271,7 +273,7 @@ TEST(SimA608, ForContinue) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("count");
+  auto* var = f.ctx.FindVariable("count");
   ASSERT_NE(var, nullptr);
   // 6 iterations, skip i==2 and i==4 => count = 4
   EXPECT_EQ(var->value.ToUint64(), 4u);
@@ -280,7 +282,7 @@ TEST(SimA608, ForContinue) {
 // §12.7.5: do-while with break
 TEST(SimA608, DoWhileBreak) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -296,7 +298,7 @@ TEST(SimA608, DoWhileBreak) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
@@ -304,7 +306,7 @@ TEST(SimA608, DoWhileBreak) {
 // §12.7.5: do-while with continue
 TEST(SimA608, DoWhileContinue) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x, count;\n"
       "  initial begin\n"
@@ -322,7 +324,7 @@ TEST(SimA608, DoWhileContinue) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *count = f.ctx.FindVariable("count");
+  auto* count = f.ctx.FindVariable("count");
   ASSERT_NE(count, nullptr);
   // 5 iterations (x=1..5), skip x==3 => count = 4
   EXPECT_EQ(count->value.ToUint64(), 4u);
@@ -332,7 +334,7 @@ TEST(SimA608, DoWhileContinue) {
 // Nested loops: inner break doesn't affect outer
 TEST(SimA608, NestedLoopInnerBreak) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] outer_count;\n"
       "  initial begin\n"
@@ -350,7 +352,7 @@ TEST(SimA608, NestedLoopInnerBreak) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("outer_count");
+  auto* var = f.ctx.FindVariable("outer_count");
   ASSERT_NE(var, nullptr);
   // Outer loop runs 3 times despite inner break
   EXPECT_EQ(var->value.ToUint64(), 3u);
@@ -359,7 +361,7 @@ TEST(SimA608, NestedLoopInnerBreak) {
 // Nested loops: inner continue doesn't affect outer
 TEST(SimA608, NestedLoopInnerContinue) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] total;\n"
       "  initial begin\n"
@@ -377,7 +379,7 @@ TEST(SimA608, NestedLoopInnerContinue) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("total");
+  auto* var = f.ctx.FindVariable("total");
   ASSERT_NE(var, nullptr);
   // 3 outer * (4 inner - 1 skipped) = 3 * 3 = 9
   EXPECT_EQ(var->value.ToUint64(), 9u);

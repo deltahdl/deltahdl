@@ -1,6 +1,7 @@
 // §11.5.3: Longest static prefix
 
 #include <gtest/gtest.h>
+
 #include "common/arena.h"
 #include "elaboration/const_eval.h"
 #include "parser/ast.h"
@@ -70,7 +71,7 @@ TEST(ConstEval, LongestStaticPrefixParamIdx) {
 TEST(Sensitivity, SelectConstIdxUsesLSP) {
   // a[1] → LSP is "a[1]", sensitivity should include "a[1]" not "a".
   Arena arena;
-  auto *expr = SensSelect(arena, SensId(arena, "a"), SensIntLit(arena, 1));
+  auto* expr = SensSelect(arena, SensId(arena, "a"), SensIntLit(arena, 1));
   std::unordered_set<std::string> reads;
   CollectExprReads(expr, reads);
   EXPECT_TRUE(reads.count("a[1]"));
@@ -80,8 +81,8 @@ TEST(Sensitivity, SelectConstIdxUsesLSP) {
 TEST(Sensitivity, NestedSelectUsesLSP) {
   // a[1][i] → LSP is "a[1]", sensitivity includes "a[1]" and "i".
   Arena arena;
-  auto *inner = SensSelect(arena, SensId(arena, "a"), SensIntLit(arena, 1));
-  auto *outer = SensSelect(arena, inner, SensId(arena, "i"));
+  auto* inner = SensSelect(arena, SensId(arena, "a"), SensIntLit(arena, 1));
+  auto* outer = SensSelect(arena, inner, SensId(arena, "i"));
   std::unordered_set<std::string> reads;
   CollectExprReads(outer, reads);
   EXPECT_TRUE(reads.count("a[1]"));

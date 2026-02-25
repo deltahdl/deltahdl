@@ -16,7 +16,7 @@ namespace {
 // =============================================================================
 TEST(Coverage, CrossCoverageCreation) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
+  auto* g = db.CreateGroup("cg");
   CoverageDB::AddCoverPoint(g, "a");
   CoverageDB::AddCoverPoint(g, "b");
 
@@ -40,7 +40,7 @@ TEST(Coverage, CrossCoverageCreation) {
 
 TEST(Coverage, CrossCoverageSampling) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
+  auto* g = db.CreateGroup("cg");
   CoverageDB::AddCoverPoint(g, "a");
   CoverageDB::AddCoverPoint(g, "b");
 

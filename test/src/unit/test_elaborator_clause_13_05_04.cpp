@@ -1,7 +1,9 @@
 // §13.5.4: Argument binding by name
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -19,13 +21,13 @@ struct ElabA609Fixture {
   bool has_errors = false;
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, ElabA609Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, ElabA609Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
-  auto *design = elab.Elaborate(cu->modules.back()->name);
+  auto* design = elab.Elaborate(cu->modules.back()->name);
   f.has_errors = f.diag.HasErrors();
   return design;
 }
@@ -35,7 +37,7 @@ namespace {
 // named argument call elaborates without error
 TEST(ElabA609, NamedArgCallElaborates) {
   ElabA609Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  function int add(int a, int b); return a + b; endfunction\n"
       "  logic [31:0] x;\n"
@@ -53,13 +55,13 @@ struct ElabA82Fixture {
   bool has_errors = false;
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, ElabA82Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, ElabA82Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
-  auto *design = elab.Elaborate(cu->modules.back()->name);
+  auto* design = elab.Elaborate(cu->modules.back()->name);
   f.has_errors = f.diag.HasErrors();
   return design;
 }
@@ -67,7 +69,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA82Fixture &f) {
 // § list_of_arguments — named arguments elaborate
 TEST(ElabA82, NamedArgsElaborate) {
   ElabA82Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  function int add(int a, int b); return a + b; endfunction\n"
       "  logic [31:0] x;\n"

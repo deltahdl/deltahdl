@@ -18,11 +18,11 @@ struct ElabFixture {
   DiagEngine diag{mgr};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, ElabFixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -35,28 +35,28 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabFixture &f) {
 
 TEST(ElabClause1011, NetAliasNotSilentlyIgnored) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  wire a, b;\n"
       "  alias a = b;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   ASSERT_GE(mod->aliases.size(), 1u);
   ASSERT_EQ(mod->aliases[0].nets.size(), 2u);
 }
 
 TEST(ElabClause1011, NetAliasThreeNets) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  wire a, b, c;\n"
       "  alias a = b = c;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  auto *mod = design->top_modules[0];
+  auto* mod = design->top_modules[0];
   ASSERT_GE(mod->aliases.size(), 1u);
   ASSERT_EQ(mod->aliases[0].nets.size(), 3u);
 }
@@ -113,7 +113,7 @@ TEST(ElabClause1011, Validate_NetAlias_NoSelfAlias) {
 
 TEST(ElabClause1011, Validate_NetAlias_ImplicitNetCreation) {
   ElabFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  wire a;\n"
       "  alias a = b;\n"

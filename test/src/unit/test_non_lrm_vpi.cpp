@@ -9,7 +9,7 @@ namespace {
 
 TEST(NonLrmVpi, DefaultContextIsAvailable) {
   SetGlobalVpiContext(nullptr);
-  VpiContext &ctx = GetGlobalVpiContext();
+  VpiContext& ctx = GetGlobalVpiContext();
   (void)ctx;
 }
 

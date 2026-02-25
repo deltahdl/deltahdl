@@ -1,7 +1,9 @@
 // §9.4.2: Event control
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -24,11 +26,11 @@ struct SimA605Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA605Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA605Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -38,7 +40,7 @@ namespace {
 // §9.4.2: posedge event control triggers on 0->1 transition
 TEST(SimA605, EventControlPosedge) {
   SimA605Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] x;\n"
@@ -55,7 +57,7 @@ TEST(SimA605, EventControlPosedge) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
@@ -63,7 +65,7 @@ TEST(SimA605, EventControlPosedge) {
 // §9.4.2: negedge event control triggers on 1->0 transition
 TEST(SimA605, EventControlNegedge) {
   SimA605Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] x;\n"
@@ -80,7 +82,7 @@ TEST(SimA605, EventControlNegedge) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
@@ -88,7 +90,7 @@ TEST(SimA605, EventControlNegedge) {
 // §9.4.2: any-change event control (no edge specified)
 TEST(SimA605, EventControlAnyChange) {
   SimA605Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] sig;\n"
       "  logic [7:0] x;\n"
@@ -105,7 +107,7 @@ TEST(SimA605, EventControlAnyChange) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
@@ -113,7 +115,7 @@ TEST(SimA605, EventControlAnyChange) {
 // §9.4: multiple timing controls in sequence
 TEST(SimA605, MultipleTimingControls) {
   SimA605Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  logic clk;\n"

@@ -27,14 +27,14 @@ struct AggFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static Expr *MkSelect(Arena &arena, std::string_view name, uint64_t idx) {
-  auto *sel = arena.Create<Expr>();
+static Expr* MkSelect(Arena& arena, std::string_view name, uint64_t idx) {
+  auto* sel = arena.Create<Expr>();
   sel->kind = ExprKind::kSelect;
-  auto *base = arena.Create<Expr>();
+  auto* base = arena.Create<Expr>();
   base->kind = ExprKind::kIdentifier;
   base->text = name;
   sel->base = base;
-  auto *idx_expr = arena.Create<Expr>();
+  auto* idx_expr = arena.Create<Expr>();
   idx_expr->kind = ExprKind::kIntegerLiteral;
   idx_expr->int_val = idx;
   sel->index = idx_expr;
@@ -48,8 +48,8 @@ TEST(ArrayAccess, OutOfBoundsReturnsX) {
   f.ctx.RegisterArray("arr", {0, 4, 8, false, false, false});
   for (uint32_t i = 0; i < 4; ++i) {
     auto tmp = "arr[" + std::to_string(i) + "]";
-    auto *s = f.arena.AllocString(tmp.c_str(), tmp.size());
-    auto *v = f.ctx.CreateVariable(std::string_view(s, tmp.size()), 8);
+    auto* s = f.arena.AllocString(tmp.c_str(), tmp.size());
+    auto* v = f.ctx.CreateVariable(std::string_view(s, tmp.size()), 8);
     v->value = MakeLogic4VecVal(f.arena, 8, static_cast<uint64_t>(i + 1) * 10);
   }
   // In-bounds: arr[2] should return 30.

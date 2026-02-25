@@ -1,7 +1,9 @@
 // §3.12.1: Compilation units
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"

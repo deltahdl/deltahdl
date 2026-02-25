@@ -10,7 +10,7 @@
 
 using namespace delta;
 
-static std::vector<Token> Lex(const std::string &src) {
+static std::vector<Token> Lex(const std::string& src) {
   static SourceManager mgr;
   auto fid = mgr.AddFile("<test>", src);
   DiagEngine diag(mgr);
@@ -23,7 +23,7 @@ struct LexResult {
   bool has_errors;
 };
 
-static LexResult LexWithDiag(const std::string &src) {
+static LexResult LexWithDiag(const std::string& src) {
   SourceManager mgr;
   DiagEngine diag(mgr);
   auto fid = mgr.AddFile("<test>", src);
@@ -150,7 +150,8 @@ TEST(LexerA94, OnlyWhitespaceInput) {
 // ---------------------------------------------------------------------------
 
 TEST(LexerA94, WhitespaceRequiredBetweenKeywords) {
-  // §5.3: Without whitespace, "moduleendmodule" is one identifier, not two keywords.
+  // §5.3: Without whitespace, "moduleendmodule" is one identifier, not two
+  // keywords.
   auto tokens = Lex("moduleendmodule");
   ASSERT_EQ(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
@@ -299,7 +300,8 @@ TEST(LexerA94, EscapedIdentTerminatedByFormfeed) {
 }
 
 TEST(LexerA94, EscapedIdentTerminatedByEof) {
-  // §A.9.4 / Clarification 56: eof is white_space; terminates escaped_identifier.
+  // §A.9.4 / Clarification 56: eof is white_space; terminates
+  // escaped_identifier.
   auto tokens = Lex("\\esc_id");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);

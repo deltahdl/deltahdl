@@ -1,7 +1,9 @@
 // §14.3: Clocking block declaration
 
 #include <gtest/gtest.h>
+
 #include <cstdint>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -22,8 +24,8 @@ struct SimA611Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-void SchedulePosedge(SimA611Fixture &f, Variable *clk, uint64_t time) {
-  auto *ev = f.scheduler.GetEventPool().Acquire();
+void SchedulePosedge(SimA611Fixture& f, Variable* clk, uint64_t time) {
+  auto* ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [clk, &f]() {
     clk->prev_value = clk->value;
     clk->value = MakeLogic4VecVal(f.arena, 1, 1);
@@ -32,8 +34,8 @@ void SchedulePosedge(SimA611Fixture &f, Variable *clk, uint64_t time) {
   f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
 }
 
-void ScheduleNegedge(SimA611Fixture &f, Variable *clk, uint64_t time) {
-  auto *ev = f.scheduler.GetEventPool().Acquire();
+void ScheduleNegedge(SimA611Fixture& f, Variable* clk, uint64_t time) {
+  auto* ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [clk, &f]() {
     clk->prev_value = clk->value;
     clk->value = MakeLogic4VecVal(f.arena, 1, 0);
@@ -58,7 +60,7 @@ TEST(SimA611, RegisterClockingBlock) {
   block.default_output_skew = SimTime{0};
   cmgr.Register(block);
 
-  const auto *found = cmgr.Find("cb");
+  const auto* found = cmgr.Find("cb");
   ASSERT_NE(found, nullptr);
   EXPECT_EQ(found->clock_signal, "clk");
   EXPECT_EQ(found->clock_edge, Edge::kPosedge);

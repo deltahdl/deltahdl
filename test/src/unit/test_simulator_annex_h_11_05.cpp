@@ -1,6 +1,7 @@
 // Annex H.11.5: Utility functions for working with the canonical representation
 
 #include <gtest/gtest.h>
+
 #include "vpi/svdpi.h"
 
 namespace {

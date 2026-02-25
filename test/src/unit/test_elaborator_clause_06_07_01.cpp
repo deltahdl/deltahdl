@@ -41,15 +41,15 @@ struct NetDeclInfo {
   NetDataTypeKind data_kind = NetDataTypeKind::k4StateIntegral;
 };
 
-bool ValidateNetDecl(const NetDeclInfo &info);
+bool ValidateNetDecl(const NetDeclInfo& info);
 
 bool ValidateNetDataType(NetDataTypeKind kind);
 
-void InitializeNet(Net &net, NetType type, Arena &arena);
+void InitializeNet(Net& net, NetType type, Arena& arena);
 
-void InitializeTriregNet(Net &net, LocalChargeStrength str, Arena &arena);
+void InitializeTriregNet(Net& net, LocalChargeStrength str, Arena& arena);
 
-static bool ValidateInterconnectDecl(const NetDeclInfo &info) {
+static bool ValidateInterconnectDecl(const NetDeclInfo& info) {
   if (info.has_data_type) return false;
   if (info.has_drive_strength) return false;
   if (info.has_charge_strength) return false;
@@ -57,7 +57,7 @@ static bool ValidateInterconnectDecl(const NetDeclInfo &info) {
   return info.delay_count <= 1;
 }
 
-bool ValidateNetDecl(const NetDeclInfo &info) {
+bool ValidateNetDecl(const NetDeclInfo& info) {
   // Charge strength only allowed on trireg.
   if (info.has_charge_strength && info.type != NetType::kTrireg &&
       !info.is_interconnect)
@@ -84,7 +84,7 @@ bool ValidateNetDataType(NetDataTypeKind kind) {
   return false;
 }
 
-void InitializeNet(Net &net, NetType type, Arena &arena) {
+void InitializeNet(Net& net, NetType type, Arena& arena) {
   (void)type;
   (void)arena;
   if (!net.drivers.empty()) {
@@ -99,7 +99,7 @@ void InitializeNet(Net &net, NetType type, Arena &arena) {
   }
 }
 
-void InitializeTriregNet(Net &net, LocalChargeStrength str, Arena &arena) {
+void InitializeTriregNet(Net& net, LocalChargeStrength str, Arena& arena) {
   (void)str;
   (void)arena;
   // Set value to x: aval=0, bval=1.

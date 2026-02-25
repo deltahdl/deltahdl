@@ -25,11 +25,11 @@ struct LowerFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, LowerFixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, LowerFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -39,7 +39,7 @@ namespace {
 TEST(Lowerer, ForkJoinNone) {
   // fork/join_none: parent continues immediately.
   LowerFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] a, b;\n"
       "  initial begin\n"
@@ -57,8 +57,8 @@ TEST(Lowerer, ForkJoinNone) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *a = f.ctx.FindVariable("a");
-  auto *b = f.ctx.FindVariable("b");
+  auto* a = f.ctx.FindVariable("a");
+  auto* b = f.ctx.FindVariable("b");
   ASSERT_NE(a, nullptr);
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 10u);
@@ -68,7 +68,7 @@ TEST(Lowerer, ForkJoinNone) {
 TEST(Lowerer, ForkJoin) {
   // fork/join: parent waits for all children to complete.
   LowerFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] a, b, done;\n"
       "  initial begin\n"
@@ -88,11 +88,11 @@ TEST(Lowerer, ForkJoin) {
   f.scheduler.Run();
 
   struct {
-    const char *name;
+    const char* name;
     uint64_t expected;
   } const kCases[] = {{"a", 10u}, {"b", 20u}, {"done", 1u}};
-  for (const auto &c : kCases) {
-    auto *var = f.ctx.FindVariable(c.name);
+  for (const auto& c : kCases) {
+    auto* var = f.ctx.FindVariable(c.name);
     ASSERT_NE(var, nullptr);
     EXPECT_EQ(var->value.ToUint64(), c.expected);
   }
@@ -107,11 +107,11 @@ struct SimA603Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA603Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA603Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -122,7 +122,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA603Fixture &f) {
 // fork/join: all children execute
 TEST(SimA603, ForkJoinAllChildrenExecute) {
   SimA603Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  initial begin\n"
@@ -137,8 +137,8 @@ TEST(SimA603, ForkJoinAllChildrenExecute) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *a = f.ctx.FindVariable("a");
-  auto *b = f.ctx.FindVariable("b");
+  auto* a = f.ctx.FindVariable("a");
+  auto* b = f.ctx.FindVariable("b");
   ASSERT_NE(a, nullptr);
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 10u);
@@ -148,7 +148,7 @@ TEST(SimA603, ForkJoinAllChildrenExecute) {
 // fork/join_none: all children execute, parent continues immediately
 TEST(SimA603, ForkJoinNoneChildrenExecute) {
   SimA603Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, c;\n"
       "  initial begin\n"
@@ -164,9 +164,9 @@ TEST(SimA603, ForkJoinNoneChildrenExecute) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *a = f.ctx.FindVariable("a");
-  auto *b = f.ctx.FindVariable("b");
-  auto *c = f.ctx.FindVariable("c");
+  auto* a = f.ctx.FindVariable("a");
+  auto* b = f.ctx.FindVariable("b");
+  auto* c = f.ctx.FindVariable("c");
   ASSERT_NE(a, nullptr);
   ASSERT_NE(b, nullptr);
   ASSERT_NE(c, nullptr);
@@ -178,7 +178,7 @@ TEST(SimA603, ForkJoinNoneChildrenExecute) {
 // fork/join_any: all children execute
 TEST(SimA603, ForkJoinAnyChildrenExecute) {
   SimA603Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  initial begin\n"
@@ -193,8 +193,8 @@ TEST(SimA603, ForkJoinAnyChildrenExecute) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *a = f.ctx.FindVariable("a");
-  auto *b = f.ctx.FindVariable("b");
+  auto* a = f.ctx.FindVariable("a");
+  auto* b = f.ctx.FindVariable("b");
   ASSERT_NE(a, nullptr);
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 7u);
@@ -204,7 +204,7 @@ TEST(SimA603, ForkJoinAnyChildrenExecute) {
 // fork with single begin-end: executes as single sequential process
 TEST(SimA603, ForkWithSingleBeginEnd) {
   SimA603Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -221,7 +221,7 @@ TEST(SimA603, ForkWithSingleBeginEnd) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
@@ -229,7 +229,7 @@ TEST(SimA603, ForkWithSingleBeginEnd) {
 // Empty fork-join completes immediately
 TEST(SimA603, EmptyForkJoin) {
   SimA603Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -242,7 +242,7 @@ TEST(SimA603, EmptyForkJoin) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }

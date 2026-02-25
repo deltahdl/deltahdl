@@ -25,38 +25,38 @@ struct SimCh507Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimCh507Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimCh507Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-static uint64_t RunAndGet(const std::string &src, const char *var_name) {
+static uint64_t RunAndGet(const std::string& src, const char* var_name) {
   SimCh507Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable(var_name);
+  auto* var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
   if (!var) return 0;
   return var->value.ToUint64();
 }
 
-static double RunAndGetReal(const std::string &src, const char *var_name) {
+static double RunAndGetReal(const std::string& src, const char* var_name) {
   SimCh507Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0.0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable(var_name);
+  auto* var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
   if (!var) return 0.0;
   double d = 0.0;
@@ -66,8 +66,8 @@ static double RunAndGetReal(const std::string &src, const char *var_name) {
 }
 
 // Helper: elaborate, lower, and run simulation. Returns true on success.
-static bool RunSim(SimCh507Fixture &f, const std::string &src) {
-  auto *design = ElaborateSrc(src, f);
+static bool RunSim(SimCh507Fixture& f, const std::string& src) {
+  auto* design = ElaborateSrc(src, f);
   if (!design) return false;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -85,7 +85,7 @@ static bool RunSim(SimCh507Fixture &f, const std::string &src) {
 TEST(SimCh507, NumberBothFormsCoexist) {
   // §5.7: Both integer and real constants in the same module.
   SimCh507Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] i;\n"
       "  real r;\n"
@@ -100,8 +100,8 @@ TEST(SimCh507, NumberBothFormsCoexist) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *vi = f.ctx.FindVariable("i");
-  auto *vr = f.ctx.FindVariable("r");
+  auto* vi = f.ctx.FindVariable("i");
+  auto* vr = f.ctx.FindVariable("r");
   EXPECT_NE(vi, nullptr);
   EXPECT_NE(vr, nullptr);
   if (!vi || !vr) return;
@@ -193,9 +193,9 @@ TEST(SimCh507, NumberAllIntegralBases) {
                      "    d = 8'b1111_1111;\n"
                      "  end\n"
                      "endmodule\n"));
-  const char *const kNames[] = {"a", "b", "c", "d"};
-  for (const char *name : kNames) {
-    auto *v = f.ctx.FindVariable(name);
+  const char* const kNames[] = {"a", "b", "c", "d"};
+  for (const char* name : kNames) {
+    auto* v = f.ctx.FindVariable(name);
     ASSERT_NE(v, nullptr) << name;
     EXPECT_EQ(v->value.ToUint64(), 255u) << name;
   }
@@ -208,7 +208,7 @@ TEST(SimCh507, NumberMixedInExpression) {
   // §5.7: Both number forms usable in expression contexts.
   // Integer literal 10 used in expression assigned to logic; real 2.5 to real.
   SimCh507Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] i;\n"
       "  real r;\n"
@@ -223,8 +223,8 @@ TEST(SimCh507, NumberMixedInExpression) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *vi = f.ctx.FindVariable("i");
-  auto *vr = f.ctx.FindVariable("r");
+  auto* vi = f.ctx.FindVariable("i");
+  auto* vr = f.ctx.FindVariable("r");
   EXPECT_NE(vi, nullptr);
   EXPECT_NE(vr, nullptr);
   if (!vi || !vr) return;

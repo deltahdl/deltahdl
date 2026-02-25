@@ -92,11 +92,11 @@ struct SimA83Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA83Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA83Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -104,7 +104,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA83Fixture &f) {
 // § expression — left shift
 TEST(SimA83, LeftShift) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'd1 << 3;\n"
@@ -114,7 +114,7 @@ TEST(SimA83, LeftShift) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 8u);
 }
@@ -122,7 +122,7 @@ TEST(SimA83, LeftShift) {
 // § expression — right shift
 TEST(SimA83, RightShift) {
   SimA83Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'd16 >> 2;\n"
@@ -132,7 +132,7 @@ TEST(SimA83, RightShift) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
@@ -145,11 +145,11 @@ struct SimA86Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA86Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA86Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -160,7 +160,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA86Fixture &f) {
 // § binary_operator — << (logical left shift)
 TEST(SimA86, BinaryLogicalLeftShift) {
   SimA86Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'd1 << 4;\n"
@@ -170,7 +170,7 @@ TEST(SimA86, BinaryLogicalLeftShift) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 16u);
 }
@@ -178,7 +178,7 @@ TEST(SimA86, BinaryLogicalLeftShift) {
 // § binary_operator — >> (logical right shift)
 TEST(SimA86, BinaryLogicalRightShift) {
   SimA86Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'd128 >> 3;\n"
@@ -188,7 +188,7 @@ TEST(SimA86, BinaryLogicalRightShift) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 16u);
 }
@@ -196,7 +196,7 @@ TEST(SimA86, BinaryLogicalRightShift) {
 // § binary_operator — <<< (arithmetic left shift)
 TEST(SimA86, BinaryArithLeftShift) {
   SimA86Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'd3 <<< 2;\n"
@@ -206,7 +206,7 @@ TEST(SimA86, BinaryArithLeftShift) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 12u);
 }
@@ -214,7 +214,7 @@ TEST(SimA86, BinaryArithLeftShift) {
 // § binary_operator — >>> (arithmetic right shift)
 TEST(SimA86, BinaryArithRightShift) {
   SimA86Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'd64 >>> 2;\n"
@@ -224,7 +224,7 @@ TEST(SimA86, BinaryArithRightShift) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 16u);
 }

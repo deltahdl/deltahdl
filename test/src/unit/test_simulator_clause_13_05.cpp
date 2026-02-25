@@ -1,7 +1,9 @@
 // §13.5: Subroutine calls and argument passing
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -24,11 +26,11 @@ struct SimA609Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA609Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA609Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -42,7 +44,7 @@ namespace {
 // Simple task call modifies a variable
 TEST(SimA609, TaskCallSimple) {
   SimA609Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  task set_x;\n"
@@ -58,7 +60,7 @@ TEST(SimA609, TaskCallSimple) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -66,7 +68,7 @@ TEST(SimA609, TaskCallSimple) {
 // --- void'(function_subroutine_call) ---
 TEST(SimA609, VoidCastFunctionCall) {
   SimA609Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  function int side_effect;\n"
@@ -83,7 +85,7 @@ TEST(SimA609, VoidCastFunctionCall) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
@@ -91,7 +93,7 @@ TEST(SimA609, VoidCastFunctionCall) {
 // --- nested function calls ---
 TEST(SimA609, NestedFunctionCalls) {
   SimA609Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  function logic [7:0] double_val(input logic [7:0] v);\n"
@@ -109,7 +111,7 @@ TEST(SimA609, NestedFunctionCalls) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 12u);
 }
@@ -117,7 +119,7 @@ TEST(SimA609, NestedFunctionCalls) {
 // --- task with output argument ---
 TEST(SimA609, TaskOutputArg) {
   SimA609Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  task get_val(output logic [7:0] v);\n"
@@ -133,7 +135,7 @@ TEST(SimA609, TaskOutputArg) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
@@ -146,11 +148,11 @@ struct SimA82Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA82Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA82Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -158,7 +160,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA82Fixture &f) {
 // § tf_call — task call modifies variable
 TEST(SimA82, TfCallTaskModifiesVar) {
   SimA82Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  task set_x;\n"
@@ -174,7 +176,7 @@ TEST(SimA82, TfCallTaskModifiesVar) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -182,7 +184,7 @@ TEST(SimA82, TfCallTaskModifiesVar) {
 // § tf_call — function call in expression with binary op
 TEST(SimA82, FunctionCallInBinaryExpr) {
   SimA82Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  function logic [7:0] five; return 8'd5; endfunction\n"
@@ -194,7 +196,7 @@ TEST(SimA82, FunctionCallInBinaryExpr) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 8u);
 }

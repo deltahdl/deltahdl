@@ -90,7 +90,7 @@ bool ValidateStrengthPair(StrengthLevel s0, StrengthLevel s1) {
 StrengthSignal CombineUnambiguous(StrengthSignal a, StrengthSignal b) {
   // Effective strength is the maximum of the two strength fields,
   // since for an unambiguous signal one side is always highz.
-  auto effective = [](const StrengthSignal &s) -> StrengthLevel {
+  auto effective = [](const StrengthSignal& s) -> StrengthLevel {
     return std::max(s.strength0_hi, s.strength1_hi);
   };
 
@@ -132,7 +132,7 @@ StrengthSignal CombineWithWiredLogic(StrengthSignal a, StrengthSignal b,
   // For different strengths, the stronger signal dominates (same as
   // unambiguous combination). Wired logic only applies when two
   // same-strength opposite-value signals combine.
-  auto effective = [](const StrengthSignal &s) -> StrengthLevel {
+  auto effective = [](const StrengthSignal& s) -> StrengthLevel {
     return std::max(s.strength0_hi, s.strength1_hi);
   };
 

@@ -1,9 +1,11 @@
 // Annex H.10.1.1: Scalars of type bit and logic
 
 #include <gtest/gtest.h>
+
 #include <cstdint>
 #include <string>
 #include <vector>
+
 #include "simulation/dpi_runtime.h"
 
 using namespace delta;

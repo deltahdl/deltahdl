@@ -27,7 +27,7 @@ TEST(Clocking, RegisterAndFind) {
   mgr.Register(block);
   EXPECT_EQ(mgr.Count(), 1u);
 
-  const auto *found = mgr.Find("cb_main");
+  const auto* found = mgr.Find("cb_main");
   ASSERT_NE(found, nullptr);
   EXPECT_EQ(found->clock_signal, "clk");
   EXPECT_EQ(found->default_input_skew.ticks, 2u);

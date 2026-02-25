@@ -1,7 +1,9 @@
 // §12.7.3: The foreach-loop
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -24,11 +26,11 @@ struct SimA608Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA608Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA608Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -39,7 +41,7 @@ namespace {
 // §12.7.3: foreach iterates over array elements
 TEST(SimA608, ForeachBasic) {
   SimA608Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] arr [4];\n"
       "  logic [7:0] total;\n"
@@ -57,7 +59,7 @@ TEST(SimA608, ForeachBasic) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("total");
+  auto* var = f.ctx.FindVariable("total");
   ASSERT_NE(var, nullptr);
   // 1 + 2 + 3 + 4 = 10
   EXPECT_EQ(var->value.ToUint64(), 10u);

@@ -25,11 +25,11 @@ struct LowerFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, LowerFixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, LowerFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -38,7 +38,7 @@ namespace {
 
 TEST(Lowerer, PosedgeWakeup) {
   LowerFixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk;\n"
       "  logic [31:0] count;\n"
@@ -58,7 +58,7 @@ TEST(Lowerer, PosedgeWakeup) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto *count = f.ctx.FindVariable("count");
+  auto* count = f.ctx.FindVariable("count");
   ASSERT_NE(count, nullptr);
   EXPECT_EQ(count->value.ToUint64(), 1u);
 }

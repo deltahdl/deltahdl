@@ -10,7 +10,7 @@
 
 using namespace delta;
 
-static std::vector<Token> Lex(const std::string &src) {
+static std::vector<Token> Lex(const std::string& src) {
   static SourceManager mgr;
   auto fid = mgr.AddFile("<test>", src);
   DiagEngine diag(mgr);
@@ -23,7 +23,7 @@ struct LexResult {
   bool has_errors;
 };
 
-static LexResult LexWithDiag(const std::string &src) {
+static LexResult LexWithDiag(const std::string& src) {
   SourceManager mgr;
   DiagEngine diag(mgr);
   auto fid = mgr.AddFile("<test>", src);
@@ -38,7 +38,8 @@ static LexResult LexWithDiag(const std::string &src) {
 
 // ---------------------------------------------------------------------------
 // simple_identifier54 ::= [ a-zA-Z_ ] { [ a-zA-Z0-9_$ ] }
-// Footnote 54: shall start with alpha or underscore, at least one char, no spaces
+// Footnote 54: shall start with alpha or underscore, at least one char, no
+// spaces
 // ---------------------------------------------------------------------------
 
 TEST(LexerA93, SimpleIdentSingleChar) {
@@ -145,7 +146,8 @@ TEST(LexerA93, SimpleIdentSourceLocation) {
 }
 
 // ---------------------------------------------------------------------------
-// escaped_identifier ::= \ { any_printable_ASCII_character_except_white_space } white_space
+// escaped_identifier ::= \ { any_printable_ASCII_character_except_white_space }
+// white_space
 // ---------------------------------------------------------------------------
 
 TEST(LexerA93, EscapedIdentBasic) {
@@ -301,7 +303,8 @@ TEST(LexerA93, SystemIdExceedsMaxLength) {
 }
 
 TEST(LexerA93, DollarAloneIsNotSystemId) {
-  // §A.9.3 / Footnote 55: Bare $ followed by whitespace is kDollar, not system id.
+  // §A.9.3 / Footnote 55: Bare $ followed by whitespace is kDollar, not system
+  // id.
   auto tokens = Lex("$ ");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kDollar);

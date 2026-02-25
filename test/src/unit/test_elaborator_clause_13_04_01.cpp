@@ -1,7 +1,9 @@
 // §13.4.1: Return values and void functions
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -15,11 +17,11 @@ using namespace delta;
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
-  CompilationUnit *cu = nullptr;
+  CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-ParseResult Parse(const std::string &src) {
+ParseResult Parse(const std::string& src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
@@ -36,11 +38,11 @@ struct ElabFixture {
   DiagEngine diag{mgr};
 };
 
-RtlirDesign *Elaborate(const std::string &src, ElabFixture &f) {
+RtlirDesign* Elaborate(const std::string& src, ElabFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -52,7 +54,7 @@ namespace {
 // ---------------------------------------------------------------------------
 TEST(ParserA26, ElabFunctionDeclInModule) {
   ElabFixture f;
-  auto *design = Elaborate(
+  auto* design = Elaborate(
       "module m;\n"
       "  function int add(input int a, input int b);\n"
       "    return a + b;\n"
@@ -85,7 +87,7 @@ TEST(ElabA604, VoidFunctionReturnWithValueError) {
 // §13.4: non-void function can return a value
 TEST(ElabA604, NonVoidFunctionReturnWithValue) {
   ElabA604Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  function int f();\n"
       "    return 42;\n"
@@ -99,7 +101,7 @@ TEST(ElabA604, NonVoidFunctionReturnWithValue) {
 // void'(function_subroutine_call) elaborates without error
 TEST(ElabA609, VoidCastElaborates) {
   ElabA609Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  function int foo(); return 1; endfunction\n"
       "  initial void'(foo());\n"
@@ -116,13 +118,13 @@ struct ElabA609Fixture {
   bool has_errors = false;
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, ElabA609Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, ElabA609Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
-  auto *design = elab.Elaborate(cu->modules.back()->name);
+  auto* design = elab.Elaborate(cu->modules.back()->name);
   f.has_errors = f.diag.HasErrors();
   return design;
 }
@@ -130,7 +132,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, ElabA609Fixture &f) {
 // § tf_call — function call as expression elaborates
 TEST(ElabA82, TfCallAsExprElaborates) {
   ElabA82Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] x;\n"
       "  function logic [7:0] add_one(input logic [7:0] v);\n"

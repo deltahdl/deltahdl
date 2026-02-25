@@ -101,11 +101,11 @@ struct SimA86Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA86Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA86Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -113,7 +113,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA86Fixture &f) {
 // § unary_operator — bitwise NOT
 TEST(SimA86, UnaryBitwiseNot) {
   SimA86Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin x = 8'h0F; x = ~x; end\n"
@@ -123,7 +123,7 @@ TEST(SimA86, UnaryBitwiseNot) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64() & 0xFFu, 0xF0u);
 }
@@ -134,7 +134,7 @@ TEST(SimA86, UnaryBitwiseNot) {
 // § binary_operator — & (bitwise AND)
 TEST(SimA86, BinaryBitwiseAnd) {
   SimA86Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'hF0 & 8'h3C;\n"
@@ -144,7 +144,7 @@ TEST(SimA86, BinaryBitwiseAnd) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x30u);
 }
@@ -152,7 +152,7 @@ TEST(SimA86, BinaryBitwiseAnd) {
 // § binary_operator — | (bitwise OR)
 TEST(SimA86, BinaryBitwiseOr) {
   SimA86Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'hF0 | 8'h0F;\n"
@@ -162,7 +162,7 @@ TEST(SimA86, BinaryBitwiseOr) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
@@ -170,7 +170,7 @@ TEST(SimA86, BinaryBitwiseOr) {
 // § binary_operator — ^ (bitwise XOR)
 TEST(SimA86, BinaryBitwiseXor) {
   SimA86Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'hFF ^ 8'h0F;\n"
@@ -180,7 +180,7 @@ TEST(SimA86, BinaryBitwiseXor) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xF0u);
 }
@@ -188,7 +188,7 @@ TEST(SimA86, BinaryBitwiseXor) {
 // § binary_operator — ^~ (bitwise XNOR)
 TEST(SimA86, BinaryBitwiseXnor) {
   SimA86Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'hFF ^~ 8'h0F;\n"
@@ -198,7 +198,7 @@ TEST(SimA86, BinaryBitwiseXnor) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x0Fu);
 }

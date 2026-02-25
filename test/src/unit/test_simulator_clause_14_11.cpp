@@ -27,8 +27,8 @@ struct ClockingSimFixture {
 };
 
 // Schedule posedge at a given time through the scheduler.
-void SchedulePosedge(ClockingSimFixture &f, Variable *clk, uint64_t time) {
-  auto *ev = f.scheduler.GetEventPool().Acquire();
+void SchedulePosedge(ClockingSimFixture& f, Variable* clk, uint64_t time) {
+  auto* ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [clk, &f]() {
     clk->prev_value = clk->value;
     clk->value = MakeLogic4VecVal(f.arena, 1, 1);
@@ -38,8 +38,8 @@ void SchedulePosedge(ClockingSimFixture &f, Variable *clk, uint64_t time) {
 }
 
 // Schedule negedge at a given time through the scheduler.
-void ScheduleNegedge(ClockingSimFixture &f, Variable *clk, uint64_t time) {
-  auto *ev = f.scheduler.GetEventPool().Acquire();
+void ScheduleNegedge(ClockingSimFixture& f, Variable* clk, uint64_t time) {
+  auto* ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [clk, &f]() {
     clk->prev_value = clk->value;
     clk->value = MakeLogic4VecVal(f.arena, 1, 0);
@@ -55,7 +55,7 @@ namespace {
 // =============================================================================
 TEST(ClockingSim, CycleDelayWaitsNEdges) {
   ClockingSimFixture f;
-  auto *clk = f.ctx.CreateVariable("clk", 1);
+  auto* clk = f.ctx.CreateVariable("clk", 1);
   clk->value = MakeLogic4VecVal(f.arena, 1, 0);
 
   ClockingManager cmgr;
@@ -72,7 +72,7 @@ TEST(ClockingSim, CycleDelayWaitsNEdges) {
 
   f.ctx.SetClockingManager(&cmgr);
 
-  auto *counter = f.ctx.CreateVariable("counter", 32);
+  auto* counter = f.ctx.CreateVariable("counter", 32);
   counter->value = MakeLogic4VecVal(f.arena, 32, 0);
 
   SchedulePosedge(f, clk, 10);

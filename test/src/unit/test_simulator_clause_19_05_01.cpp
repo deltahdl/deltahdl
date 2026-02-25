@@ -16,13 +16,13 @@ namespace {
 // =============================================================================
 TEST(Coverage, ExplicitBinCreation) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "addr");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "addr");
   CoverBin bin;
   bin.name = "low";
   bin.kind = CoverBinKind::kExplicit;
   bin.values = {0, 1, 2, 3};
-  auto *b = CoverageDB::AddBin(cp, bin);
+  auto* b = CoverageDB::AddBin(cp, bin);
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(b->name, "low");
   EXPECT_EQ(b->values.size(), 4u);
@@ -33,8 +33,8 @@ TEST(Coverage, ExplicitBinCreation) {
 // =============================================================================
 TEST(Coverage, SampleHitsExplicitBin) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "val");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "val");
   CoverBin bin;
   bin.name = "ones";
   bin.values = {1};
@@ -55,8 +55,8 @@ TEST(Coverage, SampleHitsExplicitBin) {
 // =============================================================================
 TEST(Coverage, AutoBinCreation) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "addr");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "addr");
   cp->auto_bin_count = 4;
   CoverageDB::AutoCreateBins(cp, 0, 7);
   EXPECT_EQ(cp->bins.size(), 4u);
@@ -72,7 +72,7 @@ TEST(Coverage, AutoBinCreation) {
       {3, 0, 6},
       {3, 1, 7},
   };
-  for (const auto &c : kCases) {
+  for (const auto& c : kCases) {
     EXPECT_EQ(cp->bins[c.bin_idx].values[c.val_idx], c.expected);
   }
   EXPECT_EQ(cp->bins[0].values.size(), 2u);
@@ -80,8 +80,8 @@ TEST(Coverage, AutoBinCreation) {
 
 TEST(Coverage, AutoBinSmallRange) {
   CoverageDB db;
-  auto *g = db.CreateGroup("cg");
-  auto *cp = CoverageDB::AddCoverPoint(g, "x");
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "x");
   cp->auto_bin_count = 64;
   CoverageDB::AutoCreateBins(cp, 0, 3);
   // Range is 4, smaller than auto_bin_count=64, so only 4 bins.

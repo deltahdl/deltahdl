@@ -1,7 +1,9 @@
 // §10.9.2: Structure assignment patterns
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -24,11 +26,11 @@ struct ElabA60701Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, ElabA60701Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, ElabA60701Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -41,7 +43,7 @@ namespace {
 // §10.9: positional assignment pattern elaborates for struct init
 TEST(ElabA60701, StructPositionalPatternElaborates) {
   ElabA60701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
       "  pair_t p;\n"
@@ -64,18 +66,18 @@ struct AggFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static Expr *ParseExprFrom(const std::string &src, AggFixture &f) {
+static Expr* ParseExprFrom(const std::string& src, AggFixture& f) {
   std::string code = "module t; initial x = " + src + "; endmodule";
   auto fid = f.mgr.AddFile("<test>", code);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
-  auto *item = cu->modules[0]->items[0];
+  auto* cu = parser.Parse();
+  auto* item = cu->modules[0]->items[0];
   return item->body->rhs;
 }
 
-static Expr *MakeIntLit(Arena &arena, uint64_t val) {
-  auto *e = arena.Create<Expr>();
+static Expr* MakeIntLit(Arena& arena, uint64_t val) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
   e->int_val = val;
   return e;
@@ -95,7 +97,7 @@ TEST(StructPattern, MixedPrecedence) {
   info.fields.push_back({"b", 8, 8, DataTypeKind::kByte});
   info.fields.push_back({"c", 0, 8, DataTypeKind::kLogic});
 
-  auto *pat = f.arena.Create<Expr>();
+  auto* pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"a", "byte", "default"};
   pat->elements = {MakeIntLit(f.arena, 1), MakeIntLit(f.arena, 2),
@@ -109,7 +111,7 @@ TEST(StructPattern, MixedPrecedence) {
 // §10.9: typed assignment pattern expression elaborates
 TEST(ElabA60701, TypedPatternExpressionElaborates) {
   ElabA60701Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  typedef struct packed { logic [7:0] x; logic [7:0] y; } coord_t;\n"
       "  coord_t c;\n"

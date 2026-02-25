@@ -13,7 +13,7 @@ namespace {
 
 TEST(NetResolution, Tri0ResolvesToZero) {
   Arena arena;
-  auto *var = arena.Create<Variable>();
+  auto* var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 8);
   Net net;
   net.type = NetType::kTri0;
@@ -30,7 +30,7 @@ TEST(NetResolution, Tri0ResolvesToZero) {
 
 TEST(NetResolution, Tri1ResolvesToOne) {
   Arena arena;
-  auto *var = arena.Create<Variable>();
+  auto* var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 8);
   Net net;
   net.type = NetType::kTri1;

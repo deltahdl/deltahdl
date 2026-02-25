@@ -22,17 +22,17 @@ struct FuncFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 // Helper: make a function call expression.
-static Expr *MakeCall(Arena &arena, std::string_view callee,
-                      std::vector<Expr *> args) {
-  auto *e = arena.Create<Expr>();
+static Expr* MakeCall(Arena& arena, std::string_view callee,
+                      std::vector<Expr*> args) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kCall;
   e->callee = callee;
   e->args = std::move(args);
   return e;
 }
 
-static Expr *MakeIntLit(Arena &arena, uint64_t val) {
-  auto *e = arena.Create<Expr>();
+static Expr* MakeIntLit(Arena& arena, uint64_t val) {
+  auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
   e->int_val = val;
   return e;
@@ -47,14 +47,14 @@ TEST(Functions, VoidFunctionReturnsZero) {
   FuncFixture f;
 
   // function void set_val(input int a); endfunction
-  auto *func = f.arena.Create<ModuleItem>();
+  auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "set_val";
   func->return_type.kind = DataTypeKind::kVoid;
   func->func_args = {{Direction::kInput, false, {}, "a", nullptr, {}}};
   f.ctx.RegisterFunction("set_val", func);
 
-  auto *call = MakeCall(f.arena, "set_val", {MakeIntLit(f.arena, 42)});
+  auto* call = MakeCall(f.arena, "set_val", {MakeIntLit(f.arena, 42)});
   auto result = EvalExpr(call, f.ctx, f.arena);
   // Void function should return 0.
   EXPECT_EQ(result.ToUint64(), 0u);
@@ -69,11 +69,11 @@ struct SimA604Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA604Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA604Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -81,7 +81,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA604Fixture &f) {
 // §13: function_statement execution via function call
 TEST(SimA604, FunctionStatementExecution) {
   SimA604Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  function void set_x();\n"
@@ -96,7 +96,7 @@ TEST(SimA604, FunctionStatementExecution) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
@@ -109,11 +109,11 @@ struct SimA605Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA605Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA605Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -121,7 +121,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA605Fixture &f) {
 // §12.8: return exits function with value
 TEST(SimA605, JumpReturnFromFunction) {
   SimA605Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  function int get_val();\n"
@@ -136,7 +136,7 @@ TEST(SimA605, JumpReturnFromFunction) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -149,11 +149,11 @@ struct SimA609Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA609Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA609Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -161,7 +161,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA609Fixture &f) {
 // --- tf_call: function call as expression statement ---
 TEST(SimA609, FunctionCallAsStatement) {
   SimA609Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  function void set_x;\n"
@@ -177,7 +177,7 @@ TEST(SimA609, FunctionCallAsStatement) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
@@ -185,7 +185,7 @@ TEST(SimA609, FunctionCallAsStatement) {
 // --- function return value used in expression ---
 TEST(SimA609, FunctionReturnValue) {
   SimA609Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  function logic [7:0] add_one(input logic [7:0] v);\n"
@@ -200,7 +200,7 @@ TEST(SimA609, FunctionReturnValue) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
@@ -213,11 +213,11 @@ struct SimA82Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA82Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA82Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -228,7 +228,7 @@ static RtlirDesign *ElaborateSrc(const std::string &src, SimA82Fixture &f) {
 // § tf_call — function returning value used in expression
 TEST(SimA82, TfCallReturnValue) {
   SimA82Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  function logic [7:0] add_one(input logic [7:0] v);\n"
@@ -241,7 +241,7 @@ TEST(SimA82, TfCallReturnValue) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
@@ -249,7 +249,7 @@ TEST(SimA82, TfCallReturnValue) {
 // § function_subroutine_call — nested function calls
 TEST(SimA82, NestedFunctionCalls) {
   SimA82Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  function logic [7:0] double_val(input logic [7:0] v);\n"
@@ -265,7 +265,7 @@ TEST(SimA82, NestedFunctionCalls) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 12u);
 }
@@ -273,7 +273,7 @@ TEST(SimA82, NestedFunctionCalls) {
 // § void'(function_subroutine_call) — side effect executes, return discarded
 TEST(SimA82, VoidCastFunctionCall) {
   SimA82Fixture f;
-  auto *design = ElaborateSrc(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  function int side_effect;\n"
@@ -290,7 +290,7 @@ TEST(SimA82, VoidCastFunctionCall) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto *var = f.ctx.FindVariable("x");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }

@@ -25,7 +25,7 @@ TEST(Process, ProcessKindEnum) {
       {ProcessKind::kAlwaysFF, 4},   {ProcessKind::kFinal, 5},
       {ProcessKind::kContAssign, 6},
   };
-  for (const auto &c : kCases) {
+  for (const auto& c : kCases) {
     EXPECT_EQ(static_cast<uint8_t>(c.kind), c.expected);
   }
 }

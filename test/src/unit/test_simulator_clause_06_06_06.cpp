@@ -14,7 +14,7 @@ namespace {
 // --- §6.6.6: Supply net resolution ---
 TEST(NetResolution, Supply0AlwaysZero) {
   Arena arena;
-  auto *var = arena.Create<Variable>();
+  auto* var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 8);
   Net net;
   net.type = NetType::kSupply0;
@@ -27,7 +27,7 @@ TEST(NetResolution, Supply0AlwaysZero) {
 
 TEST(NetResolution, Supply1AlwaysOne) {
   Arena arena;
-  auto *var = arena.Create<Variable>();
+  auto* var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 8);
   Net net;
   net.type = NetType::kSupply1;
@@ -40,7 +40,7 @@ TEST(NetResolution, Supply1AlwaysOne) {
 
 TEST(NetResolution, Supply0OverridesMultipleDrivers) {
   Arena arena;
-  auto *var = arena.Create<Variable>();
+  auto* var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 8);
   Net net;
   net.type = NetType::kSupply0;

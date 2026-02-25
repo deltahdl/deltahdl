@@ -1,6 +1,7 @@
 // §B
 
 #include <gtest/gtest.h>
+
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/keywords.h"
@@ -8,7 +9,7 @@
 
 using namespace delta;
 
-static std::vector<Token> Lex(const std::string &src) {
+static std::vector<Token> Lex(const std::string& src) {
   static SourceManager mgr;
   auto fid = mgr.AddFile("<test>", src);
   DiagEngine diag(mgr);
@@ -20,7 +21,7 @@ namespace {
 
 // §B Table B.1 — every keyword paired with its expected TokenKind.
 struct KwEntry {
-  const char *text;
+  const char* text;
   TokenKind expected;
 };
 
@@ -281,9 +282,7 @@ static constexpr size_t kTableB1Count = sizeof(kTableB1) / sizeof(kTableB1[0]);
 // B.1  Completeness — Table B.1 contains exactly 248 keywords
 // ------------------------------------------------------------------
 
-TEST(LexerAnnexB, TableB1CountIs248) {
-  EXPECT_EQ(kTableB1Count, 248u);
-}
+TEST(LexerAnnexB, TableB1CountIs248) { EXPECT_EQ(kTableB1Count, 248u); }
 
 // ------------------------------------------------------------------
 // B.2  Reservation — every Table B.1 keyword lexes as a keyword
@@ -318,7 +317,8 @@ TEST(LexerAnnexB, EachKeywordMapsToCorrectTokenKind) {
 TEST(LexerAnnexB, LookupKeywordReturnsCorrectTokenKind) {
   for (size_t i = 0; i < kTableB1Count; ++i) {
     auto result = LookupKeyword(kTableB1[i].text);
-    ASSERT_TRUE(result.has_value()) << kTableB1[i].text << " not in keyword table";
+    ASSERT_TRUE(result.has_value())
+        << kTableB1[i].text << " not in keyword table";
     EXPECT_EQ(*result, kTableB1[i].expected)
         << kTableB1[i].text << " LookupKeyword returned wrong TokenKind";
   }
@@ -329,13 +329,12 @@ TEST(LexerAnnexB, LookupKeywordReturnsCorrectTokenKind) {
 // ------------------------------------------------------------------
 
 TEST(LexerAnnexB, UppercaseIsNotKeyword) {
-  const char *const kSamples[] = {
-      "MODULE",  "WIRE",   "REG",      "INPUT",   "OUTPUT",
-      "ALWAYS",  "IF",     "ELSE",     "BEGIN",   "END",
-      "CLASS",   "LOGIC",  "INT",      "FUNCTION","TASK",
-      "PACKAGE", "IMPORT", "TYPEDEF",  "ENUM",    "STRUCT",
+  const char* const kSamples[] = {
+      "MODULE", "WIRE",    "REG",    "INPUT",   "OUTPUT", "ALWAYS", "IF",
+      "ELSE",   "BEGIN",   "END",    "CLASS",   "LOGIC",  "INT",    "FUNCTION",
+      "TASK",   "PACKAGE", "IMPORT", "TYPEDEF", "ENUM",   "STRUCT",
   };
-  for (const char *upper : kSamples) {
+  for (const char* upper : kSamples) {
     auto tokens = Lex(upper);
     ASSERT_GE(tokens.size(), 2u) << "upper: " << upper;
     EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier)
@@ -344,14 +343,13 @@ TEST(LexerAnnexB, UppercaseIsNotKeyword) {
 }
 
 TEST(LexerAnnexB, MixedCaseIsNotKeyword) {
-  const char *const kSamples[] = {
-      "Module",     "Wire",      "Reg",       "Input",
-      "Output",     "Always",    "Begin",     "End",
-      "Class",      "Logic",     "Int",       "Function",
-      "Task",       "Package",   "Import",    "Typedef",
-      "Enum",       "Struct",    "AlwaysComb","AlwaysFF",
+  const char* const kSamples[] = {
+      "Module",  "Wire",     "Reg",    "Input",      "Output",
+      "Always",  "Begin",    "End",    "Class",      "Logic",
+      "Int",     "Function", "Task",   "Package",    "Import",
+      "Typedef", "Enum",     "Struct", "AlwaysComb", "AlwaysFF",
   };
-  for (const char *mixed : kSamples) {
+  for (const char* mixed : kSamples) {
     auto tokens = Lex(mixed);
     ASSERT_GE(tokens.size(), 2u) << "mixed: " << mixed;
     EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier)
@@ -364,15 +362,14 @@ TEST(LexerAnnexB, MixedCaseIsNotKeyword) {
 // ------------------------------------------------------------------
 
 TEST(LexerAnnexB, EscapedKeywordsAreIdentifiers) {
-  const char *const kSamples[] = {
-      "module",    "wire",      "reg",       "input",      "output",
-      "always",    "if",        "else",      "begin",      "end",
-      "class",     "logic",     "int",       "function",   "task",
-      "package",   "import",    "typedef",   "enum",       "struct",
-      "interface", "program",   "checker",   "clocking",   "property",
-      "sequence",  "covergroup","constraint","assert",     "assume",
+  const char* const kSamples[] = {
+      "module",   "wire",     "reg",        "input",      "output",  "always",
+      "if",       "else",     "begin",      "end",        "class",   "logic",
+      "int",      "function", "task",       "package",    "import",  "typedef",
+      "enum",     "struct",   "interface",  "program",    "checker", "clocking",
+      "property", "sequence", "covergroup", "constraint", "assert",  "assume",
   };
-  for (const char *kw : kSamples) {
+  for (const char* kw : kSamples) {
     // Escaped identifiers: backslash + text + whitespace terminator
     std::string escaped = std::string("\\") + kw + " ";
     auto tokens = Lex(escaped);
@@ -387,12 +384,11 @@ TEST(LexerAnnexB, EscapedKeywordsAreIdentifiers) {
 // ------------------------------------------------------------------
 
 TEST(LexerAnnexB, NonKeywordsAreIdentifiers) {
-  const char *const kNonKeywords[] = {
-      "foo",        "bar",       "my_signal",  "data_in",
-      "clk",        "reset",     "valid",      "ready",
-      "counter",    "state",     "next_state",  "addr",
+  const char* const kNonKeywords[] = {
+      "foo",   "bar",   "my_signal", "data_in", "clk",        "reset",
+      "valid", "ready", "counter",   "state",   "next_state", "addr",
   };
-  for (const char *id : kNonKeywords) {
+  for (const char* id : kNonKeywords) {
     auto result = LookupKeyword(id);
     EXPECT_FALSE(result.has_value()) << id << " should not be a keyword";
     auto tokens = Lex(id);
@@ -450,8 +446,7 @@ TEST(LexerAnnexB, NoDuplicateTokenKinds) {
   std::set<TokenKind> seen;
   for (size_t i = 0; i < kTableB1Count; ++i) {
     auto [it, inserted] = seen.insert(kTableB1[i].expected);
-    EXPECT_TRUE(inserted)
-        << kTableB1[i].text << " has a duplicate TokenKind";
+    EXPECT_TRUE(inserted) << kTableB1[i].text << " has a duplicate TokenKind";
   }
   EXPECT_EQ(seen.size(), kTableB1Count);
 }

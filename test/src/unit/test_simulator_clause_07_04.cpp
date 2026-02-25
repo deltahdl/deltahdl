@@ -27,31 +27,31 @@ struct AggFixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static Expr *MkSlice(Arena &arena, std::string_view name, uint64_t hi,
+static Expr* MkSlice(Arena& arena, std::string_view name, uint64_t hi,
                      uint64_t lo) {
-  auto *sel = arena.Create<Expr>();
+  auto* sel = arena.Create<Expr>();
   sel->kind = ExprKind::kSelect;
-  auto *base = arena.Create<Expr>();
+  auto* base = arena.Create<Expr>();
   base->kind = ExprKind::kIdentifier;
   base->text = name;
   sel->base = base;
-  auto *hi_expr = arena.Create<Expr>();
+  auto* hi_expr = arena.Create<Expr>();
   hi_expr->kind = ExprKind::kIntegerLiteral;
   hi_expr->int_val = hi;
   sel->index = hi_expr;
-  auto *lo_expr = arena.Create<Expr>();
+  auto* lo_expr = arena.Create<Expr>();
   lo_expr->kind = ExprKind::kIntegerLiteral;
   lo_expr->int_val = lo;
   sel->index_end = lo_expr;
   return sel;
 }
 
-static void MakeArray4(AggFixture &f, std::string_view name) {
+static void MakeArray4(AggFixture& f, std::string_view name) {
   f.ctx.RegisterArray(name, {0, 4, 8, false, false, false});
   for (uint32_t i = 0; i < 4; ++i) {
     auto tmp = std::string(name) + "[" + std::to_string(i) + "]";
-    auto *s = f.arena.AllocString(tmp.c_str(), tmp.size());
-    auto *v = f.ctx.CreateVariable(std::string_view(s, tmp.size()), 8);
+    auto* s = f.arena.AllocString(tmp.c_str(), tmp.size());
+    auto* v = f.ctx.CreateVariable(std::string_view(s, tmp.size()), 8);
     v->value = MakeLogic4VecVal(f.arena, 8, static_cast<uint64_t>(i + 1) * 10);
   }
 }

@@ -1,7 +1,9 @@
 // §31.4.3: $fullskew
 
 #include <gtest/gtest.h>
+
 #include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -25,11 +27,11 @@ struct SimA70501Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimA70501Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimA70501Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -50,7 +52,7 @@ TEST(SimA70501, FullskewDualLimitsStored) {
   tc.limit = 4;
   tc.limit2 = 6;
   mgr.AddTimingCheck(tc);
-  auto &stored = mgr.GetTimingChecks()[0];
+  auto& stored = mgr.GetTimingChecks()[0];
   EXPECT_EQ(stored.kind, TimingCheckKind::kFullskew);
   EXPECT_EQ(stored.limit, 4u);
   EXPECT_EQ(stored.limit2, 6u);

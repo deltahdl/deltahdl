@@ -30,7 +30,7 @@ struct PullSourceInfo {
 
 Val4 EvalPullSource(PullKind kind);
 
-StrengthLevel GetPullSourceStrength(const PullSourceInfo &info);
+StrengthLevel GetPullSourceStrength(const PullSourceInfo& info);
 
 bool PullSourceAcceptsDelaySpec();
 
@@ -44,7 +44,7 @@ Val4 EvalPullSource(PullKind kind) {
   return Val4::kX;
 }
 
-StrengthLevel GetPullSourceStrength(const PullSourceInfo &info) {
+StrengthLevel GetPullSourceStrength(const PullSourceInfo& info) {
   if (info.kind == PullKind::kPullup && info.has_strength1)
     return info.strength1;
   if (info.kind == PullKind::kPulldown && info.has_strength0)

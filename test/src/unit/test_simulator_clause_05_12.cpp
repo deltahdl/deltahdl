@@ -25,11 +25,11 @@ struct SimCh512Fixture {
   SimContext ctx{scheduler, arena, diag};
 };
 
-static RtlirDesign *ElaborateSrc(const std::string &src, SimCh512Fixture &f) {
+static RtlirDesign* ElaborateSrc(const std::string& src, SimCh512Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
-  auto *cu = parser.Parse();
+  auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   return elab.Elaborate(cu->modules.back()->name);
 }
@@ -43,7 +43,7 @@ TEST(SimCh512, AttrOnVarDecl) {
       "  (* fsm_state *) logic [7:0] x = 8'hAB;\n"
       "endmodule\n";
   SimCh512Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -58,7 +58,7 @@ TEST(SimCh512, AttrWithValueOnDecl) {
       "  (* fsm_state = 1 *) logic [7:0] y = 8'hCD;\n"
       "endmodule\n";
   SimCh512Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -73,7 +73,7 @@ TEST(SimCh512, AttrMultipleSpecs) {
       "  (* full_case, parallel_case *) logic [7:0] z = 8'hEF;\n"
       "endmodule\n";
   SimCh512Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -90,7 +90,7 @@ TEST(SimCh512, AttrMultipleInstances) {
       "  logic [7:0] w = 8'h77;\n"
       "endmodule\n";
   SimCh512Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -108,7 +108,7 @@ TEST(SimCh512, AttrOnInitialBlock) {
       "  end\n"
       "endmodule\n";
   SimCh512Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -126,7 +126,7 @@ TEST(SimCh512, AttrOnAssignStmt) {
       "  end\n"
       "endmodule\n";
   SimCh512Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -145,7 +145,7 @@ TEST(SimCh512, AttrOnIfStmt) {
       "  end\n"
       "endmodule\n";
   SimCh512Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -168,7 +168,7 @@ TEST(SimCh512, AttrOnCaseStmt) {
       "  end\n"
       "endmodule\n";
   SimCh512Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -188,7 +188,7 @@ TEST(SimCh512, AttrOnForLoop) {
       "  end\n"
       "endmodule\n";
   SimCh512Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -203,7 +203,7 @@ TEST(SimCh512, AttrWithStringValue) {
       "  (* mode = \"fast\" *) logic [7:0] g = 8'h99;\n"
       "endmodule\n";
   SimCh512Fixture f;
-  auto *design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);

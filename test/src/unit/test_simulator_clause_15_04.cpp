@@ -53,14 +53,14 @@ TEST(IpcSync, MailboxTryGetFifoOrder) {
 // =============================================================================
 TEST(IpcSync, MailboxContextCreateFind) {
   SyncFixture f;
-  auto *mb = f.ctx.CreateMailbox("mbox1", 10);
+  auto* mb = f.ctx.CreateMailbox("mbox1", 10);
   ASSERT_NE(mb, nullptr);
   EXPECT_EQ(mb->bound, 10);
 
-  auto *found = f.ctx.FindMailbox("mbox1");
+  auto* found = f.ctx.FindMailbox("mbox1");
   EXPECT_EQ(found, mb);
 
-  auto *not_found = f.ctx.FindMailbox("no_such_mbox");
+  auto* not_found = f.ctx.FindMailbox("no_such_mbox");
   EXPECT_EQ(not_found, nullptr);
 }
 
@@ -122,8 +122,8 @@ TEST(IpcSync, MailboxParameterizedTypeValues) {
 // =============================================================================
 TEST(IpcSync, MultipleMailboxesInContext) {
   SyncFixture f;
-  auto *mb1 = f.ctx.CreateMailbox("m1", 0);
-  auto *mb2 = f.ctx.CreateMailbox("m2", 3);
+  auto* mb1 = f.ctx.CreateMailbox("m1", 0);
+  auto* mb2 = f.ctx.CreateMailbox("m2", 3);
   mb1->TryPut(100);
   mb2->TryPut(200);
   uint64_t msg = 0;
