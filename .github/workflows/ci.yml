@@ -311,11 +311,11 @@ on:
       - .github/workflows/classify_tests_in_file.yml
       - LICENSE
       - scripts/convert_figure.py
-      - scripts/convert_tables/**
+      - scripts/convert_table.py
       - scripts/classify_tests_in_file.py
-      - scripts/implement_clause/**
+      - scripts/implement_clause.py
       - test/scripts/convert_figure/**
-      - test/scripts/convert_tables/**
+      - test/scripts/convert_table/**
       - test/scripts/classify_tests_in_file/**
       - test/scripts/implement_clause/**
   push:
@@ -329,11 +329,11 @@ on:
       - .github/workflows/classify_tests_in_file.yml
       - LICENSE
       - scripts/convert_figure.py
-      - scripts/convert_tables/**
+      - scripts/convert_table.py
       - scripts/classify_tests_in_file.py
-      - scripts/implement_clause/**
+      - scripts/implement_clause.py
       - test/scripts/convert_figure/**
-      - test/scripts/convert_tables/**
+      - test/scripts/convert_table/**
       - test/scripts/classify_tests_in_file/**
       - test/scripts/implement_clause/**
   workflow_dispatch:
