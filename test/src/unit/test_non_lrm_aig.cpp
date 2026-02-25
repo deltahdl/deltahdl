@@ -122,4 +122,72 @@ TEST(SynthLower, AlwaysCombSimpleAssign) {
   EXPECT_EQ(aig->outputs.size(), 1);
 }
 
+TEST(SynthLower, AcceptCombinationalModule) {
+  SynthFixture f;
+  auto *mod = ElaborateSrc(f,
+                           "module m(input a, input b, output y);\n"
+                           "  assign y = a & b;\n"
+                           "endmodule");
+  ASSERT_NE(mod, nullptr);
+  SynthLower synth(f.arena, f.diag);
+  auto *aig = synth.Lower(mod);
+  ASSERT_NE(aig, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(SynthLower, AssignAndGate) {
+  SynthFixture f;
+  auto *mod = ElaborateSrc(f,
+                           "module m(input a, input b, output y);\n"
+                           "  assign y = a & b;\n"
+                           "endmodule");
+  ASSERT_NE(mod, nullptr);
+  SynthLower synth(f.arena, f.diag);
+  auto *aig = synth.Lower(mod);
+  ASSERT_NE(aig, nullptr);
+  EXPECT_NE(aig->outputs[0], AigGraph::kConstFalse);
+  EXPECT_NE(aig->outputs[0], AigGraph::kConstTrue);
+  EXPECT_GT(aig->NodeCount(), 3);
+}
+
+TEST(SynthLower, AssignOrGate) {
+  SynthFixture f;
+  auto *mod = ElaborateSrc(f,
+                           "module m(input a, input b, output y);\n"
+                           "  assign y = a | b;\n"
+                           "endmodule");
+  ASSERT_NE(mod, nullptr);
+  SynthLower synth(f.arena, f.diag);
+  auto *aig = synth.Lower(mod);
+  ASSERT_NE(aig, nullptr);
+  EXPECT_NE(aig->outputs[0], AigGraph::kConstFalse);
+}
+
+TEST(SynthLower, AssignNotGate) {
+  SynthFixture f;
+  auto *mod = ElaborateSrc(f,
+                           "module m(input a, output y);\n"
+                           "  assign y = ~a;\n"
+                           "endmodule");
+  ASSERT_NE(mod, nullptr);
+  SynthLower synth(f.arena, f.diag);
+  auto *aig = synth.Lower(mod);
+  ASSERT_NE(aig, nullptr);
+  auto input_lit = AigLit(aig->inputs[0], false);
+  EXPECT_EQ(aig->outputs[0], input_lit ^ 1u);
+}
+
+TEST(SynthLower, AssignXorGate) {
+  SynthFixture f;
+  auto *mod = ElaborateSrc(f,
+                           "module m(input a, input b, output y);\n"
+                           "  assign y = a ^ b;\n"
+                           "endmodule");
+  ASSERT_NE(mod, nullptr);
+  SynthLower synth(f.arena, f.diag);
+  auto *aig = synth.Lower(mod);
+  ASSERT_NE(aig, nullptr);
+  EXPECT_NE(aig->outputs[0], AigGraph::kConstFalse);
+}
+
 }  // namespace
