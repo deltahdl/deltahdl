@@ -435,16 +435,3 @@ def test_run_prompt_calls_invoke(mock_invoke, tmp_path):
     build_fn = MagicMock(return_value="generated prompt")
     run_prompt(build_fn, lrm, "4.1", issue=6, model="sonnet")
     assert mock_invoke.call_args[0][0] == "generated prompt"
-
-
-@patch("implement_clause.invoke_claude")
-def test_run_prompt_passes_supplementary(_mock_invoke, tmp_path):
-    """run_prompt forwards supplementary string to the builder."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text("")
-    build_fn = MagicMock(return_value="prompt")
-    run_prompt(
-        build_fn, lrm, "4",
-        issue=6, model="sonnet", supplementary="- Figure 4-1\n",
-    )
-    assert build_fn.call_args[1]["supplementary"] == "- Figure 4-1\n"

@@ -5,6 +5,7 @@ Dispatches to depth-appropriate prompt builders and invokes Claude CLI.
 """
 
 import argparse
+import functools
 import os
 import re
 import subprocess
@@ -338,7 +339,7 @@ def invoke_claude(prompt: str, *, model: str = "sonnet") -> None:
 
 def run_prompt(
     build_fn, lrm_path: Path, clause: str, *,
-    issue: int, model: str, supplementary: str = "",
+    issue: int, model: str,
 ) -> None:
     """Load titles, build a prompt via *build_fn*, and invoke Claude."""
     titles = load_lrm_titles(lrm_path)
@@ -346,10 +347,7 @@ def run_prompt(
         f"Loaded {len(titles)} LRM clause titles from {lrm_path}",
         file=sys.stderr,
     )
-    prompt = build_fn(
-        clause, titles, str(lrm_path),
-        issue=issue, supplementary=supplementary,
-    )
+    prompt = build_fn(clause, titles, str(lrm_path), issue=issue)
     print(f"Built prompt ({len(prompt)} characters)", file=sys.stderr)
     invoke_claude(prompt, model=model)
 
@@ -602,10 +600,10 @@ def main(argv=None):
         )
         supplementary += "\n"
 
+    bound_handler = functools.partial(handler, supplementary=supplementary)
     run_prompt(
-        handler, args.lrm, args.clause,
+        bound_handler, args.lrm, args.clause,
         issue=args.issue, model=args.model,
-        supplementary=supplementary,
     )
 
 
