@@ -426,7 +426,7 @@ ModuleDecl* Parser::ParseModuleDecl() {
   // Optional lifetime qualifier (§3.4)
   Match(TokenKind::kKwAutomatic) || Match(TokenKind::kKwStatic);
 
-  auto name_tok = Expect(TokenKind::kIdentifier);
+  auto name_tok = ExpectIdentifier();
   mod->name = name_tok.text;
   mod->range.start = loc;
 
