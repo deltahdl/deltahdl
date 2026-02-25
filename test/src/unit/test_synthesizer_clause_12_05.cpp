@@ -1,4 +1,4 @@
-// §9.2.2.2: Combinational logic always_comb procedure
+// §12.5: Case statement
 
 #include <gtest/gtest.h>
 #include "common/arena.h"
@@ -33,22 +33,25 @@ static const RtlirModule *ElaborateSrc(SynthFixture &f,
 
 namespace {
 
-TEST(SynthLower, AlwaysCombIfElse) {
+TEST(SynthLower, AlwaysCombCaseStmt) {
   SynthFixture f;
   auto *mod =
       ElaborateSrc(f,
-                   "module m(input sel, input a, input b, output reg y);\n"
+                   "module m(input logic [1:0] sel, output logic [1:0] y);\n"
                    "  always_comb begin\n"
-                   "    if (sel) y = a;\n"
-                   "    else y = b;\n"
+                   "    case (sel)\n"
+                   "      2'b00: y = 2'b01;\n"
+                   "      2'b01: y = 2'b10;\n"
+                   "      default: y = 2'b00;\n"
+                   "    endcase\n"
                    "  end\n"
                    "endmodule");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto *aig = synth.Lower(mod);
   ASSERT_NE(aig, nullptr);
-  EXPECT_EQ(aig->inputs.size(), 3);
-  EXPECT_EQ(aig->outputs.size(), 1);
+  EXPECT_EQ(aig->inputs.size(), 2);
+  EXPECT_EQ(aig->outputs.size(), 2);
 }
 
 }  // namespace
