@@ -16,15 +16,9 @@ from pathlib import Path
 # Constants
 # ---------------------------------------------------------------------------
 
-_GDRIVE = Path(
-    "/Users/jdrowne/Library/CloudStorage/"
-    "GoogleDrive-jdrowne@10ulabs.com/Shared drives/"
-    "10U Labs Shared Drive/Standards/SystemVerilog"
-)
-FIGURES_DIR = _GDRIVE / "Figures"
-TABLES_DIR = _GDRIVE / "Tables"
-
 CLAUSE_RE = re.compile(r"^(\d+|[A-Z])(\.\d+){0,4}$")
+FIGURE_LABEL_RE = re.compile(r"^Figure ([\d\w]+-[\d\w]+)")
+TABLE_LABEL_RE = re.compile(r"^Table ([\d\w]+-[\d\w]+)")
 
 
 # ---------------------------------------------------------------------------
@@ -157,48 +151,120 @@ def build_top_level_line(h: dict, titles: dict[str, str], lrm: str) -> str:
 # Supplementary files (Figures / Tables)
 # ---------------------------------------------------------------------------
 
-def find_supplementary_files(clause: str) -> list[tuple[str, Path]]:
-    """Find converted Figure/Table files for the clause's top-level component.
+def _label_from_gv(path: Path) -> str:
+    """Figure_4_1.gv -> 'Figure 4-1'."""
+    return path.stem.replace("_", " ", 1).replace("_", "-")
 
-    Returns (human_label, path) pairs for files that exist on disk.
-    """
+
+def _label_from_md(path: Path) -> str:
+    """TABLE_B_1.md -> 'Table B-1'."""
+    raw = path.stem[len("TABLE_"):]
+    return f"Table {raw.replace('_', '-')}"
+
+
+def _shorthand_from_label(label: str) -> str:
+    """'Figure 4-1' -> '4-1', 'Table B-1' -> 'B-1'."""
+    return label.split(" ", 1)[1]
+
+
+def _lrm_labels_for_clause(
+    lrm_path: Path, clause: str,
+) -> tuple[list[str], list[str]]:
+    """Parse the LRM to find figure/table labels for a clause's top-level."""
     top = clause.split(".")[0]
-    results = []
+    prefix_fig = f"Figure {top}-"
+    prefix_tbl = f"Table {top}-"
+    figures: list[str] = []
+    tables: list[str] = []
 
-    if FIGURES_DIR.is_dir():
-        for path in sorted(FIGURES_DIR.glob(f"Figure_{top}_*.gv")):
-            # Figure_4_1.gv -> "Figure 4-1"
-            stem = path.stem  # "Figure_4_1"
-            label = stem.replace("_", " ", 1).replace("_", "-")
-            results.append((label, path))
+    text = lrm_path.read_text(errors="replace")
+    for line in text.splitlines():
+        m = FIGURE_LABEL_RE.match(line)
+        if m and line.startswith(prefix_fig):
+            figures.append(m.group(1))
+            continue
+        m = TABLE_LABEL_RE.match(line)
+        if m and line.startswith(prefix_tbl):
+            tables.append(m.group(1))
 
-    if TABLES_DIR.is_dir():
-        for path in sorted(TABLES_DIR.glob(f"TABLE_{top}_*.md")):
-            # TABLE_B_1.md -> "Table B-1"
-            stem = path.stem  # "TABLE_B_1"
-            raw = stem[len("TABLE_"):]  # "B_1"
-            label = f"Table {raw.replace('_', '-')}"
-            results.append((label, path))
-
-    return results
+    return figures, tables
 
 
-def build_supplementary_lines(clause: str) -> str:
+def check_supplementary_args(
+    clause: str,
+    lrm_path: Path,
+    *,
+    figures: list[Path],
+    tables: list[Path],
+    ignore_figures: list[str],
+) -> None:
+    """Validate that all required figures/tables are provided.
+
+    Exits with an error if any are missing or paths don't exist.
+    """
+    errors: list[str] = []
+
+    for path in figures:
+        if not path.is_file():
+            errors.append(f"--figures path does not exist: {path}")
+    for path in tables:
+        if not path.is_file():
+            errors.append(f"--tables path does not exist: {path}")
+
+    if errors:
+        for e in errors:
+            print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    lrm_figs, lrm_tbls = _lrm_labels_for_clause(lrm_path, clause)
+
+    provided_fig_shorthands = {
+        _shorthand_from_label(_label_from_gv(p)) for p in figures
+    }
+    ignored = set(ignore_figures)
+
+    for label in lrm_figs:
+        if label not in provided_fig_shorthands and label not in ignored:
+            errors.append(
+                f"Figure {label} required for clause {clause}"
+                f" (use --figures or --ignore-figures {label})"
+            )
+
+    provided_tbl_shorthands = {
+        _shorthand_from_label(_label_from_md(p)) for p in tables
+    }
+
+    for label in lrm_tbls:
+        if label not in provided_tbl_shorthands:
+            errors.append(
+                f"Table {label} required for clause {clause}"
+                f" (use --tables)"
+            )
+
+    if errors:
+        for e in errors:
+            print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def build_supplementary_lines(
+    *, figures: list[Path], tables: list[Path],
+) -> str:
     """Build prompt lines acknowledging available Figures/Tables."""
-    files = find_supplementary_files(clause)
-    if not files:
+    if not figures and not tables:
         return ""
-    lines = []
-    for label, path in files:
-        if path.suffix == ".gv":
-            fmt = "a DOT GraphViz"
-        elif path.suffix == ".md":
-            fmt = "a Markdown file"
-        else:
-            fmt = "a file"
+    lines: list[str] = []
+    for path in figures:
+        label = _label_from_gv(path)
         lines.append(
             f"- Acknowledge that you know {label} is available"
-            f" at {path} as {fmt}"
+            f" at {path} as a DOT GraphViz"
+        )
+    for path in tables:
+        label = _label_from_md(path)
+        lines.append(
+            f"- Acknowledge that you know {label} is available"
+            f" at {path} as a Markdown file"
         )
     return "\n".join(lines)
 
@@ -273,6 +339,7 @@ def invoke_claude(prompt: str, *, model: str = "sonnet") -> None:
 def run_prompt(
     build_fn, lrm_path: Path, clause: str, *,
     issue: int, model: str,
+    figures: list[Path], tables: list[Path],
 ) -> None:
     """Load titles, build a prompt via *build_fn*, and invoke Claude."""
     titles = load_lrm_titles(lrm_path)
@@ -280,7 +347,9 @@ def run_prompt(
         f"Loaded {len(titles)} LRM clause titles from {lrm_path}",
         file=sys.stderr,
     )
-    supplementary = build_supplementary_lines(clause)
+    supplementary = build_supplementary_lines(
+        figures=figures, tables=tables,
+    )
     if supplementary:
         n_supp = supplementary.count("\n") + 1
         print(
@@ -464,6 +533,24 @@ def parse_args(argv=None):
         default="opus",
         help="Claude model to use (default: opus).",
     )
+    parser.add_argument(
+        "--figures",
+        type=str,
+        default="",
+        help="Comma-separated list of .gv figure files.",
+    )
+    parser.add_argument(
+        "--tables",
+        type=str,
+        default="",
+        help="Comma-separated list of .md table files.",
+    )
+    parser.add_argument(
+        "--ignore-figures",
+        type=str,
+        default="",
+        help="Comma-separated shorthand labels (e.g. 4-1,16-5) to skip.",
+    )
     args = parser.parse_args(argv)
 
     if not args.lrm.is_file():
@@ -475,6 +562,19 @@ def parse_args(argv=None):
             "Expected V, V.W, V.W.X, V.W.X.Y, or V.W.X.Y.Z "
             "(V is a number or uppercase letter; remaining parts are numbers)."
         )
+
+    args.figures = (
+        [Path(p.strip()) for p in args.figures.split(",") if p.strip()]
+        if args.figures else []
+    )
+    args.tables = (
+        [Path(p.strip()) for p in args.tables.split(",") if p.strip()]
+        if args.tables else []
+    )
+    args.ignore_figures = (
+        [s.strip() for s in args.ignore_figures.split(",") if s.strip()]
+        if args.ignore_figures else []
+    )
 
     return args
 
@@ -495,9 +595,17 @@ def main(argv=None):
         file=sys.stderr,
     )
 
+    check_supplementary_args(
+        args.clause, args.lrm,
+        figures=args.figures,
+        tables=args.tables,
+        ignore_figures=args.ignore_figures,
+    )
+
     run_prompt(
         handler, args.lrm, args.clause,
         issue=args.issue, model=args.model,
+        figures=args.figures, tables=args.tables,
     )
 
 

@@ -8,7 +8,7 @@ import pytest
 from implement_clause import (
     build_hierarchy,
     build_supplementary_lines,
-    find_supplementary_files,
+    check_supplementary_args,
     format_prompt,
     invoke_claude,
     load_lrm_titles,
@@ -212,112 +212,151 @@ class TestBuildHierarchyAnnex:
         }
 
 
-# ---- find_supplementary_files ----------------------------------------------
-
-
-_FIGURES_DIR = Path(
-    "/Users/jdrowne/Library/CloudStorage/"
-    "GoogleDrive-jdrowne@10ulabs.com/Shared drives/"
-    "10U Labs Shared Drive/Standards/SystemVerilog/Figures"
-)
-_TABLES_DIR = Path(
-    "/Users/jdrowne/Library/CloudStorage/"
-    "GoogleDrive-jdrowne@10ulabs.com/Shared drives/"
-    "10U Labs Shared Drive/Standards/SystemVerilog/Tables"
-)
-
-
-def test_find_supplementary_empty_when_dirs_missing(tmp_path, monkeypatch):
-    """Returns empty list when Figures/Tables dirs don't exist."""
-    monkeypatch.setattr(
-        "implement_clause.FIGURES_DIR",
-        tmp_path / "no_figures",
-    )
-    monkeypatch.setattr(
-        "implement_clause.TABLES_DIR",
-        tmp_path / "no_tables",
-    )
-    assert not find_supplementary_files("4.4.3.1")
-
-
-def test_find_supplementary_finds_figure(tmp_path, monkeypatch):
-    """Finds Figure files matching the clause's top-level component."""
-    figs = tmp_path / "Figures"
-    figs.mkdir()
-    gv = figs / "Figure_4_1.gv"
-    gv.write_text("digraph {}")
-    monkeypatch.setattr("implement_clause.FIGURES_DIR", figs)
-    monkeypatch.setattr(
-        "implement_clause.TABLES_DIR", tmp_path / "no_tables",
-    )
-    assert find_supplementary_files("4.4.3.1") == [("Figure 4-1", gv)]
-
-
-def test_find_supplementary_finds_table(tmp_path, monkeypatch):
-    """Finds Table files matching the clause's top-level component."""
-    tabs = tmp_path / "Tables"
-    tabs.mkdir()
-    md = tabs / "TABLE_B_1.md"
-    md.write_text("| keyword |\n")
-    monkeypatch.setattr(
-        "implement_clause.FIGURES_DIR", tmp_path / "no_figs",
-    )
-    monkeypatch.setattr("implement_clause.TABLES_DIR", tabs)
-    assert find_supplementary_files("B") == [("Table B-1", md)]
-
-
-def test_find_supplementary_ignores_other_clauses(tmp_path, monkeypatch):
-    """Ignores files belonging to other clauses."""
-    figs = tmp_path / "Figures"
-    figs.mkdir()
-    (figs / "Figure_4_1.gv").write_text("digraph {}")
-    monkeypatch.setattr("implement_clause.FIGURES_DIR", figs)
-    monkeypatch.setattr(
-        "implement_clause.TABLES_DIR", tmp_path / "no_tables",
-    )
-    assert not find_supplementary_files("6.24.1")
-
-
 # ---- build_supplementary_lines ---------------------------------------------
 
 
-def test_build_supplementary_lines_with_figure(tmp_path, monkeypatch):
+def test_build_supplementary_lines_with_figure(tmp_path):
     """Generates acknowledgment line for a .gv figure."""
-    figs = tmp_path / "Figures"
-    figs.mkdir()
-    gv = figs / "Figure_4_1.gv"
+    gv = tmp_path / "Figure_4_1.gv"
     gv.write_text("digraph {}")
-    monkeypatch.setattr("implement_clause.FIGURES_DIR", figs)
-    monkeypatch.setattr(
-        "implement_clause.TABLES_DIR", tmp_path / "no_tables",
-    )
-    lines = build_supplementary_lines("4")
+    lines = build_supplementary_lines(figures=[gv], tables=[])
     assert "Figure 4-1" in lines and "DOT GraphViz" in lines
 
 
-def test_build_supplementary_lines_with_table(tmp_path, monkeypatch):
+def test_build_supplementary_lines_with_table(tmp_path):
     """Generates acknowledgment line for a .md table."""
-    tabs = tmp_path / "Tables"
-    tabs.mkdir()
-    md = tabs / "TABLE_B_1.md"
+    md = tmp_path / "TABLE_B_1.md"
     md.write_text("| keyword |\n")
-    monkeypatch.setattr(
-        "implement_clause.FIGURES_DIR", tmp_path / "no_figs",
-    )
-    monkeypatch.setattr("implement_clause.TABLES_DIR", tabs)
-    lines = build_supplementary_lines("B")
+    lines = build_supplementary_lines(figures=[], tables=[md])
     assert "Table B-1" in lines and "Markdown" in lines
 
 
-def test_build_supplementary_lines_empty_when_none(tmp_path, monkeypatch):
-    """Returns empty string when no supplementary files found."""
-    monkeypatch.setattr(
-        "implement_clause.FIGURES_DIR", tmp_path / "no_figs",
+def test_build_supplementary_lines_empty_when_none():
+    """Returns empty string when no figures or tables provided."""
+    assert build_supplementary_lines(figures=[], tables=[]) == ""
+
+
+def test_build_supplementary_lines_multiple(tmp_path):
+    """Produces one line per figure and table."""
+    gv = tmp_path / "Figure_4_1.gv"
+    gv.write_text("digraph {}")
+    md = tmp_path / "TABLE_4_1.md"
+    md.write_text("| col |\n")
+    lines = build_supplementary_lines(figures=[gv], tables=[md])
+    assert "Figure 4-1" in lines
+    assert "Table 4-1" in lines
+
+
+# ---- check_supplementary_args ---------------------------------------------
+
+
+_LRM_WITH_FIGURES_AND_TABLES = """\
+List of figures
+Figure 4-1\u2014Event scheduling regions
+
+List of tables
+Table 4-1\u2014PLI callbacks
+"""
+
+_LRM_NO_SUPPLEMENTARY = """\
+List of figures
+
+List of tables
+"""
+
+
+def test_check_fails_when_figure_missing(tmp_path):
+    """Fails when LRM lists a figure but no --figures or --ignore-figures."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text(_LRM_WITH_FIGURES_AND_TABLES)
+    with pytest.raises(SystemExit):
+        check_supplementary_args(
+            "4", lrm, figures=[], tables=[], ignore_figures=[],
+        )
+
+
+def test_check_passes_when_figure_ignored(tmp_path):
+    """Passes when figure is in --ignore-figures."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text(_LRM_WITH_FIGURES_AND_TABLES)
+    # Still need the table though
+    tbl = tmp_path / "TABLE_4_1.md"
+    tbl.write_text("| col |\n")
+    check_supplementary_args(
+        "4", lrm, figures=[], tables=[tbl], ignore_figures=["4-1"],
     )
-    monkeypatch.setattr(
-        "implement_clause.TABLES_DIR", tmp_path / "no_tables",
+
+
+def test_check_passes_when_figure_provided(tmp_path):
+    """Passes when all figures and tables are provided."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text(_LRM_WITH_FIGURES_AND_TABLES)
+    fig = tmp_path / "Figure_4_1.gv"
+    fig.write_text("digraph {}")
+    tbl = tmp_path / "TABLE_4_1.md"
+    tbl.write_text("| col |\n")
+    check_supplementary_args(
+        "4", lrm, figures=[fig], tables=[tbl], ignore_figures=[],
     )
-    assert build_supplementary_lines("99") == ""
+
+
+def test_check_fails_when_table_missing(tmp_path):
+    """Fails when LRM lists a table but no --tables provided."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text(_LRM_WITH_FIGURES_AND_TABLES)
+    fig = tmp_path / "Figure_4_1.gv"
+    fig.write_text("digraph {}")
+    with pytest.raises(SystemExit):
+        check_supplementary_args(
+            "4", lrm, figures=[fig], tables=[], ignore_figures=[],
+        )
+
+
+def test_check_passes_when_table_provided(tmp_path):
+    """Passes when all tables are provided."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text(_LRM_WITH_FIGURES_AND_TABLES)
+    fig = tmp_path / "Figure_4_1.gv"
+    fig.write_text("digraph {}")
+    tbl = tmp_path / "TABLE_4_1.md"
+    tbl.write_text("| col |\n")
+    check_supplementary_args(
+        "4", lrm, figures=[fig], tables=[tbl], ignore_figures=[],
+    )
+
+
+def test_check_fails_when_figure_path_missing(tmp_path):
+    """Fails when a --figures path does not exist on disk."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text(_LRM_NO_SUPPLEMENTARY)
+    with pytest.raises(SystemExit):
+        check_supplementary_args(
+            "99", lrm,
+            figures=[tmp_path / "nonexistent.gv"],
+            tables=[], ignore_figures=[],
+        )
+
+
+def test_check_fails_when_table_path_missing(tmp_path):
+    """Fails when a --tables path does not exist on disk."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text(_LRM_NO_SUPPLEMENTARY)
+    with pytest.raises(SystemExit):
+        check_supplementary_args(
+            "99", lrm,
+            figures=[],
+            tables=[tmp_path / "nonexistent.md"],
+            ignore_figures=[],
+        )
+
+
+def test_check_passes_when_no_supplementary(tmp_path):
+    """Passes when clause has no figures or tables in LRM."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text(_LRM_NO_SUPPLEMENTARY)
+    check_supplementary_args(
+        "99", lrm, figures=[], tables=[], ignore_figures=[],
+    )
 
 
 # ---- load_lrm_titles: annex without normative/informative -----------------
@@ -335,18 +374,6 @@ def test_load_annex_no_title_found(tmp_path):
     lrm = tmp_path / "lrm.txt"
     lrm.write_text("Annex Q\n\n\n\n\n\n\n")
     assert "Q" not in load_lrm_titles(lrm)
-
-
-# ---- build_supplementary_lines: unknown extension -------------------------
-
-
-@patch(
-    "implement_clause.find_supplementary_files",
-    return_value=[("Custom 4-1", Path("/fake/Custom_4_1.xyz"))],
-)
-def test_build_supplementary_lines_unknown_ext(_mock_find):
-    """Unknown file extension produces generic 'a file' label."""
-    assert "a file" in build_supplementary_lines("4")
 
 
 # ---- format_prompt --------------------------------------------------------
@@ -395,33 +422,28 @@ def test_invoke_claude_failure_exits(mock_popen, mock_exit):
 
 
 @patch("implement_clause.invoke_claude")
-def test_run_prompt_calls_invoke(mock_invoke, tmp_path, monkeypatch):
+def test_run_prompt_calls_invoke(mock_invoke, tmp_path):
     """run_prompt loads titles, builds prompt, and invokes Claude."""
-    monkeypatch.setattr(
-        "implement_clause.FIGURES_DIR", tmp_path / "no_figs",
-    )
-    monkeypatch.setattr(
-        "implement_clause.TABLES_DIR", tmp_path / "no_tables",
-    )
     lrm = tmp_path / "lrm.txt"
     lrm.write_text("4. Scheduling semantics\n4.1 General\n")
     build_fn = MagicMock(return_value="generated prompt")
-    run_prompt(build_fn, lrm, "4.1", issue=6, model="sonnet")
+    run_prompt(
+        build_fn, lrm, "4.1",
+        issue=6, model="sonnet", figures=[], tables=[],
+    )
     assert mock_invoke.call_args[0][0] == "generated prompt"
 
 
 @patch("implement_clause.invoke_claude")
-def test_run_prompt_appends_supplementary(_mock_invoke, tmp_path, monkeypatch):
+def test_run_prompt_appends_supplementary(_mock_invoke, tmp_path):
     """run_prompt appends newline to non-empty supplementary."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text("")
-    figs = tmp_path / "Figures"
-    figs.mkdir()
-    (figs / "Figure_4_1.gv").write_text("digraph {}")
-    monkeypatch.setattr("implement_clause.FIGURES_DIR", figs)
-    monkeypatch.setattr(
-        "implement_clause.TABLES_DIR", tmp_path / "no_tables",
-    )
+    gv = tmp_path / "Figure_4_1.gv"
+    gv.write_text("digraph {}")
     build_fn = MagicMock(return_value="prompt")
-    run_prompt(build_fn, lrm, "4", issue=6, model="sonnet")
+    run_prompt(
+        build_fn, lrm, "4",
+        issue=6, model="sonnet", figures=[gv], tables=[],
+    )
     assert build_fn.call_args[1]["supplementary"].endswith("\n")

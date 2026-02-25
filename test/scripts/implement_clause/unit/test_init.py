@@ -61,13 +61,13 @@ def test_parse_args_accepts_issue(tmp_path):
 
 
 def test_parse_args_model_default(tmp_path):
-    """--model defaults to 'sonnet'."""
+    """--model defaults to 'opus'."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text("")
     args = parse_args([
         "--lrm", str(lrm), "--clause", "4.1", "--issue", "8",
     ])
-    assert args.model == "sonnet"
+    assert args.model == "opus"
 
 
 def test_parse_args_model_override(tmp_path):
@@ -114,7 +114,8 @@ def test_parse_args_accepts_annex_clause(tmp_path):
 
 
 @patch("implement_clause.run_prompt")
-def test_main_dispatches_depth_1(mock_run, tmp_path):
+@patch("implement_clause.check_supplementary_args")
+def test_main_dispatches_depth_1(_mock_check, mock_run, tmp_path):
     """main() dispatches depth-1 clause to prompt_v handler."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text("")
