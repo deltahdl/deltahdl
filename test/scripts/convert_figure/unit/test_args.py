@@ -5,8 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 
 import convert_figure
-import convert_figure._pdf as pdf_mod
-from convert_figure._models import Figure, Node
+from convert_figure import Figure, Node
 
 _run = getattr(convert_figure, "_run")
 
@@ -113,16 +112,16 @@ def test_run_prints_dot_to_stdout(tmp_path, monkeypatch, capsys):
     mock_doc = MagicMock()
     mock_doc.__len__ = lambda self: 1
     mock_page = MagicMock()
-    monkeypatch.setattr(pdf_mod, "open_document", lambda p: mock_doc)
+    monkeypatch.setattr(convert_figure, "open_document", lambda p: mock_doc)
     monkeypatch.setattr(
-        pdf_mod, "find_clause_pages", lambda d, c: [0],
+        convert_figure, "find_clause_pages", lambda d, c: [0],
     )
     monkeypatch.setattr(
-        pdf_mod, "find_figure_captions",
+        convert_figure, "find_figure_captions",
         lambda d, p, c: [(0, "4-1", "T", 690.0)],
     )
     monkeypatch.setattr(
-        pdf_mod, "extract_figure",
+        convert_figure, "extract_figure",
         lambda page, figure_number, figure_title, caption_y: fig,
     )
 
@@ -140,7 +139,7 @@ def _setup_run(tmp_path, monkeypatch):
     lrm.write_bytes(b"")
     mock_doc = MagicMock()
     mock_doc.__len__ = lambda _self: 1
-    monkeypatch.setattr(pdf_mod, "open_document", lambda p: mock_doc)
+    monkeypatch.setattr(convert_figure, "open_document", lambda p: mock_doc)
     return lrm, mock_doc
 
 
@@ -148,10 +147,10 @@ def test_run_no_figures_exits(tmp_path, monkeypatch):
     """_run exits with error when no figures are found."""
     lrm, _ = _setup_run(tmp_path, monkeypatch)
     monkeypatch.setattr(
-        pdf_mod, "find_clause_pages", lambda d, c: [0],
+        convert_figure, "find_clause_pages", lambda d, c: [0],
     )
     monkeypatch.setattr(
-        pdf_mod, "find_figure_captions", lambda d, p, c: [],
+        convert_figure, "find_figure_captions", lambda d, p, c: [],
     )
     with pytest.raises(SystemExit):
         _run(lrm, "99")
@@ -161,7 +160,7 @@ def test_run_no_pages_exits(tmp_path, monkeypatch):
     """_run exits with error when no clause pages are found."""
     lrm, _ = _setup_run(tmp_path, monkeypatch)
     monkeypatch.setattr(
-        pdf_mod, "find_clause_pages", lambda d, c: [],
+        convert_figure, "find_clause_pages", lambda d, c: [],
     )
     with pytest.raises(SystemExit):
         _run(lrm, "99")

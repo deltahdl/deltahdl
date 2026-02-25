@@ -1,6 +1,6 @@
 """Shared test helpers for convert_figure unit tests."""
 
-from convert_figure._models import Edge, Figure, Node
+from convert_figure import Edge, Figure, Node
 
 
 def mock_text_block(text, x0, y0, x1, y1):

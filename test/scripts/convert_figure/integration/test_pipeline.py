@@ -2,8 +2,7 @@
 
 from unittest.mock import MagicMock
 
-from convert_figure._dot import generate_dot
-from convert_figure._pdf import extract_figure
+from convert_figure import extract_figure, generate_dot
 
 
 # ---- Pipeline: mocked page -> Figure -> DOT --------------------------------

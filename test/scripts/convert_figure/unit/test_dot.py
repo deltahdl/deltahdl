@@ -1,6 +1,6 @@
 """Unit tests for DOT generation in convert_figure."""
 
-from convert_figure._dot import (
+from convert_figure import (
     figure_number_to_graph_name,
     format_edge,
     format_node,

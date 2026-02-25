@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-import convert_figure._pdf as pdf_mod
+import convert_figure as pdf_mod
 from helpers import mock_text_block
 
 _find_figure_bounds = getattr(pdf_mod, "_find_figure_bounds")

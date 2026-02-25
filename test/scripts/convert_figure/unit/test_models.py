@@ -2,7 +2,7 @@
 
 import pytest
 
-from convert_figure._models import Edge, Figure, Node, label_to_node_id
+from convert_figure import Edge, Figure, Node, label_to_node_id
 
 
 # ---- Node ------------------------------------------------------------------

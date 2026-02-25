@@ -1,12 +1,104 @@
-"""Extract figure data from the LRM PDF using pymupdf."""
+#!/usr/bin/env python3
+"""Convert figures from the IEEE 1800-2023 SystemVerilog LRM to DOT."""
 
+import argparse
 import re
+import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 import fitz
 
-from convert_figure._dot import figure_number_to_graph_name
-from convert_figure._models import Edge, Figure, Node, label_to_node_id
+
+# ---------------------------------------------------------------------------
+# Data model
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Node:
+    """A graph node representing a labeled box in a figure."""
+
+    node_id: str
+    label: str
+
+
+@dataclass(frozen=True)
+class Edge:
+    """A directed edge between two nodes."""
+
+    source: str
+    target: str
+
+
+@dataclass(frozen=True)
+class Figure:
+    """A complete figure extracted from the LRM."""
+
+    number: str
+    title: str
+    graph_name: str
+    nodes: tuple[Node, ...]
+    edges: tuple[Edge, ...]
+
+
+def label_to_node_id(label: str) -> str:
+    """Convert a figure label to a DOT node identifier.
+
+    Removes hyphens and replaces spaces with underscores.
+    """
+    return label.replace("-", "").replace(" ", "_")
+
+
+# ---------------------------------------------------------------------------
+# DOT generation
+# ---------------------------------------------------------------------------
+
+
+def _quote_id(node_id: str) -> str:
+    """Quote a DOT identifier if it contains special characters."""
+    if re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", node_id):
+        return node_id
+    escaped = node_id.replace('"', '\\"')
+    return f'"{escaped}"'
+
+
+def format_node(node: Node) -> str:
+    """Format a single node as a DOT statement."""
+    escaped = node.label.replace('"', '\\"')
+    return f'  {_quote_id(node.node_id)} [label="{escaped}"];'
+
+
+def format_edge(edge: Edge) -> str:
+    """Format a single edge as a DOT statement."""
+    return f"  {_quote_id(edge.source)} -> {_quote_id(edge.target)};"
+
+
+def figure_number_to_graph_name(number: str) -> str:
+    """Convert a figure number like '4-1' to a graph name like 'Figure_4_1'."""
+    return "Figure_" + number.replace("-", "_")
+
+
+def generate_dot(figure: Figure) -> str:
+    """Generate complete DOT digraph source for a figure."""
+    lines: list[str] = []
+    lines.append(f"digraph {figure.graph_name} {{")
+    lines.append("  rankdir=TB;")
+    if figure.nodes:
+        lines.append("")
+        for node in figure.nodes:
+            lines.append(format_node(node))
+    if figure.edges:
+        lines.append("")
+        for edge in figure.edges:
+            lines.append(format_edge(edge))
+    lines.append("}")
+    return "\n".join(lines) + "\n"
+
+
+# ---------------------------------------------------------------------------
+# PDF extraction
+# ---------------------------------------------------------------------------
 
 _CAPTION_RE = re.compile(
     r"Figure\s+(\d+[A-Z]?-\d+)\s*\u2014\s*(.+)",
@@ -295,3 +387,78 @@ def extract_figure(
         nodes=tuple(nodes),
         edges=tuple(edges),
     )
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+_CLAUSE_RE = re.compile(
+    r"^([1-9][0-9]*|[A-Z])"  # V: positive non-zero integer or uppercase letter
+    r"(\.[0-9]+){0,4}$"      # optional .W, .W.X, .W.X.Y, .W.X.Y.Z
+)
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Parse and validate command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Convert figures from the IEEE 1800-2023 "
+        "SystemVerilog LRM.",
+    )
+    parser.add_argument(
+        "--lrm",
+        type=Path,
+        required=True,
+        help="Path to the IEEE 1800-2023 SystemVerilog LRM.",
+    )
+    parser.add_argument(
+        "--clause",
+        required=True,
+        help="LRM clause (e.g. 6, 6.3, 6.3.1, A, A.1.2).",
+    )
+    args = parser.parse_args(argv)
+    if not args.lrm.is_file():
+        parser.error(f"LRM file not found: {args.lrm}")
+    if not _CLAUSE_RE.match(args.clause):
+        parser.error(
+            f"Invalid clause '{args.clause}'. "
+            "Expected V, V.W, V.W.X, V.W.X.Y, or V.W.X.Y.Z "
+            "where V is a positive non-zero number or uppercase "
+            "letter."
+        )
+    return args
+
+
+def _run(lrm_path: Path, clause: str) -> None:
+    """Open the LRM, extract figures for clause, print DOT to stdout."""
+    doc = open_document(lrm_path)
+    pages = find_clause_pages(doc, clause)
+    if not pages:
+        print(f"ERROR: No pages found for clause {clause}.", file=sys.stderr)
+        sys.exit(1)
+    captions = find_figure_captions(doc, pages, clause)
+    if not captions:
+        print(
+            f"ERROR: No figures found for clause {clause}.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    for page_idx, fig_num, fig_title, caption_y in captions:
+        page = doc[page_idx]
+        figure = extract_figure(
+            page=page,
+            figure_number=fig_num,
+            figure_title=fig_title,
+            caption_y=caption_y,
+        )
+        print(generate_dot(figure), end="")
+
+
+def main(argv: list[str] | None = None) -> None:
+    """Entry point: parse args, extract figures, emit DOT."""
+    args = parse_args(argv)
+    _run(args.lrm, args.clause)
+
+
+if __name__ == "__main__":  # pragma: no cover
+    main()

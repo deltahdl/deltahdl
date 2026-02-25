@@ -4,8 +4,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-_PACKAGE = str(
-    Path(__file__).resolve().parents[4] / "scripts" / "convert_figure",
+_SCRIPT = str(
+    Path(__file__).resolve().parents[4] / "scripts" / "convert_figure.py",
 )
 
 
@@ -15,12 +15,10 @@ _PACKAGE = str(
 def _invoke(*args):
     """Run convert_figure as a child process."""
     return subprocess.run(
-        [sys.executable, "-m", "convert_figure", *args],
+        [sys.executable, _SCRIPT, *args],
         capture_output=True,
         text=True,
         check=False,
-        env={"PYTHONPATH": ".:scripts"},
-        cwd=str(Path(__file__).resolve().parents[4]),
     )
 
 
