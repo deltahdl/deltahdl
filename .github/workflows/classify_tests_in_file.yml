@@ -61,7 +61,7 @@ jobs:
       - name: Detect copy-paste in source
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
-          --reporters console scripts/
+          --reporters console scripts/classify_tests_in_file/
       - name: Detect copy-paste in tests
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
