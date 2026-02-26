@@ -4,8 +4,8 @@ import classify_test
 
 
 def make_test_block(
-    name, prefix=None, clause=None, rationale=None, comments=None,
-    body=None,
+    name, prefix=None, clause=None, *,
+    comments=None, body=None,
 ):
     """Shorthand factory for TestBlock."""
     if body is None:
@@ -19,7 +19,7 @@ def make_test_block(
         preceding_comments=comments or [],
         prefix=prefix,
         clause=clause,
-        rationale=rationale,
+        rationale=None,
     )
 
 

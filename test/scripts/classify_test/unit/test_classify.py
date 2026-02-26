@@ -398,7 +398,7 @@ def test_classify_tests_per_test(monkeypatch, tmp_path):
     """classify_tests calls Claude once per (non-lrm) test."""
     call_count = [0]
 
-    def counting_claude(_prompt, schema=None):
+    def counting_claude(_prompt, _schema=None):
         call_count[0] += 1
         return {"clause": "6.1", "rationale": "r"}
 
@@ -416,11 +416,11 @@ def test_classify_tests_per_test(monkeypatch, tmp_path):
     assert call_count[0] == 3
 
 
-def test_classify_tests_non_lrm_two_calls(monkeypatch, tmp_path):
-    """classify_tests makes two calls for non-LRM tests."""
+def _do_non_lrm_two_calls(monkeypatch, tmp_path):
+    """Classify a non-LRM test and return (call_count, test)."""
     call_count = [0]
 
-    def two_call_claude(_prompt, schema=None):
+    def two_call_claude(_prompt, _schema=None):
         call_count[0] += 1
         if call_count[0] == 1:
             return {"clause": "non-lrm", "rationale": "r"}
@@ -433,8 +433,24 @@ def test_classify_tests_non_lrm_two_calls(monkeypatch, tmp_path):
     classify_test.classify_tests(
         [t], tmp_path, tmp_path / "lrm.txt",
     )
-    assert call_count[0] == 2
+    return call_count[0], t
+
+
+def test_classify_tests_non_lrm_call_count(monkeypatch, tmp_path):
+    """classify_tests makes two Claude calls for non-LRM tests."""
+    count, _ = _do_non_lrm_two_calls(monkeypatch, tmp_path)
+    assert count == 2
+
+
+def test_classify_tests_non_lrm_clause(monkeypatch, tmp_path):
+    """classify_tests sets clause to non-lrm:aig for non-LRM tests."""
+    _, t = _do_non_lrm_two_calls(monkeypatch, tmp_path)
     assert t.clause == "non-lrm:aig"
+
+
+def test_classify_tests_non_lrm_prefix(monkeypatch, tmp_path):
+    """classify_tests sets prefix to test_non_lrm_ for non-LRM tests."""
+    _, t = _do_non_lrm_two_calls(monkeypatch, tmp_path)
     assert t.prefix == "test_non_lrm_"
 
 
@@ -487,30 +503,28 @@ def test_validate_clause_response_invalid_clause_trailing_dot():
 
 def test_validate_clause_response_clause_single_digit():
     """Accepts a single-digit clause."""
-    result = _validate_clause_response(_valid_clause(clause="6"), "T")
-    assert result is None
+    assert _validate_clause_response(
+        _valid_clause(clause="6"), "T",
+    ) is None
 
 
 def test_validate_clause_response_clause_deep_numeric():
     """Accepts a deeply nested numeric clause."""
-    result = _validate_clause_response(
+    assert _validate_clause_response(
         _valid_clause(clause="9.2.2.2.2"), "T",
-    )
-    assert result is None
+    ) is None
 
 
 def test_validate_clause_response_clause_annex():
     """Accepts an annex clause like A.6.3."""
-    result = _validate_clause_response(
+    assert _validate_clause_response(
         _valid_clause(clause="A.6.3"), "T",
-    )
-    assert result is None
+    ) is None
 
 
 def test_validate_clause_response_valid():
     """Accepts a valid clause response."""
-    result = _validate_clause_response(_valid_clause(), "T")
-    assert result is None
+    assert _validate_clause_response(_valid_clause(), "T") is None
 
 
 # ---- _validate_topic_response ----------------------------------------------
@@ -538,8 +552,7 @@ def test_validate_topic_response_empty_topic():
 
 def test_validate_topic_response_valid():
     """Accepts a valid topic response."""
-    result = _validate_topic_response(_valid_topic(), "T")
-    assert result is None
+    assert _validate_topic_response(_valid_topic(), "T") is None
 
 
 # ---- _validate_clause_response: error messages -----------------------------

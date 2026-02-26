@@ -139,51 +139,52 @@ def test_format_clause_regular():
 
 def test_print_classification_test_line(capsys):
     """Prints 'Test: Name()' for each test."""
-    t = _tb("Foo", prefix="test_parser_", clause="6.1", rationale="r")
+    t = _tb("Foo", prefix="test_parser_", clause="6.1")
     _print_classification_table([t])
     assert "Test: Foo()" in capsys.readouterr().out
 
 
 def test_print_classification_clause_line(capsys):
     """Prints 'Clause:' with formatted clause."""
-    t = _tb("T", prefix="test_parser_", clause="6.1", rationale="r")
+    t = _tb("T", prefix="test_parser_", clause="6.1")
     _print_classification_table([t])
     assert "Clause: \u00a76.1" in capsys.readouterr().out
 
 
 def test_print_classification_rationale_line(capsys):
     """Prints 'Rationale:' with rationale text."""
-    t = _tb("T", prefix="test_parser_", clause="6.1", rationale="AIG stuff")
+    t = _tb("T", prefix="test_parser_", clause="6.1")
+    t.rationale = "AIG stuff"
     _print_classification_table([t])
     assert "Rationale: AIG stuff" in capsys.readouterr().out
 
 
 def test_print_classification_non_lrm_clause(capsys):
     """Non-LRM clause displays as 'Non-LRM AIG'."""
-    t = _tb("T", prefix="test_non_lrm_", clause="non-lrm:aig", rationale="r")
+    t = _tb("T", prefix="test_non_lrm_", clause="non-lrm:aig")
     _print_classification_table([t])
     assert "Clause: Non-LRM AIG" in capsys.readouterr().out
 
 
 def test_print_classification_none_clause(capsys):
     """None clause displays as '(parse error)'."""
-    t = _tb("T", prefix="test_non_lrm_", clause=None, rationale="r")
+    t = _tb("T", prefix="test_non_lrm_", clause=None)
     _print_classification_table([t])
     assert "Clause: (parse error)" in capsys.readouterr().out
 
 
 def test_print_classification_separator_between(capsys):
     """Multi-test output has ---- separator between sub-reports."""
-    t1 = _tb("A", prefix="test_parser_", clause="6.1", rationale="r")
-    t2 = _tb("B", prefix="test_parser_", clause="6.1", rationale="r")
+    t1 = _tb("A", prefix="test_parser_", clause="6.1")
+    t2 = _tb("B", prefix="test_parser_", clause="6.1")
     _print_classification_table([t1, t2])
     assert "----" in capsys.readouterr().out
 
 
 def test_print_classification_no_trailing_separator(capsys):
     """No ---- after the last sub-report."""
-    t1 = _tb("A", prefix="test_parser_", clause="6.1", rationale="r")
-    t2 = _tb("B", prefix="test_parser_", clause="6.1", rationale="r")
+    t1 = _tb("A", prefix="test_parser_", clause="6.1")
+    t2 = _tb("B", prefix="test_parser_", clause="6.1")
     _print_classification_table([t1, t2])
     out = capsys.readouterr().out
     assert out.count("----") == 1
@@ -191,7 +192,7 @@ def test_print_classification_no_trailing_separator(capsys):
 
 def test_print_classification_single_no_separator(capsys):
     """Single test has no ---- separator."""
-    t = _tb("T", prefix="test_parser_", clause="6.1", rationale="r")
+    t = _tb("T", prefix="test_parser_", clause="6.1")
     _print_classification_table([t])
     assert "----" not in capsys.readouterr().out
 
@@ -199,8 +200,8 @@ def test_print_classification_single_no_separator(capsys):
 def test_print_classification_no_line_over_80(capsys):
     """No output line exceeds 80 characters."""
     long_rationale = "word " * 20  # 100 chars, will need wrapping
-    t = _tb("T", prefix="test_parser_", clause="6.1",
-            rationale=long_rationale.strip())
+    t = _tb("T", prefix="test_parser_", clause="6.1")
+    t.rationale = long_rationale.strip()
     _print_classification_table([t])
     out = capsys.readouterr().out
     assert all(len(line) <= 80 for line in out.splitlines())
@@ -209,8 +210,8 @@ def test_print_classification_no_line_over_80(capsys):
 def test_print_classification_wrap_aligns(capsys):
     """Wrapped continuation lines align with 2-space indent."""
     long_rationale = "word " * 20
-    t = _tb("T", prefix="test_parser_", clause="6.1",
-            rationale=long_rationale.strip())
+    t = _tb("T", prefix="test_parser_", clause="6.1")
+    t.rationale = long_rationale.strip()
     _print_classification_table([t])
     lines = capsys.readouterr().out.splitlines()
     # Find continuation lines (after Rationale: line, before next label/sep)
@@ -518,14 +519,24 @@ def test_filter_preamble_drops_unused():
     assert elab_fn not in _filter_preamble([parse_fn, elab_fn], [t])
 
 
-def test_filter_preamble_transitive():
-    """Keeps transitive deps (test uses Parse, Parse uses ParseResult)."""
+def _do_transitive_filter():
+    """Filter preamble with transitive deps and return kept list."""
     result_struct = _PI(lines=["struct ParseResult {", "  int x;", "};"])
     parse_fn = _PI(lines=["ParseResult Parse(const std::string& s) {",
                            "  ParseResult r;", "  return r;", "}"])
     t = _test_block(["  auto r = Parse(src);"])
-    kept = _filter_preamble([result_struct, parse_fn], [t])
+    return _filter_preamble([result_struct, parse_fn], [t]), result_struct, parse_fn
+
+
+def test_filter_preamble_transitive_keeps_struct():
+    """Transitive dep: keeps ParseResult struct used by Parse."""
+    kept, result_struct, _ = _do_transitive_filter()
     assert result_struct in kept
+
+
+def test_filter_preamble_transitive_keeps_fn():
+    """Transitive dep: keeps Parse function used by test."""
+    kept, _, parse_fn = _do_transitive_filter()
     assert parse_fn in kept
 
 

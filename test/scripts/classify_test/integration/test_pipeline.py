@@ -23,9 +23,9 @@ def _write_input(tmp_path, body):
 
 def _make_classifier(*triples):
     """Build per-test classifier from (test_name, clause) triples."""
-    lookup = {n: c for n, c in triples}
+    lookup = dict(triples)
 
-    def classifier(prompt, schema=None):
+    def classifier(prompt, _schema=None):
         for name, clause in lookup.items():
             if name in prompt:
                 return {"clause": clause, "rationale": "r"}
