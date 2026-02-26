@@ -354,7 +354,8 @@ def test_generate_file_with_section_preamble():
     sec = classify_tests_in_file.PreambleItem(
         lines=["static int Helper() {", "  return 42;", "}"],
     )
-    parsed = _parsed(section_preamble=[sec])
+    parsed = _parsed()
+    parsed.section_preamble = [sec]
     t = _tb("T", comments=[])
     content = classify_tests_in_file.generate_file("6.3", "", parsed, [t])
     assert "static int Helper() {" in content

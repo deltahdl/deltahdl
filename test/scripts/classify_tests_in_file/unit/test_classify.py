@@ -122,7 +122,8 @@ def test_build_prompt_contains_non_lrm_prefix(tmp_path):
 def test_build_prompt_contains_source_filename(tmp_path):
     """Prompt includes the source filename."""
     t = _tb("X")
-    parsed = _parsed(source_filename="test_non_lrm_misc.cpp")
+    parsed = _parsed()
+    parsed.source_filename = "test_non_lrm_misc.cpp"
     prompt = _build_prompt(
         t, parsed, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
     )
