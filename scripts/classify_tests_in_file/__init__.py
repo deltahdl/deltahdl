@@ -63,15 +63,6 @@ class PreambleItem:
 
 
 @dataclass
-class SectionGroup:
-    """A group of tests under a section header banner."""
-
-    header_lines: list[str]
-    preamble: list[PreambleItem]
-    tests: list[TestBlock]
-
-
-@dataclass
 class ParsedFile:
     """Result of parsing a standalone test file."""
 
@@ -80,8 +71,8 @@ class ParsedFile:
     has_namespace_wrapper: bool
     global_preamble: list[PreambleItem]
     section_preamble: list[PreambleItem]
-    sections: list[SectionGroup]
     all_tests: list[TestBlock]
+    source_filename: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -305,8 +296,8 @@ def parse_file(filepath):
         has_namespace_wrapper=hdr_ns or body_ns,
         global_preamble=g_pre,
         section_preamble=s_pre,
-        sections=[],
         all_tests=all_tests,
+        source_filename=filepath.name,
     )
 
 
@@ -371,10 +362,7 @@ Respond with ONLY JSON:
 """
 
 
-def _build_prompt(  # pylint: disable=too-many-arguments
-    test, parsed, test_dir, lrm_path, arch_path, *,
-    source_filename=None,
-):
+def _build_prompt(test, parsed, test_dir, lrm_path, arch_path):
     """Build the Claude classification prompt for a single test."""
     topics = existing_non_lrm_topics(test_dir)
     topics_hint = ""
@@ -386,8 +374,8 @@ def _build_prompt(  # pylint: disable=too-many-arguments
             " test fits, to avoid near-duplicate filenames.\n"
         )
     context_parts = []
-    if source_filename:
-        context_parts.append(f"Source file: {source_filename}")
+    if parsed.source_filename:
+        context_parts.append(f"Source file: {parsed.source_filename}")
     if parsed.includes:
         context_parts.append("Includes:\n" + "\n".join(parsed.includes))
     all_preamble = list(parsed.global_preamble) + list(parsed.section_preamble)
@@ -465,16 +453,12 @@ def _apply_classification(test, response):
     test.rationale = response.get("rationale", "")
 
 
-def classify_tests(  # pylint: disable=too-many-arguments
-    tests, parsed, test_dir, lrm_path, arch_path, *,
-    source_filename=None,
-):
+def classify_tests(tests, parsed, test_dir, lrm_path, arch_path):
     """Use Claude to classify each test's prefix and clause."""
 
     def _classify_one(test):
         prompt = _build_prompt(
             test, parsed, test_dir, lrm_path, arch_path,
-            source_filename=source_filename,
         )
         response = _call_claude(prompt)
         _apply_classification(test, response)
@@ -854,7 +838,6 @@ def _run(args):  # pylint: disable=too-many-locals
     print(f"{test_name}.cpp \u2014 {len(parsed.all_tests)} tests{dry}")
     classify_tests(
         parsed.all_tests, parsed, test_dir, lrm_path, arch_path,
-        source_filename=filepath.name,
     )
     _print_classification_table(parsed.all_tests)
     groups = _group_tests(parsed.all_tests)
