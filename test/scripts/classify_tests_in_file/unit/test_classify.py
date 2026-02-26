@@ -71,6 +71,17 @@ def test_build_prompt_with_topics(tmp_path):
     assert "Existing non-lrm topic files" in prompt
 
 
+def test_build_prompt_no_context(tmp_path):
+    """Prompt omits FILE CONTEXT when includes and preamble are empty."""
+    t = _tb("X")
+    parsed = _parsed()
+    parsed.includes = []
+    prompt = _build_prompt(
+        t, parsed, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
+    )
+    assert "FILE CONTEXT" not in prompt
+
+
 def test_build_prompt_contains_lrm_path(tmp_path):
     """Prompt includes the LRM file path."""
     lrm = tmp_path / "LRM.txt"
