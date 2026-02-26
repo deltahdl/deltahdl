@@ -506,7 +506,7 @@ def classify_tests(tests, parsed, test_dir, lrm_path, arch_path):
         _apply_classification(test, response)
 
     with ThreadPoolExecutor(max_workers=8) as pool:
-        pool.map(_classify_one, tests)
+        list(pool.map(_classify_one, tests))
     return tests
 
 

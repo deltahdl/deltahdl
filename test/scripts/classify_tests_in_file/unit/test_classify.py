@@ -498,3 +498,17 @@ def test_apply_classification_rejects_bad_prefix():
     t = _tb("T")
     with pytest.raises(SystemExit):
         _apply_classification(t, _valid_resp(prefix="test_bad_"))
+
+
+def test_classify_tests_propagates_validation_error(monkeypatch, tmp_path):
+    """classify_tests exits when Claude returns an invalid prefix."""
+    monkeypatch.setattr(
+        classify_tests_in_file, "_call_claude",
+        lambda _p: _valid_resp(prefix="test_bad_"),
+    )
+    parsed = _parsed()
+    with pytest.raises(SystemExit):
+        classify_tests_in_file.classify_tests(
+            [_tb("T")], parsed, tmp_path,
+            tmp_path / "lrm.txt", tmp_path / "arch.md",
+        )
