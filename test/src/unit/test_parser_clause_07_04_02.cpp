@@ -75,4 +75,20 @@ TEST(ParserA25, UnpackedDimConstantExpression) {
   EXPECT_EQ(item->unpacked_dims[0]->kind, ExprKind::kIntegerLiteral);
 }
 
+TEST(ParserA28, DataDeclUnpackedDimsInBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int arr[3];\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  ASSERT_GE(body->stmts.size(), 1u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(body->stmts[0]->var_unpacked_dims.size(), 1u);
+}
+
 }  // namespace

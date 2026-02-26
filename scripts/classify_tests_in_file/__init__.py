@@ -612,7 +612,7 @@ def _preamble_name(item):
         if m:
             return m.group(1)
         m = re.match(
-            r"(?:\w+\s+)*?(\w+)\s*\(", stripped,
+            r"(?:[\w*&:]+\s+)*(\w+)\s*\(", stripped,
         )
         if m:
             return m.group(1)

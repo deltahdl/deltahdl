@@ -1,9 +1,7 @@
-// §16.9.8: First_match operation
+// §8.23: Class scope resolution operator ::
 
 #include <gtest/gtest.h>
-
 #include <string>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -12,6 +10,7 @@
 
 using namespace delta;
 
+// --- Test helpers ---
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
@@ -30,29 +29,18 @@ ParseResult Parse(const std::string& src) {
   return result;
 }
 
-static bool ParseOk(const std::string& src) {
-  SourceManager mgr;
-  Arena arena;
-  auto fid = mgr.AddFile("<test>", src);
-  DiagEngine diag(mgr);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, arena, diag);
-  parser.Parse();
-  return !diag.HasErrors();
-}
-
-  return nullptr;
-}
-
 namespace {
 
-// sequence_expr ::= first_match ( sequence_expr {, sequence_match_item} )
-TEST(ParserA210, SequenceExpr_FirstMatch) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk)\n"
-              "    first_match(a ##[1:5] b));\n"
-              "endmodule\n"));
+// --- class_scope ---
+// class_type ::
+TEST(ParserA221, ClassScope) {
+  auto r = Parse(
+      "class base_cls;\n"
+      "  typedef int inner_t;\n"
+      "endclass\n"
+      "module m; base_cls::inner_t x; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
 }  // namespace

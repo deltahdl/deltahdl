@@ -485,6 +485,30 @@ def test_preamble_name_with_leading_comment():
     assert _preamble_name(item) == "Foo"
 
 
+def test_preamble_name_pointer_return():
+    """Extracts name from function with pointer return type."""
+    item = _PI(lines=["RtlirDesign* Elaborate(const std::string& src) {",
+                       "  return nullptr;", "}"])
+    assert _preamble_name(item) == "Elaborate"
+
+
+def test_preamble_name_static_pointer_return():
+    """Extracts name from static function with pointer return type."""
+    item = _PI(lines=[
+        "static ModuleItem* FindItemByKind("
+        "const std::vector<ModuleItem*>& items,",
+        "  ModuleItemKind kind) {",
+        "  return nullptr;", "}"])
+    assert _preamble_name(item) == "FindItemByKind"
+
+
+def test_preamble_name_reference_return():
+    """Extracts name from function with reference return type."""
+    item = _PI(lines=["const std::string& GetName() {",
+                       '  return name_;', "}"])
+    assert _preamble_name(item) == "GetName"
+
+
 def _test_block(body):
     """Create a TestBlock with specific body lines for preamble tests."""
     return classify_tests_in_file.TestBlock(

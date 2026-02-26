@@ -1,9 +1,7 @@
-// §16.9.8: First_match operation
+// §8.26.2: Extends versus implements
 
 #include <gtest/gtest.h>
-
 #include <string>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -12,6 +10,7 @@
 
 using namespace delta;
 
+// --- Test helpers ---
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
@@ -30,29 +29,15 @@ ParseResult Parse(const std::string& src) {
   return result;
 }
 
-static bool ParseOk(const std::string& src) {
-  SourceManager mgr;
-  Arena arena;
-  auto fid = mgr.AddFile("<test>", src);
-  DiagEngine diag(mgr);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, arena, diag);
-  parser.Parse();
-  return !diag.HasErrors();
-}
-
-  return nullptr;
-}
-
 namespace {
 
-// sequence_expr ::= first_match ( sequence_expr {, sequence_match_item} )
-TEST(ParserA210, SequenceExpr_FirstMatch) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk)\n"
-              "    first_match(a ##[1:5] b));\n"
-              "endmodule\n"));
+// Class with implements clause.
+TEST(SourceText, ClassWithImplements) {
+  auto r = Parse("class C implements I; endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->name, "C");
 }
 
 }  // namespace

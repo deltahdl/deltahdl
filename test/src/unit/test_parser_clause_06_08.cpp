@@ -143,4 +143,16 @@ TEST(ParserAnnexA, A2VarDeclWithInit) {
   EXPECT_NE(r.cu->modules[0]->items[0]->init_expr, nullptr);
 }
 
+TEST(ParserA213, DataDeclMultipleAssign) {
+  // list_of_variable_decl_assignments: multiple names
+  auto r = Parse("module m; int a = 1, b = 2; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  int count = 0;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kVarDecl) count++;
+  }
+  EXPECT_GE(count, 2);
+}
+
 }  // namespace

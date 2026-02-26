@@ -96,15 +96,6 @@ TEST(SourceText, DescriptionPackageItemTask) {
   ASSERT_EQ(r.cu->cu_items.size(), 1u);
 }
 
-// Class with implements clause.
-TEST(SourceText, ClassWithImplements) {
-  auto r = Parse("class C implements I; endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->name, "C");
-}
-
 // Interface with non-ANSI ports.
 TEST(SourceText, InterfaceNonAnsiHeader) {
   auto r = Parse(
@@ -163,27 +154,6 @@ TEST(ParserA212, RefUnpackedDim) {
   auto& port = r.cu->modules[0]->ports[0];
   EXPECT_EQ(port.direction, Direction::kRef);
   EXPECT_FALSE(port.unpacked_dims.empty());
-}
-
-TEST(ParserA213, DataDeclMultipleAssign) {
-  // list_of_variable_decl_assignments: multiple names
-  auto r = Parse("module m; int a = 1, b = 2; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  int count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kVarDecl) count++;
-  }
-  EXPECT_GE(count, 2);
-}
-
-TEST(ParserA213, DataDeclPackageImport) {
-  // package_import_declaration alternative
-  auto r = Parse(
-      "package pkg; endpackage\n"
-      "module m; import pkg::*; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
 }
 
 // --- package_import_declaration ---
@@ -248,32 +218,6 @@ TEST(ParserA213, TypedefStruct) {
   EXPECT_FALSE(r.has_errors);
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kStruct);
-}
-
-// --- data_type --- (12 alternatives)
-// integer_vector_type [signing] {packed_dimension}
-TEST(ParserA221, DataTypeIntegerVector) {
-  auto r = Parse("module m; logic signed [7:0] a; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
-  EXPECT_TRUE(item->data_type.is_signed);
-  EXPECT_NE(item->data_type.packed_dim_left, nullptr);
-}
-
-// struct_union [packed [signing]] { ... } {packed_dimension}
-TEST(ParserA221, DataTypeStructPacked) {
-  auto r = Parse(
-      "module m;\n"
-      "  struct packed signed { logic [7:0] a; logic [7:0] b; } pair;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kStruct);
-  EXPECT_TRUE(item->data_type.is_packed);
-  EXPECT_TRUE(item->data_type.is_signed);
 }
 
 // [class_scope | package_scope] type_identifier {packed_dimension}
@@ -341,30 +285,6 @@ TEST(ParserA221, EnumNameWithRangeColon) {
   EXPECT_NE(member.range_start, nullptr);
   EXPECT_NE(member.range_end, nullptr);
   EXPECT_NE(member.value, nullptr);
-}
-
-// --- class_scope ---
-// class_type ::
-TEST(ParserA221, ClassScope) {
-  auto r = Parse(
-      "class base_cls;\n"
-      "  typedef int inner_t;\n"
-      "endclass\n"
-      "module m; base_cls::inner_t x; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-// --- class_type ---
-// ps_class_identifier [param] { :: class_identifier [param] }
-TEST(ParserA221, ClassTypeParameterized) {
-  auto r = Parse(
-      "class param_cls #(type T = int);\n"
-      "  typedef T value_t;\n"
-      "endclass\n"
-      "module m; param_cls#(int)::value_t x; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
 }
 
 // --- simple_type ---
@@ -728,42 +648,6 @@ TEST(ParserA27, TfPortDeclOldStyleVar) {
   auto* item = r.cu->modules[0]->items[0];
   ASSERT_EQ(item->func_args.size(), 1u);
   EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
-}
-
-// §A.2.8 block_item_declaration alternative 1: data_declaration
-// data_declaration ::= [ const ] [ var ] [ lifetime ] data_type_or_implicit
-//                      list_of_variable_decl_assignments ;
-TEST(ParserA28, DataDeclBasicInBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    int x;\n"
-      "    x = 5;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 1u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(body->stmts[0]->var_name, "x");
-}
-
-TEST(ParserA28, DataDeclUnpackedDimsInBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    int arr[3];\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 1u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(body->stmts[0]->var_unpacked_dims.size(), 1u);
 }
 
 // let_declaration in function body
