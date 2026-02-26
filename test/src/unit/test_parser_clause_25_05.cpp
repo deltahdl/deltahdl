@@ -1,4 +1,4 @@
-// §9.3.1: Sequential blocks
+// §25.5: Modports
 
 #include <gtest/gtest.h>
 #include <string>
@@ -29,31 +29,6 @@ ParseResult Parse(const std::string& src) {
   return result;
 }
 
-};
-
-static bool ParseOk(const std::string& src) {
-  SourceManager mgr;
-  Arena arena;
-  auto fid = mgr.AddFile("<test>", src);
-  DiagEngine diag(mgr);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, arena, diag);
-  parser.Parse();
-  return !diag.HasErrors();
-}
-
-namespace {
-
-// attribute_instance prefix on block items
-TEST(ParserA28, AttrOnDataDeclInBlock) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    (* synthesis *) int x;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 RtlirDesign* Elaborate(const std::string& src, ElabFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
@@ -63,13 +38,20 @@ RtlirDesign* Elaborate(const std::string& src, ElabFixture& f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-TEST(ParserA28, AttrOnLocalparamInBlock) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    (* synthesis *) localparam int X = 5;\n"
-              "  end\n"
-              "endmodule\n"));
+namespace {
+
+// §A.2.9 modport_declaration ::= modport modport_item { , modport_item } ;
+TEST(ParserA29, BasicModportDecl) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  logic a;\n"
+      "  modport target(input a);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  ASSERT_EQ(r.cu->interfaces[0]->modports.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->modports[0]->name, "target");
 }
 
 }  // namespace

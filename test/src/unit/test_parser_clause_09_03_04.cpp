@@ -1,4 +1,4 @@
-// §9.3.1: Sequential blocks
+// §9.3.4: Block names
 
 #include <gtest/gtest.h>
 #include <string>
@@ -29,31 +29,6 @@ ParseResult Parse(const std::string& src) {
   return result;
 }
 
-};
-
-static bool ParseOk(const std::string& src) {
-  SourceManager mgr;
-  Arena arena;
-  auto fid = mgr.AddFile("<test>", src);
-  DiagEngine diag(mgr);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, arena, diag);
-  parser.Parse();
-  return !diag.HasErrors();
-}
-
-namespace {
-
-// attribute_instance prefix on block items
-TEST(ParserA28, AttrOnDataDeclInBlock) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    (* synthesis *) int x;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 RtlirDesign* Elaborate(const std::string& src, ElabFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
@@ -63,13 +38,13 @@ RtlirDesign* Elaborate(const std::string& src, ElabFixture& f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-TEST(ParserA28, AttrOnLocalparamInBlock) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    (* synthesis *) localparam int X = 5;\n"
-              "  end\n"
-              "endmodule\n"));
+namespace {
+
+// Checker with end label.
+TEST(SourceText, CheckerEndLabel) {
+  auto r = Parse("checker chk; endchecker : chk\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
 }  // namespace

@@ -1,4 +1,4 @@
-// §9.3.1: Sequential blocks
+// §9.3.2: Parallel blocks
 
 #include <gtest/gtest.h>
 #include <string>
@@ -29,7 +29,14 @@ ParseResult Parse(const std::string& src) {
   return result;
 }
 
-};
+RtlirDesign* Elaborate(const std::string& src, ElabFixture& f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto* cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  return elab.Elaborate(cu->modules.back()->name);
+}
 
 static bool ParseOk(const std::string& src) {
   SourceManager mgr;
@@ -44,31 +51,23 @@ static bool ParseOk(const std::string& src) {
 
 namespace {
 
-// attribute_instance prefix on block items
-TEST(ParserA28, AttrOnDataDeclInBlock) {
+TEST(ParserA28, BlockItemInForkJoinAny) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
-              "  initial begin\n"
-              "    (* synthesis *) int x;\n"
-              "  end\n"
+              "  initial fork\n"
+              "    int x;\n"
+              "    x = 1;\n"
+              "  join_any\n"
               "endmodule\n"));
 }
 
-RtlirDesign* Elaborate(const std::string& src, ElabFixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
-TEST(ParserA28, AttrOnLocalparamInBlock) {
+TEST(ParserA28, BlockItemInForkJoinNone) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
-              "  initial begin\n"
-              "    (* synthesis *) localparam int X = 5;\n"
-              "  end\n"
+              "  initial fork\n"
+              "    int x;\n"
+              "    x = 1;\n"
+              "  join_none\n"
               "endmodule\n"));
 }
 

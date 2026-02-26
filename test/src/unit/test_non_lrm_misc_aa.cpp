@@ -88,13 +88,6 @@ TEST(SourceText, PackageLifetimeWithItems) {
   EXPECT_EQ(r.cu->packages[0]->items.size(), 2u);
 }
 
-// Checker with end label.
-TEST(SourceText, CheckerEndLabel) {
-  auto r = Parse("checker chk; endchecker : chk\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // description: { attribute_instance } package_item (file-scope task)
 TEST(SourceText, DescriptionPackageItemTask) {
   auto r = Parse("task my_task; endtask\n");
@@ -773,35 +766,6 @@ TEST(ParserA28, DataDeclUnpackedDimsInBlock) {
   EXPECT_EQ(body->stmts[0]->var_unpacked_dims.size(), 1u);
 }
 
-TEST(ParserA28, AttrOnLocalparamInBlock) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    (* synthesis *) localparam int X = 5;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
-TEST(ParserA28, BlockItemInForkJoinAny) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial fork\n"
-              "    int x;\n"
-              "    x = 1;\n"
-              "  join_any\n"
-              "endmodule\n"));
-}
-
-TEST(ParserA28, BlockItemInForkJoinNone) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial fork\n"
-              "    int x;\n"
-              "    x = 1;\n"
-              "  join_none\n"
-              "endmodule\n"));
-}
-
 // let_declaration in function body
 TEST(ParserA28, LetDeclInFunction) {
   EXPECT_TRUE(
@@ -820,20 +784,6 @@ TEST(ParserA28, TypedefInFunction) {
               "    typedef logic [7:0] byte_t;\n"
               "  endfunction\n"
               "endmodule\n"));
-}
-
-// §A.2.9 modport_declaration ::= modport modport_item { , modport_item } ;
-TEST(ParserA29, BasicModportDecl) {
-  auto r = Parse(
-      "interface bus;\n"
-      "  logic a;\n"
-      "  modport target(input a);\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  ASSERT_EQ(r.cu->interfaces[0]->modports.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces[0]->modports[0]->name, "target");
 }
 
 // modport_simple_ports_declaration ::=
