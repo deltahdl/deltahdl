@@ -27,18 +27,15 @@ def _make_input_file(tmp_path):
     f = tmp_path / "test_input.cpp"
     f.write_text(
         "#include <gtest/gtest.h>\n\n"
-        "TEST(S, T) {\n}\n",
+        "TEST(S, T) {\n  auto r = Parse(src);\n}\n",
         encoding="utf-8",
     )
     return f
 
 
 def _parser_response():
-    """Return a standard single-test classifier response."""
-    return {
-        "prefix": "test_parser_",
-        "clause": "6.1", "rationale": "r",
-    }
+    """Return a standard single-test clause response."""
+    return {"clause": "6.1", "rationale": "r"}
 
 
 def _run_args(tmp_path, **overrides):
@@ -48,7 +45,6 @@ def _run_args(tmp_path, **overrides):
         "output_dir": str(tmp_path),
         "dry_run": False,
         "lrm": str(tmp_path / "lrm.txt"),
-        "arch": str(tmp_path / "arch.md"),
         "max_lines": None,
         "test": "T",
     }
@@ -60,11 +56,11 @@ def _run_args(tmp_path, **overrides):
 
 
 def test_parse_args_basic(monkeypatch):
-    """Parses --file, --output-dir, --lrm, --arch, and --test."""
+    """Parses --file, --output-dir, --lrm, and --test."""
     monkeypatch.setattr(
         sys, "argv",
         ["prog", "--file", "f.cpp", "--output-dir", "/out",
-         "--lrm", "/lrm.txt", "--arch", "/arch.md", "--test", "T"],
+         "--lrm", "/lrm.txt", "--test", "T"],
     )
     args = _parse_args()
     assert args.file == "f.cpp" and not args.dry_run
@@ -75,8 +71,7 @@ def test_parse_args_dry_run(monkeypatch):
     monkeypatch.setattr(
         sys, "argv",
         ["prog", "--file", "f.cpp", "--output-dir", "/out",
-         "--lrm", "/lrm.txt", "--arch", "/arch.md",
-         "--test", "T", "--dry-run"],
+         "--lrm", "/lrm.txt", "--test", "T", "--dry-run"],
     )
     assert _parse_args().dry_run is True
 
@@ -86,19 +81,9 @@ def test_parse_args_lrm(monkeypatch):
     monkeypatch.setattr(
         sys, "argv",
         ["prog", "--file", "f.cpp", "--output-dir", "/out",
-         "--lrm", "/my/LRM.txt", "--arch", "/arch.md", "--test", "T"],
+         "--lrm", "/my/LRM.txt", "--test", "T"],
     )
     assert _parse_args().lrm == "/my/LRM.txt"
-
-
-def test_parse_args_arch(monkeypatch):
-    """Parses --arch flag."""
-    monkeypatch.setattr(
-        sys, "argv",
-        ["prog", "--file", "f.cpp", "--output-dir", "/out",
-         "--lrm", "/lrm.txt", "--arch", "/my/ARCH.md", "--test", "T"],
-    )
-    assert _parse_args().arch == "/my/ARCH.md"
 
 
 def test_parse_args_test_flag(monkeypatch):
@@ -106,7 +91,7 @@ def test_parse_args_test_flag(monkeypatch):
     monkeypatch.setattr(
         sys, "argv",
         ["prog", "--file", "f.cpp", "--output-dir", "/out",
-         "--lrm", "/lrm.txt", "--arch", "/arch.md", "--test", "Foo"],
+         "--lrm", "/lrm.txt", "--test", "Foo"],
     )
     assert _parse_args().test == "Foo"
 
@@ -116,8 +101,7 @@ def test_parse_args_max_lines(monkeypatch):
     monkeypatch.setattr(
         sys, "argv",
         ["prog", "--file", "f.cpp", "--output-dir", "/out",
-         "--lrm", "/lrm.txt", "--arch", "/arch.md",
-         "--test", "T", "--max-lines", "500"],
+         "--lrm", "/lrm.txt", "--test", "T", "--max-lines", "500"],
     )
     assert _parse_args().max_lines == 500
 
@@ -127,7 +111,7 @@ def test_parse_args_max_lines_default(monkeypatch):
     monkeypatch.setattr(
         sys, "argv",
         ["prog", "--file", "f.cpp", "--output-dir", "/out",
-         "--lrm", "/lrm.txt", "--arch", "/arch.md", "--test", "T"],
+         "--lrm", "/lrm.txt", "--test", "T"],
     )
     assert _parse_args().max_lines is None
 
@@ -766,18 +750,13 @@ def test_run_live_merge(tmp_path, monkeypatch, capsys):
         capsys.readouterr().out
 
 
-def _mixed_classifier(prompt):
+def _mixed_classifier(prompt, schema=None):
     """Return different classifications based on which test is in prompt."""
     if "Stay" in prompt:
-        return {
-            "prefix": "test_non_lrm_",
-            "clause": "non-lrm", "non_lrm_topic": "aig",
-            "rationale": "r",
-        }
-    return {
-        "prefix": "test_parser_",
-        "clause": "6.1", "rationale": "r",
-    }
+        if schema and "non_lrm_topic" in schema:
+            return {"non_lrm_topic": "aig", "rationale": "r"}
+        return {"clause": "non-lrm", "rationale": "r"}
+    return {"clause": "6.1", "rationale": "r"}
 
 
 def _run_live_non_lrm(tmp_path, monkeypatch, src_body, classifier,
@@ -796,20 +775,19 @@ def _run_live_non_lrm(tmp_path, monkeypatch, src_body, classifier,
     _run(_run_args(tmp_path, file=str(src), test=test))
 
 
-def _self_named_classifier(_prompt):
+def _self_named_classifier(_prompt, schema=None):
     """Classify single test as non-lrm with topic aig."""
-    return {
-        "prefix": "test_non_lrm_",
-        "clause": "non-lrm", "non_lrm_topic": "aig",
-        "rationale": "r",
-    }
+    if schema and "non_lrm_topic" in schema:
+        return {"non_lrm_topic": "aig", "rationale": "r"}
+    return {"clause": "non-lrm", "rationale": "r"}
 
 
 def test_run_live_self_named(tmp_path, monkeypatch):
     """Source file already in correct location is left untouched."""
     _run_live_non_lrm(
         tmp_path, monkeypatch,
-        "#include <gtest/gtest.h>\n\nTEST(S, T) {\n}\n",
+        "#include <gtest/gtest.h>\n\n"
+        "TEST(S, T) {\n  auto r = Parse(src);\n}\n",
         _self_named_classifier,
     )
     assert (tmp_path / "test_non_lrm_aig.cpp").exists()
@@ -817,8 +795,8 @@ def test_run_live_self_named(tmp_path, monkeypatch):
 
 _MIXED_BODY = (
     "#include <gtest/gtest.h>\n\n"
-    "TEST(S, Stay) {\n}\n"
-    "TEST(S, Move) {\n}\n"
+    "TEST(S, Stay) {\n  auto r = Parse(src);\n}\n"
+    "TEST(S, Move) {\n  auto r = Parse(src);\n}\n"
 )
 
 
@@ -866,8 +844,8 @@ def test_run_live_removes_duplicates_from_source(tmp_path, monkeypatch):
     # Source has two tests, both classified as non-lrm:aig
     src_body = (
         "#include <gtest/gtest.h>\n\n"
-        "TEST(S, Keep) {\n}\n"
-        "TEST(S, Dup) {\n}\n"
+        "TEST(S, Keep) {\n  auto r = Parse(src);\n}\n"
+        "TEST(S, Dup) {\n  auto r = Parse(src);\n}\n"
     )
     # Pre-create a variant file that already contains Dup
     variant = tmp_path / "test_non_lrm_aig_a.cpp"
@@ -887,7 +865,7 @@ def test_run_live_dedup_only_test_rewrites_source(tmp_path, monkeypatch):
     """Source with only the duplicate test is rewritten empty."""
     src_body = (
         "#include <gtest/gtest.h>\n\n"
-        "TEST(S, Dup) {\n}\n"
+        "TEST(S, Dup) {\n  auto r = Parse(src);\n}\n"
     )
     variant = tmp_path / "test_non_lrm_aig_a.cpp"
     variant.write_text(
@@ -905,8 +883,8 @@ def test_run_live_keeps_non_duplicates_when_removing(tmp_path, monkeypatch):
     """Live run keeps non-duplicate tests when removing duplicates."""
     src_body = (
         "#include <gtest/gtest.h>\n\n"
-        "TEST(S, Keep) {\n}\n"
-        "TEST(S, Dup) {\n}\n"
+        "TEST(S, Keep) {\n  auto r = Parse(src);\n}\n"
+        "TEST(S, Dup) {\n  auto r = Parse(src);\n}\n"
     )
     variant = tmp_path / "test_non_lrm_aig_a.cpp"
     variant.write_text(
@@ -936,7 +914,7 @@ def test_main(monkeypatch):
         classify_tests_in_file, "_parse_args",
         lambda: SimpleNamespace(
             file="x", output_dir="/tmp", dry_run=True,
-            lrm="/lrm.txt", arch="/arch.md",
+            lrm="/lrm.txt",
         ),
     )
     classify_tests_in_file.main()
@@ -956,7 +934,7 @@ def test_main_enables_line_buffering(monkeypatch):
         classify_tests_in_file, "_parse_args",
         lambda: SimpleNamespace(
             file="x", output_dir="/tmp", dry_run=True,
-            lrm="/lrm.txt", arch="/arch.md",
+            lrm="/lrm.txt",
         ),
     )
     classify_tests_in_file.main()

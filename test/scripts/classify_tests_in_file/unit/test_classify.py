@@ -10,12 +10,17 @@ import classify_tests_in_file
 from helpers import make_parsed_file as _parsed
 from helpers import make_test_block as _tb
 
-_build_prompt = getattr(classify_tests_in_file, "_build_prompt")
+_detect_prefix = getattr(classify_tests_in_file, "_detect_prefix")
+_build_clause_prompt = getattr(classify_tests_in_file, "_build_clause_prompt")
+_build_topic_prompt = getattr(classify_tests_in_file, "_build_topic_prompt")
 _extract_json = getattr(classify_tests_in_file, "_extract_json")
 _call_claude = getattr(classify_tests_in_file, "_call_claude")
 _apply_classification = getattr(classify_tests_in_file, "_apply_classification")
-_validate_response = getattr(
-    classify_tests_in_file, "_validate_response", None,
+_validate_clause_response = getattr(
+    classify_tests_in_file, "_validate_clause_response",
+)
+_validate_topic_response = getattr(
+    classify_tests_in_file, "_validate_topic_response",
 )
 
 
@@ -51,124 +56,150 @@ def test_existing_non_lrm_topics_empty_topic(tmp_path):
     assert classify_tests_in_file.existing_non_lrm_topics(tmp_path) == []
 
 
-# ---- _build_prompt ---------------------------------------------------------
+# ---- _detect_prefix --------------------------------------------------------
 
 
-def test_build_prompt_no_topics(tmp_path):
-    """Prompt without existing non-lrm topics omits hint."""
-    t = _tb("X")
-    parsed = _parsed()
-    prompt = _build_prompt(
-        t, parsed, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
-    )
-    assert "Existing non-lrm topic files" not in prompt
+def test_detect_prefix_parser():
+    """Detects parser prefix from Parse( call."""
+    t = _tb("T", body=["  auto r = Parse(src);"])
+    assert _detect_prefix(t, "6.1") == "test_parser_"
 
 
-def test_build_prompt_with_topics(tmp_path):
-    """Prompt with existing non-lrm topics includes hint."""
-    (tmp_path / "test_non_lrm_aig.cpp").write_text("")
-    t = _tb("X")
-    parsed = _parsed()
-    prompt = _build_prompt(
-        t, parsed, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
-    )
-    assert "Existing non-lrm topic files" in prompt
+def test_detect_prefix_parser_ok():
+    """Detects parser prefix from ParseOk( call."""
+    t = _tb("T", body=["  EXPECT_TRUE(ParseOk(src));"])
+    assert _detect_prefix(t, "6.1") == "test_parser_"
 
 
-def test_build_prompt_no_context(tmp_path):
-    """Prompt omits FILE CONTEXT when includes and preamble are empty."""
-    t = _tb("X")
-    parsed = _parsed()
-    parsed.includes = []
-    prompt = _build_prompt(
-        t, parsed, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
-    )
-    assert "FILE CONTEXT" not in prompt
+def test_detect_prefix_elaborator():
+    """Detects elaborator prefix from Elaborate( call."""
+    t = _tb("T", body=["  auto* d = Elaborate(src);"])
+    assert _detect_prefix(t, "6.1") == "test_elaborator_"
 
 
-def test_build_prompt_contains_lrm_path(tmp_path):
-    """Prompt includes the LRM file path."""
+def test_detect_prefix_lexer_lex():
+    """Detects lexer prefix from Lex( call."""
+    t = _tb("T", body=["  auto tok = Lex(src);"])
+    assert _detect_prefix(t, "6.1") == "test_lexer_"
+
+
+def test_detect_prefix_lexer_lex_all():
+    """Detects lexer prefix from LexAll( call."""
+    t = _tb("T", body=["  auto toks = LexAll(src);"])
+    assert _detect_prefix(t, "6.1") == "test_lexer_"
+
+
+def test_detect_prefix_simulator():
+    """Detects simulator prefix from Scheduler( call."""
+    t = _tb("T", body=["  Scheduler sched;"])
+    assert _detect_prefix(t, "6.1") == "test_simulator_"
+
+
+def test_detect_prefix_simulator_sim_context():
+    """Detects simulator prefix from SimContext call."""
+    t = _tb("T", body=["  SimContext ctx;"])
+    assert _detect_prefix(t, "6.1") == "test_simulator_"
+
+
+def test_detect_prefix_synthesizer():
+    """Detects synthesizer prefix from SynthLower( call."""
+    t = _tb("T", body=["  auto g = SynthLower(src);"])
+    assert _detect_prefix(t, "6.1") == "test_synthesizer_"
+
+
+def test_detect_prefix_synthesizer_aig():
+    """Detects synthesizer prefix from AigGraph."""
+    t = _tb("T", body=["  AigGraph g;"])
+    assert _detect_prefix(t, "6.1") == "test_synthesizer_"
+
+
+def test_detect_prefix_preprocessor():
+    """Detects preprocessor prefix from Preprocessor( call."""
+    t = _tb("T", body=["  Preprocessor pp(src);"])
+    assert _detect_prefix(t, "6.1") == "test_preprocessor_"
+
+
+def test_detect_prefix_non_lrm_override():
+    """Non-LRM clause overrides detected prefix to test_non_lrm_."""
+    t = _tb("T", body=["  auto r = Parse(src);"])
+    assert _detect_prefix(t, "non-lrm") == "test_non_lrm_"
+
+
+def test_detect_prefix_non_lrm_underscore_override():
+    """Non_lrm (underscore variant) also overrides prefix."""
+    t = _tb("T", body=["  auto r = Parse(src);"])
+    assert _detect_prefix(t, "non_lrm") == "test_non_lrm_"
+
+
+def test_detect_prefix_no_match():
+    """Exits when no pattern matches."""
+    t = _tb("T", body=["  int x = 1;"])
+    with pytest.raises(SystemExit):
+        _detect_prefix(t, "6.1")
+
+
+# ---- _build_clause_prompt --------------------------------------------------
+
+
+def test_build_clause_prompt_contains_lrm_path(tmp_path):
+    """Clause prompt includes the LRM file path."""
     lrm = tmp_path / "LRM.txt"
     t = _tb("X")
-    parsed = _parsed()
-    prompt = _build_prompt(t, parsed, tmp_path, lrm, tmp_path / "arch.md")
+    prompt = _build_clause_prompt(t, lrm)
     assert str(lrm) in prompt
 
 
-def test_build_prompt_contains_arch_path(tmp_path):
-    """Prompt includes the architecture file path."""
-    arch = tmp_path / "ARCHITECTURE.md"
-    t = _tb("X")
-    parsed = _parsed()
-    prompt = _build_prompt(t, parsed, tmp_path, tmp_path / "lrm.txt", arch)
-    assert str(arch) in prompt
-
-
-def test_build_prompt_contains_test_body(tmp_path):
-    """Prompt includes the test's source code."""
+def test_build_clause_prompt_contains_test_body(tmp_path):
+    """Clause prompt includes the test's source code."""
     t = _tb("MyTest")
-    parsed = _parsed()
-    prompt = _build_prompt(
-        t, parsed, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
-    )
+    prompt = _build_clause_prompt(t, tmp_path / "lrm.txt")
     assert "TEST(S, MyTest)" in prompt
 
 
-def test_build_prompt_contains_parser_prefix(tmp_path):
-    """Prompt lists the parser prefix."""
+def test_build_clause_prompt_no_prefix_instructions(tmp_path):
+    """Clause prompt does not mention pipeline prefixes."""
     t = _tb("X")
-    parsed = _parsed()
-    prompt = _build_prompt(
-        t, parsed, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
-    )
-    assert "test_parser_" in prompt
+    prompt = _build_clause_prompt(t, tmp_path / "lrm.txt")
+    assert "test_parser_" not in prompt
 
 
-def test_build_prompt_contains_non_lrm_prefix(tmp_path):
-    """Prompt lists the non-lrm prefix."""
+def test_build_clause_prompt_no_arch_path(tmp_path):
+    """Clause prompt does not reference architecture file."""
     t = _tb("X")
-    parsed = _parsed()
-    prompt = _build_prompt(
-        t, parsed, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
-    )
-    assert "test_non_lrm_" in prompt
+    prompt = _build_clause_prompt(t, tmp_path / "lrm.txt")
+    assert "architecture" not in prompt.lower()
 
 
-def test_build_prompt_contains_source_filename(tmp_path):
-    """Prompt includes the source filename."""
+def test_build_clause_prompt_no_file_context(tmp_path):
+    """Clause prompt does not include FILE CONTEXT."""
     t = _tb("X")
-    parsed = _parsed()
-    parsed.source_filename = "test_non_lrm_misc.cpp"
-    prompt = _build_prompt(
-        t, parsed, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
-    )
-    assert "test_non_lrm_misc.cpp" in prompt
+    prompt = _build_clause_prompt(t, tmp_path / "lrm.txt")
+    assert "FILE CONTEXT" not in prompt
 
 
-def test_build_prompt_contains_includes(tmp_path):
-    """Prompt includes #include directives from the parsed file."""
+# ---- _build_topic_prompt ---------------------------------------------------
+
+
+def test_build_topic_prompt_no_topics(tmp_path):
+    """Topic prompt without existing topics omits hint."""
     t = _tb("X")
-    parsed = _parsed(includes=[
-        '#include <gtest/gtest.h>',
-        '#include "parser/parser.h"',
-    ])
-    prompt = _build_prompt(
-        t, parsed, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
-    )
-    assert '#include "parser/parser.h"' in prompt
+    prompt = _build_topic_prompt(t, tmp_path)
+    assert "Existing topic files" not in prompt
 
 
-def test_build_prompt_contains_preamble_context(tmp_path):
-    """Prompt includes helper definitions from global + section preamble."""
-    pre = classify_tests_in_file.PreambleItem(
-        lines=["static bool ParseOk(const std::string& src) {", "}"],
-    )
+def test_build_topic_prompt_with_topics(tmp_path):
+    """Topic prompt with existing topics includes hint."""
+    (tmp_path / "test_non_lrm_aig.cpp").write_text("")
     t = _tb("X")
-    parsed = _parsed(preamble=[pre])
-    prompt = _build_prompt(
-        t, parsed, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
-    )
-    assert "ParseOk" in prompt
+    prompt = _build_topic_prompt(t, tmp_path)
+    assert "Existing topic files" in prompt
+
+
+def test_build_topic_prompt_contains_test_body(tmp_path):
+    """Topic prompt includes the test's source code."""
+    t = _tb("MyTest")
+    prompt = _build_topic_prompt(t, tmp_path)
+    assert "TEST(S, MyTest)" in prompt
 
 
 # ---- _extract_json ---------------------------------------------------------
@@ -202,7 +233,7 @@ def test_extract_json_embedded_invalid():
 
 def test_call_claude_success(monkeypatch):
     """Returns parsed JSON from --output-format json envelope."""
-    inner = '{"prefix": "test_parser_"}'
+    inner = '{"clause": "6.1", "rationale": "r"}'
     envelope = json.dumps({"result": inner, "session_id": "x"})
     mock_result = MagicMock()
     mock_result.returncode = 0
@@ -211,19 +242,19 @@ def test_call_claude_success(monkeypatch):
     monkeypatch.setattr(
         subprocess, "run", lambda *_a, **_kw: mock_result,
     )
-    assert _call_claude("prompt") == {"prefix": "test_parser_"}
+    assert _call_claude("prompt") == {"clause": "6.1", "rationale": "r"}
 
 
 def test_call_claude_raw_text_fallback(monkeypatch):
     """Falls back to _extract_json when stdout is not valid JSON."""
     mock_result = MagicMock()
     mock_result.returncode = 0
-    mock_result.stdout = 'Here is the answer: {"prefix": "test_parser_"}'
+    mock_result.stdout = 'Here is the answer: {"clause": "6.1"}'
     mock_result.stderr = ""
     monkeypatch.setattr(
         subprocess, "run", lambda *_a, **_kw: mock_result,
     )
-    assert _call_claude("prompt") == {"prefix": "test_parser_"}
+    assert _call_claude("prompt") == {"clause": "6.1"}
 
 
 def test_call_claude_failure(monkeypatch):
@@ -239,12 +270,12 @@ def test_call_claude_failure(monkeypatch):
         _call_claude("prompt")
 
 
-def _capture_claude_cmd(monkeypatch):
+def _capture_claude_cmd(monkeypatch, schema=None):
     """Run _call_claude and return the captured subprocess command."""
     captured_cmd = []
     mock_result = MagicMock()
     mock_result.returncode = 0
-    mock_result.stdout = '{"prefix": "test_parser_"}'
+    mock_result.stdout = '{"clause": "6.1", "rationale": "r"}'
     mock_result.stderr = ""
 
     def capture_run(*args, **_kwargs):
@@ -252,7 +283,7 @@ def _capture_claude_cmd(monkeypatch):
         return mock_result
 
     monkeypatch.setattr(subprocess, "run", capture_run)
-    _call_claude("prompt")
+    _call_claude("prompt", schema=schema)
     return captured_cmd
 
 
@@ -269,59 +300,81 @@ def test_call_claude_allows_read(monkeypatch):
     assert "--allowedTools" in cmd and "Read" in cmd
 
 
+def test_call_claude_json_schema(monkeypatch):
+    """CLI command includes --json-schema when schema is provided."""
+    schema = '{"type": "object"}'
+    cmd = _capture_claude_cmd(monkeypatch, schema=schema)
+    idx = cmd.index("--json-schema")
+    assert cmd[idx + 1] == schema
+
+
+def test_call_claude_no_json_schema_by_default(monkeypatch):
+    """CLI command omits --json-schema when no schema is provided."""
+    cmd = _capture_claude_cmd(monkeypatch)
+    assert "--json-schema" not in cmd
+
+
 # ---- _apply_classification -------------------------------------------------
 
 
 def test_apply_classification_found():
-    """Applies prefix, clause, and rationale from response."""
-    t = _tb("MyTest")
-    resp = {
-        "prefix": "test_parser_", "clause": "6.1",
-        "rationale": "reason",
-    }
-    _apply_classification(t, resp)
+    """Applies prefix, clause, and rationale from clause response."""
+    t = _tb("MyTest", body=["  auto r = Parse(src);"])
+    clause_resp = {"clause": "6.1", "rationale": "reason"}
+    _apply_classification(t, clause_resp)
     assert t.prefix == "test_parser_" and t.clause == "6.1"
 
 
 def test_apply_classification_non_lrm_underscore():
     """Normalizes non_lrm to non-lrm."""
-    t = _tb("T")
-    resp = {
-        "prefix": "test_non_lrm_", "clause": "non_lrm",
-        "non_lrm_topic": "aig",
-    }
-    _apply_classification(t, resp)
+    t = _tb("T", body=["  auto r = Parse(src);"])
+    clause_resp = {"clause": "non_lrm", "rationale": "r"}
+    topic_resp = {"non_lrm_topic": "aig", "rationale": "r"}
+    _apply_classification(t, clause_resp, topic_resp)
     assert t.clause == "non-lrm:aig"
 
 
 def test_apply_classification_non_lrm_with_topic():
     """Appends topic to non-lrm clause."""
-    t = _tb("T")
-    resp = {
-        "prefix": "test_non_lrm_", "clause": "non-lrm",
-        "non_lrm_topic": "aig",
-    }
-    _apply_classification(t, resp)
+    t = _tb("T", body=["  auto r = Parse(src);"])
+    clause_resp = {"clause": "non-lrm", "rationale": "r"}
+    topic_resp = {"non_lrm_topic": "aig", "rationale": "r"}
+    _apply_classification(t, clause_resp, topic_resp)
     assert t.clause == "non-lrm:aig"
 
 
 def test_apply_classification_no_rationale():
     """Missing rationale defaults to empty string."""
-    t = _tb("T")
-    resp = {"prefix": "test_parser_", "clause": "6.1"}
-    _apply_classification(t, resp)
+    t = _tb("T", body=["  auto r = Parse(src);"])
+    clause_resp = {"clause": "6.1"}
+    _apply_classification(t, clause_resp)
     assert t.rationale == ""
 
 
-def test_apply_classification_non_lrm_no_topic():
-    """non-lrm clause without topic causes SystemExit."""
-    t = _tb("T")
-    resp = {
-        "prefix": "test_non_lrm_", "clause": "non-lrm",
-        "non_lrm_topic": None,
-    }
+def test_apply_classification_non_lrm_empty_topic():
+    """non-lrm clause with empty topic causes SystemExit."""
+    t = _tb("T", body=["  auto r = Parse(src);"])
+    clause_resp = {"clause": "non-lrm", "rationale": "r"}
+    topic_resp = {"non_lrm_topic": "", "rationale": "r"}
     with pytest.raises(SystemExit):
-        _apply_classification(t, resp)
+        _apply_classification(t, clause_resp, topic_resp)
+
+
+def test_apply_classification_detects_prefix():
+    """Prefix is derived mechanically from test body."""
+    t = _tb("T", body=["  auto* d = Elaborate(src);"])
+    clause_resp = {"clause": "6.1", "rationale": "r"}
+    _apply_classification(t, clause_resp)
+    assert t.prefix == "test_elaborator_"
+
+
+def test_apply_classification_non_lrm_prefix_override():
+    """Non-LRM clause overrides prefix to test_non_lrm_."""
+    t = _tb("T", body=["  auto r = Parse(src);"])
+    clause_resp = {"clause": "non-lrm", "rationale": "r"}
+    topic_resp = {"non_lrm_topic": "aig", "rationale": "r"}
+    _apply_classification(t, clause_resp, topic_resp)
+    assert t.prefix == "test_non_lrm_"
 
 
 # ---- classify_tests --------------------------------------------------------
@@ -329,201 +382,205 @@ def test_apply_classification_non_lrm_no_topic():
 
 def test_classify_tests_matching(monkeypatch, tmp_path):
     """classify_tests applies classification per test."""
-    response = {
-        "prefix": "test_parser_", "clause": "6.1", "rationale": "r",
-    }
+    clause_resp = {"clause": "6.1", "rationale": "r"}
     monkeypatch.setattr(
-        classify_tests_in_file, "_call_claude", lambda p: response,
+        classify_tests_in_file, "_call_claude",
+        lambda p, schema=None: clause_resp,
     )
-    t = _tb("T")
-    parsed = _parsed()
+    t = _tb("T", body=["  auto r = Parse(src);"])
     classify_tests_in_file.classify_tests(
-        [t], parsed, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
+        [t], tmp_path, tmp_path / "lrm.txt",
     )
     assert t.prefix == "test_parser_"
 
 
 def test_classify_tests_per_test(monkeypatch, tmp_path):
-    """classify_tests calls Claude once per test."""
+    """classify_tests calls Claude once per (non-lrm) test."""
     call_count = [0]
 
-    def counting_claude(_prompt):
+    def counting_claude(_prompt, schema=None):
         call_count[0] += 1
-        return {
-            "prefix": "test_parser_", "clause": "6.1",
-            "rationale": "r",
-        }
+        return {"clause": "6.1", "rationale": "r"}
 
     monkeypatch.setattr(
         classify_tests_in_file, "_call_claude", counting_claude,
     )
-    tests = [_tb("A"), _tb("B"), _tb("C")]
-    parsed = _parsed()
+    tests = [
+        _tb("A", body=["  auto r = Parse(src);"]),
+        _tb("B", body=["  auto r = Parse(src);"]),
+        _tb("C", body=["  auto r = Parse(src);"]),
+    ]
     classify_tests_in_file.classify_tests(
-        tests, parsed, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
+        tests, tmp_path, tmp_path / "lrm.txt",
     )
     assert call_count[0] == 3
 
 
-# ---- _validate_response helpers --------------------------------------------
+def test_classify_tests_non_lrm_two_calls(monkeypatch, tmp_path):
+    """classify_tests makes two calls for non-LRM tests."""
+    call_count = [0]
+
+    def two_call_claude(_prompt, schema=None):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            return {"clause": "non-lrm", "rationale": "r"}
+        return {"non_lrm_topic": "aig", "rationale": "r"}
+
+    monkeypatch.setattr(
+        classify_tests_in_file, "_call_claude", two_call_claude,
+    )
+    t = _tb("T", body=["  auto r = Parse(src);"])
+    classify_tests_in_file.classify_tests(
+        [t], tmp_path, tmp_path / "lrm.txt",
+    )
+    assert call_count[0] == 2
+    assert t.clause == "non-lrm:aig"
+    assert t.prefix == "test_non_lrm_"
 
 
-def _valid_resp(**overrides):
-    """Build a minimal valid classification response."""
-    base = {"prefix": "test_parser_", "clause": "6.1", "rationale": "r"}
+# ---- _validate_clause_response helpers -------------------------------------
+
+
+def _valid_clause(**overrides):
+    """Build a minimal valid clause response."""
+    base = {"clause": "6.1", "rationale": "r"}
     base.update(overrides)
     return base
 
 
-def _non_lrm_resp(**overrides):
-    """Build a valid non-lrm classification response."""
-    base = {
-        "prefix": "test_non_lrm_", "clause": "non-lrm",
-        "non_lrm_topic": "aig", "rationale": "r",
-    }
+def _valid_topic(**overrides):
+    """Build a valid topic response."""
+    base = {"non_lrm_topic": "aig", "rationale": "r"}
     base.update(overrides)
     return base
 
 
-# ---- _validate_response: required keys ------------------------------------
+# ---- _validate_clause_response: required keys ------------------------------
 
 
-def test_validate_response_missing_prefix():
-    """Exits when response is missing the prefix key."""
-    with pytest.raises(SystemExit):
-        _validate_response({"clause": "6.1"}, "T")
-
-
-def test_validate_response_missing_clause():
+def test_validate_clause_response_missing_clause():
     """Exits when response is missing the clause key."""
     with pytest.raises(SystemExit):
-        _validate_response({"prefix": "test_parser_"}, "T")
+        _validate_clause_response({"rationale": "r"}, "T")
 
 
-# ---- _validate_response: prefix -------------------------------------------
+# ---- _validate_clause_response: clause format ------------------------------
 
 
-def test_validate_response_invalid_prefix():
-    """Exits when prefix is not one of the valid seven."""
-    with pytest.raises(SystemExit):
-        _validate_response(_valid_resp(prefix="test_invalid_"), "T")
-
-
-def test_validate_response_prefix_no_trailing_underscore():
-    """Exits when prefix is missing its trailing underscore."""
-    with pytest.raises(SystemExit):
-        _validate_response(_valid_resp(prefix="test_parser"), "T")
-
-
-def test_validate_response_valid_prefix():
-    """Accepts a valid prefix without raising."""
-    assert _validate_response(_valid_resp(), "T") is None
-
-
-# ---- _validate_response: clause format ------------------------------------
-
-
-def test_validate_response_invalid_clause_letters():
+def test_validate_clause_response_invalid_clause_letters():
     """Exits when clause is arbitrary text."""
     with pytest.raises(SystemExit):
-        _validate_response(_valid_resp(clause="abc"), "T")
+        _validate_clause_response(_valid_clause(clause="abc"), "T")
 
 
-def test_validate_response_invalid_clause_empty():
+def test_validate_clause_response_invalid_clause_empty():
     """Exits when clause is an empty string."""
     with pytest.raises(SystemExit):
-        _validate_response(_valid_resp(clause=""), "T")
+        _validate_clause_response(_valid_clause(clause=""), "T")
 
 
-def test_validate_response_invalid_clause_trailing_dot():
+def test_validate_clause_response_invalid_clause_trailing_dot():
     """Exits when clause has a trailing dot."""
     with pytest.raises(SystemExit):
-        _validate_response(_valid_resp(clause="6.1."), "T")
+        _validate_clause_response(_valid_clause(clause="6.1."), "T")
 
 
-def test_validate_response_clause_single_digit():
+def test_validate_clause_response_clause_single_digit():
     """Accepts a single-digit clause."""
-    assert _validate_response(_valid_resp(clause="6"), "T") is None
+    result = _validate_clause_response(_valid_clause(clause="6"), "T")
+    assert result is None
 
 
-def test_validate_response_clause_deep_numeric():
+def test_validate_clause_response_clause_deep_numeric():
     """Accepts a deeply nested numeric clause."""
-    assert _validate_response(_valid_resp(clause="9.2.2.2.2"), "T") is None
+    result = _validate_clause_response(
+        _valid_clause(clause="9.2.2.2.2"), "T",
+    )
+    assert result is None
 
 
-def test_validate_response_clause_annex():
+def test_validate_clause_response_clause_annex():
     """Accepts an annex clause like A.6.3."""
-    assert _validate_response(_valid_resp(clause="A.6.3"), "T") is None
+    result = _validate_clause_response(
+        _valid_clause(clause="A.6.3"), "T",
+    )
+    assert result is None
 
 
-# ---- _validate_response: non-lrm topic ------------------------------------
+def test_validate_clause_response_valid():
+    """Accepts a valid clause response."""
+    result = _validate_clause_response(_valid_clause(), "T")
+    assert result is None
 
 
-def test_validate_response_non_lrm_missing_topic():
-    """Exits when non-lrm clause has no non_lrm_topic key."""
-    resp = _non_lrm_resp()
-    del resp["non_lrm_topic"]
+# ---- _validate_topic_response ----------------------------------------------
+
+
+def test_validate_topic_response_missing_topic():
+    """Exits when response has no non_lrm_topic key."""
     with pytest.raises(SystemExit):
-        _validate_response(resp, "T")
+        _validate_topic_response({"rationale": "r"}, "T")
 
 
-def test_validate_response_non_lrm_null_topic():
-    """Exits when non-lrm clause has null topic."""
+def test_validate_topic_response_null_topic():
+    """Exits when non_lrm_topic is None."""
     with pytest.raises(SystemExit):
-        _validate_response(_non_lrm_resp(non_lrm_topic=None), "T")
+        _validate_topic_response(
+            _valid_topic(non_lrm_topic=None), "T",
+        )
 
 
-def test_validate_response_non_lrm_empty_topic():
-    """Exits when non-lrm clause has empty string topic."""
+def test_validate_topic_response_empty_topic():
+    """Exits when non_lrm_topic is empty string."""
     with pytest.raises(SystemExit):
-        _validate_response(_non_lrm_resp(non_lrm_topic=""), "T")
+        _validate_topic_response(_valid_topic(non_lrm_topic=""), "T")
 
 
-def test_validate_response_non_lrm_with_topic():
-    """Accepts non-lrm clause with a valid topic."""
-    assert _validate_response(_non_lrm_resp(), "T") is None
+def test_validate_topic_response_valid():
+    """Accepts a valid topic response."""
+    result = _validate_topic_response(_valid_topic(), "T")
+    assert result is None
 
 
-# ---- _validate_response: error messages ------------------------------------
+# ---- _validate_clause_response: error messages -----------------------------
 
 
-def test_validate_response_invalid_prefix_message(capsys):
-    """Error message contains the invalid prefix value."""
+def test_validate_clause_response_invalid_clause_message(capsys):
+    """Error message contains the invalid clause value."""
     try:
-        _validate_response(_valid_resp(prefix="test_bad_"), "T")
+        _validate_clause_response(_valid_clause(clause="abc"), "T")
     except SystemExit:
         pass
-    assert "test_bad_" in capsys.readouterr().out
+    assert "abc" in capsys.readouterr().out
 
 
-def test_validate_response_missing_topic_message(capsys):
-    """Error message mentions non_lrm_topic."""
+def test_validate_topic_response_missing_topic_message(capsys):
+    """Error message mentions topic."""
     try:
-        _validate_response(_non_lrm_resp(non_lrm_topic=None), "T")
+        _validate_topic_response({"rationale": "r"}, "T")
     except SystemExit:
         pass
-    assert "non_lrm_topic" in capsys.readouterr().out
+    assert "topic" in capsys.readouterr().out.lower()
 
 
-# ---- _validate_response: integration with _apply_classification ------------
+# ---- integration: _apply_classification + validation -----------------------
 
 
-def test_apply_classification_rejects_bad_prefix():
-    """_apply_classification exits on an invalid prefix."""
-    t = _tb("T")
+def test_apply_classification_rejects_bad_clause():
+    """_apply_classification exits on an invalid clause."""
+    t = _tb("T", body=["  auto r = Parse(src);"])
     with pytest.raises(SystemExit):
-        _apply_classification(t, _valid_resp(prefix="test_bad_"))
+        _apply_classification(t, _valid_clause(clause="abc"))
 
 
 def test_classify_tests_propagates_validation_error(monkeypatch, tmp_path):
-    """classify_tests exits when Claude returns an invalid prefix."""
+    """classify_tests exits when Claude returns an invalid clause."""
     monkeypatch.setattr(
         classify_tests_in_file, "_call_claude",
-        lambda _p: _valid_resp(prefix="test_bad_"),
+        lambda _p, schema=None: _valid_clause(clause="abc"),
     )
-    parsed = _parsed()
     with pytest.raises(SystemExit):
         classify_tests_in_file.classify_tests(
-            [_tb("T")], parsed, tmp_path,
-            tmp_path / "lrm.txt", tmp_path / "arch.md",
+            [_tb("T", body=["  auto r = Parse(src);"])],
+            tmp_path, tmp_path / "lrm.txt",
         )

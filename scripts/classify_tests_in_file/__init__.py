@@ -322,6 +322,33 @@ def parse_file(filepath):
 # Stage 2: Classify via Claude
 # ---------------------------------------------------------------------------
 
+_PREFIX_PATTERNS = [
+    ("Preprocessor", "test_preprocessor_"),
+    ("SynthLower(", "test_synthesizer_"),
+    ("AigGraph", "test_synthesizer_"),
+    ("Scheduler", "test_simulator_"),
+    ("SimContext", "test_simulator_"),
+    ("Elaborate(", "test_elaborator_"),
+    ("Parse(", "test_parser_"),
+    ("ParseOk(", "test_parser_"),
+    ("LexAll(", "test_lexer_"),
+    ("Lex(", "test_lexer_"),
+]
+
+
+def _detect_prefix(test, clause):
+    """Detect pipeline stage prefix mechanically from test body."""
+    if clause.replace("_", "-").startswith("non-lrm"):
+        return "test_non_lrm_"
+    body = "\n".join(test.lines)
+    for pattern, prefix in _PREFIX_PATTERNS:
+        if pattern in body:
+            return prefix
+    print(f"ERROR: Cannot detect pipeline stage for test"
+          f" {test.test_name}. No known helper call found in body.")
+    sys.exit(1)
+
+
 def existing_non_lrm_topics(test_dir):
     """Scan output dir for existing test_non_lrm_*.cpp topic names."""
     topics = set()
@@ -336,84 +363,72 @@ def existing_non_lrm_topics(test_dir):
     return sorted(topics)
 
 
-_PROMPT_TEMPLATE = """Classify this test. Determine:
+_CLAUSE_PROMPT_TEMPLATE = """What IEEE 1800-2023 clause does this test exercise?
 
-1. PREFIX — which pipeline stage the test exercises. Use EXACTLY one of:
-   - test_preprocessor_
-   - test_lexer_
-   - test_parser_
-   - test_elaborator_
-   - test_simulator_
-   - test_synthesizer_
-   - test_non_lrm_
-   Read the project architecture document for what each stage covers.
-   Do NOT invent new prefixes.
+Use the most specific subclause possible (e.g., 9.2.2.2.2 not 9.2).
+Read the LRM to verify — do not guess from titles.
+If no LRM clause applies, respond with "non-lrm".
 
-2. CLAUSE — which IEEE 1800-2023 clause the test covers based on what
-   the code actually DOES. Ignore source comments — they may be wrong.
-   Use the most specific subclause possible (e.g. 9.2.2.2.2, not 9.2).
-   Clauses and annexes can be arbitrarily deep — use the most specific
-   one that applies. Read the LRM to find the right depth.
-   Read the relevant LRM sections to verify — do not guess from titles.
-   If no LRM clause applies: non-lrm
+LRM: {lrm_path}
 
-3. NON_LRM_TOPIC — only when clause is "non-lrm". A short snake_case
-   topic (e.g. "aig", "arena", "dpi_helpers"). Set to null otherwise.
-
-4. RATIONALE — describe the process you followed to reach your
-   conclusion. Specifically:
-   - Which LRM sections did you Read (use the Read tool) and why?
-   - What did those sections contain that confirmed or ruled them out?
-   - If you concluded non-lrm, explain which sections you checked
-     and why none of them apply.
-   Do NOT just state the conclusion — show your work.
-{topics}
-Project architecture: {arch_path}
-IEEE 1800-2023 LRM: {lrm_path}
-{file_context}
 TEST({suite}, {test_name}):
 {test_body}
-
-Respond with ONLY JSON:
-{{"prefix": "...", "clause": "...", "non_lrm_topic": ..., "rationale": "..."}}
 """
 
+_TOPIC_PROMPT_TEMPLATE = """What non-LRM topic does this test belong to?
 
-def _build_prompt(test, parsed, test_dir, lrm_path, arch_path):
-    """Build the Claude classification prompt for a single test."""
+Return a short snake_case topic name (e.g., "aig", "arena", "dpi_helpers").
+{topics}
+TEST({suite}, {test_name}):
+{test_body}
+"""
+
+_CLAUSE_SCHEMA = json.dumps({
+    "type": "object",
+    "properties": {
+        "clause": {"type": "string"},
+        "rationale": {"type": "string"},
+    },
+    "required": ["clause", "rationale"],
+    "additionalProperties": False,
+})
+
+_TOPIC_SCHEMA = json.dumps({
+    "type": "object",
+    "properties": {
+        "non_lrm_topic": {"type": "string"},
+        "rationale": {"type": "string"},
+    },
+    "required": ["non_lrm_topic", "rationale"],
+    "additionalProperties": False,
+})
+
+
+def _build_clause_prompt(test, lrm_path):
+    """Build the clause-only classification prompt."""
+    body = "\n".join(test.preceding_comments + test.lines)
+    return _CLAUSE_PROMPT_TEMPLATE.format(
+        lrm_path=lrm_path,
+        suite=test.suite_name,
+        test_name=test.test_name,
+        test_body=body,
+    )
+
+
+def _build_topic_prompt(test, test_dir):
+    """Build the topic classification prompt for non-LRM tests."""
     topics = existing_non_lrm_topics(test_dir)
     topics_hint = ""
     if topics:
         topics_hint = (
-            "   Existing non-lrm topic files: "
+            "Existing topic files: "
             + ", ".join(topics)
-            + "\n   PREFER reusing one of these topics when the"
+            + "\nPREFER reusing one of these topics when the"
             " test fits, to avoid near-duplicate filenames.\n"
         )
-    context_parts = []
-    if parsed.source_filename:
-        context_parts.append(f"Source file: {parsed.source_filename}")
-    if parsed.includes:
-        context_parts.append("Includes:\n" + "\n".join(parsed.includes))
-    all_preamble = list(parsed.global_preamble) + list(parsed.section_preamble)
-    if all_preamble:
-        preamble_lines = []
-        for item in all_preamble:
-            preamble_lines.extend(item.lines)
-        context_parts.append(
-            "Helper definitions:\n" + "\n".join(preamble_lines),
-        )
-    file_context = ""
-    if context_parts:
-        file_context = (
-            "FILE CONTEXT:\n" + "\n\n".join(context_parts) + "\n"
-        )
     body = "\n".join(test.preceding_comments + test.lines)
-    return _PROMPT_TEMPLATE.format(
+    return _TOPIC_PROMPT_TEMPLATE.format(
         topics=topics_hint,
-        arch_path=arch_path,
-        lrm_path=lrm_path,
-        file_context=file_context,
         suite=test.suite_name,
         test_name=test.test_name,
         test_body=body,
@@ -437,13 +452,16 @@ def _extract_json(text):
     sys.exit(1)
 
 
-def _call_claude(prompt):
+def _call_claude(prompt, schema=None):
     """Call Claude CLI and return parsed JSON response."""
     env = os.environ.copy()
     env.pop("CLAUDECODE", None)
+    cmd = ["claude", "-p", "--model", "sonnet", "--output-format", "json",
+           "--allowedTools", "Read"]
+    if schema:
+        cmd.extend(["--json-schema", schema])
     result = subprocess.run(
-        ["claude", "-p", "--model", "sonnet", "--output-format", "json",
-         "--allowedTools", "Read"],
+        cmd,
         input=prompt,
         capture_output=True,
         text=True,
@@ -466,17 +484,11 @@ def _call_claude(prompt):
     return _extract_json(raw)
 
 
-def _validate_response(response, test_name):
-    """Validate Claude's classification response or exit with error."""
-    missing = [k for k in ("prefix", "clause") if k not in response]
-    if missing:
+def _validate_clause_response(response, test_name):
+    """Validate Claude's clause response or exit with error."""
+    if "clause" not in response:
         print(f"ERROR: Classification for test {test_name} is missing"
-              f" required key(s): {', '.join(missing)}")
-        sys.exit(1)
-    prefix = response["prefix"]
-    if prefix not in _VALID_PREFIXES:
-        print(f'ERROR: Invalid prefix "{prefix}" for test {test_name}.'
-              f"\n  Valid: {', '.join(sorted(_VALID_PREFIXES))}")
+              " required key: clause")
         sys.exit(1)
     clause = response["clause"]
     if not _CLAUSE_RE.match(clause):
@@ -484,36 +496,41 @@ def _validate_response(response, test_name):
               "\n  Expected: numeric (6.1.2), annex (A.6.3),"
               " or non-lrm")
         sys.exit(1)
-    is_non_lrm = clause.replace("_", "-") == "non-lrm"
-    if is_non_lrm and not response.get("non_lrm_topic"):
-        print(f"ERROR: Classification for test {test_name} has clause"
-              f' "{clause}" but no non_lrm_topic.'
-              "\n  A topic is required to avoid the misc bucket.")
+
+
+def _validate_topic_response(response, test_name):
+    """Validate Claude's topic response or exit with error."""
+    if not response.get("non_lrm_topic"):
+        print(f"ERROR: Topic for test {test_name} is missing"
+              " or empty. A topic is required for non-lrm tests.")
         sys.exit(1)
 
 
-def _apply_classification(test, response):
-    """Apply a single classification result to a test block."""
-    _validate_response(response, test.test_name)
-    test.prefix = response["prefix"]
-    clause = response["clause"]
+def _apply_classification(test, clause_resp, topic_resp=None):
+    """Apply clause and optional topic responses to a test block."""
+    _validate_clause_response(clause_resp, test.test_name)
+    clause = clause_resp["clause"]
     if clause.replace("_", "-") == "non-lrm":
         clause = "non-lrm"
-    topic = response.get("non_lrm_topic")
-    if clause == "non-lrm" and topic:
-        clause = f"non-lrm:{topic}"
+    if clause == "non-lrm" and topic_resp:
+        _validate_topic_response(topic_resp, test.test_name)
+        clause = f"non-lrm:{topic_resp['non_lrm_topic']}"
+    test.prefix = _detect_prefix(test, clause)
     test.clause = clause
-    test.rationale = response.get("rationale", "")
+    test.rationale = clause_resp.get("rationale", "")
 
 
-def classify_tests(tests, parsed, test_dir, lrm_path, arch_path):
+def classify_tests(tests, test_dir, lrm_path):
     """Use Claude to classify each test's prefix and clause."""
     for test in tests:
-        prompt = _build_prompt(
-            test, parsed, test_dir, lrm_path, arch_path,
-        )
-        response = _call_claude(prompt)
-        _apply_classification(test, response)
+        clause_prompt = _build_clause_prompt(test, lrm_path)
+        clause_resp = _call_claude(clause_prompt, _CLAUSE_SCHEMA)
+        topic_resp = None
+        clause = clause_resp.get("clause", "")
+        if clause.replace("_", "-") == "non-lrm":
+            topic_prompt = _build_topic_prompt(test, test_dir)
+            topic_resp = _call_claude(topic_prompt, _TOPIC_SCHEMA)
+        _apply_classification(test, clause_resp, topic_resp)
     return tests
 
 
@@ -735,10 +752,6 @@ def _parse_args():
         help="Path to IEEE 1800-2023 LRM text file",
     )
     parser.add_argument(
-        "--arch", required=True,
-        help="Path to ARCHITECTURE.md file",
-    )
-    parser.add_argument(
         "--max-lines", type=int, default=None,
         help="Maximum lines per output file; splits into _a, _b, ... suffixes",
     )
@@ -910,8 +923,8 @@ def _run(args):
     print(f"{test_name}.cpp \u2014 {args.test}"
           f"{' (dry run)' if args.dry_run else ''}")
     classify_tests(
-        target, parsed, Path(args.output_dir).resolve(),
-        Path(args.lrm).resolve(), Path(args.arch).resolve(),
+        target, Path(args.output_dir).resolve(),
+        Path(args.lrm).resolve(),
     )
     print_classification_table(target)
     groups = _group_tests(target)

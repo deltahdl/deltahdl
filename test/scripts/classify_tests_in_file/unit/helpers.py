@@ -5,12 +5,17 @@ import classify_tests_in_file
 
 def make_test_block(
     name, prefix=None, clause=None, rationale=None, comments=None,
+    body=None,
 ):
     """Shorthand factory for TestBlock."""
+    if body is None:
+        lines = [f"TEST(S, {name}) {{", "}"]
+    else:
+        lines = [f"TEST(S, {name}) {{"] + body + ["}"]
     return classify_tests_in_file.TestBlock(
         suite_name="S",
         test_name=name,
-        lines=[f"TEST(S, {name}) {{", "}"],
+        lines=lines,
         preceding_comments=comments or [],
         prefix=prefix,
         clause=clause,
@@ -36,5 +41,6 @@ def make_parsed_file(
 def stub_classifier(monkeypatch, response):
     """Stub _call_claude for classify_tests."""
     monkeypatch.setattr(
-        classify_tests_in_file, "_call_claude", lambda p: response,
+        classify_tests_in_file, "_call_claude",
+        lambda p, schema=None: response,
     )

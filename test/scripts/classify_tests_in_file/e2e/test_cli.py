@@ -41,12 +41,10 @@ def _bootstrap_repo(tmp_path, cmake_body="# header\n"):
 
 
 def _create_ref_files(tmp_path):
-    """Create minimal LRM and ARCH files for --lrm/--arch flags."""
+    """Create minimal LRM file for --lrm flag."""
     lrm = tmp_path / "LRM.txt"
     lrm.write_text("1 Overview\n", encoding="utf-8")
-    arch = tmp_path / "ARCHITECTURE.md"
-    arch.write_text("# Architecture\n", encoding="utf-8")
-    return str(lrm), str(arch)
+    return str(lrm)
 
 
 def _base_env(tmp_path):
@@ -95,14 +93,14 @@ def _write_test_file(tmp_path, body):
 def _run_dry(tmp_path):
     """Bootstrap and execute a dry-run pipeline."""
     _bootstrap_repo(tmp_path)
-    _write_test_file(tmp_path, "TEST(S, DryT) {\n}")
-    lrm, arch = _create_ref_files(tmp_path)
-    resp = {"prefix": "test_parser_", "clause": "6.1", "rationale": "r"}
+    _write_test_file(tmp_path, "TEST(S, DryT) {\n  auto r = Parse(src);\n}")
+    lrm = _create_ref_files(tmp_path)
+    resp = {"clause": "6.1", "rationale": "r"}
     env = _env_with_fakes(tmp_path, resp)
     return _invoke(
         "--file", str(tmp_path / "test_input.cpp"),
         "--output-dir", str(tmp_path),
-        "--lrm", lrm, "--arch", arch,
+        "--lrm", lrm,
         "--test", "DryT", "--dry-run",
         cwd=str(tmp_path), env=env,
     )
@@ -115,20 +113,20 @@ def _setup_pipeline(tmp_path):
     )
     _write_test_file(
         tmp_path,
-        "TEST(S, Alpha) {\n  EXPECT_TRUE(true);\n}",
+        "TEST(S, Alpha) {\n  auto r = Parse(src);\n}",
     )
-    lrm, arch = _create_ref_files(tmp_path)
-    resp = {"prefix": "test_parser_", "clause": "6.1", "rationale": "r"}
-    return _env_with_fakes(tmp_path, resp), lrm, arch
+    lrm = _create_ref_files(tmp_path)
+    resp = {"clause": "6.1", "rationale": "r"}
+    return _env_with_fakes(tmp_path, resp), lrm
 
 
 def _run_pipeline(tmp_path):
     """Run the full live pipeline and return CompletedProcess."""
-    env, lrm, arch = _setup_pipeline(tmp_path)
+    env, lrm = _setup_pipeline(tmp_path)
     return _invoke(
         "--file", str(tmp_path / "test_input.cpp"),
         "--output-dir", str(tmp_path),
-        "--lrm", lrm, "--arch", arch,
+        "--lrm", lrm,
         "--test", "Alpha",
         cwd=str(tmp_path), env=env,
     )
@@ -165,11 +163,11 @@ def test_missing_output_dir_flag_reported(tmp_path):
 def test_nonexistent_file_reports_error(tmp_path):
     """Pointing --file at a missing path prints ERROR."""
     _bootstrap_repo(tmp_path)
-    lrm, arch = _create_ref_files(tmp_path)
+    lrm = _create_ref_files(tmp_path)
     assert "ERROR" in _invoke(
         "--file", str(tmp_path / "missing.cpp"),
         "--output-dir", str(tmp_path),
-        "--lrm", lrm, "--arch", arch,
+        "--lrm", lrm,
         "--test", "T",
         cwd=str(tmp_path), env=_base_env(tmp_path),
     ).stdout
@@ -178,7 +176,7 @@ def test_nonexistent_file_reports_error(tmp_path):
 def test_file_without_tests_reports_error(tmp_path):
     """A file with no TEST blocks prints an error about missing tests."""
     _bootstrap_repo(tmp_path)
-    lrm, arch = _create_ref_files(tmp_path)
+    lrm = _create_ref_files(tmp_path)
     (tmp_path / "empty.cpp").write_text(
         "#include <gtest/gtest.h>\nint x = 0;\n",
         encoding="utf-8",
@@ -186,7 +184,7 @@ def test_file_without_tests_reports_error(tmp_path):
     assert "No TEST blocks" in _invoke(
         "--file", str(tmp_path / "empty.cpp"),
         "--output-dir", str(tmp_path),
-        "--lrm", lrm, "--arch", arch,
+        "--lrm", lrm,
         "--test", "T",
         cwd=str(tmp_path), env=_base_env(tmp_path),
     ).stdout
@@ -196,11 +194,11 @@ def test_test_not_found_reports_error(tmp_path):
     """Passing --test with unknown name prints ERROR."""
     _bootstrap_repo(tmp_path)
     _write_test_file(tmp_path, "TEST(S, Alpha) {\n}")
-    lrm, arch = _create_ref_files(tmp_path)
+    lrm = _create_ref_files(tmp_path)
     assert "ERROR" in _invoke(
         "--file", str(tmp_path / "test_input.cpp"),
         "--output-dir", str(tmp_path),
-        "--lrm", lrm, "--arch", arch,
+        "--lrm", lrm,
         "--test", "NoSuchTest",
         cwd=str(tmp_path), env=_base_env(tmp_path),
     ).stdout
@@ -286,25 +284,25 @@ def _setup_named_ns_pipeline(tmp_path):
         "namespace {\n"
         "\n"
         "TEST(S, Alpha) {\n"
-        "  EXPECT_TRUE(true);\n"
+        "  auto r = Parse(src);\n"
         "}\n"
         "\n"
         "}  // namespace\n"
         "}  // namespace delta\n",
         encoding="utf-8",
     )
-    lrm, arch = _create_ref_files(tmp_path)
-    resp = {"prefix": "test_parser_", "clause": "6.1", "rationale": "r"}
-    return _env_with_fakes(tmp_path, resp), lrm, arch
+    lrm = _create_ref_files(tmp_path)
+    resp = {"clause": "6.1", "rationale": "r"}
+    return _env_with_fakes(tmp_path, resp), lrm
 
 
 def test_named_ns_pipeline_reports_done(tmp_path):
     """Pipeline succeeds on a file with named namespace wrapper."""
-    env, lrm, arch = _setup_named_ns_pipeline(tmp_path)
+    env, lrm = _setup_named_ns_pipeline(tmp_path)
     r = _invoke(
         "--file", str(tmp_path / "test_input.cpp"),
         "--output-dir", str(tmp_path),
-        "--lrm", lrm, "--arch", arch,
+        "--lrm", lrm,
         "--test", "Alpha",
         cwd=str(tmp_path), env=env,
     )
@@ -313,11 +311,11 @@ def test_named_ns_pipeline_reports_done(tmp_path):
 
 def _run_named_ns_pipeline(tmp_path):
     """Setup and run the named-namespace pipeline."""
-    env, lrm, arch = _setup_named_ns_pipeline(tmp_path)
+    env, lrm = _setup_named_ns_pipeline(tmp_path)
     return _invoke(
         "--file", str(tmp_path / "test_input.cpp"),
         "--output-dir", str(tmp_path),
-        "--lrm", lrm, "--arch", arch,
+        "--lrm", lrm,
         "--test", "Alpha",
         cwd=str(tmp_path), env=env,
     )
