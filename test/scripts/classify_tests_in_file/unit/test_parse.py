@@ -368,8 +368,8 @@ def test_parse_body_section_preamble():
     assert not g_pre and len(tests) == 2
 
 
-def test_parse_body_returns_section_preamble():
-    """Section preamble (helpers between tests) is returned."""
+def test_parse_body_returns_section_preamble_count():
+    """Section preamble (helpers between tests) has one item."""
     lines = [
         "TEST(S, T1) {\n",
         "}\n",
@@ -379,11 +379,23 @@ def test_parse_body_returns_section_preamble():
     ]
     _, s_pre, _, _ = _parse_body(lines, 0)
     assert len(s_pre) == 1
+
+
+def test_parse_body_returns_section_preamble_content():
+    """Section preamble item contains the using declaration."""
+    lines = [
+        "TEST(S, T1) {\n",
+        "}\n",
+        "using U = float;\n",
+        "TEST(S, T2) {\n",
+        "}\n",
+    ]
+    _, s_pre, _, _ = _parse_body(lines, 0)
     assert "using U = float;" in s_pre[0].lines[0]
 
 
-def test_parse_body_section_preamble_brace_block():
-    """A brace-delimited helper between tests is returned as section preamble."""
+def test_parse_body_section_preamble_brace_block_count():
+    """A brace-delimited helper between tests yields one preamble item."""
     lines = [
         "TEST(S, T1) {\n",
         "}\n",
@@ -395,6 +407,20 @@ def test_parse_body_section_preamble_brace_block():
     ]
     _, s_pre, _, _ = _parse_body(lines, 0)
     assert len(s_pre) == 1
+
+
+def test_parse_body_section_preamble_brace_block_content():
+    """A brace-delimited helper preamble item contains the function signature."""
+    lines = [
+        "TEST(S, T1) {\n",
+        "}\n",
+        "static int Helper() {\n",
+        "  return 42;\n",
+        "}\n",
+        "TEST(S, T2) {\n",
+        "}\n",
+    ]
+    _, s_pre, _, _ = _parse_body(lines, 0)
     assert "static int Helper() {" in s_pre[0].lines[0]
 
 
