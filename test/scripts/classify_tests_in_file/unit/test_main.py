@@ -298,25 +298,38 @@ def test_print_summary_not_source_zero_moved(capsys):
     assert "Deleted" in capsys.readouterr().out
 
 
-def test_print_summary_singular_verb(capsys):
-    """Singular test uses 'belongs' and 'it belongs'."""
+def test_print_summary_singular_verb_belongs(capsys):
+    """Singular test uses 'belongs' in created line."""
     t = _tb("T", prefix="test_parser_", clause="6.1")
     to_create = [("test_parser_clause_06_01", "6.1", [t])]
     _print_summary(to_create, [], "test_input", False)
-    out = capsys.readouterr().out
-    assert "1 test belongs there" in out
-    assert "it belongs" in out
+    assert "1 test belongs there" in capsys.readouterr().out
 
 
-def test_print_summary_plural_verb(capsys):
-    """Multiple tests use 'belong' and 'they belong'."""
+def test_print_summary_singular_pronoun(capsys):
+    """Singular test uses 'it belongs' in moved line."""
+    t = _tb("T", prefix="test_parser_", clause="6.1")
+    to_create = [("test_parser_clause_06_01", "6.1", [t])]
+    _print_summary(to_create, [], "test_input", False)
+    assert "it belongs" in capsys.readouterr().out
+
+
+def test_print_summary_plural_verb_belong(capsys):
+    """Multiple tests use 'belong' in created line."""
     t1 = _tb("T1", prefix="test_parser_", clause="6.1")
     t2 = _tb("T2", prefix="test_parser_", clause="6.1")
     to_create = [("test_parser_clause_06_01", "6.1", [t1, t2])]
     _print_summary(to_create, [], "test_input", False)
-    out = capsys.readouterr().out
-    assert "2 tests belong there" in out
-    assert "they belong" in out
+    assert "2 tests belong there" in capsys.readouterr().out
+
+
+def test_print_summary_plural_pronoun(capsys):
+    """Multiple tests use 'they belong' in moved line."""
+    t1 = _tb("T1", prefix="test_parser_", clause="6.1")
+    t2 = _tb("T2", prefix="test_parser_", clause="6.1")
+    to_create = [("test_parser_clause_06_01", "6.1", [t1, t2])]
+    _print_summary(to_create, [], "test_input", False)
+    assert "they belong" in capsys.readouterr().out
 
 
 def test_print_summary_not_deleted_when_others(capsys):
