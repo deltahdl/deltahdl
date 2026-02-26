@@ -116,4 +116,24 @@ TEST(ParserA28, TypedefInBlock) {
               "endmodule\n"));
 }
 
+TEST(ParserA213, TypedefStruct) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct { int a; int b; } pair_t;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kStruct);
+}
+
+TEST(ParserA213, TypedefWithDims) {
+  auto r = Parse("module m; typedef int arr_t [4]; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
+  EXPECT_FALSE(item->unpacked_dims.empty());
+}
+
 }  // namespace

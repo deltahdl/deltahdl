@@ -1,9 +1,7 @@
-// §6.19.2: Enumerated type ranges
+// §7.2: Structures
 
 #include <gtest/gtest.h>
-
 #include <string>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -12,6 +10,7 @@
 
 using namespace delta;
 
+// --- Test helpers ---
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
@@ -32,24 +31,17 @@ ParseResult Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserA221, EnumNameWithRange) {
-  // enum_id [ integral_number ]
-  auto r = Parse("module m; enum {A[3]} x; endmodule");
+TEST(ParserA221, StructMemberRandc) {
+  // random_qualifier: randc
+  auto r = Parse(
+      "module m;\n"
+      "  struct { randc bit [7:0] x; } s;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& member = r.cu->modules[0]->items[0]->data_type.enum_members[0];
-  EXPECT_NE(member.range_start, nullptr);
-}
-
-TEST(ParserA221, EnumNameWithRangeColon) {
-  // enum_id [ integral_number : integral_number ]
-  auto r = Parse("module m; enum {A[0:3] = 10} x; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& member = r.cu->modules[0]->items[0]->data_type.enum_members[0];
-  EXPECT_NE(member.range_start, nullptr);
-  EXPECT_NE(member.range_end, nullptr);
-  EXPECT_NE(member.value, nullptr);
+  auto& members = r.cu->modules[0]->items[0]->data_type.struct_members;
+  ASSERT_GE(members.size(), 1u);
+  EXPECT_TRUE(members[0].is_randc);
 }
 
 }  // namespace
