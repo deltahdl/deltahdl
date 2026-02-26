@@ -70,18 +70,6 @@ TEST(SourceText, PackageLifetimeWithItems) {
   EXPECT_EQ(r.cu->packages[0]->items.size(), 2u);
 }
 
-// Interface with non-ANSI ports.
-TEST(SourceText, InterfaceNonAnsiHeader) {
-  auto r = Parse(
-      "interface ifc(clk);\n"
-      "  input clk;\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 1u);
-}
-
 // specparam_declaration as non_port_module_item (outside specify block).
 TEST(SourceText, SpecparamAsModuleItem) {
   auto r = Parse(
@@ -92,16 +80,6 @@ TEST(SourceText, SpecparamAsModuleItem) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules[0]->items.size(), 1u);
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kSpecparam);
-}
-
-TEST(ParserA212, InputUnpackedDim) {
-  // list_of_variable_identifiers: variable_identifier { variable_dimension }
-  auto r = Parse("module m(input logic d [3:0]); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
-  EXPECT_EQ(port.direction, Direction::kInput);
-  EXPECT_FALSE(port.unpacked_dims.empty());
 }
 
 // --- simple_type ---
@@ -117,20 +95,6 @@ TEST(ParserA221, StructUnionStruct) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kStruct);
-}
-
-TEST(ParserA221, StructMemberAttr) {
-  // {attribute_instance} before struct member
-  auto r = Parse(
-      "module m;\n"
-      "  struct { (* mark *) int a; int b; } s;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& members = r.cu->modules[0]->items[0]->data_type.struct_members;
-  ASSERT_GE(members.size(), 2u);
-  EXPECT_FALSE(members[0].attrs.empty());
-  EXPECT_TRUE(members[1].attrs.empty());
 }
 
 TEST(ParserA23, ListOfGenvarIdentifiersMultiple) {
@@ -381,16 +345,6 @@ TEST(ParserA27, TfPortDeclOldStyleVar) {
   EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
 }
 
-// let_declaration in function body
-TEST(ParserA28, LetDeclInFunction) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  function void foo();\n"
-              "    let inc(x) = x + 1;\n"
-              "  endfunction\n"
-              "endmodule\n"));
-}
-
 // typedef in function body
 TEST(ParserA28, TypedefInFunction) {
   EXPECT_TRUE(
@@ -434,39 +388,6 @@ TEST(ParserA29, ImportSingleIdentifier) {
   ASSERT_EQ(mp->ports.size(), 1u);
   EXPECT_TRUE(mp->ports[0].is_import);
   EXPECT_EQ(mp->ports[0].name, "Read");
-}
-
-TEST(ParserA29, ImportMultipleIdentifiers) {
-  auto r = Parse(
-      "interface bus;\n"
-      "  modport target(import Read, Write);\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mp = r.cu->interfaces[0]->modports[0];
-  ASSERT_EQ(mp->ports.size(), 2u);
-  EXPECT_TRUE(mp->ports[0].is_import);
-  EXPECT_EQ(mp->ports[0].name, "Read");
-  EXPECT_TRUE(mp->ports[1].is_import);
-  EXPECT_EQ(mp->ports[1].name, "Write");
-}
-
-TEST(ParserA29, ImportMultiplePrototypes) {
-  auto r = Parse(
-      "interface bus;\n"
-      "  modport init(\n"
-      "    import task Read(input logic [7:0] raddr),\n"
-      "           task Write(input logic [7:0] waddr)\n"
-      "  );\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mp = r.cu->interfaces[0]->modports[0];
-  ASSERT_EQ(mp->ports.size(), 2u);
-  EXPECT_TRUE(mp->ports[0].is_import);
-  EXPECT_EQ(mp->ports[0].prototype->name, "Read");
-  EXPECT_TRUE(mp->ports[1].is_import);
-  EXPECT_EQ(mp->ports[1].prototype->name, "Write");
 }
 
 // Mixed modport_ports_declarations

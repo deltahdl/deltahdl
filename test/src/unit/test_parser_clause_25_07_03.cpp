@@ -121,4 +121,22 @@ TEST(ParserA29, ExportFlag_NotImport) {
   EXPECT_TRUE(mp->ports[0].is_export);
 }
 
+TEST(ParserA29, ImportMultiplePrototypes) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  modport init(\n"
+      "    import task Read(input logic [7:0] raddr),\n"
+      "           task Write(input logic [7:0] waddr)\n"
+      "  );\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 2u);
+  EXPECT_TRUE(mp->ports[0].is_import);
+  EXPECT_EQ(mp->ports[0].prototype->name, "Read");
+  EXPECT_TRUE(mp->ports[1].is_import);
+  EXPECT_EQ(mp->ports[1].prototype->name, "Write");
+}
+
 }  // namespace

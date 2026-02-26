@@ -74,4 +74,18 @@ TEST(ParserA221, StructMemberRand) {
   EXPECT_FALSE(members[1].is_rand);
 }
 
+TEST(ParserA221, StructMemberAttr) {
+  // {attribute_instance} before struct member
+  auto r = Parse(
+      "module m;\n"
+      "  struct { (* mark *) int a; int b; } s;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& members = r.cu->modules[0]->items[0]->data_type.struct_members;
+  ASSERT_GE(members.size(), 2u);
+  EXPECT_FALSE(members[0].attrs.empty());
+  EXPECT_TRUE(members[1].attrs.empty());
+}
+
 }  // namespace
