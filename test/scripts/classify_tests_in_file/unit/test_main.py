@@ -50,6 +50,7 @@ def _run_args(tmp_path, **overrides):
         "lrm": str(tmp_path / "lrm.txt"),
         "arch": str(tmp_path / "arch.md"),
         "max_lines": None,
+        "test": "T",
     }
     defaults.update(overrides)
     return SimpleNamespace(**defaults)
@@ -59,11 +60,11 @@ def _run_args(tmp_path, **overrides):
 
 
 def test_parse_args_basic(monkeypatch):
-    """Parses --file, --output-dir, --lrm, and --arch."""
+    """Parses --file, --output-dir, --lrm, --arch, and --test."""
     monkeypatch.setattr(
         sys, "argv",
         ["prog", "--file", "f.cpp", "--output-dir", "/out",
-         "--lrm", "/lrm.txt", "--arch", "/arch.md"],
+         "--lrm", "/lrm.txt", "--arch", "/arch.md", "--test", "T"],
     )
     args = _parse_args()
     assert args.file == "f.cpp" and not args.dry_run
@@ -74,7 +75,8 @@ def test_parse_args_dry_run(monkeypatch):
     monkeypatch.setattr(
         sys, "argv",
         ["prog", "--file", "f.cpp", "--output-dir", "/out",
-         "--lrm", "/lrm.txt", "--arch", "/arch.md", "--dry-run"],
+         "--lrm", "/lrm.txt", "--arch", "/arch.md",
+         "--test", "T", "--dry-run"],
     )
     assert _parse_args().dry_run is True
 
@@ -84,7 +86,7 @@ def test_parse_args_lrm(monkeypatch):
     monkeypatch.setattr(
         sys, "argv",
         ["prog", "--file", "f.cpp", "--output-dir", "/out",
-         "--lrm", "/my/LRM.txt", "--arch", "/arch.md"],
+         "--lrm", "/my/LRM.txt", "--arch", "/arch.md", "--test", "T"],
     )
     assert _parse_args().lrm == "/my/LRM.txt"
 
@@ -94,9 +96,19 @@ def test_parse_args_arch(monkeypatch):
     monkeypatch.setattr(
         sys, "argv",
         ["prog", "--file", "f.cpp", "--output-dir", "/out",
-         "--lrm", "/lrm.txt", "--arch", "/my/ARCH.md"],
+         "--lrm", "/lrm.txt", "--arch", "/my/ARCH.md", "--test", "T"],
     )
     assert _parse_args().arch == "/my/ARCH.md"
+
+
+def test_parse_args_test_flag(monkeypatch):
+    """Parses --test flag."""
+    monkeypatch.setattr(
+        sys, "argv",
+        ["prog", "--file", "f.cpp", "--output-dir", "/out",
+         "--lrm", "/lrm.txt", "--arch", "/arch.md", "--test", "Foo"],
+    )
+    assert _parse_args().test == "Foo"
 
 
 def test_parse_args_max_lines(monkeypatch):
@@ -105,7 +117,7 @@ def test_parse_args_max_lines(monkeypatch):
         sys, "argv",
         ["prog", "--file", "f.cpp", "--output-dir", "/out",
          "--lrm", "/lrm.txt", "--arch", "/arch.md",
-         "--max-lines", "500"],
+         "--test", "T", "--max-lines", "500"],
     )
     assert _parse_args().max_lines == 500
 
@@ -115,7 +127,7 @@ def test_parse_args_max_lines_default(monkeypatch):
     monkeypatch.setattr(
         sys, "argv",
         ["prog", "--file", "f.cpp", "--output-dir", "/out",
-         "--lrm", "/lrm.txt", "--arch", "/arch.md"],
+         "--lrm", "/lrm.txt", "--arch", "/arch.md", "--test", "T"],
     )
     assert _parse_args().max_lines is None
 
@@ -533,6 +545,23 @@ def test_run_no_test_blocks(tmp_path):
         _run(args)
 
 
+def test_run_test_not_found(tmp_path):
+    """Exits when --test names a test not in the file."""
+    _make_input_file(tmp_path)
+    args = _run_args(tmp_path, test="NoSuchTest")
+    with pytest.raises(SystemExit):
+        _run(args)
+
+
+def test_run_dry_run_header_shows_test_name(tmp_path, monkeypatch, capsys):
+    """Dry-run header shows the test name, not the count."""
+    _make_input_file(tmp_path)
+    stub_classifier(monkeypatch, _parser_response())
+    args = _run_args(tmp_path, dry_run=True)
+    _run(args)
+    assert "T (dry run)" in capsys.readouterr().out
+
+
 def test_run_dry_run(tmp_path, monkeypatch, capsys):
     """Dry run classifies but does not write files."""
     _make_input_file(tmp_path)
@@ -589,7 +618,8 @@ def _mixed_classifier(prompt):
     }
 
 
-def _run_live_non_lrm(tmp_path, monkeypatch, src_body, classifier):
+def _run_live_non_lrm(tmp_path, monkeypatch, src_body, classifier,
+                      test="T"):
     """Write source, stub externals, and run live pipeline."""
     src = tmp_path / "test_non_lrm_aig.cpp"
     src.write_text(src_body, encoding="utf-8")
@@ -601,7 +631,7 @@ def _run_live_non_lrm(tmp_path, monkeypatch, src_body, classifier):
         f"# header\nadd_unit_test({src.stem})\n", encoding="utf-8",
     )
     monkeypatch.setattr(classify_tests_in_file, "CMAKE_PATH", cmake)
-    _run(_run_args(tmp_path, file=str(src)))
+    _run(_run_args(tmp_path, file=str(src), test=test))
 
 
 def _self_named_classifier(_prompt):
@@ -634,6 +664,7 @@ def test_run_live_mixed_keeps_source(tmp_path, monkeypatch):
     """Source is rewritten with only the staying tests."""
     _run_live_non_lrm(
         tmp_path, monkeypatch, _MIXED_BODY, _mixed_classifier,
+        test="Move",
     )
     src = (tmp_path / "test_non_lrm_aig.cpp").read_text()
     assert "Stay" in src
@@ -643,6 +674,7 @@ def test_run_live_mixed_removes_moved_from_source(tmp_path, monkeypatch):
     """Moved tests are removed from the source file."""
     _run_live_non_lrm(
         tmp_path, monkeypatch, _MIXED_BODY, _mixed_classifier,
+        test="Move",
     )
     src = (tmp_path / "test_non_lrm_aig.cpp").read_text()
     assert "Move" not in src
@@ -652,6 +684,7 @@ def test_run_live_mixed_creates_new_file(tmp_path, monkeypatch):
     """Moved tests are written to a new clause file."""
     _run_live_non_lrm(
         tmp_path, monkeypatch, _MIXED_BODY, _mixed_classifier,
+        test="Move",
     )
     assert (tmp_path / "test_parser_clause_06_01.cpp").exists()
 
@@ -660,6 +693,7 @@ def test_run_live_mixed_keeps_cmake_entry(tmp_path, monkeypatch):
     """Source kept in CMakeLists.txt when source_is_target."""
     _run_live_non_lrm(
         tmp_path, monkeypatch, _MIXED_BODY, _mixed_classifier,
+        test="Move",
     )
     cmake = (tmp_path / "CMakeLists.txt").read_text()
     assert "test_non_lrm_aig" in cmake
@@ -681,9 +715,28 @@ def test_run_live_removes_duplicates_from_source(tmp_path, monkeypatch):
     )
     _run_live_non_lrm(
         tmp_path, monkeypatch, src_body, _self_named_classifier,
+        test="Dup",
     )
     src = (tmp_path / "test_non_lrm_aig.cpp").read_text()
     assert "Dup" not in src
+
+
+def test_run_live_dedup_only_test_rewrites_source(tmp_path, monkeypatch):
+    """Source with only the duplicate test is rewritten empty."""
+    src_body = (
+        "#include <gtest/gtest.h>\n\n"
+        "TEST(S, Dup) {\n}\n"
+    )
+    variant = tmp_path / "test_non_lrm_aig_a.cpp"
+    variant.write_text(
+        "#include <gtest/gtest.h>\n\nTEST(S, Dup) {\n}\n",
+        encoding="utf-8",
+    )
+    _run_live_non_lrm(
+        tmp_path, monkeypatch, src_body, _self_named_classifier,
+        test="Dup",
+    )
+    assert (tmp_path / "test_non_lrm_aig.cpp").exists()
 
 
 def test_run_live_keeps_non_duplicates_when_removing(tmp_path, monkeypatch):
@@ -700,6 +753,7 @@ def test_run_live_keeps_non_duplicates_when_removing(tmp_path, monkeypatch):
     )
     _run_live_non_lrm(
         tmp_path, monkeypatch, src_body, _self_named_classifier,
+        test="Dup",
     )
     src = (tmp_path / "test_non_lrm_aig.cpp").read_text()
     assert "Keep" in src

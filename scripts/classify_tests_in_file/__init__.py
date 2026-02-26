@@ -16,7 +16,6 @@ import re
 import subprocess
 import sys
 import textwrap
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -506,16 +505,12 @@ def _apply_classification(test, response):
 
 def classify_tests(tests, parsed, test_dir, lrm_path, arch_path):
     """Use Claude to classify each test's prefix and clause."""
-
-    def _classify_one(test):
+    for test in tests:
         prompt = _build_prompt(
             test, parsed, test_dir, lrm_path, arch_path,
         )
         response = _call_claude(prompt)
         _apply_classification(test, response)
-
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        list(pool.map(_classify_one, tests))
     return tests
 
 
@@ -692,6 +687,10 @@ def _parse_args():
     parser.add_argument(
         "--max-lines", type=int, default=None,
         help="Maximum lines per output file; splits into _a, _b, ... suffixes",
+    )
+    parser.add_argument(
+        "--test", required=True,
+        help="Name of the single test to classify",
     )
     parser.add_argument(
         "--dry-run", action="store_true",
@@ -885,13 +884,18 @@ def _run(args):  # pylint: disable=too-many-locals
     if not parsed.all_tests:
         print("ERROR: No TEST blocks found")
         sys.exit(1)
+    matches = [t for t in parsed.all_tests if t.test_name == args.test]
+    if not matches:
+        print(f"ERROR: Test {args.test!r} not found in {filepath.name}")
+        sys.exit(1)
+    target = matches[:1]
     dry = " (dry run)" if args.dry_run else ""
-    print(f"{test_name}.cpp \u2014 {len(parsed.all_tests)} tests{dry}")
+    print(f"{test_name}.cpp \u2014 {args.test}{dry}")
     classify_tests(
-        parsed.all_tests, parsed, test_dir, lrm_path, arch_path,
+        target, parsed, test_dir, lrm_path, arch_path,
     )
-    _print_classification_table(parsed.all_tests)
-    groups = _group_tests(parsed.all_tests)
+    _print_classification_table(target)
+    groups = _group_tests(target)
     source_is_target = any(
         clause_to_filename(p, c) == test_name
         for p, c in groups
@@ -922,12 +926,26 @@ def _run(args):  # pylint: disable=too-many-locals
         to_create, to_merge, parsed, test_dir, titles,
         max_lines=getattr(args, "max_lines", None),
     )
-    if source_is_target:
+    other_tests = [t for t in parsed.all_tests
+                   if t.test_name != args.test]
+    if source_is_target and other_tests:
+        content = generate_file(
+            "non-lrm", "", parsed, other_tests,
+        )
+        filepath.write_text(content, encoding="utf-8")
+        n_kept = len(other_tests)
+    elif source_is_target:
         n_kept = _rewrite_source(
             filepath, groups, parsed, titles, test_name,
         )
-    update_cmake(test_name, new_names, keep_old=source_is_target)
-    if not source_is_target:
+    elif other_tests:
+        content = generate_file(
+            "non-lrm", "", parsed, other_tests,
+        )
+        filepath.write_text(content, encoding="utf-8")
+    update_cmake(test_name, new_names,
+                 keep_old=source_is_target or bool(other_tests))
+    if not source_is_target and not other_tests:
         filepath.unlink()
     _print_summary(to_create, to_merge, test_name,
                    source_is_target, n_kept=n_kept,

@@ -57,7 +57,7 @@ def _stub_externals(monkeypatch, tmp_path, classifier):
     monkeypatch.setattr(classify_tests_in_file, "CMAKE_PATH", cmake)
 
 
-def _run_pipeline(tmp_path, dry_run=False):
+def _run_pipeline(tmp_path, test, dry_run=False):
     """Execute _run on test_input.cpp in *tmp_path*."""
     _run(SimpleNamespace(
         file=str(tmp_path / "test_input.cpp"),
@@ -65,6 +65,7 @@ def _run_pipeline(tmp_path, dry_run=False):
         dry_run=dry_run,
         lrm=str(tmp_path / "lrm.txt"),
         arch=str(tmp_path / "arch.md"),
+        test=test,
     ))
 
 
@@ -79,7 +80,8 @@ def _do_multi_clause(tmp_path, monkeypatch):
         ("Alpha", "test_parser_", "6.1"),
         ("Beta", "test_lexer_", "5.3"),
     ))
-    _run_pipeline(tmp_path)
+    _run_pipeline(tmp_path, test="Alpha")
+    _run_pipeline(tmp_path, test="Beta")
     return tmp_path
 
 
@@ -95,7 +97,7 @@ def _do_merge(tmp_path, monkeypatch):
     _stub_externals(monkeypatch, tmp_path, _make_classifier(
         ("Fresh", "test_parser_", "6.1"),
     ))
-    _run_pipeline(tmp_path)
+    _run_pipeline(tmp_path, test="Fresh")
     return existing
 
 
@@ -105,7 +107,7 @@ def _do_dry_run(tmp_path, monkeypatch):
     _stub_externals(monkeypatch, tmp_path, _make_classifier(
         ("DryT", "test_parser_", "6.1"),
     ))
-    _run_pipeline(tmp_path, dry_run=True)
+    _run_pipeline(tmp_path, test="DryT", dry_run=True)
     return tmp_path
 
 
@@ -185,7 +187,7 @@ def test_dedup_reports_duplicate(tmp_path, monkeypatch, capsys):
     _stub_externals(monkeypatch, tmp_path, _make_classifier(
         ("Dup", "test_parser_", "6.1"),
     ))
-    _run_pipeline(tmp_path)
+    _run_pipeline(tmp_path, test="Dup")
     assert "Removed Dup" in capsys.readouterr().out
 
 
@@ -198,7 +200,7 @@ def test_non_lrm_topic_creates_named_file(tmp_path, monkeypatch):
     _stub_externals(monkeypatch, tmp_path, _make_classifier_with_topic(
         "InternalHelper", "test_non_lrm_", "non-lrm", "aig",
     ))
-    _run_pipeline(tmp_path)
+    _run_pipeline(tmp_path, test="InternalHelper")
     assert (tmp_path / "test_non_lrm_aig.cpp").exists()
 
 
@@ -219,6 +221,7 @@ def test_self_named_source_not_treated_as_duplicate(tmp_path, monkeypatch):
     _run(SimpleNamespace(
         file=str(src), output_dir=str(tmp_path), dry_run=False,
         lrm=str(tmp_path / "lrm.txt"), arch=str(tmp_path / "arch.md"),
+        test="Keeper",
     ))
     assert (tmp_path / "test_non_lrm_aig.cpp").exists()
 
@@ -232,7 +235,7 @@ def test_annex_creates_annex_file(tmp_path, monkeypatch):
     _stub_externals(monkeypatch, tmp_path, _make_classifier(
         ("GrammarRule", "test_parser_", "A.6.3"),
     ))
-    _run_pipeline(tmp_path)
+    _run_pipeline(tmp_path, test="GrammarRule")
     assert (tmp_path / "test_parser_annex_a_06_03.cpp").exists()
 
 
@@ -266,7 +269,7 @@ def test_preamble_propagated_to_output(tmp_path, monkeypatch):
     _stub_externals(monkeypatch, tmp_path, _make_classifier(
         ("T", "test_parser_", "6.1"),
     ))
-    _run_pipeline(tmp_path)
+    _run_pipeline(tmp_path, test="T")
     assert "struct Fixture {" in (
         tmp_path / "test_parser_clause_06_01.cpp"
     ).read_text()
@@ -287,7 +290,7 @@ def test_lrm_quotes_stripped_in_output(tmp_path, monkeypatch):
     _stub_externals(monkeypatch, tmp_path, _make_classifier(
         ("QuotedTest", "test_parser_", "6.1"),
     ))
-    _run_pipeline(tmp_path)
+    _run_pipeline(tmp_path, test="QuotedTest")
     assert "A module declaration" not in (
         tmp_path / "test_parser_clause_06_01.cpp"
     ).read_text()
@@ -302,7 +305,7 @@ def test_output_reparseable(tmp_path, monkeypatch):
     _stub_externals(monkeypatch, tmp_path, _make_classifier(
         ("Round", "test_parser_", "6.1"),
     ))
-    _run_pipeline(tmp_path)
+    _run_pipeline(tmp_path, test="Round")
     assert len(classify_tests_in_file.parse_file(
         tmp_path / "test_parser_clause_06_01.cpp",
     ).all_tests) == 1
@@ -329,7 +332,7 @@ def _do_named_ns(tmp_path, monkeypatch):
     _stub_externals(monkeypatch, tmp_path, _make_classifier_with_topic(
         "DefaultCtx", "test_non_lrm_", "non-lrm", "vpi",
     ))
-    _run_pipeline(tmp_path)
+    _run_pipeline(tmp_path, test="DefaultCtx")
     return tmp_path
 
 

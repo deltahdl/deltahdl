@@ -103,7 +103,7 @@ def _run_dry(tmp_path):
         "--file", str(tmp_path / "test_input.cpp"),
         "--output-dir", str(tmp_path),
         "--lrm", lrm, "--arch", arch,
-        "--dry-run",
+        "--test", "DryT", "--dry-run",
         cwd=str(tmp_path), env=env,
     )
 
@@ -129,6 +129,7 @@ def _run_pipeline(tmp_path):
         "--file", str(tmp_path / "test_input.cpp"),
         "--output-dir", str(tmp_path),
         "--lrm", lrm, "--arch", arch,
+        "--test", "Alpha",
         cwd=str(tmp_path), env=env,
     )
 
@@ -169,6 +170,7 @@ def test_nonexistent_file_reports_error(tmp_path):
         "--file", str(tmp_path / "missing.cpp"),
         "--output-dir", str(tmp_path),
         "--lrm", lrm, "--arch", arch,
+        "--test", "T",
         cwd=str(tmp_path), env=_base_env(tmp_path),
     ).stdout
 
@@ -185,6 +187,21 @@ def test_file_without_tests_reports_error(tmp_path):
         "--file", str(tmp_path / "empty.cpp"),
         "--output-dir", str(tmp_path),
         "--lrm", lrm, "--arch", arch,
+        "--test", "T",
+        cwd=str(tmp_path), env=_base_env(tmp_path),
+    ).stdout
+
+
+def test_test_not_found_reports_error(tmp_path):
+    """Passing --test with unknown name prints ERROR."""
+    _bootstrap_repo(tmp_path)
+    _write_test_file(tmp_path, "TEST(S, Alpha) {\n}")
+    lrm, arch = _create_ref_files(tmp_path)
+    assert "ERROR" in _invoke(
+        "--file", str(tmp_path / "test_input.cpp"),
+        "--output-dir", str(tmp_path),
+        "--lrm", lrm, "--arch", arch,
+        "--test", "NoSuchTest",
         cwd=str(tmp_path), env=_base_env(tmp_path),
     ).stdout
 
@@ -288,6 +305,7 @@ def test_named_ns_pipeline_reports_done(tmp_path):
         "--file", str(tmp_path / "test_input.cpp"),
         "--output-dir", str(tmp_path),
         "--lrm", lrm, "--arch", arch,
+        "--test", "Alpha",
         cwd=str(tmp_path), env=env,
     )
     assert "Updated CMakeLists.txt" in r.stdout
@@ -300,6 +318,7 @@ def test_named_ns_pipeline_creates_clause_file(tmp_path):
         "--file", str(tmp_path / "test_input.cpp"),
         "--output-dir", str(tmp_path),
         "--lrm", lrm, "--arch", arch,
+        "--test", "Alpha",
         cwd=str(tmp_path), env=env,
     )
     assert (tmp_path / "test_parser_clause_06_01.cpp").exists()
@@ -312,6 +331,7 @@ def test_named_ns_pipeline_output_contains_test(tmp_path):
         "--file", str(tmp_path / "test_input.cpp"),
         "--output-dir", str(tmp_path),
         "--lrm", lrm, "--arch", arch,
+        "--test", "Alpha",
         cwd=str(tmp_path), env=env,
     )
     assert "TEST(S, Alpha)" in (
