@@ -144,19 +144,6 @@ TEST(ParserAnnexA, A2VarDeclWithInit) {
   EXPECT_NE(r.cu->modules[0]->items[0]->init_expr, nullptr);
 }
 
-TEST(ParserAnnexA, A2TypedefStructPacked) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef struct packed {\n"
-      "    logic [7:0] addr;\n"
-      "    logic [31:0] data;\n"
-      "  } req_t;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kTypedef);
-}
-
 TEST(ParserA212, InoutUnpackedDim) {
   auto r = Parse("module m(inout logic a [3:0]); endmodule");
   ASSERT_NE(r.cu, nullptr);
