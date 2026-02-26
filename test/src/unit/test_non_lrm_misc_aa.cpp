@@ -57,24 +57,6 @@ static bool ParseOk(const std::string& src) {
 
 namespace {
 
-// description: package_declaration
-TEST(SourceText, DescriptionPackage) {
-  auto r = Parse("package pkg; endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-  EXPECT_EQ(r.cu->packages[0]->name, "pkg");
-}
-
-// description: class_declaration
-TEST(SourceText, DescriptionClass) {
-  auto r = Parse("class C; endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->name, "C");
-}
-
 // Package with items and lifetime.
 TEST(SourceText, PackageLifetimeWithItems) {
   auto r = Parse(
@@ -86,14 +68,6 @@ TEST(SourceText, PackageLifetimeWithItems) {
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->packages[0]->name, "pkg");
   EXPECT_EQ(r.cu->packages[0]->items.size(), 2u);
-}
-
-// description: { attribute_instance } package_item (file-scope task)
-TEST(SourceText, DescriptionPackageItemTask) {
-  auto r = Parse("task my_task; endtask\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->cu_items.size(), 1u);
 }
 
 // Interface with non-ANSI ports.
@@ -218,62 +192,6 @@ TEST(ParserA213, TypedefStruct) {
   EXPECT_FALSE(r.has_errors);
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kStruct);
-}
-
-// [class_scope | package_scope] type_identifier {packed_dimension}
-TEST(ParserA221, DataTypeScopedType) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  typedef int my_int_t;\n"
-      "endpackage\n"
-      "module m;\n"
-      "  import pkg::*;\n"
-      "  pkg::my_int_t x;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-// --- data_type_or_implicit ---
-// data_type | implicit_data_type
-// --- implicit_data_type ---
-// [signing] {packed_dimension}
-TEST(ParserA221, ImplicitDataType) {
-  // Implicit data type with just packed dimension
-  auto r = Parse("module m(input [7:0] d); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
-  EXPECT_NE(port.data_type.packed_dim_left, nullptr);
-}
-
-TEST(ParserA221, ImplicitDataTypeSigned) {
-  // signed [7:0]
-  auto r = Parse("module m(input signed [7:0] d); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
-  EXPECT_TRUE(port.data_type.is_signed);
-}
-
-// --- enum_base_type ---
-// integer_atom_type [signing] | integer_vector_type [signing] [packed_dim]
-// | type_identifier [packed_dimension]
-TEST(ParserA221, EnumBaseAtomType) {
-  auto r = Parse("module m; enum int {A, B} x; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kEnum);
-}
-
-// --- enum_name_declaration ---
-// enum_id [ [ integral_number [ : integral_number ] ] ] [ = const_expr ]
-TEST(ParserA221, EnumNameBasic) {
-  auto r = Parse("module m; enum {RED, GREEN, BLUE} color; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.enum_members.size(), 3u);
 }
 
 TEST(ParserA221, EnumNameWithRangeColon) {

@@ -155,4 +155,18 @@ TEST(ParserA213, DataDeclMultipleAssign) {
   EXPECT_GE(count, 2);
 }
 
+// [class_scope | package_scope] type_identifier {packed_dimension}
+TEST(ParserA221, DataTypeScopedType) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  typedef int my_int_t;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import pkg::*;\n"
+      "  pkg::my_int_t x;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
