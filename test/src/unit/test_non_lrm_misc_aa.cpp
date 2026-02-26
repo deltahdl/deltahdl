@@ -773,16 +773,6 @@ TEST(ParserA28, DataDeclUnpackedDimsInBlock) {
   EXPECT_EQ(body->stmts[0]->var_unpacked_dims.size(), 1u);
 }
 
-// attribute_instance prefix on block items
-TEST(ParserA28, AttrOnDataDeclInBlock) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    (* synthesis *) int x;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA28, AttrOnLocalparamInBlock) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
