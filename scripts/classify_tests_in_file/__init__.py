@@ -371,8 +371,10 @@ Respond with ONLY JSON:
 """
 
 
-def _build_prompt(test, parsed, test_dir, lrm_path, arch_path,
-                  source_filename=None):
+def _build_prompt(  # pylint: disable=too-many-arguments
+    test, parsed, test_dir, lrm_path, arch_path, *,
+    source_filename=None,
+):
     """Build the Claude classification prompt for a single test."""
     topics = existing_non_lrm_topics(test_dir)
     topics_hint = ""
@@ -463,8 +465,10 @@ def _apply_classification(test, response):
     test.rationale = response.get("rationale", "")
 
 
-def classify_tests(tests, parsed, test_dir, lrm_path, arch_path,
-                   source_filename=None):
+def classify_tests(  # pylint: disable=too-many-arguments
+    tests, parsed, test_dir, lrm_path, arch_path, *,
+    source_filename=None,
+):
     """Use Claude to classify each test's prefix and clause."""
 
     def _classify_one(test):
