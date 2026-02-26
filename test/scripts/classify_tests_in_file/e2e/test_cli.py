@@ -231,7 +231,7 @@ def test_dry_run_does_not_create_output(tmp_path):
 
 def test_pipeline_reports_done(tmp_path):
     """Full pipeline prints CMakeLists.txt update message."""
-    assert "Updated CMakeLists.txt" in _run_pipeline(tmp_path).stdout
+    assert "Updated `CMakeLists.txt`" in _run_pipeline(tmp_path).stdout
 
 
 def test_pipeline_creates_clause_file(tmp_path):
@@ -308,7 +308,7 @@ def test_named_ns_pipeline_reports_done(tmp_path):
         "--test", "Alpha",
         cwd=str(tmp_path), env=env,
     )
-    assert "Updated CMakeLists.txt" in r.stdout
+    assert "Updated `CMakeLists.txt`" in r.stdout
 
 
 def _run_named_ns_pipeline(tmp_path):

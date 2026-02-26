@@ -6,16 +6,16 @@ from types import SimpleNamespace
 import pytest
 
 import classify_tests_in_file
+from classify_tests_in_file._output import (
+    _format_clause,
+    print_classification_table as _print_classification_table,
+    print_summary as _print_summary,
+)
 from helpers import make_parsed_file as _parsed
 from helpers import make_test_block as _tb
 from helpers import stub_classifier
 
 _parse_args = getattr(classify_tests_in_file, "_parse_args")
-_format_clause = getattr(classify_tests_in_file, "_format_clause")
-_print_classification_table = getattr(
-    classify_tests_in_file, "_print_classification_table",
-)
-_print_summary = getattr(classify_tests_in_file, "_print_summary")
 _group_tests = getattr(classify_tests_in_file, "_group_tests")
 _resolve_destinations = getattr(classify_tests_in_file, "_resolve_destinations")
 _write_files = getattr(classify_tests_in_file, "_write_files")
@@ -242,16 +242,14 @@ def test_print_classification_wrap_aligns(capsys):
 
 def test_print_summary_created(capsys):
     """Live summary prints '- Created'."""
-    _print_summary = getattr(classify_tests_in_file, "_print_summary")
     t = _tb("T", prefix="test_parser_", clause="6.1")
     to_create = [("test_parser_clause_06_01", "6.1", [t])]
     _print_summary(to_create, [], "test_input", False)
-    assert "- Created test_parser_clause_06_01.cpp" in capsys.readouterr().out
+    assert "- Created `test_parser_clause_06_01.cpp`" in capsys.readouterr().out
 
 
 def test_print_summary_moved(capsys):
     """Live summary prints '- Moved'."""
-    _print_summary = getattr(classify_tests_in_file, "_print_summary")
     t = _tb("T", prefix="test_parser_", clause="6.1")
     to_create = [("test_parser_clause_06_01", "6.1", [t])]
     _print_summary(to_create, [], "test_input", False)
@@ -260,17 +258,15 @@ def test_print_summary_moved(capsys):
 
 def test_print_summary_deleted(capsys):
     """Live summary prints 'Deleted' when source_is_target is False."""
-    _print_summary = getattr(classify_tests_in_file, "_print_summary")
     t = _tb("T", prefix="test_parser_", clause="6.1")
     to_create = [("test_parser_clause_06_01", "6.1", [t])]
     _print_summary(to_create, [], "test_input", False)
     out = capsys.readouterr().out
-    assert "- Deleted test_input.cpp" in out
+    assert "- Deleted `test_input.cpp`" in out
 
 
 def test_print_summary_kept(capsys):
     """Live summary prints 'Kept' when source_is_target with n_kept."""
-    _print_summary = getattr(classify_tests_in_file, "_print_summary")
     t = _tb("T", prefix="test_parser_", clause="6.1")
     to_create = [("test_parser_clause_06_01", "6.1", [t])]
     _print_summary(to_create, [], "test_input", True, n_kept=3)
@@ -280,29 +276,62 @@ def test_print_summary_kept(capsys):
 
 def test_print_summary_all_correct_kept(capsys):
     """All-correct path still prints 'Kept' bullet."""
-    _print_summary = getattr(classify_tests_in_file, "_print_summary")
     _print_summary([], [], "test_input", True, n_kept=9)
     assert "- Kept 9 tests" in capsys.readouterr().out
 
 
 def test_print_summary_has_summary_header(capsys):
     """Summary section starts with 'SUMMARY'."""
-    _print_summary = getattr(classify_tests_in_file, "_print_summary")
     _print_summary([], [], "test_input", True, n_kept=9)
     assert "SUMMARY" in capsys.readouterr().out
 
 
 def test_print_summary_all_correct_zero_kept(capsys):
     """All-correct path with n_kept=0 skips Kept bullet."""
-    _print_summary = getattr(classify_tests_in_file, "_print_summary")
     _print_summary([], [], "test_input", True, n_kept=0)
     assert "Kept" not in capsys.readouterr().out
 
 
 def test_print_summary_not_source_zero_moved(capsys):
     """Non-source path with empty lists has Deleted bullet."""
-    _print_summary = getattr(classify_tests_in_file, "_print_summary")
     _print_summary([], [], "test_input", False)
+    assert "Deleted" in capsys.readouterr().out
+
+
+def test_print_summary_singular_verb(capsys):
+    """Singular test uses 'belongs' and 'it belongs'."""
+    t = _tb("T", prefix="test_parser_", clause="6.1")
+    to_create = [("test_parser_clause_06_01", "6.1", [t])]
+    _print_summary(to_create, [], "test_input", False)
+    out = capsys.readouterr().out
+    assert "1 test belongs there" in out
+    assert "it belongs" in out
+
+
+def test_print_summary_plural_verb(capsys):
+    """Multiple tests use 'belong' and 'they belong'."""
+    t1 = _tb("T1", prefix="test_parser_", clause="6.1")
+    t2 = _tb("T2", prefix="test_parser_", clause="6.1")
+    to_create = [("test_parser_clause_06_01", "6.1", [t1, t2])]
+    _print_summary(to_create, [], "test_input", False)
+    out = capsys.readouterr().out
+    assert "2 tests belong there" in out
+    assert "they belong" in out
+
+
+def test_print_summary_not_deleted_when_others(capsys):
+    """No 'Deleted' bullet when source file still has other tests."""
+    t = _tb("T", prefix="test_parser_", clause="6.1")
+    to_create = [("test_parser_clause_06_01", "6.1", [t])]
+    _print_summary(to_create, [], "test_input", False, n_others=5)
+    assert "Deleted" not in capsys.readouterr().out
+
+
+def test_print_summary_deleted_when_no_others(capsys):
+    """'Deleted' bullet appears when n_others=0."""
+    t = _tb("T", prefix="test_parser_", clause="6.1")
+    to_create = [("test_parser_clause_06_01", "6.1", [t])]
+    _print_summary(to_create, [], "test_input", False, n_others=0)
     assert "Deleted" in capsys.readouterr().out
 
 
@@ -347,13 +376,13 @@ def test_print_dry_run_summary_create(capsys):
 
 def test_print_dry_run_summary_deleted(capsys):
     """Dry-run prints 'Would have deleted'."""
-    assert "- Would have deleted test_input.cpp" in \
+    assert "- Would have deleted `test_input.cpp`" in \
         _dry_run_create_output(capsys)
 
 
 def test_print_dry_run_summary_updated(capsys):
     """Dry-run prints 'Would have updated CMakeLists.txt'."""
-    assert "- Would have updated CMakeLists.txt" in \
+    assert "- Would have updated `CMakeLists.txt`" in \
         _dry_run_create_output(capsys)
 
 
@@ -589,7 +618,7 @@ def test_run_live(tmp_path, monkeypatch, capsys):
     """Live run writes files and updates cmake."""
     args = _setup_live_run(tmp_path, monkeypatch)
     _run(args)
-    assert "Updated CMakeLists.txt" in capsys.readouterr().out
+    assert "Updated `CMakeLists.txt`" in capsys.readouterr().out
 
 
 def test_run_live_merge(tmp_path, monkeypatch, capsys):
@@ -601,7 +630,7 @@ def test_run_live_merge(tmp_path, monkeypatch, capsys):
     )
     args = _setup_live_run(tmp_path, monkeypatch)
     _run(args)
-    assert "Moved 1 test to test_parser_clause_06_01.cpp" in \
+    assert "Moved 1 test to `test_parser_clause_06_01.cpp`" in \
         capsys.readouterr().out
 
 

@@ -15,10 +15,13 @@ import os
 import re
 import subprocess
 import sys
-import textwrap
 from dataclasses import dataclass
 from pathlib import Path
 
+from ._output import (
+    print_classification_table,
+    print_summary,
+)
 from ._split import (
     _batch_tests,
     _count_file_lines,
@@ -699,35 +702,6 @@ def _parse_args():
     return parser.parse_args()
 
 
-def _format_clause(clause):
-    """Format a clause for display."""
-    if clause is None:
-        return "(parse error)"
-    if clause.startswith("non-lrm:"):
-        tag = clause[len("non-lrm:"):].upper().replace("_", " ")
-        return f"Non-LRM {tag}"
-    return f"\u00a7{clause}"
-
-
-def _wrap(label, value):
-    """Wrap a labeled line to 80 chars with 2-space continuation indent."""
-    return textwrap.fill(
-        value, width=80,
-        initial_indent=f"  {label}: ",
-        subsequent_indent="  ",
-    )
-
-
-def _print_classification_table(tests):
-    """Print the classification results as sub-reports."""
-    for i, t in enumerate(tests):
-        print(_wrap("Test", f"{t.test_name}()"))
-        print(_wrap("Clause", _format_clause(t.clause)))
-        print(_wrap("Rationale", t.rationale or ""))
-        if i < len(tests) - 1:
-            print("  ----")
-
-
 def _group_tests(tests):
     """Group tests by (prefix, clause)."""
     groups = {}
@@ -828,55 +802,6 @@ def _rewrite_source(filepath, groups, parsed, lrm_titles, test_name):
     return len(staying)
 
 
-def _print_summary(
-    to_create, to_merge, test_name, source_is_target, **kwargs,
-):
-    """Print the because-driven summary of what was done."""
-    n_kept = kwargs.get("n_kept", 0)
-    n_removed = kwargs.get("n_removed", 0)
-    dry_run = kwargs.get("dry_run", False)
-
-    def _v(past):
-        """Return past future perfect tense if dry_run, else past."""
-        if not dry_run:
-            return past
-        return f"Would have {past[0].lower()}{past[1:]}"
-
-    print("\n  SUMMARY")
-    def _pl(count, word):
-        return f"{count} {word}{'s' if count != 1 else ''}"
-
-    if not to_create and not to_merge and source_is_target:
-        if n_kept:
-            print(f"  - {_v('Kept')} {_pl(n_kept, 'test')} in"
-                  f" {test_name}.cpp because they belong there.")
-        if n_removed:
-            rem = "to remove" if dry_run else "removed"
-            print(f"  - {_pl(n_removed, 'duplicate')} {rem}.")
-        return
-    for filename, _clause, tests in to_create:
-        print(f"  - {_v('Created')} {filename}.cpp because"
-              f" {_pl(len(tests), 'test')} belong there but the"
-              " file did not exist.")
-        print(f"  - {_v('Moved')} {_pl(len(tests), 'test')} to"
-              f" {filename}.cpp because that's where they"
-              " belong.")
-    for merge_path, tests in to_merge:
-        print(f"  - {_v('Moved')} {_pl(len(tests), 'test')} to"
-              f" {merge_path.name} because that's where they"
-              " belong.")
-    if source_is_target and n_kept:
-        print(f"  - {_v('Kept')} {n_kept} tests in"
-              f" {test_name}.cpp because they belong there.")
-    if not source_is_target:
-        print(f"  - {_v('Deleted')} {test_name}.cpp because all"
-              " its tests were moved elsewhere.")
-        print(f"  - {_v('Updated')} CMakeLists.txt because"
-              f" {test_name} was removed.")
-    else:
-        print(f"  - {_v('Updated')} CMakeLists.txt because"
-              " new test targets were added.")
-
 
 def _validate_input(filepath, test_name):
     """Parse and validate the input file, returning (parsed, target)."""
@@ -935,7 +860,7 @@ def _run(args):
         target, parsed, Path(args.output_dir).resolve(),
         Path(args.lrm).resolve(), Path(args.arch).resolve(),
     )
-    _print_classification_table(target)
+    print_classification_table(target)
     groups = _group_tests(target)
     source_is_target = any(
         clause_to_filename(p, c) == test_name
@@ -946,16 +871,20 @@ def _run(args):
         exclude_path=filepath, dry_run=args.dry_run,
     )
     n_kept = _count_kept(groups, test_name)
+    n_others = sum(
+        1 for t in parsed.all_tests if t.test_name != args.test
+    )
     if args.dry_run:
-        _print_summary(to_create, to_merge, test_name,
+        print_summary(to_create, to_merge, test_name,
                        source_is_target, n_kept=n_kept,
-                       n_removed=n_removed, dry_run=True)
+                       n_removed=n_removed, n_others=n_others,
+                       dry_run=True)
         return
     if not to_create and not to_merge and source_is_target \
             and n_removed == 0:
-        _print_summary(to_create, to_merge, test_name,
+        print_summary(to_create, to_merge, test_name,
                        source_is_target, n_kept=n_kept,
-                       n_removed=n_removed)
+                       n_removed=n_removed, n_others=n_others)
         return
     titles = load_lrm_titles(Path(args.lrm).resolve())
     new_names = _write_files(to_create, to_merge, parsed, {
@@ -974,9 +903,9 @@ def _run(args):
             t.test_name != args.test for t in parsed.all_tests
         ),
     )
-    _print_summary(to_create, to_merge, test_name,
+    print_summary(to_create, to_merge, test_name,
                    source_is_target, n_kept=n_kept,
-                   n_removed=n_removed)
+                   n_removed=n_removed, n_others=n_others)
 
 
 def main():
