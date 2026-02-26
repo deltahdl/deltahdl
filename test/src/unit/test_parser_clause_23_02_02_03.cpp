@@ -57,4 +57,13 @@ TEST(ParserA212, InterfacePortParsedAsNonAnsi) {
   EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kNone);
 }
 
+TEST(ParserA212, RefUnpackedDim) {
+  auto r = Parse("module m(ref int arr [4]); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& port = r.cu->modules[0]->ports[0];
+  EXPECT_EQ(port.direction, Direction::kRef);
+  EXPECT_FALSE(port.unpacked_dims.empty());
+}
+
 }  // namespace

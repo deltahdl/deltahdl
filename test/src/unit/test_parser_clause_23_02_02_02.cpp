@@ -53,4 +53,21 @@ TEST(ParserA221, ImplicitDataTypeSigned) {
   EXPECT_TRUE(port.data_type.is_signed);
 }
 
+TEST(ParserA212, InoutUnpackedDim) {
+  auto r = Parse("module m(inout logic a [3:0]); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& port = r.cu->modules[0]->ports[0];
+  EXPECT_EQ(port.direction, Direction::kInout);
+  EXPECT_FALSE(port.unpacked_dims.empty());
+}
+
+TEST(ParserA212, OutputUnpackedDim) {
+  auto r = Parse("module m(output logic q [1:0]); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& port = r.cu->modules[0]->ports[0];
+  EXPECT_FALSE(port.unpacked_dims.empty());
+}
+
 }  // namespace

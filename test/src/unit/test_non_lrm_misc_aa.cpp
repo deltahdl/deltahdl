@@ -94,15 +94,6 @@ TEST(SourceText, SpecparamAsModuleItem) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kSpecparam);
 }
 
-TEST(ParserA212, InoutUnpackedDim) {
-  auto r = Parse("module m(inout logic a [3:0]); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
-  EXPECT_EQ(port.direction, Direction::kInout);
-  EXPECT_FALSE(port.unpacked_dims.empty());
-}
-
 TEST(ParserA212, InputUnpackedDim) {
   // list_of_variable_identifiers: variable_identifier { variable_dimension }
   auto r = Parse("module m(input logic d [3:0]); endmodule");
@@ -111,52 +102,6 @@ TEST(ParserA212, InputUnpackedDim) {
   auto& port = r.cu->modules[0]->ports[0];
   EXPECT_EQ(port.direction, Direction::kInput);
   EXPECT_FALSE(port.unpacked_dims.empty());
-}
-
-TEST(ParserA212, OutputUnpackedDim) {
-  auto r = Parse("module m(output logic q [1:0]); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
-  EXPECT_FALSE(port.unpacked_dims.empty());
-}
-
-TEST(ParserA212, RefUnpackedDim) {
-  auto r = Parse("module m(ref int arr [4]); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
-  EXPECT_EQ(port.direction, Direction::kRef);
-  EXPECT_FALSE(port.unpacked_dims.empty());
-}
-
-// --- package_import_declaration ---
-// import package_import_item { , package_import_item } ;
-TEST(ParserA213, PackageImportSingle) {
-  auto r = Parse(
-      "package pkg; endpackage\n"
-      "module m; import pkg::foo; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kImportDecl);
-  EXPECT_EQ(item->import_item.package_name, "pkg");
-  EXPECT_EQ(item->import_item.item_name, "foo");
-}
-
-TEST(ParserA213, PackageImportMultiple) {
-  // Multiple comma-separated import items
-  auto r = Parse(
-      "package p1; endpackage\n"
-      "package p2; endpackage\n"
-      "module m; import p1::a, p2::b; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  int import_count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kImportDecl) import_count++;
-  }
-  EXPECT_GE(import_count, 2);
 }
 
 TEST(ParserA213, PackageExportMultipleItems) {
@@ -474,26 +419,6 @@ TEST(ParserA25, UnsizedDimWithInitInferSize) {
   ASSERT_GE(mod->variables.size(), 1u);
   EXPECT_TRUE(mod->variables[0].is_dynamic);
   EXPECT_EQ(mod->variables[0].unpacked_size, 3u);
-}
-
-// ---------------------------------------------------------------------------
-// function_body_declaration (old-style ports)
-// ---------------------------------------------------------------------------
-TEST(ParserA26, FuncBodyOldStylePorts) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int foo;\n"
-      "    input int a;\n"
-      "    input int b;\n"
-      "    foo = a + b;\n"
-      "  endfunction\nendmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->func_args.size(), 2u);
-  EXPECT_EQ(item->func_args[0].name, "a");
-  EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
-  EXPECT_EQ(item->func_args[1].name, "b");
 }
 
 TEST(ParserA26, FuncPrototypeExternVoid) {
