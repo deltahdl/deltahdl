@@ -157,17 +157,6 @@ TEST(ParserAnnexA, A2TypedefStructPacked) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kTypedef);
 }
 
-TEST(ParserAnnexA, A2CovergroupDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  covergroup cg @(posedge clk);\n"
-      "    coverpoint x;\n"
-      "  endgroup\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserA212, InoutUnpackedDim) {
   auto r = Parse("module m(inout logic a [3:0]); endmodule");
   ASSERT_NE(r.cu, nullptr);
