@@ -1,7 +1,7 @@
 ---
 concurrency:
   cancel-in-progress: true
-  group: classify_tests_in_file-${{ github.ref }}
+  group: classify_test-${{ github.ref }}
 jobs:
   test:
     runs-on: ubuntu-24.04
@@ -11,11 +11,11 @@ jobs:
         uses: actions/cache@v4
         with:
           key: >-
-            pip-classify_tests_in_file-${{
-            hashFiles('.github/workflows/classify_tests_in_file.yml') }}
+            pip-classify_test-${{
+            hashFiles('.github/workflows/classify_test.yml') }}
           path: ~/.cache/pip
           restore-keys: |
-            pip-classify_tests_in_file-
+            pip-classify_test-
       - name: Install tools
         run: |
           pip install \
@@ -29,8 +29,8 @@ jobs:
           assert-no-inline-directives
           --tools pylint,mypy
           --verbose
-          ${{ github.workspace }}/scripts/classify_tests_in_file/
-          ${{ github.workspace }}/test/scripts/classify_tests_in_file/**/*
+          ${{ github.workspace }}/scripts/classify_test/
+          ${{ github.workspace }}/test/scripts/classify_test/**/*
       - name: Assert no linter config files
         run: >-
           assert-no-linter-config-files
@@ -41,58 +41,58 @@ jobs:
         run: >-
           assert-one-assert-per-pytest
           --verbose
-          ${{ github.workspace }}/test/scripts/classify_tests_in_file
+          ${{ github.workspace }}/test/scripts/classify_test
       - name: Run pylint on source
         run: >-
-          PYTHONPATH=. python3 -m pylint scripts/classify_tests_in_file/
+          PYTHONPATH=. python3 -m pylint scripts/classify_test/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run pylint on tests
         run: >-
-          PYTHONPATH=.:scripts:test/scripts/classify_tests_in_file/unit
-          python3 -m pylint --recursive=y test/scripts/classify_tests_in_file/
+          PYTHONPATH=.:scripts:test/scripts/classify_test/unit
+          python3 -m pylint --recursive=y test/scripts/classify_test/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run mypy on source
-        run: PYTHONPATH=. python3 -m mypy scripts/classify_tests_in_file/
+        run: PYTHONPATH=. python3 -m mypy scripts/classify_test/
       - name: Run mypy on tests
         run: >-
-          MYPYPATH=.:scripts:test/scripts/classify_tests_in_file/unit
+          MYPYPATH=.:scripts:test/scripts/classify_test/unit
           python3 -m mypy --explicit-package-bases
-          test/scripts/classify_tests_in_file/
+          test/scripts/classify_test/
       - name: Detect copy-paste in source
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
-          --reporters console scripts/classify_tests_in_file/
+          --reporters console scripts/classify_test/
       - name: Detect copy-paste in tests
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
-          --reporters console test/scripts/classify_tests_in_file/
+          --reporters console test/scripts/classify_test/
       - name: Run unit tests with 100% coverage gate
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/classify_tests_in_file/unit/ -v
-          --cov=classify_tests_in_file
+          test/scripts/classify_test/unit/ -v
+          --cov=classify_test
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
       - name: Run integration tests
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/classify_tests_in_file/integration/ -v
+          test/scripts/classify_test/integration/ -v
       - name: Run e2e tests
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/classify_tests_in_file/e2e/ -v
-name: classify_tests_in_file
+          test/scripts/classify_test/e2e/ -v
+name: classify_test
 on:
   pull_request:
     paths:
-      - .github/workflows/classify_tests_in_file.yml
-      - scripts/classify_tests_in_file/**
-      - test/scripts/classify_tests_in_file/**
+      - .github/workflows/classify_test.yml
+      - scripts/classify_test/**
+      - test/scripts/classify_test/**
   push:
     branches: [main]
     paths:
-      - .github/workflows/classify_tests_in_file.yml
-      - scripts/classify_tests_in_file/**
-      - test/scripts/classify_tests_in_file/**
+      - .github/workflows/classify_test.yml
+      - scripts/classify_test/**
+      - test/scripts/classify_test/**
   workflow_dispatch:

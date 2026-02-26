@@ -2,9 +2,9 @@
 """Classify tests in a file into per-LRM-clause files.
 
 Usage:
-  python3 scripts/classify_tests_in_file.py \
+  python3 scripts/classify_test.py \
     --file path/to/test.cpp --output-dir path/to/out
-  python3 scripts/classify_tests_in_file.py \
+  python3 scripts/classify_test.py \
     --file path/to/test.cpp --output-dir path/to/out --dry-run
 """
 

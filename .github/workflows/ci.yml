@@ -137,7 +137,7 @@ jobs:
       - name: Run mypy on tests
         run: >-
           MYPYPATH=.:scripts python3 -m mypy
-          --exclude classify_tests_in_file
+          --exclude classify_test
           test/lib/ test/scripts/
       - name: Detect copy-paste in source
         run: >-
@@ -307,15 +307,15 @@ on:
       - .github/workflows/convert_figure.yml
       - .github/workflows/convert_tables.yml
       - .github/workflows/markdownlint.yml
-      - .github/workflows/classify_tests_in_file.yml
+      - .github/workflows/classify_test.yml
       - LICENSE
       - scripts/convert_figure.py
       - scripts/convert_table.py
-      - scripts/classify_tests_in_file/**
+      - scripts/classify_test/**
       - scripts/implement_clause.py
       - test/scripts/convert_figure/**
       - test/scripts/convert_table/**
-      - test/scripts/classify_tests_in_file/**
+      - test/scripts/classify_test/**
       - test/scripts/implement_clause/**
   push:
     branches: [main]
@@ -325,15 +325,15 @@ on:
       - .github/workflows/convert_tables.yml
       - .github/workflows/implement_clause.yml
       - .github/workflows/markdownlint.yml
-      - .github/workflows/classify_tests_in_file.yml
+      - .github/workflows/classify_test.yml
       - LICENSE
       - scripts/convert_figure.py
       - scripts/convert_table.py
-      - scripts/classify_tests_in_file/**
+      - scripts/classify_test/**
       - scripts/implement_clause.py
       - test/scripts/convert_figure/**
       - test/scripts/convert_table/**
-      - test/scripts/classify_tests_in_file/**
+      - test/scripts/classify_test/**
       - test/scripts/implement_clause/**
   workflow_dispatch:
     inputs:

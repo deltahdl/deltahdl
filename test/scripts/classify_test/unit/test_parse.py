@@ -1,16 +1,16 @@
-"""Unit tests for parsing functions in classify_tests_in_file."""
+"""Unit tests for parsing functions in classify_test."""
 
 from pathlib import Path
 
 import pytest
 
-import classify_tests_in_file
+import classify_test
 from helpers import make_test_block as _tb
 
-_update_brace_depth = getattr(classify_tests_in_file, "_update_brace_depth")
-_parse_header = getattr(classify_tests_in_file, "_parse_header")
-_try_parse_preamble = getattr(classify_tests_in_file, "_try_parse_preamble")
-_parse_body = getattr(classify_tests_in_file, "_parse_body")
+_update_brace_depth = getattr(classify_test, "_update_brace_depth")
+_parse_header = getattr(classify_test, "_parse_header")
+_try_parse_preamble = getattr(classify_test, "_try_parse_preamble")
+_parse_body = getattr(classify_test, "_parse_body")
 
 
 # ---- find_repo_root --------------------------------------------------------
@@ -20,7 +20,7 @@ def test_find_repo_root_exits_when_no_repo_root(tmp_path, monkeypatch):
     """find_repo_root exits when no test/CMakeLists.txt exists."""
     monkeypatch.setattr(Path, "cwd", staticmethod(lambda: tmp_path))
     with pytest.raises(SystemExit):
-        classify_tests_in_file.find_repo_root()
+        classify_test.find_repo_root()
 
 
 def test_find_repo_root_returns_repo_root(tmp_path, monkeypatch):
@@ -30,7 +30,7 @@ def test_find_repo_root_returns_repo_root(tmp_path, monkeypatch):
     child = tmp_path / "sub" / "deep"
     child.mkdir(parents=True)
     monkeypatch.setattr(Path, "cwd", staticmethod(lambda: child))
-    assert classify_tests_in_file.find_repo_root() == tmp_path
+    assert classify_test.find_repo_root() == tmp_path
 
 
 # ---- _update_brace_depth ---------------------------------------------------
@@ -122,21 +122,21 @@ def test_update_brace_depth_empty_line():
 
 def test_extract_brace_block_single_line():
     """Extracts a simple single-line brace block."""
-    _, end = classify_tests_in_file.extract_brace_block(["{}\n"], 0)
+    _, end = classify_test.extract_brace_block(["{}\n"], 0)
     assert end == 0
 
 
 def test_extract_brace_block_multi_line():
     """Extracts a multi-line brace block."""
     lines = ["{\n", "  x;\n", "}\n"]
-    block, end = classify_tests_in_file.extract_brace_block(lines, 0)
+    block, end = classify_test.extract_brace_block(lines, 0)
     assert end == 2 and len(block) == 3
 
 
 def test_extract_brace_block_unmatched():
     """Raises ValueError for unmatched braces."""
     with pytest.raises(ValueError, match="Unmatched brace"):
-        classify_tests_in_file.extract_brace_block(["{\n"], 0)
+        classify_test.extract_brace_block(["{\n"], 0)
 
 
 # ---- is_section_header -----------------------------------------------------
@@ -144,27 +144,27 @@ def test_extract_brace_block_unmatched():
 
 def test_is_section_header_equals_banner():
     """Lines with 10+ '=' are section headers."""
-    assert classify_tests_in_file.is_section_header("// ==========") is True
+    assert classify_test.is_section_header("// ==========") is True
 
 
 def test_is_section_header_dash_banner():
     """Lines with 10+ '-' are section headers."""
-    assert classify_tests_in_file.is_section_header("// ----------") is True
+    assert classify_test.is_section_header("// ----------") is True
 
 
 def test_is_section_header_too_short():
     """Fewer than 10 repeated chars is not a header."""
-    assert classify_tests_in_file.is_section_header("// ===") is False
+    assert classify_test.is_section_header("// ===") is False
 
 
 def test_is_section_header_no_comment():
     """A line not starting with // is not a header."""
-    assert classify_tests_in_file.is_section_header("==========") is False
+    assert classify_test.is_section_header("==========") is False
 
 
 def test_is_section_header_mixed():
     """A mixed =- line is not a header."""
-    assert classify_tests_in_file.is_section_header("// ====------") is False
+    assert classify_test.is_section_header("// ====------") is False
 
 
 # ---- _parse_header ---------------------------------------------------------
@@ -558,7 +558,7 @@ def test_parse_file_full(tmp_path):
         "}  // namespace\n",
         encoding="utf-8",
     )
-    pf = classify_tests_in_file.parse_file(src)
+    pf = classify_test.parse_file(src)
     assert len(pf.all_tests) == 1
 
 
@@ -572,7 +572,7 @@ def test_parse_file_body_namespace(tmp_path):
         "}\n",
         encoding="utf-8",
     )
-    pf = classify_tests_in_file.parse_file(src)
+    pf = classify_test.parse_file(src)
     assert pf.has_namespace_wrapper is False
 
 
@@ -599,7 +599,7 @@ def test_parse_file_named_namespace_finds_test(tmp_path):
     """parse_file extracts the test from a named namespace file."""
     src = tmp_path / "test.cpp"
     src.write_text(_NAMED_NS_FILE, encoding="utf-8")
-    pf = classify_tests_in_file.parse_file(src)
+    pf = classify_test.parse_file(src)
     assert len(pf.all_tests) == 1
 
 
@@ -607,7 +607,7 @@ def test_parse_file_named_namespace_test_name(tmp_path):
     """parse_file captures correct test name from named namespace file."""
     src = tmp_path / "test.cpp"
     src.write_text(_NAMED_NS_FILE, encoding="utf-8")
-    pf = classify_tests_in_file.parse_file(src)
+    pf = classify_test.parse_file(src)
     assert pf.all_tests[0].test_name == "DefaultContextIsAvailable"
 
 
@@ -615,5 +615,5 @@ def test_parse_file_named_namespace_has_ns(tmp_path):
     """parse_file detects namespace wrapper in named namespace file."""
     src = tmp_path / "test.cpp"
     src.write_text(_NAMED_NS_FILE, encoding="utf-8")
-    pf = classify_tests_in_file.parse_file(src)
+    pf = classify_test.parse_file(src)
     assert pf.has_namespace_wrapper is True

@@ -1,6 +1,6 @@
-"""Unit tests for file generation functions in classify_tests_in_file."""
+"""Unit tests for file generation functions in classify_test."""
 
-import classify_tests_in_file
+import classify_test
 from helpers import make_parsed_file as _parsed
 from helpers import make_test_block as _tb
 
@@ -10,7 +10,7 @@ from helpers import make_test_block as _tb
 
 def test_find_existing_tests_empty(tmp_path):
     """Returns empty set when no matching files exist."""
-    assert classify_tests_in_file.find_existing_tests(
+    assert classify_test.find_existing_tests(
         "test_parser_clause_06", tmp_path,
     ) == set()
 
@@ -19,7 +19,7 @@ def test_find_existing_tests_exact(tmp_path):
     """Finds tests in exact match file."""
     f = tmp_path / "test_parser_clause_06.cpp"
     f.write_text("TEST(S, Existing) {\n}\n")
-    result = classify_tests_in_file.find_existing_tests(
+    result = classify_test.find_existing_tests(
         "test_parser_clause_06", tmp_path,
     )
     assert "Existing" in result
@@ -29,7 +29,7 @@ def test_find_existing_tests_variant(tmp_path):
     """Finds tests in variant files (e.g., _a.cpp)."""
     f = tmp_path / "test_parser_clause_06_a.cpp"
     f.write_text("TEST_F(S, Found) {\n}\n")
-    result = classify_tests_in_file.find_existing_tests(
+    result = classify_test.find_existing_tests(
         "test_parser_clause_06", tmp_path,
     )
     assert "Found" in result
@@ -39,7 +39,7 @@ def test_find_existing_tests_excludes_source(tmp_path):
     """Skips the source file when exclude_path is given."""
     f = tmp_path / "test_non_lrm_aig.cpp"
     f.write_text("TEST(S, Self) {\n}\n")
-    result = classify_tests_in_file.find_existing_tests(
+    result = classify_test.find_existing_tests(
         "test_non_lrm_aig", tmp_path, exclude_path=f,
     )
     assert "Self" not in result
@@ -50,48 +50,48 @@ def test_find_existing_tests_excludes_source(tmp_path):
 
 def test_clause_to_filename_non_lrm_with_topic():
     """non-lrm:topic produces test_non_lrm_topic."""
-    assert classify_tests_in_file.clause_to_filename(
+    assert classify_test.clause_to_filename(
         "test_non_lrm_", "non-lrm:aig",
     ) == "test_non_lrm_aig"
 
 
 def test_clause_to_filename_non_lrm_no_topic():
     """Plain non-lrm produces test_non_lrm_misc."""
-    assert classify_tests_in_file.clause_to_filename(
+    assert classify_test.clause_to_filename(
         "test_non_lrm_", "non-lrm",
     ) == "test_non_lrm_misc"
 
 
 def test_clause_to_filename_annex():
     """Annex clause produces annex filename."""
-    assert classify_tests_in_file.clause_to_filename(
+    assert classify_test.clause_to_filename(
         "test_parser_", "A.6.3",
     ) == "test_parser_annex_a_06_03"
 
 
 def test_clause_to_filename_bare_annex():
     """Bare annex letter produces annex filename."""
-    assert classify_tests_in_file.clause_to_filename(
+    assert classify_test.clause_to_filename(
         "test_lexer_", "B",
     ) == "test_lexer_annex_b"
 
 
 def test_clause_to_filename_regular():
     """Regular clause produces clause filename."""
-    assert classify_tests_in_file.clause_to_filename(
+    assert classify_test.clause_to_filename(
         "test_parser_", "6.3.1",
     ) == "test_parser_clause_06_03_01"
 
 
 def test_clause_to_filename_trailing_underscore():
     """Prefix trailing underscore is stripped."""
-    result = classify_tests_in_file.clause_to_filename("test_parser_", "6.1")
+    result = classify_test.clause_to_filename("test_parser_", "6.1")
     assert result == "test_parser_clause_06_01"
 
 
 # ---- _count_file_lines -----------------------------------------------------
 
-_count_file_lines = getattr(classify_tests_in_file, "_count_file_lines")
+_count_file_lines = getattr(classify_test, "_count_file_lines")
 
 
 def test_count_file_lines(tmp_path):
@@ -108,7 +108,7 @@ def test_count_file_lines_missing(tmp_path):
 
 # ---- _next_suffix_file -----------------------------------------------------
 
-_next_suffix_file = getattr(classify_tests_in_file, "_next_suffix_file")
+_next_suffix_file = getattr(classify_test, "_next_suffix_file")
 
 
 def test_next_suffix_file_no_existing(tmp_path):
@@ -131,7 +131,7 @@ def test_next_suffix_file_multiple(tmp_path):
 
 # ---- _rename_base_to_suffix ------------------------------------------------
 
-_rename_base_to_suffix = getattr(classify_tests_in_file, "_rename_base_to_suffix")
+_rename_base_to_suffix = getattr(classify_test, "_rename_base_to_suffix")
 
 
 def test_rename_base_to_suffix_returns_a(tmp_path):
@@ -181,7 +181,7 @@ def test_find_merge_target_exact(tmp_path):
     """Returns exact file when it exists."""
     f = tmp_path / "test_parser_clause_06.cpp"
     f.write_text("")
-    assert classify_tests_in_file.find_merge_target(
+    assert classify_test.find_merge_target(
         "test_parser_clause_06", tmp_path,
     ) == f
 
@@ -190,7 +190,7 @@ def test_find_merge_target_variant(tmp_path):
     """Returns last variant file when exact does not exist."""
     (tmp_path / "test_parser_clause_06_a.cpp").write_text("")
     (tmp_path / "test_parser_clause_06_b.cpp").write_text("")
-    result = classify_tests_in_file.find_merge_target(
+    result = classify_test.find_merge_target(
         "test_parser_clause_06", tmp_path,
     )
     assert result.name == "test_parser_clause_06_b.cpp"
@@ -198,7 +198,7 @@ def test_find_merge_target_variant(tmp_path):
 
 def test_find_merge_target_none(tmp_path):
     """Returns None when no matching files exist."""
-    assert classify_tests_in_file.find_merge_target(
+    assert classify_test.find_merge_target(
         "test_parser_clause_06", tmp_path,
     ) is None
 
@@ -207,7 +207,7 @@ def test_find_merge_target_excludes_source(tmp_path):
     """Returns None when only match is the excluded source file."""
     f = tmp_path / "test_non_lrm_aig.cpp"
     f.write_text("TEST(S, Self) {\n}\n")
-    assert classify_tests_in_file.find_merge_target(
+    assert classify_test.find_merge_target(
         "test_non_lrm_aig", tmp_path, exclude_path=f,
     ) is None
 
@@ -217,28 +217,28 @@ def test_find_merge_target_excludes_source(tmp_path):
 
 def test_load_lrm_titles_missing(tmp_path):
     """Returns empty dict when LRM file is missing."""
-    assert not classify_tests_in_file.load_lrm_titles(tmp_path / "no.txt")
+    assert not classify_test.load_lrm_titles(tmp_path / "no.txt")
 
 
 def test_load_lrm_titles_clause(tmp_path):
     """Parses numeric clauses from LRM."""
     lrm = tmp_path / "LRM.txt"
     lrm.write_text("6.3 Data types\n", encoding="utf-8")
-    assert classify_tests_in_file.load_lrm_titles(lrm)["6.3"] == "Data types"
+    assert classify_test.load_lrm_titles(lrm)["6.3"] == "Data types"
 
 
 def test_load_lrm_titles_annex(tmp_path):
     """Parses annex clauses from LRM."""
     lrm = tmp_path / "LRM.txt"
     lrm.write_text("A.6.3 Grammar stuff\n", encoding="utf-8")
-    assert classify_tests_in_file.load_lrm_titles(lrm)["A.6.3"] == "Grammar stuff"
+    assert classify_test.load_lrm_titles(lrm)["A.6.3"] == "Grammar stuff"
 
 
 def test_load_lrm_titles_non_matching(tmp_path):
     """Non-matching lines are skipped."""
     lrm = tmp_path / "LRM.txt"
     lrm.write_text("This is not a clause\n", encoding="utf-8")
-    assert not classify_tests_in_file.load_lrm_titles(lrm)
+    assert not classify_test.load_lrm_titles(lrm)
 
 
 # ---- strip_lrm_quotes ------------------------------------------------------
@@ -246,12 +246,12 @@ def test_load_lrm_titles_non_matching(tmp_path):
 
 def test_strip_lrm_quotes_no_quote():
     """Returns line unchanged when no quote present."""
-    assert classify_tests_in_file.strip_lrm_quotes("int x = 0;") == "int x = 0;"
+    assert classify_test.strip_lrm_quotes("int x = 0;") == "int x = 0;"
 
 
 def test_strip_lrm_quotes_section_ref():
     """Strips quote but keeps section reference."""
-    result = classify_tests_in_file.strip_lrm_quotes(
+    result = classify_test.strip_lrm_quotes(
         '// \u00a76.3: "A type is defined..."',
     )
     assert result == "// \u00a76.3:"
@@ -259,7 +259,7 @@ def test_strip_lrm_quotes_section_ref():
 
 def test_strip_lrm_quotes_no_section_ref():
     """Returns empty string when quote has no section reference."""
-    result = classify_tests_in_file.strip_lrm_quotes(
+    result = classify_test.strip_lrm_quotes(
         '// "All types must be..."',
     )
     assert result == ""
@@ -272,7 +272,7 @@ def test_generate_file_non_lrm():
     """Generates non-LRM file header."""
     parsed = _parsed()
     t = _tb("T", comments=[])
-    content = classify_tests_in_file.generate_file("non-lrm", "", parsed, [t])
+    content = classify_test.generate_file("non-lrm", "", parsed, [t])
     assert content.startswith("// Non-LRM tests")
 
 
@@ -280,7 +280,7 @@ def test_generate_file_annex_with_title():
     """Generates annex header with title."""
     parsed = _parsed()
     t = _tb("T", comments=[])
-    content = classify_tests_in_file.generate_file("A.6", "Grammar", parsed, [t])
+    content = classify_test.generate_file("A.6", "Grammar", parsed, [t])
     assert "// Annex A.6: Grammar" in content
 
 
@@ -288,7 +288,7 @@ def test_generate_file_annex_no_title():
     """Generates annex header without title."""
     parsed = _parsed()
     t = _tb("T", comments=[])
-    content = classify_tests_in_file.generate_file("A.6", "", parsed, [t])
+    content = classify_test.generate_file("A.6", "", parsed, [t])
     assert "// Annex A.6" in content
 
 
@@ -296,7 +296,7 @@ def test_generate_file_regular_with_title():
     """Generates regular clause header with title."""
     parsed = _parsed()
     t = _tb("T", comments=[])
-    content = classify_tests_in_file.generate_file("6.3", "Data types", parsed, [t])
+    content = classify_test.generate_file("6.3", "Data types", parsed, [t])
     assert "// \u00a76.3: Data types" in content
 
 
@@ -304,7 +304,7 @@ def test_generate_file_regular_no_title():
     """Generates regular clause header without title."""
     parsed = _parsed()
     t = _tb("T", comments=[])
-    content = classify_tests_in_file.generate_file("6.3", "", parsed, [t])
+    content = classify_test.generate_file("6.3", "", parsed, [t])
     assert "// \u00a76.3" in content
 
 
@@ -312,20 +312,20 @@ def test_generate_file_with_using():
     """Includes using-line when present."""
     parsed = _parsed(using="using namespace delta;")
     t = _tb("T", comments=[])
-    content = classify_tests_in_file.generate_file("6.3", "", parsed, [t])
+    content = classify_test.generate_file("6.3", "", parsed, [t])
     assert "using namespace delta;" in content
 
 
 def test_generate_file_with_preamble():
     """Includes global preamble items referenced by tests."""
-    pre = classify_tests_in_file.PreambleItem(lines=["struct Foo {", "};"])
+    pre = classify_test.PreambleItem(lines=["struct Foo {", "};"])
     parsed = _parsed(preamble=[pre])
-    t = classify_tests_in_file.TestBlock(
+    t = classify_test.TestBlock(
         suite_name="S", test_name="T",
         lines=["TEST(S, T) {", "  Foo f;", "}"],
         preceding_comments=[],
     )
-    content = classify_tests_in_file.generate_file("6.3", "", parsed, [t])
+    content = classify_test.generate_file("6.3", "", parsed, [t])
     assert "struct Foo {" in content
 
 
@@ -333,7 +333,7 @@ def test_generate_file_preceding_comments():
     """Includes preceding comments for tests."""
     parsed = _parsed()
     t = _tb("T", comments=["// a test comment"])
-    content = classify_tests_in_file.generate_file("6.3", "", parsed, [t])
+    content = classify_test.generate_file("6.3", "", parsed, [t])
     assert "// a test comment" in content
 
 
@@ -341,7 +341,7 @@ def test_generate_file_preceding_comment_stripped():
     """Strips LRM quotes from preceding comments."""
     parsed = _parsed()
     t = _tb("T", comments=['// "All modules are..."'])
-    content = classify_tests_in_file.generate_file("6.3", "", parsed, [t])
+    content = classify_test.generate_file("6.3", "", parsed, [t])
     assert '"All modules' not in content
 
 
@@ -349,34 +349,34 @@ def test_generate_file_namespace_wrapper():
     """Output includes namespace { ... } // namespace."""
     parsed = _parsed()
     t = _tb("T", comments=[])
-    content = classify_tests_in_file.generate_file("6.3", "", parsed, [t])
+    content = classify_test.generate_file("6.3", "", parsed, [t])
     assert "namespace {" in content and "}  // namespace" in content
 
 
 def test_generate_file_with_section_preamble():
     """Includes section preamble items referenced by tests."""
-    sec = classify_tests_in_file.PreambleItem(
+    sec = classify_test.PreambleItem(
         lines=["static int Helper() {", "  return 42;", "}"],
     )
     parsed = _parsed()
     parsed.section_preamble = [sec]
-    t = classify_tests_in_file.TestBlock(
+    t = classify_test.TestBlock(
         suite_name="S", test_name="T",
         lines=["TEST(S, T) {", "  Helper();", "}"],
         preceding_comments=[],
     )
-    content = classify_tests_in_file.generate_file("6.3", "", parsed, [t])
+    content = classify_test.generate_file("6.3", "", parsed, [t])
     assert "static int Helper() {" in content
 
 
 def test_generate_file_preamble_stripped_empty():
     """Exercise generate_file preamble with strip_lrm_quotes returning empty."""
-    pre = classify_tests_in_file.PreambleItem(
+    pre = classify_test.PreambleItem(
         lines=['// "All types are..."'],
     )
     parsed = _parsed(preamble=[pre])
     t = _tb("T", comments=[])
-    content = classify_tests_in_file.generate_file("6.3", "", parsed, [t])
+    content = classify_test.generate_file("6.3", "", parsed, [t])
     assert "All types" not in content
 
 
@@ -398,7 +398,7 @@ def test_append_tests_to_file_basic(tmp_path):
         encoding="utf-8",
     )
     t = _tb("New", comments=[])
-    classify_tests_in_file.append_tests_to_file(f, [], [t])
+    classify_test.append_tests_to_file(f, [], [t])
     text = f.read_text(encoding="utf-8")
     assert "TEST(S, New)" in text
 
@@ -407,9 +407,9 @@ def _append_with_preamble(tmp_path, existing_content):
     """Write existing_content, append a preamble + test, return file text."""
     f = tmp_path / "existing.cpp"
     f.write_text(existing_content, encoding="utf-8")
-    pre = classify_tests_in_file.PreambleItem(lines=["struct Bar {", "};"])
+    pre = classify_test.PreambleItem(lines=["struct Bar {", "};"])
     t = _tb("T", comments=[])
-    classify_tests_in_file.append_tests_to_file(f, [pre], [t])
+    classify_test.append_tests_to_file(f, [pre], [t])
     return f.read_text(encoding="utf-8")
 
 
@@ -434,7 +434,7 @@ def test_append_tests_to_file_no_namespace_close(tmp_path):
     f = tmp_path / "existing.cpp"
     f.write_text("int x = 0;\n", encoding="utf-8")
     t = _tb("T", comments=[])
-    classify_tests_in_file.append_tests_to_file(f, [], [t])
+    classify_test.append_tests_to_file(f, [], [t])
     text = f.read_text(encoding="utf-8")
     assert "TEST(S, T)" in text
 
@@ -447,7 +447,7 @@ def test_append_tests_to_file_comment_strip(tmp_path):
         encoding="utf-8",
     )
     t = _tb("T", comments=['// "All modules..."'])
-    classify_tests_in_file.append_tests_to_file(f, [], [t])
+    classify_test.append_tests_to_file(f, [], [t])
     text = f.read_text(encoding="utf-8")
     assert '"All modules' not in text
 
@@ -459,9 +459,9 @@ def test_append_tests_to_file_comment_only_preamble(tmp_path):
         "namespace {\n}  // namespace\n",
         encoding="utf-8",
     )
-    pre = classify_tests_in_file.PreambleItem(lines=["// A helper comment"])
+    pre = classify_test.PreambleItem(lines=["// A helper comment"])
     t = _tb("T", comments=[])
-    classify_tests_in_file.append_tests_to_file(f, [pre], [t])
+    classify_test.append_tests_to_file(f, [pre], [t])
     text = f.read_text(encoding="utf-8")
     assert "// A helper comment" in text
 
@@ -476,7 +476,7 @@ def test_append_tests_to_file_single_space_close(tmp_path):
         encoding="utf-8",
     )
     t = _tb("New", comments=[])
-    classify_tests_in_file.append_tests_to_file(f, [], [t])
+    classify_test.append_tests_to_file(f, [], [t])
     text = f.read_text(encoding="utf-8")
     assert "TEST(S, New)" in text
 
@@ -489,7 +489,7 @@ def test_append_tests_to_file_empty_stripped_comment(tmp_path):
         encoding="utf-8",
     )
     t = _tb("T", comments=['// "Some LRM quote..."'])
-    classify_tests_in_file.append_tests_to_file(f, [], [t])
+    classify_test.append_tests_to_file(f, [], [t])
     text = f.read_text(encoding="utf-8")
     assert "Some LRM quote" not in text
 
@@ -502,14 +502,14 @@ def test_append_tests_to_file_normal_comment(tmp_path):
         encoding="utf-8",
     )
     t = _tb("T", comments=["// normal comment"])
-    classify_tests_in_file.append_tests_to_file(f, [], [t])
+    classify_test.append_tests_to_file(f, [], [t])
     text = f.read_text(encoding="utf-8")
     assert "// normal comment" in text
 
 
 # ---- _write_files splitting -------------------------------------------------
 
-_write_files = getattr(classify_tests_in_file, "_write_files")
+_write_files = getattr(classify_test, "_write_files")
 
 
 def _make_large_test(name, n_lines):
@@ -518,7 +518,7 @@ def _make_large_test(name, n_lines):
     for i in range(n_lines - 2):
         body.append(f"  int x{i} = {i};")
     body.append("}")
-    return classify_tests_in_file.TestBlock(
+    return classify_test.TestBlock(
         suite_name="S",
         test_name=name,
         lines=body,
@@ -617,7 +617,7 @@ def test_append_splits_creates_overflow_file(tmp_path):
     """Overflow tests go to next suffix file."""
     f = _near_limit_file(tmp_path, "test_parser_clause_06_01_a.cpp")
     t = _make_large_test("Overflow", 20)
-    classify_tests_in_file.append_tests_to_file(
+    classify_test.append_tests_to_file(
         f, [], [t], max_lines=50,
     )
     assert (tmp_path / "test_parser_clause_06_01_b.cpp").exists()
@@ -627,7 +627,7 @@ def test_append_splits_returns_new_name(tmp_path):
     """Overflow append returns the new suffix filename."""
     f = _near_limit_file(tmp_path, "test_parser_clause_06_01_a.cpp")
     t = _make_large_test("Overflow", 20)
-    new_names = classify_tests_in_file.append_tests_to_file(
+    new_names = classify_test.append_tests_to_file(
         f, [], [t], max_lines=50,
     )
     assert "test_parser_clause_06_01_b" in new_names
@@ -641,7 +641,7 @@ def test_append_no_split_keeps_in_file(tmp_path):
         encoding="utf-8",
     )
     t = _tb("New", comments=[])
-    classify_tests_in_file.append_tests_to_file(
+    classify_test.append_tests_to_file(
         f, [], [t], max_lines=500,
     )
     assert "TEST(S, New)" in f.read_text(encoding="utf-8")
@@ -655,7 +655,7 @@ def test_append_no_split_returns_empty(tmp_path):
         encoding="utf-8",
     )
     t = _tb("New", comments=[])
-    new_names = classify_tests_in_file.append_tests_to_file(
+    new_names = classify_test.append_tests_to_file(
         f, [], [t], max_lines=500,
     )
     assert not new_names
@@ -665,7 +665,7 @@ def test_append_renames_base_to_a(tmp_path):
     """Base file renamed to _a when splitting."""
     f = _near_limit_file(tmp_path, "test_parser_clause_06_01.cpp")
     t = _make_large_test("Overflow", 20)
-    classify_tests_in_file.append_tests_to_file(
+    classify_test.append_tests_to_file(
         f, [], [t], max_lines=50,
     )
     assert (tmp_path / "test_parser_clause_06_01_a.cpp").exists()
@@ -675,7 +675,7 @@ def test_append_renames_base_creates_overflow(tmp_path):
     """Overflow goes to _b when base renamed to _a."""
     f = _near_limit_file(tmp_path, "test_parser_clause_06_01.cpp")
     t = _make_large_test("Overflow", 20)
-    classify_tests_in_file.append_tests_to_file(
+    classify_test.append_tests_to_file(
         f, [], [t], max_lines=50,
     )
     assert (tmp_path / "test_parser_clause_06_01_b.cpp").exists()
@@ -685,7 +685,7 @@ def test_append_renames_base_removes_original(tmp_path):
     """Original base file no longer exists after rename."""
     f = _near_limit_file(tmp_path, "test_parser_clause_06_01.cpp")
     t = _make_large_test("Overflow", 20)
-    classify_tests_in_file.append_tests_to_file(
+    classify_test.append_tests_to_file(
         f, [], [t], max_lines=50,
     )
     assert not (tmp_path / "test_parser_clause_06_01.cpp").exists()
@@ -695,7 +695,7 @@ def test_append_renames_base_returns_both_names(tmp_path):
     """Returns both _a and _b names when base is renamed."""
     f = _near_limit_file(tmp_path, "test_parser_clause_06_01.cpp")
     t = _make_large_test("Overflow", 20)
-    new_names = classify_tests_in_file.append_tests_to_file(
+    new_names = classify_test.append_tests_to_file(
         f, [], [t], max_lines=50,
     )
     assert "test_parser_clause_06_01_a" in new_names
@@ -705,7 +705,7 @@ def _do_multi_batch_overflow(tmp_path):
     """Set up multi-batch overflow: 3 tests into near-limit file."""
     f = _near_limit_file(tmp_path, "test_parser_clause_06_01_a.cpp")
     tests = [_make_large_test(f"Ov{i}", 20) for i in range(3)]
-    classify_tests_in_file.append_tests_to_file(
+    classify_test.append_tests_to_file(
         f, [], tests, max_lines=50,
     )
 
@@ -725,14 +725,14 @@ def test_append_overflow_multi_batch_creates_c(tmp_path):
 def test_append_overflow_includes_preceding_comments(tmp_path):
     """Overflow file includes preceding comments from tests."""
     f = _near_limit_file(tmp_path, "test_parser_clause_06_01_a.cpp")
-    t = classify_tests_in_file.TestBlock(
+    t = classify_test.TestBlock(
         suite_name="S", test_name="Commented",
         lines=["TEST(S, Commented) {"]
         + [f"  int x{i} = {i};" for i in range(18)]
         + ["}"],
         preceding_comments=["// important comment"],
     )
-    classify_tests_in_file.append_tests_to_file(
+    classify_test.append_tests_to_file(
         f, [], [t], max_lines=50,
     )
     overflow = tmp_path / "test_parser_clause_06_01_b.cpp"
@@ -742,7 +742,7 @@ def test_append_overflow_includes_preceding_comments(tmp_path):
 # ---- _write_overflow_file edge cases ----------------------------------------
 
 _write_overflow_file = getattr(
-    classify_tests_in_file, "_write_overflow_file",
+    classify_test, "_write_overflow_file",
 )
 
 
@@ -754,7 +754,7 @@ def test_write_overflow_file_strips_empty_comment(tmp_path):
         encoding="utf-8",
     )
     out = tmp_path / "overflow.cpp"
-    t = classify_tests_in_file.TestBlock(
+    t = classify_test.TestBlock(
         suite_name="S", test_name="T",
         lines=["TEST(S, T) {", "}"],
         preceding_comments=['// "All modules are..."'],
@@ -777,7 +777,7 @@ def test_write_overflow_file_no_namespace(tmp_path):
 
 # ---- _batch_tests edge cases ------------------------------------------------
 
-_batch_tests = getattr(classify_tests_in_file, "_batch_tests")
+_batch_tests = getattr(classify_test, "_batch_tests")
 
 
 def test_batch_tests_empty():
@@ -787,7 +787,7 @@ def test_batch_tests_empty():
 
 # ---- _flush_overflow edge cases ---------------------------------------------
 
-_flush_overflow = getattr(classify_tests_in_file, "_flush_overflow")
+_flush_overflow = getattr(classify_test, "_flush_overflow")
 
 
 def test_flush_overflow_empty(tmp_path):
@@ -808,8 +808,8 @@ def test_update_cmake_removes_and_adds(monkeypatch, tmp_path):
         "add_unit_test(keep_test)\n",
         encoding="utf-8",
     )
-    monkeypatch.setattr(classify_tests_in_file, "CMAKE_PATH", cmake)
-    classify_tests_in_file.update_cmake("old_test", ["new_a", "new_b"])
+    monkeypatch.setattr(classify_test, "CMAKE_PATH", cmake)
+    classify_test.update_cmake("old_test", ["new_a", "new_b"])
     text = cmake.read_text(encoding="utf-8")
     assert "old_test" not in text and "new_a" in text
 
@@ -821,7 +821,7 @@ def test_update_cmake_sorted(monkeypatch, tmp_path):
         "# header\nadd_unit_test(z_test)\n",
         encoding="utf-8",
     )
-    monkeypatch.setattr(classify_tests_in_file, "CMAKE_PATH", cmake)
-    classify_tests_in_file.update_cmake("old", ["a_test"])
+    monkeypatch.setattr(classify_test, "CMAKE_PATH", cmake)
+    classify_test.update_cmake("old", ["a_test"])
     text = cmake.read_text(encoding="utf-8")
     assert text.index("a_test") < text.index("z_test")

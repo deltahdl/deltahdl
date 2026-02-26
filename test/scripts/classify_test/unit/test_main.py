@@ -1,12 +1,12 @@
-"""Unit tests for main-flow functions in classify_tests_in_file."""
+"""Unit tests for main-flow functions in classify_test."""
 
 import sys
 from types import SimpleNamespace
 
 import pytest
 
-import classify_tests_in_file
-from classify_tests_in_file._output import (
+import classify_test
+from classify_test._output import (
     _format_clause,
     print_classification_table as _print_classification_table,
     print_summary as _print_summary,
@@ -15,11 +15,11 @@ from helpers import make_parsed_file as _parsed
 from helpers import make_test_block as _tb
 from helpers import stub_classifier
 
-_parse_args = getattr(classify_tests_in_file, "_parse_args")
-_group_tests = getattr(classify_tests_in_file, "_group_tests")
-_resolve_destinations = getattr(classify_tests_in_file, "_resolve_destinations")
-_write_files = getattr(classify_tests_in_file, "_write_files")
-_run = getattr(classify_tests_in_file, "_run")
+_parse_args = getattr(classify_test, "_parse_args")
+_group_tests = getattr(classify_test, "_group_tests")
+_resolve_destinations = getattr(classify_test, "_resolve_destinations")
+_write_files = getattr(classify_test, "_write_files")
+_run = getattr(classify_test, "_run")
 
 
 def _make_input_file(tmp_path):
@@ -419,9 +419,9 @@ def test_print_dry_run_summary_nothing_with_removals(capsys):
 
 # ---- _preamble_name / _filter_preamble ------------------------------------
 
-_preamble_name = getattr(classify_tests_in_file, "_preamble_name")
-_filter_preamble = getattr(classify_tests_in_file, "_filter_preamble")
-_PI = classify_tests_in_file.PreambleItem
+_preamble_name = getattr(classify_test, "_preamble_name")
+_filter_preamble = getattr(classify_test, "_filter_preamble")
+_PI = classify_test.PreambleItem
 
 
 def test_preamble_name_struct():
@@ -495,7 +495,7 @@ def test_preamble_name_reference_return():
 
 def _test_block(body):
     """Create a TestBlock with specific body lines for preamble tests."""
-    return classify_tests_in_file.TestBlock(
+    return classify_test.TestBlock(
         suite_name="S", test_name="T",
         lines=["TEST(S, T) {"] + body + ["}"],
         preceding_comments=[],
@@ -726,7 +726,7 @@ def _setup_live_run(tmp_path, monkeypatch):
         encoding="utf-8",
     )
     stub_classifier(monkeypatch, _parser_response())
-    monkeypatch.setattr(classify_tests_in_file, "CMAKE_PATH", cmake)
+    monkeypatch.setattr(classify_test, "CMAKE_PATH", cmake)
     return _run_args(tmp_path)
 
 
@@ -765,13 +765,13 @@ def _run_live_non_lrm(tmp_path, monkeypatch, src_body, classifier,
     src = tmp_path / "test_non_lrm_aig.cpp"
     src.write_text(src_body, encoding="utf-8")
     monkeypatch.setattr(
-        classify_tests_in_file, "_call_claude", classifier,
+        classify_test, "_call_claude", classifier,
     )
     cmake = tmp_path / "CMakeLists.txt"
     cmake.write_text(
         f"# header\nadd_unit_test({src.stem})\n", encoding="utf-8",
     )
-    monkeypatch.setattr(classify_tests_in_file, "CMAKE_PATH", cmake)
+    monkeypatch.setattr(classify_test, "CMAKE_PATH", cmake)
     _run(_run_args(tmp_path, file=str(src), test=test))
 
 
@@ -909,15 +909,15 @@ def test_main(monkeypatch):
     def mock_run(_args):
         ran[0] = True
 
-    monkeypatch.setattr(classify_tests_in_file, "_run", mock_run)
+    monkeypatch.setattr(classify_test, "_run", mock_run)
     monkeypatch.setattr(
-        classify_tests_in_file, "_parse_args",
+        classify_test, "_parse_args",
         lambda: SimpleNamespace(
             file="x", output_dir="/tmp", dry_run=True,
             lrm="/lrm.txt",
         ),
     )
-    classify_tests_in_file.main()
+    classify_test.main()
     assert ran[0] is True
 
 
@@ -929,13 +929,13 @@ def test_main_enables_line_buffering(monkeypatch):
         configured.append(kwargs)
 
     monkeypatch.setattr(sys.stdout, "reconfigure", mock_reconfigure)
-    monkeypatch.setattr(classify_tests_in_file, "_run", lambda _: None)
+    monkeypatch.setattr(classify_test, "_run", lambda _: None)
     monkeypatch.setattr(
-        classify_tests_in_file, "_parse_args",
+        classify_test, "_parse_args",
         lambda: SimpleNamespace(
             file="x", output_dir="/tmp", dry_run=True,
             lrm="/lrm.txt",
         ),
     )
-    classify_tests_in_file.main()
+    classify_test.main()
     assert any(k.get("line_buffering") for k in configured)

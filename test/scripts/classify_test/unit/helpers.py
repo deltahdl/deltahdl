@@ -1,6 +1,6 @@
-"""Shared test helpers for classify_tests_in_file unit tests."""
+"""Shared test helpers for classify_test unit tests."""
 
-import classify_tests_in_file
+import classify_test
 
 
 def make_test_block(
@@ -12,7 +12,7 @@ def make_test_block(
         lines = [f"TEST(S, {name}) {{", "}"]
     else:
         lines = [f"TEST(S, {name}) {{"] + body + ["}"]
-    return classify_tests_in_file.TestBlock(
+    return classify_test.TestBlock(
         suite_name="S",
         test_name=name,
         lines=lines,
@@ -28,7 +28,7 @@ def make_parsed_file(
     preamble=None, tests=None,
 ):
     """Shorthand factory for ParsedFile."""
-    return classify_tests_in_file.ParsedFile(
+    return classify_test.ParsedFile(
         includes=includes or ["#include <gtest/gtest.h>"],
         using_line=using,
         has_namespace_wrapper=ns,
@@ -41,6 +41,6 @@ def make_parsed_file(
 def stub_classifier(monkeypatch, response):
     """Stub _call_claude for classify_tests."""
     monkeypatch.setattr(
-        classify_tests_in_file, "_call_claude",
+        classify_test, "_call_claude",
         lambda p, schema=None: response,
     )

@@ -1,4 +1,4 @@
-"""Output and summary formatting for classify_tests_in_file."""
+"""Output and summary formatting for classify_test."""
 
 import textwrap
 

@@ -1,4 +1,4 @@
-"""File-splitting helpers for classify_tests_in_file."""
+"""File-splitting helpers for classify_test."""
 
 import glob
 import re

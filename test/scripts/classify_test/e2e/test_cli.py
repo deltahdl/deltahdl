@@ -1,4 +1,4 @@
-"""End-to-end tests for the classify_tests_in_file CLI."""
+"""End-to-end tests for the classify_test CLI."""
 
 import json
 import os
@@ -16,14 +16,14 @@ _SCRIPTS_DIR = str(
 
 
 def _invoke(*args, cwd=None, env=None):
-    """Run classify_tests_in_file in a child process."""
+    """Run classify_test in a child process."""
     run_env = (env or os.environ).copy()
     pypath = run_env.get("PYTHONPATH", "")
     run_env["PYTHONPATH"] = (
         _SCRIPTS_DIR + os.pathsep + pypath if pypath else _SCRIPTS_DIR
     )
     return subprocess.run(
-        [sys.executable, "-m", "classify_tests_in_file", *args],
+        [sys.executable, "-m", "classify_test", *args],
         capture_output=True,
         text=True,
         cwd=cwd,
