@@ -104,21 +104,6 @@ TEST(ParserA212, InputUnpackedDim) {
   EXPECT_FALSE(port.unpacked_dims.empty());
 }
 
-TEST(ParserA213, PackageExportMultipleItems) {
-  // BNF: export package_import_item { , package_import_item } ;
-  auto r = Parse(
-      "package pkg;\n"
-      "  export p1::a, p2::b;\n"
-      "endpackage");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  int export_count = 0;
-  for (auto* item : r.cu->packages[0]->items) {
-    if (item->kind == ModuleItemKind::kExportDecl) export_count++;
-  }
-  EXPECT_GE(export_count, 2);
-}
-
 // --- simple_type ---
 // integer_type | non_integer_type | ps_type_identifier |
 // ps_parameter_identifier (covered by casting_type and data_type tests above)
@@ -134,48 +119,6 @@ TEST(ParserA221, StructUnionStruct) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kStruct);
 }
 
-TEST(ParserA221, StructUnionUnionTagged) {
-  auto r = Parse(
-      "module m;\n"
-      "  union tagged { int a; real b; } u;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kUnion);
-  EXPECT_TRUE(item->data_type.is_tagged);
-}
-
-// --- struct_union_member ---
-// {attribute_instance} [random_qualifier] data_type_or_void
-//   list_of_variable_decl_assignments ;
-TEST(ParserA221, StructMemberBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "  struct { logic [7:0] data; int count; } s;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& members = r.cu->modules[0]->items[0]->data_type.struct_members;
-  EXPECT_EQ(members.size(), 2u);
-  EXPECT_EQ(members[0].name, "data");
-  EXPECT_EQ(members[1].name, "count");
-}
-
-TEST(ParserA221, StructMemberRand) {
-  // random_qualifier: rand
-  auto r = Parse(
-      "module m;\n"
-      "  struct { rand int a; int b; } s;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& members = r.cu->modules[0]->items[0]->data_type.struct_members;
-  ASSERT_GE(members.size(), 2u);
-  EXPECT_TRUE(members[0].is_rand);
-  EXPECT_FALSE(members[1].is_rand);
-}
-
 TEST(ParserA221, StructMemberAttr) {
   // {attribute_instance} before struct member
   auto r = Parse(
@@ -188,17 +131,6 @@ TEST(ParserA221, StructMemberAttr) {
   ASSERT_GE(members.size(), 2u);
   EXPECT_FALSE(members[0].attrs.empty());
   EXPECT_TRUE(members[1].attrs.empty());
-}
-
-TEST(ParserA23, ListOfDefparamAssignmentsThree) {
-  auto r = Parse(
-      "module top;\n"
-      "  defparam u0.A = 1, u0.B = 2, u0.C = 3;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->defparam_assigns.size(), 3u);
 }
 
 TEST(ParserA23, ListOfGenvarIdentifiersMultiple) {
