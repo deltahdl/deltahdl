@@ -255,7 +255,7 @@ def test_print_summary_moved(capsys):
     t = _tb("T", prefix="test_parser_", clause="6.1")
     to_create = [("test_parser_clause_06_01", "6.1", [t])]
     _print_summary(to_create, [], "test_input", False)
-    assert "- Moved 1 test(s)" in capsys.readouterr().out
+    assert "- Moved 1 test" in capsys.readouterr().out
 
 
 def test_print_summary_deleted(capsys):
@@ -601,7 +601,7 @@ def test_run_live_merge(tmp_path, monkeypatch, capsys):
     )
     args = _setup_live_run(tmp_path, monkeypatch)
     _run(args)
-    assert "Moved 1 test(s) to test_parser_clause_06_01.cpp" in \
+    assert "Moved 1 test to test_parser_clause_06_01.cpp" in \
         capsys.readouterr().out
 
 

@@ -843,23 +843,26 @@ def _print_summary(
         return f"Would have {past[0].lower()}{past[1:]}"
 
     print("\n  SUMMARY")
+    def _pl(count, word):
+        return f"{count} {word}{'s' if count != 1 else ''}"
+
     if not to_create and not to_merge and source_is_target:
         if n_kept:
-            print(f"  - {_v('Kept')} {n_kept} tests in"
+            print(f"  - {_v('Kept')} {_pl(n_kept, 'test')} in"
                   f" {test_name}.cpp because they belong there.")
         if n_removed:
             rem = "to remove" if dry_run else "removed"
-            print(f"  - {n_removed} duplicate(s) {rem}.")
+            print(f"  - {_pl(n_removed, 'duplicate')} {rem}.")
         return
     for filename, _clause, tests in to_create:
         print(f"  - {_v('Created')} {filename}.cpp because"
-              f" {len(tests)} test(s) belong there but the"
+              f" {_pl(len(tests), 'test')} belong there but the"
               " file did not exist.")
-        print(f"  - {_v('Moved')} {len(tests)} test(s) to"
+        print(f"  - {_v('Moved')} {_pl(len(tests), 'test')} to"
               f" {filename}.cpp because that's where they"
               " belong.")
     for merge_path, tests in to_merge:
-        print(f"  - {_v('Moved')} {len(tests)} test(s) to"
+        print(f"  - {_v('Moved')} {_pl(len(tests), 'test')} to"
               f" {merge_path.name} because that's where they"
               " belong.")
     if source_is_target and n_kept:
