@@ -580,7 +580,8 @@ def _mixed_classifier(prompt):
     if "Stay" in prompt:
         return {
             "prefix": "test_non_lrm_",
-            "clause": "non-lrm:aig", "rationale": "r",
+            "clause": "non-lrm", "non_lrm_topic": "aig",
+            "rationale": "r",
         }
     return {
         "prefix": "test_parser_",
@@ -604,10 +605,11 @@ def _run_live_non_lrm(tmp_path, monkeypatch, src_body, classifier):
 
 
 def _self_named_classifier(_prompt):
-    """Classify single test as non-lrm:aig."""
+    """Classify single test as non-lrm with topic aig."""
     return {
         "prefix": "test_non_lrm_",
-        "clause": "non-lrm:aig", "rationale": "r",
+        "clause": "non-lrm", "non_lrm_topic": "aig",
+        "rationale": "r",
     }
 
 

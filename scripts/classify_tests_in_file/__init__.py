@@ -75,6 +75,21 @@ class ParsedFile:
     source_filename: str | None = None
 
 
+_VALID_PREFIXES = frozenset({
+    "test_preprocessor_",
+    "test_lexer_",
+    "test_parser_",
+    "test_elaborator_",
+    "test_simulator_",
+    "test_synthesizer_",
+    "test_non_lrm_",
+})
+
+_CLAUSE_RE = re.compile(
+    r"^(?:non[-_]lrm|[A-Z](?:\.\d+)*|\d+(?:\.\d+)*)$",
+)
+
+
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
@@ -440,8 +455,35 @@ def _call_claude(prompt):
     return _extract_json(result.stdout.strip())
 
 
+def _validate_response(response, test_name):
+    """Validate Claude's classification response or exit with error."""
+    missing = [k for k in ("prefix", "clause") if k not in response]
+    if missing:
+        print(f"ERROR: Classification for test {test_name} is missing"
+              f" required key(s): {', '.join(missing)}")
+        sys.exit(1)
+    prefix = response["prefix"]
+    if prefix not in _VALID_PREFIXES:
+        print(f'ERROR: Invalid prefix "{prefix}" for test {test_name}.'
+              f"\n  Valid: {', '.join(sorted(_VALID_PREFIXES))}")
+        sys.exit(1)
+    clause = response["clause"]
+    if not _CLAUSE_RE.match(clause):
+        print(f'ERROR: Invalid clause "{clause}" for test {test_name}.'
+              "\n  Expected: numeric (6.1.2), annex (A.6.3),"
+              " or non-lrm")
+        sys.exit(1)
+    is_non_lrm = clause.replace("_", "-") == "non-lrm"
+    if is_non_lrm and not response.get("non_lrm_topic"):
+        print(f"ERROR: Classification for test {test_name} has clause"
+              f' "{clause}" but no non_lrm_topic.'
+              "\n  A topic is required to avoid the misc bucket.")
+        sys.exit(1)
+
+
 def _apply_classification(test, response):
     """Apply a single classification result to a test block."""
+    _validate_response(response, test.test_name)
     test.prefix = response["prefix"]
     clause = response["clause"]
     if clause.replace("_", "-") == "non-lrm":

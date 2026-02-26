@@ -31,7 +31,7 @@ def _make_classifier(*triples):
             if name in prompt:
                 return resp
         return {"prefix": "test_non_lrm_", "clause": "non-lrm",
-                "rationale": "fallback"}
+                "non_lrm_topic": "misc", "rationale": "fallback"}
 
     return classifier
 

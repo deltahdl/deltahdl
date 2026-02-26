@@ -13,6 +13,9 @@ _build_prompt = getattr(classify_tests_in_file, "_build_prompt")
 _extract_json = getattr(classify_tests_in_file, "_extract_json")
 _call_claude = getattr(classify_tests_in_file, "_call_claude")
 _apply_classification = getattr(classify_tests_in_file, "_apply_classification")
+_validate_response = getattr(
+    classify_tests_in_file, "_validate_response", None,
+)
 
 
 # ---- existing_non_lrm_topics ----------------------------------------------
@@ -268,9 +271,12 @@ def test_apply_classification_found():
 def test_apply_classification_non_lrm_underscore():
     """Normalizes non_lrm to non-lrm."""
     t = _tb("T")
-    resp = {"prefix": "test_non_lrm_", "clause": "non_lrm"}
+    resp = {
+        "prefix": "test_non_lrm_", "clause": "non_lrm",
+        "non_lrm_topic": "aig",
+    }
     _apply_classification(t, resp)
-    assert t.clause == "non-lrm"
+    assert t.clause == "non-lrm:aig"
 
 
 def test_apply_classification_non_lrm_with_topic():
@@ -293,14 +299,14 @@ def test_apply_classification_no_rationale():
 
 
 def test_apply_classification_non_lrm_no_topic():
-    """non-lrm clause without topic stays as non-lrm."""
+    """non-lrm clause without topic causes SystemExit."""
     t = _tb("T")
     resp = {
         "prefix": "test_non_lrm_", "clause": "non-lrm",
         "non_lrm_topic": None,
     }
-    _apply_classification(t, resp)
-    assert t.clause == "non-lrm"
+    with pytest.raises(SystemExit):
+        _apply_classification(t, resp)
 
 
 # ---- classify_tests --------------------------------------------------------
@@ -342,3 +348,153 @@ def test_classify_tests_per_test(monkeypatch, tmp_path):
         tests, parsed, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
     )
     assert call_count[0] == 3
+
+
+# ---- _validate_response helpers --------------------------------------------
+
+
+def _valid_resp(**overrides):
+    """Build a minimal valid classification response."""
+    base = {"prefix": "test_parser_", "clause": "6.1", "rationale": "r"}
+    base.update(overrides)
+    return base
+
+
+def _non_lrm_resp(**overrides):
+    """Build a valid non-lrm classification response."""
+    base = {
+        "prefix": "test_non_lrm_", "clause": "non-lrm",
+        "non_lrm_topic": "aig", "rationale": "r",
+    }
+    base.update(overrides)
+    return base
+
+
+# ---- _validate_response: required keys ------------------------------------
+
+
+def test_validate_response_missing_prefix():
+    """Exits when response is missing the prefix key."""
+    with pytest.raises(SystemExit):
+        _validate_response({"clause": "6.1"}, "T")
+
+
+def test_validate_response_missing_clause():
+    """Exits when response is missing the clause key."""
+    with pytest.raises(SystemExit):
+        _validate_response({"prefix": "test_parser_"}, "T")
+
+
+# ---- _validate_response: prefix -------------------------------------------
+
+
+def test_validate_response_invalid_prefix():
+    """Exits when prefix is not one of the valid seven."""
+    with pytest.raises(SystemExit):
+        _validate_response(_valid_resp(prefix="test_invalid_"), "T")
+
+
+def test_validate_response_prefix_no_trailing_underscore():
+    """Exits when prefix is missing its trailing underscore."""
+    with pytest.raises(SystemExit):
+        _validate_response(_valid_resp(prefix="test_parser"), "T")
+
+
+def test_validate_response_valid_prefix():
+    """Accepts a valid prefix without raising."""
+    assert _validate_response(_valid_resp(), "T") is None
+
+
+# ---- _validate_response: clause format ------------------------------------
+
+
+def test_validate_response_invalid_clause_letters():
+    """Exits when clause is arbitrary text."""
+    with pytest.raises(SystemExit):
+        _validate_response(_valid_resp(clause="abc"), "T")
+
+
+def test_validate_response_invalid_clause_empty():
+    """Exits when clause is an empty string."""
+    with pytest.raises(SystemExit):
+        _validate_response(_valid_resp(clause=""), "T")
+
+
+def test_validate_response_invalid_clause_trailing_dot():
+    """Exits when clause has a trailing dot."""
+    with pytest.raises(SystemExit):
+        _validate_response(_valid_resp(clause="6.1."), "T")
+
+
+def test_validate_response_clause_single_digit():
+    """Accepts a single-digit clause."""
+    assert _validate_response(_valid_resp(clause="6"), "T") is None
+
+
+def test_validate_response_clause_deep_numeric():
+    """Accepts a deeply nested numeric clause."""
+    assert _validate_response(_valid_resp(clause="9.2.2.2.2"), "T") is None
+
+
+def test_validate_response_clause_annex():
+    """Accepts an annex clause like A.6.3."""
+    assert _validate_response(_valid_resp(clause="A.6.3"), "T") is None
+
+
+# ---- _validate_response: non-lrm topic ------------------------------------
+
+
+def test_validate_response_non_lrm_missing_topic():
+    """Exits when non-lrm clause has no non_lrm_topic key."""
+    resp = _non_lrm_resp()
+    del resp["non_lrm_topic"]
+    with pytest.raises(SystemExit):
+        _validate_response(resp, "T")
+
+
+def test_validate_response_non_lrm_null_topic():
+    """Exits when non-lrm clause has null topic."""
+    with pytest.raises(SystemExit):
+        _validate_response(_non_lrm_resp(non_lrm_topic=None), "T")
+
+
+def test_validate_response_non_lrm_empty_topic():
+    """Exits when non-lrm clause has empty string topic."""
+    with pytest.raises(SystemExit):
+        _validate_response(_non_lrm_resp(non_lrm_topic=""), "T")
+
+
+def test_validate_response_non_lrm_with_topic():
+    """Accepts non-lrm clause with a valid topic."""
+    assert _validate_response(_non_lrm_resp(), "T") is None
+
+
+# ---- _validate_response: error messages ------------------------------------
+
+
+def test_validate_response_invalid_prefix_message(capsys):
+    """Error message contains the invalid prefix value."""
+    try:
+        _validate_response(_valid_resp(prefix="test_bad_"), "T")
+    except SystemExit:
+        pass
+    assert "test_bad_" in capsys.readouterr().out
+
+
+def test_validate_response_missing_topic_message(capsys):
+    """Error message mentions non_lrm_topic."""
+    try:
+        _validate_response(_non_lrm_resp(non_lrm_topic=None), "T")
+    except SystemExit:
+        pass
+    assert "non_lrm_topic" in capsys.readouterr().out
+
+
+# ---- _validate_response: integration with _apply_classification ------------
+
+
+def test_apply_classification_rejects_bad_prefix():
+    """_apply_classification exits on an invalid prefix."""
+    t = _tb("T")
+    with pytest.raises(SystemExit):
+        _apply_classification(t, _valid_resp(prefix="test_bad_"))
