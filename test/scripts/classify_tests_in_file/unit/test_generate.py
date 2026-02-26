@@ -317,10 +317,14 @@ def test_generate_file_with_using():
 
 
 def test_generate_file_with_preamble():
-    """Includes global preamble items."""
+    """Includes global preamble items referenced by tests."""
     pre = classify_tests_in_file.PreambleItem(lines=["struct Foo {", "};"])
     parsed = _parsed(preamble=[pre])
-    t = _tb("T", comments=[])
+    t = classify_tests_in_file.TestBlock(
+        suite_name="S", test_name="T",
+        lines=["TEST(S, T) {", "  Foo f;", "}"],
+        preceding_comments=[],
+    )
     content = classify_tests_in_file.generate_file("6.3", "", parsed, [t])
     assert "struct Foo {" in content
 
@@ -350,13 +354,17 @@ def test_generate_file_namespace_wrapper():
 
 
 def test_generate_file_with_section_preamble():
-    """Includes section preamble items in generated output."""
+    """Includes section preamble items referenced by tests."""
     sec = classify_tests_in_file.PreambleItem(
         lines=["static int Helper() {", "  return 42;", "}"],
     )
     parsed = _parsed()
     parsed.section_preamble = [sec]
-    t = _tb("T", comments=[])
+    t = classify_tests_in_file.TestBlock(
+        suite_name="S", test_name="T",
+        lines=["TEST(S, T) {", "  Helper();", "}"],
+        preceding_comments=[],
+    )
     content = classify_tests_in_file.generate_file("6.3", "", parsed, [t])
     assert "static int Helper() {" in content
 

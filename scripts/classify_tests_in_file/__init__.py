@@ -600,6 +600,60 @@ def load_lrm_titles(lrm_path):
     return titles
 
 
+def _preamble_name(item):
+    """Extract the identifier (struct/class/enum/function name) from a item."""
+    for line in item.lines:
+        stripped = line.strip()
+        if stripped.startswith("//"):
+            continue
+        m = re.match(
+            r"(?:struct|class|enum)\s+(\w+)\s*\{", stripped,
+        )
+        if m:
+            return m.group(1)
+        m = re.match(
+            r"(?:\w+\s+)*?(\w+)\s*\(", stripped,
+        )
+        if m:
+            return m.group(1)
+        return None
+    return None
+
+
+def _filter_preamble(items, tests):
+    """Return only preamble items referenced (directly or transitively)."""
+    names = {}
+    for item in items:
+        name = _preamble_name(item)
+        if name:
+            names[name] = item
+    text_pool = "\n".join(
+        line for t in tests for line in t.lines
+    )
+    kept = set()
+    for name, item in names.items():
+        if re.search(r'\b' + re.escape(name) + r'\b', text_pool):
+            kept.add(id(item))
+    changed = True
+    while changed:
+        changed = False
+        for name, item in names.items():
+            if id(item) in kept:
+                continue
+            for _, other in names.items():
+                if id(other) in kept and re.search(
+                    r'\b' + re.escape(name) + r'\b',
+                    "\n".join(other.lines),
+                ):
+                    kept.add(id(item))
+                    changed = True
+                    break
+    return [
+        item for item in items
+        if _preamble_name(item) is None or id(item) in kept
+    ]
+
+
 def generate_file(clause, title, parsed, tests):
     """Generate the content of a split test file."""
     out = []
@@ -618,13 +672,10 @@ def generate_file(clause, title, parsed, tests):
     if parsed.using_line:
         out.append(parsed.using_line)
         out.append("")
-    for item in parsed.global_preamble:
-        for line in item.lines:
-            cleaned = strip_lrm_quotes(line)
-            if cleaned or cleaned == "":  # pragma: no branch
-                out.append(cleaned)
-        out.append("")
-    for item in parsed.section_preamble:
+    all_preamble = _filter_preamble(
+        parsed.global_preamble + parsed.section_preamble, tests,
+    )
+    for item in all_preamble:
         for line in item.lines:
             cleaned = strip_lrm_quotes(line)
             if cleaned or cleaned == "":  # pragma: no branch
@@ -780,10 +831,12 @@ def _write_files(to_create, to_merge, parsed, ctx):
         ctx["lrm_titles"], ctx.get("max_lines"),
     )
     for merge_path, tests in to_merge:
+        filtered = _filter_preamble(
+            parsed.global_preamble + parsed.section_preamble, tests,
+        )
         split_names = append_tests_to_file(
-            merge_path, parsed.global_preamble, tests,
+            merge_path, filtered, tests,
             max_lines=ctx.get("max_lines"),
-            section_preamble=parsed.section_preamble,
         )
         new_names.extend(split_names)
     return new_names

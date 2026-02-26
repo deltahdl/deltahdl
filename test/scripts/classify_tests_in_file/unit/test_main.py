@@ -433,6 +433,101 @@ def test_print_dry_run_summary_nothing_with_removals(capsys):
     assert "Would have kept 9 tests" in out
 
 
+# ---- _preamble_name / _filter_preamble ------------------------------------
+
+_preamble_name = getattr(classify_tests_in_file, "_preamble_name")
+_filter_preamble = getattr(classify_tests_in_file, "_filter_preamble")
+_PI = classify_tests_in_file.PreambleItem
+
+
+def test_preamble_name_struct():
+    """Extracts struct name."""
+    item = _PI(lines=["struct ParseResult {", "  int x;", "};"])
+    assert _preamble_name(item) == "ParseResult"
+
+
+def test_preamble_name_function():
+    """Extracts function name."""
+    item = _PI(lines=["ParseResult Parse(const std::string& src) {",
+                       "  return {};", "}"])
+    assert _preamble_name(item) == "Parse"
+
+
+def test_preamble_name_static_function():
+    """Extracts name from static function."""
+    item = _PI(lines=["static bool ParseOk(const std::string& src) {",
+                       "  return true;", "}"])
+    assert _preamble_name(item) == "ParseOk"
+
+
+def test_preamble_name_class():
+    """Extracts class name."""
+    item = _PI(lines=["class Foo {", "};"])
+    assert _preamble_name(item) == "Foo"
+
+
+def test_preamble_name_enum():
+    """Extracts enum name."""
+    item = _PI(lines=["enum Color {", "  RED,", "};"])
+    assert _preamble_name(item) == "Color"
+
+
+def test_preamble_name_no_match():
+    """Returns None for comment-only item."""
+    item = _PI(lines=["// just a comment"])
+    assert _preamble_name(item) is None
+
+
+def test_preamble_name_with_leading_comment():
+    """Skips comment lines to find the name."""
+    item = _PI(lines=["// --- Test helpers ---",
+                       "struct Foo {", "};"])
+    assert _preamble_name(item) == "Foo"
+
+
+def _test_block(body):
+    """Create a TestBlock with specific body lines for preamble tests."""
+    return classify_tests_in_file.TestBlock(
+        suite_name="S", test_name="T",
+        lines=["TEST(S, T) {"] + body + ["}"],
+        preceding_comments=[],
+    )
+
+
+def test_filter_preamble_keeps_used():
+    """Keeps preamble items referenced by test body."""
+    parse_fn = _PI(lines=["Result Parse(const std::string& s) {", "}"])
+    elab_fn = _PI(lines=["void Elaborate() {", "}"])
+    t = _test_block(["  auto r = Parse(src);"])
+    assert parse_fn in _filter_preamble([parse_fn, elab_fn], [t])
+
+
+def test_filter_preamble_drops_unused():
+    """Drops preamble items not referenced by any test."""
+    parse_fn = _PI(lines=["Result Parse(const std::string& s) {", "}"])
+    elab_fn = _PI(lines=["void Elaborate() {", "}"])
+    t = _test_block(["  auto r = Parse(src);"])
+    assert elab_fn not in _filter_preamble([parse_fn, elab_fn], [t])
+
+
+def test_filter_preamble_transitive():
+    """Keeps transitive deps (test uses Parse, Parse uses ParseResult)."""
+    result_struct = _PI(lines=["struct ParseResult {", "  int x;", "};"])
+    parse_fn = _PI(lines=["ParseResult Parse(const std::string& s) {",
+                           "  ParseResult r;", "  return r;", "}"])
+    t = _test_block(["  auto r = Parse(src);"])
+    kept = _filter_preamble([result_struct, parse_fn], [t])
+    assert result_struct in kept
+    assert parse_fn in kept
+
+
+def test_filter_preamble_keeps_unnamed():
+    """Items with no extractable name are always kept."""
+    unnamed = _PI(lines=["using Foo = int;"])
+    t = _test_block(["  int x = 1;"])
+    assert unnamed in _filter_preamble([unnamed], [t])
+
+
 # ---- _group_tests ----------------------------------------------------------
 
 

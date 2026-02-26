@@ -263,7 +263,7 @@ def test_preamble_propagated_to_output(tmp_path, monkeypatch):
     f.write_text(
         "#include <gtest/gtest.h>\n\n"
         "struct Fixture {\n  int x;\n};\n\n"
-        "namespace {\n\nTEST(S, T) {\n}\n\n}  // namespace\n",
+        "namespace {\n\nTEST(S, T) {\n  Fixture f;\n}\n\n}  // namespace\n",
         encoding="utf-8",
     )
     _stub_externals(monkeypatch, tmp_path, _make_classifier(

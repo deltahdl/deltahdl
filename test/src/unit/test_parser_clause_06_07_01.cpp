@@ -201,20 +201,7 @@ TEST(ParserA23, ListOfNetDeclAssignmentsWithUnpackedDim) {
   EXPECT_GE(count, 2);
 }
 
-struct ElabFixture {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
 };
-
-RtlirDesign* Elaborate(const std::string& src, ElabFixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
 
 TEST(ParserA25, NetWithUnpackedDim) {
   auto r = Parse("module m; wire [7:0] bus [0:3]; endmodule\n");

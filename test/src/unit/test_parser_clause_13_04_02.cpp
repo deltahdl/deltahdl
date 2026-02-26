@@ -70,20 +70,7 @@ TEST(ParserA213, LifetimeInFunction) {
   EXPECT_TRUE(item->is_automatic);
 }
 
-struct ElabFixture {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
 };
-
-RtlirDesign* Elaborate(const std::string& src, ElabFixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
 
 // ---------------------------------------------------------------------------
 // function_declaration ::=

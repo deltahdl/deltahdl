@@ -116,17 +116,6 @@ TEST(ParserA24, VarDeclAssignmentBasic) {
   EXPECT_EQ(item->init_expr, nullptr);
 }
 
-static bool ParseOk(const std::string& src) {
-  SourceManager mgr;
-  Arena arena;
-  auto fid = mgr.AddFile("<test>", src);
-  DiagEngine diag(mgr);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, arena, diag);
-  parser.Parse();
-  return !diag.HasErrors();
-}
-
 TEST(ParserA28, DataDeclMultiVarsInBlock) {
   auto r = Parse(
       "module m;\n"
@@ -144,20 +133,7 @@ TEST(ParserA28, DataDeclMultiVarsInBlock) {
   EXPECT_EQ(body->stmts[2]->var_name, "c");
 }
 
-struct ElabFixture {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
 };
-
-RtlirDesign* Elaborate(const std::string& src, ElabFixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
 
 TEST(ParserAnnexA, A2VarDeclWithInit) {
   auto r = Parse("module m; logic [7:0] data = 8'hFF; endmodule\n");

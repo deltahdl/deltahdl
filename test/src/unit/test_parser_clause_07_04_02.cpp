@@ -42,20 +42,7 @@ TEST(ParserA24, VarDeclAssignmentWithDims) {
   EXPECT_GE(item->unpacked_dims.size(), 1u);
 }
 
-struct ElabFixture {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
 };
-
-RtlirDesign* Elaborate(const std::string& src, ElabFixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
 
 // =============================================================================
 // A.2.5 Declaration ranges
