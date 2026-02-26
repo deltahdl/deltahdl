@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 import classify_tests_in_file
+from helpers import make_parsed_file as _parsed
 from helpers import make_test_block as _tb
 
 _build_prompt = getattr(classify_tests_in_file, "_build_prompt")
@@ -52,8 +53,9 @@ def test_existing_non_lrm_topics_empty_topic(tmp_path):
 def test_build_prompt_no_topics(tmp_path):
     """Prompt without existing non-lrm topics omits hint."""
     t = _tb("X")
+    parsed = _parsed()
     prompt = _build_prompt(
-        t, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
+        t, parsed, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
     )
     assert "Existing non-lrm topic files" not in prompt
 
@@ -62,8 +64,9 @@ def test_build_prompt_with_topics(tmp_path):
     """Prompt with existing non-lrm topics includes hint."""
     (tmp_path / "test_non_lrm_aig.cpp").write_text("")
     t = _tb("X")
+    parsed = _parsed()
     prompt = _build_prompt(
-        t, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
+        t, parsed, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
     )
     assert "Existing non-lrm topic files" in prompt
 
@@ -72,7 +75,8 @@ def test_build_prompt_contains_lrm_path(tmp_path):
     """Prompt includes the LRM file path."""
     lrm = tmp_path / "LRM.txt"
     t = _tb("X")
-    prompt = _build_prompt(t, tmp_path, lrm, tmp_path / "arch.md")
+    parsed = _parsed()
+    prompt = _build_prompt(t, parsed, tmp_path, lrm, tmp_path / "arch.md")
     assert str(lrm) in prompt
 
 
@@ -80,15 +84,17 @@ def test_build_prompt_contains_arch_path(tmp_path):
     """Prompt includes the architecture file path."""
     arch = tmp_path / "ARCHITECTURE.md"
     t = _tb("X")
-    prompt = _build_prompt(t, tmp_path, tmp_path / "lrm.txt", arch)
+    parsed = _parsed()
+    prompt = _build_prompt(t, parsed, tmp_path, tmp_path / "lrm.txt", arch)
     assert str(arch) in prompt
 
 
 def test_build_prompt_contains_test_body(tmp_path):
     """Prompt includes the test's source code."""
     t = _tb("MyTest")
+    parsed = _parsed()
     prompt = _build_prompt(
-        t, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
+        t, parsed, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
     )
     assert "TEST(S, MyTest)" in prompt
 
@@ -96,8 +102,9 @@ def test_build_prompt_contains_test_body(tmp_path):
 def test_build_prompt_contains_parser_prefix(tmp_path):
     """Prompt lists the parser prefix."""
     t = _tb("X")
+    parsed = _parsed()
     prompt = _build_prompt(
-        t, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
+        t, parsed, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
     )
     assert "test_parser_" in prompt
 
@@ -105,10 +112,48 @@ def test_build_prompt_contains_parser_prefix(tmp_path):
 def test_build_prompt_contains_non_lrm_prefix(tmp_path):
     """Prompt lists the non-lrm prefix."""
     t = _tb("X")
+    parsed = _parsed()
     prompt = _build_prompt(
-        t, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
+        t, parsed, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
     )
     assert "test_non_lrm_" in prompt
+
+
+def test_build_prompt_contains_source_filename(tmp_path):
+    """Prompt includes the source filename."""
+    t = _tb("X")
+    parsed = _parsed()
+    prompt = _build_prompt(
+        t, parsed, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
+        source_filename="test_non_lrm_misc.cpp",
+    )
+    assert "test_non_lrm_misc.cpp" in prompt
+
+
+def test_build_prompt_contains_includes(tmp_path):
+    """Prompt includes #include directives from the parsed file."""
+    t = _tb("X")
+    parsed = _parsed(includes=[
+        '#include <gtest/gtest.h>',
+        '#include "parser/parser.h"',
+    ])
+    prompt = _build_prompt(
+        t, parsed, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
+    )
+    assert '#include "parser/parser.h"' in prompt
+
+
+def test_build_prompt_contains_preamble_context(tmp_path):
+    """Prompt includes helper definitions from global + section preamble."""
+    pre = classify_tests_in_file.PreambleItem(
+        lines=["static bool ParseOk(const std::string& src) {", "}"],
+    )
+    t = _tb("X")
+    parsed = _parsed(preamble=[pre])
+    prompt = _build_prompt(
+        t, parsed, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
+    )
+    assert "ParseOk" in prompt
 
 
 # ---- _extract_json ---------------------------------------------------------
@@ -259,8 +304,9 @@ def test_classify_tests_matching(monkeypatch, tmp_path):
         classify_tests_in_file, "_call_claude", lambda p: response,
     )
     t = _tb("T")
+    parsed = _parsed()
     classify_tests_in_file.classify_tests(
-        [t], tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
+        [t], parsed, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
     )
     assert t.prefix == "test_parser_"
 
@@ -280,7 +326,8 @@ def test_classify_tests_per_test(monkeypatch, tmp_path):
         classify_tests_in_file, "_call_claude", counting_claude,
     )
     tests = [_tb("A"), _tb("B"), _tb("C")]
+    parsed = _parsed()
     classify_tests_in_file.classify_tests(
-        tests, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
+        tests, parsed, tmp_path, tmp_path / "lrm.txt", tmp_path / "arch.md",
     )
     assert call_count[0] == 3

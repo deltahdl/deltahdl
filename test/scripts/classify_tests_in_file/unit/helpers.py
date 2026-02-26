@@ -19,7 +19,8 @@ def make_test_block(
 
 
 def make_parsed_file(
-    includes=None, using=None, ns=False, preamble=None, tests=None,
+    includes=None, using=None, ns=False, preamble=None,
+    section_preamble=None, tests=None,
 ):
     """Shorthand factory for ParsedFile."""
     return classify_tests_in_file.ParsedFile(
@@ -27,6 +28,7 @@ def make_parsed_file(
         using_line=using,
         has_namespace_wrapper=ns,
         global_preamble=preamble or [],
+        section_preamble=section_preamble or [],
         sections=[],
         all_tests=tests or [],
     )

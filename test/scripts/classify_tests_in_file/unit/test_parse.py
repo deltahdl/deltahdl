@@ -308,28 +308,28 @@ def test_parse_body_extracts_test():
         "TEST(Suite, MyTest) {\n",
         "}\n",
     ]
-    _, tests, _ = _parse_body(lines, 0)
+    _, _, tests, _ = _parse_body(lines, 0)
     assert len(tests) == 1
 
 
 def test_parse_body_extracts_test_f():
     """Extracts TEST_F blocks."""
     lines = ["TEST_F(Suite, MyTest) {\n", "}\n"]
-    _, tests, _ = _parse_body(lines, 0)
+    _, _, tests, _ = _parse_body(lines, 0)
     assert tests[0].suite_name == "Suite"
 
 
 def test_parse_body_detects_namespace():
     """Detects namespace { in body."""
     lines = ["namespace {\n", "TEST(S, T) {\n", "}\n"]
-    _, _, has_ns = _parse_body(lines, 0)
+    _, _, _, has_ns = _parse_body(lines, 0)
     assert has_ns is True
 
 
 def test_parse_body_skips_blank_and_closing():
     """Blank lines and } // namespace are skipped."""
     lines = ["\n", "}  // namespace\n", "} // namespace\n"]
-    g, tests, _ = _parse_body(lines, 0)
+    g, _, tests, _ = _parse_body(lines, 0)
     assert not tests and not g
 
 
@@ -340,7 +340,7 @@ def test_parse_body_comments_attached():
         "TEST(S, T) {\n",
         "}\n",
     ]
-    _, tests, _ = _parse_body(lines, 0)
+    _, _, tests, _ = _parse_body(lines, 0)
     assert len(tests[0].preceding_comments) == 1
 
 
@@ -351,12 +351,12 @@ def test_parse_body_global_preamble():
         "TEST(S, T) {\n",
         "}\n",
     ]
-    g_pre, _, _ = _parse_body(lines, 0)
+    g_pre, _, _, _ = _parse_body(lines, 0)
     assert len(g_pre) == 1
 
 
 def test_parse_body_section_preamble():
-    """Preamble after first TEST goes to section preamble (s_pre)."""
+    """Preamble after first TEST goes to section preamble."""
     lines = [
         "TEST(S, T1) {\n",
         "}\n",
@@ -364,8 +364,38 @@ def test_parse_body_section_preamble():
         "TEST(S, T2) {\n",
         "}\n",
     ]
-    g_pre, tests, _ = _parse_body(lines, 0)
+    g_pre, _, tests, _ = _parse_body(lines, 0)
     assert not g_pre and len(tests) == 2
+
+
+def test_parse_body_returns_section_preamble():
+    """Section preamble (helpers between tests) is returned."""
+    lines = [
+        "TEST(S, T1) {\n",
+        "}\n",
+        "using U = float;\n",
+        "TEST(S, T2) {\n",
+        "}\n",
+    ]
+    _, s_pre, _, _ = _parse_body(lines, 0)
+    assert len(s_pre) == 1
+    assert "using U = float;" in s_pre[0].lines[0]
+
+
+def test_parse_body_section_preamble_brace_block():
+    """A brace-delimited helper between tests is returned as section preamble."""
+    lines = [
+        "TEST(S, T1) {\n",
+        "}\n",
+        "static int Helper() {\n",
+        "  return 42;\n",
+        "}\n",
+        "TEST(S, T2) {\n",
+        "}\n",
+    ]
+    _, s_pre, _, _ = _parse_body(lines, 0)
+    assert len(s_pre) == 1
+    assert "static int Helper() {" in s_pre[0].lines[0]
 
 
 def test_parse_body_non_test_non_semicolon():
@@ -375,7 +405,7 @@ def test_parse_body_non_test_non_semicolon():
         "TEST(S, T) {\n",
         "}\n",
     ]
-    _, tests, _ = _parse_body(lines, 0)
+    _, _, tests, _ = _parse_body(lines, 0)
     assert len(tests) == 1
 
 
@@ -386,7 +416,7 @@ def test_parse_body_skips_named_namespace_opener():
         "TEST(S, T) {\n",
         "}\n",
     ]
-    _, tests, _ = _parse_body(lines, 0)
+    _, _, tests, _ = _parse_body(lines, 0)
     assert len(tests) == 1
 
 
@@ -397,7 +427,7 @@ def test_parse_body_named_namespace_opener_sets_has_ns():
         "TEST(S, T) {\n",
         "}\n",
     ]
-    _, _, has_ns = _parse_body(lines, 0)
+    _, _, _, has_ns = _parse_body(lines, 0)
     assert has_ns is True
 
 
@@ -408,7 +438,7 @@ def test_parse_body_skips_named_namespace_closer():
         "}\n",
         "}  // namespace delta\n",
     ]
-    _, tests, _ = _parse_body(lines, 0)
+    _, _, tests, _ = _parse_body(lines, 0)
     assert len(tests) == 1
 
 
@@ -425,7 +455,7 @@ def test_parse_body_extracts_test_inside_named_namespace():
         "}  // namespace\n",
         "}  // namespace delta\n",
     ]
-    _, tests, _ = _parse_body(lines, 0)
+    _, _, tests, _ = _parse_body(lines, 0)
     assert len(tests) == 1
 
 
@@ -442,7 +472,7 @@ def test_parse_body_named_namespace_captures_test_name():
         "}  // namespace\n",
         "}  // namespace delta\n",
     ]
-    _, tests, _ = _parse_body(lines, 0)
+    _, _, tests, _ = _parse_body(lines, 0)
     assert tests[0].test_name == "DefaultContextIsAvailable"
 
 
@@ -459,7 +489,7 @@ def test_parse_body_named_namespace_sets_has_ns():
         "}  // namespace\n",
         "}  // namespace delta\n",
     ]
-    _, _, has_ns = _parse_body(lines, 0)
+    _, _, _, has_ns = _parse_body(lines, 0)
     assert has_ns is True
 
 
@@ -470,7 +500,7 @@ def test_parse_body_named_namespace_no_space_before_brace():
         "TEST(S, T) {\n",
         "}\n",
     ]
-    _, tests, _ = _parse_body(lines, 0)
+    _, _, tests, _ = _parse_body(lines, 0)
     assert len(tests) == 1
 
 
@@ -481,7 +511,7 @@ def test_parse_body_named_namespace_no_space_sets_has_ns():
         "TEST(S, T) {\n",
         "}\n",
     ]
-    _, _, has_ns = _parse_body(lines, 0)
+    _, _, _, has_ns = _parse_body(lines, 0)
     assert has_ns is True
 
 

@@ -349,6 +349,17 @@ def test_generate_file_namespace_wrapper():
     assert "namespace {" in content and "}  // namespace" in content
 
 
+def test_generate_file_with_section_preamble():
+    """Includes section preamble items in generated output."""
+    sec = classify_tests_in_file.PreambleItem(
+        lines=["static int Helper() {", "  return 42;", "}"],
+    )
+    parsed = _parsed(section_preamble=[sec])
+    t = _tb("T", comments=[])
+    content = classify_tests_in_file.generate_file("6.3", "", parsed, [t])
+    assert "static int Helper() {" in content
+
+
 def test_generate_file_preamble_stripped_empty():
     """Exercise generate_file preamble with strip_lrm_quotes returning empty."""
     pre = classify_tests_in_file.PreambleItem(

@@ -124,7 +124,7 @@ def _find_namespace_close(lines):
 
 
 def append_tests_to_file(filepath, global_preamble, tests,
-                         max_lines=None):
+                         max_lines=None, section_preamble=None):
     """Append tests to an existing file before closing }  // namespace.
 
     Returns a list of new filenames created by splitting (empty if no
@@ -133,7 +133,8 @@ def append_tests_to_file(filepath, global_preamble, tests,
     text = filepath.read_text(encoding="utf-8")
     lines = text.splitlines()
     insert_idx = _find_namespace_close(lines)
-    new_lines = _dedup_preamble(global_preamble, text)
+    all_preamble = list(global_preamble) + list(section_preamble or [])
+    new_lines = _dedup_preamble(all_preamble, text)
 
     fit, overflow = _split_tests(
         tests, len(lines) + len(new_lines), max_lines,

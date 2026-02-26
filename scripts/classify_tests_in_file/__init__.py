@@ -79,6 +79,7 @@ class ParsedFile:
     using_line: str | None
     has_namespace_wrapper: bool
     global_preamble: list[PreambleItem]
+    section_preamble: list[PreambleItem]
     sections: list[SectionGroup]
     all_tests: list[TestBlock]
 
@@ -289,7 +290,7 @@ def _parse_body(lines, start_idx):
         if item:
             target = g_pre if in_global else s_pre
             target.append(item)
-    return g_pre, all_tests, has_ns
+    return g_pre, s_pre, all_tests, has_ns
 
 
 def parse_file(filepath):
@@ -297,12 +298,13 @@ def parse_file(filepath):
     text = filepath.read_text(encoding="utf-8")
     lines = text.splitlines(keepends=True)
     includes, using_line, hdr_ns, body_start = _parse_header(lines)
-    g_pre, all_tests, body_ns = _parse_body(lines, body_start)
+    g_pre, s_pre, all_tests, body_ns = _parse_body(lines, body_start)
     return ParsedFile(
         includes=includes,
         using_line=using_line,
         has_namespace_wrapper=hdr_ns or body_ns,
         global_preamble=g_pre,
+        section_preamble=s_pre,
         sections=[],
         all_tests=all_tests,
     )
@@ -360,7 +362,7 @@ _PROMPT_TEMPLATE = """Classify this test. Determine:
 {topics}
 Project architecture: {arch_path}
 IEEE 1800-2023 LRM: {lrm_path}
-
+{file_context}
 TEST({suite}, {test_name}):
 {test_body}
 
@@ -369,7 +371,8 @@ Respond with ONLY JSON:
 """
 
 
-def _build_prompt(test, test_dir, lrm_path, arch_path):
+def _build_prompt(test, parsed, test_dir, lrm_path, arch_path,
+                  source_filename=None):
     """Build the Claude classification prompt for a single test."""
     topics = existing_non_lrm_topics(test_dir)
     topics_hint = ""
@@ -380,11 +383,30 @@ def _build_prompt(test, test_dir, lrm_path, arch_path):
             + "\n   PREFER reusing one of these topics when the"
             " test fits, to avoid near-duplicate filenames.\n"
         )
+    context_parts = []
+    if source_filename:
+        context_parts.append(f"Source file: {source_filename}")
+    if parsed.includes:
+        context_parts.append("Includes:\n" + "\n".join(parsed.includes))
+    all_preamble = list(parsed.global_preamble) + list(parsed.section_preamble)
+    if all_preamble:
+        preamble_lines = []
+        for item in all_preamble:
+            preamble_lines.extend(item.lines)
+        context_parts.append(
+            "Helper definitions:\n" + "\n".join(preamble_lines),
+        )
+    file_context = ""
+    if context_parts:
+        file_context = (
+            "FILE CONTEXT:\n" + "\n\n".join(context_parts) + "\n"
+        )
     body = "\n".join(test.preceding_comments + test.lines)
     return _PROMPT_TEMPLATE.format(
         topics=topics_hint,
         arch_path=arch_path,
         lrm_path=lrm_path,
+        file_context=file_context,
         suite=test.suite_name,
         test_name=test.test_name,
         test_body=body,
@@ -441,11 +463,15 @@ def _apply_classification(test, response):
     test.rationale = response.get("rationale", "")
 
 
-def classify_tests(tests, test_dir, lrm_path, arch_path):
+def classify_tests(tests, parsed, test_dir, lrm_path, arch_path,
+                   source_filename=None):
     """Use Claude to classify each test's prefix and clause."""
 
     def _classify_one(test):
-        prompt = _build_prompt(test, test_dir, lrm_path, arch_path)
+        prompt = _build_prompt(
+            test, parsed, test_dir, lrm_path, arch_path,
+            source_filename=source_filename,
+        )
         response = _call_claude(prompt)
         _apply_classification(test, response)
 
@@ -556,6 +582,12 @@ def generate_file(clause, title, parsed, tests):
         out.append(parsed.using_line)
         out.append("")
     for item in parsed.global_preamble:
+        for line in item.lines:
+            cleaned = strip_lrm_quotes(line)
+            if cleaned or cleaned == "":  # pragma: no branch
+                out.append(cleaned)
+        out.append("")
+    for item in parsed.section_preamble:
         for line in item.lines:
             cleaned = strip_lrm_quotes(line)
             if cleaned or cleaned == "":  # pragma: no branch
@@ -725,6 +757,7 @@ def _write_files(  # pylint: disable=too-many-arguments,too-many-positional-argu
         split_names = append_tests_to_file(
             merge_path, parsed.global_preamble, tests,
             max_lines=max_lines,
+            section_preamble=parsed.section_preamble,
         )
         new_names.extend(split_names)
     return new_names
@@ -815,7 +848,10 @@ def _run(args):  # pylint: disable=too-many-locals
         sys.exit(1)
     dry = " (dry run)" if args.dry_run else ""
     print(f"{test_name}.cpp \u2014 {len(parsed.all_tests)} tests{dry}")
-    classify_tests(parsed.all_tests, test_dir, lrm_path, arch_path)
+    classify_tests(
+        parsed.all_tests, parsed, test_dir, lrm_path, arch_path,
+        source_filename=filepath.name,
+    )
     _print_classification_table(parsed.all_tests)
     groups = _group_tests(parsed.all_tests)
     source_is_target = any(
