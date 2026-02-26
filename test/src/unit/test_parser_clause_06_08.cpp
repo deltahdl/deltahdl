@@ -144,4 +144,27 @@ TEST(ParserA28, DataDeclMultiVarsInBlock) {
   EXPECT_EQ(body->stmts[2]->var_name, "c");
 }
 
+struct ElabFixture {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag{mgr};
+};
+
+RtlirDesign* Elaborate(const std::string& src, ElabFixture& f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto* cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  return elab.Elaborate(cu->modules.back()->name);
+}
+
+TEST(ParserAnnexA, A2VarDeclWithInit) {
+  auto r = Parse("module m; logic [7:0] data = 8'hFF; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_NE(r.cu->modules[0]->items[0]->init_expr, nullptr);
+}
+
 }  // namespace
