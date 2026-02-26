@@ -525,7 +525,8 @@ def _do_split_write(tmp_path):
     t2 = _make_large_test("Big2", 40)
     to_create = [("test_parser_clause_06_01", "6.1", [t1, t2])]
     return _write_files(
-        to_create, [], parsed, tmp_path, {}, max_lines=50,
+        to_create, [], parsed,
+        {"test_dir": tmp_path, "lrm_titles": {}, "max_lines": 50},
     )
 
 
@@ -559,7 +560,8 @@ def test_write_files_no_split_under_max_lines(tmp_path):
     t = _tb("Small", comments=[])
     to_create = [("test_parser_clause_06_01", "6.1", [t])]
     _write_files(
-        to_create, [], parsed, tmp_path, {}, max_lines=500,
+        to_create, [], parsed,
+        {"test_dir": tmp_path, "lrm_titles": {}, "max_lines": 500},
     )
     assert (tmp_path / "test_parser_clause_06_01.cpp").exists()
 
@@ -570,7 +572,8 @@ def test_write_files_no_split_returns_name(tmp_path):
     t = _tb("Small", comments=[])
     to_create = [("test_parser_clause_06_01", "6.1", [t])]
     names = _write_files(
-        to_create, [], parsed, tmp_path, {}, max_lines=500,
+        to_create, [], parsed,
+        {"test_dir": tmp_path, "lrm_titles": {}, "max_lines": 500},
     )
     assert "test_parser_clause_06_01" in names
 
@@ -582,7 +585,8 @@ def test_write_files_no_split_when_no_max_lines(tmp_path):
     t2 = _make_large_test("Big2", 40)
     to_create = [("test_parser_clause_06_01", "6.1", [t1, t2])]
     _write_files(
-        to_create, [], parsed, tmp_path, {}, max_lines=None,
+        to_create, [], parsed,
+        {"test_dir": tmp_path, "lrm_titles": {}},
     )
     assert (tmp_path / "test_parser_clause_06_01.cpp").exists()
 

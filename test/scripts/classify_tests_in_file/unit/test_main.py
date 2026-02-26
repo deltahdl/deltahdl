@@ -15,7 +15,7 @@ _format_clause = getattr(classify_tests_in_file, "_format_clause")
 _print_classification_table = getattr(
     classify_tests_in_file, "_print_classification_table",
 )
-_print_dry_run_summary = getattr(classify_tests_in_file, "_print_dry_run_summary")
+_print_summary = getattr(classify_tests_in_file, "_print_summary")
 _group_tests = getattr(classify_tests_in_file, "_group_tests")
 _resolve_destinations = getattr(classify_tests_in_file, "_resolve_destinations")
 _write_files = getattr(classify_tests_in_file, "_write_files")
@@ -237,7 +237,7 @@ def test_print_classification_wrap_aligns(capsys):
     assert cont.startswith("  ") and not cont.startswith("  ----")
 
 
-# ---- _print_summary / _print_dry_run_summary ------------------------------
+# ---- _print_summary --------------------------------------------------------
 
 
 def test_print_summary_created(capsys):
@@ -310,8 +310,9 @@ def test_print_dry_run_summary_moved(tmp_path, capsys):
     """Dry-run prints '- Would have moved'."""
     t = _tb("M", prefix="test_parser_", clause="6.1")
     merge_path = tmp_path / "test_parser_clause_06_01.cpp"
-    _print_dry_run_summary(
+    _print_summary(
         [], [(merge_path, [t])], "test_input", False,
+        dry_run=True,
     )
     assert "- Would have moved" in capsys.readouterr().out
 
@@ -320,8 +321,9 @@ def test_print_dry_run_summary_no_bare_moved(tmp_path, capsys):
     """Dry-run does not contain bare 'Moved' without 'Would have'."""
     t = _tb("M", prefix="test_parser_", clause="6.1")
     merge_path = tmp_path / "test_parser_clause_06_01.cpp"
-    _print_dry_run_summary(
+    _print_summary(
         [], [(merge_path, [t])], "test_input", False,
+        dry_run=True,
     )
     out = capsys.readouterr().out
     assert "Moved" not in out.replace("Would have moved", "")
@@ -331,8 +333,9 @@ def test_print_dry_run_summary_create(capsys):
     """Dry-run prints 'Would have created'."""
     t = _tb("T", prefix="test_parser_", clause="6.1")
     to_create = [("test_parser_clause_06_01", "6.1", [t])]
-    _print_dry_run_summary(
+    _print_summary(
         to_create, [], "test_input", False,
+        dry_run=True,
     )
     out = capsys.readouterr().out
     assert "- Would have created" in out
@@ -342,8 +345,9 @@ def test_print_dry_run_summary_deleted(capsys):
     """Dry-run prints 'Would have deleted'."""
     t = _tb("T", prefix="test_parser_", clause="6.1")
     to_create = [("test_parser_clause_06_01", "6.1", [t])]
-    _print_dry_run_summary(
+    _print_summary(
         to_create, [], "test_input", False,
+        dry_run=True,
     )
     out = capsys.readouterr().out
     assert "- Would have deleted test_input.cpp" in out
@@ -353,8 +357,9 @@ def test_print_dry_run_summary_updated(capsys):
     """Dry-run prints 'Would have updated CMakeLists.txt'."""
     t = _tb("T", prefix="test_parser_", clause="6.1")
     to_create = [("test_parser_clause_06_01", "6.1", [t])]
-    _print_dry_run_summary(
+    _print_summary(
         to_create, [], "test_input", False,
+        dry_run=True,
     )
     out = capsys.readouterr().out
     assert "- Would have updated CMakeLists.txt" in out
@@ -364,8 +369,9 @@ def test_print_dry_run_summary_kept(capsys):
     """Dry-run prints 'Would have kept'."""
     t = _tb("T", prefix="test_parser_", clause="6.1")
     to_create = [("test_parser_clause_06_01", "6.1", [t])]
-    _print_dry_run_summary(
+    _print_summary(
         to_create, [], "test_input", True, n_kept=3,
+        dry_run=True,
     )
     out = capsys.readouterr().out
     assert "- Would have kept 3 tests" in out
@@ -373,20 +379,21 @@ def test_print_dry_run_summary_kept(capsys):
 
 def test_print_dry_run_summary_nothing_kept(capsys):
     """Dry-run all-correct path prints 'Would have kept' bullet."""
-    _print_dry_run_summary([], [], "test_input", True, n_kept=13)
+    _print_summary([], [], "test_input", True, n_kept=13, dry_run=True)
     assert "- Would have kept 13 tests" in capsys.readouterr().out
 
 
 def test_print_dry_run_summary_nothing_no_removals(capsys):
     """Dry-run all-correct with no removals has SUMMARY header."""
-    _print_dry_run_summary([], [], "test_input", True, n_kept=13)
+    _print_summary([], [], "test_input", True, n_kept=13, dry_run=True)
     assert "SUMMARY" in capsys.readouterr().out
 
 
 def test_print_dry_run_summary_nothing_with_removals(capsys):
     """Dry-run all-correct with removals has kept and removed bullets."""
-    _print_dry_run_summary(
+    _print_summary(
         [], [], "test_input", True, n_kept=9, n_removed=4,
+        dry_run=True,
     )
     out = capsys.readouterr().out
     assert "Would have kept 9 tests" in out
@@ -503,7 +510,8 @@ def test_write_files_create(tmp_path):
     parsed = _parsed()
     to_create = [("test_parser_clause_06_01", "6.1", [t])]
     names = _write_files(
-        to_create, [], parsed, tmp_path, {},
+        to_create, [], parsed,
+        {"test_dir": tmp_path, "lrm_titles": {}},
     )
     assert "test_parser_clause_06_01" in names
 
@@ -518,7 +526,8 @@ def test_write_files_merge(tmp_path):
     t = _tb("New", comments=[])
     parsed = _parsed()
     names = _write_files(
-        [], [(f, [t])], parsed, tmp_path, {},
+        [], [(f, [t])], parsed,
+        {"test_dir": tmp_path, "lrm_titles": {}},
     )
     assert not names
 

@@ -738,7 +738,20 @@ def _group_tests(tests):
     return groups
 
 
-def _resolve_destinations(  # pylint: disable=too-many-locals
+def _report_removals(tests, existing, target, dry_run):
+    """Print removal messages for duplicate tests and return count."""
+    verb = "Would have removed" if dry_run else "Removed"
+    count = 0
+    for t in tests:
+        if t.test_name in existing:
+            count += 1
+            print(f"  - {verb} {t.test_name}() because it"
+                  f" belongs in {target}.cpp where it"
+                  " already exists.")
+    return count
+
+
+def _resolve_destinations(
     groups, test_dir, exclude_path=None, dry_run=False,
 ):
     """Deduplicate tests and resolve create/merge destinations."""
@@ -749,13 +762,7 @@ def _resolve_destinations(  # pylint: disable=too-many-locals
         target = clause_to_filename(prefix, clause)
         existing = find_existing_tests(target, test_dir, exclude_path)
         unique = [t for t in tests if t.test_name not in existing]
-        verb = "Would have removed" if dry_run else "Removed"
-        for d in tests:
-            if d.test_name in existing:
-                n_removed += 1
-                print(f"  - {verb} {d.test_name}() because it"
-                      f" belongs in {target}.cpp where it"
-                      " already exists.")
+        n_removed += _report_removals(tests, existing, target, dry_run)
         groups[(prefix, clause)] = unique
         if not unique:
             continue
@@ -769,46 +776,43 @@ def _resolve_destinations(  # pylint: disable=too-many-locals
     return to_create, to_merge, n_removed
 
 
-def _write_files(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
-    to_create, to_merge, parsed, test_dir, lrm_titles,
-    max_lines=None,
-):
-    """Write new files and merge into existing files."""
-    new_names = []
+def _write_creates(to_create, parsed, test_dir, lrm_titles, max_lines):
+    """Write newly created clause files and return their names."""
+    names = []
     for filename, clause, tests in to_create:
         title = lrm_titles.get(clause, "")
-        header_len = len(generate_file(clause, title, parsed, [])
-                         .splitlines())
-        batches = (_batch_tests(tests, header_len, max_lines)
-                   if max_lines else [tests])
+        batches = (_batch_tests(
+            tests,
+            len(generate_file(clause, title, parsed, []).splitlines()),
+            max_lines,
+        ) if max_lines else [tests])
         if len(batches) <= 1:
             content = generate_file(clause, title, parsed, tests)
-            _write_one_file(filename, content, test_dir, new_names)
+            _write_one_file(filename, content, test_dir, names)
         else:
             for i, batch in enumerate(batches):
                 suffix = chr(ord("a") + i)
                 content = generate_file(clause, title, parsed, batch)
                 _write_one_file(
-                    f"{filename}_{suffix}", content, test_dir, new_names,
+                    f"{filename}_{suffix}", content, test_dir, names,
                 )
+    return names
+
+
+def _write_files(to_create, to_merge, parsed, ctx):
+    """Write new files and merge into existing files."""
+    new_names = _write_creates(
+        to_create, parsed, ctx["test_dir"],
+        ctx["lrm_titles"], ctx.get("max_lines"),
+    )
     for merge_path, tests in to_merge:
         split_names = append_tests_to_file(
             merge_path, parsed.global_preamble, tests,
-            max_lines=max_lines,
+            max_lines=ctx.get("max_lines"),
             section_preamble=parsed.section_preamble,
         )
         new_names.extend(split_names)
     return new_names
-
-
-def _print_dry_run_summary(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-    to_create, to_merge, test_name,
-    source_is_target, n_kept=0, n_removed=0,
-):
-    """Print dry-run summary using past future perfect tense."""
-    _print_summary(to_create, to_merge, test_name,
-                   source_is_target, n_kept=n_kept,
-                   n_removed=n_removed, dry_run=True)
 
 
 def _rewrite_source(filepath, groups, parsed, lrm_titles, test_name):
@@ -824,18 +828,19 @@ def _rewrite_source(filepath, groups, parsed, lrm_titles, test_name):
     return len(staying)
 
 
-def _print_summary(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-branches
-    to_create, to_merge, test_name,
-    source_is_target, *, n_kept=0, n_removed=0,
-    dry_run=False,
+def _print_summary(
+    to_create, to_merge, test_name, source_is_target, **kwargs,
 ):
     """Print the because-driven summary of what was done."""
+    n_kept = kwargs.get("n_kept", 0)
+    n_removed = kwargs.get("n_removed", 0)
+    dry_run = kwargs.get("dry_run", False)
+
     def _v(past):
         """Return past future perfect tense if dry_run, else past."""
         if not dry_run:
             return past
         return f"Would have {past[0].lower()}{past[1:]}"
-
 
     print("\n  SUMMARY")
     if not to_create and not to_merge and source_is_target:
@@ -870,13 +875,8 @@ def _print_summary(  # pylint: disable=too-many-arguments,too-many-positional-ar
               " new test targets were added.")
 
 
-def _run(args):  # pylint: disable=too-many-locals
-    """Execute the split operation."""
-    test_dir = Path(args.output_dir).resolve()
-    filepath = Path(args.file).resolve()
-    lrm_path = Path(args.lrm).resolve()
-    arch_path = Path(args.arch).resolve()
-    test_name = filepath.stem
+def _validate_input(filepath, test_name):
+    """Parse and validate the input file, returning (parsed, target)."""
     if not filepath.exists():
         print(f"ERROR: {filepath} not found")
         sys.exit(1)
@@ -884,15 +884,53 @@ def _run(args):  # pylint: disable=too-many-locals
     if not parsed.all_tests:
         print("ERROR: No TEST blocks found")
         sys.exit(1)
-    matches = [t for t in parsed.all_tests if t.test_name == args.test]
+    matches = [t for t in parsed.all_tests if t.test_name == test_name]
     if not matches:
-        print(f"ERROR: Test {args.test!r} not found in {filepath.name}")
+        print(f"ERROR: Test {test_name!r} not found in {filepath.name}")
         sys.exit(1)
-    target = matches[:1]
-    dry = " (dry run)" if args.dry_run else ""
-    print(f"{test_name}.cpp \u2014 {args.test}{dry}")
+    return parsed, matches[:1]
+
+
+def _update_source(filepath, parsed, ctx):
+    """Rewrite or remove the source file after moving a test."""
+    others = [t for t in parsed.all_tests
+              if t.test_name != ctx["test"]]
+    source_is_target = ctx["source_is_target"]
+    if source_is_target and others:
+        content = generate_file("non-lrm", "", parsed, others)
+        filepath.write_text(content, encoding="utf-8")
+        return len(others)
+    if source_is_target:
+        return _rewrite_source(
+            filepath, ctx["groups"], parsed,
+            ctx["titles"], ctx["stem"],
+        )
+    if others:
+        content = generate_file("non-lrm", "", parsed, others)
+        filepath.write_text(content, encoding="utf-8")
+    else:
+        filepath.unlink()
+    return 0
+
+
+def _count_kept(groups, test_name):
+    """Count tests that stay in the source file."""
+    return sum(
+        len(ts) for (p, c), ts in groups.items()
+        if clause_to_filename(p, c) == test_name
+    )
+
+
+def _run(args):
+    """Execute the split operation."""
+    filepath = Path(args.file).resolve()
+    test_name = filepath.stem
+    parsed, target = _validate_input(filepath, args.test)
+    print(f"{test_name}.cpp \u2014 {args.test}"
+          f"{' (dry run)' if args.dry_run else ''}")
     classify_tests(
-        target, parsed, test_dir, lrm_path, arch_path,
+        target, parsed, Path(args.output_dir).resolve(),
+        Path(args.lrm).resolve(), Path(args.arch).resolve(),
     )
     _print_classification_table(target)
     groups = _group_tests(target)
@@ -901,52 +939,38 @@ def _run(args):  # pylint: disable=too-many-locals
         for p, c in groups
     )
     to_create, to_merge, n_removed = _resolve_destinations(
-        groups, test_dir, exclude_path=filepath,
-        dry_run=args.dry_run,
+        groups, Path(args.output_dir).resolve(),
+        exclude_path=filepath, dry_run=args.dry_run,
     )
+    n_kept = _count_kept(groups, test_name)
     if args.dry_run:
-        n_kept = sum(1 for (p, c), ts in groups.items()
-                     if clause_to_filename(p, c) == test_name
-                     for _ in ts)
-        _print_dry_run_summary(to_create, to_merge, test_name,
-                               source_is_target, n_kept=n_kept,
-                               n_removed=n_removed)
+        _print_summary(to_create, to_merge, test_name,
+                       source_is_target, n_kept=n_kept,
+                       n_removed=n_removed, dry_run=True)
         return
-    n_kept = sum(1 for (p, c), ts in groups.items()
-                 if clause_to_filename(p, c) == test_name
-                 for _ in ts)
     if not to_create and not to_merge and source_is_target \
             and n_removed == 0:
         _print_summary(to_create, to_merge, test_name,
                        source_is_target, n_kept=n_kept,
                        n_removed=n_removed)
         return
-    titles = load_lrm_titles(lrm_path)
-    new_names = _write_files(
-        to_create, to_merge, parsed, test_dir, titles,
-        max_lines=getattr(args, "max_lines", None),
+    titles = load_lrm_titles(Path(args.lrm).resolve())
+    new_names = _write_files(to_create, to_merge, parsed, {
+        "test_dir": Path(args.output_dir).resolve(),
+        "lrm_titles": titles,
+        "max_lines": getattr(args, "max_lines", None),
+    })
+    n_kept = _update_source(filepath, parsed, {
+        "test": args.test, "groups": groups,
+        "titles": titles, "stem": test_name,
+        "source_is_target": source_is_target,
+    })
+    update_cmake(
+        test_name, new_names,
+        keep_old=source_is_target or any(
+            t.test_name != args.test for t in parsed.all_tests
+        ),
     )
-    other_tests = [t for t in parsed.all_tests
-                   if t.test_name != args.test]
-    if source_is_target and other_tests:
-        content = generate_file(
-            "non-lrm", "", parsed, other_tests,
-        )
-        filepath.write_text(content, encoding="utf-8")
-        n_kept = len(other_tests)
-    elif source_is_target:
-        n_kept = _rewrite_source(
-            filepath, groups, parsed, titles, test_name,
-        )
-    elif other_tests:
-        content = generate_file(
-            "non-lrm", "", parsed, other_tests,
-        )
-        filepath.write_text(content, encoding="utf-8")
-    update_cmake(test_name, new_names,
-                 keep_old=source_is_target or bool(other_tests))
-    if not source_is_target and not other_tests:
-        filepath.unlink()
     _print_summary(to_create, to_merge, test_name,
                    source_is_target, n_kept=n_kept,
                    n_removed=n_removed)
