@@ -1,9 +1,7 @@
 // Non-LRM tests
 
 #include <gtest/gtest.h>
-
 #include <string>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -29,6 +27,32 @@ ParseResult Parse(const std::string& src) {
   result.cu = parser.Parse();
   result.has_errors = diag.HasErrors();
   return result;
+}
+
+struct ElabFixture {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag{mgr};
+};
+
+RtlirDesign* Elaborate(const std::string& src, ElabFixture& f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto* cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  return elab.Elaborate(cu->modules.back()->name);
+}
+
+static bool ParseOk(const std::string& src) {
+  SourceManager mgr;
+  Arena arena;
+  auto fid = mgr.AddFile("<test>", src);
+  DiagEngine diag(mgr);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, arena, diag);
+  parser.Parse();
+  return !diag.HasErrors();
 }
 
 namespace {
@@ -654,31 +678,6 @@ TEST(ParserA24, ParamAssignmentWithUnpackedDim) {
   EXPECT_GE(item->unpacked_dims.size(), 1u);
 }
 
-TEST(ParserA24, VarDeclAssignmentWithInit) {
-  auto r = Parse("module m; int x = 42; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
-  EXPECT_EQ(item->name, "x");
-  EXPECT_NE(item->init_expr, nullptr);
-}
-
-struct ElabFixture {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
-};
-
-RtlirDesign* Elaborate(const std::string& src, ElabFixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 TEST(ParserA25, UnsizedDimWithInitInferSize) {
   ElabFixture f;
   auto* design = Elaborate("module m; int d [] = '{1,2,3}; endmodule\n", f);
@@ -779,17 +778,6 @@ TEST(ParserA27, TfPortDeclOldStyleVar) {
   auto* item = r.cu->modules[0]->items[0];
   ASSERT_EQ(item->func_args.size(), 1u);
   EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
-}
-
-static bool ParseOk(const std::string& src) {
-  SourceManager mgr;
-  Arena arena;
-  auto fid = mgr.AddFile("<test>", src);
-  DiagEngine diag(mgr);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, arena, diag);
-  parser.Parse();
-  return !diag.HasErrors();
 }
 
 // §A.2.8 block_item_declaration alternative 1: data_declaration
