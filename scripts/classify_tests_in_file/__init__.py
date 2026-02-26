@@ -452,7 +452,16 @@ def _call_claude(prompt):
         print(f"ERROR: Claude CLI failed (RC={result.returncode}):"
               f"\n{result.stderr}", file=sys.stderr)
         sys.exit(1)
-    return _extract_json(result.stdout.strip())
+    raw = result.stdout.strip()
+    # --output-format json wraps Claude's text in an envelope
+    # with keys like "result", "session_id", etc.
+    try:
+        envelope = json.loads(raw)
+    except json.JSONDecodeError:
+        return _extract_json(raw)
+    if isinstance(envelope, dict) and "result" in envelope:
+        return _extract_json(envelope["result"])
+    return _extract_json(raw)
 
 
 def _validate_response(response, test_name):

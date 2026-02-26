@@ -1,5 +1,6 @@
 """Unit tests for classification functions in classify_tests_in_file."""
 
+import json
 import subprocess
 from unittest.mock import MagicMock
 
@@ -200,10 +201,24 @@ def test_extract_json_embedded_invalid():
 
 
 def test_call_claude_success(monkeypatch):
-    """Returns parsed JSON on success."""
+    """Returns parsed JSON from --output-format json envelope."""
+    inner = '{"prefix": "test_parser_"}'
+    envelope = json.dumps({"result": inner, "session_id": "x"})
     mock_result = MagicMock()
     mock_result.returncode = 0
-    mock_result.stdout = '{"prefix": "test_parser_"}'
+    mock_result.stdout = envelope
+    mock_result.stderr = ""
+    monkeypatch.setattr(
+        subprocess, "run", lambda *_a, **_kw: mock_result,
+    )
+    assert _call_claude("prompt") == {"prefix": "test_parser_"}
+
+
+def test_call_claude_raw_text_fallback(monkeypatch):
+    """Falls back to _extract_json when stdout is not valid JSON."""
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = 'Here is the answer: {"prefix": "test_parser_"}'
     mock_result.stderr = ""
     monkeypatch.setattr(
         subprocess, "run", lambda *_a, **_kw: mock_result,
