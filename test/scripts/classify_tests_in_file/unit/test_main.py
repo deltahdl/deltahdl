@@ -329,40 +329,32 @@ def test_print_dry_run_summary_no_bare_moved(tmp_path, capsys):
     assert "Moved" not in out.replace("Would have moved", "")
 
 
-def test_print_dry_run_summary_create(capsys):
-    """Dry-run prints 'Would have created'."""
+def _dry_run_create_output(capsys):
+    """Run a dry-run summary with one create entry and return stdout."""
     t = _tb("T", prefix="test_parser_", clause="6.1")
     to_create = [("test_parser_clause_06_01", "6.1", [t])]
     _print_summary(
         to_create, [], "test_input", False,
         dry_run=True,
     )
-    out = capsys.readouterr().out
-    assert "- Would have created" in out
+    return capsys.readouterr().out
+
+
+def test_print_dry_run_summary_create(capsys):
+    """Dry-run prints 'Would have created'."""
+    assert "- Would have created" in _dry_run_create_output(capsys)
 
 
 def test_print_dry_run_summary_deleted(capsys):
     """Dry-run prints 'Would have deleted'."""
-    t = _tb("T", prefix="test_parser_", clause="6.1")
-    to_create = [("test_parser_clause_06_01", "6.1", [t])]
-    _print_summary(
-        to_create, [], "test_input", False,
-        dry_run=True,
-    )
-    out = capsys.readouterr().out
-    assert "- Would have deleted test_input.cpp" in out
+    assert "- Would have deleted test_input.cpp" in \
+        _dry_run_create_output(capsys)
 
 
 def test_print_dry_run_summary_updated(capsys):
     """Dry-run prints 'Would have updated CMakeLists.txt'."""
-    t = _tb("T", prefix="test_parser_", clause="6.1")
-    to_create = [("test_parser_clause_06_01", "6.1", [t])]
-    _print_summary(
-        to_create, [], "test_input", False,
-        dry_run=True,
-    )
-    out = capsys.readouterr().out
-    assert "- Would have updated CMakeLists.txt" in out
+    assert "- Would have updated CMakeLists.txt" in \
+        _dry_run_create_output(capsys)
 
 
 def test_print_dry_run_summary_kept(capsys):

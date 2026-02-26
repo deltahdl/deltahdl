@@ -311,29 +311,27 @@ def test_named_ns_pipeline_reports_done(tmp_path):
     assert "Updated CMakeLists.txt" in r.stdout
 
 
-def test_named_ns_pipeline_creates_clause_file(tmp_path):
-    """Pipeline creates clause file from named-namespace input."""
+def _run_named_ns_pipeline(tmp_path):
+    """Setup and run the named-namespace pipeline."""
     env, lrm, arch = _setup_named_ns_pipeline(tmp_path)
-    _invoke(
+    return _invoke(
         "--file", str(tmp_path / "test_input.cpp"),
         "--output-dir", str(tmp_path),
         "--lrm", lrm, "--arch", arch,
         "--test", "Alpha",
         cwd=str(tmp_path), env=env,
     )
+
+
+def test_named_ns_pipeline_creates_clause_file(tmp_path):
+    """Pipeline creates clause file from named-namespace input."""
+    _run_named_ns_pipeline(tmp_path)
     assert (tmp_path / "test_parser_clause_06_01.cpp").exists()
 
 
 def test_named_ns_pipeline_output_contains_test(tmp_path):
     """Clause file from named-namespace input contains the test."""
-    env, lrm, arch = _setup_named_ns_pipeline(tmp_path)
-    _invoke(
-        "--file", str(tmp_path / "test_input.cpp"),
-        "--output-dir", str(tmp_path),
-        "--lrm", lrm, "--arch", arch,
-        "--test", "Alpha",
-        cwd=str(tmp_path), env=env,
-    )
+    _run_named_ns_pipeline(tmp_path)
     assert "TEST(S, Alpha)" in (
         tmp_path / "test_parser_clause_06_01.cpp"
     ).read_text()
