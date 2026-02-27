@@ -1,45 +1,18 @@
 // §12.8: Jump statements
 
-#include <gtest/gtest.h>
 
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "simulation/lowerer.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
 
+#include "fixture_simulator.h"
+
 using namespace delta;
-
-struct SimA605Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA605Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
 
 namespace {
 
 // §12.8: break exits loop in simulation
 TEST(SimA605, JumpBreakExitsLoop) {
-  SimA605Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -63,7 +36,7 @@ TEST(SimA605, JumpBreakExitsLoop) {
 
 // §12.8: continue skips to next iteration
 TEST(SimA605, JumpContinueSkipsIteration) {
-  SimA605Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -87,7 +60,7 @@ TEST(SimA605, JumpContinueSkipsIteration) {
 
 // §12.8: return without value exits void function
 TEST(SimA605, JumpReturnVoidFunction) {
-  SimA605Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -110,26 +83,9 @@ TEST(SimA605, JumpReturnVoidFunction) {
   EXPECT_EQ(var->value.ToUint64(), 10u);  // 20 not reached due to return
 }
 
-struct SimA608Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA608Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // §12.7.7: forever with continue skips to next iteration
 TEST(SimA608, ForeverContinue) {
-  SimA608Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x, count;\n"
@@ -157,7 +113,7 @@ TEST(SimA608, ForeverContinue) {
 
 // §12.7.6: repeat with break exits early
 TEST(SimA608, RepeatBreak) {
-  SimA608Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -181,7 +137,7 @@ TEST(SimA608, RepeatBreak) {
 
 // §12.7.6: repeat with continue skips remainder
 TEST(SimA608, RepeatContinue) {
-  SimA608Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x, count;\n"
@@ -208,7 +164,7 @@ TEST(SimA608, RepeatContinue) {
 
 // §12.7.4: while with break exits early
 TEST(SimA608, WhileBreak) {
-  SimA608Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -232,7 +188,7 @@ TEST(SimA608, WhileBreak) {
 
 // §12.7.1: for with break exits early
 TEST(SimA608, ForBreak) {
-  SimA608Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -256,7 +212,7 @@ TEST(SimA608, ForBreak) {
 
 // §12.7.1: for with continue skips to step
 TEST(SimA608, ForContinue) {
-  SimA608Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] count;\n"
@@ -281,7 +237,7 @@ TEST(SimA608, ForContinue) {
 
 // §12.7.5: do-while with break
 TEST(SimA608, DoWhileBreak) {
-  SimA608Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -305,7 +261,7 @@ TEST(SimA608, DoWhileBreak) {
 
 // §12.7.5: do-while with continue
 TEST(SimA608, DoWhileContinue) {
-  SimA608Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x, count;\n"
@@ -333,7 +289,7 @@ TEST(SimA608, DoWhileContinue) {
 // --- Nested loops ---
 // Nested loops: inner break doesn't affect outer
 TEST(SimA608, NestedLoopInnerBreak) {
-  SimA608Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] outer_count;\n"
@@ -360,7 +316,7 @@ TEST(SimA608, NestedLoopInnerBreak) {
 
 // Nested loops: inner continue doesn't affect outer
 TEST(SimA608, NestedLoopInnerContinue) {
-  SimA608Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] total;\n"

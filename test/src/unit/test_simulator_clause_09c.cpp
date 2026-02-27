@@ -1,35 +1,10 @@
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "simulation/lowerer.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
 
+#include "fixture_simulator.h"
+
 using namespace delta;
-
-struct SimCh9cFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimCh9cFixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
 
 // =============================================================================
 // §9.2.3: always_latch executes at time 0
@@ -38,7 +13,7 @@ static RtlirDesign* ElaborateSrc(const std::string& src, SimCh9cFixture& f) {
 
 // 1. always_latch body executes at time 0 with default variable values.
 TEST(SimCh9c, ExecutesAtTimeZero) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
@@ -62,7 +37,7 @@ TEST(SimCh9c, ExecutesAtTimeZero) {
 
 // 2. always_latch with unconditional assignment sets output at time 0.
 TEST(SimCh9c, UnconditionalAssignAtTimeZero) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] q;\n"
@@ -88,7 +63,7 @@ TEST(SimCh9c, UnconditionalAssignAtTimeZero) {
 
 // 3. if-without-else: enable low retains default (zero) value.
 TEST(SimCh9c, IfWithoutElseRetainsDefault) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
@@ -115,7 +90,7 @@ TEST(SimCh9c, IfWithoutElseRetainsDefault) {
 
 // 4. if-without-else: enable high passes data through.
 TEST(SimCh9c, EnableHighPassesData) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
@@ -141,7 +116,7 @@ TEST(SimCh9c, EnableHighPassesData) {
 
 // 5. Enable low retains previous value set by initial block ordering.
 TEST(SimCh9c, EnableLowRetainsPreviousValue) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
@@ -172,7 +147,7 @@ TEST(SimCh9c, EnableLowRetainsPreviousValue) {
 
 // 6. Two independent latches in one always_latch begin/end block.
 TEST(SimCh9c, MultipleLatchesInOneBlock) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
@@ -204,7 +179,7 @@ TEST(SimCh9c, MultipleLatchesInOneBlock) {
 
 // 7. Multiple latches with enable low: both retain default 0.
 TEST(SimCh9c, MultipleLatchesEnableLow) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
@@ -240,7 +215,7 @@ TEST(SimCh9c, MultipleLatchesEnableLow) {
 
 // 8. Incomplete case (no default) retains value for unmatched selectors.
 TEST(SimCh9c, IncompleteCaseRetainsValue) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [1:0] sel;\n"
@@ -267,7 +242,7 @@ TEST(SimCh9c, IncompleteCaseRetainsValue) {
 
 // 9. Incomplete case with matching selector assigns value.
 TEST(SimCh9c, IncompleteCaseMatchAssigns) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [1:0] sel;\n"
@@ -293,7 +268,7 @@ TEST(SimCh9c, IncompleteCaseMatchAssigns) {
 
 // 10. Incomplete case matching second arm.
 TEST(SimCh9c, IncompleteCaseSecondArm) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [1:0] sel;\n"
@@ -323,7 +298,7 @@ TEST(SimCh9c, IncompleteCaseSecondArm) {
 
 // 11. always_latch with logic type.
 TEST(SimCh9c, LatchLogicType) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
@@ -350,7 +325,7 @@ TEST(SimCh9c, LatchLogicType) {
 
 // 12. always_latch with int type (32-bit).
 TEST(SimCh9c, LatchIntType) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
@@ -377,7 +352,7 @@ TEST(SimCh9c, LatchIntType) {
 
 // 13. always_latch with byte type (8-bit).
 TEST(SimCh9c, LatchByteType) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
@@ -408,7 +383,7 @@ TEST(SimCh9c, LatchByteType) {
 
 // 14. Bit-select on RHS within always_latch.
 TEST(SimCh9c, BitSelectRHS) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
@@ -436,7 +411,7 @@ TEST(SimCh9c, BitSelectRHS) {
 
 // 15. Bit-select on a different bit position.
 TEST(SimCh9c, BitSelectHighBit) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
@@ -468,7 +443,7 @@ TEST(SimCh9c, BitSelectHighBit) {
 
 // 16. Part-select extracting lower nibble.
 TEST(SimCh9c, PartSelectLowerNibble) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
@@ -497,7 +472,7 @@ TEST(SimCh9c, PartSelectLowerNibble) {
 
 // 17. Part-select extracting upper nibble.
 TEST(SimCh9c, PartSelectUpperNibble) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
@@ -530,7 +505,7 @@ TEST(SimCh9c, PartSelectUpperNibble) {
 
 // 18. Concatenation on RHS within always_latch.
 TEST(SimCh9c, ConcatenationRHS) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
@@ -559,7 +534,7 @@ TEST(SimCh9c, ConcatenationRHS) {
 
 // 19. Concatenation retained when enable is low.
 TEST(SimCh9c, ConcatenationRetainedWhenLow) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
@@ -592,7 +567,7 @@ TEST(SimCh9c, ConcatenationRetainedWhenLow) {
 
 // 20. Ternary operator in always_latch selects first operand.
 TEST(SimCh9c, TernarySelectsFirst) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic sel;\n"
@@ -619,7 +594,7 @@ TEST(SimCh9c, TernarySelectsFirst) {
 
 // 21. Ternary operator in always_latch selects second operand.
 TEST(SimCh9c, TernarySelectsSecond) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic sel;\n"
@@ -650,7 +625,7 @@ TEST(SimCh9c, TernarySelectsSecond) {
 
 // 22. Nested if-else: outer condition true, inner condition true.
 TEST(SimCh9c, NestedIfElseBothTrue) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en, sel;\n"
@@ -681,7 +656,7 @@ TEST(SimCh9c, NestedIfElseBothTrue) {
 
 // 23. Nested if-else: outer condition true, inner condition false.
 TEST(SimCh9c, NestedIfElseInnerFalse) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en, sel;\n"
@@ -712,7 +687,7 @@ TEST(SimCh9c, NestedIfElseInnerFalse) {
 
 // 24. Nested if-else: outer condition false, output retains value.
 TEST(SimCh9c, NestedIfElseOuterFalse) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en, sel;\n"
@@ -748,7 +723,7 @@ TEST(SimCh9c, NestedIfElseOuterFalse) {
 
 // 25. Multiple outputs assigned from different data sources.
 TEST(SimCh9c, MultipleOutputsDifferentSources) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
@@ -787,7 +762,7 @@ TEST(SimCh9c, MultipleOutputsDifferentSources) {
 
 // 26. Multiple outputs with independent enable conditions.
 TEST(SimCh9c, MultipleOutputsIndependentEnables) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en1, en2;\n"
@@ -825,7 +800,7 @@ TEST(SimCh9c, MultipleOutputsIndependentEnables) {
 
 // 27. Output is available after scheduler.Run() completes.
 TEST(SimCh9c, OutputAvailableAfterRun) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
@@ -852,7 +827,7 @@ TEST(SimCh9c, OutputAvailableAfterRun) {
 
 // 28. Verify .width on always_latch output with 1-bit result.
 TEST(SimCh9c, WidthVerificationSingleBit) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
@@ -883,7 +858,7 @@ TEST(SimCh9c, WidthVerificationSingleBit) {
 
 // 29. 32-bit always_latch output verifies width and value.
 TEST(SimCh9c, Width32BitAndToUint64) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"
@@ -910,7 +885,7 @@ TEST(SimCh9c, Width32BitAndToUint64) {
 
 // 30. always_latch with begin/end block and arithmetic on RHS.
 TEST(SimCh9c, BeginEndBlockWithArithmetic) {
-  SimCh9cFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic en;\n"

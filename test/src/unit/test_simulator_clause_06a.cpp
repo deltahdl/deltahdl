@@ -1,39 +1,14 @@
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "simulation/lowerer.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
-struct SimCh6Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimCh6Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // §6.24.1: signed'(x) sets is_signed flag.
 TEST(SimCh6, CastSigned) {
-  SimCh6Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -58,7 +33,7 @@ TEST(SimCh6, CastSigned) {
 
 // §6.24.1: unsigned'(x) clears is_signed flag.
 TEST(SimCh6, CastUnsigned) {
-  SimCh6Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  integer x;\n"
@@ -83,7 +58,7 @@ TEST(SimCh6, CastUnsigned) {
 
 // §6.24.1: shortint'(x) casts to 16-bit width.
 TEST(SimCh6, CastShortint) {
-  SimCh6Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] x;\n"
@@ -108,7 +83,7 @@ TEST(SimCh6, CastShortint) {
 
 // §6.20.3: Type parameter with default type resolves variable width.
 TEST(SimCh6, TypeParameterDefault) {
-  SimCh6Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  parameter type T = shortint;\n"
@@ -131,7 +106,7 @@ TEST(SimCh6, TypeParameterDefault) {
 
 // §6.12.1: real→int cast rounds to nearest, ties away from zero.
 TEST(SimCh6, CastRealToInt_RoundUp) {
-  SimCh6Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  real r;\n"
@@ -156,7 +131,7 @@ TEST(SimCh6, CastRealToInt_RoundUp) {
 
 // §6.12.1: real→int cast rounds negative half away from zero.
 TEST(SimCh6, CastRealToInt_NegRound) {
-  SimCh6Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  real r;\n"
@@ -182,7 +157,7 @@ TEST(SimCh6, CastRealToInt_NegRound) {
 
 // §6.12.1: real→int cast truncates fractional part toward zero.
 TEST(SimCh6, CastRealToInt_Truncate) {
-  SimCh6Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  real r;\n"
@@ -207,7 +182,7 @@ TEST(SimCh6, CastRealToInt_Truncate) {
 
 // §6.20.7: $isunbounded returns 1 for parameter with $ value.
 TEST(SimCh6, IsunboundedTrue) {
-  SimCh6Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  parameter int p = $;\n"
@@ -228,7 +203,7 @@ TEST(SimCh6, IsunboundedTrue) {
 
 // §6.23: type(expr) in variable declaration resolves type.
 TEST(SimCh6, TypeRefVarDecl) {
-  SimCh6Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int a;\n"
@@ -254,7 +229,7 @@ TEST(SimCh6, TypeRefVarDecl) {
 
 // §6.20.7: $isunbounded returns 0 for parameter with numeric value.
 TEST(SimCh6, IsunboundedFalse) {
-  SimCh6Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  parameter int p = 42;\n"
@@ -275,7 +250,7 @@ TEST(SimCh6, IsunboundedFalse) {
 
 // §6.24.2: $cast function form returns 1 on valid enum cast.
 TEST(SimCh6, CastEnumSuccess) {
-  SimCh6Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  typedef enum {RED, GREEN, BLUE} color_t;\n"
@@ -302,7 +277,7 @@ TEST(SimCh6, CastEnumSuccess) {
 
 // §6.24.2: $cast function form returns 0 on invalid enum cast.
 TEST(SimCh6, CastEnumFailure) {
-  SimCh6Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  typedef enum {RED, GREEN, BLUE} color_t;\n"
@@ -330,7 +305,7 @@ TEST(SimCh6, CastEnumFailure) {
 
 // §6.24.3: Bit-stream cast packs unpacked array elements MSB-first.
 TEST(SimCh6, BitStreamArrayToInt) {
-  SimCh6Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  byte arr [4];\n"
@@ -358,7 +333,7 @@ TEST(SimCh6, BitStreamArrayToInt) {
 
 // §6.24.3: Bit-stream cast packs shortint array into 32-bit int.
 TEST(SimCh6, BitStreamShortArrayToInt) {
-  SimCh6Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  shortint arr [2];\n"
@@ -394,7 +369,7 @@ static void VerifyNetByName(const RtlirModule* mod, std::string_view name,
 
 // §6.6.7: User-defined nettype creates a net with correct width.
 TEST(SimCh6, NettypeCreatesNet) {
-  SimCh6Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  nettype logic [7:0] byte_net;\n"
@@ -421,7 +396,7 @@ TEST(SimCh6, NettypeCreatesNet) {
 
 // §6.6.7: Nettype with 16-bit type creates correctly-sized net.
 TEST(SimCh6, NettypeWideNet) {
-  SimCh6Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  nettype logic [15:0] wide_net;\n"

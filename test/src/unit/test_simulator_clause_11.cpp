@@ -1,39 +1,14 @@
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "simulation/lowerer.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
-struct SimCh11Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimCh11Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // §11.4.6: Basic ternary with true condition selects true branch.
 TEST(SimCh11, TernaryBasicTrue) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int result;\n"
@@ -55,7 +30,7 @@ TEST(SimCh11, TernaryBasicTrue) {
 
 // §11.4.6: Basic ternary with false condition selects false branch.
 TEST(SimCh11, TernaryBasicFalse) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int result;\n"
@@ -77,7 +52,7 @@ TEST(SimCh11, TernaryBasicFalse) {
 
 // §11.4.6: Ternary with a variable condition (nonzero is true).
 TEST(SimCh11, TernaryVariableCondition) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int cond;\n"
@@ -101,7 +76,7 @@ TEST(SimCh11, TernaryVariableCondition) {
 
 // §11.4.6: Ternary with comparison condition implements max(a, b).
 TEST(SimCh11, TernaryComparisonMax) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int a, b, result;\n"
@@ -125,7 +100,7 @@ TEST(SimCh11, TernaryComparisonMax) {
 
 // §11.4.6: Ternary with equality condition.
 TEST(SimCh11, TernaryEqualityCondition) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int a, result;\n"
@@ -148,7 +123,7 @@ TEST(SimCh11, TernaryEqualityCondition) {
 
 // §11.4.6: Nested ternary — right-to-left associativity: a ? b ? 1 : 2 : 3.
 TEST(SimCh11, TernaryNested) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int a, b, result;\n"
@@ -173,7 +148,7 @@ TEST(SimCh11, TernaryNested) {
 
 // §11.4.6: Chained ternary as priority encoder: sel==0 ? a : sel==1 ? b : c.
 TEST(SimCh11, TernaryChainedPriorityEncoder) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int sel, a, b, c, result;\n"
@@ -199,7 +174,7 @@ TEST(SimCh11, TernaryChainedPriorityEncoder) {
 
 // §11.4.6: Ternary in continuous assignment.
 TEST(SimCh11, TernaryContinuousAssign) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic sel;\n"
@@ -227,7 +202,7 @@ TEST(SimCh11, TernaryContinuousAssign) {
 
 // §11.4.6: Ternary in blocking assignment.
 TEST(SimCh11, TernaryBlockingAssign) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int x, result;\n"
@@ -250,7 +225,7 @@ TEST(SimCh11, TernaryBlockingAssign) {
 
 // §11.4.6: Ternary in nonblocking assignment.
 TEST(SimCh11, TernaryNonblockingAssign) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] sel, result;\n"
@@ -274,7 +249,7 @@ TEST(SimCh11, TernaryNonblockingAssign) {
 
 // §11.4.6: Ternary with bitwise AND in condition.
 TEST(SimCh11, TernaryBitwiseCondition) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
@@ -300,7 +275,7 @@ TEST(SimCh11, TernaryBitwiseCondition) {
 
 // §11.4.6: Ternary with logical OR in condition.
 TEST(SimCh11, TernaryLogicalOrCondition) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int a, b, result;\n"
@@ -325,7 +300,7 @@ TEST(SimCh11, TernaryLogicalOrCondition) {
 
 // §11.4.6: Ternary with concatenation as result.
 TEST(SimCh11, TernaryConcatResult) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] hi, lo;\n"
@@ -350,7 +325,7 @@ TEST(SimCh11, TernaryConcatResult) {
 
 // §11.4.6: Ternary with function call in branches.
 TEST(SimCh11, TernaryFunctionCallBranch) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  function int double_it(int x);\n"
@@ -377,7 +352,7 @@ TEST(SimCh11, TernaryFunctionCallBranch) {
 
 // §11.4.6: Ternary with different-width operands (wider result).
 TEST(SimCh11, TernaryDifferentWidthOperands) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] narrow;\n"
@@ -404,7 +379,7 @@ TEST(SimCh11, TernaryDifferentWidthOperands) {
 
 // §11.4.6: Ternary with signed operands preserves signedness.
 TEST(SimCh11, TernarySignedOperands) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int a, b, result;\n"
@@ -430,7 +405,7 @@ TEST(SimCh11, TernarySignedOperands) {
 
 // §11.4.6: Ternary selecting between constants.
 TEST(SimCh11, TernarySelectConstants) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -452,7 +427,7 @@ TEST(SimCh11, TernarySelectConstants) {
 
 // §11.4.6: Ternary in always_comb block.
 TEST(SimCh11, TernaryAlwaysComb) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic sel;\n"
@@ -480,7 +455,7 @@ TEST(SimCh11, TernaryAlwaysComb) {
 
 // §11.4.6: Ternary result used as function argument.
 TEST(SimCh11, TernaryAsFunctionArgument) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  function int add_one(int x);\n"
@@ -507,7 +482,7 @@ TEST(SimCh11, TernaryAsFunctionArgument) {
 
 // §11.4.6: Ternary with arithmetic in branches: sel ? (a+b) : (a-b).
 TEST(SimCh11, TernaryArithmeticBranches) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int sel, a, b, result;\n"
@@ -533,7 +508,7 @@ TEST(SimCh11, TernaryArithmeticBranches) {
 
 // §11.4.6: Ternary with unary NOT in condition: !sel ? a : b.
 TEST(SimCh11, TernaryUnaryNotCondition) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int sel, result;\n"
@@ -557,7 +532,7 @@ TEST(SimCh11, TernaryUnaryNotCondition) {
 
 // §11.4.6: Multiple ternaries combined in one expression.
 TEST(SimCh11, TernaryMultipleInExpression) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int a, b, result;\n"
@@ -582,7 +557,7 @@ TEST(SimCh11, TernaryMultipleInExpression) {
 
 // §11.4.6: Ternary result used in further computation.
 TEST(SimCh11, TernaryResultInComputation) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int sel, result;\n"
@@ -606,7 +581,7 @@ TEST(SimCh11, TernaryResultInComputation) {
 
 // §11.4.6: Ternary with bit-select condition.
 TEST(SimCh11, TernaryBitSelectCondition) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] flags;\n"
@@ -631,7 +606,7 @@ TEST(SimCh11, TernaryBitSelectCondition) {
 
 // §11.4.6: Ternary with part-select operands.
 TEST(SimCh11, TernaryPartSelectOperands) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] data;\n"
@@ -656,7 +631,7 @@ TEST(SimCh11, TernaryPartSelectOperands) {
 
 // §11.4.6: Verify .width on ternary result with 8-bit operands.
 TEST(SimCh11, TernaryResultWidth8Bit) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, result;\n"
@@ -681,7 +656,7 @@ TEST(SimCh11, TernaryResultWidth8Bit) {
 
 // §11.4.6: Verify .width and .ToUint64() on ternary result with 32-bit int.
 TEST(SimCh11, TernaryResultWidth32Bit) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int result;\n"
@@ -704,7 +679,7 @@ TEST(SimCh11, TernaryResultWidth32Bit) {
 
 // §11.4.6: Nested ternary — outer false, inner not reached.
 TEST(SimCh11, TernaryNestedOuterFalse) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int result;\n"
@@ -727,7 +702,7 @@ TEST(SimCh11, TernaryNestedOuterFalse) {
 
 // §11.4.6: Chained ternary selects last default when no match.
 TEST(SimCh11, TernaryChainedDefault) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int sel, result;\n"
@@ -753,7 +728,7 @@ TEST(SimCh11, TernaryChainedDefault) {
 
 // §11.4.6: Ternary with logical AND in condition.
 TEST(SimCh11, TernaryLogicalAndCondition) {
-  SimCh11Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int a, b, result;\n"

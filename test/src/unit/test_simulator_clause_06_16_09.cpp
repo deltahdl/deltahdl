@@ -1,29 +1,9 @@
 // §6.16.9: Atoi(), atohex(), atooct(), atobin()
 
-#include <gtest/gtest.h>
-
-#include <cstring>
-#include <string>
-#include <string_view>
-#include <vector>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "common/types.h"
-#include "parser/ast.h"
-#include "simulation/eval.h"
-#include "simulation/sim_context.h"
+#include "fixture_string.h"
 
 using namespace delta;
 
-// =============================================================================
-// Test fixture: sets up SimContext with a string variable
-// =============================================================================
-struct StringFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
   DiagEngine diag{mgr};
   SimContext ctx{scheduler, arena, diag};
 

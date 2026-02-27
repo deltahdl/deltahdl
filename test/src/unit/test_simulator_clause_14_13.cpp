@@ -1,30 +1,18 @@
 // §14.13: Input sampling
 
-#include <gtest/gtest.h>
 
 #include <cstdint>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "common/types.h"
 #include "parser/ast.h"
 #include "simulation/clocking.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
-struct SimA611Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-void SchedulePosedge(SimA611Fixture& f, Variable* clk, uint64_t time) {
+void SchedulePosedge(SimFixture& f, Variable* clk, uint64_t time) {
   auto* ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [clk, &f]() {
     clk->prev_value = clk->value;
@@ -34,7 +22,7 @@ void SchedulePosedge(SimA611Fixture& f, Variable* clk, uint64_t time) {
   f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
 }
 
-void ScheduleNegedge(SimA611Fixture& f, Variable* clk, uint64_t time) {
+void ScheduleNegedge(SimFixture& f, Variable* clk, uint64_t time) {
   auto* ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [clk, &f]() {
     clk->prev_value = clk->value;
@@ -48,7 +36,7 @@ namespace {
 
 // --- clocking_direction: input sampling on posedge ---
 TEST(SimA611, InputSamplingPosedge) {
-  SimA611Fixture f;
+  SimFixture f;
   auto* clk = f.ctx.CreateVariable("clk", 1);
   clk->value = MakeLogic4VecVal(f.arena, 1, 0);
   auto* data = f.ctx.CreateVariable("data_in", 8);
@@ -77,7 +65,7 @@ TEST(SimA611, InputSamplingPosedge) {
 
 // --- negedge clocking block ---
 TEST(SimA611, NegedgeClockEvent) {
-  SimA611Fixture f;
+  SimFixture f;
   auto* clk = f.ctx.CreateVariable("clk", 1);
   clk->value = MakeLogic4VecVal(f.arena, 1, 1);
   auto* data = f.ctx.CreateVariable("neg_data", 8);
@@ -106,7 +94,7 @@ TEST(SimA611, NegedgeClockEvent) {
 
 // --- sampled value updates across edges ---
 TEST(SimA611, SampledValueUpdatesAcrossEdges) {
-  SimA611Fixture f;
+  SimFixture f;
   auto* clk = f.ctx.CreateVariable("clk", 1);
   clk->value = MakeLogic4VecVal(f.arena, 1, 0);
   auto* data = f.ctx.CreateVariable("data", 8);

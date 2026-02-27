@@ -1,33 +1,21 @@
 // §10.4.1: Blocking procedural assignments
 
-#include <gtest/gtest.h>
 
 #include <cstdint>
 #include <string_view>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "common/types.h"
 #include "parser/ast.h"
 #include "simulation/awaiters.h"
 #include "simulation/exec_task.h"
 #include "simulation/process.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/stmt_exec.h"
 #include "simulation/stmt_result.h"
 #include "simulation/variable.h"
 
-using namespace delta;
+#include "fixture_simulator.h"
 
-struct StmtFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag, /*seed=*/42};
-};
+using namespace delta;
 
 Expr* MakeIdent(Arena& arena, std::string_view name) {
   auto* e = arena.Create<Expr>();

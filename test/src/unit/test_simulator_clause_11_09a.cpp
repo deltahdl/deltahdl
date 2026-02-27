@@ -1,28 +1,18 @@
 // §11.9: Tagged union expressions and member access
 
-#include <gtest/gtest.h>
 
 #include <cstring>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"  // StructTypeInfo, StructFieldInfo
 
+#include "fixture_simulator.h"
+
 using namespace delta;
 
 // Shared fixture for advanced expression evaluation tests (§11 phases 22+).
-struct EvalAdvFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 static Expr* MakeInt(Arena& arena, uint64_t val) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
@@ -37,7 +27,7 @@ static Expr* MakeId(Arena& arena, std::string_view name) {
   return e;
 }
 
-static Variable* MakeVar(EvalAdvFixture& f, std::string_view name,
+static Variable* MakeVar(SimFixture& f, std::string_view name,
                          uint32_t width, uint64_t val) {
   auto* var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4VecVal(f.arena, width, val);
@@ -50,7 +40,7 @@ namespace {
 // §11.9: Tagged union — tag mismatch returns X
 // ==========================================================================
 TEST(EvalAdv, TaggedUnionMismatchReturnsX) {
-  EvalAdvFixture f;
+  SimFixture f;
   // Create a tagged union type with members a (8-bit) and b (8-bit).
   StructTypeInfo uinfo;
   uinfo.type_name = "tagged_u";
@@ -86,7 +76,7 @@ TEST(EvalAdv, TaggedUnionMismatchReturnsX) {
 }
 
 TEST(EvalAdv, TaggedUnionNoTagSetAccessesNormally) {
-  EvalAdvFixture f;
+  SimFixture f;
   // Union without a tag set should still allow access.
   StructTypeInfo uinfo;
   uinfo.type_name = "simple_u";
@@ -111,7 +101,7 @@ TEST(EvalAdv, TaggedUnionNoTagSetAccessesNormally) {
 // §11.9: Tagged union expressions
 // ==========================================================================
 TEST(EvalAdv, TaggedExprWithValue) {
-  EvalAdvFixture f;
+  SimFixture f;
   // tagged Valid 42 → evaluates to 42.
   auto* tagged = f.arena.Create<Expr>();
   tagged->kind = ExprKind::kTagged;
@@ -125,7 +115,7 @@ TEST(EvalAdv, TaggedExprWithValue) {
 }
 
 TEST(EvalAdv, TaggedExprVoidMember) {
-  EvalAdvFixture f;
+  SimFixture f;
   // tagged Invalid (void member, no value) → 0.
   auto* tagged = f.arena.Create<Expr>();
   tagged->kind = ExprKind::kTagged;

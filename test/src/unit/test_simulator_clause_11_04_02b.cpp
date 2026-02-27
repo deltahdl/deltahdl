@@ -1,26 +1,15 @@
 // §11.4.2: Increment and decrement operators
 
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // Shared fixture for expression evaluation tests.
-struct EvalOpFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 // Helper: build an identifier Expr node.
 static Expr* MakeId(Arena& arena, std::string_view name) {
   auto* e = arena.Create<Expr>();
@@ -47,7 +36,7 @@ namespace {
 // Prefix increment/decrement (++i, --i)
 // ==========================================================================
 TEST(EvalOp, PrefixIncrement) {
-  EvalOpFixture f;
+  SimFixture f;
   auto* var = f.ctx.CreateVariable("i", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 10);
 
@@ -61,7 +50,7 @@ TEST(EvalOp, PrefixIncrement) {
 }
 
 TEST(EvalOp, PrefixDecrement) {
-  EvalOpFixture f;
+  SimFixture f;
   auto* var = f.ctx.CreateVariable("j", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 5);
 
@@ -74,7 +63,7 @@ TEST(EvalOp, PrefixDecrement) {
 }
 
 TEST(EvalOp, PostfixIncrement) {
-  EvalOpFixture f;
+  SimFixture f;
   auto* var = f.ctx.CreateVariable("i", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 10);
 
@@ -91,7 +80,7 @@ TEST(EvalOp, PostfixIncrement) {
 }
 
 TEST(EvalOp, PostfixDecrement) {
-  EvalOpFixture f;
+  SimFixture f;
   auto* var = f.ctx.CreateVariable("j", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 5);
 

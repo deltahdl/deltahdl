@@ -1,32 +1,17 @@
 // §7.9: Associative array methods
 
-#include <gtest/gtest.h>
 
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "lexer/lexer.h"
 #include "parser/ast.h"
-#include "parser/parser.h"
 #include "simulation/eval.h"
 #include "simulation/eval_array.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // =============================================================================
 // Helper fixture
 // =============================================================================
-struct AggFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 static Expr* MkAssocCall(Arena& arena, std::string_view var,
                          std::string_view method, std::string_view ref) {
   auto* expr = arena.Create<Expr>();
@@ -51,7 +36,7 @@ static Expr* MkAssocCall(Arena& arena, std::string_view var,
 namespace {
 
 TEST(AssocTraversal, FirstReturnsTruncationFlag) {
-  AggFixture f;
+  SimFixture f;
   // 32-bit index type, ref variable is only 8 bits → truncation → returns -1.
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
   aa->index_width = 32;
@@ -72,7 +57,7 @@ TEST(AssocTraversal, FirstReturnsTruncationFlag) {
 }
 
 TEST(AssocTraversal, FirstReturnsOneWhenWidthSufficient) {
-  AggFixture f;
+  SimFixture f;
   // 32-bit index, ref variable is also 32 bits → no truncation → returns 1.
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
   aa->index_width = 32;
@@ -88,7 +73,7 @@ TEST(AssocTraversal, FirstReturnsOneWhenWidthSufficient) {
 }
 
 TEST(AssocTraversal, ByteIndexFirstReturnsOneForByteRef) {
-  AggFixture f;
+  SimFixture f;
   // byte index type → index_width should be 8.
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
   aa->index_width = 8;

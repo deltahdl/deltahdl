@@ -1,26 +1,15 @@
 // §11.4.12: Concatenation operators
 
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // Shared fixture for expression evaluation tests.
-struct EvalOpFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 // Helper: build a simple integer literal Expr node.
 static Expr* MakeInt(Arena& arena, uint64_t val) {
   auto* e = arena.Create<Expr>();
@@ -37,7 +26,7 @@ static Expr* MakeId(Arena& arena, std::string_view name) {
   return e;
 }
 
-static Variable* MakeVar4(EvalOpFixture& f, std::string_view name,
+static Variable* MakeVar4(SimFixture& f, std::string_view name,
                           uint32_t width, uint64_t aval, uint64_t bval) {
   auto* var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4Vec(f.arena, width);
@@ -51,7 +40,7 @@ namespace {
 // Replication ({n{expr}})
 // ==========================================================================
 TEST(EvalOp, Replicate3Times) {
-  EvalOpFixture f;
+  SimFixture f;
   // {3{4'b1010}} = 12'b1010_1010_1010 = 0xAAA
   auto* var = f.ctx.CreateVariable("v", 4);
   var->value = MakeLogic4VecVal(f.arena, 4, 0xA);
@@ -67,7 +56,7 @@ TEST(EvalOp, Replicate3Times) {
 }
 
 TEST(EvalOp, ReplicateOnce) {
-  EvalOpFixture f;
+  SimFixture f;
   // {1{8'd42}} = 42
   auto* rep = f.arena.Create<Expr>();
   rep->kind = ExprKind::kReplicate;
@@ -81,7 +70,7 @@ TEST(EvalOp, ReplicateOnce) {
 // Concatenation bval propagation — §11.4.12
 // ==========================================================================
 TEST(EvalOp, ConcatXZPropagation) {
-  EvalOpFixture f;
+  SimFixture f;
   // {4'b1x0z, 4'b0101} = 8'b1x0z_0101
   // a = 4'b1x0z: aval=0b1001, bval=0b0101
   MakeVar4(f, "ca", 4, 0b1001, 0b0101);
@@ -105,7 +94,7 @@ TEST(EvalOp, ConcatXZPropagation) {
 }
 
 TEST(EvalOp, ReplicateXZPropagation) {
-  EvalOpFixture f;
+  SimFixture f;
   // {2{4'b1x0z}} = 8'b1x0z_1x0z
   // 4'b1x0z: aval=0b1001, bval=0b0101
   MakeVar4(f, "rv", 4, 0b1001, 0b0101);
@@ -124,26 +113,9 @@ TEST(EvalOp, ReplicateXZPropagation) {
   EXPECT_EQ(result.words[0].bval, 0x55u);
 }
 
-struct SimA81Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA81Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // § concatenation as LHS (unpacking)
 TEST(SimA81, ConcatAsLHS) {
-  SimA81Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] a, b;\n"
@@ -162,26 +134,9 @@ TEST(SimA81, ConcatAsLHS) {
   EXPECT_EQ(vb->value.ToUint64(), 0x3u);
 }
 
-struct SimA85Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA85Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // § net_lvalue — concatenation LHS in continuous assignment (procedural)
 TEST(SimA85, NetLvalueConcatProcedural) {
-  SimA85Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] a, b;\n"

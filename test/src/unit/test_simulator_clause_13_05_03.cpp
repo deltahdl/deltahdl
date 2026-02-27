@@ -1,27 +1,16 @@
 // §13.5.3: Default argument values
 
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // =============================================================================
 // Test fixture shared by all function call tests
 // =============================================================================
-struct FuncFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 // Helper: make an integer literal expression.
 static Expr* MakeIntLit(Arena& arena, uint64_t val) {
   auto* e = arena.Create<Expr>();
@@ -126,26 +115,9 @@ TEST(Functions, DefaultArgumentMultiple) {
   EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 6u);
 }
 
-struct SimA609Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA609Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // --- function with default argument ---
 TEST(SimA609, FunctionDefaultArg) {
-  SimA609Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"

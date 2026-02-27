@@ -1,27 +1,16 @@
 // §35.7: Exported functions
 
-#include <gtest/gtest.h>
 
 #include <cstdint>
 #include <vector>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "parser/ast.h"
 #include "simulation/dpi.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
-
-struct DpiSimFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
 
 namespace {
 

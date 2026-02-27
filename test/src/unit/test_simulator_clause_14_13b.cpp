@@ -1,23 +1,12 @@
 // §14.13: Input sampling
 
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "common/types.h"
 #include "simulation/clocking.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
-
-struct ClockingSimFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag, /*seed=*/42};
-};
 
 namespace {
 

@@ -1,26 +1,15 @@
 // §11.4.5: Equality operators
 
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // Shared fixture for expression evaluation tests.
-struct EvalOpFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 // Helper: build a simple integer literal Expr node.
 static Expr* MakeInt(Arena& arena, uint64_t val) {
   auto* e = arena.Create<Expr>();
@@ -45,7 +34,7 @@ namespace {
 // Wildcard equality (==?, !=?)
 // ==========================================================================
 TEST(EvalOp, WildcardEqMatch) {
-  EvalOpFixture f;
+  SimFixture f;
   // 5 ==? 5 = 1 (no X/Z bits, exact match)
   auto* expr = MakeBinary(f.arena, TokenKind::kEqEqQuestion,
                           MakeInt(f.arena, 5), MakeInt(f.arena, 5));
@@ -54,7 +43,7 @@ TEST(EvalOp, WildcardEqMatch) {
 }
 
 TEST(EvalOp, WildcardEqMismatch) {
-  EvalOpFixture f;
+  SimFixture f;
   // 5 ==? 3 = 0
   auto* expr = MakeBinary(f.arena, TokenKind::kEqEqQuestion,
                           MakeInt(f.arena, 5), MakeInt(f.arena, 3));
@@ -63,7 +52,7 @@ TEST(EvalOp, WildcardEqMismatch) {
 }
 
 TEST(EvalOp, WildcardNeqMatch) {
-  EvalOpFixture f;
+  SimFixture f;
   // 5 !=? 3 = 1
   auto* expr = MakeBinary(f.arena, TokenKind::kBangEqQuestion,
                           MakeInt(f.arena, 5), MakeInt(f.arena, 3));
@@ -72,7 +61,7 @@ TEST(EvalOp, WildcardNeqMatch) {
 }
 
 TEST(EvalOp, WildcardNeqSame) {
-  EvalOpFixture f;
+  SimFixture f;
   // 5 !=? 5 = 0
   auto* expr = MakeBinary(f.arena, TokenKind::kBangEqQuestion,
                           MakeInt(f.arena, 5), MakeInt(f.arena, 5));

@@ -1,28 +1,17 @@
 // §11.4.5: Equality operators
 
-#include <gtest/gtest.h>
 
 #include <cstring>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // Shared fixture for expression evaluation tests.
-struct EvalOpXZFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 static Expr* MakeInt(Arena& arena, uint64_t val) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
@@ -46,7 +35,7 @@ static Expr* MakeBinary(Arena& arena, TokenKind op, Expr* lhs, Expr* rhs) {
   return e;
 }
 
-static Variable* MakeVar4(EvalOpXZFixture& f, std::string_view name,
+static Variable* MakeVar4(SimFixture& f, std::string_view name,
                           uint32_t width, uint64_t aval, uint64_t bval) {
   auto* var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4Vec(f.arena, width);
@@ -61,7 +50,7 @@ namespace {
 // Equality X/Z propagation — §11.4.5, §11.4.6
 // ==========================================================================
 TEST(EvalOpXZ, LogicalEqX) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // 4'b1x00 == 4'b1100 → x
   MakeVar4(f, "el", 4, 0b1000, 0b0100);
   auto* b = f.ctx.CreateVariable("er", 4);
@@ -73,7 +62,7 @@ TEST(EvalOpXZ, LogicalEqX) {
 }
 
 TEST(EvalOpXZ, LogicalNeqX) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // 4'b1x00 != 4'b1100 → x
   MakeVar4(f, "nl", 4, 0b1000, 0b0100);
   auto* b = f.ctx.CreateVariable("nr", 4);
@@ -85,7 +74,7 @@ TEST(EvalOpXZ, LogicalNeqX) {
 }
 
 TEST(EvalOpXZ, CaseEqStillExact) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // === still compares aval+bval exactly, no X propagation
   auto* expr = MakeBinary(f.arena, TokenKind::kEqEqEq, MakeInt(f.arena, 5),
                           MakeInt(f.arena, 5));
@@ -94,26 +83,9 @@ TEST(EvalOpXZ, CaseEqStillExact) {
   EXPECT_EQ(result.words[0].bval, 0u);
 }
 
-struct SimA83Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA83Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // § expression — equality comparison
 TEST(SimA83, EqualityTrue) {
-  SimA83Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
@@ -131,7 +103,7 @@ TEST(SimA83, EqualityTrue) {
 
 // § expression — inequality comparison
 TEST(SimA83, InequalityTrue) {
-  SimA83Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
@@ -147,29 +119,12 @@ TEST(SimA83, InequalityTrue) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-struct SimA86Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA86Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // =============================================================================
 // A.8.6 Operators — binary_operator (equality) — Simulation
 // =============================================================================
 // § binary_operator — == (true)
 TEST(SimA86, BinaryEqTrue) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
@@ -187,7 +142,7 @@ TEST(SimA86, BinaryEqTrue) {
 
 // § binary_operator — != (true)
 TEST(SimA86, BinaryNeqTrue) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
@@ -205,7 +160,7 @@ TEST(SimA86, BinaryNeqTrue) {
 
 // § binary_operator — === (case equality)
 TEST(SimA86, BinaryCaseEq) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
@@ -223,7 +178,7 @@ TEST(SimA86, BinaryCaseEq) {
 
 // § binary_operator — !== (case inequality)
 TEST(SimA86, BinaryCaseNeq) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"

@@ -1,11 +1,9 @@
-#include <gtest/gtest.h>
 
-#include <string>
 #include <vector>
 
-#include "common/arena.h"
 #include "common/types.h"
-#include "simulation/scheduler.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
@@ -388,25 +386,8 @@ TEST(SimCh4091, NoUpdateWhenExpressionUnchanged) {
 // introduced in §4.2, covering parallel process execution, sequential
 // ordering within processes, and interaction between concurrent elements.
 // ===========================================================================
-struct SimCh4Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimCh4Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 static uint64_t RunAndGet(const std::string& src, const char* var_name) {
-  SimCh4Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0;
@@ -424,7 +405,7 @@ static uint64_t RunAndGet(const std::string& src, const char* var_name) {
 //     process that responds to source element changes.
 // ---------------------------------------------------------------------------
 TEST(SimCh4, ContinuousAssignAsProcess) {
-  SimCh4Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] in_val, out_val;\n"

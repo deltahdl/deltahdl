@@ -1,36 +1,8 @@
 // Annex A.7.5.2: System timing check command arguments
 
-#include <gtest/gtest.h>
-
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
+#include "fixture_elaborator.h"
 
 using namespace delta;
-
-struct ElabA70502Fixture {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
-  bool has_errors = false;
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, ElabA70502Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(cu->modules.back()->name);
-  f.has_errors = f.diag.HasErrors();
-  return design;
-}
 
 namespace {
 
@@ -38,7 +10,7 @@ namespace {
 // A.7.5.2 Elab — mintypmax timestamp_condition
 // =============================================================================
 TEST(ElabA70502, TimestampCondMinTypMaxElaborates) {
-  ElabA70502Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
@@ -54,7 +26,7 @@ TEST(ElabA70502, TimestampCondMinTypMaxElaborates) {
 // A.7.5.2 Elab — delayed_data with bracket expression
 // =============================================================================
 TEST(ElabA70502, DelayedDataWithBracketElaborates) {
-  ElabA70502Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
@@ -70,7 +42,7 @@ TEST(ElabA70502, DelayedDataWithBracketElaborates) {
 // A.7.5.2 Elab — delayed_reference with bracket mintypmax expression
 // =============================================================================
 TEST(ElabA70502, DelayedRefWithBracketMinTypMaxElaborates) {
-  ElabA70502Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
@@ -86,7 +58,7 @@ TEST(ElabA70502, DelayedRefWithBracketMinTypMaxElaborates) {
 // A.7.5.2 Elab — remain_active_flag as constant_mintypmax_expression
 // =============================================================================
 TEST(ElabA70502, RemainActiveFlagMinTypMaxElaborates) {
-  ElabA70502Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"

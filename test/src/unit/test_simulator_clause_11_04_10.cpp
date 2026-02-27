@@ -1,28 +1,17 @@
 // §11.4.10: Shift operators
 
-#include <gtest/gtest.h>
 
 #include <cstring>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // Shared fixture for expression evaluation tests.
-struct EvalOpXZFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 static Expr* MakeInt(Arena& arena, uint64_t val) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
@@ -46,7 +35,7 @@ static Expr* MakeBinary(Arena& arena, TokenKind op, Expr* lhs, Expr* rhs) {
   return e;
 }
 
-static Variable* MakeVar4(EvalOpXZFixture& f, std::string_view name,
+static Variable* MakeVar4(SimFixture& f, std::string_view name,
                           uint32_t width, uint64_t aval, uint64_t bval) {
   auto* var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4Vec(f.arena, width);
@@ -61,7 +50,7 @@ namespace {
 // Shift X/Z propagation — §11.4.10
 // ==========================================================================
 TEST(EvalOpXZ, ShiftXAmount) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // 4'b1100 << x → all-X
   MakeVar4(f, "sa", 4, 0b0000, 0b0100);  // x shift amount
   auto* a = f.ctx.CreateVariable("sv", 4);
@@ -73,7 +62,7 @@ TEST(EvalOpXZ, ShiftXAmount) {
 }
 
 TEST(EvalOpXZ, ShiftLeftXOperand) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // 4'b1x00 << 1 → 4'bx000 (bval should shift with aval)
   MakeVar4(f, "so", 4, 0b1000, 0b0100);  // 4'b1x00
   auto* expr = MakeBinary(f.arena, TokenKind::kLtLt, MakeId(f.arena, "so"),
@@ -84,26 +73,9 @@ TEST(EvalOpXZ, ShiftLeftXOperand) {
   EXPECT_EQ(result.words[0].bval & 0xFu, 0b1000u);
 }
 
-struct SimA83Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA83Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // § expression — left shift
 TEST(SimA83, LeftShift) {
-  SimA83Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -121,7 +93,7 @@ TEST(SimA83, LeftShift) {
 
 // § expression — right shift
 TEST(SimA83, RightShift) {
-  SimA83Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -137,29 +109,12 @@ TEST(SimA83, RightShift) {
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
-struct SimA86Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA86Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // =============================================================================
 // A.8.6 Operators — binary_operator (shift) — Simulation
 // =============================================================================
 // § binary_operator — << (logical left shift)
 TEST(SimA86, BinaryLogicalLeftShift) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -177,7 +132,7 @@ TEST(SimA86, BinaryLogicalLeftShift) {
 
 // § binary_operator — >> (logical right shift)
 TEST(SimA86, BinaryLogicalRightShift) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -195,7 +150,7 @@ TEST(SimA86, BinaryLogicalRightShift) {
 
 // § binary_operator — <<< (arithmetic left shift)
 TEST(SimA86, BinaryArithLeftShift) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -213,7 +168,7 @@ TEST(SimA86, BinaryArithLeftShift) {
 
 // § binary_operator — >>> (arithmetic right shift)
 TEST(SimA86, BinaryArithRightShift) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"

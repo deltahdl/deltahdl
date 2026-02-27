@@ -1,39 +1,12 @@
 // §12.6.2: Pattern matching in if statements
 
-#include <gtest/gtest.h>
 
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "simulation/lowerer.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
 
+#include "fixture_simulator.h"
+
 using namespace delta;
-
-struct SimA60701Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA60701Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
 
 namespace {
 
@@ -42,7 +15,7 @@ namespace {
 // ---------------------------------------------------------------------------
 // §12.6.2: matches with constant pattern — true case
 TEST(SimA60701, MatchesConstantTrue) {
-  SimA60701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x, y;\n"
@@ -64,7 +37,7 @@ TEST(SimA60701, MatchesConstantTrue) {
 
 // §12.6.2: matches with constant pattern — false case
 TEST(SimA60701, MatchesConstantFalse) {
-  SimA60701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x, y;\n"

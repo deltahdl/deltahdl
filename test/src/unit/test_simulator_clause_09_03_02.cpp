@@ -1,38 +1,13 @@
 // §9.3.2: Parallel blocks
 
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "simulation/lowerer.h"
 #include "simulation/net.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
 
+#include "fixture_simulator.h"
+
 using namespace delta;
-
-struct LowerFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, LowerFixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
 
 namespace {
 
@@ -99,29 +74,12 @@ TEST(Lowerer, ForkJoin) {
 }
 
 // Sim test fixture
-struct SimA603Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA603Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // ---------------------------------------------------------------------------
 // Simulation: §9.3.2 parallel block fork/join semantics
 // ---------------------------------------------------------------------------
 // fork/join: all children execute
 TEST(SimA603, ForkJoinAllChildrenExecute) {
-  SimA603Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
@@ -147,7 +105,7 @@ TEST(SimA603, ForkJoinAllChildrenExecute) {
 
 // fork/join_none: all children execute, parent continues immediately
 TEST(SimA603, ForkJoinNoneChildrenExecute) {
-  SimA603Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, c;\n"
@@ -177,7 +135,7 @@ TEST(SimA603, ForkJoinNoneChildrenExecute) {
 
 // fork/join_any: all children execute
 TEST(SimA603, ForkJoinAnyChildrenExecute) {
-  SimA603Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
@@ -203,7 +161,7 @@ TEST(SimA603, ForkJoinAnyChildrenExecute) {
 
 // fork with single begin-end: executes as single sequential process
 TEST(SimA603, ForkWithSingleBeginEnd) {
-  SimA603Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -228,7 +186,7 @@ TEST(SimA603, ForkWithSingleBeginEnd) {
 
 // Empty fork-join completes immediately
 TEST(SimA603, EmptyForkJoin) {
-  SimA603Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"

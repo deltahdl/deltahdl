@@ -1,40 +1,14 @@
-#include <gtest/gtest.h>
 
-#include <string>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "simulation/lowerer.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
-struct SimCh506Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimCh506Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 static uint64_t RunAndGet(const std::string& src, const char* var_name) {
-  SimCh506Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0;
@@ -84,7 +58,7 @@ TEST(SimCh506, IdentifierStartingWithUnderscore) {
 // ---------------------------------------------------------------------------
 TEST(SimCh506, IdentifiersCaseSensitive) {
   // §5.6: Identifiers are case sensitive.
-  SimCh506Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] data, Data, DATA;\n"
@@ -148,7 +122,7 @@ TEST(SimCh506, IdentifierWithDigits) {
 // ---------------------------------------------------------------------------
 TEST(SimCh506, IdentifierReferencesObject) {
   // §5.6: An identifier gives an object a unique name for referencing.
-  SimCh506Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] source, sink;\n"
@@ -172,7 +146,7 @@ TEST(SimCh506, IdentifierReferencesObject) {
 // ---------------------------------------------------------------------------
 TEST(SimCh506, IdentifierMixedCharClasses) {
   // §5.6: Identifiers use letters, digits, $, _ in combination.
-  SimCh506Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] _start, mid$dle, end_99, result;\n"

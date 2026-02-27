@@ -1,15 +1,15 @@
 // §18.17: Random sequence generation—randsequence
 
-#include <gtest/gtest.h>
 
 #include <algorithm>
 #include <cstdint>
-#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
 #include "simulation/constraint_solver.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
@@ -41,29 +41,12 @@ TEST(Constraint, RandsequenceBasicProduction) {
   EXPECT_LE(val, 2);
 }
 
-struct SimA612Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA612Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // =============================================================================
 // Simulation tests — A.6.12 Randsequence
 // =============================================================================
 // Basic randsequence: code block side effects execute
 TEST(SimA612, CodeBlockSideEffect) {
-  SimA612Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -86,7 +69,7 @@ TEST(SimA612, CodeBlockSideEffect) {
 
 // Sequence of productions: all execute in order
 TEST(SimA612, ProductionSequenceOrder) {
-  SimA612Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -111,7 +94,7 @@ TEST(SimA612, ProductionSequenceOrder) {
 
 // No production name — first production is used as top
 TEST(SimA612, NoProductionNameUsesFirst) {
-  SimA612Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"

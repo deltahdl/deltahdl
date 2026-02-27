@@ -1,58 +1,12 @@
 // §28.10: pullup and pulldown sources
 
-#include <gtest/gtest.h>
-
-#include <cstdint>
 
 // --- Local types for pullup/pulldown sources (§28.10) ---
 enum class Val4 : uint8_t { kV0 = 0, kV1 = 1, kX = 2, kZ = 3 };
 
-enum class StrengthLevel : uint8_t {
-  kHighz = 0,
-  kSmall = 1,
-  kMedium = 2,
-  kWeak = 3,
-  kLarge = 4,
-  kPull = 5,
-  kStrong = 6,
-  kSupply = 7,
-};
+#include <gtest/gtest.h>
 
-enum class PullKind : uint8_t { kPullup, kPulldown };
-
-struct PullSourceInfo {
-  PullKind kind = PullKind::kPullup;
-  bool has_strength0 = false;
-  bool has_strength1 = false;
-  StrengthLevel strength0 = StrengthLevel::kPull;
-  StrengthLevel strength1 = StrengthLevel::kPull;
-};
-
-Val4 EvalPullSource(PullKind kind);
-
-StrengthLevel GetPullSourceStrength(const PullSourceInfo& info);
-
-bool PullSourceAcceptsDelaySpec();
-
-Val4 EvalPullSource(PullKind kind) {
-  switch (kind) {
-    case PullKind::kPullup:
-      return Val4::kV1;
-    case PullKind::kPulldown:
-      return Val4::kV0;
-  }
-  return Val4::kX;
-}
-
-StrengthLevel GetPullSourceStrength(const PullSourceInfo& info) {
-  if (info.kind == PullKind::kPullup && info.has_strength1)
-    return info.strength1;
-  if (info.kind == PullKind::kPulldown && info.has_strength0)
-    return info.strength0;
-  return StrengthLevel::kPull;
-}
-
-bool PullSourceAcceptsDelaySpec() { return false; }
+#include "model_strength.h"
 
 namespace {
 

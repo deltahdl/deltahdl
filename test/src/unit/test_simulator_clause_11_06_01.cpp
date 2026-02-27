@@ -1,28 +1,17 @@
 // §11.6.1: Rules for expression bit lengths
 
-#include <gtest/gtest.h>
 
 #include <cstring>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // Shared fixture for expression evaluation tests.
-struct EvalOpXZFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 static Expr* MakeId(Arena& arena, std::string_view name) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
@@ -45,7 +34,7 @@ namespace {
 // Context-determined bit widths — §11.6.1
 // ==========================================================================
 TEST(EvalOpXZ, WidthPropFromContext) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // 4-bit a + 4-bit b with 8-bit context → 8-bit result (no overflow).
   auto* va = f.ctx.CreateVariable("wa", 4);
   va->value = MakeLogic4VecVal(f.arena, 4, 0xF);
@@ -63,7 +52,7 @@ TEST(EvalOpXZ, WidthPropFromContext) {
 }
 
 TEST(EvalOpXZ, TernaryWidthFromBranches) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // ?: width = max(true_width, false_width)
   auto* cond = f.ctx.CreateVariable("tc", 1);
   cond->value = MakeLogic4VecVal(f.arena, 1, 1);

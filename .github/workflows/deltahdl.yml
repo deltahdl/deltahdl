@@ -935,6 +935,12 @@ jobs:
           --minimum-tokens 100
           --language cpp
           --dir src/
+      - name: Detect copy-paste (test)
+        run: >-
+          pmd cpd
+          --minimum-tokens 100
+          --language cpp
+          --dir test/src/
       # DO NOT disable this step. Inline suppression comments (NOLINT,
       # clang-format off, etc.) hide problems instead of fixing them and
       # make the codebase progressively harder to maintain.

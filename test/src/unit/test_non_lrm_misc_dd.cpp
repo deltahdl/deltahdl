@@ -1,35 +1,8 @@
 // Non-LRM tests
 
-#include <gtest/gtest.h>
-
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
+#include "fixture_simulator.h"
 
 using namespace delta;
-
-// --- Test helpers ---
-struct ParseResult {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-ParseResult Parse(const std::string& src) {
-  ParseResult result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
 
 namespace {
 
@@ -54,30 +27,12 @@ TEST(ElabA612, BasicRandsequenceElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-struct ElabA70503Fixture {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
-  bool has_errors = false;
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, ElabA70503Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(cu->modules.back()->name);
-  f.has_errors = f.diag.HasErrors();
-  return design;
-}
-
 // =============================================================================
 // A.7.5.3 Elab — edge_control_specifier
 // =============================================================================
 // edge_control_specifier with 01, 10 descriptors elaborates
 TEST(ElabA70503, EdgeControlSpecifier01_10Elaborates) {
-  ElabA70503Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
@@ -89,30 +44,12 @@ TEST(ElabA70503, EdgeControlSpecifier01_10Elaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-struct ElabA81Fixture {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
-  bool has_errors = false;
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, ElabA81Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(cu->modules.back()->name);
-  f.has_errors = f.diag.HasErrors();
-  return design;
-}
-
 // =============================================================================
 // A.8.1 Concatenations — Elaboration
 // =============================================================================
 // § concatenation elaborates in continuous assignment
 TEST(ElabA81, ConcatenationInContAssign) {
-  ElabA81Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] a;\n"
@@ -126,7 +63,7 @@ TEST(ElabA81, ConcatenationInContAssign) {
 
 // § constant_concatenation in parameter initialization
 TEST(ElabA81, ConstantConcatenationInParam) {
-  ElabA81Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  parameter [15:0] P = {8'hAB, 8'hCD};\n"
@@ -138,7 +75,7 @@ TEST(ElabA81, ConstantConcatenationInParam) {
 
 // § multiple_concatenation (replication) in continuous assignment
 TEST(ElabA81, ReplicationInContAssign) {
-  ElabA81Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] a;\n"
@@ -152,7 +89,7 @@ TEST(ElabA81, ReplicationInContAssign) {
 
 // § streaming_concatenation elaborates in procedural context
 TEST(ElabA81, StreamingConcatLeftShiftElab) {
-  ElabA81Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] a, b;\n"
@@ -164,7 +101,7 @@ TEST(ElabA81, StreamingConcatLeftShiftElab) {
 }
 
 TEST(ElabA81, StreamingConcatRightShiftElab) {
-  ElabA81Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] a, b;\n"
@@ -177,7 +114,7 @@ TEST(ElabA81, StreamingConcatRightShiftElab) {
 
 // § streaming_concatenation with slice_size elaborates
 TEST(ElabA81, StreamingWithSliceSizeElab) {
-  ElabA81Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] a, b;\n"
@@ -190,7 +127,7 @@ TEST(ElabA81, StreamingWithSliceSizeElab) {
 
 // § concatenation in initial block elaborates
 TEST(ElabA81, ConcatInInitialBlock) {
-  ElabA81Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] a;\n"
@@ -204,7 +141,7 @@ TEST(ElabA81, ConcatInInitialBlock) {
 
 // § replication in initial block elaborates
 TEST(ElabA81, ReplicateInInitialBlock) {
-  ElabA81Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] a;\n"
@@ -216,27 +153,9 @@ TEST(ElabA81, ReplicateInInitialBlock) {
   EXPECT_FALSE(f.has_errors);
 }
 
-struct ElabA82Fixture {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
-  bool has_errors = false;
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, ElabA82Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(cu->modules.back()->name);
-  f.has_errors = f.diag.HasErrors();
-  return design;
-}
-
 // § subroutine_call — nested function calls elaborate
 TEST(ElabA82, NestedCallsElaborate) {
-  ElabA82Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  function int f(int n); return n + 1; endfunction\n"
@@ -249,27 +168,9 @@ TEST(ElabA82, NestedCallsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-struct ElabA83Fixture {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
-  bool has_errors = false;
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, ElabA83Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(cu->modules.back()->name);
-  f.has_errors = f.diag.HasErrors();
-  return design;
-}
-
 // § inside_expression — inside in initial block elaborates
 TEST(ElabA83, InsideExprElaborates) {
-  ElabA83Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] x;\n"
@@ -281,27 +182,9 @@ TEST(ElabA83, InsideExprElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-struct ElabA84Fixture {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
-  bool has_errors = false;
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, ElabA84Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(cu->modules.back()->name);
-  f.has_errors = f.diag.HasErrors();
-  return design;
-}
-
 // § primary — hierarchical identifier with select elaborates
 TEST(ElabA84, PrimaryHierIdentSelectElaborates) {
-  ElabA84Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] data;\n"
@@ -315,7 +198,7 @@ TEST(ElabA84, PrimaryHierIdentSelectElaborates) {
 
 // § primary — concatenation elaborates
 TEST(ElabA84, PrimaryConcatenationElaborates) {
-  ElabA84Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] a, b;\n"
@@ -327,27 +210,9 @@ TEST(ElabA84, PrimaryConcatenationElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-struct ElabA87Fixture {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
-  bool has_errors = false;
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, ElabA87Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(cu->modules.back()->name);
-  f.has_errors = f.diag.HasErrors();
-  return design;
-}
-
 // § unsigned_number — underscored decimal elaborates
 TEST(ElabA87, UnderscoredDecimalElaborates) {
-  ElabA87Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  int x;\n"
@@ -499,16 +364,8 @@ TEST(ConstEval, ScopedIdentifier) {
 // =============================================================================
 // Helper fixture
 // =============================================================================
-struct AggFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 TEST(StructType, FieldTypeKindPreserved) {
-  AggFixture f;
+  SimFixture f;
   StructTypeInfo info;
   info.type_name = "typed_s";
   info.is_packed = true;
@@ -571,7 +428,7 @@ TEST(Elaboration, StructPattern_DuplicateKey) {
 
 TEST(StructPattern, NamedMemberTwoFields) {
   // '{x: 5, y: 10} on struct { logic [7:0] x; logic [7:0] y; }
-  AggFixture f;
+  SimFixture f;
   StructTypeInfo info;
   info.type_name = "point_t";
   info.is_packed = true;
@@ -591,7 +448,7 @@ TEST(StructPattern, NamedMemberTwoFields) {
 
 TEST(StructPattern, NamedMemberReversedOrder) {
   // '{y: 10, x: 5} — order-independent, same result
-  AggFixture f;
+  SimFixture f;
   StructTypeInfo info;
   info.type_name = "point_t";
   info.is_packed = true;
@@ -610,7 +467,7 @@ TEST(StructPattern, NamedMemberReversedOrder) {
 
 TEST(StructPattern, NamedMemberThreeFields) {
   // '{r: 0xFF, g: 0x80, b: 0x00} on 24-bit struct
-  AggFixture f;
+  SimFixture f;
   StructTypeInfo info;
   info.type_name = "rgb_t";
   info.is_packed = true;
@@ -634,7 +491,7 @@ TEST(StructPattern, NamedMemberThreeFields) {
 // =============================================================================
 TEST(StructPattern, DefaultAllFields) {
   // '{default: 0xFF} → all fields filled with 0xFF
-  AggFixture f;
+  SimFixture f;
   StructTypeInfo info;
   info.type_name = "pair_t";
   info.is_packed = true;
@@ -651,7 +508,7 @@ TEST(StructPattern, DefaultAllFields) {
   EXPECT_EQ(result.ToUint64(), 0xFFFFu);
 }
 
-static Expr* ParseExprFrom(const std::string& src, AggFixture& f) {
+static Expr* ParseExprFrom(const std::string& src, SimFixture& f) {
   std::string code = "module t; initial x = " + src + "; endmodule";
   auto fid = f.mgr.AddFile("<test>", code);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
@@ -663,7 +520,7 @@ static Expr* ParseExprFrom(const std::string& src, AggFixture& f) {
 
 TEST(StructPattern, DefaultWithNamedOverride) {
   // '{a: 1, default: 0} → a=1, b=0
-  AggFixture f;
+  SimFixture f;
   StructTypeInfo info;
   info.type_name = "pair_t";
   info.is_packed = true;
@@ -682,7 +539,7 @@ TEST(StructPattern, DefaultWithNamedOverride) {
 
 TEST(StructPattern, TypeKeyedInt) {
   // '{int: 42} on struct { int a; logic [7:0] b; } → a=42, b=0
-  AggFixture f;
+  SimFixture f;
   StructTypeInfo info;
   info.type_name = "mixed_t";
   info.is_packed = true;
@@ -704,7 +561,7 @@ TEST(StructPattern, TypeKeyedInt) {
 // =============================================================================
 TEST(AssignmentPattern, PositionalTwoElements) {
   // '{a, b} with 8-bit variables → 16-bit packed result
-  AggFixture f;
+  SimFixture f;
   auto* a = f.ctx.CreateVariable("a", 8);
   auto* b = f.ctx.CreateVariable("b", 8);
   a->value = MakeLogic4VecVal(f.arena, 8, 5);
@@ -719,7 +576,7 @@ TEST(AssignmentPattern, PositionalTwoElements) {
 }
 
 TEST(AssignmentPattern, SingleElement) {
-  AggFixture f;
+  SimFixture f;
   auto* a = f.ctx.CreateVariable("a", 32);
   a->value = MakeLogic4VecVal(f.arena, 32, 42);
   auto* expr = ParseExprFrom("'{a}", f);
@@ -728,7 +585,7 @@ TEST(AssignmentPattern, SingleElement) {
 }
 
 TEST(AssignmentPattern, EmptyPattern) {
-  AggFixture f;
+  SimFixture f;
   auto* expr = ParseExprFrom("'{}", f);
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.width, 0u);
@@ -736,7 +593,7 @@ TEST(AssignmentPattern, EmptyPattern) {
 
 TEST(AssignmentPattern, SizedLiterals) {
   // Test the parser fix for integer literal first elements
-  AggFixture f;
+  SimFixture f;
   auto* expr = ParseExprFrom("'{32'd5, 32'd10}", f);
   ASSERT_NE(expr, nullptr);
   EXPECT_EQ(expr->kind, ExprKind::kAssignmentPattern);
@@ -750,7 +607,7 @@ TEST(AssignmentPattern, SizedLiterals) {
 
 // § empty_unpacked_array_concatenation elaborates
 TEST(ElabA81, EmptyUnpackedArrayConcatElab) {
-  ElabA81Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] a;\n"
@@ -782,7 +639,7 @@ TEST(ConstEval, Replication) {
 
 // § constant_multiple_concatenation in parameter
 TEST(ElabA81, ConstantMultipleConcatInParam) {
-  ElabA81Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  parameter [31:0] P = {4{8'hFF}};\n"
@@ -794,7 +651,7 @@ TEST(ElabA81, ConstantMultipleConcatInParam) {
 
 // § primary — streaming concatenation elaborates
 TEST(ElabA84, PrimaryStreamingConcatElaborates) {
-  ElabA84Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [31:0] a;\n"
@@ -820,30 +677,12 @@ TEST(Elaboration, WidthInference_Concatenation) {
   EXPECT_EQ(InferExprWidth(&concat, typedefs), 64);  // 32 + 32
 }
 
-struct ElabA701Fixture {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
-  bool has_errors = false;
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, ElabA701Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(cu->modules.back()->name);
-  f.has_errors = f.diag.HasErrors();
-  return design;
-}
-
 // =============================================================================
 // A.7.1 Specify block declaration — Elaboration
 // =============================================================================
 // Empty specify block elaborates without errors
 TEST(ElabA701, EmptySpecifyBlockElaborates) {
-  ElabA701Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
@@ -856,7 +695,7 @@ TEST(ElabA701, EmptySpecifyBlockElaborates) {
 
 // timing_check_event with edge keyword elaborates
 TEST(ElabA70503, TimingCheckEventEdgeKeywordElaborates) {
-  ElabA70503Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
@@ -922,23 +761,6 @@ TEST(Preprocessor, DelayToTicks_Basic) {
 }
 
 // Sim test fixture
-struct SimA604Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA604Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // =============================================================================
 // A.6.4 Statements — Simulation
 // =============================================================================
@@ -947,7 +769,7 @@ static RtlirDesign* ElaborateSrc(const std::string& src, SimA604Fixture& f) {
 // ---------------------------------------------------------------------------
 // §12.3: null statement has no effect in simulation
 TEST(SimA604, NullStatementNoEffect) {
-  SimA604Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"

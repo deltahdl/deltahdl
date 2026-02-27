@@ -1,24 +1,14 @@
 // §16.14: Concurrent assertions
 
-#include <gtest/gtest.h>
 
 #include <cstdint>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "simulation/assertion.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
-struct AssertionSimFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
 namespace {
 
 // =============================================================================

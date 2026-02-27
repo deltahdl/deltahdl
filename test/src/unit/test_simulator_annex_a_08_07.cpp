@@ -1,40 +1,14 @@
 // Annex A.8.7: Numbers
 
-#include <gtest/gtest.h>
 
 #include <cstring>
-#include <string>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "simulation/lowerer.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
 
+#include "fixture_simulator.h"
+
 using namespace delta;
-
-struct SimA87Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA87Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
 
 static double ToDouble(const Variable* var) {
   uint64_t bits = var->value.ToUint64();
@@ -47,7 +21,7 @@ namespace {
 
 // § integral_number — octal_number
 TEST(SimA87, OctalNumber) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -65,7 +39,7 @@ TEST(SimA87, OctalNumber) {
 
 // § size — 1-bit literal
 TEST(SimA87, Size1Bit) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
@@ -83,7 +57,7 @@ TEST(SimA87, Size1Bit) {
 
 // § real_number — fixed_point_number simulates
 TEST(SimA87, FixedPointNumber) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  real x;\n"
@@ -101,7 +75,7 @@ TEST(SimA87, FixedPointNumber) {
 
 // § hex_digit — lowercase a-f
 TEST(SimA87, HexDigitLowercase) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [23:0] x;\n"
@@ -119,7 +93,7 @@ TEST(SimA87, HexDigitLowercase) {
 
 // § binary_digit — x in binary
 TEST(SimA87, BinaryXDigit) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] x;\n"

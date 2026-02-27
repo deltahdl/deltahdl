@@ -1,26 +1,15 @@
 // §11.4.9: Reduction operators
 
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // Shared fixture for expression evaluation tests.
-struct EvalOpFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 // Helper: build a simple integer literal Expr node.
 static Expr* MakeInt(Arena& arena, uint64_t val) {
   auto* e = arena.Create<Expr>();
@@ -50,7 +39,7 @@ static Expr* MakeBinary(Arena& arena, TokenKind op, Expr* lhs, Expr* rhs) {
 namespace {
 
 TEST(EvalOp, LtLtEq) {
-  EvalOpFixture f;
+  SimFixture f;
   auto* var = f.ctx.CreateVariable("a", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 1);
 
@@ -62,7 +51,7 @@ TEST(EvalOp, LtLtEq) {
 }
 
 TEST(EvalOp, GtGtEq) {
-  EvalOpFixture f;
+  SimFixture f;
   auto* var = f.ctx.CreateVariable("a", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 256);
 
@@ -74,14 +63,6 @@ TEST(EvalOp, GtGtEq) {
 }
 
 // Shared fixture for expression evaluation tests.
-struct EvalOpXZFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 static Expr* MakeUnary(Arena& arena, TokenKind op, Expr* operand) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kUnary;
@@ -90,7 +71,7 @@ static Expr* MakeUnary(Arena& arena, TokenKind op, Expr* operand) {
   return e;
 }
 
-static Variable* MakeVar4(EvalOpXZFixture& f, std::string_view name,
+static Variable* MakeVar4(SimFixture& f, std::string_view name,
                           uint32_t width, uint64_t aval, uint64_t bval) {
   auto* var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4Vec(f.arena, width);
@@ -103,7 +84,7 @@ static Variable* MakeVar4(EvalOpXZFixture& f, std::string_view name,
 // Reduction X/Z propagation — §11.4.9
 // ==========================================================================
 TEST(EvalOpXZ, ReductionAndWithX) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // &4'b1x11 → x (not all bits known-1)
   MakeVar4(f, "ra", 4, 0b1011, 0b0100);  // bit2=x
   auto* expr = MakeUnary(f.arena, TokenKind::kAmp, MakeId(f.arena, "ra"));
@@ -112,7 +93,7 @@ TEST(EvalOpXZ, ReductionAndWithX) {
 }
 
 TEST(EvalOpXZ, ReductionAndWithKnown0) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // &4'b0x11 → 0 (known-0 bit forces result to 0)
   MakeVar4(f, "rb", 4, 0b0011, 0b0100);  // bit3=0, bit2=x
   auto* expr = MakeUnary(f.arena, TokenKind::kAmp, MakeId(f.arena, "rb"));
@@ -122,7 +103,7 @@ TEST(EvalOpXZ, ReductionAndWithKnown0) {
 }
 
 TEST(EvalOpXZ, ReductionOrWithKnown1) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // |4'b1x00 → 1 (known-1 bit forces result to 1)
   MakeVar4(f, "rc", 4, 0b1000, 0b0100);  // bit3=1, bit2=x
   auto* expr = MakeUnary(f.arena, TokenKind::kPipe, MakeId(f.arena, "rc"));
@@ -132,7 +113,7 @@ TEST(EvalOpXZ, ReductionOrWithKnown1) {
 }
 
 TEST(EvalOpXZ, ReductionOrWithX) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // |4'b0x00 → x (no known-1, but X could be 1)
   MakeVar4(f, "rd", 4, 0b0000, 0b0100);  // all 0 except bit2=x
   auto* expr = MakeUnary(f.arena, TokenKind::kPipe, MakeId(f.arena, "rd"));
@@ -141,7 +122,7 @@ TEST(EvalOpXZ, ReductionOrWithX) {
 }
 
 TEST(EvalOpXZ, ReductionXorWithX) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // ^4'b1x10 → x (any X/Z in XOR → X)
   MakeVar4(f, "re", 4, 0b1010, 0b0100);  // bit2=x
   auto* expr = MakeUnary(f.arena, TokenKind::kCaret, MakeId(f.arena, "re"));
@@ -149,26 +130,9 @@ TEST(EvalOpXZ, ReductionXorWithX) {
   EXPECT_NE(result.words[0].bval, 0u);  // result is X
 }
 
-struct SimA83Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA83Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // § expression — reduction AND
 TEST(SimA83, ReductionAnd) {
-  SimA83Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
@@ -186,7 +150,7 @@ TEST(SimA83, ReductionAnd) {
 
 // § expression — reduction OR
 TEST(SimA83, ReductionOr) {
-  SimA83Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
@@ -202,26 +166,9 @@ TEST(SimA83, ReductionOr) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-struct SimA86Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA86Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // § unary_operator — reduction AND
 TEST(SimA86, UnaryReductionAnd) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
@@ -239,7 +186,7 @@ TEST(SimA86, UnaryReductionAnd) {
 
 // § unary_operator — reduction NAND
 TEST(SimA86, UnaryReductionNand) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
@@ -257,7 +204,7 @@ TEST(SimA86, UnaryReductionNand) {
 
 // § unary_operator — reduction OR
 TEST(SimA86, UnaryReductionOr) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
@@ -275,7 +222,7 @@ TEST(SimA86, UnaryReductionOr) {
 
 // § unary_operator — reduction NOR
 TEST(SimA86, UnaryReductionNor) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
@@ -293,7 +240,7 @@ TEST(SimA86, UnaryReductionNor) {
 
 // § unary_operator — reduction XOR
 TEST(SimA86, UnaryReductionXor) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
@@ -312,7 +259,7 @@ TEST(SimA86, UnaryReductionXor) {
 
 // § unary_operator — reduction XNOR (~^)
 TEST(SimA86, UnaryReductionXnor) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
@@ -331,7 +278,7 @@ TEST(SimA86, UnaryReductionXnor) {
 
 // § unary_operator — reduction XNOR (^~)
 TEST(SimA86, UnaryReductionXnorAlt) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"

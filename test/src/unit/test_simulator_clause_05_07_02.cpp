@@ -1,41 +1,15 @@
-#include <gtest/gtest.h>
 
 #include <cstring>
-#include <string>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "simulation/lowerer.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
-struct SimCh50702Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimCh50702Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 static uint64_t RunAndGet(const std::string& src, const char* var_name) {
-  SimCh50702Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0;
@@ -49,7 +23,7 @@ static uint64_t RunAndGet(const std::string& src, const char* var_name) {
 }
 
 static double RunAndGetReal(const std::string& src, const char* var_name) {
-  SimCh50702Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0.0;
@@ -222,23 +196,6 @@ TEST(SimCh50702, RealLargeScientific) {
       "module t;\n  real x;\n  initial x = 39e8;\nendmodule\n", "x");
   EXPECT_DOUBLE_EQ(v, 39e8);
 }
-struct SimA87Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA87Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 static double ToDouble(const Variable* var) {
   uint64_t bits = var->value.ToUint64();
   double d = 0.0;
@@ -248,7 +205,7 @@ static double ToDouble(const Variable* var) {
 
 // § real_number — scientific notation simulates
 TEST(SimA87, ScientificNotation) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  real x;\n"
@@ -266,7 +223,7 @@ TEST(SimA87, ScientificNotation) {
 
 // § real_number — scientific with positive exponent
 TEST(SimA87, ScientificPositiveExp) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  real x;\n"
@@ -284,7 +241,7 @@ TEST(SimA87, ScientificPositiveExp) {
 
 // § real_number — scientific with negative exponent
 TEST(SimA87, ScientificNegativeExp) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  real x;\n"
@@ -302,7 +259,7 @@ TEST(SimA87, ScientificNegativeExp) {
 
 // § exp — uppercase E
 TEST(SimA87, ExpUppercase) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  real x;\n"

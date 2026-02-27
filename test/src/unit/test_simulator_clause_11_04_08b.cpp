@@ -1,26 +1,15 @@
 // §11.4.8: Bitwise operators
 
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // Shared fixture for expression evaluation tests.
-struct EvalOpFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 // Helper: build a simple integer literal Expr node.
 static Expr* MakeInt(Arena& arena, uint64_t val) {
   auto* e = arena.Create<Expr>();
@@ -44,7 +33,7 @@ namespace {
 // Reduction operators (unary &, |, ^, ~&, ~|, ~^, ^~)
 // ==========================================================================
 TEST(EvalOp, ReductionAndAllOnes) {
-  EvalOpFixture f;
+  SimFixture f;
   // &32'hFFFFFFFF = 1 (all 32 bits are 1)
   auto* expr =
       MakeUnary(f.arena, TokenKind::kAmp, MakeInt(f.arena, 0xFFFFFFFF));
@@ -53,7 +42,7 @@ TEST(EvalOp, ReductionAndAllOnes) {
 }
 
 TEST(EvalOp, ReductionAndNotAllOnes) {
-  EvalOpFixture f;
+  SimFixture f;
   // &32'd5 = 0 (not all bits 1)
   auto* expr = MakeUnary(f.arena, TokenKind::kAmp, MakeInt(f.arena, 5));
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -61,7 +50,7 @@ TEST(EvalOp, ReductionAndNotAllOnes) {
 }
 
 TEST(EvalOp, ReductionOrNonZero) {
-  EvalOpFixture f;
+  SimFixture f;
   // |32'd4 = 1
   auto* expr = MakeUnary(f.arena, TokenKind::kPipe, MakeInt(f.arena, 4));
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -69,7 +58,7 @@ TEST(EvalOp, ReductionOrNonZero) {
 }
 
 TEST(EvalOp, ReductionOrZero) {
-  EvalOpFixture f;
+  SimFixture f;
   // |32'd0 = 0
   auto* expr = MakeUnary(f.arena, TokenKind::kPipe, MakeInt(f.arena, 0));
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -77,7 +66,7 @@ TEST(EvalOp, ReductionOrZero) {
 }
 
 TEST(EvalOp, ReductionXorEvenOnes) {
-  EvalOpFixture f;
+  SimFixture f;
   // ^32'd3 = 0 (two 1-bits => even parity)
   auto* expr = MakeUnary(f.arena, TokenKind::kCaret, MakeInt(f.arena, 3));
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -85,7 +74,7 @@ TEST(EvalOp, ReductionXorEvenOnes) {
 }
 
 TEST(EvalOp, ReductionXorOddOnes) {
-  EvalOpFixture f;
+  SimFixture f;
   // ^32'd7 = 1 (three 1-bits => odd parity)
   auto* expr = MakeUnary(f.arena, TokenKind::kCaret, MakeInt(f.arena, 7));
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -93,7 +82,7 @@ TEST(EvalOp, ReductionXorOddOnes) {
 }
 
 TEST(EvalOp, ReductionNand) {
-  EvalOpFixture f;
+  SimFixture f;
   // ~&32'd5 = 1 (not all bits 1)
   auto* expr = MakeUnary(f.arena, TokenKind::kTildeAmp, MakeInt(f.arena, 5));
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -101,7 +90,7 @@ TEST(EvalOp, ReductionNand) {
 }
 
 TEST(EvalOp, ReductionNor) {
-  EvalOpFixture f;
+  SimFixture f;
   // ~|32'd0 = 1
   auto* expr = MakeUnary(f.arena, TokenKind::kTildePipe, MakeInt(f.arena, 0));
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -109,7 +98,7 @@ TEST(EvalOp, ReductionNor) {
 }
 
 TEST(EvalOp, ReductionXnorTildeCaret) {
-  EvalOpFixture f;
+  SimFixture f;
   // ~^32'd3 = 1 (even parity -> XNOR=1)
   auto* expr = MakeUnary(f.arena, TokenKind::kTildeCaret, MakeInt(f.arena, 3));
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -117,7 +106,7 @@ TEST(EvalOp, ReductionXnorTildeCaret) {
 }
 
 TEST(EvalOp, ReductionXnorCaretTilde) {
-  EvalOpFixture f;
+  SimFixture f;
   // ^~32'd7 = 0 (odd parity -> XNOR=0)
   auto* expr = MakeUnary(f.arena, TokenKind::kCaretTilde, MakeInt(f.arena, 7));
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -128,7 +117,7 @@ TEST(EvalOp, ReductionXnorCaretTilde) {
 // Additional edge cases
 // ==========================================================================
 TEST(EvalOp, ReductionAndZero) {
-  EvalOpFixture f;
+  SimFixture f;
   // &32'd0 = 0
   auto* expr = MakeUnary(f.arena, TokenKind::kAmp, MakeInt(f.arena, 0));
   auto result = EvalExpr(expr, f.ctx, f.arena);

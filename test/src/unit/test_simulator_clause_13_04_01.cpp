@@ -1,26 +1,16 @@
 // §13.4.1: Return values and void functions
 
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // =============================================================================
 // Test fixture shared by all function call tests
 // =============================================================================
-struct FuncFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
 // Helper: make a function call expression.
 static Expr* MakeCall(Arena& arena, std::string_view callee,
                       std::vector<Expr*> args) {
@@ -61,26 +51,9 @@ TEST(Functions, VoidFunctionReturnsZero) {
 }
 
 // Sim test fixture
-struct SimA604Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA604Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // §13: function_statement execution via function call
 TEST(SimA604, FunctionStatementExecution) {
-  SimA604Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -101,26 +74,9 @@ TEST(SimA604, FunctionStatementExecution) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-struct SimA605Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA605Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // §12.8: return exits function with value
 TEST(SimA605, JumpReturnFromFunction) {
-  SimA605Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -141,26 +97,9 @@ TEST(SimA605, JumpReturnFromFunction) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-struct SimA609Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA609Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // --- tf_call: function call as expression statement ---
 TEST(SimA609, FunctionCallAsStatement) {
-  SimA609Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -184,7 +123,7 @@ TEST(SimA609, FunctionCallAsStatement) {
 
 // --- function return value used in expression ---
 TEST(SimA609, FunctionReturnValue) {
-  SimA609Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -205,29 +144,12 @@ TEST(SimA609, FunctionReturnValue) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-struct SimA82Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA82Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // =============================================================================
 // A.8.2 Subroutine calls — Simulation
 // =============================================================================
 // § tf_call — function returning value used in expression
 TEST(SimA82, TfCallReturnValue) {
-  SimA82Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -248,7 +170,7 @@ TEST(SimA82, TfCallReturnValue) {
 
 // § function_subroutine_call — nested function calls
 TEST(SimA82, NestedFunctionCalls) {
-  SimA82Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -272,7 +194,7 @@ TEST(SimA82, NestedFunctionCalls) {
 
 // § void'(function_subroutine_call) — side effect executes, return discarded
 TEST(SimA82, VoidCastFunctionCall) {
-  SimA82Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"

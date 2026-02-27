@@ -1,28 +1,17 @@
 // §11.4.8: Bitwise operators
 
-#include <gtest/gtest.h>
 
 #include <cstring>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // Shared fixture for expression evaluation tests.
-struct EvalOpXZFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 static Expr* MakeId(Arena& arena, std::string_view name) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
@@ -45,7 +34,7 @@ namespace {
 // Binary XNOR (^~, ~^) — §11.4.8
 // ==========================================================================
 TEST(EvalOpXZ, BinaryXnorBasic) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // 4'b1100 ^~ 4'b1010 = 4'b1001 = 9
   auto* a = f.ctx.CreateVariable("xa", 4);
   a->value = MakeLogic4VecVal(f.arena, 4, 0b1100);
@@ -60,7 +49,7 @@ TEST(EvalOpXZ, BinaryXnorBasic) {
 }
 
 TEST(EvalOpXZ, BinaryXnorCaretTilde) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // 4'b1100 ~^ 4'b1010 = 4'b1001 = 9 (same as ^~)
   auto* a = f.ctx.CreateVariable("ya", 4);
   a->value = MakeLogic4VecVal(f.arena, 4, 0b1100);
@@ -75,7 +64,7 @@ TEST(EvalOpXZ, BinaryXnorCaretTilde) {
 }
 
 TEST(EvalOpXZ, BinaryXnorWithX) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // 4'b1x00 ^~ 4'b1010: result 4'b1x01
   auto* a = f.ctx.CreateVariable("za", 4);
   a->value = MakeLogic4Vec(f.arena, 4);
@@ -93,26 +82,9 @@ TEST(EvalOpXZ, BinaryXnorWithX) {
   EXPECT_EQ(result.words[0].bval, 0b0100u);
 }
 
-struct SimA86Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA86Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // § unary_operator — bitwise NOT
 TEST(SimA86, UnaryBitwiseNot) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -133,7 +105,7 @@ TEST(SimA86, UnaryBitwiseNot) {
 // =============================================================================
 // § binary_operator — & (bitwise AND)
 TEST(SimA86, BinaryBitwiseAnd) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -151,7 +123,7 @@ TEST(SimA86, BinaryBitwiseAnd) {
 
 // § binary_operator — | (bitwise OR)
 TEST(SimA86, BinaryBitwiseOr) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -169,7 +141,7 @@ TEST(SimA86, BinaryBitwiseOr) {
 
 // § binary_operator — ^ (bitwise XOR)
 TEST(SimA86, BinaryBitwiseXor) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -187,7 +159,7 @@ TEST(SimA86, BinaryBitwiseXor) {
 
 // § binary_operator — ^~ (bitwise XNOR)
 TEST(SimA86, BinaryBitwiseXnor) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"

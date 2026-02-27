@@ -1,39 +1,12 @@
 // §16.3: Immediate assertions
 
-#include <gtest/gtest.h>
 
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "simulation/lowerer.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
 
+#include "fixture_simulator.h"
+
 using namespace delta;
-
-struct SimA610Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA610Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
 
 namespace {
 
@@ -43,7 +16,7 @@ namespace {
 // --- simple_immediate_assert_statement ---
 // Assert true: pass action executes
 TEST(SimA610, AssertPassAction) {
-  SimA610Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -64,7 +37,7 @@ TEST(SimA610, AssertPassAction) {
 
 // Assert false: fail action executes
 TEST(SimA610, AssertFailAction) {
-  SimA610Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -85,7 +58,7 @@ TEST(SimA610, AssertFailAction) {
 
 // Assert true with both actions: only pass executes
 TEST(SimA610, AssertTruePassOnly) {
-  SimA610Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -106,7 +79,7 @@ TEST(SimA610, AssertTruePassOnly) {
 
 // Assert with no actions (just semicolon): no effect
 TEST(SimA610, AssertNoActions) {
-  SimA610Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -127,7 +100,7 @@ TEST(SimA610, AssertNoActions) {
 
 // Assert false with only else action
 TEST(SimA610, AssertElseOnly) {
-  SimA610Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -149,7 +122,7 @@ TEST(SimA610, AssertElseOnly) {
 // --- simple_immediate_assume_statement ---
 // Assume true: pass action executes
 TEST(SimA610, AssumePassAction) {
-  SimA610Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -170,7 +143,7 @@ TEST(SimA610, AssumePassAction) {
 
 // Assume false: fail action executes
 TEST(SimA610, AssumeFailAction) {
-  SimA610Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -192,7 +165,7 @@ TEST(SimA610, AssumeFailAction) {
 // --- simple_immediate_cover_statement ---
 // Cover true: pass action executes
 TEST(SimA610, CoverPassAction) {
-  SimA610Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -213,7 +186,7 @@ TEST(SimA610, CoverPassAction) {
 
 // Cover false: no action (cover has no else)
 TEST(SimA610, CoverFalseNoAction) {
-  SimA610Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -235,7 +208,7 @@ TEST(SimA610, CoverFalseNoAction) {
 // --- action_block with begin/end ---
 // Assert with begin/end block as pass action
 TEST(SimA610, AssertBeginEndBlock) {
-  SimA610Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -256,7 +229,7 @@ TEST(SimA610, AssertBeginEndBlock) {
 
 // --- multiple assertions in sequence ---
 TEST(SimA610, MultipleAssertions) {
-  SimA610Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"

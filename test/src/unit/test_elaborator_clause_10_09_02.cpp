@@ -1,39 +1,14 @@
 // §10.9.2: Structure assignment patterns
 
-#include <gtest/gtest.h>
 
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "simulation/lowerer.h"
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
 #include "simulation/variable.h"
 
+#include "fixture_simulator.h"
+
 using namespace delta;
-
-struct ElabA60701Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, ElabA60701Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
 
 namespace {
 
@@ -42,7 +17,7 @@ namespace {
 // =============================================================================
 // §10.9: positional assignment pattern elaborates for struct init
 TEST(ElabA60701, StructPositionalPatternElaborates) {
-  ElabA60701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
@@ -58,15 +33,7 @@ TEST(ElabA60701, StructPositionalPatternElaborates) {
 // =============================================================================
 // Helper fixture
 // =============================================================================
-struct AggFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static Expr* ParseExprFrom(const std::string& src, AggFixture& f) {
+static Expr* ParseExprFrom(const std::string& src, SimFixture& f) {
   std::string code = "module t; initial x = " + src + "; endmodule";
   auto fid = f.mgr.AddFile("<test>", code);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
@@ -88,7 +55,7 @@ TEST(StructPattern, MixedPrecedence) {
   // struct { byte a; byte b; logic [7:0] c; }
   // a=1 (explicit member overrides byte key), b=2 (byte type key), c=3
   // (default)
-  AggFixture f;
+  SimFixture f;
   StructTypeInfo info;
   info.type_name = "multi_t";
   info.is_packed = true;
@@ -110,7 +77,7 @@ TEST(StructPattern, MixedPrecedence) {
 
 // §10.9: typed assignment pattern expression elaborates
 TEST(ElabA60701, TypedPatternExpressionElaborates) {
-  ElabA60701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  typedef struct packed { logic [7:0] x; logic [7:0] y; } coord_t;\n"

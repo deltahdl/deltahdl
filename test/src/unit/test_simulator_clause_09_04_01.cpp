@@ -1,39 +1,12 @@
 // §9.4.1: Delay control
 
-#include <gtest/gtest.h>
 
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "simulation/lowerer.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
 
+#include "fixture_simulator.h"
+
 using namespace delta;
-
-struct SimA605Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA605Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
 
 namespace {
 
@@ -42,7 +15,7 @@ namespace {
 // =============================================================================
 // §9.4.1: delay control advances simulation time
 TEST(SimA605, DelayControlAdvancesTime) {
-  SimA605Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -62,7 +35,7 @@ TEST(SimA605, DelayControlAdvancesTime) {
 
 // §9.4.1: chained delays accumulate
 TEST(SimA605, DelayControlChained) {
-  SimA605Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
@@ -93,25 +66,8 @@ TEST(SimA605, DelayControlChained) {
 // introduced in §4.2, covering parallel process execution, sequential
 // ordering within processes, and interaction between concurrent elements.
 // ===========================================================================
-struct SimCh4Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimCh4Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 static uint64_t RunAndGet(const std::string& src, const char* var_name) {
-  SimCh4Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0;
@@ -129,7 +85,7 @@ static uint64_t RunAndGet(const std::string& src, const char* var_name) {
 //    simulation time.
 // ---------------------------------------------------------------------------
 TEST(SimCh4, SimulationTimeAdvances) {
-  SimCh4Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"

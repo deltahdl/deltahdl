@@ -1,26 +1,15 @@
 // §11.4.11: Conditional operator
 
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // Shared fixture for expression evaluation tests.
-struct EvalOpFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 // Helper: build a simple integer literal Expr node.
 static Expr* MakeInt(Arena& arena, uint64_t val) {
   auto* e = arena.Create<Expr>();
@@ -35,7 +24,7 @@ namespace {
 // Inside operator (expr inside {val1, val2, [lo:hi]})
 // ==========================================================================
 TEST(EvalOp, InsideMatch) {
-  EvalOpFixture f;
+  SimFixture f;
   // 5 inside {3, 5, 7} = 1
   auto* inside = f.arena.Create<Expr>();
   inside->kind = ExprKind::kInside;
@@ -49,7 +38,7 @@ TEST(EvalOp, InsideMatch) {
 }
 
 TEST(EvalOp, InsideNoMatch) {
-  EvalOpFixture f;
+  SimFixture f;
   // 4 inside {3, 5, 7} = 0
   auto* inside = f.arena.Create<Expr>();
   inside->kind = ExprKind::kInside;
@@ -63,7 +52,7 @@ TEST(EvalOp, InsideNoMatch) {
 }
 
 TEST(EvalOp, InsideRange) {
-  EvalOpFixture f;
+  SimFixture f;
   // 5 inside {[3:7]} = 1 (range element)
   auto* range = f.arena.Create<Expr>();
   range->kind = ExprKind::kSelect;
@@ -80,7 +69,7 @@ TEST(EvalOp, InsideRange) {
 }
 
 TEST(EvalOp, InsideRangeNoMatch) {
-  EvalOpFixture f;
+  SimFixture f;
   // 10 inside {[3:7]} = 0
   auto* range = f.arena.Create<Expr>();
   range->kind = ExprKind::kSelect;

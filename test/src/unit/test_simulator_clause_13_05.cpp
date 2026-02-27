@@ -1,39 +1,12 @@
 // §13.5: Subroutine calls and argument passing
 
-#include <gtest/gtest.h>
 
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "simulation/lowerer.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
 
+#include "fixture_simulator.h"
+
 using namespace delta;
-
-struct SimA609Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA609Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
 
 namespace {
 
@@ -43,7 +16,7 @@ namespace {
 // --- tf_call: task call ---
 // Simple task call modifies a variable
 TEST(SimA609, TaskCallSimple) {
-  SimA609Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -67,7 +40,7 @@ TEST(SimA609, TaskCallSimple) {
 
 // --- void'(function_subroutine_call) ---
 TEST(SimA609, VoidCastFunctionCall) {
-  SimA609Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -92,7 +65,7 @@ TEST(SimA609, VoidCastFunctionCall) {
 
 // --- nested function calls ---
 TEST(SimA609, NestedFunctionCalls) {
-  SimA609Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -118,7 +91,7 @@ TEST(SimA609, NestedFunctionCalls) {
 
 // --- task with output argument ---
 TEST(SimA609, TaskOutputArg) {
-  SimA609Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -140,26 +113,9 @@ TEST(SimA609, TaskOutputArg) {
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
-struct SimA82Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA82Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // § tf_call — task call modifies variable
 TEST(SimA82, TfCallTaskModifiesVar) {
-  SimA82Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -183,7 +139,7 @@ TEST(SimA82, TfCallTaskModifiesVar) {
 
 // § tf_call — function call in expression with binary op
 TEST(SimA82, FunctionCallInBinaryExpr) {
-  SimA82Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"

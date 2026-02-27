@@ -1,28 +1,17 @@
 // §11.11: Minimum, typical, and maximum delay expressions
 
-#include <gtest/gtest.h>
 
 #include <cstring>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // Shared fixture for expression evaluation tests.
-struct EvalOpXZFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 static Expr* MakeInt(Arena& arena, uint64_t val) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
@@ -36,7 +25,7 @@ namespace {
 // MinTypMax evaluation — §11.11
 // ==========================================================================
 TEST(EvalOpXZ, MinTypMaxDefaultTyp) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // Default delay mode is typ — should return middle expression.
   auto* mtm = f.arena.Create<Expr>();
   mtm->kind = ExprKind::kMinTypMax;
@@ -48,7 +37,7 @@ TEST(EvalOpXZ, MinTypMaxDefaultTyp) {
 }
 
 TEST(EvalOpXZ, MinTypMaxMin) {
-  EvalOpXZFixture f;
+  SimFixture f;
   f.ctx.SetDelayMode(DelayMode::kMin);
   auto* mtm = f.arena.Create<Expr>();
   mtm->kind = ExprKind::kMinTypMax;
@@ -60,7 +49,7 @@ TEST(EvalOpXZ, MinTypMaxMin) {
 }
 
 TEST(EvalOpXZ, MinTypMaxMax) {
-  EvalOpXZFixture f;
+  SimFixture f;
   f.ctx.SetDelayMode(DelayMode::kMax);
   auto* mtm = f.arena.Create<Expr>();
   mtm->kind = ExprKind::kMinTypMax;

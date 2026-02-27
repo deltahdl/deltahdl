@@ -1,45 +1,18 @@
 // §5.7.1: Integer literal constants
 
-#include <gtest/gtest.h>
 
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "simulation/lowerer.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
 
+#include "fixture_simulator.h"
+
 using namespace delta;
-
-struct SimA84Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA84Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
 
 namespace {
 
 // § primary — integer literal
 TEST(SimA84, PrimaryIntegerLiteral) {
-  SimA84Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -57,7 +30,7 @@ TEST(SimA84, PrimaryIntegerLiteral) {
 
 // § primary — unbased_unsized_literal '1
 TEST(SimA84, PrimaryUnbasedUnsized1) {
-  SimA84Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -75,7 +48,7 @@ TEST(SimA84, PrimaryUnbasedUnsized1) {
 
 // § primary — unbased_unsized_literal '0
 TEST(SimA84, PrimaryUnbasedUnsized0) {
-  SimA84Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -93,7 +66,7 @@ TEST(SimA84, PrimaryUnbasedUnsized0) {
 
 // § primary — hex literal with different bases
 TEST(SimA84, PrimaryHexLiteral) {
-  SimA84Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -111,7 +84,7 @@ TEST(SimA84, PrimaryHexLiteral) {
 
 // § primary — binary literal
 TEST(SimA84, PrimaryBinaryLiteral) {
-  SimA84Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -127,23 +100,6 @@ TEST(SimA84, PrimaryBinaryLiteral) {
   EXPECT_EQ(var->value.ToUint64(), 0xCCu);
 }
 
-struct SimA87Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA87Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 static double ToDouble(const Variable* var) {
   uint64_t bits = var->value.ToUint64();
   double d = 0.0;
@@ -156,7 +112,7 @@ static double ToDouble(const Variable* var) {
 // =============================================================================
 // § number — integral_number simulates
 TEST(SimA87, NumberIntegral) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -174,7 +130,7 @@ TEST(SimA87, NumberIntegral) {
 
 // § integral_number — decimal_number (unsized)
 TEST(SimA87, DecimalUnsized) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int x;\n"
@@ -192,7 +148,7 @@ TEST(SimA87, DecimalUnsized) {
 
 // § integral_number — binary_number
 TEST(SimA87, BinaryNumber) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -210,7 +166,7 @@ TEST(SimA87, BinaryNumber) {
 
 // § integral_number — hex_number
 TEST(SimA87, HexNumber) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -228,7 +184,7 @@ TEST(SimA87, HexNumber) {
 
 // § decimal_number — [size] decimal_base unsigned_number
 TEST(SimA87, DecimalSizedBase) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -246,7 +202,7 @@ TEST(SimA87, DecimalSizedBase) {
 
 // § decimal_number — [size] decimal_base z_digit (all z)
 TEST(SimA87, DecimalZDigitAllBits) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -265,7 +221,7 @@ TEST(SimA87, DecimalZDigitAllBits) {
 
 // § size — 16-bit literal
 TEST(SimA87, Size16Bit) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] x;\n"
@@ -283,7 +239,7 @@ TEST(SimA87, Size16Bit) {
 
 // § unsigned_number — with underscores
 TEST(SimA87, UnsignedNumberUnderscores) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int x;\n"
@@ -301,7 +257,7 @@ TEST(SimA87, UnsignedNumberUnderscores) {
 
 // § binary_value — with underscores
 TEST(SimA87, BinaryValueUnderscores) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -319,7 +275,7 @@ TEST(SimA87, BinaryValueUnderscores) {
 
 // § decimal_base — 'D (uppercase)
 TEST(SimA87, DecimalBaseUpper) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -337,7 +293,7 @@ TEST(SimA87, DecimalBaseUpper) {
 
 // § binary_base — 'B (uppercase)
 TEST(SimA87, BinaryBaseUpper) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] x;\n"
@@ -355,7 +311,7 @@ TEST(SimA87, BinaryBaseUpper) {
 
 // § octal_base — 'O (uppercase)
 TEST(SimA87, OctalBaseUpper) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -373,7 +329,7 @@ TEST(SimA87, OctalBaseUpper) {
 
 // § hex_base — 'H (uppercase)
 TEST(SimA87, HexBaseUpper) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -391,7 +347,7 @@ TEST(SimA87, HexBaseUpper) {
 
 // § signed bases — 'sd simulates
 TEST(SimA87, SignedDecimal) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -409,7 +365,7 @@ TEST(SimA87, SignedDecimal) {
 
 // § signed bases — 'sb simulates
 TEST(SimA87, SignedBinary) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] x;\n"
@@ -427,7 +383,7 @@ TEST(SimA87, SignedBinary) {
 
 // § signed bases — 'sh simulates
 TEST(SimA87, SignedHex) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -445,7 +401,7 @@ TEST(SimA87, SignedHex) {
 
 // § x_digit — hex x fills 4 bits
 TEST(SimA87, XDigitInHex) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -467,7 +423,7 @@ TEST(SimA87, XDigitInHex) {
 
 // § z_digit — hex z fills 4 bits
 TEST(SimA87, ZDigitInHex) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -489,7 +445,7 @@ TEST(SimA87, ZDigitInHex) {
 
 // § z_digit — ? synonym for z in binary
 TEST(SimA87, QuestionMarkAsZ) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] x;\n"
@@ -509,7 +465,7 @@ TEST(SimA87, QuestionMarkAsZ) {
 
 // § unbased_unsized_literal — '0
 TEST(SimA87, UnbasedUnsizedZero) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -527,7 +483,7 @@ TEST(SimA87, UnbasedUnsizedZero) {
 
 // § unbased_unsized_literal — '1
 TEST(SimA87, UnbasedUnsizedOne) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -545,7 +501,7 @@ TEST(SimA87, UnbasedUnsizedOne) {
 
 // § unbased_unsized_literal — 'x (fills all bits with x)
 TEST(SimA87, UnbasedUnsizedX) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -565,7 +521,7 @@ TEST(SimA87, UnbasedUnsizedX) {
 
 // § unbased_unsized_literal — 'z (fills all bits with z)
 TEST(SimA87, UnbasedUnsizedZ) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -584,7 +540,7 @@ TEST(SimA87, UnbasedUnsizedZ) {
 
 // § hex_digit — uppercase A-F
 TEST(SimA87, HexDigitUppercase) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [23:0] x;\n"

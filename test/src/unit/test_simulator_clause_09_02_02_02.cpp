@@ -1,38 +1,13 @@
 // §9.2.2.2: Combinational logic always_comb procedure
 
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "simulation/lowerer.h"
 #include "simulation/net.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
 
+#include "fixture_simulator.h"
+
 using namespace delta;
-
-struct LowerFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, LowerFixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
 
 namespace {
 
@@ -111,25 +86,8 @@ TEST(Lowerer, SensitivityMapPopulated) {
 // introduced in §4.2, covering parallel process execution, sequential
 // ordering within processes, and interaction between concurrent elements.
 // ===========================================================================
-struct SimCh4Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimCh4Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 static uint64_t RunAndGet(const std::string& src, const char* var_name) {
-  SimCh4Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0;
@@ -147,7 +105,7 @@ static uint64_t RunAndGet(const std::string& src, const char* var_name) {
 //    An initial block sets a value; always_comb reacts to produce output.
 // ---------------------------------------------------------------------------
 TEST(SimCh4, InitialAndAlwaysCombConcurrent) {
-  SimCh4Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, result;\n"
@@ -169,7 +127,7 @@ TEST(SimCh4, InitialAndAlwaysCombConcurrent) {
 //     and sequential logic (initial with delays) work together.
 // ---------------------------------------------------------------------------
 TEST(SimCh4, CombAndSequentialAbstractions) {
-  SimCh4Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, sum;\n"
@@ -194,7 +152,7 @@ TEST(SimCh4, CombAndSequentialAbstractions) {
 //     blocks compute results from a shared input.
 // ---------------------------------------------------------------------------
 TEST(SimCh4, ConcurrentAlwaysCombBlocks) {
-  SimCh4Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, r1, r2;\n"
@@ -216,7 +174,7 @@ TEST(SimCh4, ConcurrentAlwaysCombBlocks) {
 //     multiple output statements.
 // ---------------------------------------------------------------------------
 TEST(SimCh4, AlwaysCombWithBeginEnd) {
-  SimCh4Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, r1, r2;\n"

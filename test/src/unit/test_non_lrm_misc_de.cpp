@@ -1,35 +1,8 @@
 // Non-LRM tests
 
-#include <gtest/gtest.h>
-
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
+#include "fixture_simulator.h"
 
 using namespace delta;
-
-// --- Test helpers ---
-struct ParseResult {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-ParseResult Parse(const std::string& src) {
-  ParseResult result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
 
 namespace {
 
@@ -53,23 +26,6 @@ TEST(SimA604, AttributedStatementExecutes) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-struct SimA60701Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA60701Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // =============================================================================
 // A.6.7.1 Patterns — Simulation tests
 // =============================================================================
@@ -78,7 +34,7 @@ static RtlirDesign* ElaborateSrc(const std::string& src, SimA60701Fixture& f) {
 // ---------------------------------------------------------------------------
 // §10.9: positional assignment pattern packs elements MSB-first
 TEST(SimA60701, PositionalPatternPacksMSBFirst) {
-  SimA60701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] x;\n"
@@ -99,7 +55,7 @@ TEST(SimA60701, PositionalPatternPacksMSBFirst) {
 
 // §10.9: single-element positional pattern
 TEST(SimA60701, SingleElementPositionalPattern) {
-  SimA60701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -119,7 +75,7 @@ TEST(SimA60701, SingleElementPositionalPattern) {
 
 // §10.9: four-element positional pattern
 TEST(SimA60701, FourElementPositionalPattern) {
-  SimA60701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] x;\n"
@@ -143,7 +99,7 @@ TEST(SimA60701, FourElementPositionalPattern) {
 // ---------------------------------------------------------------------------
 // §10.9.2: named assignment pattern for struct initialization
 TEST(SimA60701, NamedStructPatternInit) {
-  SimA60701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
@@ -165,7 +121,7 @@ TEST(SimA60701, NamedStructPatternInit) {
 
 // §10.9.2: named pattern with reversed field order
 TEST(SimA60701, NamedStructPatternReversedOrder) {
-  SimA60701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
@@ -190,7 +146,7 @@ TEST(SimA60701, NamedStructPatternReversedOrder) {
 // ---------------------------------------------------------------------------
 // §10.9: positional assignment pattern for struct
 TEST(SimA60701, PositionalStructPatternInit) {
-  SimA60701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
@@ -215,7 +171,7 @@ TEST(SimA60701, PositionalStructPatternInit) {
 // ---------------------------------------------------------------------------
 // §10.9.2: struct with three fields, named pattern
 TEST(SimA60701, ThreeFieldStructNamedPattern) {
-  SimA60701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  typedef struct packed {\n"
@@ -244,7 +200,7 @@ TEST(SimA60701, ThreeFieldStructNamedPattern) {
 // ---------------------------------------------------------------------------
 // §10.9: assignment pattern in blocking assignment
 TEST(SimA60701, PatternInBlockingAssignment) {
-  SimA60701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
@@ -270,7 +226,7 @@ TEST(SimA60701, PatternInBlockingAssignment) {
 
 // §10.9: assignment pattern used in conditional branch
 TEST(SimA60701, PatternInConditionalBranch) {
-  SimA60701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] x;\n"
@@ -292,7 +248,7 @@ TEST(SimA60701, PatternInConditionalBranch) {
 
 // §10.9: assignment pattern used in case item body
 TEST(SimA60701, PatternInCaseItemBody) {
-  SimA60701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] sel;\n"
@@ -319,7 +275,7 @@ TEST(SimA60701, PatternInCaseItemBody) {
 
 // §10.9: assignment pattern in for loop body
 TEST(SimA60701, PatternInForLoop) {
-  SimA60701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] x;\n"
@@ -346,7 +302,7 @@ TEST(SimA60701, PatternInForLoop) {
 // ---------------------------------------------------------------------------
 // §10.9: constant assignment pattern in variable declaration initializer
 TEST(SimA60701, ConstPatternInVarDeclInit) {
-  SimA60701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
@@ -363,15 +319,7 @@ TEST(SimA60701, ConstPatternInVarDeclInit) {
   EXPECT_EQ(var->value.ToUint64(), 25800u);
 }
 
-struct SimA611Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-void SchedulePosedge(SimA611Fixture& f, Variable* clk, uint64_t time) {
+void SchedulePosedge(SimFixture& f, Variable* clk, uint64_t time) {
   auto* ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [clk, &f]() {
     clk->prev_value = clk->value;
@@ -381,7 +329,7 @@ void SchedulePosedge(SimA611Fixture& f, Variable* clk, uint64_t time) {
   f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
 }
 
-void ScheduleNegedge(SimA611Fixture& f, Variable* clk, uint64_t time) {
+void ScheduleNegedge(SimFixture& f, Variable* clk, uint64_t time) {
   auto* ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [clk, &f]() {
     clk->prev_value = clk->value;
@@ -393,7 +341,7 @@ void ScheduleNegedge(SimA611Fixture& f, Variable* clk, uint64_t time) {
 
 // --- clocking_direction: output driving with skew ---
 TEST(SimA611, OutputDrivingWithSkew) {
-  SimA611Fixture f;
+  SimFixture f;
   auto* clk = f.ctx.CreateVariable("clk", 1);
   clk->value = MakeLogic4VecVal(f.arena, 1, 0);
   auto* out = f.ctx.CreateVariable("data_out", 8);
@@ -424,29 +372,12 @@ TEST(SimA611, OutputDrivingWithSkew) {
   EXPECT_EQ(out->value.ToUint64(), 0x55u);
 }
 
-struct SimA701Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA701Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // =============================================================================
 // Simulation tests — A.7.1 Specify block declaration
 // =============================================================================
 // Module with empty specify block simulates correctly
 TEST(SimA701, EmptySpecifyBlockSimulates) {
-  SimA701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -464,26 +395,9 @@ TEST(SimA701, EmptySpecifyBlockSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-struct SimA81Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA81Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // § multiple_concatenation (replication)
 TEST(SimA81, ReplicationBasic) {
-  SimA81Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -500,7 +414,7 @@ TEST(SimA81, ReplicationBasic) {
 }
 
 TEST(SimA81, ReplicationFour) {
-  SimA81Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -519,7 +433,7 @@ TEST(SimA81, ReplicationFour) {
 
 // § multiple_concatenation with multiple inner elements
 TEST(SimA81, ReplicationMultipleInner) {
-  SimA81Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] result;\n"
@@ -538,7 +452,7 @@ TEST(SimA81, ReplicationMultipleInner) {
 
 // § streaming_concatenation — right-shift (no reversal)
 TEST(SimA81, StreamingRightShift) {
-  SimA81Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -556,7 +470,7 @@ TEST(SimA81, StreamingRightShift) {
 
 // § streaming_concatenation — left-shift (bit reversal)
 TEST(SimA81, StreamingLeftShift) {
-  SimA81Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -575,7 +489,7 @@ TEST(SimA81, StreamingLeftShift) {
 
 // § streaming_concatenation — multiple stream elements
 TEST(SimA81, StreamingMultipleElements) {
-  SimA81Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -593,7 +507,7 @@ TEST(SimA81, StreamingMultipleElements) {
 
 // § concatenation with variables
 TEST(SimA81, ConcatWithVariables) {
-  SimA81Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] a, b;\n"
@@ -616,7 +530,7 @@ TEST(SimA81, ConcatWithVariables) {
 
 // § concatenation — does not interfere with other initial blocks
 TEST(SimA81, ConcatDoesNotInterfere) {
-  SimA81Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
@@ -636,26 +550,9 @@ TEST(SimA81, ConcatDoesNotInterfere) {
   EXPECT_EQ(vb->value.ToUint64(), 99u);
 }
 
-struct SimA83Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA83Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // § inside_expression — value no match
 TEST(SimA83, InsideValueNoMatch) {
-  SimA83Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
@@ -673,7 +570,7 @@ TEST(SimA83, InsideValueNoMatch) {
 
 // § inside_expression — range match
 TEST(SimA83, InsideRangeMatch) {
-  SimA83Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
@@ -689,23 +586,6 @@ TEST(SimA83, InsideRangeMatch) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-struct SimA87Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA87Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 static double ToDouble(const Variable* var) {
   uint64_t bits = var->value.ToUint64();
   double d = 0.0;
@@ -715,7 +595,7 @@ static double ToDouble(const Variable* var) {
 
 // § decimal_number — [size] decimal_base x_digit (all x)
 TEST(SimA87, DecimalXDigitAllBits) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -734,7 +614,7 @@ TEST(SimA87, DecimalXDigitAllBits) {
 
 // § octal_value — with underscores
 TEST(SimA87, OctalValueUnderscores) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [11:0] x;\n"
@@ -752,7 +632,7 @@ TEST(SimA87, OctalValueUnderscores) {
 
 // § hex_value — with underscores
 TEST(SimA87, HexValueUnderscores) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] x;\n"
@@ -789,25 +669,8 @@ TEST(VpiAnnexK2, VpiTimeDefaultInit) {
 // introduced in §4.2, covering parallel process execution, sequential
 // ordering within processes, and interaction between concurrent elements.
 // ===========================================================================
-struct SimCh4Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimCh4Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 static uint64_t RunAndGet(const std::string& src, const char* var_name) {
-  SimCh4Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0;
@@ -825,7 +688,7 @@ static uint64_t RunAndGet(const std::string& src, const char* var_name) {
 //     re-evaluates when any input changes.
 // ---------------------------------------------------------------------------
 TEST(SimCh4, AlwaysCombReEvaluatesOnChange) {
-  SimCh4Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] sel, a, b, result;\n"

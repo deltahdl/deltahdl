@@ -1,20 +1,16 @@
 // §6.16: String data type
 
-#include <gtest/gtest.h>
 
 #include <cstdint>
 #include <cstring>
-#include <string>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "common/types.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/adv_sim.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
@@ -47,14 +43,6 @@ TEST(AdvSim, SvStringCompare) {
 }
 
 // Shared fixture for expression evaluation tests.
-struct EvalOpXZFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 static Expr* MakeInt(Arena& arena, uint64_t val) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
@@ -82,7 +70,7 @@ static std::string VecToStr(const Logic4Vec& vec) {
   return result;
 }
 
-static Variable* MakeStringVar(EvalOpXZFixture& f, std::string_view name,
+static Variable* MakeStringVar(SimFixture& f, std::string_view name,
                                std::string_view value) {
   uint32_t width = static_cast<uint32_t>(value.size()) * 8;
   if (width == 0) width = 8;
@@ -100,7 +88,7 @@ static Variable* MakeStringVar(EvalOpXZFixture& f, std::string_view name,
 }
 
 TEST(EvalOpXZ, StringConcatDataType) {
-  EvalOpXZFixture f;
+  SimFixture f;
   MakeStringVar(f, "s1", "hello");
   MakeStringVar(f, "s2", " world");
   auto* concat = f.arena.Create<Expr>();
@@ -112,7 +100,7 @@ TEST(EvalOpXZ, StringConcatDataType) {
 }
 
 TEST(EvalOpXZ, StringReplicateRuntime) {
-  EvalOpXZFixture f;
+  SimFixture f;
   MakeStringVar(f, "sr", "ab");
   auto* repl = f.arena.Create<Expr>();
   repl->kind = ExprKind::kReplicate;
@@ -126,7 +114,7 @@ TEST(EvalOpXZ, StringReplicateRuntime) {
 // §6.16: String data type detection in concatenation/replication
 // ==========================================================================
 TEST(EvalOpXZ, StringConcatSetsIsString) {
-  EvalOpXZFixture f;
+  SimFixture f;
   MakeStringVar(f, "sa", "hi");
   MakeStringVar(f, "sb", "lo");
   auto* concat = f.arena.Create<Expr>();
@@ -138,7 +126,7 @@ TEST(EvalOpXZ, StringConcatSetsIsString) {
 }
 
 TEST(EvalOpXZ, NonStringConcatNotIsString) {
-  EvalOpXZFixture f;
+  SimFixture f;
   auto* a = f.ctx.CreateVariable("ia", 8);
   a->value = MakeLogic4VecVal(f.arena, 8, 0x41);
   auto* b = f.ctx.CreateVariable("ib", 8);
@@ -152,7 +140,7 @@ TEST(EvalOpXZ, NonStringConcatNotIsString) {
 }
 
 TEST(EvalOpXZ, StringReplicateSetsIsString) {
-  EvalOpXZFixture f;
+  SimFixture f;
   MakeStringVar(f, "sr2", "ab");
   auto* repl = f.arena.Create<Expr>();
   repl->kind = ExprKind::kReplicate;
@@ -163,7 +151,7 @@ TEST(EvalOpXZ, StringReplicateSetsIsString) {
 }
 
 TEST(EvalOpXZ, IdentifierStringPropagation) {
-  EvalOpXZFixture f;
+  SimFixture f;
   MakeStringVar(f, "sv2", "test");
   auto result = EvalExpr(MakeId(f.arena, "sv2"), f.ctx, f.arena);
   EXPECT_TRUE(result.is_string);

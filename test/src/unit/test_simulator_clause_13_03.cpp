@@ -1,39 +1,24 @@
 // §13.3: Tasks
 
-#include <gtest/gtest.h>
 
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "lexer/lexer.h"
 #include "parser/ast.h"
-#include "parser/parser.h"
 #include "simulation/eval.h"
 #include "simulation/eval_array.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // =============================================================================
 // Helper fixture
 // =============================================================================
-struct AggFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 namespace {
 
 // =============================================================================
 // Phase 6: §13 Task call setup/teardown
 // =============================================================================
 TEST(TaskCall, SetupReturnsTaskItem) {
-  AggFixture f;
+  SimFixture f;
   // Create a task declaration node.
   auto* task = f.arena.Create<ModuleItem>();
   task->kind = ModuleItemKind::kTaskDecl;
@@ -53,7 +38,7 @@ TEST(TaskCall, SetupReturnsTaskItem) {
 }
 
 TEST(TaskCall, SetupReturnsNullForFunction) {
-  AggFixture f;
+  SimFixture f;
   // Create a function (not task) declaration.
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
@@ -69,7 +54,7 @@ TEST(TaskCall, SetupReturnsNullForFunction) {
 }
 
 TEST(TaskCall, SetupReturnsNullForUnknown) {
-  AggFixture f;
+  SimFixture f;
   auto* call = f.arena.Create<Expr>();
   call->kind = ExprKind::kCall;
   call->callee = "nonexistent";

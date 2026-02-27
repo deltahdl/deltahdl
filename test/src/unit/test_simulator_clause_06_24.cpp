@@ -1,26 +1,15 @@
 // §6.24: Casting
 
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // Shared fixture for expression evaluation tests.
-struct EvalOpFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 // Helper: build a simple integer literal Expr node.
 static Expr* MakeInt(Arena& arena, uint64_t val) {
   auto* e = arena.Create<Expr>();
@@ -35,7 +24,7 @@ namespace {
 // Cast (type'(expr))
 // ==========================================================================
 TEST(EvalOp, CastTruncate) {
-  EvalOpFixture f;
+  SimFixture f;
   // Cast a 32-bit value to a narrower type (truncate).
   // We test by evaluating the inner expression and checking the result.
   auto* cast = f.arena.Create<Expr>();
@@ -50,7 +39,7 @@ TEST(EvalOp, CastTruncate) {
 }
 
 TEST(EvalOp, CastWiden) {
-  EvalOpFixture f;
+  SimFixture f;
   // Cast to int (32-bit) — value should be preserved.
   auto* cast = f.arena.Create<Expr>();
   cast->kind = ExprKind::kCast;
@@ -63,7 +52,7 @@ TEST(EvalOp, CastWiden) {
 }
 
 TEST(EvalOp, CastShortint) {
-  EvalOpFixture f;
+  SimFixture f;
   auto* cast = f.arena.Create<Expr>();
   cast->kind = ExprKind::kCast;
   cast->text = "shortint";  // 16-bit type

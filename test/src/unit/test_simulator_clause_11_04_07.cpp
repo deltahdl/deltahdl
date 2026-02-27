@@ -1,26 +1,15 @@
 // §11.4.7: Logical operators
 
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // Shared fixture for expression evaluation tests.
-struct EvalOpFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 // Helper: build a simple integer literal Expr node.
 static Expr* MakeInt(Arena& arena, uint64_t val) {
   auto* e = arena.Create<Expr>();
@@ -50,7 +39,7 @@ static Expr* MakeBinary(Arena& arena, TokenKind op, Expr* lhs, Expr* rhs) {
 namespace {
 
 TEST(EvalOp, AmpEq) {
-  EvalOpFixture f;
+  SimFixture f;
   auto* var = f.ctx.CreateVariable("a", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 0xFF);
 
@@ -62,7 +51,7 @@ TEST(EvalOp, AmpEq) {
 }
 
 TEST(EvalOp, PipeEq) {
-  EvalOpFixture f;
+  SimFixture f;
   auto* var = f.ctx.CreateVariable("a", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 0xF0);
 
@@ -74,7 +63,7 @@ TEST(EvalOp, PipeEq) {
 }
 
 TEST(EvalOp, CaretEq) {
-  EvalOpFixture f;
+  SimFixture f;
   auto* var = f.ctx.CreateVariable("a", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 0xFF);
 
@@ -86,14 +75,6 @@ TEST(EvalOp, CaretEq) {
 }
 
 // Shared fixture for expression evaluation tests.
-struct EvalOpXZFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 static Expr* MakeUnary(Arena& arena, TokenKind op, Expr* operand) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kUnary;
@@ -102,7 +83,7 @@ static Expr* MakeUnary(Arena& arena, TokenKind op, Expr* operand) {
   return e;
 }
 
-static Variable* MakeVar4(EvalOpXZFixture& f, std::string_view name,
+static Variable* MakeVar4(SimFixture& f, std::string_view name,
                           uint32_t width, uint64_t aval, uint64_t bval) {
   auto* var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4Vec(f.arena, width);
@@ -115,7 +96,7 @@ static Variable* MakeVar4(EvalOpXZFixture& f, std::string_view name,
 // Logical operator X/Z — §11.4.7
 // ==========================================================================
 TEST(EvalOpXZ, LogicalNotX) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // !4'b1x00 → x
   MakeVar4(f, "ln", 4, 0b1000, 0b0100);
   auto* expr = MakeUnary(f.arena, TokenKind::kBang, MakeId(f.arena, "ln"));
@@ -124,7 +105,7 @@ TEST(EvalOpXZ, LogicalNotX) {
 }
 
 TEST(EvalOpXZ, LogicalAndZeroX) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // 0 && x → 0 (short-circuit: lhs known-0 → result 0)
   MakeVar4(f, "lx", 4, 0b0000, 0b0100);
   auto* expr = MakeBinary(f.arena, TokenKind::kAmpAmp, MakeInt(f.arena, 0),
@@ -135,7 +116,7 @@ TEST(EvalOpXZ, LogicalAndZeroX) {
 }
 
 TEST(EvalOpXZ, LogicalAndXZero) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // x && 0 → 0 (rhs known-0 → result 0 despite lhs unknown)
   MakeVar4(f, "ax", 4, 0b0000, 0b0100);
   auto* expr = MakeBinary(f.arena, TokenKind::kAmpAmp, MakeId(f.arena, "ax"),
@@ -146,7 +127,7 @@ TEST(EvalOpXZ, LogicalAndXZero) {
 }
 
 TEST(EvalOpXZ, LogicalAndXX) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // x && 1 → x
   MakeVar4(f, "bx", 4, 0b0000, 0b0100);
   auto* expr = MakeBinary(f.arena, TokenKind::kAmpAmp, MakeId(f.arena, "bx"),
@@ -156,7 +137,7 @@ TEST(EvalOpXZ, LogicalAndXX) {
 }
 
 TEST(EvalOpXZ, LogicalOrOneX) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // 1 || x → 1 (short-circuit: lhs known-1 → result 1)
   MakeVar4(f, "ox", 4, 0b0000, 0b0100);
   auto* expr = MakeBinary(f.arena, TokenKind::kPipePipe, MakeInt(f.arena, 1),
@@ -167,7 +148,7 @@ TEST(EvalOpXZ, LogicalOrOneX) {
 }
 
 TEST(EvalOpXZ, LogicalOrXOne) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // x || 1 → 1
   MakeVar4(f, "px", 4, 0b0000, 0b0100);
   auto* expr = MakeBinary(f.arena, TokenKind::kPipePipe, MakeId(f.arena, "px"),
@@ -178,7 +159,7 @@ TEST(EvalOpXZ, LogicalOrXOne) {
 }
 
 TEST(EvalOpXZ, LogicalOrXX) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // x || 0 → x
   MakeVar4(f, "qx", 4, 0b0000, 0b0100);
   auto* expr = MakeBinary(f.arena, TokenKind::kPipePipe, MakeId(f.arena, "qx"),
@@ -193,7 +174,7 @@ TEST(EvalOpXZ, LogicalOrXX) {
 // Logical implication (->) and equivalence (<->) — §11.4.7
 // ==========================================================================
 TEST(EvalOpXZ, ImplTT) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // 1 -> 1 = 1
   MakeVar4(f, "it1", 1, 1, 0);
   MakeVar4(f, "it2", 1, 1, 0);
@@ -205,7 +186,7 @@ TEST(EvalOpXZ, ImplTT) {
 }
 
 TEST(EvalOpXZ, ImplTF) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // 1 -> 0 = 0
   MakeVar4(f, "it1", 1, 1, 0);
   MakeVar4(f, "it2", 1, 0, 0);
@@ -216,7 +197,7 @@ TEST(EvalOpXZ, ImplTF) {
 }
 
 TEST(EvalOpXZ, ImplFT) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // 0 -> 1 = 1 (vacuous truth)
   MakeVar4(f, "it1", 1, 0, 0);
   MakeVar4(f, "it2", 1, 1, 0);
@@ -227,7 +208,7 @@ TEST(EvalOpXZ, ImplFT) {
 }
 
 TEST(EvalOpXZ, ImplFF) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // 0 -> 0 = 1 (vacuous truth)
   MakeVar4(f, "it1", 1, 0, 0);
   MakeVar4(f, "it2", 1, 0, 0);
@@ -238,7 +219,7 @@ TEST(EvalOpXZ, ImplFF) {
 }
 
 TEST(EvalOpXZ, ImplXT) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // x -> 1 = 1 (since !x || 1 = 1 regardless of x)
   MakeVar4(f, "ix1", 1, 0, 1);  // 1'bx
   MakeVar4(f, "ix2", 1, 1, 0);
@@ -250,7 +231,7 @@ TEST(EvalOpXZ, ImplXT) {
 }
 
 TEST(EvalOpXZ, ImplXF) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // x -> 0 = x (since !x || 0 = !x, and !x is x when x is unknown)
   MakeVar4(f, "ix1", 1, 0, 1);  // 1'bx
   MakeVar4(f, "ix2", 1, 0, 0);
@@ -261,7 +242,7 @@ TEST(EvalOpXZ, ImplXF) {
 }
 
 TEST(EvalOpXZ, EquivSame) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // 1 <-> 1 = 1
   MakeVar4(f, "eq1", 1, 1, 0);
   MakeVar4(f, "eq2", 1, 1, 0);
@@ -272,7 +253,7 @@ TEST(EvalOpXZ, EquivSame) {
 }
 
 TEST(EvalOpXZ, EquivDiff) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // 1 <-> 0 = 0
   MakeVar4(f, "eq1", 1, 1, 0);
   MakeVar4(f, "eq2", 1, 0, 0);
@@ -283,7 +264,7 @@ TEST(EvalOpXZ, EquivDiff) {
 }
 
 TEST(EvalOpXZ, EquivX) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // x <-> 1 = x
   MakeVar4(f, "ex1", 1, 0, 1);  // 1'bx
   MakeVar4(f, "ex2", 1, 1, 0);
@@ -293,26 +274,9 @@ TEST(EvalOpXZ, EquivX) {
   EXPECT_NE(result.words[0].bval, 0u);  // result is x
 }
 
-struct SimA83Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA83Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // § expression — logical AND
 TEST(SimA83, LogicalAnd) {
-  SimA83Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
@@ -330,7 +294,7 @@ TEST(SimA83, LogicalAnd) {
 
 // § expression — logical OR
 TEST(SimA83, LogicalOr) {
-  SimA83Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
@@ -346,26 +310,9 @@ TEST(SimA83, LogicalOr) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-struct SimA86Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA86Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // § unary_operator — logical NOT
 TEST(SimA86, UnaryLogicalNot) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
@@ -386,7 +333,7 @@ TEST(SimA86, UnaryLogicalNot) {
 // =============================================================================
 // § binary_operator — && (logical AND)
 TEST(SimA86, BinaryLogicalAnd) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
@@ -404,7 +351,7 @@ TEST(SimA86, BinaryLogicalAnd) {
 
 // § binary_operator — || (logical OR)
 TEST(SimA86, BinaryLogicalOr) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
@@ -425,7 +372,7 @@ TEST(SimA86, BinaryLogicalOr) {
 // =============================================================================
 // § binary_operator — -> (implication: 0->x is always 1)
 TEST(SimA86, BinaryImplication) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
@@ -443,7 +390,7 @@ TEST(SimA86, BinaryImplication) {
 
 // § binary_operator — <-> (equivalence: same values => 1)
 TEST(SimA86, BinaryEquivalence) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"

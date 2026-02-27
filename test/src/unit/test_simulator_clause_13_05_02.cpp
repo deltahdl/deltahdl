@@ -1,27 +1,16 @@
 // §13.5.2: Pass by reference
 
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // =============================================================================
 // Test fixture shared by all function call tests
 // =============================================================================
-struct FuncFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 // Helper: make an integer literal expression.
 static Expr* MakeIntLit(Arena& arena, uint64_t val) {
   auto* e = arena.Create<Expr>();
@@ -133,14 +122,6 @@ TEST(Functions, PassByRefReadsCaller) {
 // ============================================================================
 // Test fixture
 // ============================================================================
-struct QueueRefFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 // ============================================================================
 // AST helpers
 // ============================================================================
@@ -218,7 +199,7 @@ static Stmt* MkReturn(Arena& arena, Expr* expr) {
 // ============================================================================
 // Queue helper: populate a queue with integer values.
 // ============================================================================
-static QueueObject* MakeQueue(QueueRefFixture& f, std::string_view name,
+static QueueObject* MakeQueue(SimFixture& f, std::string_view name,
                               const std::vector<uint64_t>& vals) {
   auto* q = f.ctx.CreateQueue(name, 32);
   for (auto v : vals) {
@@ -229,7 +210,7 @@ static QueueObject* MakeQueue(QueueRefFixture& f, std::string_view name,
 }
 
 // Register an automatic void function with given args and body.
-static void RegAutoFunc(QueueRefFixture& f, std::string_view name,
+static void RegAutoFunc(SimFixture& f, std::string_view name,
                         std::vector<FunctionArg> args,
                         std::vector<Stmt*> body) {
   auto* func = f.arena.Create<ModuleItem>();
@@ -244,7 +225,7 @@ static void RegAutoFunc(QueueRefFixture& f, std::string_view name,
 
 // Pass q[1] by ref, return it, verify the function reads 20.
 TEST(QueueRef, RefReadsCurrentValue) {
-  QueueRefFixture f;
+  SimFixture f;
   MakeQueue(f, "q", {10, 20, 30});
 
   // function automatic int read_ref(ref int v); return v; endfunction

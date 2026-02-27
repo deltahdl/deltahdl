@@ -1,35 +1,8 @@
 // Non-LRM tests
 
-#include <gtest/gtest.h>
-
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
+#include "fixture_simulator.h"
 
 using namespace delta;
-
-// --- Test helpers ---
-struct ParseResult {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-ParseResult Parse(const std::string& src) {
-  ParseResult result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
 
 namespace {
 
@@ -890,26 +863,9 @@ TEST(ParserSection40, CoverageControlInAlwaysBlock) {
   )"));
 }
 
-struct ElabA60701Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, ElabA60701Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // §10.9: named assignment pattern elaborates for struct init
 TEST(ElabA60701, StructNamedPatternElaborates) {
-  ElabA60701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
@@ -922,27 +878,9 @@ TEST(ElabA60701, StructNamedPatternElaborates) {
   ASSERT_NE(design, nullptr);
 }
 
-struct ElabA611Fixture {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
-  bool has_errors = false;
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, ElabA611Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(cu->modules.back()->name);
-  f.has_errors = f.diag.HasErrors();
-  return design;
-}
-
 // Clocking block with assertion_item_declaration elaborates
 TEST(ElabA611, AssertionItemDeclElaborates) {
-  ElabA611Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -958,24 +896,6 @@ TEST(ElabA611, AssertionItemDeclElaborates) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-}
-
-struct ElabA612Fixture {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
-  bool has_errors = false;
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, ElabA612Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(cu->modules.back()->name);
-  f.has_errors = f.diag.HasErrors();
-  return design;
 }
 
 }  // namespace

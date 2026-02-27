@@ -1,31 +1,19 @@
 // §14.6: Signals in multiple clocking blocks
 
-#include <gtest/gtest.h>
 
 #include <cstdint>
 #include <string_view>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "common/types.h"
 #include "parser/ast.h"
 #include "simulation/clocking.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // Helper fixture for clocking simulation tests.
-struct ClockingSimFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag, /*seed=*/42};
-};
-
 // Schedule posedge at a given time through the scheduler.
 void SchedulePosedge(ClockingSimFixture& f, Variable* clk, uint64_t time) {
   auto* ev = f.scheduler.GetEventPool().Acquire();

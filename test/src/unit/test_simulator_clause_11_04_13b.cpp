@@ -1,26 +1,15 @@
 // §11.4.13: for an explanation of range list syntax.
 
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // Shared fixture for expression evaluation tests.
-struct EvalOpFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 // Helper: build an identifier Expr node.
 static Expr* MakeId(Arena& arena, std::string_view name) {
   auto* e = arena.Create<Expr>();
@@ -35,7 +24,7 @@ namespace {
 // Streaming concatenation ({<<{...}}, {>>{...}})
 // ==========================================================================
 TEST(EvalOp, StreamingLeftShift) {
-  EvalOpFixture f;
+  SimFixture f;
   // {<<{8'hAB}} — reverse bit order of 0xAB
   auto* var = f.ctx.CreateVariable("sv", 8);
   var->value = MakeLogic4VecVal(f.arena, 8, 0xAB);
@@ -51,7 +40,7 @@ TEST(EvalOp, StreamingLeftShift) {
 }
 
 TEST(EvalOp, StreamingRightShift) {
-  EvalOpFixture f;
+  SimFixture f;
   // {>>{8'hAB}} — same order (no reversal)
   auto* var = f.ctx.CreateVariable("sv2", 8);
   var->value = MakeLogic4VecVal(f.arena, 8, 0xAB);

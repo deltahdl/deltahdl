@@ -1,27 +1,16 @@
 // §non-lrm:queue_ref
 
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // ============================================================================
 // Test fixture
 // ============================================================================
-struct QueueRefFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 // ============================================================================
 // AST helpers
 // ============================================================================
@@ -99,7 +88,7 @@ static Stmt* MkReturn(Arena& arena, Expr* expr) {
 // ============================================================================
 // Queue helper: populate a queue with integer values.
 // ============================================================================
-static QueueObject* MakeQueue(QueueRefFixture& f, std::string_view name,
+static QueueObject* MakeQueue(SimFixture& f, std::string_view name,
                               const std::vector<uint64_t>& vals) {
   auto* q = f.ctx.CreateQueue(name, 32);
   for (auto v : vals) {
@@ -110,7 +99,7 @@ static QueueObject* MakeQueue(QueueRefFixture& f, std::string_view name,
 }
 
 // Register an automatic void function with given args and body.
-static void RegAutoFunc(QueueRefFixture& f, std::string_view name,
+static void RegAutoFunc(SimFixture& f, std::string_view name,
                         std::vector<FunctionArg> args,
                         std::vector<Stmt*> body) {
   auto* func = f.arena.Create<ModuleItem>();
@@ -131,7 +120,7 @@ namespace {
 // Queue elem_width=32 but function param is 16-bit ref → binding should fail
 // and fall back to pass-by-value (write does not propagate).
 TEST(QueueRef, WidthMismatchFallsBackToValue) {
-  QueueRefFixture f;
+  SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20, 30});
 
   // function automatic void set_val(ref shortint v); v = 99; endfunction
@@ -181,7 +170,7 @@ static Expr* LspInt(Arena& arena, uint64_t val) {
 
 // Ref outdated by whole-queue assignment.
 TEST(QueueRef, OutdatedByWholeAssign) {
-  QueueRefFixture f;
+  SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20, 30});
 
   // function automatic void test_fn(ref int v);
@@ -215,7 +204,7 @@ TEST(QueueRef, OutdatedByWholeAssign) {
 // ============================================================================
 // Pass q[1] by ref, set v = 99, verify q[1] == 99.
 TEST(QueueRef, BasicRefWriteback) {
-  QueueRefFixture f;
+  SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20, 30});
 
   // function automatic void set_val(ref int v); v = 99; endfunction
@@ -230,7 +219,7 @@ TEST(QueueRef, BasicRefWriteback) {
 
 // Ref survives push_front: push_front shifts indices but ref tracks element.
 TEST(QueueRef, SurvivesPushFront) {
-  QueueRefFixture f;
+  SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20, 30});
 
   // function automatic void test_fn(ref int v);

@@ -1,32 +1,17 @@
 // §10.10: Unpacked array concatenation
 
-#include <gtest/gtest.h>
 
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "lexer/lexer.h"
 #include "parser/ast.h"
-#include "parser/parser.h"
 #include "simulation/eval.h"
 #include "simulation/eval_array.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // =============================================================================
 // Helper fixture
 // =============================================================================
-struct AggFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 namespace {
 
 // =============================================================================
@@ -34,7 +19,7 @@ namespace {
 // =============================================================================
 TEST(UnpackedArrayConcat, BasicConcat) {
   // Create two array elements as flat variables, verify concatenation concept.
-  AggFixture f;
+  SimFixture f;
   auto* a0 = f.ctx.CreateVariable("a[0]", 8);
   auto* a1 = f.ctx.CreateVariable("a[1]", 8);
   a0->value = MakeLogic4VecVal(f.arena, 8, 10);

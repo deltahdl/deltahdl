@@ -1,41 +1,16 @@
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "preprocessor/preprocessor.h"
 #include "simulation/lowerer.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // §5.3 White space
 
-struct SimCh503Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimCh503Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 static uint64_t RunAndGet(const std::string& src, const char* var_name) {
-  SimCh503Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0;
@@ -172,7 +147,7 @@ TEST(SimCh503, WhitespaceAroundAssignment) {
 TEST(SimCh503, WhitespaceStringLiteralPreserved) {
   // §5.3: blanks and tabs are significant in string literals.
   // Assign a string with spaces to a wide variable and verify encoding.
-  SimCh503Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [63:0] s;\n"
@@ -196,7 +171,7 @@ TEST(SimCh503, WhitespaceStringLiteralPreserved) {
 TEST(SimCh503, WhitespaceStringLiteralTabPreserved) {
   // §5.3: tabs are significant in string literals.
   // Use a literal tab character inside the SV string literal.
-  SimCh503Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [63:0] s;\n"
@@ -283,7 +258,7 @@ TEST(SimCh503, WhitespaceAroundTernary) {
 // 10. Multiple statements with only whitespace between
 // ---------------------------------------------------------------------------
 TEST(SimCh503, WhitespaceMultipleStatements) {
-  SimCh503Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"

@@ -1,28 +1,17 @@
 // §11.4.4: Relational operators
 
-#include <gtest/gtest.h>
 
 #include <cstring>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // Shared fixture for expression evaluation tests.
-struct EvalOpXZFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 static Expr* MakeInt(Arena& arena, uint64_t val) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
@@ -46,7 +35,7 @@ static Expr* MakeBinary(Arena& arena, TokenKind op, Expr* lhs, Expr* rhs) {
   return e;
 }
 
-static Variable* MakeVar4(EvalOpXZFixture& f, std::string_view name,
+static Variable* MakeVar4(SimFixture& f, std::string_view name,
                           uint32_t width, uint64_t aval, uint64_t bval) {
   auto* var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4Vec(f.arena, width);
@@ -55,7 +44,7 @@ static Variable* MakeVar4(EvalOpXZFixture& f, std::string_view name,
   return var;
 }
 
-static Variable* MakeRealVar(EvalOpXZFixture& f, std::string_view name,
+static Variable* MakeRealVar(SimFixture& f, std::string_view name,
                              double val) {
   auto* var = f.ctx.CreateVariable(name, 64);
   uint64_t bits = 0;
@@ -72,7 +61,7 @@ namespace {
 // Relational X/Z propagation — §11.4.4
 // ==========================================================================
 TEST(EvalOpXZ, RelationalLtX) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // 4'b1x00 < 4'b1010 → x
   MakeVar4(f, "rl", 4, 0b1000, 0b0100);
   auto* b = f.ctx.CreateVariable("rr", 4);
@@ -84,7 +73,7 @@ TEST(EvalOpXZ, RelationalLtX) {
 }
 
 TEST(EvalOpXZ, RelationalGtZ) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // 4'b10z0 > 4'b1000 → x (Z operand)
   MakeVar4(f, "gz", 4, 0b1000, 0b0010);  // bit1=z
   auto* b = f.ctx.CreateVariable("g8", 4);
@@ -96,7 +85,7 @@ TEST(EvalOpXZ, RelationalGtZ) {
 }
 
 TEST(EvalOpXZ, RelationalKnownStillWorks) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // 3 < 5 → 1 (known values still work)
   auto* expr = MakeBinary(f.arena, TokenKind::kLt, MakeInt(f.arena, 3),
                           MakeInt(f.arena, 5));
@@ -106,7 +95,7 @@ TEST(EvalOpXZ, RelationalKnownStillWorks) {
 }
 
 TEST(EvalOpXZ, RealComparisonSingleBit) {
-  EvalOpXZFixture f;
+  SimFixture f;
   MakeRealVar(f, "rc", 3.14);
   MakeRealVar(f, "rd", 2.71);
   auto* expr = MakeBinary(f.arena, TokenKind::kGt, MakeId(f.arena, "rc"),
@@ -116,29 +105,12 @@ TEST(EvalOpXZ, RealComparisonSingleBit) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-struct SimA86Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA86Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // =============================================================================
 // A.8.6 Operators — binary_operator (relational) — Simulation
 // =============================================================================
 // § binary_operator — < (less than)
 TEST(SimA86, BinaryLessThan) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
@@ -156,7 +128,7 @@ TEST(SimA86, BinaryLessThan) {
 
 // § binary_operator — > (greater than)
 TEST(SimA86, BinaryGreaterThan) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
@@ -174,7 +146,7 @@ TEST(SimA86, BinaryGreaterThan) {
 
 // § binary_operator — >= (greater or equal)
 TEST(SimA86, BinaryGreaterOrEqual) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"

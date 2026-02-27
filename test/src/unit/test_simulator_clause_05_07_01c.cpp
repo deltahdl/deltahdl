@@ -1,28 +1,18 @@
 // §5.7.1: Integer literal constants
 
-#include <gtest/gtest.h>
 
 #include <cstring>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"  // StructTypeInfo, StructFieldInfo
 
+#include "fixture_simulator.h"
+
 using namespace delta;
 
 // Shared fixture for advanced expression evaluation tests (§11 phases 22+).
-struct EvalAdvFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 static Expr* MakeSizedLiteral(Arena& arena, std::string_view text,
                               uint64_t val) {
   auto* e = arena.Create<Expr>();
@@ -34,7 +24,7 @@ static Expr* MakeSizedLiteral(Arena& arena, std::string_view text,
 namespace {
 
 TEST(EvalAdv, SignedBaseLiteralIsSigned) {
-  EvalAdvFixture f;
+  SimFixture f;
   // §11.3.3: 4'sd3 should produce is_signed=true on the Logic4Vec.
   auto* lit = MakeSizedLiteral(f.arena, "4'sd3", 3);
   auto result = EvalExpr(lit, f.ctx, f.arena);
@@ -44,7 +34,7 @@ TEST(EvalAdv, SignedBaseLiteralIsSigned) {
 }
 
 TEST(EvalAdv, UnsignedBaseLiteralNotSigned) {
-  EvalAdvFixture f;
+  SimFixture f;
   // 4'd3 should produce is_signed=false.
   auto* lit = MakeSizedLiteral(f.arena, "4'd3", 3);
   auto result = EvalExpr(lit, f.ctx, f.arena);
@@ -54,7 +44,7 @@ TEST(EvalAdv, UnsignedBaseLiteralNotSigned) {
 }
 
 TEST(EvalAdv, SignedHexLiteralIsSigned) {
-  EvalAdvFixture f;
+  SimFixture f;
   // 8'shFF should produce is_signed=true.
   auto* lit = MakeSizedLiteral(f.arena, "8'shFF", 0xFF);
   auto result = EvalExpr(lit, f.ctx, f.arena);

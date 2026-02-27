@@ -1,25 +1,10 @@
 // Annex A.8.8: Strings
 
-#include <gtest/gtest.h>
-
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
+#include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
-
-struct ParseResult {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
 
 static ParseResult Parse(const std::string& src) {
   ParseResult r;

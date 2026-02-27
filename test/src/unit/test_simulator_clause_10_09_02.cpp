@@ -1,32 +1,17 @@
 // §10.9.2: Structure assignment patterns
 
-#include <gtest/gtest.h>
 
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "lexer/lexer.h"
 #include "parser/ast.h"
-#include "parser/parser.h"
 #include "simulation/eval.h"
 #include "simulation/eval_array.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // =============================================================================
 // Helper fixture
 // =============================================================================
-struct AggFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 static Expr* MakeIntLit(Arena& arena, uint64_t val) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
@@ -37,7 +22,7 @@ namespace {
 
 TEST(StructPattern, NamedMemberTwoFields) {
   // '{x: 5, y: 10} on struct { logic [7:0] x; logic [7:0] y; }
-  AggFixture f;
+  SimFixture f;
   StructTypeInfo info;
   info.type_name = "point_t";
   info.is_packed = true;
@@ -57,7 +42,7 @@ TEST(StructPattern, NamedMemberTwoFields) {
 
 TEST(StructPattern, NamedMemberReversedOrder) {
   // '{y: 10, x: 5} — order-independent, same result
-  AggFixture f;
+  SimFixture f;
   StructTypeInfo info;
   info.type_name = "point_t";
   info.is_packed = true;
@@ -76,7 +61,7 @@ TEST(StructPattern, NamedMemberReversedOrder) {
 
 TEST(StructPattern, NamedMemberThreeFields) {
   // '{r: 0xFF, g: 0x80, b: 0x00} on 24-bit struct
-  AggFixture f;
+  SimFixture f;
   StructTypeInfo info;
   info.type_name = "rgb_t";
   info.is_packed = true;
@@ -100,7 +85,7 @@ TEST(StructPattern, NamedMemberThreeFields) {
 // =============================================================================
 TEST(StructPattern, DefaultAllFields) {
   // '{default: 0xFF} → all fields filled with 0xFF
-  AggFixture f;
+  SimFixture f;
   StructTypeInfo info;
   info.type_name = "pair_t";
   info.is_packed = true;
@@ -119,7 +104,7 @@ TEST(StructPattern, DefaultAllFields) {
 
 TEST(StructPattern, DefaultWithNamedOverride) {
   // '{a: 1, default: 0} → a=1, b=0
-  AggFixture f;
+  SimFixture f;
   StructTypeInfo info;
   info.type_name = "pair_t";
   info.is_packed = true;
@@ -138,7 +123,7 @@ TEST(StructPattern, DefaultWithNamedOverride) {
 
 TEST(StructPattern, TypeKeyedInt) {
   // '{int: 42} on struct { int a; logic [7:0] b; } → a=42, b=0
-  AggFixture f;
+  SimFixture f;
   StructTypeInfo info;
   info.type_name = "mixed_t";
   info.is_packed = true;
@@ -160,7 +145,7 @@ TEST(StructPattern, MixedPrecedence) {
   // struct { byte a; byte b; logic [7:0] c; }
   // a=1 (explicit member overrides byte key), b=2 (byte type key), c=3
   // (default)
-  AggFixture f;
+  SimFixture f;
   StructTypeInfo info;
   info.type_name = "multi_t";
   info.is_packed = true;
@@ -180,26 +165,9 @@ TEST(StructPattern, MixedPrecedence) {
   EXPECT_EQ(result.ToUint64(), expected);
 }
 
-struct SimA60701Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA60701Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // §10.9.2: named pattern with default key fills remaining fields
 TEST(SimA60701, NamedStructPatternWithDefault) {
-  SimA60701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
@@ -221,7 +189,7 @@ TEST(SimA60701, NamedStructPatternWithDefault) {
 
 // §10.9.2: named pattern with only default key
 TEST(SimA60701, NamedStructPatternOnlyDefault) {
-  SimA60701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"

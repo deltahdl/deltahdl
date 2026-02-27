@@ -1,41 +1,16 @@
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "simulation/lowerer.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
 
+#include "fixture_simulator.h"
+
 using namespace delta;
-
-struct SimCh9dFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimCh9dFixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
 
 // ---------------------------------------------------------------------------
 // 1. always @* with simple combinational AND gate: y = a & b.
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarSimpleAnd) {
-  SimCh9dFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, y;\n"
@@ -62,7 +37,7 @@ TEST(SimCh9d, AlwaysStarSimpleAnd) {
 // 2. always @* with if-else selects the true branch.
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarIfElseTrueBranch) {
-  SimCh9dFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic sel;\n"
@@ -93,7 +68,7 @@ TEST(SimCh9d, AlwaysStarIfElseTrueBranch) {
 // 3. always @* with case statement selects the correct arm.
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarCaseStatement) {
-  SimCh9dFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [1:0] sel;\n"
@@ -126,7 +101,7 @@ TEST(SimCh9d, AlwaysStarCaseStatement) {
 // 4. always @* sensitivity includes all RHS signals (a, b, c).
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarAllRhsSensitive) {
-  SimCh9dFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, c, y;\n"
@@ -155,7 +130,7 @@ TEST(SimCh9d, AlwaysStarAllRhsSensitive) {
 // 5. always @* does NOT include LHS signal 'y' in sensitivity.
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarLhsNotSensitive) {
-  SimCh9dFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, y;\n"
@@ -182,7 +157,7 @@ TEST(SimCh9d, AlwaysStarLhsNotSensitive) {
 // 6. always @(*) form (with parentheses) is equivalent to @*.
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarParenForm) {
-  SimCh9dFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, y;\n"
@@ -209,7 +184,7 @@ TEST(SimCh9d, AlwaysStarParenForm) {
 // 7. always @* with ternary operator: sel ? a : b.
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarTernaryOp) {
-  SimCh9dFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic sel;\n"
@@ -238,7 +213,7 @@ TEST(SimCh9d, AlwaysStarTernaryOp) {
 // 8. always @* with concatenation -- all parts are sensitive.
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarConcatenation) {
-  SimCh9dFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] hi, lo;\n"
@@ -266,7 +241,7 @@ TEST(SimCh9d, AlwaysStarConcatenation) {
 // 9. always @* with bit-select -- reading a single bit from a vector.
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarBitSelect) {
-  SimCh9dFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] data;\n"
@@ -297,7 +272,7 @@ TEST(SimCh9d, AlwaysStarBitSelect) {
 // 10. always @* with part-select -- extracting a sub-range from a vector.
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarPartSelect) {
-  SimCh9dFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] data;\n"
@@ -329,7 +304,7 @@ TEST(SimCh9d, AlwaysStarPartSelect) {
 // 11. always @* with function call -- function arguments are sensitive.
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarFunctionCall) {
-  SimCh9dFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  function logic [7:0] add3(input logic [7:0] x);\n"
@@ -359,7 +334,7 @@ TEST(SimCh9d, AlwaysStarFunctionCall) {
 // 12. always @* with nested expressions -- all leaf signals are sensitive.
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarNestedExpr) {
-  SimCh9dFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, c, y;\n"
@@ -388,7 +363,7 @@ TEST(SimCh9d, AlwaysStarNestedExpr) {
 // 13. always @* with multiple statements -- all read signals are sensitive.
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarMultipleStmts) {
-  SimCh9dFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, x, y;\n"
@@ -421,7 +396,7 @@ TEST(SimCh9d, AlwaysStarMultipleStmts) {
 // 14. always @* with arithmetic operators (+, -, *, /).
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarArithmetic) {
-  SimCh9dFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] a, b, y;\n"
@@ -449,7 +424,7 @@ TEST(SimCh9d, AlwaysStarArithmetic) {
 // 15. always @* with bitwise operators (&, |, ^).
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarBitwiseOps) {
-  SimCh9dFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, c, y;\n"
@@ -478,7 +453,7 @@ TEST(SimCh9d, AlwaysStarBitwiseOps) {
 // 16. always @* with comparison operators (==, <).
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarComparison) {
-  SimCh9dFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
@@ -507,7 +482,7 @@ TEST(SimCh9d, AlwaysStarComparison) {
 // 17. always @* with logical operators (&&, ||).
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarLogicalOps) {
-  SimCh9dFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic a, b, y;\n"
@@ -534,7 +509,7 @@ TEST(SimCh9d, AlwaysStarLogicalOps) {
 // 18. always @* with unary operators (~, !).
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarUnaryOps) {
-  SimCh9dFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, y;\n"
@@ -561,7 +536,7 @@ TEST(SimCh9d, AlwaysStarUnaryOps) {
 // 19. always @* with multiple outputs computed from same inputs.
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarMultipleOutputs) {
-  SimCh9dFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, sum, diff;\n"
@@ -594,7 +569,7 @@ TEST(SimCh9d, AlwaysStarMultipleOutputs) {
 // 20. always @* with local variable (not in sensitivity).
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarLocalVar) {
-  SimCh9dFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, y;\n"
@@ -625,7 +600,7 @@ TEST(SimCh9d, AlwaysStarLocalVar) {
 // 21. always @* with begin-end block and sequential assignments.
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarBeginEnd) {
-  SimCh9dFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, x, y;\n"
@@ -658,7 +633,7 @@ TEST(SimCh9d, AlwaysStarBeginEnd) {
 // 22. always @* with nested if-else (priority encoder using full-signal reads).
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarPriorityEncoder) {
-  SimCh9dFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] req;\n"
@@ -691,7 +666,7 @@ TEST(SimCh9d, AlwaysStarPriorityEncoder) {
 // 23. always @* with case decode (address decoder pattern).
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarCaseDecode) {
-  SimCh9dFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [1:0] addr;\n"
@@ -725,7 +700,7 @@ TEST(SimCh9d, AlwaysStarCaseDecode) {
 // 24. Multiple always @* blocks have independent sensitivity and outputs.
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, MultipleAlwaysStarIndependent) {
-  SimCh9dFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, c, d, x, y;\n"
@@ -758,7 +733,7 @@ TEST(SimCh9d, MultipleAlwaysStarIndependent) {
 // 25. always @* equivalent to always_comb for simple combinational logic.
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarEquivAlwaysComb) {
-  SimCh9dFixture f_star;
+  SimFixture f_star;
   auto* d_star = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, y;\n"
@@ -776,7 +751,7 @@ TEST(SimCh9d, AlwaysStarEquivAlwaysComb) {
   lowerer_star.Lower(d_star);
   f_star.scheduler.Run();
 
-  SimCh9dFixture f_comb;
+  SimFixture f_comb;
   auto* d_comb = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, y;\n"
@@ -805,7 +780,7 @@ TEST(SimCh9d, AlwaysStarEquivAlwaysComb) {
 // 26. always @* with type cast (signed').
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarTypeCast) {
-  SimCh9dFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a;\n"
@@ -833,7 +808,7 @@ TEST(SimCh9d, AlwaysStarTypeCast) {
 // 27. Verify correctness of combinational output set via initial block.
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarCombOutputFromInitial) {
-  SimCh9dFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] a, b, y;\n"
@@ -860,7 +835,7 @@ TEST(SimCh9d, AlwaysStarCombOutputFromInitial) {
 // 28. Verify .width and .ToUint64() on always @* results (8-bit output).
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarResultWidthAndValue8) {
-  SimCh9dFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, y;\n"
@@ -887,7 +862,7 @@ TEST(SimCh9d, AlwaysStarResultWidthAndValue8) {
 // 29. Verify .width and .ToUint64() on always @(*) results (32-bit output).
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarParenResultWidth32) {
-  SimCh9dFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] a, y;\n"
@@ -914,7 +889,7 @@ TEST(SimCh9d, AlwaysStarParenResultWidth32) {
 // 30. always @* with logical NOT (!) on a multi-bit signal.
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarLogicalNot) {
-  SimCh9dFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a;\n"

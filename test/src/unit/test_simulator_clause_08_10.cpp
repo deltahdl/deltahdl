@@ -1,16 +1,11 @@
 // §8.10: Static methods
 
-#include <gtest/gtest.h>
 
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "parser/ast.h"
 #include "simulation/class_object.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
@@ -18,14 +13,6 @@ using namespace delta;
 // Test fixture — provides arena, scheduler, sim context, and helpers to
 // build class types and objects at the AST/runtime level.
 // =============================================================================
-struct ClassFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 // AST helper: make an integer literal expression.
 static Expr* MkInt(Arena& a, uint64_t val) {
   auto* e = a.Create<Expr>();
@@ -43,7 +30,7 @@ static Stmt* MkReturn(Arena& a, Expr* expr) {
 
 // Build a simple ClassTypeInfo and register it with the context.
 static ClassTypeInfo* MakeClassType(
-    ClassFixture& f, std::string_view name,
+    SimFixture& f, std::string_view name,
     const std::vector<std::string_view>& props) {
   auto* info = f.arena.Create<ClassTypeInfo>();
   info->name = name;
@@ -57,7 +44,7 @@ static ClassTypeInfo* MakeClassType(
 namespace {
 
 TEST(ClassSim, StaticMethodResolution) {
-  ClassFixture f;
+  SimFixture f;
   auto* type = MakeClassType(f, "Util", {});
 
   auto* method = f.arena.Create<ModuleItem>();

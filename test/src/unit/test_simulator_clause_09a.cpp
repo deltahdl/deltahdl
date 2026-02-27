@@ -1,41 +1,16 @@
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "simulation/lowerer.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
 
+#include "fixture_simulator.h"
+
 using namespace delta;
-
-struct SimCh9Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimCh9Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
 
 // ---------------------------------------------------------------------------
 // 1. always_comb executes at time 0 (initial evaluation).
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombExecutesAtTimeZero) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a;\n"
@@ -60,7 +35,7 @@ TEST(SimCh9, AlwaysCombExecutesAtTimeZero) {
 // 2. always_comb AND gate: result = a & b.
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombAndGate) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, result;\n"
@@ -86,7 +61,7 @@ TEST(SimCh9, AlwaysCombAndGate) {
 // 3. always_comb OR gate: result = a | b.
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombOrGate) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, result;\n"
@@ -112,7 +87,7 @@ TEST(SimCh9, AlwaysCombOrGate) {
 // 4. always_comb XOR gate: result = a ^ b.
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombXorGate) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, result;\n"
@@ -138,7 +113,7 @@ TEST(SimCh9, AlwaysCombXorGate) {
 // 5. always_comb NOT gate: result = ~a & mask.
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombNotGate) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a;\n"
@@ -164,7 +139,7 @@ TEST(SimCh9, AlwaysCombNotGate) {
 // 6. always_comb 2-to-1 mux using if-else.
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombMuxIfElse) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic sel;\n"
@@ -195,7 +170,7 @@ TEST(SimCh9, AlwaysCombMuxIfElse) {
 // 7. always_comb if-else selects the else branch.
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombIfElseBranch) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic sel;\n"
@@ -226,7 +201,7 @@ TEST(SimCh9, AlwaysCombIfElseBranch) {
 // 8. always_comb case statement decode.
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombCaseDecode) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [1:0] sel;\n"
@@ -255,7 +230,7 @@ TEST(SimCh9, AlwaysCombCaseDecode) {
 // 9. always_comb case with default branch.
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombCaseDefault) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [2:0] sel;\n"
@@ -283,7 +258,7 @@ TEST(SimCh9, AlwaysCombCaseDefault) {
 // 10. Two always_comb blocks in the same module.
 // ---------------------------------------------------------------------------
 TEST(SimCh9, MultipleAlwaysCombBlocks) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, sum, diff;\n"
@@ -315,7 +290,7 @@ TEST(SimCh9, MultipleAlwaysCombBlocks) {
 // 11. Nested if-else priority encoding.
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombPriorityEncoder) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a;\n"
@@ -347,7 +322,7 @@ TEST(SimCh9, AlwaysCombPriorityEncoder) {
 // 12. Multiple outputs from one always_comb block.
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombMultipleOutputs) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a;\n"
@@ -375,7 +350,7 @@ TEST(SimCh9, AlwaysCombMultipleOutputs) {
 // 13. Bit-select in always_comb using initial begin/end.
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombBitSelect) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a;\n"
@@ -402,7 +377,7 @@ TEST(SimCh9, AlwaysCombBitSelect) {
 // 14. Part-select via mask in always_comb (lower nibble).
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombPartSelect) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a;\n"
@@ -428,7 +403,7 @@ TEST(SimCh9, AlwaysCombPartSelect) {
 // 15. Upper part-select via shift in always_comb (upper nibble).
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombUpperPartSelect) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a;\n"
@@ -454,7 +429,7 @@ TEST(SimCh9, AlwaysCombUpperPartSelect) {
 // 16. Concatenation in always_comb.
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombConcatenation) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] hi, lo;\n"
@@ -481,7 +456,7 @@ TEST(SimCh9, AlwaysCombConcatenation) {
 // 17. Ternary operator in always_comb.
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombTernaryTrue) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic sel;\n"
@@ -505,7 +480,7 @@ TEST(SimCh9, AlwaysCombTernaryTrue) {
 // 18. Ternary operator in always_comb (false branch).
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombTernaryFalse) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic sel;\n"
@@ -529,7 +504,7 @@ TEST(SimCh9, AlwaysCombTernaryFalse) {
 // 19. Function call in always_comb.
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombFunctionCall) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  function automatic logic [7:0] add_one(input logic [7:0] x);\n"
@@ -555,7 +530,7 @@ TEST(SimCh9, AlwaysCombFunctionCall) {
 // 20. Verify result variable width is 8 bits.
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombResultWidth8) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, result;\n"
@@ -579,7 +554,7 @@ TEST(SimCh9, AlwaysCombResultWidth8) {
 // 21. Verify result variable width is 32 bits (int).
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombResultWidth32) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int a;\n"
@@ -604,7 +579,7 @@ TEST(SimCh9, AlwaysCombResultWidth32) {
 // 22. always_comb with packed struct assignment.
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombStructAssign) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  typedef struct packed {\n"
@@ -633,7 +608,7 @@ TEST(SimCh9, AlwaysCombStructAssign) {
 // 23. always_comb with struct field access.
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombStructFieldAccess) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  typedef struct packed {\n"
@@ -661,7 +636,7 @@ TEST(SimCh9, AlwaysCombStructFieldAccess) {
 // 24. always_comb with addition and subtraction.
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombAddSub) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
@@ -688,7 +663,7 @@ TEST(SimCh9, AlwaysCombAddSub) {
 // 25. always_comb with logical operators.
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombLogicalOps) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic a, b;\n"
@@ -715,7 +690,7 @@ TEST(SimCh9, AlwaysCombLogicalOps) {
 // 26. always_comb with shift operations.
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombShift) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, result;\n"
@@ -738,7 +713,7 @@ TEST(SimCh9, AlwaysCombShift) {
 // 27. always_comb with comparison producing boolean.
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombComparison) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
@@ -765,7 +740,7 @@ TEST(SimCh9, AlwaysCombComparison) {
 // 28. always_comb with explicit zero inputs produces zero output.
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombExplicitZeros) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
@@ -793,7 +768,7 @@ TEST(SimCh9, AlwaysCombExplicitZeros) {
 // 29. always_comb with chained ternary (nested conditional).
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombChainedTernary) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [1:0] sel;\n"
@@ -819,7 +794,7 @@ TEST(SimCh9, AlwaysCombChainedTernary) {
 // 30. always_comb with reduction operator and width check.
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombReductionAnd) {
-  SimCh9Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] a;\n"

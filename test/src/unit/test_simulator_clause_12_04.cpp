@@ -1,23 +1,13 @@
 // §12.4: Conditional if–else statement
 
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "parser/ast.h"
 #include "simulation/compiled_sim.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
-struct CompiledSimFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
 namespace {
 
 TEST(CompiledSim, ExecuteIfElse) {
@@ -74,29 +64,12 @@ TEST(CompiledSim, ExecuteIfElse) {
   EXPECT_EQ(out->value.ToUint64(), 0u);
 }
 
-struct SimA606Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA606Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // =============================================================================
 // Simulation: conditional statement execution
 // =============================================================================
 // §12.4: if true takes then branch
 TEST(SimA606, IfTrueTakesThenBranch) {
-  SimA606Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -117,7 +90,7 @@ TEST(SimA606, IfTrueTakesThenBranch) {
 
 // §12.4: if false takes else branch
 TEST(SimA606, IfFalseTakesElseBranch) {
-  SimA606Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -138,7 +111,7 @@ TEST(SimA606, IfFalseTakesElseBranch) {
 
 // §12.4: if false with no else — no change
 TEST(SimA606, IfFalseNoElse) {
-  SimA606Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -159,7 +132,7 @@ TEST(SimA606, IfFalseNoElse) {
 
 // §12.4: nonzero value is truthy
 TEST(SimA606, IfNonzeroIsTruthy) {
-  SimA606Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -180,7 +153,7 @@ TEST(SimA606, IfNonzeroIsTruthy) {
 
 // §12.4: nested if — both levels evaluated
 TEST(SimA606, NestedIfBothLevels) {
-  SimA606Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -205,7 +178,7 @@ TEST(SimA606, NestedIfBothLevels) {
 
 // §12.4: nested if — outer true, inner false takes inner else
 TEST(SimA606, NestedIfOuterTrueInnerFalse) {
-  SimA606Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -230,7 +203,7 @@ TEST(SimA606, NestedIfOuterTrueInnerFalse) {
 
 // §12.4: if inside for loop
 TEST(SimA606, IfInsideForLoop) {
-  SimA606Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] count;\n"
@@ -253,7 +226,7 @@ TEST(SimA606, IfInsideForLoop) {
 
 // §12.4: sequential if statements (not chained)
 TEST(SimA606, SequentialIfStatements) {
-  SimA606Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"

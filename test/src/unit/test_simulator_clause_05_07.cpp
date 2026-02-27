@@ -1,41 +1,15 @@
-#include <gtest/gtest.h>
 
 #include <cstring>
-#include <string>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "simulation/lowerer.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
-struct SimCh507Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimCh507Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 static uint64_t RunAndGet(const std::string& src, const char* var_name) {
-  SimCh507Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0;
@@ -49,7 +23,7 @@ static uint64_t RunAndGet(const std::string& src, const char* var_name) {
 }
 
 static double RunAndGetReal(const std::string& src, const char* var_name) {
-  SimCh507Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0.0;
@@ -66,7 +40,7 @@ static double RunAndGetReal(const std::string& src, const char* var_name) {
 }
 
 // Helper: elaborate, lower, and run simulation. Returns true on success.
-static bool RunSim(SimCh507Fixture& f, const std::string& src) {
+static bool RunSim(SimFixture& f, const std::string& src) {
   auto* design = ElaborateSrc(src, f);
   if (!design) return false;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -84,7 +58,7 @@ static bool RunSim(SimCh507Fixture& f, const std::string& src) {
 // ---------------------------------------------------------------------------
 TEST(SimCh507, NumberBothFormsCoexist) {
   // §5.7: Both integer and real constants in the same module.
-  SimCh507Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] i;\n"
@@ -182,7 +156,7 @@ TEST(SimCh507, NumberRealScientific) {
 // ---------------------------------------------------------------------------
 TEST(SimCh507, NumberAllIntegralBases) {
   // §5.7 + Syntax 5-2: decimal, hex, octal, binary all work as number.
-  SimCh507Fixture f;
+  SimFixture f;
   ASSERT_TRUE(RunSim(f,
                      "module t;\n"
                      "  logic [7:0] a, b, c, d;\n"
@@ -207,7 +181,7 @@ TEST(SimCh507, NumberAllIntegralBases) {
 TEST(SimCh507, NumberMixedInExpression) {
   // §5.7: Both number forms usable in expression contexts.
   // Integer literal 10 used in expression assigned to logic; real 2.5 to real.
-  SimCh507Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] i;\n"

@@ -1,18 +1,14 @@
 // §6.12: Real, shortreal, and realtime data types
 
-#include <gtest/gtest.h>
 
 #include <cmath>
 #include <cstring>
-#include <string>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "common/types.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
@@ -104,23 +100,6 @@ TEST(RealTypes, IsRealVariable) {
   EXPECT_FALSE(f.ctx.IsRealVariable("i"));
 }
 
-struct SimA87Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA87Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 static double ToDouble(const Variable* var) {
   uint64_t bits = var->value.ToUint64();
   double d = 0.0;
@@ -130,7 +109,7 @@ static double ToDouble(const Variable* var) {
 
 // § number — real_number simulates
 TEST(SimA87, NumberReal) {
-  SimA87Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  real x;\n"

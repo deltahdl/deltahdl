@@ -1,27 +1,16 @@
 // §13.4.3: Constant functions
 
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // =============================================================================
 // Test fixture shared by all function call tests
 // =============================================================================
-struct FuncFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 // Helper: make an integer literal expression.
 static Expr* MakeIntLit(Arena& arena, uint64_t val) {
   auto* e = arena.Create<Expr>();

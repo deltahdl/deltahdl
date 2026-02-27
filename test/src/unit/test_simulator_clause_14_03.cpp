@@ -1,30 +1,18 @@
 // §14.3: Clocking block declaration
 
-#include <gtest/gtest.h>
 
 #include <cstdint>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "common/types.h"
 #include "parser/ast.h"
 #include "simulation/clocking.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
-struct SimA611Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-void SchedulePosedge(SimA611Fixture& f, Variable* clk, uint64_t time) {
+void SchedulePosedge(SimFixture& f, Variable* clk, uint64_t time) {
   auto* ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [clk, &f]() {
     clk->prev_value = clk->value;
@@ -34,7 +22,7 @@ void SchedulePosedge(SimA611Fixture& f, Variable* clk, uint64_t time) {
   f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
 }
 
-void ScheduleNegedge(SimA611Fixture& f, Variable* clk, uint64_t time) {
+void ScheduleNegedge(SimFixture& f, Variable* clk, uint64_t time) {
   auto* ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [clk, &f]() {
     clk->prev_value = clk->value;

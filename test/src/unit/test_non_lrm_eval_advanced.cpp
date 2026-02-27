@@ -1,29 +1,19 @@
 // §non-lrm:eval_advanced
 
-#include <gtest/gtest.h>
 
 #include <cstring>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/adv_sim.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"  // StructTypeInfo, StructFieldInfo
 
+#include "fixture_simulator.h"
+
 using namespace delta;
 
 // Shared fixture for advanced expression evaluation tests (§11 phases 22+).
-struct EvalAdvFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 namespace {
 
 // =============================================================================

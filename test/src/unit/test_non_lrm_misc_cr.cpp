@@ -1,35 +1,8 @@
 // Non-LRM tests
 
-#include <gtest/gtest.h>
-
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
+#include "fixture_simulator.h"
 
 using namespace delta;
-
-// --- Test helpers ---
-struct ParseResult {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-ParseResult Parse(const std::string& src) {
-  ParseResult result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
 
 namespace {
 
@@ -182,14 +155,6 @@ TEST(SourceText, ElabSeverityAllForms) {
 // ============================================================================
 // Test helpers
 // ============================================================================
-struct SysCallFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 static Expr* MakeSysCall(Arena& arena, std::string_view name,
                          std::vector<Expr*> args) {
   auto* e = arena.Create<Expr>();
@@ -231,42 +196,42 @@ static Expr* MakeIdent(Arena& arena, std::string_view name) {
 // §20.8.1 — $clog2
 // ============================================================================
 TEST(Section20, Clog2Zero) {
-  SysCallFixture f;
+  SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$clog2", {MakeIntLit(f.arena, 0)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
 TEST(Section20, Clog2One) {
-  SysCallFixture f;
+  SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$clog2", {MakeIntLit(f.arena, 1)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
 TEST(Section20, Clog2Two) {
-  SysCallFixture f;
+  SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$clog2", {MakeIntLit(f.arena, 2)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
 TEST(Section20, Clog2Three) {
-  SysCallFixture f;
+  SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$clog2", {MakeIntLit(f.arena, 3)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 2u);
 }
 
 TEST(Section20, Clog2PowerOf2) {
-  SysCallFixture f;
+  SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$clog2", {MakeIntLit(f.arena, 256)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 8u);
 }
 
 TEST(Section20, Clog2NonPowerOf2) {
-  SysCallFixture f;
+  SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$clog2", {MakeIntLit(f.arena, 257)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 9u);
@@ -276,14 +241,14 @@ TEST(Section20, Clog2NonPowerOf2) {
 // §20.6.2 — $bits
 // ============================================================================
 TEST(Section20, BitsOf32BitValue) {
-  SysCallFixture f;
+  SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$bits", {MakeIntLit(f.arena, 42)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 32u);
 }
 
 TEST(Section20, BitsOfVariable) {
-  SysCallFixture f;
+  SimFixture f;
   auto* var = f.ctx.CreateVariable("wide_var", 64);
   var->value = MakeLogic4VecVal(f.arena, 64, 0);
   auto* expr = MakeSysCall(f.arena, "$bits", {MakeIdent(f.arena, "wide_var")});
@@ -295,14 +260,14 @@ TEST(Section20, BitsOfVariable) {
 // §20.6.1 — $unsigned, $signed
 // ============================================================================
 TEST(Section20, Unsigned) {
-  SysCallFixture f;
+  SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$unsigned", {MakeIntLit(f.arena, 42)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 42u);
 }
 
 TEST(Section20, Signed) {
-  SysCallFixture f;
+  SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$signed", {MakeIntLit(f.arena, 42)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 42u);
@@ -312,21 +277,21 @@ TEST(Section20, Signed) {
 // §20.9 — $countones, $onehot, $onehot0, $isunknown
 // ============================================================================
 TEST(Section20, CountonesZero) {
-  SysCallFixture f;
+  SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$countones", {MakeIntLit(f.arena, 0)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
 TEST(Section20, CountonesAllBits) {
-  SysCallFixture f;
+  SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$countones", {MakeIntLit(f.arena, 0xFF)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 8u);
 }
 
 TEST(Section20, CountonesSparse) {
-  SysCallFixture f;
+  SimFixture f;
   auto* expr =
       MakeSysCall(f.arena, "$countones", {MakeIntLit(f.arena, 0b10101)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -334,56 +299,56 @@ TEST(Section20, CountonesSparse) {
 }
 
 TEST(Section20, OnehotTrue) {
-  SysCallFixture f;
+  SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$onehot", {MakeIntLit(f.arena, 4)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
 TEST(Section20, OnehotFalseZero) {
-  SysCallFixture f;
+  SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$onehot", {MakeIntLit(f.arena, 0)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
 TEST(Section20, OnehotFalseMultiple) {
-  SysCallFixture f;
+  SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$onehot", {MakeIntLit(f.arena, 3)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
 TEST(Section20, Onehot0True) {
-  SysCallFixture f;
+  SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$onehot0", {MakeIntLit(f.arena, 0)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
 TEST(Section20, Onehot0TrueOneBit) {
-  SysCallFixture f;
+  SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$onehot0", {MakeIntLit(f.arena, 8)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
 TEST(Section20, Onehot0FalseMultiple) {
-  SysCallFixture f;
+  SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$onehot0", {MakeIntLit(f.arena, 3)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
 TEST(Section20, IsunknownFalse) {
-  SysCallFixture f;
+  SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$isunknown", {MakeIntLit(f.arena, 42)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
 TEST(Section20, IsunknownTrueXVar) {
-  SysCallFixture f;
+  SimFixture f;
   // CreateVariable initializes to X (bval = all ones).
   f.ctx.CreateVariable("xvar", 8);
   auto* expr = MakeSysCall(f.arena, "$isunknown", {MakeIdent(f.arena, "xvar")});
@@ -395,7 +360,7 @@ TEST(Section20, IsunknownTrueXVar) {
 // §20.11 — $test$plusargs, $value$plusargs
 // ============================================================================
 TEST(Section20, TestPlusargsNotFound) {
-  SysCallFixture f;
+  SimFixture f;
   auto* expr =
       MakeSysCall(f.arena, "$test$plusargs", {MakeStrLit(f.arena, "VERBOSE")});
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -403,7 +368,7 @@ TEST(Section20, TestPlusargsNotFound) {
 }
 
 TEST(Section20, TestPlusargsFound) {
-  SysCallFixture f;
+  SimFixture f;
   f.ctx.AddPlusArg("VERBOSE");
   auto* expr =
       MakeSysCall(f.arena, "$test$plusargs", {MakeStrLit(f.arena, "VERBOSE")});
@@ -412,7 +377,7 @@ TEST(Section20, TestPlusargsFound) {
 }
 
 TEST(Section20, TestPlusargsPrefixMatch) {
-  SysCallFixture f;
+  SimFixture f;
   f.ctx.AddPlusArg("VERBOSE=1");
   auto* expr =
       MakeSysCall(f.arena, "$test$plusargs", {MakeStrLit(f.arena, "VERB")});
@@ -421,7 +386,7 @@ TEST(Section20, TestPlusargsPrefixMatch) {
 }
 
 TEST(Section20, ValuePlusargsFound) {
-  SysCallFixture f;
+  SimFixture f;
   f.ctx.AddPlusArg("DEPTH=42");
   auto* dest_var = f.ctx.CreateVariable("depth", 32);
   dest_var->value = MakeLogic4VecVal(f.arena, 32, 0);
@@ -434,7 +399,7 @@ TEST(Section20, ValuePlusargsFound) {
 }
 
 TEST(Section20, ValuePlusargsNotFound) {
-  SysCallFixture f;
+  SimFixture f;
   auto* dest_var = f.ctx.CreateVariable("depth", 32);
   dest_var->value = MakeLogic4VecVal(f.arena, 32, 0);
   auto* expr = MakeSysCall(
@@ -448,7 +413,7 @@ TEST(Section20, ValuePlusargsNotFound) {
 // §20.6.1 — $typename
 // ============================================================================
 TEST(Section20, Typename) {
-  SysCallFixture f;
+  SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$typename", {MakeIntLit(f.arena, 0)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   // Returns a string-encoded result; just verify it doesn't crash and
@@ -460,7 +425,7 @@ TEST(Section20, Typename) {
 // §21.3.3 — $sformatf
 // ============================================================================
 TEST(Section20, SformatfBasic) {
-  SysCallFixture f;
+  SimFixture f;
   auto* expr =
       MakeSysCall(f.arena, "$sformatf",
                   {MakeStrLit(f.arena, "val=%d"), MakeIntLit(f.arena, 42)});
@@ -474,7 +439,7 @@ TEST(Section20, SformatfBasic) {
 // §21.3.1/§21.3.2 — $fopen, $fclose
 // ============================================================================
 TEST(Section21, FopenFclose) {
-  SysCallFixture f;
+  SimFixture f;
   // Create a temporary file for the test.
   std::string tmp_path = "/tmp/deltahdl_test_fopen.txt";
   {
@@ -495,7 +460,7 @@ TEST(Section21, FopenFclose) {
 }
 
 TEST(Section21, FopenInvalidFile) {
-  SysCallFixture f;
+  SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$fopen",
                            {MakeStrLit(f.arena, "/nonexistent/path/file.txt"),
                             MakeStrLit(f.arena, "r")});
@@ -507,7 +472,7 @@ TEST(Section21, FopenInvalidFile) {
 // §21.3.3 — $fdisplay, $fwrite
 // ============================================================================
 TEST(Section21, FdisplayToFile) {
-  SysCallFixture f;
+  SimFixture f;
   std::string tmp_path = "/tmp/deltahdl_test_fdisplay.txt";
 
   auto* open_expr = MakeSysCall(
@@ -539,7 +504,7 @@ TEST(Section21, FdisplayToFile) {
 // §21.4 — $readmemh, $readmemb
 // ============================================================================
 TEST(Section21, ReadmemhBasic) {
-  SysCallFixture f;
+  SimFixture f;
   std::string tmp_path = "/tmp/deltahdl_test_readmemh.txt";
   {
     std::ofstream ofs(tmp_path);
@@ -564,7 +529,7 @@ TEST(Section21, ReadmemhBasic) {
 }
 
 TEST(Section21, ReadmembBasic) {
-  SysCallFixture f;
+  SimFixture f;
   std::string tmp_path = "/tmp/deltahdl_test_readmemb.txt";
   {
     std::ofstream ofs(tmp_path);
@@ -589,7 +554,7 @@ TEST(Section21, ReadmembBasic) {
 // §21.4 — $writememh, $writememb
 // ============================================================================
 TEST(Section21, WritememhBasic) {
-  SysCallFixture f;
+  SimFixture f;
   std::string tmp_path = "/tmp/deltahdl_test_writememh.txt";
 
   auto* var = f.ctx.CreateVariable("wmem", 32);
@@ -611,7 +576,7 @@ TEST(Section21, WritememhBasic) {
 }
 
 TEST(Section21, WritemembBasic) {
-  SysCallFixture f;
+  SimFixture f;
   std::string tmp_path = "/tmp/deltahdl_test_writememb.txt";
 
   auto* var = f.ctx.CreateVariable("wbmem", 8);
@@ -635,7 +600,7 @@ TEST(Section21, WritemembBasic) {
 // §21.3.5 — $sscanf
 // ============================================================================
 TEST(Section21, SscanfDecimal) {
-  SysCallFixture f;
+  SimFixture f;
   auto* dest = f.ctx.CreateVariable("scanned", 32);
   dest->value = MakeLogic4VecVal(f.arena, 32, 0);
 
@@ -652,7 +617,7 @@ TEST(Section21, SscanfDecimal) {
 // §21.3 — $rewind(fd)
 // ============================================================================
 TEST(Section21, Rewind) {
-  SysCallFixture f;
+  SimFixture f;
   std::string tmp_path = "/tmp/deltahdl_test_rewind.txt";
   {
     std::ofstream ofs(tmp_path);
@@ -688,7 +653,7 @@ TEST(Section21, Rewind) {
 // §21.3 — $ungetc(char, fd)
 // ============================================================================
 TEST(Section21, Ungetc) {
-  SysCallFixture f;
+  SimFixture f;
   std::string tmp_path = "/tmp/deltahdl_test_ungetc.txt";
   {
     std::ofstream ofs(tmp_path);

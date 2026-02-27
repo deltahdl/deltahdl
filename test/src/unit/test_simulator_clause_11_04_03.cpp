@@ -1,28 +1,17 @@
 // §11.4.3: Arithmetic operators
 
-#include <gtest/gtest.h>
 
 #include <cstring>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // Shared fixture for expression evaluation tests.
-struct EvalOpXZFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 static Expr* MakeInt(Arena& arena, uint64_t val) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
@@ -46,7 +35,7 @@ static Expr* MakeBinary(Arena& arena, TokenKind op, Expr* lhs, Expr* rhs) {
   return e;
 }
 
-static Variable* MakeVar4(EvalOpXZFixture& f, std::string_view name,
+static Variable* MakeVar4(SimFixture& f, std::string_view name,
                           uint32_t width, uint64_t aval, uint64_t bval) {
   auto* var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4Vec(f.arena, width);
@@ -55,7 +44,7 @@ static Variable* MakeVar4(EvalOpXZFixture& f, std::string_view name,
   return var;
 }
 
-static Variable* MakeRealVar(EvalOpXZFixture& f, std::string_view name,
+static Variable* MakeRealVar(SimFixture& f, std::string_view name,
                              double val) {
   auto* var = f.ctx.CreateVariable(name, 64);
   uint64_t bits = 0;
@@ -79,7 +68,7 @@ namespace {
 // Arithmetic X/Z propagation — §11.4.3
 // ==========================================================================
 TEST(EvalOpXZ, ArithAddX) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // 4'b1x00 + 4'b0001 → all-X (any X/Z operand)
   MakeVar4(f, "ax", 4, 0b1000, 0b0100);  // 4'b1x00
   auto* b = f.ctx.CreateVariable("a1", 4);
@@ -92,7 +81,7 @@ TEST(EvalOpXZ, ArithAddX) {
 }
 
 TEST(EvalOpXZ, DivByZeroReturnsX) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // 10 / 0 → all-X (not 0)
   auto* expr = MakeBinary(f.arena, TokenKind::kSlash, MakeInt(f.arena, 10),
                           MakeInt(f.arena, 0));
@@ -101,7 +90,7 @@ TEST(EvalOpXZ, DivByZeroReturnsX) {
 }
 
 TEST(EvalOpXZ, ModByZeroReturnsX) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // 10 % 0 → all-X (not 0)
   auto* expr = MakeBinary(f.arena, TokenKind::kPercent, MakeInt(f.arena, 10),
                           MakeInt(f.arena, 0));
@@ -110,7 +99,7 @@ TEST(EvalOpXZ, ModByZeroReturnsX) {
 }
 
 TEST(EvalOpXZ, RealArithResult) {
-  EvalOpXZFixture f;
+  SimFixture f;
   MakeRealVar(f, "ra", 2.5);
   MakeRealVar(f, "rb", 1.5);
   auto* expr = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "ra"),
@@ -121,7 +110,7 @@ TEST(EvalOpXZ, RealArithResult) {
 }
 
 TEST(EvalOpXZ, MixedRealIntArith) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // If either operand is real, both are converted to real.
   MakeRealVar(f, "re", 2.5);
   auto* vi = f.ctx.CreateVariable("ri", 32);
@@ -137,7 +126,7 @@ TEST(EvalOpXZ, MixedRealIntArith) {
 // Arithmetic X/Z — §11.4.3 (subtraction, multiply, power with X/Z)
 // ==========================================================================
 TEST(EvalOpXZ, ArithSubX) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // 4'b1x00 - 1 → all-X (X/Z operand in subtraction)
   MakeVar4(f, "sx", 4, 0b1000, 0b0100);
   auto* b = f.ctx.CreateVariable("s1", 4);
@@ -149,7 +138,7 @@ TEST(EvalOpXZ, ArithSubX) {
 }
 
 TEST(EvalOpXZ, ArithMulZ) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // 4'b10z0 * 3 → all-X (Z operand in multiply)
   MakeVar4(f, "mz", 4, 0b1000, 0b0010);  // bit1=z (aval=0,bval=1)
   auto* b = f.ctx.CreateVariable("m3", 4);
@@ -161,7 +150,7 @@ TEST(EvalOpXZ, ArithMulZ) {
 }
 
 TEST(EvalOpXZ, ArithPowX) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // 2 ** 4'b1x00 → all-X (X in exponent)
   MakeVar4(f, "px", 4, 0b1000, 0b0100);
   auto* expr = MakeBinary(f.arena, TokenKind::kPower, MakeInt(f.arena, 2),
@@ -170,26 +159,9 @@ TEST(EvalOpXZ, ArithPowX) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-struct SimA83Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA83Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // § expression — binary addition
 TEST(SimA83, BinaryAddition) {
-  SimA83Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -207,7 +179,7 @@ TEST(SimA83, BinaryAddition) {
 
 // § expression — binary subtraction
 TEST(SimA83, BinarySubtraction) {
-  SimA83Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -225,7 +197,7 @@ TEST(SimA83, BinarySubtraction) {
 
 // § expression — binary multiplication
 TEST(SimA83, BinaryMultiplication) {
-  SimA83Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -243,7 +215,7 @@ TEST(SimA83, BinaryMultiplication) {
 
 // § expression — unary bitwise NOT
 TEST(SimA83, UnaryNegate) {
-  SimA83Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -259,29 +231,12 @@ TEST(SimA83, UnaryNegate) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-struct SimA86Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA86Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // =============================================================================
 // A.8.6 Operators — unary_operator — Simulation
 // =============================================================================
 // § unary_operator — unary plus (identity)
 TEST(SimA86, UnaryPlus) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -299,7 +254,7 @@ TEST(SimA86, UnaryPlus) {
 
 // § unary_operator — unary minus (negate)
 TEST(SimA86, UnaryMinus) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -320,7 +275,7 @@ TEST(SimA86, UnaryMinus) {
 // =============================================================================
 // § binary_operator — addition
 TEST(SimA86, BinaryAdd) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -338,7 +293,7 @@ TEST(SimA86, BinaryAdd) {
 
 // § binary_operator — subtraction
 TEST(SimA86, BinarySub) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -356,7 +311,7 @@ TEST(SimA86, BinarySub) {
 
 // § binary_operator — multiplication
 TEST(SimA86, BinaryMul) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -374,7 +329,7 @@ TEST(SimA86, BinaryMul) {
 
 // § binary_operator — division
 TEST(SimA86, BinaryDiv) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -392,7 +347,7 @@ TEST(SimA86, BinaryDiv) {
 
 // § binary_operator — modulo
 TEST(SimA86, BinaryMod) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -410,7 +365,7 @@ TEST(SimA86, BinaryMod) {
 
 // § binary_operator — power
 TEST(SimA86, BinaryPower) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"

@@ -1,20 +1,11 @@
-#include <gtest/gtest.h>
 
-#include <string>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
 #include "parser/ast.h"
-#include "parser/parser.h"
 #include "simulation/class_object.h"
 #include "simulation/lowerer.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
@@ -22,25 +13,8 @@ using namespace delta;
 // Full-simulation fixture: parse → elaborate → lower → run → check.
 // =============================================================================
 
-struct SimCh13Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimCh13Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // Helper: elaborate + lower + run, then return FindVariable result.
-static Variable* RunAndFind(const std::string& src, SimCh13Fixture& f,
+static Variable* RunAndFind(const std::string& src, SimFixture& f,
                             const char* var_name) {
   auto* design = ElaborateSrc(src, f);
   if (!design) return nullptr;
@@ -57,7 +31,7 @@ static Variable* RunAndFind(const std::string& src, SimCh13Fixture& f,
 
 // §13.8: Virtual class flag maps to is_abstract in ClassTypeInfo.
 TEST(SimCh13, VirtualClassIsAbstract) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  virtual class C #(parameter W = 8);\n"
@@ -76,7 +50,7 @@ TEST(SimCh13, VirtualClassIsAbstract) {
 
 // §13.8: ClassTypeInfo preserves ClassDecl with params.
 TEST(SimCh13, ClassParamsPreserved) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  class C #(parameter A = 1, parameter B = 2);\n"
@@ -98,7 +72,7 @@ TEST(SimCh13, ClassParamsPreserved) {
 
 // §13.8: Static method is registered in ClassTypeInfo.methods.
 TEST(SimCh13, StaticMethodRegistered) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  virtual class C #(parameter W = 8);\n"
@@ -119,7 +93,7 @@ TEST(SimCh13, StaticMethodRegistered) {
 
 // §13.8: Multiple static methods registered in same class.
 TEST(SimCh13, MultipleStaticMethodsRegistered) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  virtual class C #(parameter W = 8);\n"
@@ -140,7 +114,7 @@ TEST(SimCh13, MultipleStaticMethodsRegistered) {
 
 // §13.8: Non-virtual parameterized class also works.
 TEST(SimCh13, NonVirtualParameterizedClass) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  class C #(parameter W = 8);\n"
@@ -164,7 +138,7 @@ TEST(SimCh13, NonVirtualParameterizedClass) {
 
 // §13.8: Static method returns parameter value via C#(16)::get_w().
 TEST(SimCh13, SimpleParameterReturn) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter W = 8);\n"
@@ -180,7 +154,7 @@ TEST(SimCh13, SimpleParameterReturn) {
 
 // §13.8: Default parameter used when only first param specified.
 TEST(SimCh13, DefaultParameterValue) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter A = 10, parameter B = 5);\n"
@@ -197,7 +171,7 @@ TEST(SimCh13, DefaultParameterValue) {
 
 // §13.8: Default parameter using $clog2 of another parameter.
 TEST(SimCh13, DefaultParamClog2) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter DECODE_W = 8,\n"
@@ -217,7 +191,7 @@ TEST(SimCh13, DefaultParamClog2) {
 
 // §13.8: Multiple specializations in same module give different results.
 TEST(SimCh13, MultipleSpecializations) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  virtual class C #(parameter W = 8);\n"
@@ -245,7 +219,7 @@ TEST(SimCh13, MultipleSpecializations) {
 
 // §13.8: Two parameters, both provided explicitly at call site.
 TEST(SimCh13, TwoParametersExplicit) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter A = 1, parameter B = 2);\n"
@@ -261,7 +235,7 @@ TEST(SimCh13, TwoParametersExplicit) {
 
 // §13.8: Parameter used in arithmetic expression.
 TEST(SimCh13, ParameterArithmetic) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter W = 8);\n"
@@ -277,7 +251,7 @@ TEST(SimCh13, ParameterArithmetic) {
 
 // §13.8: Parameter used in bitmask computation: (1 << W) - 1.
 TEST(SimCh13, ParameterBitmask) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter W = 8);\n"
@@ -296,7 +270,7 @@ TEST(SimCh13, ParameterBitmask) {
 
 // §13.8: Parameter in if-else condition.
 TEST(SimCh13, ParameterIfElse) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter W = 8);\n"
@@ -316,7 +290,7 @@ TEST(SimCh13, ParameterIfElse) {
 
 // §13.8: Static method with input argument.
 TEST(SimCh13, MethodWithInputArg) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter W = 8);\n"
@@ -335,7 +309,7 @@ TEST(SimCh13, MethodWithInputArg) {
 
 // §13.8: Static method with two input arguments.
 TEST(SimCh13, MethodWithTwoArgs) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter W = 0);\n"
@@ -354,7 +328,7 @@ TEST(SimCh13, MethodWithTwoArgs) {
 
 // §13.8: Two different static methods in same class.
 TEST(SimCh13, TwoMethodsSameClass) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  virtual class C #(parameter W = 8);\n"
@@ -385,7 +359,7 @@ TEST(SimCh13, TwoMethodsSameClass) {
 
 // §13.8: Parameterized scope call in continuous assignment.
 TEST(SimCh13, ContinuousAssignCall) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter W = 8);\n"
@@ -401,7 +375,7 @@ TEST(SimCh13, ContinuousAssignCall) {
 
 // §13.8: Parameterized scope call in always_comb.
 TEST(SimCh13, AlwaysCombCall) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter W = 8);\n"
@@ -417,7 +391,7 @@ TEST(SimCh13, AlwaysCombCall) {
 
 // §13.8: Different specializations produce different results.
 TEST(SimCh13, DifferentSpecsDifferentResults) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  virtual class C #(parameter W = 0);\n"
@@ -447,7 +421,7 @@ TEST(SimCh13, DifferentSpecsDifferentResults) {
 
 // §13.8: Parameter subtraction.
 TEST(SimCh13, ParameterSubtract) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter W = 8);\n"
@@ -465,7 +439,7 @@ TEST(SimCh13, ParameterSubtract) {
 
 // §13.8: Chained parameter expression: (W + 1) * 2.
 TEST(SimCh13, ChainedParamExpr) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter W = 0);\n"
@@ -484,7 +458,7 @@ TEST(SimCh13, ChainedParamExpr) {
 
 // §13.8: Parameter used in shift: val << W.
 TEST(SimCh13, ParameterShift) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter W = 0);\n"
@@ -503,7 +477,7 @@ TEST(SimCh13, ParameterShift) {
 
 // §13.8: Calling same method twice with same specialization.
 TEST(SimCh13, MultipleCallsSameSpec) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  virtual class C #(parameter W = 0);\n"
@@ -533,7 +507,7 @@ TEST(SimCh13, MultipleCallsSameSpec) {
 
 // §13.8: Zero parameter value edge case.
 TEST(SimCh13, ZeroParamValue) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter W = 8);\n"
@@ -549,7 +523,7 @@ TEST(SimCh13, ZeroParamValue) {
 
 // §13.8: Nested if using parameter in static method.
 TEST(SimCh13, ParameterNestedIf) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter W = 0);\n"
@@ -575,7 +549,7 @@ TEST(SimCh13, ParameterNestedIf) {
 
 // §13.8: For loop in static method with parameter as bound.
 TEST(SimCh13, ForLoopWithParam) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter N = 4);\n"
@@ -596,7 +570,7 @@ TEST(SimCh13, ForLoopWithParam) {
 
 // §13.8: For loop with different specializations.
 TEST(SimCh13, ForLoopDifferentSpecs) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  virtual class C #(parameter N = 4);\n"
@@ -629,7 +603,7 @@ TEST(SimCh13, ForLoopDifferentSpecs) {
 // §13.8 LRM example: Decoder function — C#(4)::DECODER_f(2'b11).
 // DECODER_f sets bit EncodeIn to 1: result[3] = 1 → 4'b1000 = 8.
 TEST(SimCh13, DecoderFunction) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter DECODE_W = 4,\n"
@@ -651,7 +625,7 @@ TEST(SimCh13, DecoderFunction) {
 // §13.8 LRM example: Encoder function (simplified, no break).
 // Finds the last set bit in DecodeIn using a for loop bounded by DECODE_W.
 TEST(SimCh13, EncoderFunction) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
       "  virtual class C #(parameter DECODE_W = 8,\n"
@@ -675,7 +649,7 @@ TEST(SimCh13, EncoderFunction) {
 
 // §13.8 LRM example: Both encoder and decoder in same class.
 TEST(SimCh13, EncoderDecoderSameClass) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  virtual class C #(parameter DECODE_W = 8,\n"
@@ -712,7 +686,7 @@ TEST(SimCh13, EncoderDecoderSameClass) {
 
 // §13.8: Parser preserves param expressions in AST (kIdentifier.elements).
 TEST(SimCh13, ParserPreservesParams) {
-  SimCh13Fixture f;
+  SimFixture f;
   auto fid = f.mgr.AddFile("<test>",
                            "module t;\n"
                            "  class C #(parameter W = 8);\n"

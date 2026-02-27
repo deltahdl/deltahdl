@@ -1,28 +1,18 @@
 // §11.4.14: Streaming operators (pack/unpack)
 
-#include <gtest/gtest.h>
 
 #include <cstring>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"  // StructTypeInfo, StructFieldInfo
 
+#include "fixture_simulator.h"
+
 using namespace delta;
 
 // Shared fixture for advanced expression evaluation tests (§11 phases 22+).
-struct EvalAdvFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 static Expr* MakeId(Arena& arena, std::string_view name) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
@@ -30,7 +20,7 @@ static Expr* MakeId(Arena& arena, std::string_view name) {
   return e;
 }
 
-static Variable* MakeVar(EvalAdvFixture& f, std::string_view name,
+static Variable* MakeVar(SimFixture& f, std::string_view name,
                          uint32_t width, uint64_t val) {
   auto* var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4VecVal(f.arena, width, val);
@@ -43,7 +33,7 @@ namespace {
 // §11.4.14: Streaming operator — basic integral test (existing behavior)
 // ==========================================================================
 TEST(EvalAdv, StreamingLeftShiftReversesSlices) {
-  EvalAdvFixture f;
+  SimFixture f;
   // {<< 8 {16'hABCD}} → reverse 8-bit slices: 0xCDAB
   MakeVar(f, "sv", 16, 0xABCD);
   auto* stream = f.arena.Create<Expr>();
@@ -60,7 +50,7 @@ TEST(EvalAdv, StreamingLeftShiftReversesSlices) {
 }
 
 TEST(EvalAdv, StreamingRightShiftPreservesOrder) {
-  EvalAdvFixture f;
+  SimFixture f;
   // {>> 8 {16'hABCD}} → no reversal, same as concat.
   MakeVar(f, "sv2", 16, 0xABCD);
   auto* stream = f.arena.Create<Expr>();
@@ -80,7 +70,7 @@ TEST(EvalAdv, StreamingRightShiftPreservesOrder) {
 // §11.4.14.1: Streaming with unpacked array — element concatenation
 // ==========================================================================
 TEST(EvalAdv, StreamingUnpackedArrayConcat) {
-  EvalAdvFixture f;
+  SimFixture f;
   // Create unpacked array: arr[0]=0xAB, arr[1]=0xCD, each 8-bit.
   MakeVar(f, "arr[0]", 8, 0xAB);
   MakeVar(f, "arr[1]", 8, 0xCD);
@@ -101,7 +91,7 @@ TEST(EvalAdv, StreamingUnpackedArrayConcat) {
 }
 
 TEST(EvalAdv, StreamingUnpackedArrayLeftShift) {
-  EvalAdvFixture f;
+  SimFixture f;
   // Create unpacked array: arr2[0]=0xAB, arr2[1]=0xCD.
   MakeVar(f, "arr2[0]", 8, 0xAB);
   MakeVar(f, "arr2[1]", 8, 0xCD);
@@ -127,7 +117,7 @@ TEST(EvalAdv, StreamingUnpackedArrayLeftShift) {
 }
 
 TEST(EvalAdv, StreamingUnpackedArrayMissingElemGivesX) {
-  EvalAdvFixture f;
+  SimFixture f;
   // Array with 3 elements but only [0] and [2] exist — [1] should be X.
   MakeVar(f, "arr3[0]", 8, 0x11);
   MakeVar(f, "arr3[2]", 8, 0x33);

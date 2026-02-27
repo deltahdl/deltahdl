@@ -1,28 +1,17 @@
 // §11.4.11: Conditional operator
 
-#include <gtest/gtest.h>
 
 #include <cstring>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // Shared fixture for expression evaluation tests.
-struct EvalOpXZFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 static Expr* MakeInt(Arena& arena, uint64_t val) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
@@ -37,7 +26,7 @@ static Expr* MakeId(Arena& arena, std::string_view name) {
   return e;
 }
 
-static Variable* MakeVar4(EvalOpXZFixture& f, std::string_view name,
+static Variable* MakeVar4(SimFixture& f, std::string_view name,
                           uint32_t width, uint64_t aval, uint64_t bval) {
   auto* var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4Vec(f.arena, width);
@@ -52,7 +41,7 @@ namespace {
 // Ternary X/Z condition — §11.4.11
 // ==========================================================================
 TEST(EvalOpXZ, TernaryZCond) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // z ? 4'b1100 : 4'b1010 → same as x condition (bit-by-bit combine)
   MakeVar4(f, "tz", 1, 0, 1);  // 1'bz (aval=0, bval=1)
   auto* tv = f.ctx.CreateVariable("zt", 4);
@@ -71,7 +60,7 @@ TEST(EvalOpXZ, TernaryZCond) {
 }
 
 TEST(EvalOpXZ, TernaryXCondSame) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // x ? 5 : 5 → 5 (both branches same → known result)
   MakeVar4(f, "tc", 1, 0, 1);  // 1'bx
   auto* ternary = f.arena.Create<Expr>();
@@ -85,7 +74,7 @@ TEST(EvalOpXZ, TernaryXCondSame) {
 }
 
 TEST(EvalOpXZ, TernaryXCondDiff) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // x ? 4'b1100 : 4'b1010 → 4'b1x0x (matching bits kept, differing → X)
   MakeVar4(f, "td", 1, 0, 1);  // 1'bx
   auto* tv = f.ctx.CreateVariable("tt", 4);
@@ -108,26 +97,9 @@ TEST(EvalOpXZ, TernaryXCondDiff) {
   EXPECT_EQ(result.words[0].bval, 0b0110u);
 }
 
-struct SimA83Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA83Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // § conditional_expression — ternary true branch
 TEST(SimA83, TernaryTrueBranch) {
-  SimA83Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -145,7 +117,7 @@ TEST(SimA83, TernaryTrueBranch) {
 
 // § conditional_expression — ternary false branch
 TEST(SimA83, TernaryFalseBranch) {
-  SimA83Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -163,7 +135,7 @@ TEST(SimA83, TernaryFalseBranch) {
 
 // § conditional_expression — nested ternary
 TEST(SimA83, NestedTernary) {
-  SimA83Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"

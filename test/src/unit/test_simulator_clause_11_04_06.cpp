@@ -1,32 +1,17 @@
 // §11.4.6: Wildcard equality operators
 
-#include <gtest/gtest.h>
 
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "lexer/lexer.h"
 #include "parser/ast.h"
-#include "parser/parser.h"
 #include "simulation/eval.h"
 #include "simulation/eval_array.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // =============================================================================
 // Helper fixture
 // =============================================================================
-struct AggFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 static Expr* MkEq(Arena& arena, std::string_view a, std::string_view b) {
   auto* expr = arena.Create<Expr>();
   expr->kind = ExprKind::kBinary;
@@ -42,7 +27,7 @@ static Expr* MkEq(Arena& arena, std::string_view a, std::string_view b) {
   return expr;
 }
 
-static void MakeArray4(AggFixture& f, std::string_view name) {
+static void MakeArray4(SimFixture& f, std::string_view name) {
   f.ctx.RegisterArray(name, {0, 4, 8, false, false, false});
   for (uint32_t i = 0; i < 4; ++i) {
     auto tmp = std::string(name) + "[" + std::to_string(i) + "]";
@@ -54,7 +39,7 @@ static void MakeArray4(AggFixture& f, std::string_view name) {
 namespace {
 
 TEST(ArrayEquality, EqualArrays) {
-  AggFixture f;
+  SimFixture f;
   MakeArray4(f, "a");
   MakeArray4(f, "b");
   auto result = EvalExpr(MkEq(f.arena, "a", "b"), f.ctx, f.arena);
@@ -62,7 +47,7 @@ TEST(ArrayEquality, EqualArrays) {
 }
 
 TEST(ArrayEquality, UnequalArrays) {
-  AggFixture f;
+  SimFixture f;
   MakeArray4(f, "a");
   MakeArray4(f, "b");
   // Modify b[2] to differ.
@@ -74,14 +59,6 @@ TEST(ArrayEquality, UnequalArrays) {
 }
 
 // Shared fixture for expression evaluation tests.
-struct EvalOpXZFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 static Expr* MakeId(Arena& arena, std::string_view name) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
@@ -98,7 +75,7 @@ static Expr* MakeBinary(Arena& arena, TokenKind op, Expr* lhs, Expr* rhs) {
   return e;
 }
 
-static Variable* MakeVar4(EvalOpXZFixture& f, std::string_view name,
+static Variable* MakeVar4(SimFixture& f, std::string_view name,
                           uint32_t width, uint64_t aval, uint64_t bval) {
   auto* var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4Vec(f.arena, width);
@@ -108,7 +85,7 @@ static Variable* MakeVar4(EvalOpXZFixture& f, std::string_view name,
 }
 
 TEST(EvalOpXZ, WildcardEqLeftX) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // §11.4.6: 4'bx001 ==? 4'b0001 → x (left X in non-wildcard position)
   MakeVar4(f, "wl", 4, 0b0001, 0b1000);  // bit3=x
   auto* b = f.ctx.CreateVariable("wr", 4);
@@ -119,26 +96,9 @@ TEST(EvalOpXZ, WildcardEqLeftX) {
   EXPECT_NE(result.words[0].bval, 0u);  // result is X
 }
 
-struct SimA86Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA86Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // § binary_operator — ==? (wildcard equality)
 TEST(SimA86, BinaryWildcardEq) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"
@@ -156,7 +116,7 @@ TEST(SimA86, BinaryWildcardEq) {
 
 // § binary_operator — !=? (wildcard inequality)
 TEST(SimA86, BinaryWildcardNeq) {
-  SimA86Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"

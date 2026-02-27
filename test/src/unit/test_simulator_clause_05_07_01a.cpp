@@ -1,40 +1,14 @@
-#include <gtest/gtest.h>
 
-#include <string>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "simulation/lowerer.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
-struct SimCh50701Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimCh50701Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 static uint64_t RunAndGet(const std::string& src, const char* var_name) {
-  SimCh50701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0;
@@ -183,7 +157,7 @@ TEST(SimCh50701, NegativeTwosComplement) {
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, HexDigitsCaseInsensitive) {
   // §5.7.1: Hex digits a-f are case insensitive.
-  SimCh50701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] a, b;\n"
@@ -210,7 +184,7 @@ TEST(SimCh50701, HexDigitsCaseInsensitive) {
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, UnderscoreInNumber) {
   // §5.7.1: Underscores are legal anywhere in a number except as first char.
-  SimCh50701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] a, b, c;\n"
@@ -269,7 +243,7 @@ TEST(SimCh50701, TruncationFromLeft) {
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, XValueInHexLiteral) {
   // §5.7.1: x sets 4 bits to unknown in hex base.
-  SimCh50701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [11:0] x;\n"
@@ -290,7 +264,7 @@ TEST(SimCh50701, XValueInHexLiteral) {
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, ZValueInHexLiteral) {
   // §5.7.1: z sets 4 bits to high-impedance in hex base.
-  SimCh50701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] x;\n"
@@ -314,7 +288,7 @@ TEST(SimCh50701, ZValueInHexLiteral) {
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, XInBinaryLiteral) {
   // §5.7.1: x sets 1 bit to unknown in binary base.
-  SimCh50701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [2:0] x;\n"
@@ -337,7 +311,7 @@ TEST(SimCh50701, XInBinaryLiteral) {
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, QuestionMarkAsZ) {
   // §5.7.1: ? is an alternative for the z character.
-  SimCh50701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] a, b;\n"
@@ -364,7 +338,7 @@ TEST(SimCh50701, QuestionMarkAsZ) {
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, UnbasedUnsizedLiteral01) {
   // §5.7.1: Unbased unsized literals — all bits set to specified value.
-  SimCh50701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] a, b;\n"
@@ -391,7 +365,7 @@ TEST(SimCh50701, UnbasedUnsizedLiteral01) {
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, UnbasedUnsizedLiteralXZ) {
   // §5.7.1: Unbased unsized x and z set all bits to x or z.
-  SimCh50701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] a, b;\n"
@@ -422,7 +396,7 @@ TEST(SimCh50701, UnbasedUnsizedLiteralXZ) {
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, LeftPadWithX) {
   // §5.7.1: Leftmost x causes x-padding to the left.
-  SimCh50701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [11:0] x;\n"
@@ -446,7 +420,7 @@ TEST(SimCh50701, LeftPadWithX) {
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, LeftPadWithZ) {
   // §5.7.1: Leftmost z causes z-padding to the left.
-  SimCh50701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [11:0] x;\n"
@@ -485,7 +459,7 @@ TEST(SimCh50701, SignedBasedLiteral) {
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, SignedDesignatorBitPattern) {
   // §5.7.1: The s designator affects interpretation, not the bit pattern.
-  SimCh50701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] a, b;\n"
@@ -513,7 +487,7 @@ TEST(SimCh50701, SignedDesignatorBitPattern) {
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, XZCaseInsensitive) {
   // §5.7.1: x and z are case insensitive in number values.
-  SimCh50701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] a, b;\n"
@@ -540,7 +514,7 @@ TEST(SimCh50701, XZCaseInsensitive) {
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, XInOctalLiteral) {
   // §5.7.1: x sets 3 bits to unknown in octal base.
-  SimCh50701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [5:0] x;\n"
@@ -562,7 +536,7 @@ TEST(SimCh50701, XInOctalLiteral) {
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, BaseFormatCaseInsensitive) {
   // §5.7.1: Base format letter is case insensitive.
-  SimCh50701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, c, d;\n"
@@ -611,7 +585,7 @@ TEST(SimCh50701, WhiteSpaceSizeAndBase) {
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, LeftPadKnownHex) {
   // §5.7.1: Known value with x in low nibble — yields 03x.
-  SimCh50701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [11:0] x;\n"
@@ -635,7 +609,7 @@ TEST(SimCh50701, LeftPadKnownHex) {
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, DecimalSingleDigitX) {
   // §5.7.1: Decimal literal allows single x/z/? digit only.
-  SimCh50701Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"

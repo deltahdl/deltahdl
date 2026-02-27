@@ -1,28 +1,18 @@
 // §11.4.2: Increment and decrement operators
 
-#include <gtest/gtest.h>
 
 #include <cstring>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"  // StructTypeInfo, StructFieldInfo
 
+#include "fixture_simulator.h"
+
 using namespace delta;
 
 // Shared fixture for advanced expression evaluation tests (§11 phases 22+).
-struct EvalAdvFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 static Expr* MakeId(Arena& arena, std::string_view name) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
@@ -37,7 +27,7 @@ static double AdvToDouble(const Logic4Vec& v) {
   return d;
 }
 
-static Variable* MakeRealVarAdv(EvalAdvFixture& f, std::string_view name,
+static Variable* MakeRealVarAdv(SimFixture& f, std::string_view name,
                                 double val) {
   auto* var = f.ctx.CreateVariable(name, 64);
   uint64_t bits = 0;
@@ -50,7 +40,7 @@ static Variable* MakeRealVarAdv(EvalAdvFixture& f, std::string_view name,
 namespace {
 
 TEST(EvalAdv, RealIncrementBy1Point0) {
-  EvalAdvFixture f;
+  SimFixture f;
   // §11.4.2: ++real_var should increment by 1.0, not by integer 1.
   MakeRealVarAdv(f, "rv", 2.5);
   auto* inc = f.arena.Create<Expr>();

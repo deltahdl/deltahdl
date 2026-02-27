@@ -1,11 +1,9 @@
-#include <gtest/gtest.h>
 
-#include <string>
 #include <vector>
 
-#include "common/arena.h"
 #include "common/types.h"
-#include "simulation/scheduler.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
@@ -291,26 +289,9 @@ TEST(SimCh4423, InactiveRegionHoldsMultipleEvents) {
   sched.Run();
   EXPECT_EQ(count, 5);
 }
-struct SimA605Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA605Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // §9.4.1: #0 delay (same timestep, inactive region)
 TEST(SimA605, DelayControlZero) {
-  SimA605Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"

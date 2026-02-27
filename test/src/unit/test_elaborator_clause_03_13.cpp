@@ -1,14 +1,9 @@
 // §3.13: Name spaces
 
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "preprocessor/preprocessor.h"
+
+#include "fixture_elaborator.h"
 
 using namespace delta;
 
@@ -66,21 +61,6 @@ TEST(ElabClause03, Cl3_13_SameNameDifferentModulesElab) {
   Elaborator elab_b(arena, diag, cu);
   elab_b.Elaborate("b");
   EXPECT_FALSE(diag.HasErrors());
-}
-
-struct ElabFixture {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
 }
 
 // =============================================================================

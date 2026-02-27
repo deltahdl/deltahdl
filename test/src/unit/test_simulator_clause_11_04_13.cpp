@@ -1,29 +1,19 @@
 // §11.4.13: for an explanation of range list syntax.
 
-#include <gtest/gtest.h>
 
 #include <cstring>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/adv_sim.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"  // StructTypeInfo, StructFieldInfo
 
+#include "fixture_simulator.h"
+
 using namespace delta;
 
 // Shared fixture for advanced expression evaluation tests (§11 phases 22+).
-struct EvalAdvFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 static Expr* MakeInt(Arena& arena, uint64_t val) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
@@ -51,7 +41,7 @@ static Expr* MakeRange(Arena& arena, Expr* lo, Expr* hi,
 namespace {
 
 TEST(EvalAdv, InsideAbsTolerance) {
-  EvalAdvFixture f;
+  SimFixture f;
   auto* var = f.ctx.CreateVariable("at", 8);
   var->value = MakeLogic4VecVal(f.arena, 8, 10);
   auto* inside = f.arena.Create<Expr>();
@@ -65,7 +55,7 @@ TEST(EvalAdv, InsideAbsTolerance) {
 }
 
 TEST(EvalAdv, InsideAbsToleranceMiss) {
-  EvalAdvFixture f;
+  SimFixture f;
   auto* var = f.ctx.CreateVariable("am", 8);
   var->value = MakeLogic4VecVal(f.arena, 8, 20);
   auto* inside = f.arena.Create<Expr>();
@@ -79,7 +69,7 @@ TEST(EvalAdv, InsideAbsToleranceMiss) {
 }
 
 TEST(EvalAdv, InsideRelTolerance) {
-  EvalAdvFixture f;
+  SimFixture f;
   auto* var = f.ctx.CreateVariable("rt", 8);
   var->value = MakeLogic4VecVal(f.arena, 8, 8);
   auto* inside = f.arena.Create<Expr>();
@@ -93,15 +83,7 @@ TEST(EvalAdv, InsideRelTolerance) {
 }
 
 // Shared fixture for expression evaluation tests.
-struct EvalOpXZFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static Variable* MakeVar4(EvalOpXZFixture& f, std::string_view name,
+static Variable* MakeVar4(SimFixture& f, std::string_view name,
                           uint32_t width, uint64_t aval, uint64_t bval) {
   auto* var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4Vec(f.arena, width);
@@ -114,7 +96,7 @@ static Variable* MakeVar4(EvalOpXZFixture& f, std::string_view name,
 // Inside operator X/Z — §11.4.13
 // ==========================================================================
 TEST(EvalOpXZ, InsideXOperand) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // x inside {3, 5, 7} → x (unknown operand, no definite match)
   MakeVar4(f, "ix", 4, 0b0000, 0b0100);  // 4'b0x00
 
@@ -129,26 +111,9 @@ TEST(EvalOpXZ, InsideXOperand) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-struct SimA83Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA83Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // § inside_expression — value match
 TEST(SimA83, InsideValueMatch) {
-  SimA83Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic x;\n"

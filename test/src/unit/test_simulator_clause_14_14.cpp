@@ -1,31 +1,19 @@
 // §14.14: Global clocking
 
-#include <gtest/gtest.h>
 
 #include <cstdint>
 #include <string_view>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "common/types.h"
 #include "parser/ast.h"
 #include "simulation/clocking.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // Helper fixture for clocking simulation tests.
-struct ClockingSimFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag, /*seed=*/42};
-};
-
 // Schedule posedge at a given time through the scheduler.
 void SchedulePosedge(ClockingSimFixture& f, Variable* clk, uint64_t time) {
   auto* ev = f.scheduler.GetEventPool().Acquire();
@@ -70,15 +58,7 @@ TEST(ClockingSim, GlobalClockingBlock) {
   EXPECT_EQ(cmgr.GetGlobalClocking(), "gclk");
 }
 
-struct SimA611Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-void SchedulePosedge(SimA611Fixture& f, Variable* clk, uint64_t time) {
+void SchedulePosedge(SimFixture& f, Variable* clk, uint64_t time) {
   auto* ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [clk, &f]() {
     clk->prev_value = clk->value;
@@ -88,7 +68,7 @@ void SchedulePosedge(SimA611Fixture& f, Variable* clk, uint64_t time) {
   f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
 }
 
-void ScheduleNegedge(SimA611Fixture& f, Variable* clk, uint64_t time) {
+void ScheduleNegedge(SimFixture& f, Variable* clk, uint64_t time) {
   auto* ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [clk, &f]() {
     clk->prev_value = clk->value;

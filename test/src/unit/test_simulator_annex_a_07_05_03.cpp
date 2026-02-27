@@ -1,40 +1,13 @@
 // Annex A.7.5.3: System timing check event definitions
 
-#include <gtest/gtest.h>
 
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "simulation/lowerer.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/specify.h"
 #include "simulation/variable.h"
 
+#include "fixture_simulator.h"
+
 using namespace delta;
-
-struct SimA70503Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA70503Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
 
 namespace {
 
@@ -74,7 +47,7 @@ TEST(SimA70503, RuntimeTimingCheckEntryEdgeKw) {
 // =============================================================================
 // Terminal with bit select simulates
 TEST(SimA70503, TerminalBitSelectSimulates) {
-  SimA70503Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -95,7 +68,7 @@ TEST(SimA70503, TerminalBitSelectSimulates) {
 
 // Terminal with part select simulates
 TEST(SimA70503, TerminalPartSelectSimulates) {
-  SimA70503Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -119,7 +92,7 @@ TEST(SimA70503, TerminalPartSelectSimulates) {
 // =============================================================================
 // Timing check with &&& condition simulates
 TEST(SimA70503, TimingCheckConditionSimulates) {
-  SimA70503Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -143,7 +116,7 @@ TEST(SimA70503, TimingCheckConditionSimulates) {
 // =============================================================================
 // $period with controlled event simulates
 TEST(SimA70503, ControlledTimingCheckEventPeriodSimulates) {
-  SimA70503Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -164,7 +137,7 @@ TEST(SimA70503, ControlledTimingCheckEventPeriodSimulates) {
 
 // Full combination: edge control + bit-select + condition simulates
 TEST(SimA70503, FullCombinationSimulates) {
-  SimA70503Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"

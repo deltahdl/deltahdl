@@ -1,26 +1,15 @@
 // §11.4.1: Assignment operators
 
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // Shared fixture for expression evaluation tests.
-struct EvalOpFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 // Helper: build a simple integer literal Expr node.
 static Expr* MakeInt(Arena& arena, uint64_t val) {
   auto* e = arena.Create<Expr>();
@@ -53,7 +42,7 @@ namespace {
 // Compound assignment operators (+=, -=, *=, /=, %=, &=, |=, ^=, <<=, >>=)
 // ==========================================================================
 TEST(EvalOp, PlusEq) {
-  EvalOpFixture f;
+  SimFixture f;
   auto* var = f.ctx.CreateVariable("a", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 10);
 
@@ -65,7 +54,7 @@ TEST(EvalOp, PlusEq) {
 }
 
 TEST(EvalOp, MinusEq) {
-  EvalOpFixture f;
+  SimFixture f;
   auto* var = f.ctx.CreateVariable("a", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 20);
 
@@ -77,7 +66,7 @@ TEST(EvalOp, MinusEq) {
 }
 
 TEST(EvalOp, StarEq) {
-  EvalOpFixture f;
+  SimFixture f;
   auto* var = f.ctx.CreateVariable("a", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 6);
 
@@ -89,7 +78,7 @@ TEST(EvalOp, StarEq) {
 }
 
 TEST(EvalOp, SlashEq) {
-  EvalOpFixture f;
+  SimFixture f;
   auto* var = f.ctx.CreateVariable("a", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 100);
 
@@ -101,7 +90,7 @@ TEST(EvalOp, SlashEq) {
 }
 
 TEST(EvalOp, PercentEq) {
-  EvalOpFixture f;
+  SimFixture f;
   auto* var = f.ctx.CreateVariable("m", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 17);
 

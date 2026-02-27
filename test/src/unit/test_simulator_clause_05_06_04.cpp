@@ -1,32 +1,16 @@
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "preprocessor/preprocessor.h"
 #include "simulation/lowerer.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // §5.6.4 Compiler directives
 
-struct SimCh50604Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 static uint64_t PreprocessAndGet(const std::string& src, const char* var_name) {
-  SimCh50604Fixture f;
+  SimFixture f;
   auto fid = f.mgr.AddFile("<test>", src);
   Preprocessor pp(f.mgr, f.diag, {});
   auto preprocessed = pp.Preprocess(fid);

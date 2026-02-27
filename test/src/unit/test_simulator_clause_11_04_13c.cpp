@@ -1,33 +1,18 @@
 // §11.4.13: for an explanation of range list syntax.
 
-#include <gtest/gtest.h>
 
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "lexer/lexer.h"
 #include "parser/ast.h"
-#include "parser/parser.h"
 #include "simulation/eval.h"
 #include "simulation/eval_array.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // =============================================================================
 // Helper fixture
 // =============================================================================
-struct AggFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static Expr* ParseExprFrom(const std::string& src, AggFixture& f) {
+static Expr* ParseExprFrom(const std::string& src, SimFixture& f) {
   std::string code = "module t; initial x = " + src + "; endmodule";
   auto fid = f.mgr.AddFile("<test>", code);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
@@ -44,7 +29,7 @@ namespace {
 // =============================================================================
 TEST(AggregateExpr, PackedStructInsideSet) {
   // A packed struct is just a bitvector — inside should work by value.
-  AggFixture f;
+  SimFixture f;
   auto* var = f.ctx.CreateVariable("s", 8);
   var->value = MakeLogic4VecVal(f.arena, 8, 5);
   auto* expr = ParseExprFrom("s inside {5, 10, 15}", f);
@@ -53,7 +38,7 @@ TEST(AggregateExpr, PackedStructInsideSet) {
 }
 
 TEST(AggregateExpr, PackedStructNotInSet) {
-  AggFixture f;
+  SimFixture f;
   auto* var = f.ctx.CreateVariable("s", 8);
   var->value = MakeLogic4VecVal(f.arena, 8, 7);
   auto* expr = ParseExprFrom("s inside {5, 10, 15}", f);

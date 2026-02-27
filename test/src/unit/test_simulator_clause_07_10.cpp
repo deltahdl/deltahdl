@@ -1,32 +1,17 @@
 // §7.10: Queues
 
-#include <gtest/gtest.h>
 
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "lexer/lexer.h"
 #include "parser/ast.h"
-#include "parser/parser.h"
 #include "simulation/eval.h"
 #include "simulation/eval_array.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // =============================================================================
 // Helper fixture
 // =============================================================================
-struct AggFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 static Expr* MkSelect(Arena& arena, std::string_view name, uint64_t idx) {
   auto* sel = arena.Create<Expr>();
   sel->kind = ExprKind::kSelect;
@@ -43,7 +28,7 @@ static Expr* MkSelect(Arena& arena, std::string_view name, uint64_t idx) {
 namespace {
 
 TEST(ArrayAccess, OutOfBoundsReturnsX) {
-  AggFixture f;
+  SimFixture f;
   // Register a 4-element array arr[0:3], each element 8 bits.
   f.ctx.RegisterArray("arr", {0, 4, 8, false, false, false});
   for (uint32_t i = 0; i < 4; ++i) {
@@ -62,7 +47,7 @@ TEST(ArrayAccess, OutOfBoundsReturnsX) {
 }
 
 TEST(QueueAccess, OutOfBoundsReturnsX) {
-  AggFixture f;
+  SimFixture f;
   auto* q = f.ctx.CreateQueue("q", 16);
   q->elements.push_back(MakeLogic4VecVal(f.arena, 16, 100));
   q->elements.push_back(MakeLogic4VecVal(f.arena, 16, 200));

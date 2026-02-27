@@ -1,33 +1,18 @@
 // §10.9: Assignment patterns
 
-#include <gtest/gtest.h>
 
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "lexer/lexer.h"
 #include "parser/ast.h"
-#include "parser/parser.h"
 #include "simulation/eval.h"
 #include "simulation/eval_array.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // =============================================================================
 // Helper fixture
 // =============================================================================
-struct AggFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static Expr* ParseExprFrom(const std::string& src, AggFixture& f) {
+static Expr* ParseExprFrom(const std::string& src, SimFixture& f) {
   std::string code = "module t; initial x = " + src + "; endmodule";
   auto fid = f.mgr.AddFile("<test>", code);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
@@ -44,7 +29,7 @@ namespace {
 // =============================================================================
 TEST(AssignmentPattern, PositionalTwoElements) {
   // '{a, b} with 8-bit variables → 16-bit packed result
-  AggFixture f;
+  SimFixture f;
   auto* a = f.ctx.CreateVariable("a", 8);
   auto* b = f.ctx.CreateVariable("b", 8);
   a->value = MakeLogic4VecVal(f.arena, 8, 5);
@@ -59,7 +44,7 @@ TEST(AssignmentPattern, PositionalTwoElements) {
 }
 
 TEST(AssignmentPattern, PositionalThreeElements) {
-  AggFixture f;
+  SimFixture f;
   auto* a = f.ctx.CreateVariable("a", 4);
   auto* b = f.ctx.CreateVariable("b", 4);
   auto* c = f.ctx.CreateVariable("c", 4);
@@ -74,7 +59,7 @@ TEST(AssignmentPattern, PositionalThreeElements) {
 }
 
 TEST(AssignmentPattern, SingleElement) {
-  AggFixture f;
+  SimFixture f;
   auto* a = f.ctx.CreateVariable("a", 32);
   a->value = MakeLogic4VecVal(f.arena, 32, 42);
   auto* expr = ParseExprFrom("'{a}", f);
@@ -83,7 +68,7 @@ TEST(AssignmentPattern, SingleElement) {
 }
 
 TEST(AssignmentPattern, EmptyPattern) {
-  AggFixture f;
+  SimFixture f;
   auto* expr = ParseExprFrom("'{}", f);
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.width, 0u);
@@ -91,7 +76,7 @@ TEST(AssignmentPattern, EmptyPattern) {
 
 TEST(AssignmentPattern, SizedLiterals) {
   // Test the parser fix for integer literal first elements
-  AggFixture f;
+  SimFixture f;
   auto* expr = ParseExprFrom("'{32'd5, 32'd10}", f);
   ASSERT_NE(expr, nullptr);
   EXPECT_EQ(expr->kind, ExprKind::kAssignmentPattern);

@@ -1,18 +1,10 @@
 // §4.5: SystemVerilog simulation reference algorithm
 
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "simulation/lowerer.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
@@ -29,25 +21,8 @@ using namespace delta;
 // introduced in §4.2, covering parallel process execution, sequential
 // ordering within processes, and interaction between concurrent elements.
 // ===========================================================================
-struct SimCh4Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimCh4Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 static uint64_t RunAndGet(const std::string& src, const char* var_name) {
-  SimCh4Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0;
@@ -67,7 +42,7 @@ namespace {
 //     block assignments (simulation is the canonical model).
 // ---------------------------------------------------------------------------
 TEST(SimCh4, TimeZeroSemantics) {
-  SimCh4Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
@@ -94,7 +69,7 @@ TEST(SimCh4, TimeZeroSemantics) {
 //     updates value at different times, always_comb tracks changes.
 // ---------------------------------------------------------------------------
 TEST(SimCh4, ProcessInteractionMultipleTimeSteps) {
-  SimCh4Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, doubled;\n"
@@ -121,7 +96,7 @@ TEST(SimCh4, ProcessInteractionMultipleTimeSteps) {
 //     defined by the simulation model.
 // ---------------------------------------------------------------------------
 TEST(SimCh4, CanonicalSimulationSemantics) {
-  SimCh4Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, c, d;\n"

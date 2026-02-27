@@ -1,33 +1,18 @@
 // §10.9.1: Array assignment patterns
 
-#include <gtest/gtest.h>
 
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "lexer/lexer.h"
 #include "parser/ast.h"
-#include "parser/parser.h"
 #include "simulation/eval.h"
 #include "simulation/eval_array.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // =============================================================================
 // Helper fixture
 // =============================================================================
-struct AggFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static Expr* ParseExprFrom(const std::string& src, AggFixture& f) {
+static Expr* ParseExprFrom(const std::string& src, SimFixture& f) {
   std::string code = "module t; initial x = " + src + "; endmodule";
   auto fid = f.mgr.AddFile("<test>", code);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
@@ -47,7 +32,7 @@ static Expr* MakeIntLit(Arena& arena, uint64_t val) {
 namespace {
 
 TEST(AssignmentPattern, PositionalThreeElements) {
-  AggFixture f;
+  SimFixture f;
   auto* a = f.ctx.CreateVariable("a", 4);
   auto* b = f.ctx.CreateVariable("b", 4);
   auto* c = f.ctx.CreateVariable("c", 4);

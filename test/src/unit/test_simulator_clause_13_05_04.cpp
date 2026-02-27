@@ -1,27 +1,16 @@
 // §13.5.4: Argument binding by name
 
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // =============================================================================
 // Test fixture shared by all function call tests
 // =============================================================================
-struct FuncFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 // Helper: make an integer literal expression.
 static Expr* MakeIntLit(Arena& arena, uint64_t val) {
   auto* e = arena.Create<Expr>();
@@ -194,26 +183,9 @@ TEST(Functions, DefaultsAndNamedArgsCombined) {
   EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 21u);
 }
 
-struct SimA609Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA609Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // --- named argument binding ---
 TEST(SimA609, NamedArgCall) {
-  SimA609Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -236,7 +208,7 @@ TEST(SimA609, NamedArgCall) {
 
 // --- mixed positional + named arguments ---
 TEST(SimA609, MixedPositionalNamedArgs) {
-  SimA609Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -258,26 +230,9 @@ TEST(SimA609, MixedPositionalNamedArgs) {
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
 
-struct SimA82Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA82Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // § list_of_arguments — named argument binding reorders args
 TEST(SimA82, NamedArgBinding) {
-  SimA82Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"

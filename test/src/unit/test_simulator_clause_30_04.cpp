@@ -1,14 +1,10 @@
 // §30.4: Module path declarations
 
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "lexer/lexer.h"
 #include "parser/ast.h"
-#include "parser/parser.h"
 #include "simulation/specify.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
@@ -62,26 +58,9 @@ TEST_F(SpecifyTest, RuntimeMultiplePathDelays) {
   EXPECT_EQ(mgr.GetPathDelay("in2", "out2"), 8u);
 }
 
-struct SimA702Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA702Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // Path declarations do not interfere with behavioral initial block
 TEST(SimA702, PathDeclsDoNotInterfereBehavioral) {
-  SimA702Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"

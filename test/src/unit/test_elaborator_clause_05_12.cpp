@@ -1,26 +1,14 @@
 // §5.12 Attributes — elaboration-level semantics (A.9.1 BNF)
 
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "common/types.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
 #include "parser/ast.h"
-#include "parser/parser.h"
+
+#include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
-
-struct ElabFixture {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
-};
 
 static RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);

@@ -1,16 +1,11 @@
 // §8.25: Parameterized classes
 
-#include <gtest/gtest.h>
 
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "parser/ast.h"
 #include "simulation/class_object.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
@@ -18,15 +13,8 @@ using namespace delta;
 // Test fixture — provides arena, scheduler, sim context, and helpers to
 // build class types and objects at the AST/runtime level.
 // =============================================================================
-struct ClassFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
 // Allocate a ClassObject of the given type, returning (handle_id, object*).
-static std::pair<uint64_t, ClassObject*> MakeObj(ClassFixture& f,
+static std::pair<uint64_t, ClassObject*> MakeObj(SimFixture& f,
                                                  ClassTypeInfo* type) {
   auto* obj = f.arena.Create<ClassObject>();
   obj->type = type;
@@ -45,7 +33,7 @@ namespace {
 // §8.25: Parameterized classes (basic cases)
 // =============================================================================
 TEST(ClassSim, ParameterizedClassDifferentWidths) {
-  ClassFixture f;
+  SimFixture f;
 
   // Simulate Stack#(8) — 8-bit data property.
   auto* type8 = f.arena.Create<ClassTypeInfo>();
@@ -68,7 +56,7 @@ TEST(ClassSim, ParameterizedClassDifferentWidths) {
 }
 
 TEST(ClassSim, ParameterizedClassInstantiation) {
-  ClassFixture f;
+  SimFixture f;
 
   auto* type = f.arena.Create<ClassTypeInfo>();
   type->name = "Pair_int";

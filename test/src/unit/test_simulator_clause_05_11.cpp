@@ -1,38 +1,12 @@
-#include <gtest/gtest.h>
 
 #include <cstring>
-#include <string>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "simulation/lowerer.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
 
+#include "fixture_simulator.h"
+
 using namespace delta;
-
-struct SimCh511Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimCh511Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
 
 // §5.11 Array literals
 
@@ -45,7 +19,7 @@ TEST(SimCh511, ArrayLitPositional) {
       "    arr = '{8'hAA, 8'hBB, 8'hCC};\n"
       "  end\n"
       "endmodule\n";
-  SimCh511Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -62,7 +36,7 @@ TEST(SimCh511, ArrayLitPositionalInit) {
       "module m;\n"
       "  logic [7:0] arr [0:2] = '{8'h11, 8'h22, 8'h33};\n"
       "endmodule\n";
-  SimCh511Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -82,7 +56,7 @@ TEST(SimCh511, ArrayLitReplication) {
       "    arr = '{3{8'hFF}};\n"
       "  end\n"
       "endmodule\n";
-  SimCh511Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -99,7 +73,7 @@ TEST(SimCh511, ArrayLitReplicationInit) {
       "module m;\n"
       "  logic [7:0] arr [0:2] = '{3{8'hAA}};\n"
       "endmodule\n";
-  SimCh511Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -119,7 +93,7 @@ TEST(SimCh511, ArrayLitDefault) {
       "    arr = '{default: 8'h42};\n"
       "  end\n"
       "endmodule\n";
-  SimCh511Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -136,7 +110,7 @@ TEST(SimCh511, ArrayLitDefaultInit) {
       "module m;\n"
       "  logic [7:0] arr [0:2] = '{default: 8'h99};\n"
       "endmodule\n";
-  SimCh511Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -156,7 +130,7 @@ TEST(SimCh511, ArrayLitIndexKeyDefault) {
       "    arr = '{1: 8'hBB, default: 8'h00};\n"
       "  end\n"
       "endmodule\n";
-  SimCh511Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -173,7 +147,7 @@ TEST(SimCh511, ArrayLitIndexKeyInit) {
       "module m;\n"
       "  logic [7:0] arr [0:2] = '{2: 8'hCC, default: 8'h11};\n"
       "endmodule\n";
-  SimCh511Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -190,7 +164,7 @@ TEST(SimCh511, ArrayLitDescending) {
       "module m;\n"
       "  logic [7:0] arr [2:0] = '{8'hAA, 8'hBB, 8'hCC};\n"
       "endmodule\n";
-  SimCh511Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -211,7 +185,7 @@ TEST(SimCh511, ArrayLitTypeFromContext) {
       "    arr = '{8'hDE, 8'hAD};\n"
       "  end\n"
       "endmodule\n";
-  SimCh511Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);

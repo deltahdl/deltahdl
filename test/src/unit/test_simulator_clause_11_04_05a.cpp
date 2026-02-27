@@ -1,28 +1,18 @@
 // §11.4.5: Equality operators
 
-#include <gtest/gtest.h>
 
 #include <cstring>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"  // StructTypeInfo, StructFieldInfo
 
+#include "fixture_simulator.h"
+
 using namespace delta;
 
 // Shared fixture for advanced expression evaluation tests (§11 phases 22+).
-struct EvalAdvFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 static Expr* MakeId(Arena& arena, std::string_view name) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
@@ -30,7 +20,7 @@ static Expr* MakeId(Arena& arena, std::string_view name) {
   return e;
 }
 
-static Variable* MakeVar(EvalAdvFixture& f, std::string_view name,
+static Variable* MakeVar(SimFixture& f, std::string_view name,
                          uint32_t width, uint64_t val) {
   auto* var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4VecVal(f.arena, width, val);
@@ -46,7 +36,7 @@ static Expr* MakeBinary(Arena& arena, TokenKind op, Expr* lhs, Expr* rhs) {
   return e;
 }
 
-static Variable* MakeSignedVarAdv(EvalAdvFixture& f, std::string_view name,
+static Variable* MakeSignedVarAdv(SimFixture& f, std::string_view name,
                                   uint32_t width, uint64_t val) {
   auto* var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4VecVal(f.arena, width, val);
@@ -56,7 +46,7 @@ static Variable* MakeSignedVarAdv(EvalAdvFixture& f, std::string_view name,
 namespace {
 
 TEST(EvalAdv, PackedStructEqualitySameValue) {
-  EvalAdvFixture f;
+  SimFixture f;
   // Two 16-bit packed struct vars with same value → == is 1.
   StructTypeInfo sinfo;
   sinfo.type_name = "my_struct";
@@ -76,7 +66,7 @@ TEST(EvalAdv, PackedStructEqualitySameValue) {
 }
 
 TEST(EvalAdv, PackedStructEqualityDiffValue) {
-  EvalAdvFixture f;
+  SimFixture f;
   // Two 16-bit packed struct vars with different values → == is 0.
   StructTypeInfo sinfo;
   sinfo.type_name = "my_struct";
@@ -96,7 +86,7 @@ TEST(EvalAdv, PackedStructEqualityDiffValue) {
 }
 
 TEST(EvalAdv, PackedStructInequality) {
-  EvalAdvFixture f;
+  SimFixture f;
   StructTypeInfo sinfo;
   sinfo.type_name = "my_struct";
   sinfo.total_width = 16;
@@ -115,7 +105,7 @@ TEST(EvalAdv, PackedStructInequality) {
 }
 
 TEST(EvalAdv, SignedEqNeg) {
-  EvalAdvFixture f;
+  SimFixture f;
   MakeSignedVarAdv(f, "sa", 8, 0xFF);
   MakeSignedVarAdv(f, "sb", 8, 0xFF);
   auto* expr = MakeBinary(f.arena, TokenKind::kEqEq, MakeId(f.arena, "sa"),

@@ -1,35 +1,23 @@
 // §12.5: Case statement
 
-#include <gtest/gtest.h>
 
 #include <cstdint>
 #include <string_view>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "common/types.h"
 #include "parser/ast.h"
 #include "simulation/awaiters.h"
 #include "simulation/exec_task.h"
 #include "simulation/process.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/stmt_exec.h"
 #include "simulation/stmt_result.h"
 #include "simulation/variable.h"
 
+#include "fixture_simulator.h"
+
 using namespace delta;
 
 // Helper fixture providing scheduler, arena, diag, and sim context.
-struct StmtFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag, /*seed=*/42};
-};
-
 // Helper to create a simple identifier expression.
 Expr* MakeIdent(Arena& arena, std::string_view name) {
   auto* e = arena.Create<Expr>();
@@ -185,29 +173,12 @@ TEST(StmtExec, CaseMultiplePatterns) {
   EXPECT_EQ(result_var->value.ToUint64(), 111u);
 }
 
-struct SimA607Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA607Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // =============================================================================
 // Simulation tests — A.6.7 Case statements
 // =============================================================================
 // §12.5: case statement — first matching item
 TEST(SimA607, CaseFirstMatch) {
-  SimA607Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] sel, x;\n"
@@ -232,7 +203,7 @@ TEST(SimA607, CaseFirstMatch) {
 
 // §12.5: case falls to default when no item matches
 TEST(SimA607, CaseDefaultFallthrough) {
-  SimA607Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] sel, x;\n"
@@ -257,7 +228,7 @@ TEST(SimA607, CaseDefaultFallthrough) {
 
 // §12.5: no default, no match — no change
 TEST(SimA607, CaseNoDefaultNoMatch) {
-  SimA607Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] sel, x;\n"
@@ -282,7 +253,7 @@ TEST(SimA607, CaseNoDefaultNoMatch) {
 
 // §12.5: case inside for loop
 TEST(SimA607, CaseInsideForLoop) {
-  SimA607Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] total;\n"
@@ -309,7 +280,7 @@ TEST(SimA607, CaseInsideForLoop) {
 
 // §12.5: nested case statements
 TEST(SimA607, NestedCaseExecution) {
-  SimA607Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, x;\n"
@@ -338,7 +309,7 @@ TEST(SimA607, NestedCaseExecution) {
 
 // §12.5: case with block body in item
 TEST(SimA607, CaseWithBlockBody) {
-  SimA607Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x, y;\n"

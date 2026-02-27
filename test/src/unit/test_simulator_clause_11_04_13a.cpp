@@ -1,28 +1,18 @@
 // §11.4.13: for an explanation of range list syntax.
 
-#include <gtest/gtest.h>
 
 #include <cstring>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"  // StructTypeInfo, StructFieldInfo
 
+#include "fixture_simulator.h"
+
 using namespace delta;
 
 // Shared fixture for advanced expression evaluation tests (§11 phases 22+).
-struct EvalAdvFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 static Expr* MakeInt(Arena& arena, uint64_t val) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
@@ -56,7 +46,7 @@ static Expr* MakeDollar(Arena& arena) {
 namespace {
 
 TEST(EvalAdv, InsideDollarLowerBound) {
-  EvalAdvFixture f;
+  SimFixture f;
   auto* var = f.ctx.CreateVariable("dv", 8);
   var->value = MakeLogic4VecVal(f.arena, 8, 5);
   auto* inside = f.arena.Create<Expr>();
@@ -69,7 +59,7 @@ TEST(EvalAdv, InsideDollarLowerBound) {
 }
 
 TEST(EvalAdv, InsideDollarUpperBound) {
-  EvalAdvFixture f;
+  SimFixture f;
   auto* var = f.ctx.CreateVariable("du", 8);
   var->value = MakeLogic4VecVal(f.arena, 8, 200);
   auto* inside = f.arena.Create<Expr>();

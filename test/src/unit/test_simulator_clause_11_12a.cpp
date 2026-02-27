@@ -1,28 +1,18 @@
 // §11.12: Let construct
 
-#include <gtest/gtest.h>
 
 #include <cstring>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"  // StructTypeInfo, StructFieldInfo
 
+#include "fixture_simulator.h"
+
 using namespace delta;
 
 // Shared fixture for advanced expression evaluation tests (§11 phases 22+).
-struct EvalAdvFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 static Expr* MakeInt(Arena& arena, uint64_t val) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
@@ -37,7 +27,7 @@ static Expr* MakeId(Arena& arena, std::string_view name) {
   return e;
 }
 
-static Variable* MakeVar(EvalAdvFixture& f, std::string_view name,
+static Variable* MakeVar(SimFixture& f, std::string_view name,
                          uint32_t width, uint64_t val) {
   auto* var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4VecVal(f.arena, width, val);
@@ -65,7 +55,7 @@ static ModuleItem* MakeLetDecl(Arena& arena, std::string_view name, Expr* body,
 namespace {
 
 TEST(EvalAdv, LetExpandSimple) {
-  EvalAdvFixture f;
+  SimFixture f;
   // let add1(a) = a + 1;
   FunctionArg arg;
   arg.name = "a";
@@ -84,7 +74,7 @@ TEST(EvalAdv, LetExpandSimple) {
 }
 
 TEST(EvalAdv, LetExpandDefaultArg) {
-  EvalAdvFixture f;
+  SimFixture f;
   // let inc(a, b = 1) = a + b;
   FunctionArg arg_a;
   arg_a.name = "a";
@@ -106,7 +96,7 @@ TEST(EvalAdv, LetExpandDefaultArg) {
 }
 
 TEST(EvalAdv, LetNoRecursive) {
-  EvalAdvFixture f;
+  SimFixture f;
   // let bad(a) = bad(a + 1); — recursive, should return X (not infinite loop).
   auto* body_call = MakeCall(f.arena, "bad", {[&]() {
                                auto* e = f.arena.Create<Expr>();
@@ -128,7 +118,7 @@ TEST(EvalAdv, LetNoRecursive) {
 }
 
 TEST(EvalAdv, LetDeclarativeScope) {
-  EvalAdvFixture f;
+  SimFixture f;
   // let get_k() = K;
   // K is set in the outer scope before let registration.
   MakeVar(f, "K", 32, 42);

@@ -1,36 +1,8 @@
 // §31.3.1: $setup
 
-#include <gtest/gtest.h>
-
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
+#include "fixture_elaborator.h"
 
 using namespace delta;
-
-struct ElabA705Fixture {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
-  bool has_errors = false;
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, ElabA705Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(cu->modules.back()->name);
-  f.has_errors = f.diag.HasErrors();
-  return design;
-}
 
 namespace {
 
@@ -39,7 +11,7 @@ namespace {
 // =============================================================================
 // $setup timing check elaborates
 TEST(ElabA705, SetupTimingCheckElaborates) {
-  ElabA705Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
@@ -53,7 +25,7 @@ TEST(ElabA705, SetupTimingCheckElaborates) {
 
 // Timing checks with specparam declarations elaborate
 TEST(ElabA705, TimingChecksWithSpecparamsElaborate) {
-  ElabA705Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
@@ -66,29 +38,11 @@ TEST(ElabA705, TimingChecksWithSpecparamsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-struct ElabA70501Fixture {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
-  bool has_errors = false;
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, ElabA70501Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(cu->modules.back()->name);
-  f.has_errors = f.diag.HasErrors();
-  return design;
-}
-
 // =============================================================================
 // A.7.5.1 $setup_timing_check — command structure
 // =============================================================================
 TEST(ElabA70501, SetupWithNotifierElaborates) {
-  ElabA70501Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
@@ -100,30 +54,12 @@ TEST(ElabA70501, SetupWithNotifierElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-struct ElabA70503Fixture {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
-  bool has_errors = false;
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, ElabA70503Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(cu->modules.back()->name);
-  f.has_errors = f.diag.HasErrors();
-  return design;
-}
-
 // =============================================================================
 // A.7.5.3 Elab — specify_terminal_descriptor with ranges
 // =============================================================================
 // Terminal with bit select elaborates
 TEST(ElabA70503, TerminalBitSelectElaborates) {
-  ElabA70503Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
@@ -137,7 +73,7 @@ TEST(ElabA70503, TerminalBitSelectElaborates) {
 
 // timing_check_event with posedge elaborates
 TEST(ElabA70503, TimingCheckEventPosedgeElaborates) {
-  ElabA70503Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
@@ -154,7 +90,7 @@ TEST(ElabA70503, TimingCheckEventPosedgeElaborates) {
 // =============================================================================
 // timing_check_event with no edge elaborates
 TEST(ElabA70503, TimingCheckEventNoEdgeElaborates) {
-  ElabA70503Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"

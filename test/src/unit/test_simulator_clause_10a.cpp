@@ -1,41 +1,16 @@
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "simulation/lowerer.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
 
+#include "fixture_simulator.h"
+
 using namespace delta;
-
-struct SimCh10Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimCh10Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
 
 // ---------------------------------------------------------------------------
 // 1. Simple blocking assignment: a = 5; check a == 5.
 // ---------------------------------------------------------------------------
 TEST(SimCh10, SimpleBlockingAssign) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int a;\n"
@@ -59,7 +34,7 @@ TEST(SimCh10, SimpleBlockingAssign) {
 // 2. Sequential blocking assignments: value available immediately.
 // ---------------------------------------------------------------------------
 TEST(SimCh10, SequentialBlockingImmediate) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int a, b;\n"
@@ -84,7 +59,7 @@ TEST(SimCh10, SequentialBlockingImmediate) {
 // 3. Blocking assignment with arithmetic expression.
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignExpression) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int a;\n"
@@ -108,7 +83,7 @@ TEST(SimCh10, BlockingAssignExpression) {
 // 4. Blocking assignment to bit-select.
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignBitSelect) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a;\n"
@@ -133,7 +108,7 @@ TEST(SimCh10, BlockingAssignBitSelect) {
 // 5. Blocking assignment to part-select.
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignPartSelect) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a;\n"
@@ -158,7 +133,7 @@ TEST(SimCh10, BlockingAssignPartSelect) {
 // 6. Blocking assignment splitting a packed value into parts.
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignSplitPacked) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] packed_val;\n"
@@ -188,7 +163,7 @@ TEST(SimCh10, BlockingAssignSplitPacked) {
 // 7. Blocking assignment with concatenation on RHS.
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignConcatRHS) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
@@ -215,7 +190,7 @@ TEST(SimCh10, BlockingAssignConcatRHS) {
 // 8. Blocking assignment with ternary on RHS.
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignTernary) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int sel, result;\n"
@@ -240,7 +215,7 @@ TEST(SimCh10, BlockingAssignTernary) {
 // 9. Blocking assignment in if-else: sequential execution order matters.
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignIfElse) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int x, y;\n"
@@ -268,7 +243,7 @@ TEST(SimCh10, BlockingAssignIfElse) {
 // 10. Blocking assignment in case statement.
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignCase) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [1:0] sel;\n"
@@ -299,7 +274,7 @@ TEST(SimCh10, BlockingAssignCase) {
 // 11. Blocking assignment in for loop (accumulate).
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignForLoop) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int sum;\n"
@@ -328,7 +303,7 @@ TEST(SimCh10, BlockingAssignForLoop) {
 // 12. Blocking assignment in begin-end block.
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignBeginEnd) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int a, b, c;\n"
@@ -356,7 +331,7 @@ TEST(SimCh10, BlockingAssignBeginEnd) {
 // 13. Blocking assignment with function call on RHS.
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignFunctionCall) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  function integer add(integer a, integer b);\n"
@@ -383,7 +358,7 @@ TEST(SimCh10, BlockingAssignFunctionCall) {
 // 14. Blocking assignment with system function ($clog2) on RHS.
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignSysClog2) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int result;\n"
@@ -408,7 +383,7 @@ TEST(SimCh10, BlockingAssignSysClog2) {
 // 15. Blocking assignment with unary operators (~, !).
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignUnaryOps) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int a;\n"
@@ -440,7 +415,7 @@ TEST(SimCh10, BlockingAssignUnaryOps) {
 // 16. Blocking assignment with unary logical NOT (!) and unary minus (-).
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignUnaryLogicalNotAndMinus) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int a, neg_result, not_result;\n"
@@ -473,7 +448,7 @@ TEST(SimCh10, BlockingAssignUnaryLogicalNotAndMinus) {
 // 17. Blocking assignment with arithmetic operators (+, -, *, /).
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignArithmeticOps) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int r_add, r_sub, r_mul, r_div;\n"
@@ -509,7 +484,7 @@ TEST(SimCh10, BlockingAssignArithmeticOps) {
 // 18. Blocking assignment with bitwise operators (&, |, ^).
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignBitwiseOps) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int a, b;\n"
@@ -547,7 +522,7 @@ TEST(SimCh10, BlockingAssignBitwiseOps) {
 // 19. Blocking assignment with shift operators (<<, >>).
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignShiftOps) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a;\n"
@@ -579,7 +554,7 @@ TEST(SimCh10, BlockingAssignShiftOps) {
 // 20. Blocking assignment with comparison operators.
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignComparisonOps) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int a, b;\n"
@@ -626,7 +601,7 @@ TEST(SimCh10, BlockingAssignComparisonOps) {
 // 21. Blocking assignment with logical operators (&&, ||).
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignLogicalOps) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int a, b;\n"
@@ -657,7 +632,7 @@ TEST(SimCh10, BlockingAssignLogicalOps) {
 // 22. Multiple blocking assignments to same variable (last wins).
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignLastWins) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int x;\n"
@@ -683,7 +658,7 @@ TEST(SimCh10, BlockingAssignLastWins) {
 // 23. Blocking assignment chain: a=1; b=a; c=b; check c==1.
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignChain) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int a, b, c;\n"
@@ -715,7 +690,7 @@ TEST(SimCh10, BlockingAssignChain) {
 // 24. Blocking assignment with type cast (signed').
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignTypeCast) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -742,7 +717,7 @@ TEST(SimCh10, BlockingAssignTypeCast) {
 // 25. Blocking assignment preserving width/truncation.
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignTruncation) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] narrow;\n"
@@ -768,7 +743,7 @@ TEST(SimCh10, BlockingAssignTruncation) {
 // 26. Verify .width and .ToUint64() for 8-bit variable.
 // ---------------------------------------------------------------------------
 TEST(SimCh10, VerifyWidthAndToUint64_8bit) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] val;\n"
@@ -793,7 +768,7 @@ TEST(SimCh10, VerifyWidthAndToUint64_8bit) {
 // 27. Verify .width and .ToUint64() for 32-bit int.
 // ---------------------------------------------------------------------------
 TEST(SimCh10, VerifyWidthAndToUint64_32bit) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int val;\n"
@@ -818,7 +793,7 @@ TEST(SimCh10, VerifyWidthAndToUint64_32bit) {
 // 28. Blocking assignment with ternary false branch.
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignTernaryFalse) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int sel, result;\n"
@@ -843,7 +818,7 @@ TEST(SimCh10, BlockingAssignTernaryFalse) {
 // 29. Blocking assignment with modulo operator (%).
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignModulo) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int result;\n"
@@ -868,7 +843,7 @@ TEST(SimCh10, BlockingAssignModulo) {
 // 30. Blocking assignment with unary plus (+).
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignUnaryPlus) {
-  SimCh10Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  int a, result;\n"

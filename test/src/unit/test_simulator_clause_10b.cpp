@@ -1,41 +1,16 @@
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "simulation/lowerer.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
 
+#include "fixture_simulator.h"
+
 using namespace delta;
-
-struct SimCh10bFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimCh10bFixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
 
 // ---------------------------------------------------------------------------
 // §10.4.2: Simple nonblocking assignment — value updates after scheduler run.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, SimpleNBA) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] a;\n"
@@ -60,7 +35,7 @@ TEST(SimCh10b, SimpleNBA) {
 // The RHS is sampled in the Active region but the LHS update is deferred.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBADeferredUpdate) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] a;\n"
@@ -92,7 +67,7 @@ TEST(SimCh10b, NBADeferredUpdate) {
 // §10.4.2: Multiple NBAs to same variable — last one wins in NBA region.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, MultipleNBASameVarLastWins) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] a;\n"
@@ -118,7 +93,7 @@ TEST(SimCh10b, MultipleNBASameVarLastWins) {
 // §10.4.2: NBA swap pattern — a <= b; b <= a; both capture old values.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBASwapPattern) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] a;\n"
@@ -150,7 +125,7 @@ TEST(SimCh10b, NBASwapPattern) {
 // §10.4.2: NBA with expression on RHS.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAExpressionRHS) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] a;\n"
@@ -176,7 +151,7 @@ TEST(SimCh10b, NBAExpressionRHS) {
 // §10.4.2: NBA with bit-select on LHS.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBABitSelectLHS) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a;\n"
@@ -202,7 +177,7 @@ TEST(SimCh10b, NBABitSelectLHS) {
 // §10.4.2: NBA with part-select on LHS.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAPartSelectLHS) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a;\n"
@@ -228,7 +203,7 @@ TEST(SimCh10b, NBAPartSelectLHS) {
 // §10.4.2: NBA with concatenation on RHS.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAConcatenationRHS) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] hi;\n"
@@ -256,7 +231,7 @@ TEST(SimCh10b, NBAConcatenationRHS) {
 // §10.4.2: NBA with ternary operator on RHS.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBATernaryRHS) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] sel;\n"
@@ -282,7 +257,7 @@ TEST(SimCh10b, NBATernaryRHS) {
 // §10.4.2: NBA in always_ff block (canonical use for sequential logic).
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAInAlwaysFF) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk;\n"
@@ -313,7 +288,7 @@ TEST(SimCh10b, NBAInAlwaysFF) {
 // §10.4.2: NBA in initial block.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAInInitialBlock) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] x;\n"
@@ -337,7 +312,7 @@ TEST(SimCh10b, NBAInInitialBlock) {
 // §10.4.2: NBA with if-else control flow.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAWithIfElse) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] a;\n"
@@ -377,7 +352,7 @@ TEST(SimCh10b, NBAWithIfElse) {
 // §10.4.2: NBA with case statement.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAWithCase) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] sel;\n"
@@ -408,7 +383,7 @@ TEST(SimCh10b, NBAWithCase) {
 // §10.4.2: NBA in for loop.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAInForLoop) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] acc;\n"
@@ -437,7 +412,7 @@ TEST(SimCh10b, NBAInForLoop) {
 // §10.4.2: NBA with function call on RHS.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAFunctionCallRHS) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] result;\n"
@@ -465,7 +440,7 @@ TEST(SimCh10b, NBAFunctionCallRHS) {
 // stage2 <= stage1; stage1 <= in; (simulates a two-stage pipeline)
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAPipelinePattern) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] in_val;\n"
@@ -499,7 +474,7 @@ TEST(SimCh10b, NBAPipelinePattern) {
 // §10.4.2: NBA with different widths — truncation.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAWidthTruncation) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] narrow;\n"
@@ -524,7 +499,7 @@ TEST(SimCh10b, NBAWidthTruncation) {
 // §10.4.2: NBA with different widths — zero extension.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAWidthExtension) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] wide;\n"
@@ -550,7 +525,7 @@ TEST(SimCh10b, NBAWidthExtension) {
 // §10.4.2: NBA with arithmetic expression on RHS.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAArithmeticExpression) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] a;\n"
@@ -578,7 +553,7 @@ TEST(SimCh10b, NBAArithmeticExpression) {
 // §10.4.2: NBA with bitwise operators on RHS.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBABitwiseOperators) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a;\n"
@@ -616,7 +591,7 @@ TEST(SimCh10b, NBABitwiseOperators) {
 // §10.4.2: NBA with shift operators on RHS.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAShiftOperators) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] val;\n"
@@ -649,7 +624,7 @@ TEST(SimCh10b, NBAShiftOperators) {
 // §10.4.2: NBA with comparison result on RHS.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAComparisonResult) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] a;\n"
@@ -687,7 +662,7 @@ TEST(SimCh10b, NBAComparisonResult) {
 // §10.4.2: Mixed blocking and nonblocking in same block — blocking first.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, MixedBlockingAndNBA) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] a;\n"
@@ -718,7 +693,7 @@ TEST(SimCh10b, MixedBlockingAndNBA) {
 // §10.4.2: Multiple NBAs in sequence — each captures current blocking state.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, MultipleNBAsInSequence) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] a;\n"
@@ -751,7 +726,7 @@ TEST(SimCh10b, MultipleNBAsInSequence) {
 // §10.4.2: NBA preserving width — result width matches LHS declaration.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAPreservesWidth) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] a;\n"
@@ -782,7 +757,7 @@ TEST(SimCh10b, NBAPreservesWidth) {
 // §10.4.2: NBA register file pattern — array elements via indexed NBA.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBARegisterFilePattern) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] regfile [0:3];\n"
@@ -818,7 +793,7 @@ TEST(SimCh10b, NBARegisterFilePattern) {
 // §10.4.2: Verify .width and .ToUint64() on NBA results.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAWidthAndToUint64) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [3:0] nibble;\n"
@@ -855,7 +830,7 @@ TEST(SimCh10b, NBAWidthAndToUint64) {
 // §10.4.2: NBA case default branch.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBACaseDefaultBranch) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] sel;\n"
@@ -885,7 +860,7 @@ TEST(SimCh10b, NBACaseDefaultBranch) {
 // §10.4.2: NBA with bitwise NOT on RHS.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBABitwiseNot) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a;\n"
@@ -912,7 +887,7 @@ TEST(SimCh10b, NBABitwiseNot) {
 // §10.4.2: NBA with replication on RHS.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAReplicationRHS) {
-  SimCh10bFixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] result;\n"

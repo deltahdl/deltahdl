@@ -1,16 +1,11 @@
 // §8.4: Objects (class instance)
 
-#include <gtest/gtest.h>
 
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "parser/ast.h"
 #include "simulation/class_object.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
@@ -18,16 +13,9 @@ using namespace delta;
 // Test fixture — provides arena, scheduler, sim context, and helpers to
 // build class types and objects at the AST/runtime level.
 // =============================================================================
-struct ClassFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
 // Build a simple ClassTypeInfo and register it with the context.
 static ClassTypeInfo* MakeClassType(
-    ClassFixture& f, std::string_view name,
+    SimFixture& f, std::string_view name,
     const std::vector<std::string_view>& props) {
   auto* info = f.arena.Create<ClassTypeInfo>();
   info->name = name;
@@ -39,7 +27,7 @@ static ClassTypeInfo* MakeClassType(
 }
 
 // Allocate a ClassObject of the given type, returning (handle_id, object*).
-static std::pair<uint64_t, ClassObject*> MakeObj(ClassFixture& f,
+static std::pair<uint64_t, ClassObject*> MakeObj(SimFixture& f,
                                                  ClassTypeInfo* type) {
   auto* obj = f.arena.Create<ClassObject>();
   obj->type = type;
@@ -58,7 +46,7 @@ namespace {
 // §8.6-8.8: Class declaration and new() constructor
 // =============================================================================
 TEST(ClassSim, AllocateNewObject) {
-  ClassFixture f;
+  SimFixture f;
   auto* type = MakeClassType(f, "Packet", {"header", "payload"});
   auto [handle, obj] = MakeObj(f, type);
 
@@ -68,7 +56,7 @@ TEST(ClassSim, AllocateNewObject) {
 }
 
 TEST(ClassSim, NewReturnsUniqueHandles) {
-  ClassFixture f;
+  SimFixture f;
   auto* type = MakeClassType(f, "MyClass", {"x"});
   auto [h1, _1] = MakeObj(f, type);
   auto [h2, _2] = MakeObj(f, type);
@@ -77,7 +65,7 @@ TEST(ClassSim, NewReturnsUniqueHandles) {
 }
 
 TEST(ClassSim, HandleToObjectLookup) {
-  ClassFixture f;
+  SimFixture f;
   auto* type = MakeClassType(f, "Foo", {"val"});
   auto [handle, obj] = MakeObj(f, type);
 
@@ -91,19 +79,19 @@ TEST(ClassSim, HandleToObjectLookup) {
 TEST(ClassSim, NullHandleIsZero) { EXPECT_EQ(kNullClassHandle, 0u); }
 
 TEST(ClassSim, GetClassObjectNullReturnsNullptr) {
-  ClassFixture f;
+  SimFixture f;
   auto* obj = f.ctx.GetClassObject(kNullClassHandle);
   EXPECT_EQ(obj, nullptr);
 }
 
 TEST(ClassSim, GetClassObjectInvalidReturnsNullptr) {
-  ClassFixture f;
+  SimFixture f;
   auto* obj = f.ctx.GetClassObject(99999);
   EXPECT_EQ(obj, nullptr);
 }
 
 TEST(ClassSim, ClassTypeRegistryLookup) {
-  ClassFixture f;
+  SimFixture f;
   auto* type = MakeClassType(f, "Registry", {"x"});
 
   auto* found = f.ctx.FindClassType("Registry");
@@ -114,7 +102,7 @@ TEST(ClassSim, ClassTypeRegistryLookup) {
 }
 
 TEST(ClassSim, MultipleObjectsSameType) {
-  ClassFixture f;
+  SimFixture f;
   auto* type = MakeClassType(f, "Widget", {"value"});
 
   auto [h1, o1] = MakeObj(f, type);

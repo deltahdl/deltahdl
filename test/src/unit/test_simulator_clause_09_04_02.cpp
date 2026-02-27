@@ -1,45 +1,18 @@
 // §9.4.2: Event control
 
-#include <gtest/gtest.h>
 
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "simulation/lowerer.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
 
+#include "fixture_simulator.h"
+
 using namespace delta;
-
-struct SimA605Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA605Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
 
 namespace {
 
 // §9.4.2: posedge event control triggers on 0->1 transition
 TEST(SimA605, EventControlPosedge) {
-  SimA605Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk;\n"
@@ -64,7 +37,7 @@ TEST(SimA605, EventControlPosedge) {
 
 // §9.4.2: negedge event control triggers on 1->0 transition
 TEST(SimA605, EventControlNegedge) {
-  SimA605Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk;\n"
@@ -89,7 +62,7 @@ TEST(SimA605, EventControlNegedge) {
 
 // §9.4.2: any-change event control (no edge specified)
 TEST(SimA605, EventControlAnyChange) {
-  SimA605Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] sig;\n"
@@ -114,7 +87,7 @@ TEST(SimA605, EventControlAnyChange) {
 
 // §9.4: multiple timing controls in sequence
 TEST(SimA605, MultipleTimingControls) {
-  SimA605Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"

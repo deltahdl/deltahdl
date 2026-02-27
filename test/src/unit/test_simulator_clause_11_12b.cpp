@@ -1,25 +1,14 @@
 // §11.12: Let construct
 
-#include <gtest/gtest.h>
 
 #include <cstdint>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "simulation/assertion.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
-
-struct SampledLetFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
 
 static Expr* SLMakeId(Arena& arena, std::string_view name) {
   auto* e = arena.Create<Expr>();

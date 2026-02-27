@@ -11,6 +11,7 @@ include(GoogleTest)
 function(add_unit_test name)
     add_executable(${name} src/unit/${name}.cpp)
     target_link_libraries(${name} PRIVATE deltahdl_lib GTest::gtest_main)
+    target_include_directories(${name} PRIVATE ${CMAKE_SOURCE_DIR}/lib/test)
     gtest_discover_tests(${name})
 endfunction()
 

@@ -1,17 +1,9 @@
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "simulation/lowerer.h"
 #include "simulation/process.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/variable.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
@@ -30,15 +22,7 @@ using namespace delta;
 //   - A single time slot is divided into multiple regions for ordering.
 // ===========================================================================
 
-struct SimCh43Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc43(const std::string& src, SimCh43Fixture& f) {
+static RtlirDesign* ElaborateSrc43(const std::string& src, SimFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
@@ -48,7 +32,7 @@ static RtlirDesign* ElaborateSrc43(const std::string& src, SimCh43Fixture& f) {
 }
 
 static uint64_t RunAndGet43(const std::string& src, const char* var_name) {
-  SimCh43Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc43(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0;
@@ -79,7 +63,7 @@ TEST(SimCh43, InitialProcedureIsProcess) {
 // §4.3 Process: always_comb is a process that responds to input changes.
 // ---------------------------------------------------------------------------
 TEST(SimCh43, AlwaysCombIsProcess) {
-  SimCh43Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc43(
       "module t;\n"
       "  logic [7:0] a, b;\n"
@@ -98,7 +82,7 @@ TEST(SimCh43, AlwaysCombIsProcess) {
 // §4.3 Process: always_latch is a process for latch-based logic.
 // ---------------------------------------------------------------------------
 TEST(SimCh43, AlwaysLatchIsProcess) {
-  SimCh43Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc43(
       "module t;\n"
       "  logic [7:0] d, q;\n"
@@ -121,7 +105,7 @@ TEST(SimCh43, AlwaysLatchIsProcess) {
 // §4.3 Process: always_ff is a process for flip-flop-based logic.
 // ---------------------------------------------------------------------------
 TEST(SimCh43, AlwaysFFIsProcess) {
-  SimCh43Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc43(
       "module t;\n"
       "  logic clk;\n"
@@ -145,7 +129,7 @@ TEST(SimCh43, AlwaysFFIsProcess) {
 // §4.3 Process: continuous assignment is an implicit process.
 // ---------------------------------------------------------------------------
 TEST(SimCh43, ContinuousAssignIsProcess) {
-  SimCh43Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc43(
       "module t;\n"
       "  logic [7:0] src, dst;\n"
@@ -182,7 +166,7 @@ TEST(SimCh43, ProceduralAssignmentInProcess) {
 // A blocking assignment changes state, creating an update event.
 // ---------------------------------------------------------------------------
 TEST(SimCh43, BlockingAssignCreatesUpdateEvent) {
-  SimCh43Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc43(
       "module t;\n"
       "  logic [7:0] a, b;\n"
@@ -202,7 +186,7 @@ TEST(SimCh43, BlockingAssignCreatesUpdateEvent) {
 // in the NBA region.
 // ---------------------------------------------------------------------------
 TEST(SimCh43, NonBlockingAssignCreatesUpdateEvent) {
-  SimCh43Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc43(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -222,7 +206,7 @@ TEST(SimCh43, NonBlockingAssignCreatesUpdateEvent) {
 // §4.3 Update event: continuous assignment change propagates as update event.
 // ---------------------------------------------------------------------------
 TEST(SimCh43, ContinuousAssignUpdateEvent) {
-  SimCh43Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc43(
       "module t;\n"
       "  logic [7:0] a, b, c;\n"
@@ -244,7 +228,7 @@ TEST(SimCh43, ContinuousAssignUpdateEvent) {
 // always_comb is sensitive to all RHS variables and re-evaluates on change.
 // ---------------------------------------------------------------------------
 TEST(SimCh43, EvaluationEventOnInputChange) {
-  SimCh43Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc43(
       "module t;\n"
       "  logic [7:0] a, result;\n"
@@ -267,7 +251,7 @@ TEST(SimCh43, EvaluationEventOnInputChange) {
 // event all evaluate.
 // ---------------------------------------------------------------------------
 TEST(SimCh43, MultipleProcessesSensitiveToSameEvent) {
-  SimCh43Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc43(
       "module t;\n"
       "  logic [7:0] src, r1, r2;\n"
@@ -289,7 +273,7 @@ TEST(SimCh43, MultipleProcessesSensitiveToSameEvent) {
 // to the same variable both evaluate when the source is set.
 // ---------------------------------------------------------------------------
 TEST(SimCh43, MixedProcessTypesSensitiveToSameVariable) {
-  SimCh43Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc43(
       "module t;\n"
       "  logic [7:0] src, via_assign, via_comb;\n"
@@ -310,7 +294,7 @@ TEST(SimCh43, MixedProcessTypesSensitiveToSameVariable) {
 // §4.3 Simulation time: time starts at zero.
 // ---------------------------------------------------------------------------
 TEST(SimCh43, SimulationTimeStartsAtZero) {
-  SimCh43Fixture f;
+  SimFixture f;
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
 }
 
@@ -318,7 +302,7 @@ TEST(SimCh43, SimulationTimeStartsAtZero) {
 // §4.3 Simulation time: processes with no delays execute at time 0.
 // ---------------------------------------------------------------------------
 TEST(SimCh43, NoDelayExecutesAtTimeZero) {
-  SimCh43Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc43(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -336,7 +320,7 @@ TEST(SimCh43, NoDelayExecutesAtTimeZero) {
 // §4.3 Simulation time: a #delay advances simulation time.
 // ---------------------------------------------------------------------------
 TEST(SimCh43, DelayAdvancesSimulationTime) {
-  SimCh43Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc43(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -376,7 +360,7 @@ TEST(SimCh43, MultipleDelaysAccumulate) {
 // order (time never goes backwards).
 // ---------------------------------------------------------------------------
 TEST(SimCh43, EventsExecuteInChronologicalOrder) {
-  SimCh43Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc43(
       "module t;\n"
       "  logic [7:0] a, b;\n"
@@ -402,7 +386,7 @@ TEST(SimCh43, EventsExecuteInChronologicalOrder) {
 // same process demonstrate region ordering.
 // ---------------------------------------------------------------------------
 TEST(SimCh43, ActiveRegionBeforeNBARegion) {
-  SimCh43Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc43(
       "module t;\n"
       "  logic [7:0] a, b;\n"
@@ -426,7 +410,7 @@ TEST(SimCh43, ActiveRegionBeforeNBARegion) {
 // be observed by processes that re-evaluate.
 // ---------------------------------------------------------------------------
 TEST(SimCh43, NBAUpdateVisibleAfterActiveRegion) {
-  SimCh43Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc43(
       "module t;\n"
       "  logic [7:0] x, y;\n"
@@ -466,7 +450,7 @@ TEST(SimCh43, ProcessMaintainsStateAcrossTime) {
 // time an input variable changes, tracking intermediate values.
 // ---------------------------------------------------------------------------
 TEST(SimCh43, ProcessRespondsToMultipleInputChanges) {
-  SimCh43Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc43(
       "module t;\n"
       "  logic [7:0] a, doubled;\n"
@@ -490,7 +474,7 @@ TEST(SimCh43, ProcessRespondsToMultipleInputChanges) {
 // (initial, always_comb, assign) all execute within the same simulation.
 // ---------------------------------------------------------------------------
 TEST(SimCh43, ConcurrentProcessTypes) {
-  SimCh43Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc43(
       "module t;\n"
       "  logic [7:0] a, b, c;\n"
@@ -513,7 +497,7 @@ TEST(SimCh43, ConcurrentProcessTypes) {
 // which may produce further update events (chain of assign statements).
 // ---------------------------------------------------------------------------
 TEST(SimCh43, UpdateEventCascade) {
-  SimCh43Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc43(
       "module t;\n"
       "  logic [7:0] a, b, c, d;\n"
@@ -539,7 +523,7 @@ TEST(SimCh43, UpdateEventCascade) {
 // Blocking in Active, NBA applied later, always_comb re-evaluates.
 // ---------------------------------------------------------------------------
 TEST(SimCh43, RegionOrderingPredictableInteraction) {
-  SimCh43Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc43(
       "module t;\n"
       "  logic [7:0] a, b, result;\n"
@@ -562,7 +546,7 @@ TEST(SimCh43, RegionOrderingPredictableInteraction) {
 // combinational function and makes it visible to other processes.
 // ---------------------------------------------------------------------------
 TEST(SimCh43, ProcessProducesOutputVisibleToOthers) {
-  SimCh43Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc43(
       "module t;\n"
       "  logic [7:0] a, mid, out;\n"
@@ -584,7 +568,7 @@ TEST(SimCh43, ProcessProducesOutputVisibleToOthers) {
 // execute in time order. Processes at time 5 execute before time 10.
 // ---------------------------------------------------------------------------
 TEST(SimCh43, DiscreteEventsInTimeOrder) {
-  SimCh43Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc43(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -837,25 +821,8 @@ TEST(SimCh43, AllRegionsDefined) {
 // introduced in §4.2, covering parallel process execution, sequential
 // ordering within processes, and interaction between concurrent elements.
 // ===========================================================================
-struct SimCh4Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimCh4Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 static uint64_t RunAndGet(const std::string& src, const char* var_name) {
-  SimCh4Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   if (!design) return 0;
@@ -873,7 +840,7 @@ static uint64_t RunAndGet(const std::string& src, const char* var_name) {
 //    (continuous assignment) coexist and interact.
 // ---------------------------------------------------------------------------
 TEST(SimCh4, BehavioralAndDataflowCoexist) {
-  SimCh4Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
@@ -898,7 +865,7 @@ TEST(SimCh4, BehavioralAndDataflowCoexist) {
 //    with different delays both produce correct final values.
 // ---------------------------------------------------------------------------
 TEST(SimCh4, MultipleProcessesAcrossTime) {
-  SimCh4Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
@@ -929,7 +896,7 @@ TEST(SimCh4, MultipleProcessesAcrossTime) {
 //     always_comb c = b * 2. All three execute and propagate.
 // ---------------------------------------------------------------------------
 TEST(SimCh4, CascadeOfProcesses) {
-  SimCh4Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, c;\n"
@@ -952,7 +919,7 @@ TEST(SimCh4, CascadeOfProcesses) {
 //     simulation time.
 // ---------------------------------------------------------------------------
 TEST(SimCh4, InterleavedTimeExecution) {
-  SimCh4Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"

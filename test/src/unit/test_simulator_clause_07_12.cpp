@@ -1,33 +1,18 @@
 // §7.12: Array manipulation methods
 
-#include <gtest/gtest.h>
 
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "lexer/lexer.h"
 #include "parser/ast.h"
-#include "parser/parser.h"
 #include "simulation/eval.h"
 #include "simulation/eval_array.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // =============================================================================
 // Helper fixture
 // =============================================================================
-struct AggFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static void MakeDynArray(AggFixture& f, std::string_view name,
+static void MakeDynArray(SimFixture& f, std::string_view name,
                          const std::vector<uint64_t>& vals) {
   auto* q = f.ctx.CreateQueue(name, 32);
   for (auto v : vals) {
@@ -43,7 +28,7 @@ static void MakeDynArray(AggFixture& f, std::string_view name,
 namespace {
 
 TEST(DynArrayMethod, SumReduction) {
-  AggFixture f;
+  SimFixture f;
   MakeDynArray(f, "d", {10, 20, 30, 40});
   Logic4Vec out{};
   bool ok = TryEvalArrayProperty("d", "sum", f.ctx, f.arena, out);
@@ -52,7 +37,7 @@ TEST(DynArrayMethod, SumReduction) {
 }
 
 TEST(DynArrayMethod, SizeProperty) {
-  AggFixture f;
+  SimFixture f;
   MakeDynArray(f, "d", {1, 2, 3});
   Logic4Vec out{};
   bool ok = TryEvalArrayProperty("d", "size", f.ctx, f.arena, out);
@@ -61,7 +46,7 @@ TEST(DynArrayMethod, SizeProperty) {
 }
 
 TEST(DynArrayMethod, MinReduction) {
-  AggFixture f;
+  SimFixture f;
   MakeDynArray(f, "d", {50, 10, 30});
   Logic4Vec out{};
   bool ok = TryEvalArrayProperty("d", "min", f.ctx, f.arena, out);
@@ -70,7 +55,7 @@ TEST(DynArrayMethod, MinReduction) {
 }
 
 TEST(DynArrayMethod, MaxReduction) {
-  AggFixture f;
+  SimFixture f;
   MakeDynArray(f, "d", {50, 10, 30});
   Logic4Vec out{};
   bool ok = TryEvalArrayProperty("d", "max", f.ctx, f.arena, out);

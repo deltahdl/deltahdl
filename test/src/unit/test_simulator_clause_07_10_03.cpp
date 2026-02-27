@@ -1,27 +1,16 @@
 // §7.10.3: Persistence of references to elements of a queue
 
-#include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // ============================================================================
 // Test fixture
 // ============================================================================
-struct QueueRefFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 // ============================================================================
 // AST helpers
 // ============================================================================
@@ -99,7 +88,7 @@ static Stmt* MkReturn(Arena& arena, Expr* expr) {
 // ============================================================================
 // Queue helper: populate a queue with integer values.
 // ============================================================================
-static QueueObject* MakeQueue(QueueRefFixture& f, std::string_view name,
+static QueueObject* MakeQueue(SimFixture& f, std::string_view name,
                               const std::vector<uint64_t>& vals) {
   auto* q = f.ctx.CreateQueue(name, 32);
   for (auto v : vals) {
@@ -110,7 +99,7 @@ static QueueObject* MakeQueue(QueueRefFixture& f, std::string_view name,
 }
 
 // Register an automatic void function with given args and body.
-static void RegAutoFunc(QueueRefFixture& f, std::string_view name,
+static void RegAutoFunc(SimFixture& f, std::string_view name,
                         std::vector<FunctionArg> args,
                         std::vector<Stmt*> body) {
   auto* func = f.arena.Create<ModuleItem>();
@@ -131,7 +120,7 @@ namespace {
 // Ref outdated by delete(1): q.delete(1) removes the bound element.
 // Write 99 to ref — should NOT propagate back.
 TEST(QueueRef, OutdatedByDelete) {
-  QueueRefFixture f;
+  SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20, 30});
 
   // function automatic void test_fn(ref int v);
@@ -155,7 +144,7 @@ TEST(QueueRef, OutdatedByDelete) {
 
 // Ref outdated by pop_front when the ref points to element 0.
 TEST(QueueRef, OutdatedByPopFront) {
-  QueueRefFixture f;
+  SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20, 30});
 
   // function automatic void test_fn(ref int v);
@@ -199,7 +188,7 @@ static Expr* LspInt(Arena& arena, uint64_t val) {
 
 // Ref survives push_back: push_back never outdates refs.
 TEST(QueueRef, SurvivesPushBack) {
-  QueueRefFixture f;
+  SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20, 30});
 
   // function automatic void test_fn(ref int v);

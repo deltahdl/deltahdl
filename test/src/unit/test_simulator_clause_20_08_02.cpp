@@ -1,29 +1,18 @@
 // §20.8.2: Real math functions
 
-#include <gtest/gtest.h>
 
 #include <cstring>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // ============================================================================
 // Test helpers (shared with test_systask.cpp)
 // ============================================================================
-
-struct SysTaskMathFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
 
 static double ResultToDouble(const Logic4Vec& vec) {
   uint64_t bits = vec.ToUint64();

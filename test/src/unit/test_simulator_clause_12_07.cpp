@@ -1,35 +1,23 @@
 // §12.7: Loop statements
 
-#include <gtest/gtest.h>
 
 #include <cstdint>
 #include <string_view>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "common/types.h"
 #include "parser/ast.h"
 #include "simulation/awaiters.h"
 #include "simulation/exec_task.h"
 #include "simulation/process.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
 #include "simulation/stmt_exec.h"
 #include "simulation/stmt_result.h"
 #include "simulation/variable.h"
 
+#include "fixture_simulator.h"
+
 using namespace delta;
 
 // Helper fixture providing scheduler, arena, diag, and sim context.
-struct StmtFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag, /*seed=*/42};
-};
-
 // Helper to create a simple identifier expression.
 Expr* MakeIdent(Arena& arena, std::string_view name) {
   auto* e = arena.Create<Expr>();
@@ -246,26 +234,9 @@ TEST(StmtExec, ForeachIteratorVariableAccessible) {
   EXPECT_EQ(last->value.ToUint64(), 4u);
 }
 
-struct SimA608Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA608Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // Mixed loop types: repeat inside for
 TEST(SimA608, MixedRepeatInsideFor) {
-  SimA608Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"

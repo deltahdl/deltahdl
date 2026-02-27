@@ -1,28 +1,18 @@
 // §11.5.1: Vector bit-select and part-select addressing
 
-#include <gtest/gtest.h>
 
 #include <cstring>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"  // StructTypeInfo, StructFieldInfo
 
+#include "fixture_simulator.h"
+
 using namespace delta;
 
 // Shared fixture for advanced expression evaluation tests (§11 phases 22+).
-struct EvalAdvFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 static Expr* MakeInt(Arena& arena, uint64_t val) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
@@ -37,7 +27,7 @@ static Expr* MakeId(Arena& arena, std::string_view name) {
   return e;
 }
 
-static Variable* MakeVar(EvalAdvFixture& f, std::string_view name,
+static Variable* MakeVar(SimFixture& f, std::string_view name,
                          uint32_t width, uint64_t val) {
   auto* var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4VecVal(f.arena, width, val);
@@ -50,7 +40,7 @@ namespace {
 // Part-select partial OOB — §11.5.1
 // ==========================================================================
 TEST(EvalAdv, PartSelectPartialOOB) {
-  EvalAdvFixture f;
+  SimFixture f;
   // §11.5.1: v[6 +: 4] on 8-bit var → bits 6,7 valid, bits 8,9 OOB → X.
   MakeVar(f, "ov", 8, 0xFF);
   auto* sel = f.arena.Create<Expr>();
@@ -71,7 +61,7 @@ TEST(EvalAdv, PartSelectPartialOOB) {
 // §7.4.5: X/Z address on array gives OOB (X) value
 // ==========================================================================
 TEST(EvalAdv, ArrayXZAddrReturnsX) {
-  EvalAdvFixture f;
+  SimFixture f;
   // arr[0]=0x11, arr[1]=0x22 (8-bit elements).
   MakeVar(f, "arr4[0]", 8, 0x11);
   MakeVar(f, "arr4[1]", 8, 0x22);
@@ -104,15 +94,7 @@ TEST(EvalAdv, ArrayXZAddrReturnsX) {
 }
 
 // Shared fixture for expression evaluation tests.
-struct EvalOpXZFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static Variable* MakeVar4(EvalOpXZFixture& f, std::string_view name,
+static Variable* MakeVar4(SimFixture& f, std::string_view name,
                           uint32_t width, uint64_t aval, uint64_t bval) {
   auto* var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4Vec(f.arena, width);
@@ -125,7 +107,7 @@ static Variable* MakeVar4(EvalOpXZFixture& f, std::string_view name,
 // Bit-select/part-select X/Z address — §11.5.1
 // ==========================================================================
 TEST(EvalOpXZ, BitSelectXAddr) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // v[x] should return 1'bx when index is unknown.
   auto* v = f.ctx.CreateVariable("bsv", 8);
   v->value = MakeLogic4VecVal(f.arena, 8, 0xAB);
@@ -140,7 +122,7 @@ TEST(EvalOpXZ, BitSelectXAddr) {
 }
 
 TEST(EvalOpXZ, PartSelectXAddr) {
-  EvalOpXZFixture f;
+  SimFixture f;
   // v[x +: 4] should return all-x when base index is unknown.
   auto* v = f.ctx.CreateVariable("psv", 8);
   v->value = MakeLogic4VecVal(f.arena, 8, 0xAB);
@@ -156,26 +138,9 @@ TEST(EvalOpXZ, PartSelectXAddr) {
   EXPECT_NE(result.words[0].bval, 0u);  // result has x bits
 }
 
-struct SimA83Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA83Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // § constant_range — part select
 TEST(SimA83, PartSelectRange) {
-  SimA83Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] data;\n"
@@ -197,7 +162,7 @@ TEST(SimA83, PartSelectRange) {
 
 // § indexed_range — plus-colon indexed part select
 TEST(SimA83, IndexedPartSelectPlus) {
-  SimA83Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] data;\n"
@@ -219,7 +184,7 @@ TEST(SimA83, IndexedPartSelectPlus) {
 
 // § indexed_range — minus-colon indexed part select
 TEST(SimA83, IndexedPartSelectMinus) {
-  SimA83Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] data;\n"
@@ -239,26 +204,9 @@ TEST(SimA83, IndexedPartSelectMinus) {
   EXPECT_EQ(var->value.ToUint64(), 0xAu);
 }
 
-struct SimA84Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA84Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // § primary — bit_select
 TEST(SimA84, PrimaryBitSelect) {
-  SimA84Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] data;\n"
@@ -277,7 +225,7 @@ TEST(SimA84, PrimaryBitSelect) {
 
 // § primary — part_select_range (constant range)
 TEST(SimA84, PrimaryPartSelectRange) {
-  SimA84Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] data;\n"
@@ -296,7 +244,7 @@ TEST(SimA84, PrimaryPartSelectRange) {
 
 // § primary — indexed part select (plus)
 TEST(SimA84, PrimaryIndexedPartSelectPlus) {
-  SimA84Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] data;\n"
@@ -315,7 +263,7 @@ TEST(SimA84, PrimaryIndexedPartSelectPlus) {
 
 // § primary — indexed part select (minus)
 TEST(SimA84, PrimaryIndexedPartSelectMinus) {
-  SimA84Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] data;\n"
@@ -332,26 +280,9 @@ TEST(SimA84, PrimaryIndexedPartSelectMinus) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
-struct SimA85Fixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
-static RtlirDesign* ElaborateSrc(const std::string& src, SimA85Fixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 // § variable_lvalue — bit select blocking assignment
 TEST(SimA85, VarLvalueBitSelect) {
-  SimA85Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -369,7 +300,7 @@ TEST(SimA85, VarLvalueBitSelect) {
 
 // § variable_lvalue — indexed part select + blocking assignment
 TEST(SimA85, VarLvalueIndexedPartSelectPlus) {
-  SimA85Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] x;\n"
@@ -387,7 +318,7 @@ TEST(SimA85, VarLvalueIndexedPartSelectPlus) {
 
 // § variable_lvalue — indexed part select - blocking assignment
 TEST(SimA85, VarLvalueIndexedPartSelectMinus) {
-  SimA85Fixture f;
+  SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] x;\n"

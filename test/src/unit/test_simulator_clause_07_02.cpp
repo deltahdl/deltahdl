@@ -1,32 +1,17 @@
 // §7.2: Structures
 
-#include <gtest/gtest.h>
 
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "lexer/lexer.h"
 #include "parser/ast.h"
-#include "parser/parser.h"
 #include "simulation/eval.h"
 #include "simulation/eval_array.h"
-#include "simulation/sim_context.h"
+
+#include "fixture_simulator.h"
 
 using namespace delta;
 
 // =============================================================================
 // Helper fixture
 // =============================================================================
-struct AggFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-};
-
 // =============================================================================
 // §7.2 Struct type metadata — StructTypeInfo registration
 // =============================================================================
@@ -42,7 +27,7 @@ static void VerifyStructField(const StructFieldInfo& field,
 namespace {
 
 TEST(StructType, RegisterAndFind_Metadata) {
-  AggFixture f;
+  SimFixture f;
   StructTypeInfo info;
   info.type_name = "point_t";
   info.is_packed = true;
@@ -60,7 +45,7 @@ TEST(StructType, RegisterAndFind_Metadata) {
 }
 
 TEST(StructType, RegisterAndFind_Fields) {
-  AggFixture f;
+  SimFixture f;
   StructTypeInfo info;
   info.type_name = "point_t";
   info.is_packed = true;
@@ -78,12 +63,12 @@ TEST(StructType, RegisterAndFind_Fields) {
 }
 
 TEST(StructType, FindNonexistent) {
-  AggFixture f;
+  SimFixture f;
   EXPECT_EQ(f.ctx.FindStructType("no_such_type"), nullptr);
 }
 
 TEST(StructType, SetVariableStructType) {
-  AggFixture f;
+  SimFixture f;
   StructTypeInfo info;
   info.type_name = "color_t";
   info.is_packed = true;
@@ -103,12 +88,12 @@ TEST(StructType, SetVariableStructType) {
 }
 
 TEST(StructType, GetVariableStructTypeUnknown) {
-  AggFixture f;
+  SimFixture f;
   EXPECT_EQ(f.ctx.GetVariableStructType("nonexistent"), nullptr);
 }
 
 TEST(StructType, FieldTypeKindPreserved) {
-  AggFixture f;
+  SimFixture f;
   StructTypeInfo info;
   info.type_name = "typed_s";
   info.is_packed = true;
