@@ -1,6 +1,7 @@
 // Non-LRM tests
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 
 using namespace delta;
 
@@ -535,22 +536,7 @@ TEST(ParserSection29, MixedLevelEdgeSensitive) {
   VerifyUdpTableSpotChecks(udp, checks, std::size(checks));
 }
 
-struct SpecifyParseTest : ::testing::Test {
- protected:
-  CompilationUnit* Parse(const std::string& src) {
-    source_ = src;
-    lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
-    parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
-    return parser_->Parse();
-  }
-
-  SourceManager mgr_;
-  Arena arena_;
-  DiagEngine diag_{mgr_};
-  std::string source_;
-  std::unique_ptr<Lexer> lexer_;
-  std::unique_ptr<Parser> parser_;
-};
+using SpecifyParseTest = ProgramTestParse;
 
 TEST_F(SpecifyParseTest, SpecparamDeclaration) {
   auto* unit = Parse("module m; specparam tRISE = 10; endmodule");

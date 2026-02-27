@@ -1,6 +1,5 @@
 // §11.4.6: Wildcard equality operators
 
-#include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/eval_array.h"
 
@@ -9,24 +8,6 @@
 #include "helpers_eval_op.h"
 
 using namespace delta;
-
-// =============================================================================
-// Helper fixture
-// =============================================================================
-static Expr* MkEq(Arena& arena, std::string_view a, std::string_view b) {
-  auto* expr = arena.Create<Expr>();
-  expr->kind = ExprKind::kBinary;
-  expr->op = TokenKind::kEqEq;
-  auto* lhs = arena.Create<Expr>();
-  lhs->kind = ExprKind::kIdentifier;
-  lhs->text = a;
-  auto* rhs = arena.Create<Expr>();
-  rhs->kind = ExprKind::kIdentifier;
-  rhs->text = b;
-  expr->lhs = lhs;
-  expr->rhs = rhs;
-  return expr;
-}
 
 namespace {
 

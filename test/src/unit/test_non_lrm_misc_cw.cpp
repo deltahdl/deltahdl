@@ -1,6 +1,7 @@
 // Non-LRM tests
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 
 using namespace delta;
 

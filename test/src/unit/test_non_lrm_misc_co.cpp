@@ -1,6 +1,7 @@
 // Non-LRM tests
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 
 using namespace delta;
 
@@ -476,22 +477,7 @@ TEST(ParserSection16, Sec16_5_1_SequenceMatchedMethod) {
               "endmodule\n"));
 }
 
-struct VerifyParseTest : ::testing::Test {
- protected:
-  CompilationUnit* Parse(const std::string& src) {
-    source_ = src;
-    lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
-    parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
-    return parser_->Parse();
-  }
-
-  SourceManager mgr_;
-  Arena arena_;
-  DiagEngine diag_{mgr_};
-  std::string source_;
-  std::unique_ptr<Lexer> lexer_;
-  std::unique_ptr<Parser> parser_;
-};
+using VerifyParseTest = ProgramTestParse;
 
 // =============================================================================
 // §17 Checker declarations

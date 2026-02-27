@@ -1,8 +1,11 @@
 // Non-LRM tests
 
+#include "fixture_program.h"
 #include "fixture_simulator.h"
 
 using namespace delta;
+
+using DpiParseTest = ProgramTestParse;
 
 namespace {
 
@@ -141,22 +144,7 @@ TEST_F(DpiParseTest, AttributeWithAndWithoutValue) {
   EXPECT_NE(items[0]->attrs[1].value, nullptr);
 }
 
-struct ApiParseTest : ::testing::Test {
- protected:
-  CompilationUnit* Parse(const std::string& src) {
-    source_ = src;
-    lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
-    parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
-    return parser_->Parse();
-  }
-
-  SourceManager mgr_;
-  Arena arena_;
-  DiagEngine diag_{mgr_};
-  std::string source_;
-  std::unique_ptr<Lexer> lexer_;
-  std::unique_ptr<Parser> parser_;
-};
+using ApiParseTest = ProgramTestParse;
 
 // =============================================================================
 // §39 Assertion control system functions
