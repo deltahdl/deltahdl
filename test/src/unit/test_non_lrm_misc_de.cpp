@@ -2,6 +2,8 @@
 
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
+#include "helpers_scheduler.h"
+#include "helpers_clocking.h"
 
 using namespace delta;
 
@@ -318,26 +320,6 @@ TEST(SimA60701, ConstPatternInVarDeclInit) {
   ASSERT_NE(var, nullptr);
   // '{8'd100, 8'd200} = {8'h64, 8'hC8} = 16'h64C8 = 25800
   EXPECT_EQ(var->value.ToUint64(), 25800u);
-}
-
-void SchedulePosedge(SimFixture& f, Variable* clk, uint64_t time) {
-  auto* ev = f.scheduler.GetEventPool().Acquire();
-  ev->callback = [clk, &f]() {
-    clk->prev_value = clk->value;
-    clk->value = MakeLogic4VecVal(f.arena, 1, 1);
-    clk->NotifyWatchers();
-  };
-  f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
-}
-
-void ScheduleNegedge(SimFixture& f, Variable* clk, uint64_t time) {
-  auto* ev = f.scheduler.GetEventPool().Acquire();
-  ev->callback = [clk, &f]() {
-    clk->prev_value = clk->value;
-    clk->value = MakeLogic4VecVal(f.arena, 1, 0);
-    clk->NotifyWatchers();
-  };
-  f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
 }
 
 // --- clocking_direction: output driving with skew ---
@@ -663,19 +645,6 @@ TEST(VpiAnnexK2, VpiTimeDefaultInit) {
 // introduced in §4.2, covering parallel process execution, sequential
 // ordering within processes, and interaction between concurrent elements.
 // ===========================================================================
-static uint64_t RunAndGet(const std::string& src, const char* var_name) {
-  SimFixture f;
-  auto* design = ElaborateSrc(src, f);
-  EXPECT_NE(design, nullptr);
-  if (!design) return 0;
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable(var_name);
-  EXPECT_NE(var, nullptr);
-  if (!var) return 0;
-  return var->value.ToUint64();
-}
 
 // ---------------------------------------------------------------------------
 // 29. §4.2 Processes are concurrently scheduled elements: always_comb

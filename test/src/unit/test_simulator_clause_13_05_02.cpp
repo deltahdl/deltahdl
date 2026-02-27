@@ -5,6 +5,7 @@
 
 #include "fixture_simulator.h"
 #include "builders_ast.h"
+#include "helpers_queue.h"
 
 using namespace delta;
 
@@ -66,15 +67,6 @@ TEST(Functions, PassByRefReadsCaller) {
 // ============================================================================
 // Queue helper: populate a queue with integer values.
 // ============================================================================
-static QueueObject* MakeQueue(SimFixture& f, std::string_view name,
-                              const std::vector<uint64_t>& vals) {
-  auto* q = f.ctx.CreateQueue(name, 32);
-  for (auto v : vals) {
-    q->elements.push_back(MakeLogic4VecVal(f.arena, 32, v));
-  }
-  q->AssignFreshIds();
-  return q;
-}
 
 // Register an automatic void function with given args and body.
 static void RegAutoFunc(SimFixture& f, std::string_view name,

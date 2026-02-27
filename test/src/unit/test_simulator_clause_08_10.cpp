@@ -6,6 +6,7 @@
 
 #include "fixture_simulator.h"
 #include "builders_ast.h"
+#include "helpers_class_object.h"
 
 using namespace delta;
 
@@ -21,17 +22,6 @@ static Expr* MkInt(Arena& a, uint64_t val) {
   return e;
 }
 // Build a simple ClassTypeInfo and register it with the context.
-static ClassTypeInfo* MakeClassType(
-    SimFixture& f, std::string_view name,
-    const std::vector<std::string_view>& props) {
-  auto* info = f.arena.Create<ClassTypeInfo>();
-  info->name = name;
-  for (auto p : props) {
-    info->properties.push_back({p, 32, false});
-  }
-  f.ctx.RegisterClassType(name, info);
-  return info;
-}
 
 namespace {
 

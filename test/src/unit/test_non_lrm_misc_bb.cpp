@@ -1,6 +1,7 @@
 // Non-LRM tests
 
 #include "fixture_parser.h"
+#include "fixture_preprocessor_timescale.h"
 
 using namespace delta;
 
@@ -46,26 +47,6 @@ TEST(ParserClause03, Cl3_14_1_FinerGlobalPrecision) {
 }
 
 // Helper: preprocess source and return timescale state.
-struct PreprocResult31402 {
-  SourceManager mgr;
-  TimeScale timescale;
-  TimeUnit global_precision;
-  bool has_timescale;
-  bool has_errors;
-};
-
-static PreprocResult31402 Preprocess(const std::string& src) {
-  PreprocResult31402 result;
-  DiagEngine diag(result.mgr);
-  auto fid = result.mgr.AddFile("<test>", src);
-  Preprocessor preproc(result.mgr, diag, {});
-  preproc.Preprocess(fid);
-  result.timescale = preproc.CurrentTimescale();
-  result.global_precision = preproc.GlobalPrecision();
-  result.has_timescale = preproc.HasTimescale();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
 
 // Helper: parse source and return the compilation unit.
 struct ParseResult31402 {
@@ -80,7 +61,7 @@ static ParseResult31402 Parse(const std::string& src) {
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.Preprocess(fid);
+  auto pp = preproc.PreprocessTimescale(fid);
   auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
   Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
   Parser parser(lexer, result.arena, diag);
@@ -140,7 +121,7 @@ TEST(ParserClause03, Cl3_14_2_TimeunitAllSixUnits) {
 // `timescale 1ns/1ps is equivalent to timeunit 1ns; timeprecision 1ps.
 TEST(ParserClause03, Cl3_14_2_EquivalentSpecifications) {
   // Way 1: `timescale directive.
-  auto pp = Preprocess("`timescale 1ns / 1ps\n");
+  auto pp = PreprocessTimescale("`timescale 1ns / 1ps\n");
   EXPECT_FALSE(pp.has_errors);
   // Way 2: keywords inside a module.
   auto pr = Parse(
@@ -203,7 +184,7 @@ static ParseResult3140202 Parse(const std::string& src) {
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.Preprocess(fid);
+  auto pp = preproc.PreprocessTimescale(fid);
   auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
   Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
   Parser parser(lexer, result.arena, diag);
@@ -552,7 +533,7 @@ static ParseResult3140203 Parse(const std::string& src) {
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.Preprocess(fid);
+  auto pp = preproc.PreprocessTimescale(fid);
   result.preproc_timescale = preproc.CurrentTimescale();
   result.has_preproc_timescale = preproc.HasTimescale();
   result.preproc_global_precision = preproc.GlobalPrecision();
@@ -920,7 +901,7 @@ static ParseResult31403 Parse(const std::string& src) {
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.Preprocess(fid);
+  auto pp = preproc.PreprocessTimescale(fid);
   result.preproc_timescale = preproc.CurrentTimescale();
   result.has_preproc_timescale = preproc.HasTimescale();
   result.preproc_global_precision = preproc.GlobalPrecision();

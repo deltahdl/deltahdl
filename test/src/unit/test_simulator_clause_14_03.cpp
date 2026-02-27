@@ -1,6 +1,5 @@
 // §14.3: Clocking block declaration
 
-
 #include <cstdint>
 
 #include "common/types.h"
@@ -9,28 +8,9 @@
 #include "simulation/variable.h"
 
 #include "fixture_simulator.h"
+#include "helpers_clocking.h"
 
 using namespace delta;
-
-void SchedulePosedge(SimFixture& f, Variable* clk, uint64_t time) {
-  auto* ev = f.scheduler.GetEventPool().Acquire();
-  ev->callback = [clk, &f]() {
-    clk->prev_value = clk->value;
-    clk->value = MakeLogic4VecVal(f.arena, 1, 1);
-    clk->NotifyWatchers();
-  };
-  f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
-}
-
-void ScheduleNegedge(SimFixture& f, Variable* clk, uint64_t time) {
-  auto* ev = f.scheduler.GetEventPool().Acquire();
-  ev->callback = [clk, &f]() {
-    clk->prev_value = clk->value;
-    clk->value = MakeLogic4VecVal(f.arena, 1, 0);
-    clk->NotifyWatchers();
-  };
-  f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
-}
 
 namespace {
 

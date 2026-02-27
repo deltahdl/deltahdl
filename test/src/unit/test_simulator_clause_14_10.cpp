@@ -1,6 +1,5 @@
 // §14.10: Clocking block events
 
-
 #include <cstdint>
 #include <string_view>
 
@@ -10,31 +9,14 @@
 #include "simulation/variable.h"
 
 #include "fixture_simulator.h"
+#include "helpers_clocking.h"
 
 using namespace delta;
 
 // Helper fixture for clocking simulation tests.
 // Schedule posedge at a given time through the scheduler.
-void SchedulePosedge(ClockingSimFixture& f, Variable* clk, uint64_t time) {
-  auto* ev = f.scheduler.GetEventPool().Acquire();
-  ev->callback = [clk, &f]() {
-    clk->prev_value = clk->value;
-    clk->value = MakeLogic4VecVal(f.arena, 1, 1);
-    clk->NotifyWatchers();
-  };
-  f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
-}
 
 // Schedule negedge at a given time through the scheduler.
-void ScheduleNegedge(ClockingSimFixture& f, Variable* clk, uint64_t time) {
-  auto* ev = f.scheduler.GetEventPool().Acquire();
-  ev->callback = [clk, &f]() {
-    clk->prev_value = clk->value;
-    clk->value = MakeLogic4VecVal(f.arena, 1, 0);
-    clk->NotifyWatchers();
-  };
-  f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
-}
 
 namespace {
 
@@ -101,26 +83,6 @@ TEST(ClockingSim, EdgeCallbackOnPosedge) {
 
   f.scheduler.Run();
   EXPECT_EQ(count, 2u);
-}
-
-void SchedulePosedge(SimFixture& f, Variable* clk, uint64_t time) {
-  auto* ev = f.scheduler.GetEventPool().Acquire();
-  ev->callback = [clk, &f]() {
-    clk->prev_value = clk->value;
-    clk->value = MakeLogic4VecVal(f.arena, 1, 1);
-    clk->NotifyWatchers();
-  };
-  f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
-}
-
-void ScheduleNegedge(SimFixture& f, Variable* clk, uint64_t time) {
-  auto* ev = f.scheduler.GetEventPool().Acquire();
-  ev->callback = [clk, &f]() {
-    clk->prev_value = clk->value;
-    clk->value = MakeLogic4VecVal(f.arena, 1, 0);
-    clk->NotifyWatchers();
-  };
-  f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
 }
 
 // --- edge callback registration ---

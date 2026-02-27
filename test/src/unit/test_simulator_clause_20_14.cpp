@@ -1,28 +1,12 @@
 // §20.14: Probabilistic distribution functions
 
-
 #include "parser/ast.h"
 #include "simulation/eval.h"
 
 #include "fixture_simulator.h"
+#include "builders_systask.h"
 
 using namespace delta;
-
-static Expr* MkSysCall(Arena& arena, std::string_view name,
-                       std::vector<Expr*> args) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kSystemCall;
-  e->callee = name;
-  e->args = std::move(args);
-  return e;
-}
-
-static Expr* MkInt(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
 
 namespace {
 

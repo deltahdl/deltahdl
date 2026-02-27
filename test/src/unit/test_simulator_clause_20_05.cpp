@@ -1,37 +1,14 @@
 // §20.5: Conversion functions
 
-
 #include <cstring>
 
 #include "parser/ast.h"
 #include "simulation/eval.h"
 
 #include "fixture_simulator.h"
+#include "builders_systask.h"
 
 using namespace delta;
-
-static double ResultToDouble(const Logic4Vec& vec) {
-  uint64_t bits = vec.ToUint64();
-  double d = 0.0;
-  std::memcpy(&d, &bits, sizeof(double));
-  return d;
-}
-
-static Expr* MkSysCall(Arena& arena, std::string_view name,
-                       std::vector<Expr*> args) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kSystemCall;
-  e->callee = name;
-  e->args = std::move(args);
-  return e;
-}
-
-static Expr* MkInt(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
 
 namespace {
 

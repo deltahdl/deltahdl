@@ -14,24 +14,10 @@
 
 #include "fixture_simulator.h"
 #include "builders_ast.h"
+#include "helpers_stmt_exec.h"
 
 using namespace delta;
 
-struct DriverResult {
-  StmtResult value = StmtResult::kDone;
-};
-
-SimCoroutine DriverCoroutine(const Stmt* stmt, SimContext& ctx, Arena& arena,
-                             DriverResult* out) {
-  out->value = co_await ExecStmt(stmt, ctx, arena);
-}
-
-StmtResult RunStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
-  DriverResult result;
-  auto coro = DriverCoroutine(stmt, ctx, arena, &result);
-  coro.Resume();
-  return result.value;
-}
 namespace {
 
 // =============================================================================

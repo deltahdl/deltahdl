@@ -1,38 +1,17 @@
 // §7.9: Associative array methods
 
-
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/eval_array.h"
 
 #include "fixture_simulator.h"
+#include "helpers_assoc.h"
 
 using namespace delta;
 
 // =============================================================================
 // Helper fixture
 // =============================================================================
-static Expr* MkAssocCall(Arena& arena, std::string_view var,
-                         std::string_view method, std::string_view ref) {
-  auto* expr = arena.Create<Expr>();
-  expr->kind = ExprKind::kCall;
-  auto* access = arena.Create<Expr>();
-  access->kind = ExprKind::kMemberAccess;
-  auto* base = arena.Create<Expr>();
-  base->kind = ExprKind::kIdentifier;
-  base->text = var;
-  auto* meth = arena.Create<Expr>();
-  meth->kind = ExprKind::kIdentifier;
-  meth->text = method;
-  access->lhs = base;
-  access->rhs = meth;
-  expr->lhs = access;
-  auto* arg = arena.Create<Expr>();
-  arg->kind = ExprKind::kIdentifier;
-  arg->text = ref;
-  expr->args.push_back(arg);
-  return expr;
-}
 namespace {
 
 TEST(AssocTraversal, FirstReturnsTruncationFlag) {

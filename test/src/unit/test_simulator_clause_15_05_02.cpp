@@ -19,6 +19,7 @@
 #include "simulation/stmt_result.h"
 #include "simulation/sync_objects.h"
 #include "simulation/variable.h"
+#include "helpers_stmt_exec.h"
 
 using namespace delta;
 
@@ -72,10 +73,7 @@ TEST(IpcSync, EventTriggerSetsTriggeredState) {
   trigger_stmt->expr->text = "my_event";
 
   // Execute trigger via a driver coroutine.
-  struct DriverResult {
-    StmtResult value = StmtResult::kDone;
-  };
-  auto driver = [](const Stmt* stmt, SimContext& ctx, Arena& arena,
+    auto driver = [](const Stmt* stmt, SimContext& ctx, Arena& arena,
                    DriverResult* out) -> SimCoroutine {
     out->value = co_await ExecStmt(stmt, ctx, arena);
   };

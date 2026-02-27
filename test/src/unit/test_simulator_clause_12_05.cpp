@@ -14,37 +14,16 @@
 
 #include "fixture_simulator.h"
 #include "builders_ast.h"
+#include "helpers_stmt_exec.h"
 
 using namespace delta;
 
 // Helper to create a blocking assignment statement: lhs = rhs_val.
-Stmt* MakeBlockAssign(Arena& arena, std::string_view lhs_name,
-                      uint64_t rhs_val) {
-  auto* s = arena.Create<Stmt>();
-  s->kind = StmtKind::kBlockingAssign;
-  s->lhs = MakeId(arena, lhs_name);
-  s->rhs = MakeInt(arena, rhs_val);
-  return s;
-}
 
 // Driver coroutine that co_awaits an ExecTask and stores its result.
-struct DriverResult {
-  StmtResult value = StmtResult::kDone;
-};
-
-SimCoroutine DriverCoroutine(const Stmt* stmt, SimContext& ctx, Arena& arena,
-                             DriverResult* out) {
-  out->value = co_await ExecStmt(stmt, ctx, arena);
-}
 
 // Helper to run ExecStmt synchronously (for non-suspending statements).
 // Creates a wrapper coroutine, resumes it, and returns the result.
-StmtResult RunStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
-  DriverResult result;
-  auto coro = DriverCoroutine(stmt, ctx, arena, &result);
-  coro.Resume();
-  return result.value;
-}
 namespace {
 
 // =============================================================================

@@ -1,11 +1,11 @@
 // §8.25: Parameterized classes
 
-
 #include "parser/ast.h"
 #include "simulation/class_object.h"
 #include "simulation/eval.h"
 
 #include "fixture_simulator.h"
+#include "helpers_class_object.h"
 
 using namespace delta;
 
@@ -14,18 +14,6 @@ using namespace delta;
 // build class types and objects at the AST/runtime level.
 // =============================================================================
 // Allocate a ClassObject of the given type, returning (handle_id, object*).
-static std::pair<uint64_t, ClassObject*> MakeObj(SimFixture& f,
-                                                 ClassTypeInfo* type) {
-  auto* obj = f.arena.Create<ClassObject>();
-  obj->type = type;
-  // Initialize properties to 0.
-  for (const auto& p : type->properties) {
-    obj->properties[std::string(p.name)] =
-        MakeLogic4VecVal(f.arena, p.width, 0);
-  }
-  uint64_t handle = f.ctx.AllocateClassObject(obj);
-  return {handle, obj};
-}
 
 namespace {
 

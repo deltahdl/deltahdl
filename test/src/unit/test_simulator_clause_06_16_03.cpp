@@ -4,65 +4,6 @@
 
 using namespace delta;
 
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-
-  // Create a string variable and store the given string value.
-  Variable* CreateStringVar(std::string_view var_name, std::string_view value) {
-    uint32_t width = static_cast<uint32_t>(value.size()) * 8;
-    if (width == 0) width = 8;
-    auto* var = ctx.CreateVariable(var_name, width);
-    var->value = MakeLogic4Vec(arena, width);
-    for (size_t i = 0; i < value.size(); ++i) {
-      auto byte_idx = static_cast<uint32_t>(value.size() - 1 - i);
-      uint32_t word = (byte_idx * 8) / 64;
-      uint32_t bit = (byte_idx * 8) % 64;
-      var->value.words[word].aval |=
-          static_cast<uint64_t>(static_cast<unsigned char>(value[i])) << bit;
-    }
-    ctx.RegisterStringVariable(var_name);
-    return var;
-  }
-
-  // Build a method call expression: var_name.method_name(args...)
-  Expr* MakeMethodCall(std::string_view var_name, std::string_view method_name,
-                       std::vector<Expr*> args = {}) {
-    auto* id = arena.Create<Expr>();
-    id->kind = ExprKind::kIdentifier;
-    id->text = var_name;
-
-    auto* member = arena.Create<Expr>();
-    member->kind = ExprKind::kIdentifier;
-    member->text = method_name;
-
-    auto* access = arena.Create<Expr>();
-    access->kind = ExprKind::kMemberAccess;
-    access->lhs = id;
-    access->rhs = member;
-
-    auto* call = arena.Create<Expr>();
-    call->kind = ExprKind::kCall;
-    call->lhs = access;
-    call->args = std::move(args);
-    return call;
-  }
-
-  Expr* MakeIntLiteral(uint64_t val) {
-    auto* lit = arena.Create<Expr>();
-    lit->kind = ExprKind::kIntegerLiteral;
-    lit->int_val = val;
-    return lit;
-  }
-
-  Expr* MakeStringLiteral(std::string_view text) {
-    std::string quoted = "\"" + std::string(text) + "\"";
-    char* buf = arena.AllocString(quoted.c_str(), quoted.size());
-    auto* lit = arena.Create<Expr>();
-    lit->kind = ExprKind::kStringLiteral;
-    lit->text = std::string_view(buf, quoted.size());
-    return lit;
-  }
-};
 namespace {
 
 // =============================================================================

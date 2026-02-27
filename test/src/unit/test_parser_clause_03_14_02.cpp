@@ -9,30 +9,11 @@
 #include "lexer/lexer.h"
 #include "parser/parser.h"
 #include "preprocessor/preprocessor.h"
+#include "fixture_preprocessor_timescale.h"
 
 using namespace delta;
 
 // Helper: preprocess source and return timescale state.
-struct PreprocResult31402 {
-  SourceManager mgr;
-  TimeScale timescale;
-  TimeUnit global_precision;
-  bool has_timescale;
-  bool has_errors;
-};
-
-static PreprocResult31402 Preprocess(const std::string& src) {
-  PreprocResult31402 result;
-  DiagEngine diag(result.mgr);
-  auto fid = result.mgr.AddFile("<test>", src);
-  Preprocessor preproc(result.mgr, diag, {});
-  preproc.Preprocess(fid);
-  result.timescale = preproc.CurrentTimescale();
-  result.global_precision = preproc.GlobalPrecision();
-  result.has_timescale = preproc.HasTimescale();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
 
 // Helper: parse source and return the compilation unit.
 struct ParseResult31402 {
@@ -47,7 +28,7 @@ static ParseResult31402 Parse(const std::string& src) {
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.Preprocess(fid);
+  auto pp = preproc.PreprocessTimescale(fid);
   auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
   Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
   Parser parser(lexer, result.arena, diag);
@@ -61,11 +42,11 @@ namespace {
 // 29. Both mechanisms handle all three magnitudes (1, 10, 100).
 TEST(ParserClause03, Cl3_14_2_BothMechanismsMagnitudes) {
   // `timescale with magnitudes.
-  auto r1 = Preprocess("`timescale 1ns / 1ps\n");
+  auto r1 = PreprocessTimescale("`timescale 1ns / 1ps\n");
   EXPECT_EQ(r1.timescale.magnitude, 1);
-  auto r10 = Preprocess("`timescale 10ns / 10ps\n");
+  auto r10 = PreprocessTimescale("`timescale 10ns / 10ps\n");
   EXPECT_EQ(r10.timescale.magnitude, 10);
-  auto r100 = Preprocess("`timescale 100ns / 100ps\n");
+  auto r100 = PreprocessTimescale("`timescale 100ns / 100ps\n");
   EXPECT_EQ(r100.timescale.magnitude, 100);
   // timeunit with magnitudes: all three parse successfully.
   EXPECT_FALSE(Parse("module m; timeunit 1ns; endmodule\n").has_errors);

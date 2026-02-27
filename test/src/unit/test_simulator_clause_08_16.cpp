@@ -1,11 +1,11 @@
 // §8.16: Casting
 
-
 #include "parser/ast.h"
 #include "simulation/class_object.h"
 #include "simulation/eval.h"
 
 #include "fixture_simulator.h"
+#include "helpers_class_object.h"
 
 using namespace delta;
 
@@ -14,17 +14,6 @@ using namespace delta;
 // build class types and objects at the AST/runtime level.
 // =============================================================================
 // Build a simple ClassTypeInfo and register it with the context.
-static ClassTypeInfo* MakeClassType(
-    SimFixture& f, std::string_view name,
-    const std::vector<std::string_view>& props) {
-  auto* info = f.arena.Create<ClassTypeInfo>();
-  info->name = name;
-  for (auto p : props) {
-    info->properties.push_back({p, 32, false});
-  }
-  f.ctx.RegisterClassType(name, info);
-  return info;
-}
 
 namespace {
 

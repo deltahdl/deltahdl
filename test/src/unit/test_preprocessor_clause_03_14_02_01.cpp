@@ -7,30 +7,11 @@
 #include "lexer/lexer.h"
 #include "parser/parser.h"
 #include "fixture_preprocessor.h"
+#include "fixture_preprocessor_timescale.h"
 
 using namespace delta;
 
 // Helper: preprocess source and return timescale state.
-struct PreprocResult3140201 {
-  SourceManager mgr;
-  TimeScale timescale;
-  TimeUnit global_precision;
-  bool has_timescale;
-  bool has_errors;
-};
-
-static PreprocResult3140201 Preprocess(const std::string& src) {
-  PreprocResult3140201 result;
-  DiagEngine diag(result.mgr);
-  auto fid = result.mgr.AddFile("<test>", src);
-  Preprocessor preproc(result.mgr, diag, {});
-  preproc.Preprocess(fid);
-  result.timescale = preproc.CurrentTimescale();
-  result.global_precision = preproc.GlobalPrecision();
-  result.has_timescale = preproc.HasTimescale();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
 
 // Helper: parse source and return the compilation unit.
 struct ParseResult3140201 {
@@ -45,7 +26,7 @@ static ParseResult3140201 Parse(const std::string& src) {
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.Preprocess(fid);
+  auto pp = preproc.PreprocessTimescale(fid);
   auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
   Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
   Parser parser(lexer, result.arena, diag);
@@ -61,7 +42,7 @@ namespace {
 TEST(ParserClause03, Cl3_14_2_1_GlobalPrecisionTracking) {
   // Two directives: 1ns/1ps then 1us/1ns.
   // Global precision should be the finer one: 1ps.
-  auto r = Preprocess(
+  auto r = PreprocessTimescale(
       "`timescale 1ns / 1ps\n"
       "`timescale 1us / 1ns\n");
   EXPECT_FALSE(r.has_errors);
@@ -74,7 +55,7 @@ TEST(ParserClause03, Cl3_14_2_1_GlobalPrecisionTracking) {
 static std::string PreprocessWithPP(const std::string& src, PreprocFixture& f,
                                     Preprocessor& pp) {
   auto fid = f.mgr.AddFile("<test>", src);
-  return pp.Preprocess(fid);
+  return pp.PreprocessTimescale(fid);
 }
 
 // =============================================================================
@@ -82,7 +63,7 @@ static std::string PreprocessWithPP(const std::string& src, PreprocFixture& f,
 // =============================================================================
 // 24. Way 1: `timescale compiler directive specifies both time unit and
 TEST(ParserClause03, Cl3_14_2_TimescaleDirectiveSetsUnitAndPrecision) {
-  auto r = Preprocess("`timescale 1ns / 1ps\n");
+  auto r = PreprocessTimescale("`timescale 1ns / 1ps\n");
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.timescale.unit, TimeUnit::kNs);
   EXPECT_EQ(r.timescale.magnitude, 1);
@@ -92,17 +73,17 @@ TEST(ParserClause03, Cl3_14_2_TimescaleDirectiveSetsUnitAndPrecision) {
 
 // 27. `timescale handles all six time units from Table 3-1.
 TEST(ParserClause03, Cl3_14_2_TimescaleAllSixUnits) {
-  auto r_s = Preprocess("`timescale 1s / 1s\n");
+  auto r_s = PreprocessTimescale("`timescale 1s / 1s\n");
   EXPECT_EQ(r_s.timescale.unit, TimeUnit::kS);
-  auto r_ms = Preprocess("`timescale 1ms / 1ms\n");
+  auto r_ms = PreprocessTimescale("`timescale 1ms / 1ms\n");
   EXPECT_EQ(r_ms.timescale.unit, TimeUnit::kMs);
-  auto r_us = Preprocess("`timescale 1us / 1us\n");
+  auto r_us = PreprocessTimescale("`timescale 1us / 1us\n");
   EXPECT_EQ(r_us.timescale.unit, TimeUnit::kUs);
-  auto r_ns = Preprocess("`timescale 1ns / 1ns\n");
+  auto r_ns = PreprocessTimescale("`timescale 1ns / 1ns\n");
   EXPECT_EQ(r_ns.timescale.unit, TimeUnit::kNs);
-  auto r_ps = Preprocess("`timescale 1ps / 1ps\n");
+  auto r_ps = PreprocessTimescale("`timescale 1ps / 1ps\n");
   EXPECT_EQ(r_ps.timescale.unit, TimeUnit::kPs);
-  auto r_fs = Preprocess("`timescale 1fs / 1fs\n");
+  auto r_fs = PreprocessTimescale("`timescale 1fs / 1fs\n");
   EXPECT_EQ(r_fs.timescale.unit, TimeUnit::kFs);
 }
 
@@ -114,7 +95,7 @@ TEST(ParserClause03, Cl3_14_2_TimescaleAllSixUnits) {
 // specifies the default time unit and precision for all design elements
 // that follow this directive."
 TEST(ParserClause03, Cl3_14_2_1_DefaultForFollowingElements) {
-  auto r = Preprocess("`timescale 10us / 100ns\n");
+  auto r = PreprocessTimescale("`timescale 10us / 100ns\n");
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(r.has_timescale);
   EXPECT_EQ(r.timescale.unit, TimeUnit::kUs);
@@ -129,7 +110,7 @@ TEST(ParserClause03, Cl3_14_2_1_DefaultForFollowingElements) {
 // directive is read."
 TEST(ParserClause03, Cl3_14_2_1_PersistsUntilReplaced) {
   // Two directives: second replaces first.
-  auto r = Preprocess(
+  auto r = PreprocessTimescale(
       "`timescale 1ns / 1ps\n"
       "`timescale 1us / 1ns\n");
   EXPECT_FALSE(r.has_errors);
@@ -145,11 +126,11 @@ TEST(ParserClause03, Cl3_14_2_1_PersistsUntilReplaced) {
 // compilation unit; it does not span multiple compilation units."
 TEST(ParserClause03, Cl3_14_2_1_CuScoped) {
   // First CU: set timescale.
-  auto r1 = Preprocess("`timescale 1ps / 1fs\n");
+  auto r1 = PreprocessTimescale("`timescale 1ps / 1fs\n");
   EXPECT_TRUE(r1.has_timescale);
   EXPECT_EQ(r1.timescale.unit, TimeUnit::kPs);
   // Second CU (separate Preprocess call): no timescale inherited.
-  auto r2 = Preprocess("// no timescale here\n");
+  auto r2 = PreprocessTimescale("// no timescale here\n");
   EXPECT_FALSE(r2.has_timescale);
 }
 
@@ -159,13 +140,13 @@ TEST(ParserClause03, Cl3_14_2_1_CuScoped) {
 // problems."
 TEST(ParserClause03, Cl3_14_2_1_FileOrderDependency) {
   // Order 1: 1ns/10ps then module B then 1ps/1ps.
-  auto r1 = Preprocess(
+  auto r1 = PreprocessTimescale(
       "`timescale 1ns / 10ps\n"
       "module B; endmodule\n"
       "`timescale 1ps / 1ps\n");
   EXPECT_EQ(r1.timescale.unit, TimeUnit::kPs);
   // Order 2: 1ps/1ps then module B then 1ns/10ps.
-  auto r2 = Preprocess(
+  auto r2 = PreprocessTimescale(
       "`timescale 1ps / 1ps\n"
       "module B; endmodule\n"
       "`timescale 1ns / 10ps\n");
@@ -176,13 +157,13 @@ TEST(ParserClause03, Cl3_14_2_1_FileOrderDependency) {
 
 // 40. Error: missing slash in `timescale.
 TEST(ParserClause03, Cl3_14_2_1_ErrorMissingSlash) {
-  auto r = Preprocess("`timescale 1ns 1ps\n");
+  auto r = PreprocessTimescale("`timescale 1ns 1ps\n");
   EXPECT_TRUE(r.has_errors);
 }
 
 // 41. Error: invalid magnitude (must be 1, 10, or 100).
 TEST(ParserClause03, Cl3_14_2_1_ErrorInvalidMagnitude) {
-  auto r = Preprocess("`timescale 5ns / 1ps\n");
+  auto r = PreprocessTimescale("`timescale 5ns / 1ps\n");
   EXPECT_TRUE(r.has_errors);
 }
 
@@ -190,12 +171,12 @@ TEST(ParserClause03, Cl3_14_2_1_ErrorInvalidMagnitude) {
 // §3.14.2.1 examples show both "1ns / 10ps" and "1ps/1ps".
 TEST(ParserClause03, Cl3_14_2_1_WhitespaceAroundSlash) {
   // No spaces around slash.
-  auto r1 = Preprocess("`timescale 1ns/1ps\n");
+  auto r1 = PreprocessTimescale("`timescale 1ns/1ps\n");
   EXPECT_FALSE(r1.has_errors);
   EXPECT_EQ(r1.timescale.unit, TimeUnit::kNs);
   EXPECT_EQ(r1.timescale.precision, TimeUnit::kPs);
   // Spaces around slash.
-  auto r2 = Preprocess("`timescale 1ns / 1ps\n");
+  auto r2 = PreprocessTimescale("`timescale 1ns / 1ps\n");
   EXPECT_FALSE(r2.has_errors);
   EXPECT_EQ(r2.timescale.unit, TimeUnit::kNs);
   EXPECT_EQ(r2.timescale.precision, TimeUnit::kPs);
