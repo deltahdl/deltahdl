@@ -7,6 +7,8 @@
 #include "common/types.h"
 #include "simulation/scheduler.h"
 
+#include "helpers_scheduler_event.h"
+
 using namespace delta;
 
 // ===========================================================================
@@ -42,22 +44,8 @@ TEST(SimCh4428, ReNBARegionExecutesEvents) {
 // Re-NBA events execute only after Re-Inactive events have drained.
 // ---------------------------------------------------------------------------
 TEST(SimCh4428, ReNBAExecutesAfterReInactive) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto* renba = sched.GetEventPool().Acquire();
-  renba->callback = [&]() { order.push_back("renba"); };
-  sched.ScheduleEvent({0}, Region::kReNBA, renba);
-
-  auto* reinactive = sched.GetEventPool().Acquire();
-  reinactive->callback = [&]() { order.push_back("reinactive"); };
-  sched.ScheduleEvent({0}, Region::kReInactive, reinactive);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 2u);
-  EXPECT_EQ(order[0], "reinactive");
-  EXPECT_EQ(order[1], "renba");
+  VerifyTwoRegionOrder(Region::kReInactive, "reinactive", Region::kReNBA,
+                       "renba");
 }
 
 // ---------------------------------------------------------------------------
@@ -179,17 +167,11 @@ TEST(SimCh4428, ReNBAExecutesAfterReactiveAndReInactiveBeforePostReNBA) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, label]() { order.push_back(label); };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
   // Schedule in reverse order to prove region ordering, not insertion order.
-  schedule(Region::kPostReNBA, "post_renba");
-  schedule(Region::kReNBA, "renba");
-  schedule(Region::kReInactive, "reinactive");
-  schedule(Region::kReactive, "reactive");
+  ScheduleLabeled(sched, Region::kPostReNBA, "post_renba", order);
+  ScheduleLabeled(sched, Region::kReNBA, "renba", order);
+  ScheduleLabeled(sched, Region::kReInactive, "reinactive", order);
+  ScheduleLabeled(sched, Region::kReactive, "reactive", order);
 
   sched.Run();
   ASSERT_EQ(order.size(), 4u);

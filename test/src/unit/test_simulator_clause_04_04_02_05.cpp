@@ -7,6 +7,8 @@
 #include "common/types.h"
 #include "simulation/scheduler.h"
 
+#include "helpers_scheduler_event.h"
+
 using namespace delta;
 
 // ===========================================================================
@@ -123,17 +125,11 @@ TEST(SimCh4425, ObservedExecutesAfterActiveRegionSet) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, label]() { order.push_back(label); };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
   // Schedule in reverse order to prove region ordering, not insertion order.
-  schedule(Region::kObserved, "observed");
-  schedule(Region::kNBA, "nba");
-  schedule(Region::kInactive, "inactive");
-  schedule(Region::kActive, "active");
+  ScheduleLabeled(sched, Region::kObserved, "observed", order);
+  ScheduleLabeled(sched, Region::kNBA, "nba", order);
+  ScheduleLabeled(sched, Region::kInactive, "inactive", order);
+  ScheduleLabeled(sched, Region::kActive, "active", order);
 
   sched.Run();
   ASSERT_EQ(order.size(), 4u);

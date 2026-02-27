@@ -4,6 +4,7 @@
 #include "common/types.h"
 
 #include "fixture_simulator.h"
+#include "helpers_scheduler_event.h"
 
 using namespace delta;
 
@@ -40,22 +41,8 @@ TEST(SimCh4423, InactiveRegionExecutesEvents) {
 // Inactive events execute only after Active events have drained.
 // ---------------------------------------------------------------------------
 TEST(SimCh4423, InactiveExecutesAfterActive) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto* inactive = sched.GetEventPool().Acquire();
-  inactive->callback = [&]() { order.push_back("inactive"); };
-  sched.ScheduleEvent({0}, Region::kInactive, inactive);
-
-  auto* active = sched.GetEventPool().Acquire();
-  active->callback = [&]() { order.push_back("active"); };
-  sched.ScheduleEvent({0}, Region::kActive, active);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 2u);
-  EXPECT_EQ(order[0], "active");
-  EXPECT_EQ(order[1], "inactive");
+  VerifyTwoRegionOrder(Region::kActive, "active", Region::kInactive,
+                       "inactive");
 }
 
 // ---------------------------------------------------------------------------
@@ -202,22 +189,7 @@ TEST(SimCh4423, InactiveIsWithinActiveRegionSet) {
 // to PreNBA/NBA.  This test verifies Inactive executes before NBA.
 // ---------------------------------------------------------------------------
 TEST(SimCh4423, InactiveExecutesBeforeNBA) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto* nba = sched.GetEventPool().Acquire();
-  nba->callback = [&]() { order.push_back("nba"); };
-  sched.ScheduleEvent({0}, Region::kNBA, nba);
-
-  auto* inactive = sched.GetEventPool().Acquire();
-  inactive->callback = [&]() { order.push_back("inactive"); };
-  sched.ScheduleEvent({0}, Region::kInactive, inactive);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 2u);
-  EXPECT_EQ(order[0], "inactive");
-  EXPECT_EQ(order[1], "nba");
+  VerifyTwoRegionOrder(Region::kInactive, "inactive", Region::kNBA, "nba");
 }
 
 // ---------------------------------------------------------------------------

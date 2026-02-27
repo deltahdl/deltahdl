@@ -7,6 +7,8 @@
 #include "common/types.h"
 #include "simulation/scheduler.h"
 
+#include "helpers_scheduler_event.h"
+
 using namespace delta;
 
 // ===========================================================================
@@ -42,22 +44,7 @@ TEST(SimCh4424, NBARegionExecutesEvents) {
 // NBA events execute only after Inactive events have drained.
 // ---------------------------------------------------------------------------
 TEST(SimCh4424, NBAExecutesAfterInactive) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto* nba = sched.GetEventPool().Acquire();
-  nba->callback = [&]() { order.push_back("nba"); };
-  sched.ScheduleEvent({0}, Region::kNBA, nba);
-
-  auto* inactive = sched.GetEventPool().Acquire();
-  inactive->callback = [&]() { order.push_back("inactive"); };
-  sched.ScheduleEvent({0}, Region::kInactive, inactive);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 2u);
-  EXPECT_EQ(order[0], "inactive");
-  EXPECT_EQ(order[1], "nba");
+  VerifyTwoRegionOrder(Region::kInactive, "inactive", Region::kNBA, "nba");
 }
 
 // ---------------------------------------------------------------------------
@@ -179,17 +166,11 @@ TEST(SimCh4424, NBAExecutesAfterActiveAndInactiveBeforeObserved) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, label]() { order.push_back(label); };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
   // Schedule in reverse order to prove region ordering, not insertion order.
-  schedule(Region::kObserved, "observed");
-  schedule(Region::kNBA, "nba");
-  schedule(Region::kInactive, "inactive");
-  schedule(Region::kActive, "active");
+  ScheduleLabeled(sched, Region::kObserved, "observed", order);
+  ScheduleLabeled(sched, Region::kNBA, "nba", order);
+  ScheduleLabeled(sched, Region::kInactive, "inactive", order);
+  ScheduleLabeled(sched, Region::kActive, "active", order);
 
   sched.Run();
   ASSERT_EQ(order.size(), 4u);

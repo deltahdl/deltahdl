@@ -7,6 +7,8 @@
 #include "common/types.h"
 #include "simulation/scheduler.h"
 
+#include "helpers_scheduler_event.h"
+
 using namespace delta;
 
 // ===========================================================================
@@ -42,22 +44,8 @@ TEST(SimCh4427, ReInactiveRegionExecutesEvents) {
 // Re-Inactive events execute only after Reactive events have drained.
 // ---------------------------------------------------------------------------
 TEST(SimCh4427, ReInactiveExecutesAfterReactive) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto* reinactive = sched.GetEventPool().Acquire();
-  reinactive->callback = [&]() { order.push_back("reinactive"); };
-  sched.ScheduleEvent({0}, Region::kReInactive, reinactive);
-
-  auto* reactive = sched.GetEventPool().Acquire();
-  reactive->callback = [&]() { order.push_back("reactive"); };
-  sched.ScheduleEvent({0}, Region::kReactive, reactive);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 2u);
-  EXPECT_EQ(order[0], "reactive");
-  EXPECT_EQ(order[1], "reinactive");
+  VerifyTwoRegionOrder(Region::kReactive, "reactive", Region::kReInactive,
+                       "reinactive");
 }
 
 // ---------------------------------------------------------------------------
@@ -206,22 +194,8 @@ TEST(SimCh4427, ReInactiveIsWithinReactiveRegionSet) {
 // to PreReNBA/ReNBA.  This test verifies Re-Inactive executes before ReNBA.
 // ---------------------------------------------------------------------------
 TEST(SimCh4427, ReInactiveExecutesBeforeReNBA) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto* renba = sched.GetEventPool().Acquire();
-  renba->callback = [&]() { order.push_back("renba"); };
-  sched.ScheduleEvent({0}, Region::kReNBA, renba);
-
-  auto* reinactive = sched.GetEventPool().Acquire();
-  reinactive->callback = [&]() { order.push_back("reinactive"); };
-  sched.ScheduleEvent({0}, Region::kReInactive, reinactive);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 2u);
-  EXPECT_EQ(order[0], "reinactive");
-  EXPECT_EQ(order[1], "renba");
+  VerifyTwoRegionOrder(Region::kReInactive, "reinactive", Region::kReNBA,
+                       "renba");
 }
 
 // ---------------------------------------------------------------------------

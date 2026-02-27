@@ -7,6 +7,8 @@
 #include "common/types.h"
 #include "simulation/scheduler.h"
 
+#include "helpers_scheduler_event.h"
+
 using namespace delta;
 
 // ===========================================================================
@@ -283,21 +285,14 @@ TEST(SimCh49, AllAssignmentTypesUseSchedulerInfrastructure) {
   std::vector<std::string> executed;
 
   // Schedule one event per assignment type to show they all use the same
-  // scheduler infrastructure (ScheduleEvent → Region → EventQueue → Run).
-  auto schedule = [&](const std::string& label, Region region) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->kind = EventKind::kUpdate;
-    ev->callback = [&executed, label]() { executed.push_back(label); };
-    sched.ScheduleEvent({0}, region, ev);
-  };
-
-  schedule("continuous", Region::kActive);       // §4.9.1
-  schedule("proc_continuous", Region::kActive);  // §4.9.2
-  schedule("blocking", Region::kInactive);       // §4.9.3 (zero delay)
-  schedule("nonblocking", Region::kNBA);         // §4.9.4
-  schedule("switch", Region::kActive);           // §4.9.5
-  schedule("port", Region::kActive);             // §4.9.6
-  schedule("subroutine", Region::kActive);       // §4.9.7
+  // scheduler infrastructure (ScheduleEvent -> Region -> EventQueue -> Run).
+  ScheduleLabeled(sched, Region::kActive, "continuous", executed);       // §4.9.1
+  ScheduleLabeled(sched, Region::kActive, "proc_continuous", executed);  // §4.9.2
+  ScheduleLabeled(sched, Region::kInactive, "blocking", executed);      // §4.9.3 (zero delay)
+  ScheduleLabeled(sched, Region::kNBA, "nonblocking", executed);        // §4.9.4
+  ScheduleLabeled(sched, Region::kActive, "switch", executed);          // §4.9.5
+  ScheduleLabeled(sched, Region::kActive, "port", executed);            // §4.9.6
+  ScheduleLabeled(sched, Region::kActive, "subroutine", executed);      // §4.9.7
 
   sched.Run();
   EXPECT_EQ(executed.size(), 7u);

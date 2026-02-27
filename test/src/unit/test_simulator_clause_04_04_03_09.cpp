@@ -7,6 +7,8 @@
 #include "common/types.h"
 #include "simulation/scheduler.h"
 
+#include "helpers_scheduler_event.h"
+
 using namespace delta;
 
 // ===========================================================================
@@ -138,26 +140,9 @@ TEST(SimCh4439, PrePostponedExecutesAfterPostReNBA) {
 // Pre-Postponed executes after Post-Re-NBA and before Postponed.
 // ---------------------------------------------------------------------------
 TEST(SimCh4439, PrePostponedExecutesAfterPostReNBABeforePostponed) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, label]() { order.push_back(label); };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
-  // Schedule in reverse order to prove region ordering.
-  schedule(Region::kPostponed, "postponed");
-  schedule(Region::kPrePostponed, "pre_postponed");
-  schedule(Region::kPostReNBA, "post_re_nba");
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 3u);
-  EXPECT_EQ(order[0], "post_re_nba");
-  EXPECT_EQ(order[1], "pre_postponed");
-  EXPECT_EQ(order[2], "postponed");
+  VerifyThreeRegionOrder(Region::kPostReNBA, "post_re_nba",
+                         Region::kPrePostponed, "pre_postponed",
+                         Region::kPostponed, "postponed");
 }
 
 // ---------------------------------------------------------------------------

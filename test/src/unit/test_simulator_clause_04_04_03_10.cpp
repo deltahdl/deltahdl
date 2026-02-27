@@ -7,6 +7,8 @@
 #include "common/types.h"
 #include "simulation/scheduler.h"
 
+#include "helpers_scheduler_event.h"
+
 using namespace delta;
 
 // ===========================================================================
@@ -122,18 +124,12 @@ TEST(SimCh44310, PostponedIsLastRegionInTimeSlot) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, label]() { order.push_back(label); };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
   // Schedule in reverse order to prove region ordering.
-  schedule(Region::kPostponed, "postponed");
-  schedule(Region::kPrePostponed, "pre_postponed");
-  schedule(Region::kReactive, "reactive");
-  schedule(Region::kActive, "active");
-  schedule(Region::kPreponed, "preponed");
+  ScheduleLabeled(sched, Region::kPostponed, "postponed", order);
+  ScheduleLabeled(sched, Region::kPrePostponed, "pre_postponed", order);
+  ScheduleLabeled(sched, Region::kReactive, "reactive", order);
+  ScheduleLabeled(sched, Region::kActive, "active", order);
+  ScheduleLabeled(sched, Region::kPreponed, "preponed", order);
 
   sched.Run();
   ASSERT_EQ(order.size(), 5u);
@@ -244,21 +240,15 @@ TEST(SimCh44310, PostponedInfrastructureWithFullRegionChain) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, label]() { order.push_back(label); };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
-  schedule(Region::kPostponed, "postponed");
-  schedule(Region::kPrePostponed, "pre_postponed");
-  schedule(Region::kPostReNBA, "post_re_nba");
-  schedule(Region::kReactive, "reactive");
-  schedule(Region::kPostObserved, "post_observed");
-  schedule(Region::kObserved, "observed");
-  schedule(Region::kPostNBA, "post_nba");
-  schedule(Region::kActive, "active");
-  schedule(Region::kPreponed, "preponed");
+  ScheduleLabeled(sched, Region::kPostponed, "postponed", order);
+  ScheduleLabeled(sched, Region::kPrePostponed, "pre_postponed", order);
+  ScheduleLabeled(sched, Region::kPostReNBA, "post_re_nba", order);
+  ScheduleLabeled(sched, Region::kReactive, "reactive", order);
+  ScheduleLabeled(sched, Region::kPostObserved, "post_observed", order);
+  ScheduleLabeled(sched, Region::kObserved, "observed", order);
+  ScheduleLabeled(sched, Region::kPostNBA, "post_nba", order);
+  ScheduleLabeled(sched, Region::kActive, "active", order);
+  ScheduleLabeled(sched, Region::kPreponed, "preponed", order);
 
   sched.Run();
   std::vector<std::string> expected = {

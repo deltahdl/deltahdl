@@ -7,6 +7,8 @@
 #include "simulation/process.h"
 #include "simulation/scheduler.h"
 
+#include "helpers_scheduler_event.h"
+
 using namespace delta;
 
 // ===========================================================================
@@ -105,17 +107,11 @@ TEST(SimCh441, ActiveSetBeforeReactiveSet) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, label]() { order.push_back(label); };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
   // Schedule reactive first, active second — active should still run first.
-  schedule(Region::kReactive, "reactive");
-  schedule(Region::kActive, "active");
-  schedule(Region::kNBA, "nba");
-  schedule(Region::kReNBA, "renba");
+  ScheduleLabeled(sched, Region::kReactive, "reactive", order);
+  ScheduleLabeled(sched, Region::kActive, "active", order);
+  ScheduleLabeled(sched, Region::kNBA, "nba", order);
+  ScheduleLabeled(sched, Region::kReNBA, "renba", order);
 
   sched.Run();
   ASSERT_EQ(order.size(), 4u);
@@ -308,16 +304,10 @@ TEST(SimCh441, ActiveSetCompletesBeforeObservedReactive) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, label]() { order.push_back(label); };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
-  schedule(Region::kObserved, "observed");
-  schedule(Region::kActive, "active");
-  schedule(Region::kNBA, "nba");
-  schedule(Region::kInactive, "inactive");
+  ScheduleLabeled(sched, Region::kObserved, "observed", order);
+  ScheduleLabeled(sched, Region::kActive, "active", order);
+  ScheduleLabeled(sched, Region::kNBA, "nba", order);
+  ScheduleLabeled(sched, Region::kInactive, "inactive", order);
 
   sched.Run();
   ASSERT_EQ(order.size(), 4u);
@@ -337,17 +327,11 @@ TEST(SimCh441, ObservedRegionsBridgeActivAndReactive) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, label]() { order.push_back(label); };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
-  schedule(Region::kActive, "active");
-  schedule(Region::kPreObserved, "pre_observed");
-  schedule(Region::kObserved, "observed");
-  schedule(Region::kPostObserved, "post_observed");
-  schedule(Region::kReactive, "reactive");
+  ScheduleLabeled(sched, Region::kActive, "active", order);
+  ScheduleLabeled(sched, Region::kPreObserved, "pre_observed", order);
+  ScheduleLabeled(sched, Region::kObserved, "observed", order);
+  ScheduleLabeled(sched, Region::kPostObserved, "post_observed", order);
+  ScheduleLabeled(sched, Region::kReactive, "reactive", order);
 
   sched.Run();
   ASSERT_EQ(order.size(), 5u);
@@ -363,25 +347,9 @@ TEST(SimCh441, ObservedRegionsBridgeActivAndReactive) {
 // all reactive regions and before the non-iterative Postponed region.
 // ---------------------------------------------------------------------------
 TEST(SimCh441, PrePostponedIsLastIterativeRegion) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, label]() { order.push_back(label); };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
-  schedule(Region::kPostReNBA, "post_renba");
-  schedule(Region::kPrePostponed, "pre_postponed");
-  schedule(Region::kPostponed, "postponed");
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 3u);
-  EXPECT_EQ(order[0], "post_renba");
-  EXPECT_EQ(order[1], "pre_postponed");
-  EXPECT_EQ(order[2], "postponed");
+  VerifyThreeRegionOrder(Region::kPostReNBA, "post_renba",
+                         Region::kPrePostponed, "pre_postponed",
+                         Region::kPostponed, "postponed");
 }
 
 // ---------------------------------------------------------------------------

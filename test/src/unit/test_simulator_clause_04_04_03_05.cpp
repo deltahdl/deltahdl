@@ -7,6 +7,8 @@
 #include "common/types.h"
 #include "simulation/scheduler.h"
 
+#include "helpers_scheduler_event.h"
+
 using namespace delta;
 
 // ===========================================================================
@@ -95,26 +97,8 @@ TEST(SimCh4435, PreObservedReadsAfterActiveRegionSetStabilized) {
 // Pre-Observed executes after PostNBA and before Observed.
 // ---------------------------------------------------------------------------
 TEST(SimCh4435, PreObservedExecutesAfterPostNBABeforeObserved) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, label]() { order.push_back(label); };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
-  // Schedule in reverse order to prove region ordering.
-  schedule(Region::kObserved, "observed");
-  schedule(Region::kPreObserved, "pre_observed");
-  schedule(Region::kPostNBA, "post_nba");
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 3u);
-  EXPECT_EQ(order[0], "post_nba");
-  EXPECT_EQ(order[1], "pre_observed");
-  EXPECT_EQ(order[2], "observed");
+  VerifyThreeRegionOrder(Region::kPostNBA, "post_nba", Region::kPreObserved,
+                         "pre_observed", Region::kObserved, "observed");
 }
 
 // ---------------------------------------------------------------------------
@@ -127,17 +111,11 @@ TEST(SimCh4435, PreObservedExecutesAfterEntireActiveRegionSet) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, label]() { order.push_back(label); };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
   // Schedule in reverse to prove region ordering, not insertion order.
-  schedule(Region::kPreObserved, "pre_observed");
-  schedule(Region::kPostNBA, "post_nba");
-  schedule(Region::kNBA, "nba");
-  schedule(Region::kActive, "active");
+  ScheduleLabeled(sched, Region::kPreObserved, "pre_observed", order);
+  ScheduleLabeled(sched, Region::kPostNBA, "post_nba", order);
+  ScheduleLabeled(sched, Region::kNBA, "nba", order);
+  ScheduleLabeled(sched, Region::kActive, "active", order);
 
   sched.Run();
   ASSERT_EQ(order.size(), 4u);

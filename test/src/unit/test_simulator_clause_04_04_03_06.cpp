@@ -7,6 +7,8 @@
 #include "common/types.h"
 #include "simulation/scheduler.h"
 
+#include "helpers_scheduler_event.h"
+
 using namespace delta;
 
 // ===========================================================================
@@ -89,26 +91,8 @@ TEST(SimCh4436, PostObservedReadsAfterObservedRegion) {
 // Post-Observed executes after Observed and before Reactive.
 // ---------------------------------------------------------------------------
 TEST(SimCh4436, PostObservedExecutesAfterObservedBeforeReactive) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, label]() { order.push_back(label); };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
-  // Schedule in reverse order to prove region ordering.
-  schedule(Region::kReactive, "reactive");
-  schedule(Region::kPostObserved, "post_observed");
-  schedule(Region::kObserved, "observed");
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 3u);
-  EXPECT_EQ(order[0], "observed");
-  EXPECT_EQ(order[1], "post_observed");
-  EXPECT_EQ(order[2], "reactive");
+  VerifyThreeRegionOrder(Region::kObserved, "observed", Region::kPostObserved,
+                         "post_observed", Region::kReactive, "reactive");
 }
 
 // ---------------------------------------------------------------------------
@@ -122,17 +106,11 @@ TEST(SimCh4436, PostObservedExecutesAfterEntireChainThroughObserved) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, label]() { order.push_back(label); };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
   // Schedule in reverse to prove region ordering, not insertion order.
-  schedule(Region::kPostObserved, "post_observed");
-  schedule(Region::kObserved, "observed");
-  schedule(Region::kPreObserved, "pre_observed");
-  schedule(Region::kActive, "active");
+  ScheduleLabeled(sched, Region::kPostObserved, "post_observed", order);
+  ScheduleLabeled(sched, Region::kObserved, "observed", order);
+  ScheduleLabeled(sched, Region::kPreObserved, "pre_observed", order);
+  ScheduleLabeled(sched, Region::kActive, "active", order);
 
   sched.Run();
   ASSERT_EQ(order.size(), 4u);
@@ -242,18 +220,12 @@ TEST(SimCh4436, PostObservedInfrastructureWorksEvenIfCurrentlyUnused) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, label]() { order.push_back(label); };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
-  schedule(Region::kReactive, "reactive");
-  schedule(Region::kPostObserved, "post_observed");
-  schedule(Region::kObserved, "observed");
-  schedule(Region::kPreObserved, "pre_observed");
-  schedule(Region::kPostNBA, "post_nba");
-  schedule(Region::kActive, "active");
+  ScheduleLabeled(sched, Region::kReactive, "reactive", order);
+  ScheduleLabeled(sched, Region::kPostObserved, "post_observed", order);
+  ScheduleLabeled(sched, Region::kObserved, "observed", order);
+  ScheduleLabeled(sched, Region::kPreObserved, "pre_observed", order);
+  ScheduleLabeled(sched, Region::kPostNBA, "post_nba", order);
+  ScheduleLabeled(sched, Region::kActive, "active", order);
 
   sched.Run();
   std::vector<std::string> expected = {"active",        "post_nba",

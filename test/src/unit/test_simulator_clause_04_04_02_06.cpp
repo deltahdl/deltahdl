@@ -8,6 +8,8 @@
 #include "common/types.h"
 #include "simulation/scheduler.h"
 
+#include "helpers_scheduler_event.h"
+
 using namespace delta;
 
 // ===========================================================================
@@ -117,22 +119,8 @@ TEST(SimCh4426, ReactiveSelfLoopSchedulesMoreReactiveEvents) {
 // same reactive region set iteration.
 // ---------------------------------------------------------------------------
 TEST(SimCh4426, ReactiveExecutesBeforeReInactive) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto* reinactive = sched.GetEventPool().Acquire();
-  reinactive->callback = [&]() { order.push_back("reinactive"); };
-  sched.ScheduleEvent({0}, Region::kReInactive, reinactive);
-
-  auto* reactive = sched.GetEventPool().Acquire();
-  reactive->callback = [&]() { order.push_back("reactive"); };
-  sched.ScheduleEvent({0}, Region::kReactive, reactive);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 2u);
-  EXPECT_EQ(order[0], "reactive");
-  EXPECT_EQ(order[1], "reinactive");
+  VerifyTwoRegionOrder(Region::kReactive, "reactive", Region::kReInactive,
+                       "reinactive");
 }
 
 // ---------------------------------------------------------------------------
@@ -153,26 +141,8 @@ TEST(SimCh4426, ReactiveIsWithinReactiveRegionSet) {
 // Figure 4-1.  The flow is: Observed -> PostObserved -> Reactive.
 // ---------------------------------------------------------------------------
 TEST(SimCh4426, ReactiveExecutesAfterObservedAndPostObserved) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, label]() { order.push_back(label); };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
-  // Schedule in reverse order to prove region ordering, not insertion order.
-  schedule(Region::kReactive, "reactive");
-  schedule(Region::kPostObserved, "post_observed");
-  schedule(Region::kObserved, "observed");
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 3u);
-  EXPECT_EQ(order[0], "observed");
-  EXPECT_EQ(order[1], "post_observed");
-  EXPECT_EQ(order[2], "reactive");
+  VerifyThreeRegionOrder(Region::kObserved, "observed", Region::kPostObserved,
+                         "post_observed", Region::kReactive, "reactive");
 }
 
 // ---------------------------------------------------------------------------

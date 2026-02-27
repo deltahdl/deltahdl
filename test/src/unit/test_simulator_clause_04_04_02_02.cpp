@@ -8,6 +8,8 @@
 #include "common/types.h"
 #include "simulation/scheduler.h"
 
+#include "helpers_scheduler_event.h"
+
 using namespace delta;
 
 // ===========================================================================
@@ -115,22 +117,8 @@ TEST(SimCh4422, ActiveSelfLoopSchedulesMoreActiveEvents) {
 // active region set iteration.
 // ---------------------------------------------------------------------------
 TEST(SimCh4422, ActiveExecutesBeforeInactive) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto* inactive = sched.GetEventPool().Acquire();
-  inactive->callback = [&]() { order.push_back("inactive"); };
-  sched.ScheduleEvent({0}, Region::kInactive, inactive);
-
-  auto* active = sched.GetEventPool().Acquire();
-  active->callback = [&]() { order.push_back("active"); };
-  sched.ScheduleEvent({0}, Region::kActive, active);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 2u);
-  EXPECT_EQ(order[0], "active");
-  EXPECT_EQ(order[1], "inactive");
+  VerifyTwoRegionOrder(Region::kActive, "active", Region::kInactive,
+                       "inactive");
 }
 
 // ---------------------------------------------------------------------------
@@ -150,26 +138,8 @@ TEST(SimCh4422, ActiveIsWithinActiveRegionSet) {
 // The flow is: Preponed -> PreActive -> Active.
 // ---------------------------------------------------------------------------
 TEST(SimCh4422, ActiveExecutesAfterPreponedAndPreActive) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, label]() { order.push_back(label); };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
-  // Schedule in reverse order to prove region ordering, not insertion order.
-  schedule(Region::kActive, "active");
-  schedule(Region::kPreActive, "preactive");
-  schedule(Region::kPreponed, "preponed");
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 3u);
-  EXPECT_EQ(order[0], "preponed");
-  EXPECT_EQ(order[1], "preactive");
-  EXPECT_EQ(order[2], "active");
+  VerifyThreeRegionOrder(Region::kPreponed, "preponed", Region::kPreActive,
+                         "preactive", Region::kActive, "active");
 }
 
 // ---------------------------------------------------------------------------

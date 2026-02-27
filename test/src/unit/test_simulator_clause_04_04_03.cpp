@@ -7,6 +7,8 @@
 #include "common/types.h"
 #include "simulation/scheduler.h"
 
+#include "helpers_scheduler_event.h"
+
 using namespace delta;
 
 // ===========================================================================
@@ -114,25 +116,8 @@ TEST(SimCh443, PLIRegionsAreInterleavedWithSimulationRegions) {
 // Pre-Active PLI region executes between Preponed and Active.
 // ---------------------------------------------------------------------------
 TEST(SimCh443, PreActiveExecutesBetweenPreponedAndActive) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, label]() { order.push_back(label); };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
-  schedule(Region::kActive, "active");
-  schedule(Region::kPreActive, "pre_active");
-  schedule(Region::kPreponed, "preponed");
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 3u);
-  EXPECT_EQ(order[0], "preponed");
-  EXPECT_EQ(order[1], "pre_active");
-  EXPECT_EQ(order[2], "active");
+  VerifyThreeRegionOrder(Region::kPreponed, "preponed", Region::kPreActive,
+                         "pre_active", Region::kActive, "active");
 }
 
 // ---------------------------------------------------------------------------
@@ -140,25 +125,8 @@ TEST(SimCh443, PreActiveExecutesBetweenPreponedAndActive) {
 // Pre-NBA PLI region executes between Inactive and NBA.
 // ---------------------------------------------------------------------------
 TEST(SimCh443, PreNBAExecutesBetweenInactiveAndNBA) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, label]() { order.push_back(label); };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
-  schedule(Region::kNBA, "nba");
-  schedule(Region::kPreNBA, "pre_nba");
-  schedule(Region::kInactive, "inactive");
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 3u);
-  EXPECT_EQ(order[0], "inactive");
-  EXPECT_EQ(order[1], "pre_nba");
-  EXPECT_EQ(order[2], "nba");
+  VerifyThreeRegionOrder(Region::kInactive, "inactive", Region::kPreNBA,
+                         "pre_nba", Region::kNBA, "nba");
 }
 
 // ---------------------------------------------------------------------------
@@ -170,14 +138,8 @@ TEST(SimCh443, PostNBAExecutesAfterNBA) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, label]() { order.push_back(label); };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
-  schedule(Region::kPostNBA, "post_nba");
-  schedule(Region::kNBA, "nba");
+  ScheduleLabeled(sched, Region::kPostNBA, "post_nba", order);
+  ScheduleLabeled(sched, Region::kNBA, "nba", order);
 
   sched.Run();
   ASSERT_EQ(order.size(), 2u);
@@ -191,25 +153,8 @@ TEST(SimCh443, PostNBAExecutesAfterNBA) {
 // Pre-Observed PLI region executes between Post-NBA and Observed.
 // ---------------------------------------------------------------------------
 TEST(SimCh443, PreObservedExecutesBetweenPostNBAAndObserved) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, label]() { order.push_back(label); };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
-  schedule(Region::kObserved, "observed");
-  schedule(Region::kPreObserved, "pre_observed");
-  schedule(Region::kPostNBA, "post_nba");
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 3u);
-  EXPECT_EQ(order[0], "post_nba");
-  EXPECT_EQ(order[1], "pre_observed");
-  EXPECT_EQ(order[2], "observed");
+  VerifyThreeRegionOrder(Region::kPostNBA, "post_nba", Region::kPreObserved,
+                         "pre_observed", Region::kObserved, "observed");
 }
 
 // ---------------------------------------------------------------------------
@@ -218,25 +163,8 @@ TEST(SimCh443, PreObservedExecutesBetweenPostNBAAndObserved) {
 // Post-Observed PLI region executes between Observed and Reactive.
 // ---------------------------------------------------------------------------
 TEST(SimCh443, PostObservedExecutesBetweenObservedAndReactive) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, label]() { order.push_back(label); };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
-  schedule(Region::kReactive, "reactive");
-  schedule(Region::kPostObserved, "post_observed");
-  schedule(Region::kObserved, "observed");
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 3u);
-  EXPECT_EQ(order[0], "observed");
-  EXPECT_EQ(order[1], "post_observed");
-  EXPECT_EQ(order[2], "reactive");
+  VerifyThreeRegionOrder(Region::kObserved, "observed", Region::kPostObserved,
+                         "post_observed", Region::kReactive, "reactive");
 }
 
 // ---------------------------------------------------------------------------
@@ -245,25 +173,8 @@ TEST(SimCh443, PostObservedExecutesBetweenObservedAndReactive) {
 // Pre-Re-NBA PLI region executes between Re-Inactive and Re-NBA.
 // ---------------------------------------------------------------------------
 TEST(SimCh443, PreReNBAExecutesBetweenReInactiveAndReNBA) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, label]() { order.push_back(label); };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
-  schedule(Region::kReNBA, "renba");
-  schedule(Region::kPreReNBA, "pre_renba");
-  schedule(Region::kReInactive, "reinactive");
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 3u);
-  EXPECT_EQ(order[0], "reinactive");
-  EXPECT_EQ(order[1], "pre_renba");
-  EXPECT_EQ(order[2], "renba");
+  VerifyThreeRegionOrder(Region::kReInactive, "reinactive", Region::kPreReNBA,
+                         "pre_renba", Region::kReNBA, "renba");
 }
 
 // ---------------------------------------------------------------------------
@@ -272,25 +183,8 @@ TEST(SimCh443, PreReNBAExecutesBetweenReInactiveAndReNBA) {
 // Post-Re-NBA PLI region executes between Re-NBA and Pre-Postponed.
 // ---------------------------------------------------------------------------
 TEST(SimCh443, PostReNBAExecutesBetweenReNBAAndPrePostponed) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, label]() { order.push_back(label); };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
-  schedule(Region::kPrePostponed, "pre_postponed");
-  schedule(Region::kPostReNBA, "post_renba");
-  schedule(Region::kReNBA, "renba");
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 3u);
-  EXPECT_EQ(order[0], "renba");
-  EXPECT_EQ(order[1], "post_renba");
-  EXPECT_EQ(order[2], "pre_postponed");
+  VerifyThreeRegionOrder(Region::kReNBA, "renba", Region::kPostReNBA,
+                         "post_renba", Region::kPrePostponed, "pre_postponed");
 }
 
 // ---------------------------------------------------------------------------
@@ -302,14 +196,8 @@ TEST(SimCh443, PrePostponedExecutesBeforePostponed) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, label]() { order.push_back(label); };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
-  schedule(Region::kPostponed, "postponed");
-  schedule(Region::kPrePostponed, "pre_postponed");
+  ScheduleLabeled(sched, Region::kPostponed, "postponed", order);
+  ScheduleLabeled(sched, Region::kPrePostponed, "pre_postponed", order);
 
   sched.Run();
   ASSERT_EQ(order.size(), 2u);
@@ -327,30 +215,24 @@ TEST(SimCh443, FullPLIRegionOrderingPerFigure41) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, label]() { order.push_back(label); };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
   // Schedule all regions in reverse order to prove ordering is structural.
-  schedule(Region::kPostponed, "postponed");
-  schedule(Region::kPrePostponed, "pre_postponed");
-  schedule(Region::kPostReNBA, "post_renba");
-  schedule(Region::kReNBA, "renba");
-  schedule(Region::kPreReNBA, "pre_renba");
-  schedule(Region::kReInactive, "reinactive");
-  schedule(Region::kReactive, "reactive");
-  schedule(Region::kPostObserved, "post_observed");
-  schedule(Region::kObserved, "observed");
-  schedule(Region::kPreObserved, "pre_observed");
-  schedule(Region::kPostNBA, "post_nba");
-  schedule(Region::kNBA, "nba");
-  schedule(Region::kPreNBA, "pre_nba");
-  schedule(Region::kInactive, "inactive");
-  schedule(Region::kActive, "active");
-  schedule(Region::kPreActive, "pre_active");
-  schedule(Region::kPreponed, "preponed");
+  ScheduleLabeled(sched, Region::kPostponed, "postponed", order);
+  ScheduleLabeled(sched, Region::kPrePostponed, "pre_postponed", order);
+  ScheduleLabeled(sched, Region::kPostReNBA, "post_renba", order);
+  ScheduleLabeled(sched, Region::kReNBA, "renba", order);
+  ScheduleLabeled(sched, Region::kPreReNBA, "pre_renba", order);
+  ScheduleLabeled(sched, Region::kReInactive, "reinactive", order);
+  ScheduleLabeled(sched, Region::kReactive, "reactive", order);
+  ScheduleLabeled(sched, Region::kPostObserved, "post_observed", order);
+  ScheduleLabeled(sched, Region::kObserved, "observed", order);
+  ScheduleLabeled(sched, Region::kPreObserved, "pre_observed", order);
+  ScheduleLabeled(sched, Region::kPostNBA, "post_nba", order);
+  ScheduleLabeled(sched, Region::kNBA, "nba", order);
+  ScheduleLabeled(sched, Region::kPreNBA, "pre_nba", order);
+  ScheduleLabeled(sched, Region::kInactive, "inactive", order);
+  ScheduleLabeled(sched, Region::kActive, "active", order);
+  ScheduleLabeled(sched, Region::kPreActive, "pre_active", order);
+  ScheduleLabeled(sched, Region::kPreponed, "preponed", order);
 
   sched.Run();
   std::vector<std::string> expected = {
@@ -371,19 +253,13 @@ TEST(SimCh443, PLIRegionsExecuteAcrossMultipleTimeSlots) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](uint64_t t, Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, label]() { order.push_back(label); };
-    sched.ScheduleEvent({t}, r, ev);
-  };
-
   // Time 0: Pre-Active and Active
-  schedule(0, Region::kPreActive, "t0_pre_active");
-  schedule(0, Region::kActive, "t0_active");
+  ScheduleLabeled(sched, 0, Region::kPreActive, "t0_pre_active", order);
+  ScheduleLabeled(sched, 0, Region::kActive, "t0_active", order);
 
   // Time 1: Pre-NBA and NBA
-  schedule(1, Region::kPreNBA, "t1_pre_nba");
-  schedule(1, Region::kNBA, "t1_nba");
+  ScheduleLabeled(sched, 1, Region::kPreNBA, "t1_pre_nba", order);
+  ScheduleLabeled(sched, 1, Region::kNBA, "t1_nba", order);
 
   sched.Run();
   ASSERT_EQ(order.size(), 4u);

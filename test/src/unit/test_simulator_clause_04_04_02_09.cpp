@@ -7,6 +7,8 @@
 #include "common/types.h"
 #include "simulation/scheduler.h"
 
+#include "helpers_scheduler_event.h"
+
 using namespace delta;
 
 // ===========================================================================
@@ -106,21 +108,15 @@ TEST(SimCh4429, PostponedExecutesAfterAllOtherSimulationRegions) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, label]() { order.push_back(label); };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
   // Schedule in reverse order to prove region ordering, not insertion order.
-  schedule(Region::kPostponed, "postponed");
-  schedule(Region::kReNBA, "renba");
-  schedule(Region::kReInactive, "reinactive");
-  schedule(Region::kReactive, "reactive");
-  schedule(Region::kObserved, "observed");
-  schedule(Region::kNBA, "nba");
-  schedule(Region::kInactive, "inactive");
-  schedule(Region::kActive, "active");
+  ScheduleLabeled(sched, Region::kPostponed, "postponed", order);
+  ScheduleLabeled(sched, Region::kReNBA, "renba", order);
+  ScheduleLabeled(sched, Region::kReInactive, "reinactive", order);
+  ScheduleLabeled(sched, Region::kReactive, "reactive", order);
+  ScheduleLabeled(sched, Region::kObserved, "observed", order);
+  ScheduleLabeled(sched, Region::kNBA, "nba", order);
+  ScheduleLabeled(sched, Region::kInactive, "inactive", order);
+  ScheduleLabeled(sched, Region::kActive, "active", order);
 
   sched.Run();
   ASSERT_EQ(order.size(), 8u);

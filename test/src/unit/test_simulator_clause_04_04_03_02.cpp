@@ -7,6 +7,8 @@
 #include "common/types.h"
 #include "simulation/scheduler.h"
 
+#include "helpers_scheduler_event.h"
+
 using namespace delta;
 
 // ===========================================================================
@@ -134,26 +136,8 @@ TEST(SimCh4432, PreActiveExecutesBeforeActive) {
 // Pre-Active executes after Preponed and before Active.
 // ---------------------------------------------------------------------------
 TEST(SimCh4432, PreActiveExecutesAfterPreponedBeforeActive) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto schedule = [&](Region r, const std::string& label) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, label]() { order.push_back(label); };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
-  // Schedule in reverse order to prove region ordering.
-  schedule(Region::kActive, "active");
-  schedule(Region::kPreActive, "pre_active");
-  schedule(Region::kPreponed, "preponed");
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 3u);
-  EXPECT_EQ(order[0], "preponed");
-  EXPECT_EQ(order[1], "pre_active");
-  EXPECT_EQ(order[2], "active");
+  VerifyThreeRegionOrder(Region::kPreponed, "preponed", Region::kPreActive,
+                         "pre_active", Region::kActive, "active");
 }
 
 // ---------------------------------------------------------------------------
