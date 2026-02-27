@@ -62,6 +62,14 @@ inline Expr* MakeSysCall(Arena& arena, std::string_view name,
   return e;
 }
 
+inline Expr* MakeSelectExpr(Arena& arena, Expr* base, Expr* index) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kSelect;
+  e->base = base;
+  e->index = index;
+  return e;
+}
+
 inline Expr* MakeSelect(Arena& arena, std::string_view base, uint64_t idx) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kSelect;

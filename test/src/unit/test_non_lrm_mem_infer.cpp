@@ -2,36 +2,11 @@
 
 #include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "synthesis/mem_infer.h"
 
+#include "fixture_synthesizer.h"
+
 using namespace delta;
-
-// --- Test fixture ---
-struct MemInferFixture {
-  SourceManager src_mgr;
-  DiagEngine diag{src_mgr};
-  Arena arena;
-};
-
-static const RtlirModule* ElaborateSrc(MemInferFixture& f,
-                                       const std::string& src) {
-  auto fid = f.src_mgr.AddFile("<test>", src);
-  Lexer lexer(f.src_mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  if (!cu || cu->modules.empty()) return nullptr;
-  Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(cu->modules.back()->name);
-  if (!design || design->top_modules.empty()) return nullptr;
-  return design->top_modules[0];
-}
 
 namespace {
 
@@ -39,7 +14,7 @@ namespace {
 // Single-port write pattern: mem[addr] <= wdata inside always_ff
 // =============================================================================
 TEST(MemInfer, DetectSinglePortWrite) {
-  MemInferFixture f;
+  SynthFixture f;
   auto* mod = ElaborateSrc(f,
                            "module m(input clk, input logic [3:0] addr,\n"
                            "         input logic [7:0] wdata, input we);\n"
@@ -56,7 +31,7 @@ TEST(MemInfer, DetectSinglePortWrite) {
 }
 
 TEST(MemInfer, DetectSinglePortWrite_PortDetails) {
-  MemInferFixture f;
+  SynthFixture f;
   auto* mod = ElaborateSrc(f,
                            "module m(input clk, input logic [3:0] addr,\n"
                            "         input logic [7:0] wdata, input we);\n"
@@ -78,7 +53,7 @@ TEST(MemInfer, DetectSinglePortWrite_PortDetails) {
 // Single-port read pattern: rdata <= mem[addr] inside always_ff
 // =============================================================================
 TEST(MemInfer, DetectSinglePortRead) {
-  MemInferFixture f;
+  SynthFixture f;
   auto* mod = ElaborateSrc(f,
                            "module m(input clk, input logic [3:0] addr,\n"
                            "         output logic [7:0] rdata);\n"
@@ -95,7 +70,7 @@ TEST(MemInfer, DetectSinglePortRead) {
 }
 
 TEST(MemInfer, DetectSinglePortRead_PortDetails) {
-  MemInferFixture f;
+  SynthFixture f;
   auto* mod = ElaborateSrc(f,
                            "module m(input clk, input logic [3:0] addr,\n"
                            "         output logic [7:0] rdata);\n"
@@ -117,7 +92,7 @@ TEST(MemInfer, DetectSinglePortRead_PortDetails) {
 // Dual-port (read + write) detection in same always_ff block
 // =============================================================================
 TEST(MemInfer, DetectDualPort) {
-  MemInferFixture f;
+  SynthFixture f;
   auto* mod = ElaborateSrc(f,
                            "module m(input clk, input logic [3:0] raddr,\n"
                            "         input logic [3:0] waddr,\n"
@@ -142,7 +117,7 @@ TEST(MemInfer, DetectDualPort) {
 // No memory when no array patterns (scalar assignments only)
 // =============================================================================
 TEST(MemInfer, NoMemoryForScalarAssign) {
-  MemInferFixture f;
+  SynthFixture f;
   auto* mod = ElaborateSrc(f,
                            "module m(input clk, input d, output reg q);\n"
                            "  always_ff @(posedge clk) begin\n"
@@ -159,7 +134,7 @@ TEST(MemInfer, NoMemoryForScalarAssign) {
 // ROM inference: read-only array access (no writes)
 // =============================================================================
 TEST(MemInfer, RomInference) {
-  MemInferFixture f;
+  SynthFixture f;
   auto* mod = ElaborateSrc(f,
                            "module m(input clk, input logic [3:0] addr,\n"
                            "         output logic [7:0] rdata);\n"

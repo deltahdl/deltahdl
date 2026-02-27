@@ -36,28 +36,6 @@ TEST(Elaborator, AlwaysCombSensitivityInferred) {
   EXPECT_TRUE(found_a);
 }
 
-static Expr* LspId(Arena& arena, std::string_view name) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIdentifier;
-  e->text = name;
-  return e;
-}
-
-static Expr* LspSelect(Arena& arena, Expr* base, Expr* index) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kSelect;
-  e->base = base;
-  e->index = index;
-  return e;
-}
-
-static Expr* LspInt(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
-
 TEST(Sensitivity, SelectVarIdxUsesLSP) {
   // a[i] → LSP is "a", sensitivity includes "a" and "i".
   Arena arena;

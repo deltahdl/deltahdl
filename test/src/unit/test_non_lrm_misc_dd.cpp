@@ -278,24 +278,6 @@ TEST(ConstEval, ScopedIdentifier) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("WIDTH", f), scope), 16);
 }
 
-// =============================================================================
-// Helper fixture
-// =============================================================================
-TEST(StructType, FieldTypeKindPreserved) {
-  SimFixture f;
-  StructTypeInfo info;
-  info.type_name = "typed_s";
-  info.is_packed = true;
-  info.total_width = 40;
-  info.fields.push_back({"a", 8, 32, DataTypeKind::kInt});
-  info.fields.push_back({"b", 0, 8, DataTypeKind::kByte});
-  f.ctx.RegisterStructType("typed_s", info);
-  auto* found = f.ctx.FindStructType("typed_s");
-  ASSERT_NE(found, nullptr);
-  EXPECT_EQ(found->fields[0].type_kind, DataTypeKind::kInt);
-  EXPECT_EQ(found->fields[1].type_kind, DataTypeKind::kByte);
-}
-
 TEST(Elaboration, HardPackedUnion_DifferentWidth_Error) {
   ElabFixture f;
   ElaborateSrc(

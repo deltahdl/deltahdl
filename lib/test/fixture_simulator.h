@@ -32,8 +32,6 @@ using SampledLetFixture = SimFixture;
 using CompiledSimFixture = SimFixture;
 using DpiSimFixture = SimFixture;
 using AssertionSimFixture = SimFixture;
-using RealFixture = SimFixture;
-
 using StmtFixture = SimFixtureSeeded;
 using ClockingSimFixture = SimFixtureSeeded;
 

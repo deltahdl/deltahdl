@@ -79,28 +79,6 @@ TEST(QueueRef, OutdatedByPopFront) {
   EXPECT_EQ(q->elements[1].ToUint64(), 30u);
 }
 
-static Expr* LspId(Arena& arena, std::string_view name) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIdentifier;
-  e->text = name;
-  return e;
-}
-
-static Expr* LspSelect(Arena& arena, Expr* base, Expr* index) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kSelect;
-  e->base = base;
-  e->index = index;
-  return e;
-}
-
-static Expr* LspInt(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
-
 // Ref survives push_back: push_back never outdates refs.
 TEST(QueueRef, SurvivesPushBack) {
   SimFixture f;
