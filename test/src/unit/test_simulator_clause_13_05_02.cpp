@@ -64,24 +64,6 @@ TEST(Functions, PassByRefReadsCaller) {
   EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 75u);
 }
 
-// ============================================================================
-// Queue helper: populate a queue with integer values.
-// ============================================================================
-
-// Register an automatic void function with given args and body.
-static void RegAutoFunc(SimFixture& f, std::string_view name,
-                        std::vector<FunctionArg> args,
-                        std::vector<Stmt*> body) {
-  auto* func = f.arena.Create<ModuleItem>();
-  func->kind = ModuleItemKind::kFunctionDecl;
-  func->name = name;
-  func->is_automatic = true;
-  func->return_type.kind = DataTypeKind::kVoid;
-  func->func_args = std::move(args);
-  func->func_body_stmts = std::move(body);
-  f.ctx.RegisterFunction(name, func);
-}
-
 // Pass q[1] by ref, return it, verify the function reads 20.
 TEST(QueueRef, RefReadsCurrentValue) {
   SimFixture f;

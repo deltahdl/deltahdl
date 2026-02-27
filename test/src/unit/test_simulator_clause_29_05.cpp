@@ -2,36 +2,13 @@
 
 #include <gtest/gtest.h>
 
-#include "parser/ast.h"
 #include "simulation/udp_eval.h"
+
+#include "builders_udp.h"
 
 using namespace delta;
 
 namespace {
-
-struct UdpBuilder {
-  UdpDecl decl;
-
-  UdpBuilder& SetSequential() {
-    decl.is_sequential = true;
-    return *this;
-  }
-
-  UdpBuilder& SetInitial(char val) {
-    decl.has_initial = true;
-    decl.initial_value = val;
-    return *this;
-  }
-
-  UdpBuilder& AddSeqRow(std::vector<char> inputs, char state, char output) {
-    UdpTableRow row;
-    row.inputs = std::move(inputs);
-    row.current_state = state;
-    row.output = output;
-    decl.table.push_back(row);
-    return *this;
-  }
-};
 
 TEST(UdpLevelSeq, Latch) {
   UdpBuilder b;
