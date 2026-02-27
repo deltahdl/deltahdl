@@ -6,6 +6,7 @@
 #include "simulation/variable.h"
 
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 
 using namespace delta;
 
@@ -26,18 +27,7 @@ TEST(Lowerer, ForkJoinNone) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* a = f.ctx.FindVariable("a");
-  auto* b = f.ctx.FindVariable("b");
-  ASSERT_NE(a, nullptr);
-  ASSERT_NE(b, nullptr);
-  EXPECT_EQ(a->value.ToUint64(), 10u);
-  EXPECT_EQ(b->value.ToUint64(), 20u);
+  LowerRunAndCheck(f, design, {{"a", 10u}, {"b", 20u}});
 }
 
 TEST(Lowerer, ForkJoin) {
@@ -91,16 +81,7 @@ TEST(SimA603, ForkJoinAllChildrenExecute) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
-  auto* b = f.ctx.FindVariable("b");
-  ASSERT_NE(a, nullptr);
-  ASSERT_NE(b, nullptr);
-  EXPECT_EQ(a->value.ToUint64(), 10u);
-  EXPECT_EQ(b->value.ToUint64(), 20u);
+  LowerRunAndCheck(f, design, {{"a", 10u}, {"b", 20u}});
 }
 
 // fork/join_none: all children execute, parent continues immediately
@@ -118,19 +99,7 @@ TEST(SimA603, ForkJoinNoneChildrenExecute) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
-  auto* b = f.ctx.FindVariable("b");
-  auto* c = f.ctx.FindVariable("c");
-  ASSERT_NE(a, nullptr);
-  ASSERT_NE(b, nullptr);
-  ASSERT_NE(c, nullptr);
-  EXPECT_EQ(a->value.ToUint64(), 1u);
-  EXPECT_EQ(b->value.ToUint64(), 2u);
-  EXPECT_EQ(c->value.ToUint64(), 3u);
+  LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 2u}, {"c", 3u}});
 }
 
 // fork/join_any: all children execute

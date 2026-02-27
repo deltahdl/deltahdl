@@ -226,6 +226,55 @@ inline void VerifyCACorrespondsToProcess() {
   EXPECT_EQ(process_eval_count, 2);
 }
 
+// Verify all 17 regions execute in the correct order.
+inline void VerifyAllRegionOrder() {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<std::string> order;
+  ScheduleLabeled(sched, Region::kPostponed, "postponed", order);
+  ScheduleLabeled(sched, Region::kPrePostponed, "pre_postponed", order);
+  ScheduleLabeled(sched, Region::kPostReNBA, "post_re_nba", order);
+  ScheduleLabeled(sched, Region::kReNBA, "re_nba", order);
+  ScheduleLabeled(sched, Region::kPreReNBA, "pre_re_nba", order);
+  ScheduleLabeled(sched, Region::kReInactive, "re_inactive", order);
+  ScheduleLabeled(sched, Region::kReactive, "reactive", order);
+  ScheduleLabeled(sched, Region::kPostObserved, "post_observed", order);
+  ScheduleLabeled(sched, Region::kObserved, "observed", order);
+  ScheduleLabeled(sched, Region::kPreObserved, "pre_observed", order);
+  ScheduleLabeled(sched, Region::kPostNBA, "post_nba", order);
+  ScheduleLabeled(sched, Region::kNBA, "nba", order);
+  ScheduleLabeled(sched, Region::kPreNBA, "pre_nba", order);
+  ScheduleLabeled(sched, Region::kInactive, "inactive", order);
+  ScheduleLabeled(sched, Region::kActive, "active", order);
+  ScheduleLabeled(sched, Region::kPreActive, "pre_active", order);
+  ScheduleLabeled(sched, Region::kPreponed, "preponed", order);
+  sched.Run();
+  std::vector<std::string> expected = {
+      "preponed",   "pre_active",  "active",      "inactive",
+      "pre_nba",    "nba",         "post_nba",    "pre_observed",
+      "observed",   "post_observed", "reactive",  "re_inactive",
+      "pre_re_nba", "re_nba",      "post_re_nba", "pre_postponed",
+      "postponed"};
+  EXPECT_EQ(order, expected);
+}
+
+// Verify all regions execute in monotonically increasing ordinal order.
+inline void VerifyAllRegionsExecuteInOrder() {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<int> order;
+  for (int r = 0; r < static_cast<int>(Region::kCOUNT); ++r) {
+    auto* ev = sched.GetEventPool().Acquire();
+    ev->callback = [&order, r]() { order.push_back(r); };
+    sched.ScheduleEvent({0}, static_cast<Region>(r), ev);
+  }
+  sched.Run();
+  ASSERT_EQ(order.size(), kRegionCount);
+  for (size_t i = 1; i < order.size(); ++i) {
+    EXPECT_LT(order[i - 1], order[i]);
+  }
+}
+
 // Verify CA schedules an active update event (before NBA).
 inline void VerifyCASchedulesActiveUpdateEvent() {
   Arena arena;

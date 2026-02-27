@@ -98,37 +98,7 @@ TEST(SimCh45, ExecuteSimulationStopsWhenAllTimeSlotsEmpty) {
 // Preponed -> Pre-Active -> Active set -> Reactive set -> Postponed.
 // ---------------------------------------------------------------------------
 TEST(SimCh45, ExecuteTimeSlotFullRegionOrdering) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  // Schedule in reverse to prove ordering.
-  ScheduleLabeled(sched, Region::kPostponed, "postponed", order);
-  ScheduleLabeled(sched, Region::kPrePostponed, "pre_postponed", order);
-  ScheduleLabeled(sched, Region::kPostReNBA, "post_re_nba", order);
-  ScheduleLabeled(sched, Region::kReNBA, "re_nba", order);
-  ScheduleLabeled(sched, Region::kPreReNBA, "pre_re_nba", order);
-  ScheduleLabeled(sched, Region::kReInactive, "re_inactive", order);
-  ScheduleLabeled(sched, Region::kReactive, "reactive", order);
-  ScheduleLabeled(sched, Region::kPostObserved, "post_observed", order);
-  ScheduleLabeled(sched, Region::kObserved, "observed", order);
-  ScheduleLabeled(sched, Region::kPreObserved, "pre_observed", order);
-  ScheduleLabeled(sched, Region::kPostNBA, "post_nba", order);
-  ScheduleLabeled(sched, Region::kNBA, "nba", order);
-  ScheduleLabeled(sched, Region::kPreNBA, "pre_nba", order);
-  ScheduleLabeled(sched, Region::kInactive, "inactive", order);
-  ScheduleLabeled(sched, Region::kActive, "active", order);
-  ScheduleLabeled(sched, Region::kPreActive, "pre_active", order);
-  ScheduleLabeled(sched, Region::kPreponed, "preponed", order);
-
-  sched.Run();
-  std::vector<std::string> expected = {
-      "preponed",   "pre_active",    "active",      "inactive",
-      "pre_nba",    "nba",           "post_nba",    "pre_observed",
-      "observed",   "post_observed", "reactive",    "re_inactive",
-      "pre_re_nba", "re_nba",        "post_re_nba", "pre_postponed",
-      "postponed"};
-  EXPECT_EQ(order, expected);
+  VerifyAllRegionOrder();
 }
 
 // ---------------------------------------------------------------------------

@@ -6,6 +6,7 @@
 #include "fixture_simulator.h"
 #include "builders_ast.h"
 #include "helpers_eval_op.h"
+#include "helpers_scheduler.h"
 
 using namespace delta;
 
@@ -97,16 +98,7 @@ TEST(SimA81, ConcatAsLHS) {
       "  initial {a, b} = 8'hC3;\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  EXPECT_EQ(va->value.ToUint64(), 0xCu);
-  EXPECT_EQ(vb->value.ToUint64(), 0x3u);
+  LowerRunAndCheck(f, design, {{"a", 0xCu}, {"b", 0x3u}});
 }
 
 // § net_lvalue — concatenation LHS in continuous assignment (procedural)
@@ -118,16 +110,7 @@ TEST(SimA85, NetLvalueConcatProcedural) {
       "  initial {a, b} = 8'hA5;\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  EXPECT_EQ(va->value.ToUint64(), 0xAu);
-  EXPECT_EQ(vb->value.ToUint64(), 0x5u);
+  LowerRunAndCheck(f, design, {{"a", 0xAu}, {"b", 0x5u}});
 }
 
 }  // namespace

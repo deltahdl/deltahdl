@@ -7,6 +7,8 @@
 #include "common/types.h"
 #include "simulation/scheduler.h"
 
+#include "helpers_scheduler_event.h"
+
 using namespace delta;
 
 // ===========================================================================
@@ -170,22 +172,5 @@ TEST(SimCh442, PreponedIsFirstPostponedIsLast) {
 // should execute all events respecting the region ordering.
 // ---------------------------------------------------------------------------
 TEST(SimCh442, MixedSimAndPLIRegionsExecuteInOrder) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<int> order;
-
-  // Schedule one event in every region.
-  for (int r = 0; r < static_cast<int>(Region::kCOUNT); ++r) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, r]() { order.push_back(r); };
-    sched.ScheduleEvent({0}, static_cast<Region>(r), ev);
-  }
-
-  sched.Run();
-  ASSERT_EQ(order.size(), kRegionCount);
-
-  // Verify monotonically increasing region ordinals.
-  for (size_t i = 1; i < order.size(); ++i) {
-    EXPECT_GT(order[i], order[i - 1]);
-  }
+  VerifyAllRegionsExecuteInOrder();
 }

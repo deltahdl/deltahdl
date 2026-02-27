@@ -3,6 +3,7 @@
 #include "simulation/variable.h"
 
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 
 using namespace delta;
 
@@ -570,21 +571,8 @@ TEST(SimCh10b, NBABitwiseOperators) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* r_and = f.ctx.FindVariable("r_and");
-  auto* r_or = f.ctx.FindVariable("r_or");
-  auto* r_xor = f.ctx.FindVariable("r_xor");
-  ASSERT_NE(r_and, nullptr);
-  ASSERT_NE(r_or, nullptr);
-  ASSERT_NE(r_xor, nullptr);
-  EXPECT_EQ(r_and->value.ToUint64(), 0x30u);  // 0xF0 & 0x3C = 0x30.
-  EXPECT_EQ(r_or->value.ToUint64(), 0xFCu);   // 0xF0 | 0x3C = 0xFC.
-  EXPECT_EQ(r_xor->value.ToUint64(), 0xCCu);  // 0xF0 ^ 0x3C = 0xCC.
+  LowerRunAndCheck(f, design,
+                   {{"r_and", 0x30u}, {"r_or", 0xFCu}, {"r_xor", 0xCCu}});
 }
 
 // ---------------------------------------------------------------------------
@@ -674,19 +662,7 @@ TEST(SimCh10b, MixedBlockingAndNBA) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* a = f.ctx.FindVariable("a");
-  auto* b = f.ctx.FindVariable("b");
-  ASSERT_NE(a, nullptr);
-  ASSERT_NE(b, nullptr);
-  // Blocking: a=5, then NBA samples a+1=6, then a=10.
-  EXPECT_EQ(a->value.ToUint64(), 10u);
-  EXPECT_EQ(b->value.ToUint64(), 6u);
+  LowerRunAndCheck(f, design, {{"a", 10u}, {"b", 6u}});
 }
 
 // ---------------------------------------------------------------------------

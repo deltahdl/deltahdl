@@ -149,15 +149,8 @@ TEST(SimCh4, FiveParallelInitialBlocks) {
       "  initial e = 8'd5;\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 1u);
-  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 2u);
-  EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 3u);
-  EXPECT_EQ(f.ctx.FindVariable("d")->value.ToUint64(), 4u);
-  EXPECT_EQ(f.ctx.FindVariable("e")->value.ToUint64(), 5u);
+  LowerRunAndCheck(f, design,
+                   {{"a", 1u}, {"b", 2u}, {"c", 3u}, {"d", 4u}, {"e", 5u}});
 }
 
 }  // namespace

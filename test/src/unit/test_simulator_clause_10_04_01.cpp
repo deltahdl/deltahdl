@@ -37,16 +37,7 @@ TEST(SimA85, VarLvalueConcatenation) {
       "  initial {a, b} = 8'hA5;\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  EXPECT_EQ(va->value.ToUint64(), 0xAu);
-  EXPECT_EQ(vb->value.ToUint64(), 0x5u);
+  LowerRunAndCheck(f, design, {{"a", 0xAu}, {"b", 0x5u}});
 }
 
 // § variable_lvalue — multi-dimensional array element

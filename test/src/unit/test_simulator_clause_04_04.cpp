@@ -5,6 +5,7 @@
 
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
+#include "helpers_scheduler_event.h"
 
 using namespace delta;
 
@@ -264,21 +265,7 @@ TEST(SimCh44, All17RegionsNamedAndOrdered) {
 // monotonically increasing order.
 // ---------------------------------------------------------------------------
 TEST(SimCh44, AllRegionsExecuteInOrder) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<int> order;
-
-  for (int r = 0; r < static_cast<int>(Region::kCOUNT); ++r) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, r]() { order.push_back(r); };
-    sched.ScheduleEvent({0}, static_cast<Region>(r), ev);
-  }
-
-  sched.Run();
-  ASSERT_EQ(order.size(), kRegionCount);
-  for (size_t i = 1; i < order.size(); ++i) {
-    EXPECT_LT(order[i - 1], order[i]);
-  }
+  VerifyAllRegionsExecuteInOrder();
 }
 
 // ---------------------------------------------------------------------------
@@ -431,13 +418,7 @@ TEST(SimCh44, BlockingAndNBACompleteInSameTimeSlot) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 1u);
-  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 2u);
-  EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 3u);
+  LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 2u}, {"c", 3u}});
 }
 
 // ---------------------------------------------------------------------------

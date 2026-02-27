@@ -2,7 +2,9 @@
 
 #include <cstdint>
 #include <cstring>
+#include <initializer_list>
 #include <string>
+#include <utility>
 
 #include "simulation/lowerer.h"
 #include "simulation/variable.h"
@@ -40,4 +42,19 @@ inline double RunAndGetReal(const std::string& src, const char* var_name) {
   uint64_t bits = var->value.ToUint64();
   std::memcpy(&d, &bits, sizeof(double));
   return d;
+}
+
+// Lower a design and check variable values.
+inline void LowerRunAndCheck(
+    SimFixture& f, RtlirDesign* design,
+    std::initializer_list<std::pair<const char*, uint64_t>> checks) {
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  for (auto& [name, expected] : checks) {
+    auto* var = f.ctx.FindVariable(name);
+    ASSERT_NE(var, nullptr) << "Variable not found: " << name;
+    EXPECT_EQ(var->value.ToUint64(), expected) << "Variable: " << name;
+  }
 }

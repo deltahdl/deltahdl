@@ -211,37 +211,7 @@ TEST(SimCh443, PrePostponedExecutesBeforePostponed) {
 // positions relative to each other and the simulation regions.
 // ---------------------------------------------------------------------------
 TEST(SimCh443, FullPLIRegionOrderingPerFigure41) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  // Schedule all regions in reverse order to prove ordering is structural.
-  ScheduleLabeled(sched, Region::kPostponed, "postponed", order);
-  ScheduleLabeled(sched, Region::kPrePostponed, "pre_postponed", order);
-  ScheduleLabeled(sched, Region::kPostReNBA, "post_renba", order);
-  ScheduleLabeled(sched, Region::kReNBA, "renba", order);
-  ScheduleLabeled(sched, Region::kPreReNBA, "pre_renba", order);
-  ScheduleLabeled(sched, Region::kReInactive, "reinactive", order);
-  ScheduleLabeled(sched, Region::kReactive, "reactive", order);
-  ScheduleLabeled(sched, Region::kPostObserved, "post_observed", order);
-  ScheduleLabeled(sched, Region::kObserved, "observed", order);
-  ScheduleLabeled(sched, Region::kPreObserved, "pre_observed", order);
-  ScheduleLabeled(sched, Region::kPostNBA, "post_nba", order);
-  ScheduleLabeled(sched, Region::kNBA, "nba", order);
-  ScheduleLabeled(sched, Region::kPreNBA, "pre_nba", order);
-  ScheduleLabeled(sched, Region::kInactive, "inactive", order);
-  ScheduleLabeled(sched, Region::kActive, "active", order);
-  ScheduleLabeled(sched, Region::kPreActive, "pre_active", order);
-  ScheduleLabeled(sched, Region::kPreponed, "preponed", order);
-
-  sched.Run();
-  std::vector<std::string> expected = {
-      "preponed",  "pre_active",    "active",     "inactive",
-      "pre_nba",   "nba",           "post_nba",   "pre_observed",
-      "observed",  "post_observed", "reactive",   "reinactive",
-      "pre_renba", "renba",         "post_renba", "pre_postponed",
-      "postponed"};
-  EXPECT_EQ(order, expected);
+  VerifyAllRegionOrder();
 }
 
 // ---------------------------------------------------------------------------

@@ -5,6 +5,7 @@
 #include "simulation/variable.h"
 
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 
 using namespace delta;
 
@@ -54,13 +55,7 @@ TEST(SimA609, VoidCastFunctionCall) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 55u);
+  LowerRunAndCheck(f, design, {{"x", 55u}});
 }
 
 // --- nested function calls ---

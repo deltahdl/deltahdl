@@ -3,6 +3,7 @@
 #include "simulation/variable.h"
 
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 
 using namespace delta;
 
@@ -378,18 +379,7 @@ TEST(SimCh9d, AlwaysStarMultipleStmts) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* x = f.ctx.FindVariable("x");
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(x, nullptr);
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(x->value.ToUint64(), 0x11u);
-  EXPECT_EQ(y->value.ToUint64(), 0x22u);
+  LowerRunAndCheck(f, design, {{"x", 0x11u}, {"y", 0x22u}});
 }
 
 // ---------------------------------------------------------------------------
