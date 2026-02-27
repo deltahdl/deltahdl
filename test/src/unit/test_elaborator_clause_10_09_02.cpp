@@ -30,19 +30,6 @@ TEST(ElabA60701, StructPositionalPatternElaborates) {
   ASSERT_NE(design, nullptr);
 }
 
-// =============================================================================
-// Helper fixture
-// =============================================================================
-static Expr* ParseExprFrom(const std::string& src, SimFixture& f) {
-  std::string code = "module t; initial x = " + src + "; endmodule";
-  auto fid = f.mgr.AddFile("<test>", code);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  auto* item = cu->modules[0]->items[0];
-  return item->body->rhs;
-}
-
 TEST(StructPattern, MixedPrecedence) {
   // '{a: 1, byte: 2, default: 3} — member > type > default
   // struct { byte a; byte b; logic [7:0] c; }

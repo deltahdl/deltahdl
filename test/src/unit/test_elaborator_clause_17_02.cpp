@@ -1,36 +1,6 @@
 // §17.2: Checker declaration
 
-#include <gtest/gtest.h>
-
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
-#include "lexer/lexer.h"
-#include "parser/ast.h"
-#include "parser/parser.h"
-
-using namespace delta;
-
-struct CheckerElabFixture {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
-};
-
-static RtlirDesign* ElaborateSource(const std::string& src,
-                                    CheckerElabFixture& f,
-                                    std::string_view top_name) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(top_name);
-}
+#include "fixture_checker_elab.h"
 
 namespace {
 

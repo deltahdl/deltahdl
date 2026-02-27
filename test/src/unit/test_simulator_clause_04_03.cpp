@@ -23,35 +23,12 @@ using namespace delta;
 //   - A single time slot is divided into multiple regions for ordering.
 // ===========================================================================
 
-static RtlirDesign* ElaborateSrc43(const std::string& src, SimFixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
-static uint64_t RunAndGet43(const std::string& src, const char* var_name) {
-  SimFixture f;
-  auto* design = ElaborateSrc43(src, f);
-  EXPECT_NE(design, nullptr);
-  if (!design) return 0;
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable(var_name);
-  EXPECT_NE(var, nullptr);
-  if (!var) return 0;
-  return var->value.ToUint64();
-}
-
 // ---------------------------------------------------------------------------
 // §4.3 Process: initial procedure is a process that can be evaluated,
 // has state, and produces output.
 // ---------------------------------------------------------------------------
 TEST(SimCh43, InitialProcedureIsProcess) {
-  auto result = RunAndGet43(
+  auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'd42;\n"
@@ -65,7 +42,7 @@ TEST(SimCh43, InitialProcedureIsProcess) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, AlwaysCombIsProcess) {
   SimFixture f;
-  auto* design = ElaborateSrc43(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  initial a = 8'd5;\n"
@@ -84,7 +61,7 @@ TEST(SimCh43, AlwaysCombIsProcess) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, AlwaysLatchIsProcess) {
   SimFixture f;
-  auto* design = ElaborateSrc43(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] d, q;\n"
       "  logic en;\n"
@@ -107,7 +84,7 @@ TEST(SimCh43, AlwaysLatchIsProcess) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, AlwaysFFIsProcess) {
   SimFixture f;
-  auto* design = ElaborateSrc43(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] d, q;\n"
@@ -131,7 +108,7 @@ TEST(SimCh43, AlwaysFFIsProcess) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, ContinuousAssignIsProcess) {
   SimFixture f;
-  auto* design = ElaborateSrc43(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] src, dst;\n"
       "  assign dst = src;\n"
@@ -150,7 +127,7 @@ TEST(SimCh43, ContinuousAssignIsProcess) {
 // sequentially within the process.
 // ---------------------------------------------------------------------------
 TEST(SimCh43, ProceduralAssignmentInProcess) {
-  auto result = RunAndGet43(
+  auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -168,7 +145,7 @@ TEST(SimCh43, ProceduralAssignmentInProcess) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, BlockingAssignCreatesUpdateEvent) {
   SimFixture f;
-  auto* design = ElaborateSrc43(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  initial a = 8'd7;\n"
@@ -188,7 +165,7 @@ TEST(SimCh43, BlockingAssignCreatesUpdateEvent) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, NonBlockingAssignCreatesUpdateEvent) {
   SimFixture f;
-  auto* design = ElaborateSrc43(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -208,7 +185,7 @@ TEST(SimCh43, NonBlockingAssignCreatesUpdateEvent) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, ContinuousAssignUpdateEvent) {
   SimFixture f;
-  auto* design = ElaborateSrc43(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, c;\n"
       "  initial a = 8'd4;\n"
@@ -230,7 +207,7 @@ TEST(SimCh43, ContinuousAssignUpdateEvent) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, EvaluationEventOnInputChange) {
   SimFixture f;
-  auto* design = ElaborateSrc43(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, result;\n"
       "  initial begin\n"
@@ -253,7 +230,7 @@ TEST(SimCh43, EvaluationEventOnInputChange) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, MultipleProcessesSensitiveToSameEvent) {
   SimFixture f;
-  auto* design = ElaborateSrc43(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] src, r1, r2;\n"
       "  initial src = 8'd5;\n"
@@ -275,7 +252,7 @@ TEST(SimCh43, MultipleProcessesSensitiveToSameEvent) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, MixedProcessTypesSensitiveToSameVariable) {
   SimFixture f;
-  auto* design = ElaborateSrc43(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] src, via_assign, via_comb;\n"
       "  initial src = 8'd10;\n"
@@ -304,7 +281,7 @@ TEST(SimCh43, SimulationTimeStartsAtZero) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, NoDelayExecutesAtTimeZero) {
   SimFixture f;
-  auto* design = ElaborateSrc43(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'd1;\n"
@@ -322,7 +299,7 @@ TEST(SimCh43, NoDelayExecutesAtTimeZero) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, DelayAdvancesSimulationTime) {
   SimFixture f;
-  auto* design = ElaborateSrc43(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -342,7 +319,7 @@ TEST(SimCh43, DelayAdvancesSimulationTime) {
 // §4.3 Simulation time: multiple delays accumulate correctly.
 // ---------------------------------------------------------------------------
 TEST(SimCh43, MultipleDelaysAccumulate) {
-  auto result = RunAndGet43(
+  auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -362,7 +339,7 @@ TEST(SimCh43, MultipleDelaysAccumulate) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, EventsExecuteInChronologicalOrder) {
   SimFixture f;
-  auto* design = ElaborateSrc43(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  initial begin\n"
@@ -388,7 +365,7 @@ TEST(SimCh43, EventsExecuteInChronologicalOrder) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, ActiveRegionBeforeNBARegion) {
   SimFixture f;
-  auto* design = ElaborateSrc43(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  initial begin\n"
@@ -412,7 +389,7 @@ TEST(SimCh43, ActiveRegionBeforeNBARegion) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, NBAUpdateVisibleAfterActiveRegion) {
   SimFixture f;
-  auto* design = ElaborateSrc43(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x, y;\n"
       "  initial begin\n"
@@ -433,7 +410,7 @@ TEST(SimCh43, NBAUpdateVisibleAfterActiveRegion) {
 // §4.3 Processes have state: a process maintains state across time steps.
 // ---------------------------------------------------------------------------
 TEST(SimCh43, ProcessMaintainsStateAcrossTime) {
-  auto result = RunAndGet43(
+  auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -452,7 +429,7 @@ TEST(SimCh43, ProcessMaintainsStateAcrossTime) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, ProcessRespondsToMultipleInputChanges) {
   SimFixture f;
-  auto* design = ElaborateSrc43(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, doubled;\n"
       "  initial begin\n"
@@ -476,7 +453,7 @@ TEST(SimCh43, ProcessRespondsToMultipleInputChanges) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, ConcurrentProcessTypes) {
   SimFixture f;
-  auto* design = ElaborateSrc43(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, c;\n"
       "  initial a = 8'd2;\n"
@@ -499,7 +476,7 @@ TEST(SimCh43, ConcurrentProcessTypes) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, UpdateEventCascade) {
   SimFixture f;
-  auto* design = ElaborateSrc43(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, c, d;\n"
       "  initial a = 8'd1;\n"
@@ -525,7 +502,7 @@ TEST(SimCh43, UpdateEventCascade) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, RegionOrderingPredictableInteraction) {
   SimFixture f;
-  auto* design = ElaborateSrc43(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, result;\n"
       "  initial begin\n"
@@ -548,7 +525,7 @@ TEST(SimCh43, RegionOrderingPredictableInteraction) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, ProcessProducesOutputVisibleToOthers) {
   SimFixture f;
-  auto* design = ElaborateSrc43(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, mid, out;\n"
       "  initial a = 8'd6;\n"
@@ -570,7 +547,7 @@ TEST(SimCh43, ProcessProducesOutputVisibleToOthers) {
 // ---------------------------------------------------------------------------
 TEST(SimCh43, DiscreteEventsInTimeOrder) {
   SimFixture f;
-  auto* design = ElaborateSrc43(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"

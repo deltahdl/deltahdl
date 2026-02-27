@@ -29,29 +29,6 @@ using namespace delta;
 //     to provide predictable interactions between design and testbench.
 // ===========================================================================
 
-static RtlirDesign* ElaborateSrc44(const std::string& src, SimFixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
-static uint64_t RunAndGet44(const std::string& src, const char* var_name) {
-  SimFixture f;
-  auto* design = ElaborateSrc44(src, f);
-  EXPECT_NE(design, nullptr);
-  if (!design) return 0;
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable(var_name);
-  EXPECT_NE(var, nullptr);
-  if (!var) return 0;
-  return var->value.ToUint64();
-}
-
 // ---------------------------------------------------------------------------
 // §4.4 "A compliant SystemVerilog simulator shall maintain some form of
 // data structure that allows events to be dynamically scheduled, executed,
@@ -372,7 +349,7 @@ TEST(SimCh44, EventQueueClear) {
 // ---------------------------------------------------------------------------
 TEST(SimCh44, RegionsPredictableDesignTestbenchInteraction) {
   SimFixture f;
-  auto* design = ElaborateSrc44(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  initial begin\n"
@@ -396,7 +373,7 @@ TEST(SimCh44, RegionsPredictableDesignTestbenchInteraction) {
 // ---------------------------------------------------------------------------
 TEST(SimCh44, PredictableNBAToAlwaysCombInteraction) {
   SimFixture f;
-  auto* design = ElaborateSrc44(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x, y;\n"
       "  initial x <= 8'd50;\n"
@@ -444,7 +421,7 @@ TEST(SimCh44, DynamicSchedulingWithinSameTimeSlot) {
 // ---------------------------------------------------------------------------
 TEST(SimCh44, BlockingAndNBACompleteInSameTimeSlot) {
   SimFixture f;
-  auto* design = ElaborateSrc44(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b, c;\n"
       "  initial begin\n"
@@ -468,7 +445,7 @@ TEST(SimCh44, BlockingAndNBACompleteInSameTimeSlot) {
 // Events at time 5, 10, and 15 each form separate time slots.
 // ---------------------------------------------------------------------------
 TEST(SimCh44, MultipleTimeSlotsFormDistinctSlots) {
-  auto result = RunAndGet44(
+  auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"

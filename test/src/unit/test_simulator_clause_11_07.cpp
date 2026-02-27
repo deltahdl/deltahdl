@@ -11,27 +11,12 @@
 
 using namespace delta;
 
-static Variable* MakeVar(SimFixture& f, std::string_view name,
-                         uint32_t width, uint64_t val) {
-  auto* var = f.ctx.CreateVariable(name, width);
-  var->value = MakeLogic4VecVal(f.arena, width, val);
-  return var;
-}
-
 static Variable* MakeVar4Adv(SimFixture& f, std::string_view name,
                              uint32_t width, uint64_t aval, uint64_t bval) {
   auto* var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4Vec(f.arena, width);
   var->value.words[0].aval = aval;
   var->value.words[0].bval = bval;
-  return var;
-}
-
-static Variable* MakeSignedVarAdv(SimFixture& f, std::string_view name,
-                                  uint32_t width, uint64_t val) {
-  auto* var = f.ctx.CreateVariable(name, width);
-  var->value = MakeLogic4VecVal(f.arena, width, val);
-  var->is_signed = true;
   return var;
 }
 namespace {

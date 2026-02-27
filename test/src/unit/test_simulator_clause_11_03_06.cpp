@@ -12,13 +12,6 @@
 
 using namespace delta;
 
-static Variable* MakeVar(SimFixture& f, std::string_view name,
-                         uint32_t width, uint64_t val) {
-  auto* var = f.ctx.CreateVariable(name, width);
-  var->value = MakeLogic4VecVal(f.arena, width, val);
-  return var;
-}
-
 namespace {
 
 // ==========================================================================
