@@ -1,31 +1,12 @@
 // §11.4.8: Bitwise operators
 
-
-#include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
 
 using namespace delta;
-
-// Shared fixture for expression evaluation tests.
-// Helper: build a simple integer literal Expr node.
-static Expr* MakeInt(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
-
-// Helper: build a unary Expr.
-static Expr* MakeUnary(Arena& arena, TokenKind op, Expr* operand) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kUnary;
-  e->op = op;
-  e->lhs = operand;
-  return e;
-}
 
 namespace {
 

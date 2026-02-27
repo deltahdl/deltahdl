@@ -1,31 +1,15 @@
 // §11.7: Signed expressions
 
-
 #include <cstring>
 
-#include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"  // StructTypeInfo, StructFieldInfo
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
 
 using namespace delta;
-
-// Shared fixture for advanced expression evaluation tests (§11 phases 22+).
-static Expr* MakeInt(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
-
-static Expr* MakeId(Arena& arena, std::string_view name) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIdentifier;
-  e->text = name;
-  return e;
-}
 
 static Variable* MakeVar(SimFixture& f, std::string_view name,
                          uint32_t width, uint64_t val) {
@@ -43,22 +27,6 @@ static Variable* MakeVar4Adv(SimFixture& f, std::string_view name,
   return var;
 }
 
-static Expr* MakeBinary(Arena& arena, TokenKind op, Expr* lhs, Expr* rhs) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kBinary;
-  e->op = op;
-  e->lhs = lhs;
-  e->rhs = rhs;
-  return e;
-}
-
-static Expr* MakeUnary(Arena& arena, TokenKind op, Expr* operand) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kUnary;
-  e->op = op;
-  e->lhs = operand;
-  return e;
-}
 static Variable* MakeSignedVarAdv(SimFixture& f, std::string_view name,
                                   uint32_t width, uint64_t val) {
   auto* var = f.ctx.CreateVariable(name, width);

@@ -1,32 +1,14 @@
 // §11.6.1: Rules for expression bit lengths
 
-
 #include <cstring>
 
-#include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
 
 using namespace delta;
-
-// Shared fixture for expression evaluation tests.
-static Expr* MakeId(Arena& arena, std::string_view name) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIdentifier;
-  e->text = name;
-  return e;
-}
-
-static Expr* MakeBinary(Arena& arena, TokenKind op, Expr* lhs, Expr* rhs) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kBinary;
-  e->op = op;
-  e->lhs = lhs;
-  e->rhs = rhs;
-  return e;
-}
 
 namespace {
 

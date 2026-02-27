@@ -1,24 +1,15 @@
 // §11.4.2: Increment and decrement operators
 
-
 #include <cstring>
 
-#include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/sim_context.h"  // StructTypeInfo, StructFieldInfo
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
 
 using namespace delta;
-
-// Shared fixture for advanced expression evaluation tests (§11 phases 22+).
-static Expr* MakeId(Arena& arena, std::string_view name) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIdentifier;
-  e->text = name;
-  return e;
-}
 
 static double AdvToDouble(const Logic4Vec& v) {
   double d = 0.0;

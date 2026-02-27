@@ -1,59 +1,12 @@
 // §13.4.3: Constant functions
 
-
 #include "parser/ast.h"
 #include "simulation/eval.h"
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
 
 using namespace delta;
-
-// =============================================================================
-// Test fixture shared by all function call tests
-// =============================================================================
-// Helper: make an integer literal expression.
-static Expr* MakeIntLit(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
-
-// Helper: make an identifier expression.
-static Expr* MakeIdent(Arena& arena, std::string_view name) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIdentifier;
-  e->text = name;
-  return e;
-}
-
-// Helper: make a binary expression.
-static Expr* MakeBinary(Arena& arena, TokenKind op, Expr* lhs, Expr* rhs) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kBinary;
-  e->op = op;
-  e->lhs = lhs;
-  e->rhs = rhs;
-  return e;
-}
-
-// Helper: make a return statement.
-static Stmt* MakeReturn(Arena& arena, Expr* expr) {
-  auto* s = arena.Create<Stmt>();
-  s->kind = StmtKind::kReturn;
-  s->expr = expr;
-  return s;
-}
-
-// Helper: make a function call expression.
-static Expr* MakeCall(Arena& arena, std::string_view callee,
-                      std::vector<Expr*> args) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kCall;
-  e->callee = callee;
-  e->args = std::move(args);
-  return e;
-}
 
 namespace {
 
@@ -79,12 +32,12 @@ TEST(Functions, ConstantFunctionEvalAtElaboration) {
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "double_val";
   func->func_args = {{Direction::kInput, false, {}, "x", nullptr, {}}};
-  auto* body = MakeBinary(f.arena, TokenKind::kStar, MakeIdent(f.arena, "x"),
-                          MakeIntLit(f.arena, 2));
+  auto* body = MakeBinary(f.arena, TokenKind::kStar, MakeId(f.arena, "x"),
+                          MakeInt(f.arena, 2));
   func->func_body_stmts.push_back(MakeReturn(f.arena, body));
   f.ctx.RegisterFunction("double_val", func);
 
-  auto* call = MakeCall(f.arena, "double_val", {MakeIntLit(f.arena, 21)});
+  auto* call = MakeCall(f.arena, "double_val", {MakeInt(f.arena, 21)});
   EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 42u);
 }
 

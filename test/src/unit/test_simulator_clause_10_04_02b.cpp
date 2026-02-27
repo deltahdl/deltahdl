@@ -1,6 +1,5 @@
 // §10.4.2: Nonblocking procedural assignments
 
-
 #include <cstdint>
 #include <string_view>
 
@@ -14,22 +13,9 @@
 #include "simulation/variable.h"
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
 
 using namespace delta;
-
-Expr* MakeIdent(Arena& arena, std::string_view name) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIdentifier;
-  e->text = name;
-  return e;
-}
-
-Expr* MakeIntLit(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
 
 struct DriverResult {
   StmtResult value = StmtResult::kDone;
@@ -59,13 +45,13 @@ TEST(StmtExec, NonblockingAssignBitSelect) {
   // nb[5] <= 1;
   auto* sel = f.arena.Create<Expr>();
   sel->kind = ExprKind::kSelect;
-  sel->base = MakeIdent(f.arena, "nb");
-  sel->index = MakeIntLit(f.arena, 5);
+  sel->base = MakeId(f.arena, "nb");
+  sel->index = MakeInt(f.arena, 5);
 
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kNonblockingAssign;
   stmt->lhs = sel;
-  stmt->rhs = MakeIntLit(f.arena, 1);
+  stmt->rhs = MakeInt(f.arena, 1);
 
   RunStmt(stmt, f.ctx, f.arena);
   // NBA is deferred -- drain the scheduler to apply it.

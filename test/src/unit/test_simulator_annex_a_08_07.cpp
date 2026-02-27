@@ -1,21 +1,12 @@
 // Annex A.8.7: Numbers
 
-
-#include <cstring>
-
 #include "simulation/lowerer.h"
 #include "simulation/variable.h"
 
 #include "fixture_simulator.h"
+#include "helpers_eval_op.h"
 
 using namespace delta;
-
-static double ToDouble(const Variable* var) {
-  uint64_t bits = var->value.ToUint64();
-  double d = 0.0;
-  std::memcpy(&d, &bits, sizeof(double));
-  return d;
-}
 
 namespace {
 

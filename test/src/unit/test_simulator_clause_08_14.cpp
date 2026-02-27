@@ -1,11 +1,11 @@
 // §8.14: Overridden members
 
-
 #include "parser/ast.h"
 #include "simulation/class_object.h"
 #include "simulation/eval.h"
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
 
 using namespace delta;
 
@@ -20,14 +20,6 @@ static Expr* MkInt(Arena& a, uint64_t val) {
   e->int_val = val;
   return e;
 }
-// AST helper: make a return statement.
-static Stmt* MkReturn(Arena& a, Expr* expr) {
-  auto* s = a.Create<Stmt>();
-  s->kind = StmtKind::kReturn;
-  s->expr = expr;
-  return s;
-}
-
 // Build a simple ClassTypeInfo and register it with the context.
 static ClassTypeInfo* MakeClassType(
     SimFixture& f, std::string_view name,
@@ -64,7 +56,7 @@ TEST(ClassSim, ChildMethodOverridesParent) {
   auto* base_method = f.arena.Create<ModuleItem>();
   base_method->kind = ModuleItemKind::kFunctionDecl;
   base_method->name = "greet";
-  base_method->func_body_stmts.push_back(MkReturn(f.arena, MkInt(f.arena, 1)));
+  base_method->func_body_stmts.push_back(MakeReturn(f.arena, MkInt(f.arena, 1)));
   base->methods["greet"] = base_method;
 
   auto* derived = MakeClassType(f, "Derived", {});
@@ -72,7 +64,7 @@ TEST(ClassSim, ChildMethodOverridesParent) {
   auto* child_method = f.arena.Create<ModuleItem>();
   child_method->kind = ModuleItemKind::kFunctionDecl;
   child_method->name = "greet";
-  child_method->func_body_stmts.push_back(MkReturn(f.arena, MkInt(f.arena, 2)));
+  child_method->func_body_stmts.push_back(MakeReturn(f.arena, MkInt(f.arena, 2)));
   derived->methods["greet"] = child_method;
 
   auto [handle, obj] = MakeObj(f, derived);

@@ -1,6 +1,5 @@
 // §12.7: Loop statements
 
-
 #include <cstdint>
 #include <string_view>
 
@@ -14,33 +13,17 @@
 #include "simulation/variable.h"
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
 
 using namespace delta;
-
-// Helper fixture providing scheduler, arena, diag, and sim context.
-// Helper to create a simple identifier expression.
-Expr* MakeIdent(Arena& arena, std::string_view name) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIdentifier;
-  e->text = name;
-  return e;
-}
-
-// Helper to create an integer literal expression.
-Expr* MakeIntLit(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
 
 // Helper to create a blocking assignment statement: lhs = rhs_val.
 Stmt* MakeBlockAssign(Arena& arena, std::string_view lhs_name,
                       uint64_t rhs_val) {
   auto* s = arena.Create<Stmt>();
   s->kind = StmtKind::kBlockingAssign;
-  s->lhs = MakeIdent(arena, lhs_name);
-  s->rhs = MakeIntLit(arena, rhs_val);
+  s->lhs = MakeId(arena, lhs_name);
+  s->rhs = MakeInt(arena, rhs_val);
   return s;
 }
 
@@ -79,8 +62,8 @@ TEST(StmtExec, ForeachIteratesOverArrayWidth) {
 
   // Build: foreach (arr[i]) sum = sum + 1;
   // Body: sum = sum + 1
-  auto* sum_id = MakeIdent(f.arena, "sum");
-  auto* one = MakeIntLit(f.arena, 1);
+  auto* sum_id = MakeId(f.arena, "sum");
+  auto* one = MakeInt(f.arena, 1);
   auto* add_expr = f.arena.Create<Expr>();
   add_expr->kind = ExprKind::kBinary;
   add_expr->op = TokenKind::kPlus;
@@ -89,12 +72,12 @@ TEST(StmtExec, ForeachIteratesOverArrayWidth) {
 
   auto* body = f.arena.Create<Stmt>();
   body->kind = StmtKind::kBlockingAssign;
-  body->lhs = MakeIdent(f.arena, "sum");
+  body->lhs = MakeId(f.arena, "sum");
   body->rhs = add_expr;
 
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kForeach;
-  stmt->expr = MakeIdent(f.arena, "arr");
+  stmt->expr = MakeId(f.arena, "arr");
   stmt->foreach_vars.push_back("i");
   stmt->body = body;
 
@@ -114,7 +97,7 @@ TEST(StmtExec, ForeachEmptyArrayNoOp) {
 
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kForeach;
-  stmt->expr = MakeIdent(f.arena, "empty");
+  stmt->expr = MakeId(f.arena, "empty");
   stmt->foreach_vars.push_back("i");
   stmt->body = body;
 
@@ -134,17 +117,17 @@ TEST(StmtExec, ForeachNoVarsStillIterates) {
   auto* add = f.arena.Create<Expr>();
   add->kind = ExprKind::kBinary;
   add->op = TokenKind::kPlus;
-  add->lhs = MakeIdent(f.arena, "cnt");
-  add->rhs = MakeIntLit(f.arena, 1);
+  add->lhs = MakeId(f.arena, "cnt");
+  add->rhs = MakeInt(f.arena, 1);
 
   auto* body = f.arena.Create<Stmt>();
   body->kind = StmtKind::kBlockingAssign;
-  body->lhs = MakeIdent(f.arena, "cnt");
+  body->lhs = MakeId(f.arena, "cnt");
   body->rhs = add;
 
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kForeach;
-  stmt->expr = MakeIdent(f.arena, "arr2");
+  stmt->expr = MakeId(f.arena, "arr2");
   // No loop variables (empty foreach_vars => no index binding).
   stmt->body = body;
 
@@ -167,12 +150,12 @@ TEST(StmtExec, ForeachBreakExitsLoop) {
   auto* add = f.arena.Create<Expr>();
   add->kind = ExprKind::kBinary;
   add->op = TokenKind::kPlus;
-  add->lhs = MakeIdent(f.arena, "brk_cnt");
-  add->rhs = MakeIntLit(f.arena, 1);
+  add->lhs = MakeId(f.arena, "brk_cnt");
+  add->rhs = MakeInt(f.arena, 1);
 
   auto* inc_stmt = f.arena.Create<Stmt>();
   inc_stmt->kind = StmtKind::kBlockingAssign;
-  inc_stmt->lhs = MakeIdent(f.arena, "brk_cnt");
+  inc_stmt->lhs = MakeId(f.arena, "brk_cnt");
   inc_stmt->rhs = add;
 
   auto* break_stmt = f.arena.Create<Stmt>();
@@ -181,8 +164,8 @@ TEST(StmtExec, ForeachBreakExitsLoop) {
   auto* cmp = f.arena.Create<Expr>();
   cmp->kind = ExprKind::kBinary;
   cmp->op = TokenKind::kEqEq;
-  cmp->lhs = MakeIdent(f.arena, "brk_cnt");
-  cmp->rhs = MakeIntLit(f.arena, 3);
+  cmp->lhs = MakeId(f.arena, "brk_cnt");
+  cmp->rhs = MakeInt(f.arena, 3);
 
   auto* if_stmt = f.arena.Create<Stmt>();
   if_stmt->kind = StmtKind::kIf;
@@ -196,7 +179,7 @@ TEST(StmtExec, ForeachBreakExitsLoop) {
 
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kForeach;
-  stmt->expr = MakeIdent(f.arena, "brk_arr");
+  stmt->expr = MakeId(f.arena, "brk_arr");
   stmt->foreach_vars.push_back("i");
   stmt->body = block;
 
@@ -220,12 +203,12 @@ TEST(StmtExec, ForeachIteratorVariableAccessible) {
   // We test that iterator variable "i" is created and accessible.
   auto* body = f.arena.Create<Stmt>();
   body->kind = StmtKind::kBlockingAssign;
-  body->lhs = MakeIdent(f.arena, "last_i");
-  body->rhs = MakeIdent(f.arena, "i");
+  body->lhs = MakeId(f.arena, "last_i");
+  body->rhs = MakeId(f.arena, "i");
 
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kForeach;
-  stmt->expr = MakeIdent(f.arena, "itarr");
+  stmt->expr = MakeId(f.arena, "itarr");
   stmt->foreach_vars.push_back("i");
   stmt->body = body;
 

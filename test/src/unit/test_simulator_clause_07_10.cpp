@@ -1,30 +1,14 @@
 // §7.10: Queues
 
-
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/eval_array.h"
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
 
 using namespace delta;
 
-// =============================================================================
-// Helper fixture
-// =============================================================================
-static Expr* MkSelect(Arena& arena, std::string_view name, uint64_t idx) {
-  auto* sel = arena.Create<Expr>();
-  sel->kind = ExprKind::kSelect;
-  auto* base = arena.Create<Expr>();
-  base->kind = ExprKind::kIdentifier;
-  base->text = name;
-  sel->base = base;
-  auto* idx_expr = arena.Create<Expr>();
-  idx_expr->kind = ExprKind::kIntegerLiteral;
-  idx_expr->int_val = idx;
-  sel->index = idx_expr;
-  return sel;
-}
 namespace {
 
 TEST(ArrayAccess, OutOfBoundsReturnsX) {
@@ -38,11 +22,11 @@ TEST(ArrayAccess, OutOfBoundsReturnsX) {
     v->value = MakeLogic4VecVal(f.arena, 8, static_cast<uint64_t>(i + 1) * 10);
   }
   // In-bounds: arr[2] should return 30.
-  auto in_result = EvalExpr(MkSelect(f.arena, "arr", 2), f.ctx, f.arena);
+  auto in_result = EvalExpr(MakeSelect(f.arena, "arr", 2), f.ctx, f.arena);
   EXPECT_EQ(in_result.ToUint64(), 30u);
   EXPECT_TRUE(in_result.IsKnown());
   // Out-of-bounds: arr[10] should return X.
-  auto oob_result = EvalExpr(MkSelect(f.arena, "arr", 10), f.ctx, f.arena);
+  auto oob_result = EvalExpr(MakeSelect(f.arena, "arr", 10), f.ctx, f.arena);
   EXPECT_FALSE(oob_result.IsKnown());
 }
 
@@ -52,11 +36,11 @@ TEST(QueueAccess, OutOfBoundsReturnsX) {
   q->elements.push_back(MakeLogic4VecVal(f.arena, 16, 100));
   q->elements.push_back(MakeLogic4VecVal(f.arena, 16, 200));
   // In-bounds: q[1] should return 200.
-  auto in_result = EvalExpr(MkSelect(f.arena, "q", 1), f.ctx, f.arena);
+  auto in_result = EvalExpr(MakeSelect(f.arena, "q", 1), f.ctx, f.arena);
   EXPECT_EQ(in_result.ToUint64(), 200u);
   EXPECT_TRUE(in_result.IsKnown());
   // Out-of-bounds: q[5] should return X.
-  auto oob_result = EvalExpr(MkSelect(f.arena, "q", 5), f.ctx, f.arena);
+  auto oob_result = EvalExpr(MakeSelect(f.arena, "q", 5), f.ctx, f.arena);
   EXPECT_FALSE(oob_result.IsKnown());
 }
 

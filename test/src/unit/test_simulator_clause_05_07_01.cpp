@@ -1,10 +1,10 @@
 // §5.7.1: Integer literal constants
 
-
 #include "simulation/lowerer.h"
 #include "simulation/variable.h"
 
 #include "fixture_simulator.h"
+#include "helpers_eval_op.h"
 
 using namespace delta;
 
@@ -98,13 +98,6 @@ TEST(SimA84, PrimaryBinaryLiteral) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xCCu);
-}
-
-static double ToDouble(const Variable* var) {
-  uint64_t bits = var->value.ToUint64();
-  double d = 0.0;
-  std::memcpy(&d, &bits, sizeof(double));
-  return d;
 }
 
 // =============================================================================

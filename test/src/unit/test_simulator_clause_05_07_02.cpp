@@ -1,10 +1,10 @@
 
-#include <cstring>
 
 #include "simulation/lowerer.h"
 #include "simulation/variable.h"
 
 #include "fixture_simulator.h"
+#include "helpers_eval_op.h"
 
 using namespace delta;
 
@@ -196,13 +196,6 @@ TEST(SimCh50702, RealLargeScientific) {
       "module t;\n  real x;\n  initial x = 39e8;\nendmodule\n", "x");
   EXPECT_DOUBLE_EQ(v, 39e8);
 }
-static double ToDouble(const Variable* var) {
-  uint64_t bits = var->value.ToUint64();
-  double d = 0.0;
-  std::memcpy(&d, &bits, sizeof(double));
-  return d;
-}
-
 // § real_number — scientific notation simulates
 TEST(SimA87, ScientificNotation) {
   SimFixture f;

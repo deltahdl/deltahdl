@@ -1,6 +1,11 @@
 // Non-LRM tests
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
+#include "fixture_evaluator.h"
+#include "fixture_lexer.h"
+#include "fixture_enum_methods.h"
+#include "fixture_preprocessor.h"
 
 using namespace delta;
 
@@ -256,77 +261,6 @@ TEST(Elaboration, EnumUnassignedAfterXZ_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// =============================================================================
-// Test fixture: sets up SimContext with an enum type and variable
-// =============================================================================
-struct EnumFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-
-  // Register an enum type with the given members and values.
-  // Returns the variable associated with the enum.
-  Variable* RegisterEnum(
-      std::string_view var_name, std::string_view type_name,
-      const std::vector<std::pair<std::string, uint64_t>>& members) {
-    EnumTypeInfo info;
-    char* tn = arena.AllocString(type_name.data(), type_name.size());
-    info.type_name = std::string_view(tn, type_name.size());
-    for (auto& [name, val] : members) {
-      EnumMemberInfo m;
-      char* mn = arena.AllocString(name.c_str(), name.size());
-      m.name = std::string_view(mn, name.size());
-      m.value = val;
-      info.members.push_back(m);
-    }
-    ctx.RegisterEnumType(info.type_name, info);
-
-    auto* var = ctx.CreateVariable(var_name, 32);
-    var->value = MakeLogic4VecVal(arena, 32, members[0].second);
-    ctx.SetVariableEnumType(var_name, info.type_name);
-    return var;
-  }
-
-  // Build a method call expression: var_name.method_name(args...)
-  Expr* MakeEnumMethodCall(std::string_view var_name,
-                           std::string_view method_name) {
-    return MakeEnumMethodCallWithArgs(var_name, method_name, {});
-  }
-
-  Expr* MakeEnumMethodCallWithArgs(std::string_view var_name,
-                                   std::string_view method_name,
-                                   std::vector<Expr*> args) {
-    // Build: var_name.method_name(args...)
-    auto* id = arena.Create<Expr>();
-    id->kind = ExprKind::kIdentifier;
-    id->text = var_name;
-
-    auto* member = arena.Create<Expr>();
-    member->kind = ExprKind::kIdentifier;
-    member->text = method_name;
-
-    auto* access = arena.Create<Expr>();
-    access->kind = ExprKind::kMemberAccess;
-    access->lhs = id;
-    access->rhs = member;
-
-    auto* call = arena.Create<Expr>();
-    call->kind = ExprKind::kCall;
-    call->lhs = access;
-    call->args = std::move(args);
-    return call;
-  }
-
-  Expr* MakeIntLiteral(uint64_t val) {
-    auto* lit = arena.Create<Expr>();
-    lit->kind = ExprKind::kIntegerLiteral;
-    lit->int_val = val;
-    return lit;
-  }
-};
-
 TEST(EnumMethods, NameForUnknownValue) {
   EnumFixture f;
   auto* var = f.RegisterEnum("color", "color_t",
@@ -336,23 +270,6 @@ TEST(EnumMethods, NameForUnknownValue) {
   auto result = EvalExpr(call, f.ctx, f.arena);
   // name() returns empty string for invalid enum values.
   EXPECT_EQ(result.ToUint64(), 0u);
-}
-
-struct EvalFixture {
-  SourceManager mgr;
-  Arena arena;
-};
-
-static Expr* ParseExprFrom(const std::string& src, EvalFixture& f) {
-  std::string code = "module t #(parameter P = " + src + ") (); endmodule";
-  auto fid = f.mgr.AddFile("<test>", code);
-  DiagEngine diag(f.mgr);
-  Lexer lexer(f.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, f.arena, diag);
-  auto* cu = parser.Parse();
-  EXPECT_FALSE(cu->modules.empty());
-  EXPECT_FALSE(cu->modules[0]->params.empty());
-  return cu->modules[0]->params[0].second;
 }
 
 TEST(ConstEval, ScopedIdentifier) {
@@ -439,7 +356,7 @@ TEST(StructPattern, NamedMemberTwoFields) {
   auto* pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"x", "y"};
-  pat->elements = {MakeIntLit(f.arena, 5), MakeIntLit(f.arena, 10)};
+  pat->elements = {MakeInt(f.arena, 5), MakeInt(f.arena, 10)};
 
   auto result = EvalStructPattern(pat, &info, f.ctx, f.arena);
   EXPECT_EQ(result.width, 16u);
@@ -459,7 +376,7 @@ TEST(StructPattern, NamedMemberReversedOrder) {
   auto* pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"y", "x"};
-  pat->elements = {MakeIntLit(f.arena, 10), MakeIntLit(f.arena, 5)};
+  pat->elements = {MakeInt(f.arena, 10), MakeInt(f.arena, 5)};
 
   auto result = EvalStructPattern(pat, &info, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0x050Au);
@@ -479,8 +396,8 @@ TEST(StructPattern, NamedMemberThreeFields) {
   auto* pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"r", "g", "b"};
-  pat->elements = {MakeIntLit(f.arena, 0xFF), MakeIntLit(f.arena, 0x80),
-                   MakeIntLit(f.arena, 0x00)};
+  pat->elements = {MakeInt(f.arena, 0xFF), MakeInt(f.arena, 0x80),
+                   MakeInt(f.arena, 0x00)};
 
   auto result = EvalStructPattern(pat, &info, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0xFF8000u);
@@ -502,7 +419,7 @@ TEST(StructPattern, DefaultAllFields) {
   auto* pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"default"};
-  pat->elements = {MakeIntLit(f.arena, 0xFF)};
+  pat->elements = {MakeInt(f.arena, 0xFF)};
 
   auto result = EvalStructPattern(pat, &info, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0xFFFFu);
@@ -531,7 +448,7 @@ TEST(StructPattern, DefaultWithNamedOverride) {
   auto* pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"a", "default"};
-  pat->elements = {MakeIntLit(f.arena, 1), MakeIntLit(f.arena, 0)};
+  pat->elements = {MakeInt(f.arena, 1), MakeInt(f.arena, 0)};
 
   auto result = EvalStructPattern(pat, &info, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0x0100u);
@@ -550,7 +467,7 @@ TEST(StructPattern, TypeKeyedInt) {
   auto* pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"int"};
-  pat->elements = {MakeIntLit(f.arena, 42)};
+  pat->elements = {MakeInt(f.arena, 42)};
 
   auto result = EvalStructPattern(pat, &info, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), uint64_t{42} << 8);
@@ -707,14 +624,6 @@ TEST(ElabA70503, TimingCheckEventEdgeKeywordElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-static std::vector<Token> Lex(const std::string& src) {
-  static SourceManager mgr;
-  auto fid = mgr.AddFile("<test>", src);
-  DiagEngine diag(mgr);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  return lexer.LexAll();
-}
-
 // --- §5: Source locations ---
 TEST(LexerCh5, SourceLocations) {
   auto tokens = Lex("a\nb c");
@@ -740,11 +649,6 @@ TEST(LexerCh50603, DollarAloneIsNotSystemIdentifier) {
   ASSERT_GE(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kDollar);
 }
-
-struct PreprocFixture {
-  SourceManager mgr;
-  DiagEngine diag{mgr};
-};
 
 static std::string PreprocessWithPP(const std::string& src, PreprocFixture& f,
                                     Preprocessor& pp) {

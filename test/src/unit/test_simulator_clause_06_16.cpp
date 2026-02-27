@@ -1,16 +1,15 @@
 // §6.16: String data type
 
-
 #include <cstdint>
 #include <cstring>
 
 #include "common/types.h"
-#include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/adv_sim.h"
 #include "simulation/eval.h"
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
 
 using namespace delta;
 
@@ -40,21 +39,6 @@ TEST(AdvSim, SvStringCompare) {
   EXPECT_TRUE(a == b);
   b.Set("xyz");
   EXPECT_FALSE(a == b);
-}
-
-// Shared fixture for expression evaluation tests.
-static Expr* MakeInt(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
-
-static Expr* MakeId(Arena& arena, std::string_view name) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIdentifier;
-  e->text = name;
-  return e;
 }
 
 static std::string VecToStr(const Logic4Vec& vec) {

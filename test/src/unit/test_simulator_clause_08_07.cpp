@@ -1,11 +1,11 @@
 // §8.7: Constructors
 
-
 #include "parser/ast.h"
 #include "simulation/class_object.h"
 #include "simulation/eval.h"
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
 
 using namespace delta;
 
@@ -19,15 +19,6 @@ static Expr* MkId(Arena& a, std::string_view name) {
   e->kind = ExprKind::kIdentifier;
   e->text = name;
   return e;
-}
-
-// AST helper: make a blocking assignment statement.
-static Stmt* MkAssign(Arena& a, std::string_view lhs_name, Expr* rhs) {
-  auto* s = a.Create<Stmt>();
-  s->kind = StmtKind::kBlockingAssign;
-  s->lhs = MkId(a, lhs_name);
-  s->rhs = rhs;
-  return s;
 }
 
 // Build a simple ClassTypeInfo and register it with the context.
@@ -78,9 +69,9 @@ TEST(ClassSim, ConstructorMethodRegistered) {
       {Direction::kInput, false, {}, "p", nullptr, {}},
   };
   ctor->func_body_stmts.push_back(
-      MkAssign(f.arena, "header", MkId(f.arena, "h")));
+      MakeAssign(f.arena, "header", MkId(f.arena, "h")));
   ctor->func_body_stmts.push_back(
-      MkAssign(f.arena, "payload", MkId(f.arena, "p")));
+      MakeAssign(f.arena, "payload", MkId(f.arena, "p")));
   type->methods["new"] = ctor;
 
   auto* resolved = type->methods["new"];
@@ -97,7 +88,7 @@ TEST(ClassSim, ConstructorBodyExecutesStatements) {
   ctor->name = "new";
   ctor->return_type.kind = DataTypeKind::kVoid;
   ctor->func_args = {{Direction::kInput, false, {}, "v", nullptr, {}}};
-  ctor->func_body_stmts.push_back(MkAssign(f.arena, "val", MkId(f.arena, "v")));
+  ctor->func_body_stmts.push_back(MakeAssign(f.arena, "val", MkId(f.arena, "v")));
   type->methods["new"] = ctor;
 
   // Simulate constructor execution manually.

@@ -2,17 +2,10 @@
 
 #include <gtest/gtest.h>
 
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "common/types.h"
-#include "preprocessor/preprocessor.h"
+#include "fixture_preprocessor.h"
 
 using namespace delta;
-
-struct PreprocFixture {
-  SourceManager mgr;
-  DiagEngine diag{mgr};
-};
 
 static std::string PreprocessWithPP(const std::string& src, PreprocFixture& f,
                                     Preprocessor& pp) {

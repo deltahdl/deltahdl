@@ -1,68 +1,12 @@
 // §13.5.2: Pass by reference
 
-
 #include "parser/ast.h"
 #include "simulation/eval.h"
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
 
 using namespace delta;
-
-// =============================================================================
-// Test fixture shared by all function call tests
-// =============================================================================
-// Helper: make an integer literal expression.
-static Expr* MakeIntLit(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
-
-// Helper: make an identifier expression.
-static Expr* MakeIdent(Arena& arena, std::string_view name) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIdentifier;
-  e->text = name;
-  return e;
-}
-
-// Helper: make a binary expression.
-static Expr* MakeBinary(Arena& arena, TokenKind op, Expr* lhs, Expr* rhs) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kBinary;
-  e->op = op;
-  e->lhs = lhs;
-  e->rhs = rhs;
-  return e;
-}
-
-// Helper: make a blocking assignment statement.
-static Stmt* MakeAssign(Arena& arena, std::string_view lhs_name, Expr* rhs) {
-  auto* s = arena.Create<Stmt>();
-  s->kind = StmtKind::kBlockingAssign;
-  s->lhs = MakeIdent(arena, lhs_name);
-  s->rhs = rhs;
-  return s;
-}
-
-// Helper: make a return statement.
-static Stmt* MakeReturn(Arena& arena, Expr* expr) {
-  auto* s = arena.Create<Stmt>();
-  s->kind = StmtKind::kReturn;
-  s->expr = expr;
-  return s;
-}
-
-// Helper: make a function call expression.
-static Expr* MakeCall(Arena& arena, std::string_view callee,
-                      std::vector<Expr*> args) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kCall;
-  e->callee = callee;
-  e->args = std::move(args);
-  return e;
-}
 
 namespace {
 
@@ -84,13 +28,13 @@ TEST(Functions, PassByRef) {
   func->name = "add_ten";
   func->return_type.kind = DataTypeKind::kVoid;
   func->func_args = {{Direction::kRef, false, {}, "r", nullptr, {}}};
-  auto* rhs = MakeBinary(f.arena, TokenKind::kPlus, MakeIdent(f.arena, "r"),
-                         MakeIntLit(f.arena, 10));
+  auto* rhs = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "r"),
+                         MakeInt(f.arena, 10));
   func->func_body_stmts.push_back(MakeAssign(f.arena, "r", rhs));
   f.ctx.RegisterFunction("add_ten", func);
 
   // Call: add_ten(x) — should modify x directly (not via writeback)
-  auto* call = MakeCall(f.arena, "add_ten", {MakeIdent(f.arena, "x")});
+  auto* call = MakeCall(f.arena, "add_ten", {MakeId(f.arena, "x")});
   EvalExpr(call, f.ctx, f.arena);
 
   EXPECT_EQ(x_var->value.ToUint64(), 60u);
@@ -111,89 +55,12 @@ TEST(Functions, PassByRefReadsCaller) {
   func->name = "read_ref";
   func->func_args = {{Direction::kRef, false, {}, "r", nullptr, {}}};
   auto* body_expr = MakeBinary(f.arena, TokenKind::kStar,
-                               MakeIdent(f.arena, "r"), MakeIntLit(f.arena, 3));
+                               MakeId(f.arena, "r"), MakeInt(f.arena, 3));
   func->func_body_stmts.push_back(MakeReturn(f.arena, body_expr));
   f.ctx.RegisterFunction("read_ref", func);
 
-  auto* call = MakeCall(f.arena, "read_ref", {MakeIdent(f.arena, "x")});
+  auto* call = MakeCall(f.arena, "read_ref", {MakeId(f.arena, "x")});
   EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 75u);
-}
-
-// ============================================================================
-// Test fixture
-// ============================================================================
-// ============================================================================
-// AST helpers
-// ============================================================================
-static Expr* MkIntLit(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
-
-static Expr* MkIdent(Arena& arena, std::string_view name) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIdentifier;
-  e->text = name;
-  return e;
-}
-
-// Build a[i] (kSelect).
-static Expr* MkSelect(Arena& arena, std::string_view base, uint64_t idx) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kSelect;
-  e->base = MkIdent(arena, base);
-  e->index = MkIntLit(arena, idx);
-  return e;
-}
-
-// Build a.method(args...) (kCall with kMemberAccess lhs).
-static Expr* MkMethodCall(Arena& arena, std::string_view obj,
-                          std::string_view method, std::vector<Expr*> args) {
-  auto* access = arena.Create<Expr>();
-  access->kind = ExprKind::kMemberAccess;
-  access->lhs = MkIdent(arena, obj);
-  access->rhs = MkIdent(arena, method);
-
-  auto* call = arena.Create<Expr>();
-  call->kind = ExprKind::kCall;
-  call->lhs = access;
-  call->args = std::move(args);
-  return call;
-}
-
-static Expr* MkCall(Arena& arena, std::string_view callee,
-                    std::vector<Expr*> args) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kCall;
-  e->callee = callee;
-  e->args = std::move(args);
-  return e;
-}
-
-// Build: lhs_name = rhs;
-static Stmt* MkAssign(Arena& arena, std::string_view lhs_name, Expr* rhs) {
-  auto* s = arena.Create<Stmt>();
-  s->kind = StmtKind::kBlockingAssign;
-  s->lhs = MkIdent(arena, lhs_name);
-  s->rhs = rhs;
-  return s;
-}
-
-// Build: expr; (expression statement, e.g. method call).
-static Stmt* MkExprStmt(Arena& arena, Expr* expr) {
-  auto* s = arena.Create<Stmt>();
-  s->kind = StmtKind::kExprStmt;
-  s->expr = expr;
-  return s;
-}
-
-static Stmt* MkReturn(Arena& arena, Expr* expr) {
-  auto* s = arena.Create<Stmt>();
-  s->kind = StmtKind::kReturn;
-  s->expr = expr;
-  return s;
 }
 
 // ============================================================================
@@ -234,10 +101,10 @@ TEST(QueueRef, RefReadsCurrentValue) {
   func->name = "read_ref";
   func->is_automatic = true;
   func->func_args = {{Direction::kRef, false, {}, "v", nullptr, {}}};
-  func->func_body_stmts = {MkReturn(f.arena, MkIdent(f.arena, "v"))};
+  func->func_body_stmts = {MakeReturn(f.arena, MakeId(f.arena, "v"))};
   f.ctx.RegisterFunction("read_ref", func);
 
-  auto* call = MkCall(f.arena, "read_ref", {MkSelect(f.arena, "q", 1)});
+  auto* call = MakeCall(f.arena, "read_ref", {MakeSelect(f.arena, "q", 1)});
   EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 20u);
 }
 

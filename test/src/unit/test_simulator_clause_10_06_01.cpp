@@ -1,6 +1,5 @@
 // §10.6.1: The assign and deassign procedural statements
 
-
 #include <cstdint>
 #include <string_view>
 
@@ -14,33 +13,17 @@
 #include "simulation/variable.h"
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
 
 using namespace delta;
-
-// Helper fixture providing scheduler, arena, diag, and sim context.
-// Helper to create a simple identifier expression.
-Expr* MakeIdent(Arena& arena, std::string_view name) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIdentifier;
-  e->text = name;
-  return e;
-}
-
-// Helper to create an integer literal expression.
-Expr* MakeIntLit(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
 
 // Helper to create a blocking assignment statement: lhs = rhs_val.
 Stmt* MakeBlockAssign(Arena& arena, std::string_view lhs_name,
                       uint64_t rhs_val) {
   auto* s = arena.Create<Stmt>();
   s->kind = StmtKind::kBlockingAssign;
-  s->lhs = MakeIdent(arena, lhs_name);
-  s->rhs = MakeIntLit(arena, rhs_val);
+  s->lhs = MakeId(arena, lhs_name);
+  s->rhs = MakeInt(arena, rhs_val);
   return s;
 }
 
@@ -74,8 +57,8 @@ TEST(StmtExec, ProceduralAssignSetsValue) {
 
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kAssign;
-  stmt->lhs = MakeIdent(f.arena, "a");
-  stmt->rhs = MakeIntLit(f.arena, 77);
+  stmt->lhs = MakeId(f.arena, "a");
+  stmt->rhs = MakeInt(f.arena, 77);
 
   RunStmt(stmt, f.ctx, f.arena);
   EXPECT_TRUE(var->is_forced);
@@ -91,7 +74,7 @@ TEST(StmtExec, DeassignReleasesProceduralAssign) {
 
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kDeassign;
-  stmt->lhs = MakeIdent(f.arena, "b");
+  stmt->lhs = MakeId(f.arena, "b");
 
   RunStmt(stmt, f.ctx, f.arena);
   EXPECT_FALSE(var->is_forced);
@@ -118,8 +101,8 @@ TEST(StmtExec, AssignDeassignBlockingAssign) {
   // assign adb = 33;
   auto* assign_stmt = f.arena.Create<Stmt>();
   assign_stmt->kind = StmtKind::kAssign;
-  assign_stmt->lhs = MakeIdent(f.arena, "adb");
-  assign_stmt->rhs = MakeIntLit(f.arena, 33);
+  assign_stmt->lhs = MakeId(f.arena, "adb");
+  assign_stmt->rhs = MakeInt(f.arena, 33);
   RunStmt(assign_stmt, f.ctx, f.arena);
   EXPECT_EQ(var->value.ToUint64(), 33u);
   EXPECT_TRUE(var->is_forced);
@@ -127,7 +110,7 @@ TEST(StmtExec, AssignDeassignBlockingAssign) {
   // deassign adb;
   auto* deassign_stmt = f.arena.Create<Stmt>();
   deassign_stmt->kind = StmtKind::kDeassign;
-  deassign_stmt->lhs = MakeIdent(f.arena, "adb");
+  deassign_stmt->lhs = MakeId(f.arena, "adb");
   RunStmt(deassign_stmt, f.ctx, f.arena);
   EXPECT_FALSE(var->is_forced);
 

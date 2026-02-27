@@ -3,32 +3,16 @@
 #include <gtest/gtest.h>
 
 #include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "common/types.h"
-#include "lexer/lexer.h"
 #include "parser/parser.h"
 #include "preprocessor/preprocessor.h"
+#include "fixture_lexer.h"
 
 using namespace delta;
 
 // Helper: lex a single token from source text.
 // Returns both the SourceManager (owning the source buffer) and the token
 // so that token.text (a string_view) remains valid.
-struct LexResult {
-  SourceManager mgr;
-  Token token;
-};
-
-static LexResult LexOne(const std::string& src) {
-  LexResult result;
-  DiagEngine diag(result.mgr);
-  auto fid = result.mgr.AddFile("<test>", src);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  result.token = lexer.Next();
-  return result;
-}
-
 // Helper: parse source and return the compilation unit.
 struct ParseResult314 {
   SourceManager mgr;

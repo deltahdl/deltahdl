@@ -1,40 +1,13 @@
 // §11.4.9: Reduction operators
 
-
-#include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
+#include "helpers_eval_op.h"
 
 using namespace delta;
-
-// Shared fixture for expression evaluation tests.
-// Helper: build a simple integer literal Expr node.
-static Expr* MakeInt(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
-
-// Helper: build an identifier Expr node.
-static Expr* MakeId(Arena& arena, std::string_view name) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIdentifier;
-  e->text = name;
-  return e;
-}
-
-// Helper: build a binary Expr.
-static Expr* MakeBinary(Arena& arena, TokenKind op, Expr* lhs, Expr* rhs) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kBinary;
-  e->op = op;
-  e->lhs = lhs;
-  e->rhs = rhs;
-  return e;
-}
 
 namespace {
 
@@ -60,24 +33,6 @@ TEST(EvalOp, GtGtEq) {
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 16u);
   EXPECT_EQ(var->value.ToUint64(), 16u);
-}
-
-// Shared fixture for expression evaluation tests.
-static Expr* MakeUnary(Arena& arena, TokenKind op, Expr* operand) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kUnary;
-  e->op = op;
-  e->lhs = operand;
-  return e;
-}
-
-static Variable* MakeVar4(SimFixture& f, std::string_view name,
-                          uint32_t width, uint64_t aval, uint64_t bval) {
-  auto* var = f.ctx.CreateVariable(name, width);
-  var->value = MakeLogic4Vec(f.arena, width);
-  var->value.words[0].aval = aval;
-  var->value.words[0].bval = bval;
-  return var;
 }
 
 // ==========================================================================

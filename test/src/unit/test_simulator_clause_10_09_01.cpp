@@ -1,11 +1,11 @@
 // §10.9.1: Array assignment patterns
 
-
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/eval_array.h"
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
 
 using namespace delta;
 
@@ -20,13 +20,6 @@ static Expr* ParseExprFrom(const std::string& src, SimFixture& f) {
   auto* cu = parser.Parse();
   auto* item = cu->modules[0]->items[0];
   return item->body->rhs;
-}
-
-static Expr* MakeIntLit(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
 }
 
 namespace {

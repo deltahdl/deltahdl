@@ -1,6 +1,5 @@
 // §10.6.2: The force and release procedural statements
 
-
 #include <cstdint>
 #include <string_view>
 
@@ -14,33 +13,17 @@
 #include "simulation/variable.h"
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
 
 using namespace delta;
-
-// Helper fixture providing scheduler, arena, diag, and sim context.
-// Helper to create a simple identifier expression.
-Expr* MakeIdent(Arena& arena, std::string_view name) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIdentifier;
-  e->text = name;
-  return e;
-}
-
-// Helper to create an integer literal expression.
-Expr* MakeIntLit(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
 
 // Helper to create a blocking assignment statement: lhs = rhs_val.
 Stmt* MakeBlockAssign(Arena& arena, std::string_view lhs_name,
                       uint64_t rhs_val) {
   auto* s = arena.Create<Stmt>();
   s->kind = StmtKind::kBlockingAssign;
-  s->lhs = MakeIdent(arena, lhs_name);
-  s->rhs = MakeIntLit(arena, rhs_val);
+  s->lhs = MakeId(arena, lhs_name);
+  s->rhs = MakeInt(arena, rhs_val);
   return s;
 }
 
@@ -74,8 +57,8 @@ TEST(StmtExec, ForceOverridesValue) {
 
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kForce;
-  stmt->lhs = MakeIdent(f.arena, "x");
-  stmt->rhs = MakeIntLit(f.arena, 99);
+  stmt->lhs = MakeId(f.arena, "x");
+  stmt->rhs = MakeInt(f.arena, 99);
 
   RunStmt(stmt, f.ctx, f.arena);
   EXPECT_TRUE(var->is_forced);
@@ -88,7 +71,7 @@ TEST(StmtExec, ForceNullLhsNoOp) {
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kForce;
   stmt->lhs = nullptr;
-  stmt->rhs = MakeIntLit(f.arena, 5);
+  stmt->rhs = MakeInt(f.arena, 5);
 
   auto result = RunStmt(stmt, f.ctx, f.arena);
   EXPECT_EQ(result, StmtResult::kDone);
@@ -103,7 +86,7 @@ TEST(StmtExec, ReleaseClearsForce) {
 
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kRelease;
-  stmt->lhs = MakeIdent(f.arena, "y");
+  stmt->lhs = MakeId(f.arena, "y");
 
   RunStmt(stmt, f.ctx, f.arena);
   EXPECT_FALSE(var->is_forced);
@@ -113,7 +96,7 @@ TEST(StmtExec, ReleaseUnknownVarNoOp) {
   StmtFixture f;
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kRelease;
-  stmt->lhs = MakeIdent(f.arena, "nonexistent");
+  stmt->lhs = MakeId(f.arena, "nonexistent");
 
   auto result = RunStmt(stmt, f.ctx, f.arena);
   EXPECT_EQ(result, StmtResult::kDone);
@@ -130,8 +113,8 @@ TEST(StmtExec, ForcePreventsNormalAssign) {
   // Force fv = 50;
   auto* force_stmt = f.arena.Create<Stmt>();
   force_stmt->kind = StmtKind::kForce;
-  force_stmt->lhs = MakeIdent(f.arena, "fv");
-  force_stmt->rhs = MakeIntLit(f.arena, 50);
+  force_stmt->lhs = MakeId(f.arena, "fv");
+  force_stmt->rhs = MakeInt(f.arena, 50);
   RunStmt(force_stmt, f.ctx, f.arena);
 
   // Normal blocking assign: fv = 100;
@@ -157,8 +140,8 @@ TEST(StmtExec, ForceReleaseThenAssign) {
   // Force fra = 50;
   auto* force_stmt = f.arena.Create<Stmt>();
   force_stmt->kind = StmtKind::kForce;
-  force_stmt->lhs = MakeIdent(f.arena, "fra");
-  force_stmt->rhs = MakeIntLit(f.arena, 50);
+  force_stmt->lhs = MakeId(f.arena, "fra");
+  force_stmt->rhs = MakeInt(f.arena, 50);
   RunStmt(force_stmt, f.ctx, f.arena);
   EXPECT_EQ(var->value.ToUint64(), 50u);
   EXPECT_TRUE(var->is_forced);
@@ -166,7 +149,7 @@ TEST(StmtExec, ForceReleaseThenAssign) {
   // Release fra;
   auto* release_stmt = f.arena.Create<Stmt>();
   release_stmt->kind = StmtKind::kRelease;
-  release_stmt->lhs = MakeIdent(f.arena, "fra");
+  release_stmt->lhs = MakeId(f.arena, "fra");
   RunStmt(release_stmt, f.ctx, f.arena);
   EXPECT_FALSE(var->is_forced);
 

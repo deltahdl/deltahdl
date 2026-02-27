@@ -1,11 +1,11 @@
 // §8.24: Out-of-block declarations
 
-
 #include "parser/ast.h"
 #include "simulation/class_object.h"
 #include "simulation/eval.h"
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
 
 using namespace delta;
 
@@ -19,14 +19,6 @@ static Expr* MkId(Arena& a, std::string_view name) {
   e->kind = ExprKind::kIdentifier;
   e->text = name;
   return e;
-}
-
-// AST helper: make a return statement.
-static Stmt* MkReturn(Arena& a, Expr* expr) {
-  auto* s = a.Create<Stmt>();
-  s->kind = StmtKind::kReturn;
-  s->expr = expr;
-  return s;
 }
 
 // Build a simple ClassTypeInfo and register it with the context.
@@ -70,7 +62,7 @@ TEST(ClassSim, ExternMethodRegisteredSeparately) {
   extern_method->kind = ModuleItemKind::kFunctionDecl;
   extern_method->name = "get_val";
   extern_method->func_body_stmts.push_back(
-      MkReturn(f.arena, MkId(f.arena, "val")));
+      MakeReturn(f.arena, MkId(f.arena, "val")));
 
   // Register it on the type (as if elaboration resolved the extern).
   type->methods["get_val"] = extern_method;

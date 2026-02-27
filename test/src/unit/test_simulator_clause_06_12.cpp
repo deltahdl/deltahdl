@@ -1,14 +1,13 @@
 // §6.12: Real, shortreal, and realtime data types
 
-
 #include <cmath>
-#include <cstring>
 
 #include "common/types.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
 
 #include "fixture_simulator.h"
+#include "helpers_eval_op.h"
 
 using namespace delta;
 
@@ -98,13 +97,6 @@ TEST(RealTypes, IsRealVariable) {
   EXPECT_TRUE(f.ctx.IsRealVariable("r"));
   f.ctx.CreateVariable("i", 32);
   EXPECT_FALSE(f.ctx.IsRealVariable("i"));
-}
-
-static double ToDouble(const Variable* var) {
-  uint64_t bits = var->value.ToUint64();
-  double d = 0.0;
-  std::memcpy(&d, &bits, sizeof(double));
-  return d;
 }
 
 // § number — real_number simulates

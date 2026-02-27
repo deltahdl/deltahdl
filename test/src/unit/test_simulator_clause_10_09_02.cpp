@@ -1,23 +1,14 @@
 // §10.9.2: Structure assignment patterns
 
-
 #include "parser/ast.h"
 #include "simulation/eval.h"
 #include "simulation/eval_array.h"
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
 
 using namespace delta;
 
-// =============================================================================
-// Helper fixture
-// =============================================================================
-static Expr* MakeIntLit(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
 namespace {
 
 TEST(StructPattern, NamedMemberTwoFields) {
@@ -33,7 +24,7 @@ TEST(StructPattern, NamedMemberTwoFields) {
   auto* pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"x", "y"};
-  pat->elements = {MakeIntLit(f.arena, 5), MakeIntLit(f.arena, 10)};
+  pat->elements = {MakeInt(f.arena, 5), MakeInt(f.arena, 10)};
 
   auto result = EvalStructPattern(pat, &info, f.ctx, f.arena);
   EXPECT_EQ(result.width, 16u);
@@ -53,7 +44,7 @@ TEST(StructPattern, NamedMemberReversedOrder) {
   auto* pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"y", "x"};
-  pat->elements = {MakeIntLit(f.arena, 10), MakeIntLit(f.arena, 5)};
+  pat->elements = {MakeInt(f.arena, 10), MakeInt(f.arena, 5)};
 
   auto result = EvalStructPattern(pat, &info, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0x050Au);
@@ -73,8 +64,8 @@ TEST(StructPattern, NamedMemberThreeFields) {
   auto* pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"r", "g", "b"};
-  pat->elements = {MakeIntLit(f.arena, 0xFF), MakeIntLit(f.arena, 0x80),
-                   MakeIntLit(f.arena, 0x00)};
+  pat->elements = {MakeInt(f.arena, 0xFF), MakeInt(f.arena, 0x80),
+                   MakeInt(f.arena, 0x00)};
 
   auto result = EvalStructPattern(pat, &info, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0xFF8000u);
@@ -96,7 +87,7 @@ TEST(StructPattern, DefaultAllFields) {
   auto* pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"default"};
-  pat->elements = {MakeIntLit(f.arena, 0xFF)};
+  pat->elements = {MakeInt(f.arena, 0xFF)};
 
   auto result = EvalStructPattern(pat, &info, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0xFFFFu);
@@ -115,7 +106,7 @@ TEST(StructPattern, DefaultWithNamedOverride) {
   auto* pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"a", "default"};
-  pat->elements = {MakeIntLit(f.arena, 1), MakeIntLit(f.arena, 0)};
+  pat->elements = {MakeInt(f.arena, 1), MakeInt(f.arena, 0)};
 
   auto result = EvalStructPattern(pat, &info, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0x0100u);
@@ -134,7 +125,7 @@ TEST(StructPattern, TypeKeyedInt) {
   auto* pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"int"};
-  pat->elements = {MakeIntLit(f.arena, 42)};
+  pat->elements = {MakeInt(f.arena, 42)};
 
   auto result = EvalStructPattern(pat, &info, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), uint64_t{42} << 8);
@@ -157,8 +148,8 @@ TEST(StructPattern, MixedPrecedence) {
   auto* pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"a", "byte", "default"};
-  pat->elements = {MakeIntLit(f.arena, 1), MakeIntLit(f.arena, 2),
-                   MakeIntLit(f.arena, 3)};
+  pat->elements = {MakeInt(f.arena, 1), MakeInt(f.arena, 2),
+                   MakeInt(f.arena, 3)};
 
   auto result = EvalStructPattern(pat, &info, f.ctx, f.arena);
   uint64_t expected = (uint64_t{1} << 16) | (uint64_t{2} << 8) | 3;

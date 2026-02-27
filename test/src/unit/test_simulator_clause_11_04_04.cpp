@@ -1,59 +1,13 @@
 // §11.4.4: Relational operators
 
-
-#include <cstring>
-
-#include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulation/eval.h"
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
+#include "helpers_eval_op.h"
 
 using namespace delta;
-
-// Shared fixture for expression evaluation tests.
-static Expr* MakeInt(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
-
-static Expr* MakeId(Arena& arena, std::string_view name) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIdentifier;
-  e->text = name;
-  return e;
-}
-
-static Expr* MakeBinary(Arena& arena, TokenKind op, Expr* lhs, Expr* rhs) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kBinary;
-  e->op = op;
-  e->lhs = lhs;
-  e->rhs = rhs;
-  return e;
-}
-
-static Variable* MakeVar4(SimFixture& f, std::string_view name,
-                          uint32_t width, uint64_t aval, uint64_t bval) {
-  auto* var = f.ctx.CreateVariable(name, width);
-  var->value = MakeLogic4Vec(f.arena, width);
-  var->value.words[0].aval = aval;
-  var->value.words[0].bval = bval;
-  return var;
-}
-
-static Variable* MakeRealVar(SimFixture& f, std::string_view name,
-                             double val) {
-  auto* var = f.ctx.CreateVariable(name, 64);
-  uint64_t bits = 0;
-  std::memcpy(&bits, &val, sizeof(double));
-  var->value = MakeLogic4VecVal(f.arena, 64, bits);
-  var->value.is_real = true;
-  f.ctx.RegisterRealVariable(name);
-  return var;
-}
 
 namespace {
 

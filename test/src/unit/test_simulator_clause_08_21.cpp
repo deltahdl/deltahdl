@@ -1,11 +1,11 @@
 // §8.21: Abstract classes and pure virtual methods
 
-
 #include "parser/ast.h"
 #include "simulation/class_object.h"
 #include "simulation/eval.h"
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
 
 using namespace delta;
 
@@ -20,14 +20,6 @@ static Expr* MkInt(Arena& a, uint64_t val) {
   e->int_val = val;
   return e;
 }
-// AST helper: make a return statement.
-static Stmt* MkReturn(Arena& a, Expr* expr) {
-  auto* s = a.Create<Stmt>();
-  s->kind = StmtKind::kReturn;
-  s->expr = expr;
-  return s;
-}
-
 // Build a simple ClassTypeInfo and register it with the context.
 static ClassTypeInfo* MakeClassType(
     SimFixture& f, std::string_view name,
@@ -83,7 +75,7 @@ TEST(ClassSim, PureVirtualMethodNullBody) {
   auto* method = f.arena.Create<ModuleItem>();
   method->kind = ModuleItemKind::kFunctionDecl;
   method->name = "area";
-  method->func_body_stmts.push_back(MkReturn(f.arena, MkInt(f.arena, 314)));
+  method->func_body_stmts.push_back(MakeReturn(f.arena, MkInt(f.arena, 314)));
   concrete->vtable.push_back({"area", method, concrete});
 
   auto [handle, obj] = MakeObj(f, concrete);

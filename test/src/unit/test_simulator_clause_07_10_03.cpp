@@ -1,89 +1,12 @@
 // §7.10.3: Persistence of references to elements of a queue
 
-
 #include "parser/ast.h"
 #include "simulation/eval.h"
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
 
 using namespace delta;
-
-// ============================================================================
-// Test fixture
-// ============================================================================
-// ============================================================================
-// AST helpers
-// ============================================================================
-static Expr* MkIntLit(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
-
-static Expr* MkIdent(Arena& arena, std::string_view name) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIdentifier;
-  e->text = name;
-  return e;
-}
-
-// Build a[i] (kSelect).
-static Expr* MkSelect(Arena& arena, std::string_view base, uint64_t idx) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kSelect;
-  e->base = MkIdent(arena, base);
-  e->index = MkIntLit(arena, idx);
-  return e;
-}
-
-// Build a.method(args...) (kCall with kMemberAccess lhs).
-static Expr* MkMethodCall(Arena& arena, std::string_view obj,
-                          std::string_view method, std::vector<Expr*> args) {
-  auto* access = arena.Create<Expr>();
-  access->kind = ExprKind::kMemberAccess;
-  access->lhs = MkIdent(arena, obj);
-  access->rhs = MkIdent(arena, method);
-
-  auto* call = arena.Create<Expr>();
-  call->kind = ExprKind::kCall;
-  call->lhs = access;
-  call->args = std::move(args);
-  return call;
-}
-
-static Expr* MkCall(Arena& arena, std::string_view callee,
-                    std::vector<Expr*> args) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kCall;
-  e->callee = callee;
-  e->args = std::move(args);
-  return e;
-}
-
-// Build: lhs_name = rhs;
-static Stmt* MkAssign(Arena& arena, std::string_view lhs_name, Expr* rhs) {
-  auto* s = arena.Create<Stmt>();
-  s->kind = StmtKind::kBlockingAssign;
-  s->lhs = MkIdent(arena, lhs_name);
-  s->rhs = rhs;
-  return s;
-}
-
-// Build: expr; (expression statement, e.g. method call).
-static Stmt* MkExprStmt(Arena& arena, Expr* expr) {
-  auto* s = arena.Create<Stmt>();
-  s->kind = StmtKind::kExprStmt;
-  s->expr = expr;
-  return s;
-}
-
-static Stmt* MkReturn(Arena& arena, Expr* expr) {
-  auto* s = arena.Create<Stmt>();
-  s->kind = StmtKind::kReturn;
-  s->expr = expr;
-  return s;
-}
 
 // ============================================================================
 // Queue helper: populate a queue with integer values.
@@ -128,11 +51,11 @@ TEST(QueueRef, OutdatedByDelete) {
   //   v = 99;
   // endfunction
   RegAutoFunc(f, "test_fn", {{Direction::kRef, false, {}, "v", nullptr, {}}},
-              {MkExprStmt(f.arena, MkMethodCall(f.arena, "q", "delete",
-                                                {MkIntLit(f.arena, 1)})),
-               MkAssign(f.arena, "v", MkIntLit(f.arena, 99))});
+              {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "delete",
+                                                {MakeInt(f.arena, 1)})),
+               MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});
 
-  auto* call = MkCall(f.arena, "test_fn", {MkSelect(f.arena, "q", 1)});
+  auto* call = MakeCall(f.arena, "test_fn", {MakeSelect(f.arena, "q", 1)});
   EvalExpr(call, f.ctx, f.arena);
 
   // q now has {10, 30}. Element 20 was deleted → ref is outdated.
@@ -152,10 +75,10 @@ TEST(QueueRef, OutdatedByPopFront) {
   //   v = 99;
   // endfunction
   RegAutoFunc(f, "test_fn", {{Direction::kRef, false, {}, "v", nullptr, {}}},
-              {MkExprStmt(f.arena, MkMethodCall(f.arena, "q", "pop_front", {})),
-               MkAssign(f.arena, "v", MkIntLit(f.arena, 99))});
+              {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "pop_front", {})),
+               MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});
 
-  auto* call = MkCall(f.arena, "test_fn", {MkSelect(f.arena, "q", 0)});
+  auto* call = MakeCall(f.arena, "test_fn", {MakeSelect(f.arena, "q", 0)});
   EvalExpr(call, f.ctx, f.arena);
 
   // q now has {20, 30}. Element 10 was popped → ref is outdated.
@@ -196,11 +119,11 @@ TEST(QueueRef, SurvivesPushBack) {
   //   v = 99;
   // endfunction
   RegAutoFunc(f, "test_fn", {{Direction::kRef, false, {}, "v", nullptr, {}}},
-              {MkExprStmt(f.arena, MkMethodCall(f.arena, "q", "push_back",
-                                                {MkIntLit(f.arena, 40)})),
-               MkAssign(f.arena, "v", MkIntLit(f.arena, 99))});
+              {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "push_back",
+                                                {MakeInt(f.arena, 40)})),
+               MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});
 
-  auto* call = MkCall(f.arena, "test_fn", {MkSelect(f.arena, "q", 1)});
+  auto* call = MakeCall(f.arena, "test_fn", {MakeSelect(f.arena, "q", 1)});
   EvalExpr(call, f.ctx, f.arena);
 
   // q now has {10, 99, 30, 40}. q[1] should be 99 (ref survived push_back).

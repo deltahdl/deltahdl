@@ -1,11 +1,11 @@
 // §8.6: Object methods
 
-
 #include "parser/ast.h"
 #include "simulation/class_object.h"
 #include "simulation/eval.h"
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
 
 using namespace delta;
 
@@ -29,23 +29,6 @@ static Expr* MkBin(Arena& a, TokenKind op, Expr* l, Expr* r) {
   e->lhs = l;
   e->rhs = r;
   return e;
-}
-
-// AST helper: make a blocking assignment statement.
-static Stmt* MkAssign(Arena& a, std::string_view lhs_name, Expr* rhs) {
-  auto* s = a.Create<Stmt>();
-  s->kind = StmtKind::kBlockingAssign;
-  s->lhs = MkId(a, lhs_name);
-  s->rhs = rhs;
-  return s;
-}
-
-// AST helper: make a return statement.
-static Stmt* MkReturn(Arena& a, Expr* expr) {
-  auto* s = a.Create<Stmt>();
-  s->kind = StmtKind::kReturn;
-  s->expr = expr;
-  return s;
 }
 
 // Build a simple ClassTypeInfo and register it with the context.
@@ -88,7 +71,7 @@ TEST(ClassSim, SimpleMethodCall) {
   auto* method = f.arena.Create<ModuleItem>();
   method->kind = ModuleItemKind::kFunctionDecl;
   method->name = "get_count";
-  method->func_body_stmts.push_back(MkReturn(f.arena, MkId(f.arena, "count")));
+  method->func_body_stmts.push_back(MakeReturn(f.arena, MkId(f.arena, "count")));
   type->methods["get_count"] = method;
 
   auto [handle, obj] = MakeObj(f, type);
@@ -111,7 +94,7 @@ TEST(ClassSim, MethodWithArgs) {
   method->func_args = {{Direction::kInput, false, {}, "v", nullptr, {}}};
   auto* rhs = MkBin(f.arena, TokenKind::kPlus, MkId(f.arena, "total"),
                     MkId(f.arena, "v"));
-  method->func_body_stmts.push_back(MkAssign(f.arena, "total", rhs));
+  method->func_body_stmts.push_back(MakeAssign(f.arena, "total", rhs));
   type->methods["add"] = method;
 
   auto [handle, obj] = MakeObj(f, type);

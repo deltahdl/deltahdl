@@ -1,6 +1,5 @@
 // §12.5: Case statement
 
-
 #include <cstdint>
 #include <string_view>
 
@@ -14,33 +13,17 @@
 #include "simulation/variable.h"
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
 
 using namespace delta;
-
-// Helper fixture providing scheduler, arena, diag, and sim context.
-// Helper to create a simple identifier expression.
-Expr* MakeIdent(Arena& arena, std::string_view name) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIdentifier;
-  e->text = name;
-  return e;
-}
-
-// Helper to create an integer literal expression.
-Expr* MakeIntLit(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
 
 // Helper to create a blocking assignment statement: lhs = rhs_val.
 Stmt* MakeBlockAssign(Arena& arena, std::string_view lhs_name,
                       uint64_t rhs_val) {
   auto* s = arena.Create<Stmt>();
   s->kind = StmtKind::kBlockingAssign;
-  s->lhs = MakeIdent(arena, lhs_name);
-  s->rhs = MakeIntLit(arena, rhs_val);
+  s->lhs = MakeId(arena, lhs_name);
+  s->rhs = MakeInt(arena, rhs_val);
   return s;
 }
 
@@ -75,15 +58,15 @@ TEST(StmtExec, UniqueCaseExactMatch) {
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kCase;
   stmt->qualifier = CaseQualifier::kUnique;
-  stmt->condition = MakeIntLit(f.arena, 2);
+  stmt->condition = MakeInt(f.arena, 2);
 
   CaseItem item1;
-  item1.patterns.push_back(MakeIntLit(f.arena, 1));
+  item1.patterns.push_back(MakeInt(f.arena, 1));
   item1.body = MakeBlockAssign(f.arena, "uc", 10);
   stmt->case_items.push_back(item1);
 
   CaseItem item2;
-  item2.patterns.push_back(MakeIntLit(f.arena, 2));
+  item2.patterns.push_back(MakeInt(f.arena, 2));
   item2.body = MakeBlockAssign(f.arena, "uc", 20);
   stmt->case_items.push_back(item2);
 
@@ -99,10 +82,10 @@ TEST(StmtExec, PriorityCaseNoMatchNoDefaultWarning) {
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kCase;
   stmt->qualifier = CaseQualifier::kPriority;
-  stmt->condition = MakeIntLit(f.arena, 99);
+  stmt->condition = MakeInt(f.arena, 99);
 
   CaseItem item1;
-  item1.patterns.push_back(MakeIntLit(f.arena, 1));
+  item1.patterns.push_back(MakeInt(f.arena, 1));
   item1.body = MakeBlockAssign(f.arena, "pcw", 10);
   stmt->case_items.push_back(item1);
 
@@ -123,15 +106,15 @@ TEST(StmtExec, CaseExactMatchBaseline) {
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kCase;
   stmt->case_kind = TokenKind::kKwCase;
-  stmt->condition = MakeIntLit(f.arena, 3);
+  stmt->condition = MakeInt(f.arena, 3);
 
   CaseItem item1;
-  item1.patterns.push_back(MakeIntLit(f.arena, 1));
+  item1.patterns.push_back(MakeInt(f.arena, 1));
   item1.body = MakeBlockAssign(f.arena, "ce", 10);
   stmt->case_items.push_back(item1);
 
   CaseItem item2;
-  item2.patterns.push_back(MakeIntLit(f.arena, 3));
+  item2.patterns.push_back(MakeInt(f.arena, 3));
   item2.body = MakeBlockAssign(f.arena, "ce", 30);
   stmt->case_items.push_back(item2);
 
@@ -155,12 +138,12 @@ TEST(StmtExec, CaseMultiplePatterns) {
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kCase;
   stmt->case_kind = TokenKind::kKwCase;
-  stmt->condition = MakeIntLit(f.arena, 5);
+  stmt->condition = MakeInt(f.arena, 5);
 
   CaseItem item1;
-  item1.patterns.push_back(MakeIntLit(f.arena, 3));
-  item1.patterns.push_back(MakeIntLit(f.arena, 5));
-  item1.patterns.push_back(MakeIntLit(f.arena, 7));
+  item1.patterns.push_back(MakeInt(f.arena, 3));
+  item1.patterns.push_back(MakeInt(f.arena, 5));
+  item1.patterns.push_back(MakeInt(f.arena, 7));
   item1.body = MakeBlockAssign(f.arena, "cmp", 111);
   stmt->case_items.push_back(item1);
 

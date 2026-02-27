@@ -1,6 +1,5 @@
 // §18.16: Random weighted case—randcase
 
-
 #include <cstdint>
 #include <string_view>
 
@@ -14,33 +13,17 @@
 #include "simulation/variable.h"
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
 
 using namespace delta;
-
-// Helper fixture providing scheduler, arena, diag, and sim context.
-// Helper to create a simple identifier expression.
-Expr* MakeIdent(Arena& arena, std::string_view name) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIdentifier;
-  e->text = name;
-  return e;
-}
-
-// Helper to create an integer literal expression.
-Expr* MakeIntLit(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
 
 // Helper to create a blocking assignment statement: lhs = rhs_val.
 Stmt* MakeBlockAssign(Arena& arena, std::string_view lhs_name,
                       uint64_t rhs_val) {
   auto* s = arena.Create<Stmt>();
   s->kind = StmtKind::kBlockingAssign;
-  s->lhs = MakeIdent(arena, lhs_name);
-  s->rhs = MakeIntLit(arena, rhs_val);
+  s->lhs = MakeId(arena, lhs_name);
+  s->rhs = MakeInt(arena, rhs_val);
   return s;
 }
 
@@ -79,9 +62,9 @@ TEST(StmtExec, RandcaseSelectsBranch) {
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kRandcase;
   stmt->randcase_items.push_back(
-      {MakeIntLit(f.arena, 1), MakeBlockAssign(f.arena, "r", 10)});
+      {MakeInt(f.arena, 1), MakeBlockAssign(f.arena, "r", 10)});
   stmt->randcase_items.push_back(
-      {MakeIntLit(f.arena, 1), MakeBlockAssign(f.arena, "r", 20)});
+      {MakeInt(f.arena, 1), MakeBlockAssign(f.arena, "r", 20)});
 
   RunStmt(stmt, f.ctx, f.arena);
   uint64_t val = result_var->value.ToUint64();
@@ -96,9 +79,9 @@ TEST(StmtExec, RandcaseAllZeroWeightsNoOp) {
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kRandcase;
   stmt->randcase_items.push_back(
-      {MakeIntLit(f.arena, 0), MakeBlockAssign(f.arena, "rz", 10)});
+      {MakeInt(f.arena, 0), MakeBlockAssign(f.arena, "rz", 10)});
   stmt->randcase_items.push_back(
-      {MakeIntLit(f.arena, 0), MakeBlockAssign(f.arena, "rz", 20)});
+      {MakeInt(f.arena, 0), MakeBlockAssign(f.arena, "rz", 20)});
 
   RunStmt(stmt, f.ctx, f.arena);
   EXPECT_EQ(result_var->value.ToUint64(), 0u);
@@ -112,7 +95,7 @@ TEST(StmtExec, RandcaseSingleBranchAlwaysSelected) {
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kRandcase;
   stmt->randcase_items.push_back(
-      {MakeIntLit(f.arena, 5), MakeBlockAssign(f.arena, "rs", 42)});
+      {MakeInt(f.arena, 5), MakeBlockAssign(f.arena, "rs", 42)});
 
   RunStmt(stmt, f.ctx, f.arena);
   EXPECT_EQ(result_var->value.ToUint64(), 42u);
@@ -131,9 +114,9 @@ TEST(StmtExec, RandcaseRespectsWeights) {
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kRandcase;
   stmt->randcase_items.push_back(
-      {MakeIntLit(f.arena, 100), MakeBlockAssign(f.arena, "rw", 1)});
+      {MakeInt(f.arena, 100), MakeBlockAssign(f.arena, "rw", 1)});
   stmt->randcase_items.push_back(
-      {MakeIntLit(f.arena, 0), MakeBlockAssign(f.arena, "rw", 2)});
+      {MakeInt(f.arena, 0), MakeBlockAssign(f.arena, "rw", 2)});
 
   for (int i = 0; i < 10; ++i) {
     result_var->value = MakeLogic4VecVal(f.arena, 32, 0);

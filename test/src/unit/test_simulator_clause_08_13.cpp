@@ -1,11 +1,11 @@
 // §8.13: Inheritance and subclasses
 
-
 #include "parser/ast.h"
 #include "simulation/class_object.h"
 #include "simulation/eval.h"
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
 
 using namespace delta;
 
@@ -19,14 +19,6 @@ static Expr* MkId(Arena& a, std::string_view name) {
   e->kind = ExprKind::kIdentifier;
   e->text = name;
   return e;
-}
-
-// AST helper: make a return statement.
-static Stmt* MkReturn(Arena& a, Expr* expr) {
-  auto* s = a.Create<Stmt>();
-  s->kind = StmtKind::kReturn;
-  s->expr = expr;
-  return s;
 }
 
 // Build a simple ClassTypeInfo and register it with the context.
@@ -78,7 +70,7 @@ TEST(ClassSim, InheritedMethodResolution) {
   auto* method = f.arena.Create<ModuleItem>();
   method->kind = ModuleItemKind::kFunctionDecl;
   method->name = "get_x";
-  method->func_body_stmts.push_back(MkReturn(f.arena, MkId(f.arena, "x")));
+  method->func_body_stmts.push_back(MakeReturn(f.arena, MkId(f.arena, "x")));
   base->methods["get_x"] = method;
 
   auto* derived = MakeClassType(f, "Derived", {"y"});

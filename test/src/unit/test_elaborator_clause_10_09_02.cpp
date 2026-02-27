@@ -1,12 +1,12 @@
 // §10.9.2: Structure assignment patterns
 
-
 #include "simulation/lowerer.h"
 #include "simulation/scheduler.h"
 #include "simulation/sim_context.h"
 #include "simulation/variable.h"
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
 
 using namespace delta;
 
@@ -43,13 +43,6 @@ static Expr* ParseExprFrom(const std::string& src, SimFixture& f) {
   return item->body->rhs;
 }
 
-static Expr* MakeIntLit(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
-
 TEST(StructPattern, MixedPrecedence) {
   // '{a: 1, byte: 2, default: 3} — member > type > default
   // struct { byte a; byte b; logic [7:0] c; }
@@ -67,8 +60,8 @@ TEST(StructPattern, MixedPrecedence) {
   auto* pat = f.arena.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->pattern_keys = {"a", "byte", "default"};
-  pat->elements = {MakeIntLit(f.arena, 1), MakeIntLit(f.arena, 2),
-                   MakeIntLit(f.arena, 3)};
+  pat->elements = {MakeInt(f.arena, 1), MakeInt(f.arena, 2),
+                   MakeInt(f.arena, 3)};
 
   auto result = EvalStructPattern(pat, &info, f.ctx, f.arena);
   uint64_t expected = (uint64_t{1} << 16) | (uint64_t{2} << 8) | 3;

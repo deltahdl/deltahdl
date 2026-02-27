@@ -3,12 +3,10 @@
 #include <gtest/gtest.h>
 
 #include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "common/types.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include "preprocessor/preprocessor.h"
+#include "fixture_preprocessor.h"
 
 using namespace delta;
 
@@ -72,11 +70,6 @@ TEST(ParserClause03, Cl3_14_2_1_GlobalPrecisionTracking) {
   // Global precision is the finest across all directives.
   EXPECT_EQ(r.global_precision, TimeUnit::kPs);
 }
-
-struct PreprocFixture {
-  SourceManager mgr;
-  DiagEngine diag{mgr};
-};
 
 static std::string PreprocessWithPP(const std::string& src, PreprocFixture& f,
                                     Preprocessor& pp) {

@@ -4,33 +4,9 @@
 
 #include <string>
 
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "lexer/lexer.h"
+#include "fixture_lexer.h"
 
 using namespace delta;
-
-static std::vector<Token> Lex(const std::string& src) {
-  static SourceManager mgr;
-  auto fid = mgr.AddFile("<test>", src);
-  DiagEngine diag(mgr);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  return lexer.LexAll();
-}
-
-struct LexResult {
-  std::vector<Token> tokens;
-  bool has_errors;
-};
-
-static LexResult LexWithDiag(const std::string& src) {
-  SourceManager mgr;
-  DiagEngine diag(mgr);
-  auto fid = mgr.AddFile("<test>", src);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  auto tokens = lexer.LexAll();
-  return {tokens, diag.HasErrors()};
-}
 
 // ===========================================================================
 // §A.9.3 / §5.6: identifier ::= simple_identifier | escaped_identifier

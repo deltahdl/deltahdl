@@ -1,6 +1,5 @@
 // §12.4.2: unique-if, unique0-if, and priority-if
 
-
 #include <cstdint>
 #include <string_view>
 
@@ -14,33 +13,17 @@
 #include "simulation/variable.h"
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
 
 using namespace delta;
-
-// Helper fixture providing scheduler, arena, diag, and sim context.
-// Helper to create a simple identifier expression.
-Expr* MakeIdent(Arena& arena, std::string_view name) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIdentifier;
-  e->text = name;
-  return e;
-}
-
-// Helper to create an integer literal expression.
-Expr* MakeIntLit(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
 
 // Helper to create a blocking assignment statement: lhs = rhs_val.
 Stmt* MakeBlockAssign(Arena& arena, std::string_view lhs_name,
                       uint64_t rhs_val) {
   auto* s = arena.Create<Stmt>();
   s->kind = StmtKind::kBlockingAssign;
-  s->lhs = MakeIdent(arena, lhs_name);
-  s->rhs = MakeIntLit(arena, rhs_val);
+  s->lhs = MakeId(arena, lhs_name);
+  s->rhs = MakeInt(arena, rhs_val);
   return s;
 }
 
@@ -76,7 +59,7 @@ TEST(StmtExec, UniqueIfMatchingBranch) {
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kIf;
   stmt->qualifier = CaseQualifier::kUnique;
-  stmt->condition = MakeIntLit(f.arena, 1);
+  stmt->condition = MakeInt(f.arena, 1);
   stmt->then_branch = MakeBlockAssign(f.arena, "ui", 10);
   stmt->else_branch = MakeBlockAssign(f.arena, "ui", 20);
 
@@ -93,7 +76,7 @@ TEST(StmtExec, PriorityIfFirstMatchTaken) {
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kIf;
   stmt->qualifier = CaseQualifier::kPriority;
-  stmt->condition = MakeIntLit(f.arena, 1);
+  stmt->condition = MakeInt(f.arena, 1);
   stmt->then_branch = MakeBlockAssign(f.arena, "pi", 30);
 
   RunStmt(stmt, f.ctx, f.arena);
@@ -110,7 +93,7 @@ TEST(StmtExec, PriorityIfNoMatchNoElseWarning) {
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kIf;
   stmt->qualifier = CaseQualifier::kPriority;
-  stmt->condition = MakeIntLit(f.arena, 0);
+  stmt->condition = MakeInt(f.arena, 0);
   stmt->then_branch = MakeBlockAssign(f.arena, "piw", 30);
 
   RunStmt(stmt, f.ctx, f.arena);

@@ -1,11 +1,11 @@
 // §8.17: Chaining constructors
 
-
 #include "parser/ast.h"
 #include "simulation/class_object.h"
 #include "simulation/eval.h"
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
 
 using namespace delta;
 
@@ -19,15 +19,6 @@ static Expr* MkId(Arena& a, std::string_view name) {
   e->kind = ExprKind::kIdentifier;
   e->text = name;
   return e;
-}
-
-// AST helper: make a blocking assignment statement.
-static Stmt* MkAssign(Arena& a, std::string_view lhs_name, Expr* rhs) {
-  auto* s = a.Create<Stmt>();
-  s->kind = StmtKind::kBlockingAssign;
-  s->lhs = MkId(a, lhs_name);
-  s->rhs = rhs;
-  return s;
 }
 
 // Build a simple ClassTypeInfo and register it with the context.
@@ -89,7 +80,7 @@ TEST(ClassSim, SuperNewWithArgs) {
   ctor->return_type.kind = DataTypeKind::kVoid;
   ctor->func_args = {{Direction::kInput, false, {}, "s", nullptr, {}}};
   ctor->func_body_stmts.push_back(
-      MkAssign(f.arena, "speed", MkId(f.arena, "s")));
+      MakeAssign(f.arena, "speed", MkId(f.arena, "s")));
   base->methods["new"] = ctor;
 
   auto* derived = MakeClassType(f, "Car", {"doors"});

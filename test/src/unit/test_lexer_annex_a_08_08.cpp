@@ -4,21 +4,11 @@
 
 #include <string>
 
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "lexer/lexer.h"
+#include "fixture_lexer.h"
 
 using namespace delta;
 
 namespace {
-
-static std::vector<Token> Lex(const std::string& src) {
-  static SourceManager mgr;
-  auto fid = mgr.AddFile("<test>", src);
-  DiagEngine diag(mgr);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  return lexer.LexAll();
-}
 
 static bool LexHasErrors(const std::string& src) {
   SourceManager mgr;

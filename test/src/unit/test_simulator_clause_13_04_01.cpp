@@ -1,32 +1,12 @@
 // §13.4.1: Return values and void functions
 
-
 #include "parser/ast.h"
 #include "simulation/eval.h"
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
 
 using namespace delta;
-
-// =============================================================================
-// Test fixture shared by all function call tests
-// =============================================================================
-// Helper: make a function call expression.
-static Expr* MakeCall(Arena& arena, std::string_view callee,
-                      std::vector<Expr*> args) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kCall;
-  e->callee = callee;
-  e->args = std::move(args);
-  return e;
-}
-
-static Expr* MakeIntLit(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
 
 namespace {
 
@@ -44,7 +24,7 @@ TEST(Functions, VoidFunctionReturnsZero) {
   func->func_args = {{Direction::kInput, false, {}, "a", nullptr, {}}};
   f.ctx.RegisterFunction("set_val", func);
 
-  auto* call = MakeCall(f.arena, "set_val", {MakeIntLit(f.arena, 42)});
+  auto* call = MakeCall(f.arena, "set_val", {MakeInt(f.arena, 42)});
   auto result = EvalExpr(call, f.ctx, f.arena);
   // Void function should return 0.
   EXPECT_EQ(result.ToUint64(), 0u);

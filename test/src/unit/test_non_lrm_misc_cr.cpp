@@ -1,6 +1,7 @@
 // Non-LRM tests
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
 
 using namespace delta;
 
@@ -152,25 +153,6 @@ TEST(SourceText, ElabSeverityAllForms) {
   }
 }
 
-// ============================================================================
-// Test helpers
-// ============================================================================
-static Expr* MakeSysCall(Arena& arena, std::string_view name,
-                         std::vector<Expr*> args) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kSystemCall;
-  e->callee = name;
-  e->args = std::move(args);
-  return e;
-}
-
-static Expr* MakeIntLit(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
-
 static Expr* MakeStrLit(Arena& arena, std::string_view text) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kStringLiteral;
@@ -185,54 +167,47 @@ static Expr* MakeStrLit(Arena& arena, std::string_view text) {
   return e;
 }
 
-static Expr* MakeIdent(Arena& arena, std::string_view name) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIdentifier;
-  e->text = name;
-  return e;
-}
-
 // ============================================================================
 // §20.8.1 — $clog2
 // ============================================================================
 TEST(Section20, Clog2Zero) {
   SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$clog2", {MakeIntLit(f.arena, 0)});
+  auto* expr = MakeSysCall(f.arena, "$clog2", {MakeInt(f.arena, 0)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
 TEST(Section20, Clog2One) {
   SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$clog2", {MakeIntLit(f.arena, 1)});
+  auto* expr = MakeSysCall(f.arena, "$clog2", {MakeInt(f.arena, 1)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
 TEST(Section20, Clog2Two) {
   SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$clog2", {MakeIntLit(f.arena, 2)});
+  auto* expr = MakeSysCall(f.arena, "$clog2", {MakeInt(f.arena, 2)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
 TEST(Section20, Clog2Three) {
   SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$clog2", {MakeIntLit(f.arena, 3)});
+  auto* expr = MakeSysCall(f.arena, "$clog2", {MakeInt(f.arena, 3)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 2u);
 }
 
 TEST(Section20, Clog2PowerOf2) {
   SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$clog2", {MakeIntLit(f.arena, 256)});
+  auto* expr = MakeSysCall(f.arena, "$clog2", {MakeInt(f.arena, 256)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 8u);
 }
 
 TEST(Section20, Clog2NonPowerOf2) {
   SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$clog2", {MakeIntLit(f.arena, 257)});
+  auto* expr = MakeSysCall(f.arena, "$clog2", {MakeInt(f.arena, 257)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 9u);
 }
@@ -242,7 +217,7 @@ TEST(Section20, Clog2NonPowerOf2) {
 // ============================================================================
 TEST(Section20, BitsOf32BitValue) {
   SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$bits", {MakeIntLit(f.arena, 42)});
+  auto* expr = MakeSysCall(f.arena, "$bits", {MakeInt(f.arena, 42)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 32u);
 }
@@ -251,7 +226,7 @@ TEST(Section20, BitsOfVariable) {
   SimFixture f;
   auto* var = f.ctx.CreateVariable("wide_var", 64);
   var->value = MakeLogic4VecVal(f.arena, 64, 0);
-  auto* expr = MakeSysCall(f.arena, "$bits", {MakeIdent(f.arena, "wide_var")});
+  auto* expr = MakeSysCall(f.arena, "$bits", {MakeId(f.arena, "wide_var")});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 64u);
 }
@@ -261,14 +236,14 @@ TEST(Section20, BitsOfVariable) {
 // ============================================================================
 TEST(Section20, Unsigned) {
   SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$unsigned", {MakeIntLit(f.arena, 42)});
+  auto* expr = MakeSysCall(f.arena, "$unsigned", {MakeInt(f.arena, 42)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 42u);
 }
 
 TEST(Section20, Signed) {
   SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$signed", {MakeIntLit(f.arena, 42)});
+  auto* expr = MakeSysCall(f.arena, "$signed", {MakeInt(f.arena, 42)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 42u);
 }
@@ -278,14 +253,14 @@ TEST(Section20, Signed) {
 // ============================================================================
 TEST(Section20, CountonesZero) {
   SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$countones", {MakeIntLit(f.arena, 0)});
+  auto* expr = MakeSysCall(f.arena, "$countones", {MakeInt(f.arena, 0)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
 TEST(Section20, CountonesAllBits) {
   SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$countones", {MakeIntLit(f.arena, 0xFF)});
+  auto* expr = MakeSysCall(f.arena, "$countones", {MakeInt(f.arena, 0xFF)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 8u);
 }
@@ -293,56 +268,56 @@ TEST(Section20, CountonesAllBits) {
 TEST(Section20, CountonesSparse) {
   SimFixture f;
   auto* expr =
-      MakeSysCall(f.arena, "$countones", {MakeIntLit(f.arena, 0b10101)});
+      MakeSysCall(f.arena, "$countones", {MakeInt(f.arena, 0b10101)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 3u);
 }
 
 TEST(Section20, OnehotTrue) {
   SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$onehot", {MakeIntLit(f.arena, 4)});
+  auto* expr = MakeSysCall(f.arena, "$onehot", {MakeInt(f.arena, 4)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
 TEST(Section20, OnehotFalseZero) {
   SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$onehot", {MakeIntLit(f.arena, 0)});
+  auto* expr = MakeSysCall(f.arena, "$onehot", {MakeInt(f.arena, 0)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
 TEST(Section20, OnehotFalseMultiple) {
   SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$onehot", {MakeIntLit(f.arena, 3)});
+  auto* expr = MakeSysCall(f.arena, "$onehot", {MakeInt(f.arena, 3)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
 TEST(Section20, Onehot0True) {
   SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$onehot0", {MakeIntLit(f.arena, 0)});
+  auto* expr = MakeSysCall(f.arena, "$onehot0", {MakeInt(f.arena, 0)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
 TEST(Section20, Onehot0TrueOneBit) {
   SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$onehot0", {MakeIntLit(f.arena, 8)});
+  auto* expr = MakeSysCall(f.arena, "$onehot0", {MakeInt(f.arena, 8)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
 TEST(Section20, Onehot0FalseMultiple) {
   SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$onehot0", {MakeIntLit(f.arena, 3)});
+  auto* expr = MakeSysCall(f.arena, "$onehot0", {MakeInt(f.arena, 3)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
 TEST(Section20, IsunknownFalse) {
   SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$isunknown", {MakeIntLit(f.arena, 42)});
+  auto* expr = MakeSysCall(f.arena, "$isunknown", {MakeInt(f.arena, 42)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
@@ -351,7 +326,7 @@ TEST(Section20, IsunknownTrueXVar) {
   SimFixture f;
   // CreateVariable initializes to X (bval = all ones).
   f.ctx.CreateVariable("xvar", 8);
-  auto* expr = MakeSysCall(f.arena, "$isunknown", {MakeIdent(f.arena, "xvar")});
+  auto* expr = MakeSysCall(f.arena, "$isunknown", {MakeId(f.arena, "xvar")});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
@@ -392,7 +367,7 @@ TEST(Section20, ValuePlusargsFound) {
   dest_var->value = MakeLogic4VecVal(f.arena, 32, 0);
   auto* expr = MakeSysCall(
       f.arena, "$value$plusargs",
-      {MakeStrLit(f.arena, "DEPTH=%d"), MakeIdent(f.arena, "depth")});
+      {MakeStrLit(f.arena, "DEPTH=%d"), MakeId(f.arena, "depth")});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
   EXPECT_EQ(dest_var->value.ToUint64(), 42u);
@@ -404,7 +379,7 @@ TEST(Section20, ValuePlusargsNotFound) {
   dest_var->value = MakeLogic4VecVal(f.arena, 32, 0);
   auto* expr = MakeSysCall(
       f.arena, "$value$plusargs",
-      {MakeStrLit(f.arena, "DEPTH=%d"), MakeIdent(f.arena, "depth")});
+      {MakeStrLit(f.arena, "DEPTH=%d"), MakeId(f.arena, "depth")});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
@@ -414,7 +389,7 @@ TEST(Section20, ValuePlusargsNotFound) {
 // ============================================================================
 TEST(Section20, Typename) {
   SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$typename", {MakeIntLit(f.arena, 0)});
+  auto* expr = MakeSysCall(f.arena, "$typename", {MakeInt(f.arena, 0)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   // Returns a string-encoded result; just verify it doesn't crash and
   // returns a non-zero width.
@@ -428,7 +403,7 @@ TEST(Section20, SformatfBasic) {
   SimFixture f;
   auto* expr =
       MakeSysCall(f.arena, "$sformatf",
-                  {MakeStrLit(f.arena, "val=%d"), MakeIntLit(f.arena, 42)});
+                  {MakeStrLit(f.arena, "val=%d"), MakeInt(f.arena, 42)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   // $sformatf returns a string as a Logic4Vec; the width should be
   // text.size()*8. "val=42" is 6 chars = 48 bits.
@@ -453,7 +428,7 @@ TEST(Section21, FopenFclose) {
   EXPECT_NE(fd_val.ToUint64(), 0u);
 
   auto* close_expr =
-      MakeSysCall(f.arena, "$fclose", {MakeIntLit(f.arena, fd_val.ToUint64())});
+      MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, fd_val.ToUint64())});
   EvalExpr(close_expr, f.ctx, f.arena);
 
   std::remove(tmp_path.c_str());
@@ -481,14 +456,14 @@ TEST(Section21, FdisplayToFile) {
   auto fd_val = EvalExpr(open_expr, f.ctx, f.arena);
   EXPECT_NE(fd_val.ToUint64(), 0u);
 
-  auto* fd_lit = MakeIntLit(f.arena, fd_val.ToUint64());
+  auto* fd_lit = MakeInt(f.arena, fd_val.ToUint64());
   auto* disp_expr = MakeSysCall(
       f.arena, "$fdisplay",
-      {fd_lit, MakeStrLit(f.arena, "value=%d"), MakeIntLit(f.arena, 99)});
+      {fd_lit, MakeStrLit(f.arena, "value=%d"), MakeInt(f.arena, 99)});
   EvalExpr(disp_expr, f.ctx, f.arena);
 
   auto* close_expr =
-      MakeSysCall(f.arena, "$fclose", {MakeIntLit(f.arena, fd_val.ToUint64())});
+      MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, fd_val.ToUint64())});
   EvalExpr(close_expr, f.ctx, f.arena);
 
   // Read back and verify.
@@ -518,7 +493,7 @@ TEST(Section21, ReadmemhBasic) {
 
   auto* expr = MakeSysCall(
       f.arena, "$readmemh",
-      {MakeStrLit(f.arena, tmp_path.c_str()), MakeIdent(f.arena, "mem")});
+      {MakeStrLit(f.arena, tmp_path.c_str()), MakeId(f.arena, "mem")});
   EvalExpr(expr, f.ctx, f.arena);
 
   // The first value (0x0A = 10) should be in mem[0] = "mem".
@@ -541,7 +516,7 @@ TEST(Section21, ReadmembBasic) {
 
   auto* expr = MakeSysCall(
       f.arena, "$readmemb",
-      {MakeStrLit(f.arena, tmp_path.c_str()), MakeIdent(f.arena, "bmem")});
+      {MakeStrLit(f.arena, tmp_path.c_str()), MakeId(f.arena, "bmem")});
   EvalExpr(expr, f.ctx, f.arena);
 
   // First value: 1010 binary = 10 decimal.
@@ -562,7 +537,7 @@ TEST(Section21, WritememhBasic) {
 
   auto* expr = MakeSysCall(
       f.arena, "$writememh",
-      {MakeStrLit(f.arena, tmp_path.c_str()), MakeIdent(f.arena, "wmem")});
+      {MakeStrLit(f.arena, tmp_path.c_str()), MakeId(f.arena, "wmem")});
   EvalExpr(expr, f.ctx, f.arena);
 
   std::ifstream ifs(tmp_path);
@@ -584,7 +559,7 @@ TEST(Section21, WritemembBasic) {
 
   auto* expr = MakeSysCall(
       f.arena, "$writememb",
-      {MakeStrLit(f.arena, tmp_path.c_str()), MakeIdent(f.arena, "wbmem")});
+      {MakeStrLit(f.arena, tmp_path.c_str()), MakeId(f.arena, "wbmem")});
   EvalExpr(expr, f.ctx, f.arena);
 
   std::ifstream ifs(tmp_path);
@@ -607,7 +582,7 @@ TEST(Section21, SscanfDecimal) {
   auto* expr =
       MakeSysCall(f.arena, "$sscanf",
                   {MakeStrLit(f.arena, "42"), MakeStrLit(f.arena, "%d"),
-                   MakeIdent(f.arena, "scanned")});
+                   MakeId(f.arena, "scanned")});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);  // 1 item scanned
   EXPECT_EQ(dest->value.ToUint64(), 42u);
@@ -631,20 +606,20 @@ TEST(Section21, Rewind) {
   ASSERT_NE(fd, 0u);
 
   // Read first char.
-  auto* getc1 = MakeSysCall(f.arena, "$fgetc", {MakeIntLit(f.arena, fd)});
+  auto* getc1 = MakeSysCall(f.arena, "$fgetc", {MakeInt(f.arena, fd)});
   auto ch1 = EvalExpr(getc1, f.ctx, f.arena);
   EXPECT_EQ(ch1.ToUint64(), static_cast<uint64_t>('A'));
 
   // Rewind.
-  auto* rw = MakeSysCall(f.arena, "$rewind", {MakeIntLit(f.arena, fd)});
+  auto* rw = MakeSysCall(f.arena, "$rewind", {MakeInt(f.arena, fd)});
   EvalExpr(rw, f.ctx, f.arena);
 
   // Read first char again — should be 'A' after rewind.
-  auto* getc2 = MakeSysCall(f.arena, "$fgetc", {MakeIntLit(f.arena, fd)});
+  auto* getc2 = MakeSysCall(f.arena, "$fgetc", {MakeInt(f.arena, fd)});
   auto ch2 = EvalExpr(getc2, f.ctx, f.arena);
   EXPECT_EQ(ch2.ToUint64(), static_cast<uint64_t>('A'));
 
-  auto* close_expr = MakeSysCall(f.arena, "$fclose", {MakeIntLit(f.arena, fd)});
+  auto* close_expr = MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, fd)});
   EvalExpr(close_expr, f.ctx, f.arena);
   std::remove(tmp_path.c_str());
 }
@@ -668,20 +643,20 @@ TEST(Section21, Ungetc) {
 
   // Push back 'Z'.
   auto* ug = MakeSysCall(f.arena, "$ungetc",
-                         {MakeIntLit(f.arena, 'Z'), MakeIntLit(f.arena, fd)});
+                         {MakeInt(f.arena, 'Z'), MakeInt(f.arena, fd)});
   EvalExpr(ug, f.ctx, f.arena);
 
   // Next read should return 'Z'.
-  auto* getc1 = MakeSysCall(f.arena, "$fgetc", {MakeIntLit(f.arena, fd)});
+  auto* getc1 = MakeSysCall(f.arena, "$fgetc", {MakeInt(f.arena, fd)});
   auto ch1 = EvalExpr(getc1, f.ctx, f.arena);
   EXPECT_EQ(ch1.ToUint64(), static_cast<uint64_t>('Z'));
 
   // Then 'X' (the original first char).
-  auto* getc2 = MakeSysCall(f.arena, "$fgetc", {MakeIntLit(f.arena, fd)});
+  auto* getc2 = MakeSysCall(f.arena, "$fgetc", {MakeInt(f.arena, fd)});
   auto ch2 = EvalExpr(getc2, f.ctx, f.arena);
   EXPECT_EQ(ch2.ToUint64(), static_cast<uint64_t>('X'));
 
-  auto* close_expr = MakeSysCall(f.arena, "$fclose", {MakeIntLit(f.arena, fd)});
+  auto* close_expr = MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, fd)});
   EvalExpr(close_expr, f.ctx, f.arena);
   std::remove(tmp_path.c_str());
 }

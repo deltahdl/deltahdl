@@ -1,6 +1,7 @@
 // Non-LRM tests
 
 #include "fixture_simulator.h"
+#include "helpers_eval_op.h"
 
 using namespace delta;
 
@@ -584,13 +585,6 @@ TEST(SimA83, InsideRangeMatch) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
-}
-
-static double ToDouble(const Variable* var) {
-  uint64_t bits = var->value.ToUint64();
-  double d = 0.0;
-  std::memcpy(&d, &bits, sizeof(double));
-  return d;
 }
 
 // § decimal_number — [size] decimal_base x_digit (all x)

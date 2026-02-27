@@ -1,6 +1,5 @@
 // §12.5.2: Constant expression in case statement
 
-
 #include <cstdint>
 #include <string_view>
 
@@ -14,33 +13,17 @@
 #include "simulation/variable.h"
 
 #include "fixture_simulator.h"
+#include "builders_ast.h"
 
 using namespace delta;
-
-// Helper fixture providing scheduler, arena, diag, and sim context.
-// Helper to create a simple identifier expression.
-Expr* MakeIdent(Arena& arena, std::string_view name) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIdentifier;
-  e->text = name;
-  return e;
-}
-
-// Helper to create an integer literal expression.
-Expr* MakeIntLit(Arena& arena, uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->int_val = val;
-  return e;
-}
 
 // Helper to create a blocking assignment statement: lhs = rhs_val.
 Stmt* MakeBlockAssign(Arena& arena, std::string_view lhs_name,
                       uint64_t rhs_val) {
   auto* s = arena.Create<Stmt>();
   s->kind = StmtKind::kBlockingAssign;
-  s->lhs = MakeIdent(arena, lhs_name);
-  s->rhs = MakeIntLit(arena, rhs_val);
+  s->lhs = MakeId(arena, lhs_name);
+  s->rhs = MakeInt(arena, rhs_val);
   return s;
 }
 
@@ -76,10 +59,10 @@ TEST(StmtExec, CaseInsideExactMatch) {
   stmt->kind = StmtKind::kCase;
   stmt->case_kind = TokenKind::kKwCase;
   stmt->case_inside = true;
-  stmt->condition = MakeIntLit(f.arena, 5);
+  stmt->condition = MakeInt(f.arena, 5);
 
   CaseItem item1;
-  item1.patterns.push_back(MakeIntLit(f.arena, 5));
+  item1.patterns.push_back(MakeInt(f.arena, 5));
   item1.body = MakeBlockAssign(f.arena, "ci", 100);
   stmt->case_items.push_back(item1);
 
@@ -101,10 +84,10 @@ TEST(StmtExec, CaseInsideNoMatchDefault) {
   stmt->kind = StmtKind::kCase;
   stmt->case_kind = TokenKind::kKwCase;
   stmt->case_inside = true;
-  stmt->condition = MakeIntLit(f.arena, 99);
+  stmt->condition = MakeInt(f.arena, 99);
 
   CaseItem item1;
-  item1.patterns.push_back(MakeIntLit(f.arena, 5));
+  item1.patterns.push_back(MakeInt(f.arena, 5));
   item1.body = MakeBlockAssign(f.arena, "cid", 100);
   stmt->case_items.push_back(item1);
 
