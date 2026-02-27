@@ -33,34 +33,13 @@ TEST(ParserClause03, Cl3_8_FunctionReturnAndVoidAndDirections) {
   EXPECT_EQ(compute->func_args[3].direction, Direction::kRef);
 }
 
-struct ParseResult309 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult309 Parse(const std::string& src) {
-  ParseResult309 result;
-  DiagEngine diag(result.mgr);
-  auto fid = result.mgr.AddFile("<test>", src);
-  Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.Preprocess(fid);
-  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 // =============================================================================
 // LRM §3.9 — Packages
 // =============================================================================
 // §3.9: "Packages provide a declaration space, which can be shared by other
 //        building blocks." Package with typedef, functions, and end label.
 TEST(ParserClause03, Cl3_9_PackageDeclarationsAndEndLabel) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "package ComplexPkg;\n"
       "  typedef struct { shortreal i, r; } Complex;\n"
       "  function automatic int helper(int x); return x; endfunction\n"
@@ -78,7 +57,7 @@ TEST(ParserClause03, Cl3_9_PackageDeclarationsAndEndLabel) {
 // §3.9: "Package declarations can be imported into other building blocks,
 //        including other packages."
 TEST(ParserClause03, Cl3_9_ImportIntoModuleAndPackage) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "package A; typedef int myint; endpackage\n"
       "package B; import A::*; endpackage\n"
       "module m; import A::myint; endmodule\n");
@@ -90,27 +69,6 @@ TEST(ParserClause03, Cl3_9_ImportIntoModuleAndPackage) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-struct ParseResult310 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult310 Parse(const std::string& src) {
-  ParseResult310 result;
-  DiagEngine diag(result.mgr);
-  auto fid = result.mgr.AddFile("<test>", src);
-  Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.Preprocess(fid);
-  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 // =============================================================================
 // LRM §3.10 — Configurations
 // =============================================================================
@@ -118,7 +76,7 @@ static ParseResult310 Parse(const std::string& src) {
 //         which specify the binding information of module instances to specific
 //         SystemVerilog source code. Configurations utilize libraries."
 TEST(ParserClause03, Cl3_10_ConfigBindingAndLibraries) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "config cfg1;\n"
       "  design work.top;\n"
       "  default liblist work;\n"
@@ -149,28 +107,7 @@ TEST(ParserClause03, Cl3_10_ConfigBindingAndLibraries) {
   ASSERT_EQ(r2->liblist.size(), 2u);
 }
 
-struct ParseResult311 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult311 Parse(const std::string& src) {
-  ParseResult311 result;
-  DiagEngine diag(result.mgr);
-  auto fid = result.mgr.AddFile("<test>", src);
-  Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.Preprocess(fid);
-  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static ModuleItem* FindItemByKind(ParseResult311& r, ModuleItemKind kind) {
+static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
   for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == kind) return item;
   }
@@ -182,7 +119,7 @@ static ModuleItem* FindItemByKind(ParseResult311& r, ModuleItemKind kind) {
 // =============================================================================
 // §3.11 Hierarchy through instantiation, primitives as leaves, multiple tops
 TEST(ParserClause03, Cl3_11_HierarchyAndInstantiation) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module top;\n"
       "  logic in1, in2, sel;\n"
       "  wire out1;\n"
@@ -211,27 +148,6 @@ TEST(ParserClause03, Cl3_11_HierarchyAndInstantiation) {
       CountItemsByKind(r.cu->modules[1]->items, ModuleItemKind::kGateInst), 4);
 }
 
-struct ParseResult312 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult312 Parse(const std::string& src) {
-  ParseResult312 result;
-  DiagEngine diag(result.mgr);
-  auto fid = result.mgr.AddFile("<test>", src);
-  Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.Preprocess(fid);
-  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 static const ModuleItem* FindInstByModule(const std::vector<ModuleItem*>& items,
                                           const std::string& module_name) {
   for (const auto* item : items)
@@ -246,7 +162,7 @@ static const ModuleItem* FindInstByModule(const std::vector<ModuleItem*>& items,
 // =============================================================================
 // §3.12 Compilation and elaboration with parameterized instantiation
 TEST(ParserClause03, Cl3_12_CompilationAndElaboration) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "package pkg; typedef logic [7:0] byte_t; endpackage\n"
       "module adder #(parameter W = 8) (\n"
       "    input [W-1:0] a, b, output [W-1:0] s);\n"
@@ -271,27 +187,6 @@ TEST(ParserClause03, Cl3_12_CompilationAndElaboration) {
   EXPECT_EQ(inst->inst_ports.size(), 3u);
 }
 
-struct ParseResult31201 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult31201 Parse(const std::string& src) {
-  ParseResult31201 result;
-  DiagEngine diag(result.mgr);
-  auto fid = result.mgr.AddFile("<test>", src);
-  Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.Preprocess(fid);
-  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 static const ModuleItem* FindItemByKindAndName(
     const std::vector<ModuleItem*>& items, ModuleItemKind kind,
     const std::string& name) {
@@ -306,7 +201,7 @@ static const ModuleItem* FindItemByKindAndName(
 // 1. Compilation unit definition: a collection of source files compiled
 // together.  A single Parse() call produces one CompilationUnit.
 TEST(ParserClause03, Cl3_12_1_CompilationUnitDefinition) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module a; endmodule\n"
       "module b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -321,7 +216,7 @@ TEST(ParserClause03, Cl3_12_1_CompilationUnitDefinition) {
 // CU scope can contain anything valid in a package (§26.2) —
 // functions, tasks, typedefs, parameters, classes.
 TEST(ParserClause03, Cl3_12_1_CuScopeContainsPackageItems) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "function int helper(int x); return x + 1; endfunction\n"
       "task auto_task; endtask\n"
       "module m; endmodule\n");
@@ -337,7 +232,7 @@ TEST(ParserClause03, Cl3_12_1_CuScopeContainsPackageItems) {
 
 // 3. Bind constructs at CU scope (§23.11) — CU scope can also hold bind.
 TEST(ParserClause03, Cl3_12_1_CuScopeBindDirective) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module target; endmodule\n"
       "bind target target chk_inst();\n");
   ASSERT_NE(r.cu, nullptr);
@@ -353,7 +248,7 @@ TEST(ParserClause03, Cl3_12_1_IncludeBecomesPartOfCU) {
   // the preprocessor produces a single text blob from `define/`ifdef
   // which are CU-scoped directives.  If an `include were processed,
   // its content would appear in the same preprocessed output.
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "`define MY_CONST 42\n"
       "module m;\n"
       "  localparam C = `MY_CONST;\n"
@@ -368,7 +263,7 @@ TEST(ParserClause03, Cl3_12_1_IncludeBecomesPartOfCU) {
 // 5. Global visibility: modules, primitives, programs, interfaces, packages
 // are visible in all CUs.  Within a single CU, all are accessible.
 TEST(ParserClause03, Cl3_12_1_GloballyVisibleDesignElements) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "package pkg; endpackage\n"
       "interface intf; endinterface\n"
       "program prog; endprogram\n"
@@ -392,7 +287,7 @@ TEST(ParserClause03, Cl3_12_1_GloballyVisibleDesignElements) {
 
 // 6. CU scope can hold classes (valid in a package per §26.2).
 TEST(ParserClause03, Cl3_12_1_CuScopeClassDecl) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "class my_class;\n"
       "  int x;\n"
       "endclass\n"
@@ -408,7 +303,7 @@ TEST(ParserClause03, Cl3_12_1_CuScopeClassDecl) {
 TEST(ParserClause03, Cl3_12_1_NameResolutionOrder) {
   // A function at CU scope and a module that also declares 'helper'.
   // The parser accepts both — resolution is elaboration's job.
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "function int helper(int x); return x; endfunction\n"
       "module m;\n"
       "  function int helper(int x); return x * 2; endfunction\n"
@@ -443,7 +338,7 @@ TEST(ParserClause03, Cl3_12_1_ForwardRefSyntaxValid) {
 // works and that CU items remain separate from packages.
 TEST(ParserClause03, Cl3_12_1_CuScopeCannotBeImported) {
   // Normal package import works fine.
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "package pkg;\n"
       "  typedef int myint;\n"
       "endpackage\n"
@@ -461,7 +356,7 @@ TEST(ParserClause03, Cl3_12_1_CuScopeCannotBeImported) {
 // Hierarchical names start from $root (§23.3.1), not from CU scope.
 // Verify that a hierarchical reference in a module parses correctly.
 TEST(ParserClause03, Cl3_12_1_HierRefFromCUScope) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module top;\n"
       "  module_a u1();\n"
       "endmodule\n"
@@ -479,7 +374,7 @@ TEST(ParserClause03, Cl3_12_1_HierRefFromCUScope) {
 // in current implementation) or could be a class.  Verify CU-scope
 // classes enable type sharing.
 TEST(ParserClause03, Cl3_12_1_TypeSharingViaCUScope) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "class shared_type;\n"
       "  int value;\n"
       "endclass\n"
@@ -497,7 +392,7 @@ TEST(ParserClause03, Cl3_12_1_TypeSharingViaCUScope) {
 
 // 15. Config declarations at top level (part of CU).
 TEST(ParserClause03, Cl3_12_1_ConfigAtCUScope) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module lib_mod; endmodule\n"
       "config my_cfg;\n"
       "  design lib_mod;\n"
@@ -511,7 +406,7 @@ TEST(ParserClause03, Cl3_12_1_ConfigAtCUScope) {
 
 // 16. Checker declarations at CU scope.
 TEST(ParserClause03, Cl3_12_1_CheckerAtCUScope) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "checker my_chk;\n"
       "endchecker\n"
       "module m; endmodule\n");
@@ -525,31 +420,10 @@ TEST(ParserClause03, Cl3_12_1_CheckerAtCUScope) {
 // =============================================================================
 // Empty source text.
 TEST(SourceText, EmptySourceText) {
-  auto r = Parse("");
+  auto r = ParseWithPreprocessor("");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(r.cu->modules.empty());
-}
-
-struct ParseResult313 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult313 Parse(const std::string& src) {
-  ParseResult313 result;
-  DiagEngine diag(result.mgr);
-  auto fid = result.mgr.AddFile("<test>", src);
-  Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.Preprocess(fid);
-  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
 }
 
 static bool HasItemOfKindAndName(const std::vector<ModuleItem*>& items,
@@ -572,7 +446,7 @@ static bool HasAttrNamed(const std::vector<ModuleItem*>& items,
 // =============================================================================
 // 1. Module and package in definition name space (can coexist without conflict)
 TEST(ParserClause03, Cl3_13_ModuleAndPackageInDefinitionNameSpace) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "package my_pkg;\n"
       "  typedef int myint;\n"
       "endpackage\n"
@@ -588,7 +462,7 @@ TEST(ParserClause03, Cl3_13_ModuleAndPackageInDefinitionNameSpace) {
 
 // 2. Same-name variables in different modules (separate scopes)
 TEST(ParserClause03, Cl3_13_SameNameVarsInDifferentModules) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module a;\n"
       "  logic [7:0] data;\n"
       "endmodule\n"
@@ -607,7 +481,7 @@ TEST(ParserClause03, Cl3_13_SameNameVarsInDifferentModules) {
 
 // 6. Task and function names in same module scope
 TEST(ParserClause03, Cl3_13_TaskAndFunctionInSameModule) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  function int add(int a, int b);\n"
       "    return a + b;\n"
@@ -642,7 +516,7 @@ TEST(ParserClause03, Cl3_13_VarNameSameAsModuleName) {
 
 // 18. $unit scope -- declarations outside any module/package
 TEST(ParserClause03, Cl3_13_UnitScopeDeclarations) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "function automatic int helper(int x);\n"
       "  return x + 1;\n"
       "endfunction\n"
@@ -662,7 +536,7 @@ TEST(ParserClause03, Cl3_13_UnitScopeDeclarations) {
 
 // 33. All 8 name spaces coexist in a single compilation unit
 TEST(ParserClause03, Cl3_13_AllEightNameSpaces) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       // (d) Text macro name space
       "`define VAL 1\n"
       // (b) Package name space
@@ -699,7 +573,7 @@ TEST(ParserClause03, Cl3_13_AllEightNameSpaces) {
 
 // package_item: timeunits_declaration (footnote 3)
 TEST(SourceText, PackageItemTimeunitsDecl) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "package pkg;\n"
       "  timeunit 1ns;\n"
       "  timeprecision 1ps;\n"
@@ -713,13 +587,13 @@ TEST(SourceText, PackageItemTimeunitsDecl) {
 // LRM §3.14 — Simulation time units and precision
 // =============================================================================
 TEST(ParserClause03, Cl3_14_TimeunitsAndTimescale) {
-  auto r1 = Parse("module m; timeunit 1ns; endmodule\n");
+  auto r1 = ParseWithPreprocessor("module m; timeunit 1ns; endmodule\n");
   EXPECT_FALSE(r1.has_errors);
   EXPECT_TRUE(r1.cu->modules[0]->has_timeunit);
-  auto r2 = Parse("module m; timeprecision 1ps; endmodule\n");
+  auto r2 = ParseWithPreprocessor("module m; timeprecision 1ps; endmodule\n");
   EXPECT_FALSE(r2.has_errors);
   EXPECT_TRUE(r2.cu->modules[0]->has_timeprecision);
-  auto r3 = Parse("module m; timeunit 1ns; timeprecision 1ps; endmodule\n");
+  auto r3 = ParseWithPreprocessor("module m; timeunit 1ns; timeprecision 1ps; endmodule\n");
   EXPECT_FALSE(r3.has_errors);
   EXPECT_TRUE(r3.cu->modules[0]->has_timeunit);
   EXPECT_TRUE(r3.cu->modules[0]->has_timeprecision);
@@ -815,7 +689,7 @@ TEST(ParserClause03, Cl3_14_PrecisionAtLeastAsPreciseAsUnit) {
 // 13. Time values stored in design element: module with timeunit and
 // timeprecision stores both components.
 TEST(ParserClause03, Cl3_14_TimeValuesInDesignElement) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  timeunit 1ns;\n"
       "  timeprecision 1ps;\n"
@@ -834,7 +708,7 @@ TEST(ParserClause03, Cl3_14_TimeValuesInDesignElement) {
 // §3.14: Timeunit/timeprecision parsing
 // ===========================================================================
 TEST(Lexical, Timeunit_BasicParse) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module top;\n"
       "  timeunit 1ns;\n"
       "endmodule\n");
@@ -845,7 +719,7 @@ TEST(Lexical, Timeunit_BasicParse) {
 }
 
 TEST(Lexical, Timeprecision_BasicParse) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module top;\n"
       "  timeprecision 1ps;\n"
       "endmodule\n");
@@ -855,7 +729,7 @@ TEST(Lexical, Timeprecision_BasicParse) {
 
 TEST(Lexical, Timeunit_WithSlash) {
   // timeunit 1ns / 1ps;  (combined form)
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module top;\n"
       "  timeunit 1ns / 1ps;\n"
       "endmodule\n");
@@ -865,7 +739,7 @@ TEST(Lexical, Timeunit_WithSlash) {
 
 TEST(Lexical, Timeunit_DifferentValues) {
   // Various time unit values
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module top;\n"
       "  timeunit 100us;\n"
       "  timeprecision 10ns;\n"
@@ -876,7 +750,7 @@ TEST(Lexical, Timeunit_DifferentValues) {
 
 TEST(Lexical, Timeunit_StoredInModuleDecl_Values) {
   // The timeunit/timeprecision values should be stored in ModuleDecl.
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module top;\n"
       "  timeunit 1ns;\n"
       "  timeprecision 1ps;\n"
@@ -889,7 +763,7 @@ TEST(Lexical, Timeunit_StoredInModuleDecl_Values) {
 }
 
 TEST(Lexical, Timeunit_StoredInModuleDecl_Flags) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module top;\n"
       "  timeunit 1ns;\n"
       "  timeprecision 1ps;\n"

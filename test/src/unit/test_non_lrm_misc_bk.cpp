@@ -66,33 +66,11 @@ TEST(ParserSection6, TypeCompatibilityAnonymousStruct) {
   // AB1 and AB2 should both be declared
   EXPECT_GE(r.cu->modules[0]->items.size(), 2u);
 }
-
-struct ParseResult6c {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult6c Parse(const std::string& src) {
-  ParseResult6c result;
-  DiagEngine diag(result.mgr);
-  auto fid = result.mgr.AddFile("<test>", src);
-  Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.Preprocess(fid);
-  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 // =============================================================================
 // LRM section 6.10 -- Implicit declarations
 // =============================================================================
 TEST(ParserSection6, ImplicitNetInPortList) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m(a, b);\n"
       "  input a;\n"
       "  output b;\n"
@@ -104,7 +82,7 @@ TEST(ParserSection6, ImplicitNetInPortList) {
 }
 
 TEST(ParserSection6, ImplicitNetInContAssign) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  assign out = in1 & in2;\n"
       "endmodule\n");
@@ -113,7 +91,7 @@ TEST(ParserSection6, ImplicitNetInContAssign) {
 }
 
 TEST(ParserSection6, ImplicitNetInModuleInst) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  sub u1(.a(w1), .b(w2));\n"
       "endmodule\n");
@@ -122,7 +100,7 @@ TEST(ParserSection6, ImplicitNetInModuleInst) {
 }
 
 TEST(ParserSection6, DefaultNettypeAffectsImplicit) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "`default_nettype none\n"
       "module m;\n"
       "  wire w;\n"
@@ -132,7 +110,7 @@ TEST(ParserSection6, DefaultNettypeAffectsImplicit) {
 }
 
 TEST(ParserSection6, TypedefForwardClass) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "typedef class MyClass;\n"
       "class MyClass;\n"
       "  int x;\n"
@@ -143,7 +121,7 @@ TEST(ParserSection6, TypedefForwardClass) {
 }
 
 TEST(ParserSection6, TypedefForwardStruct) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  typedef struct my_struct;\n"
       "endmodule\n");
@@ -152,7 +130,7 @@ TEST(ParserSection6, TypedefForwardStruct) {
 }
 
 TEST(ParserSection6, TypedefUnion) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  typedef union { int i; real r; } num_t;\n"
       "endmodule\n");
@@ -164,7 +142,7 @@ TEST(ParserSection6, TypedefUnion) {
 // LRM section 6.20 -- Type operator
 // =============================================================================
 TEST(ParserSection6, TypeExprInCast) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  initial begin\n"
       "    int x;\n"
@@ -176,7 +154,7 @@ TEST(ParserSection6, TypeExprInCast) {
 }
 
 TEST(ParserSection6, TypeRefInBitsCast) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  initial begin\n"
       "    int x;\n"
@@ -188,7 +166,7 @@ TEST(ParserSection6, TypeRefInBitsCast) {
 }
 
 TEST(ParserSection6, TypeOperatorTypeOf) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  int a;\n"
       "  initial begin\n"
@@ -203,7 +181,7 @@ TEST(ParserSection6, TypeOperatorTypeOf) {
 // LRM section 6.22.2 -- Compatible types
 // =============================================================================
 TEST(ParserSection6, CompatibleTypesParseLogicVectors) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  logic [7:0] a;\n"
       "  logic [7:0] b;\n"
@@ -214,7 +192,7 @@ TEST(ParserSection6, CompatibleTypesParseLogicVectors) {
 }
 
 TEST(ParserSection6, CompatibleTypesIntToLogic) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  int a;\n"
       "  logic [31:0] b;\n"
@@ -225,7 +203,7 @@ TEST(ParserSection6, CompatibleTypesIntToLogic) {
 }
 
 TEST(ParserSection6, CompatibleTypesNamedType) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  typedef logic [7:0] byte_t;\n"
       "  byte_t a;\n"
@@ -240,7 +218,7 @@ TEST(ParserSection6, CompatibleTypesNamedType) {
 // LRM section 6.22.3 -- Assignment compatible types
 // =============================================================================
 TEST(ParserSection6, AssignCompatibleIntToReal) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  real r;\n"
       "  initial r = 42;\n"
@@ -250,7 +228,7 @@ TEST(ParserSection6, AssignCompatibleIntToReal) {
 }
 
 TEST(ParserSection6, AssignCompatibleRealToInt) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  int x;\n"
       "  initial x = 3.14;\n"
@@ -260,7 +238,7 @@ TEST(ParserSection6, AssignCompatibleRealToInt) {
 }
 
 TEST(ParserSection6, AssignCompatibleStringLiteral) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  string s;\n"
       "  initial s = \"hello\";\n"
@@ -268,33 +246,13 @@ TEST(ParserSection6, AssignCompatibleStringLiteral) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-
-struct ParseResult6d {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult6d Parse(const std::string& src) {
-  ParseResult6d result;
-  DiagEngine diag(result.mgr);
-  auto fid = result.mgr.AddFile("<test>", src);
-  Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.Preprocess(fid);
-  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult6d& r) {
+static ModuleItem* FirstItem(ParseResult& r) {
   if (!r.cu || r.cu->modules.empty()) return nullptr;
   auto& items = r.cu->modules[0]->items;
   return items.empty() ? nullptr : items[0];
 }
 
-static Stmt* FirstInitialStmt(ParseResult6d& r) {
+static Stmt* FirstInitialStmt(ParseResult& r) {
   for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kInitialBlock) {
       if (item->body && item->body->kind == StmtKind::kBlock) {
@@ -311,7 +269,7 @@ static Stmt* FirstInitialStmt(ParseResult6d& r) {
 // =========================================================================
 TEST(ParserSection6, ValueSet_4StateLogicDecl) {
   // §6.3: logic is the basic 4-state data type.
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module t;\n"
       "  logic [3:0] val;\n"
       "endmodule\n");
@@ -324,7 +282,7 @@ TEST(ParserSection6, ValueSet_4StateLogicDecl) {
 
 TEST(ParserSection6, ValueSet_2StateBitDecl) {
   // §6.3: bit is a 2-state type (only 0 and 1).
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module t;\n"
       "  bit [7:0] val;\n"
       "endmodule\n");
@@ -340,7 +298,7 @@ TEST(ParserSection6, ValueSet_2StateBitDecl) {
 // =========================================================================
 TEST(ParserSection6, InterconnectDeclFlag) {
   // §6.6.8: interconnect declares a typeless generic net.
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module t;\n"
       "  interconnect ibus;\n"
       "endmodule\n");
@@ -380,7 +338,7 @@ TEST(ParserSection6, VarKeywordImplicitType) {
 
 TEST(ParserSection6, VarBareNoType) {
   // §6.8: "var v;" — no type at all implies logic.
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module t;\n"
       "  var v;\n"
       "endmodule\n");
@@ -408,7 +366,7 @@ TEST(ParserSection6, VarRegDecl) {
 
 TEST(ParserSection6, VarWithInitializer) {
   // §6.8: Variable with initializer "int i = 0;"
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module t;\n"
       "  int i = 0;\n"
       "endmodule\n");
@@ -422,7 +380,7 @@ TEST(ParserSection6, VarWithInitializer) {
 
 TEST(ParserSection6, MultipleVarDeclsSameStmt) {
   // §6.8: "shortint s1, s2[0:9];" — multiple instances in one decl.
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module t;\n"
       "  shortint s1, s2;\n"
       "endmodule\n");
@@ -454,7 +412,7 @@ TEST(ParserSection6, VarImplicitInPort) {
 // =========================================================================
 TEST(ParserSection6, VectorBigEndian) {
   // §6.9: Vector [msb:lsb] with msb > lsb (big-endian).
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module t;\n"
       "  logic [31:0] wide;\n"
       "endmodule\n");
@@ -469,7 +427,7 @@ TEST(ParserSection6, VectorBigEndian) {
 
 TEST(ParserSection6, VectorLittleEndian) {
   // §6.9: Vector [lsb:msb] with lsb < msb (little-endian).
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module t;\n"
       "  logic [0:7] le;\n"
       "endmodule\n");
@@ -487,7 +445,7 @@ TEST(ParserSection6, VectorLittleEndian) {
 // =========================================================================
 TEST(ParserSection6, DefaultNettypeWire) {
   // §6.10: Default nettype is wire; implicit nets are wire.
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "`default_nettype wire\n"
       "module t;\n"
       "  assign out = 1'b0;\n"
@@ -498,7 +456,7 @@ TEST(ParserSection6, DefaultNettypeWire) {
 
 TEST(ParserSection6, DefaultNettypeNone) {
   // §6.10: `default_nettype none disables implicit declarations.
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "`default_nettype none\n"
       "module t;\n"
       "  wire explicit_w;\n"
@@ -514,7 +472,7 @@ TEST(ParserSection6, DefaultNettypeNone) {
 // =========================================================================
 TEST(ParserSection6, AutomaticFunctionLocalVar) {
   // §6.11.1: Automatic function has automatic local variables.
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module t;\n"
       "  function automatic int factorial(int n);\n"
       "    if (n <= 1) return 1;\n"
@@ -530,7 +488,7 @@ TEST(ParserSection6, AutomaticFunctionLocalVar) {
 
 TEST(ParserSection6, AutomaticFunctionReturnType) {
   // §6.11.1: Function return type is an integral type.
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module t;\n"
       "  function automatic int get_value();\n"
       "    return 42;\n"
@@ -544,7 +502,7 @@ TEST(ParserSection6, AutomaticFunctionReturnType) {
 
 TEST(ParserSection6, ShortrealInit) {
   // §6.12: shortreal is a 32-bit IEEE float.
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module t;\n"
       "  shortreal sr = 1.5;\n"
       "endmodule\n");
@@ -560,7 +518,7 @@ TEST(ParserSection6, ShortrealInit) {
 // =========================================================================
 TEST(ParserSection6, StringDeclModule) {
   // §6.16: String data type is a dynamic ordered collection of characters.
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module t;\n"
       "  string name;\n"
       "endmodule\n");
@@ -573,7 +531,7 @@ TEST(ParserSection6, StringDeclModule) {
 
 TEST(ParserSection6, StringDeclWithInit) {
   // §6.16: String variable with initializer.
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module t;\n"
       "  string msg = \"hello\";\n"
       "endmodule\n");
@@ -589,7 +547,7 @@ TEST(ParserSection6, StringDeclWithInit) {
 // =========================================================================
 TEST(ParserSection6, TypedefLogicVector) {
   // §6.18: typedef creates a user-defined type from a built-in type.
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module t;\n"
       "  typedef logic [7:0] byte_t;\n"
       "endmodule\n");
@@ -602,7 +560,7 @@ TEST(ParserSection6, TypedefLogicVector) {
 
 TEST(ParserSection6, TypedefUsedInVarDecl) {
   // §6.18: A typedef-defined name appears as kNamed in subsequent decls.
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module t;\n"
       "  typedef int counter_t;\n"
       "  counter_t cnt;\n"
@@ -619,7 +577,7 @@ TEST(ParserSection6, TypedefUsedInVarDecl) {
 // =========================================================================
 TEST(ParserSection6, ParameterWithExplicitType) {
   // §6.20: parameter with explicit type.
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module t;\n"
       "  parameter int WIDTH = 8;\n"
       "endmodule\n");
@@ -663,7 +621,7 @@ TEST(ParserSection6, TypeParamDefaultLogicVector) {
 // =========================================================================
 TEST(ParserSection6, ModuleLifetimeStatic) {
   // §6.21: module with static (default) lifetime.
-  auto r = Parse("module static t; endmodule\n");
+  auto r = ParseWithPreprocessor("module static t; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
   EXPECT_EQ(r.cu->modules[0]->name, "t");
@@ -671,7 +629,7 @@ TEST(ParserSection6, ModuleLifetimeStatic) {
 
 TEST(ParserSection6, ProgramLifetimeAutomatic) {
   // §6.21: program blocks may be declared automatic.
-  auto r = Parse("program automatic test_prog; endprogram\n");
+  auto r = ParseWithPreprocessor("program automatic test_prog; endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->programs.size(), 1u);
   EXPECT_EQ(r.cu->programs[0]->name, "test_prog");
@@ -797,7 +755,7 @@ TEST(ParserSection6, TypeOpInParamDefault) {
 // =========================================================================
 TEST(ParserSection6, CastUnsigned) {
   // §6.24: unsigned'(expr) changes signedness.
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module t;\n"
       "  initial x = unsigned'(y);\n"
       "endmodule\n");
@@ -909,7 +867,7 @@ TEST(ParserSection6, ValueSet_IntIs2State) {
 // =========================================================================
 TEST(ParserSection6, ChandleInClass) {
   // §6.6.8: chandle used in a class for DPI handle.
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "class Wrapper;\n"
       "  chandle ptr;\n"
       "endclass\n");
@@ -933,7 +891,7 @@ TEST(ParserSection6, ChandleMultipleDecls) {
 // =========================================================================
 TEST(ParserSection6, VectorUnsignedExplicit) {
   // §6.9: Explicit unsigned qualifier on a vector.
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module t;\n"
       "  logic unsigned [7:0] uv;\n"
       "endmodule\n");
@@ -946,7 +904,7 @@ TEST(ParserSection6, VectorUnsignedExplicit) {
 
 TEST(ParserSection6, VectorSignedBitType) {
   // §6.9: bit type with signed qualifier.
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module t;\n"
       "  bit signed [15:0] sb;\n"
       "endmodule\n");

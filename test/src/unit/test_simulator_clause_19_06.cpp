@@ -7,6 +7,8 @@
 
 #include "simulation/coverage.h"
 
+#include "helpers_coverage.h"
+
 using namespace delta;
 
 namespace {
@@ -16,48 +18,14 @@ namespace {
 // =============================================================================
 TEST(Coverage, CrossCoverageCreation) {
   CoverageDB db;
-  auto* g = db.CreateGroup("cg");
-  CoverageDB::AddCoverPoint(g, "a");
-  CoverageDB::AddCoverPoint(g, "b");
-
-  CrossCover cross;
-  cross.name = "aXb";
-  cross.coverpoint_names = {"a", "b"};
-
-  CrossBin cb;
-  cb.name = "a0_b0";
-  cb.value_sets = {{0}, {0}};
-  cross.bins.push_back(cb);
-
-  cb.name = "a1_b1";
-  cb.value_sets = {{1}, {1}};
-  cross.bins.push_back(cb);
-
-  CoverageDB::AddCross(g, cross);
+  auto* g = SetupTwoPointCross(db);
   EXPECT_EQ(g->crosses.size(), 1u);
   EXPECT_EQ(g->crosses[0].bins.size(), 2u);
 }
 
 TEST(Coverage, CrossCoverageSampling) {
   CoverageDB db;
-  auto* g = db.CreateGroup("cg");
-  CoverageDB::AddCoverPoint(g, "a");
-  CoverageDB::AddCoverPoint(g, "b");
-
-  CrossCover cross;
-  cross.name = "aXb";
-  cross.coverpoint_names = {"a", "b"};
-
-  CrossBin cb;
-  cb.name = "a0_b0";
-  cb.value_sets = {{0}, {0}};
-  cross.bins.push_back(cb);
-
-  cb.name = "a1_b1";
-  cb.value_sets = {{1}, {1}};
-  cross.bins.push_back(cb);
-
-  CoverageDB::AddCross(g, cross);
+  auto* g = SetupTwoPointCross(db);
 
   db.Sample(g, {{"a", 0}, {"b", 0}});
   EXPECT_EQ(g->crosses[0].bins[0].hit_count, 1u);

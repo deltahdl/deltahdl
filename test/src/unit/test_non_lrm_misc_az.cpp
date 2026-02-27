@@ -491,34 +491,13 @@ TEST_F(AnnexHParseTest, AnnexOMultipleDpiDecls) {
   EXPECT_TRUE(items[3]->dpi_is_task);
 }
 
-struct ParseResult302 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult302 Parse(const std::string& src) {
-  ParseResult302 result;
-  DiagEngine diag(result.mgr);
-  auto fid = result.mgr.AddFile("<test>", src);
-  Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.Preprocess(fid);
-  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 // =============================================================================
 // LRM §3.2 — Design elements
 // =============================================================================
 TEST(ParserClause03, AllSevenDesignElements) {
   // §3.2: A design element is a module, program, interface, checker,
   //       package, primitive, or configuration.
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m; endmodule\n"
       "program p; endprogram\n"
       "interface ifc; endinterface\n"
@@ -558,7 +537,7 @@ TEST(ParserClause03, AllSevenDesignElements) {
 
 // Multiple descriptions in source text.
 TEST(SourceText, MultipleDescriptions) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m1; endmodule\n"
       "interface ifc; endinterface\n"
       "program prg; endprogram\n"
@@ -569,27 +548,6 @@ TEST(SourceText, MultipleDescriptions) {
   EXPECT_EQ(r.cu->interfaces.size(), 1u);
   EXPECT_EQ(r.cu->programs.size(), 1u);
   EXPECT_EQ(r.cu->packages.size(), 1u);
-}
-
-struct ParseResult304 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult304 Parse(const std::string& src) {
-  ParseResult304 result;
-  DiagEngine diag(result.mgr);
-  auto fid = result.mgr.AddFile("<test>", src);
-  Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.Preprocess(fid);
-  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
 }
 
 static bool HasItemOfKind(const std::vector<ModuleItem*>& items,
@@ -607,7 +565,7 @@ static bool HasItemOfKind(const std::vector<ModuleItem*>& items,
 //   initial begin ... end
 //   endprogram : test
 TEST(ParserClause03, Cl3_4_LrmExample) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "program test (input clk, input [16:1] addr, inout [7:0] data);\n"
       "  initial begin\n"
       "  end\n"
@@ -627,7 +585,7 @@ TEST(ParserClause03, Cl3_4_LrmExample) {
 
 // §3.4:
 TEST(ParserClause03, Cl3_4_DataAndClassDeclarations) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "program p;\n"
       "  logic [7:0] count;\n"
       "  int status;\n"
@@ -647,7 +605,7 @@ TEST(ParserClause03, Cl3_4_DataAndClassDeclarations) {
 // §3.4: "A program block can contain ... subroutine definitions ...
 //        initial ... final procedures"
 TEST(ParserClause03, Cl3_4_SubroutinesAndProcedures) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "program p;\n"
       "  function int get_val; return 42; endfunction\n"
       "  task run_test; endtask\n"
@@ -669,42 +627,25 @@ TEST(ParserClause03, Cl3_4_SubroutinesAndProcedures) {
 // §3.4:
 TEST(ParserClause03, Cl3_4_RejectsDisallowedItems) {
   EXPECT_TRUE(
-      Parse("program p; always @(*) begin end endprogram\n").has_errors);
-  EXPECT_TRUE(
-      Parse("program p; always_comb begin end endprogram\n").has_errors);
-  EXPECT_TRUE(
-      Parse("program p; always_ff @(posedge clk) begin end endprogram\n")
+      ParseWithPreprocessor("program p; always @(*) begin end endprogram\n")
           .has_errors);
   EXPECT_TRUE(
-      Parse("program p; always_latch begin end endprogram\n").has_errors);
-  EXPECT_TRUE(Parse("module c; endmodule\n"
-                    "program p; c i(); endprogram\n")
+      ParseWithPreprocessor("program p; always_comb begin end endprogram\n")
+          .has_errors);
+  EXPECT_TRUE(
+      ParseWithPreprocessor(
+          "program p; always_ff @(posedge clk) begin end endprogram\n")
+          .has_errors);
+  EXPECT_TRUE(
+      ParseWithPreprocessor("program p; always_latch begin end endprogram\n")
+          .has_errors);
+  EXPECT_TRUE(ParseWithPreprocessor("module c; endmodule\n"
+                                    "program p; c i(); endprogram\n")
                   .has_errors);
   // Interface and program instances hit the same instantiation path.
-  EXPECT_TRUE(Parse("interface ifc; endinterface\n"
-                    "program p; ifc i(); endprogram\n")
+  EXPECT_TRUE(ParseWithPreprocessor("interface ifc; endinterface\n"
+                                    "program p; ifc i(); endprogram\n")
                   .has_errors);
-}
-
-struct ParseResult305 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult305 Parse(const std::string& src) {
-  ParseResult305 result;
-  DiagEngine diag(result.mgr);
-  auto fid = result.mgr.AddFile("<test>", src);
-  Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.Preprocess(fid);
-  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
 }
 
 // =============================================================================
@@ -713,7 +654,7 @@ static ParseResult305 Parse(const std::string& src) {
 // §3.5 LRM example: simple_bus interface definition.
 // Also covers end label (endinterface : simple_bus) and interface port.
 TEST(ParserClause03, Cl3_5_LrmExample) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "interface simple_bus(input logic clk);\n"
       "  logic req, gnt;\n"
       "  logic [7:0] addr, data;\n"
@@ -732,7 +673,7 @@ TEST(ParserClause03, Cl3_5_LrmExample) {
 
 // §3.5:
 TEST(ParserClause03, Cl3_5_ParametersConstantsVariables) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "interface ifc #(parameter WIDTH = 8);\n"
       "  localparam DEPTH = 16;\n"
       "  logic [WIDTH-1:0] data;\n"
@@ -746,7 +687,7 @@ TEST(ParserClause03, Cl3_5_ParametersConstantsVariables) {
 
 // §3.5:
 TEST(ParserClause03, Cl3_5_FunctionsAndTasks) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "interface ifc;\n"
       "  function automatic int get_data;\n"
       "    return 42;\n"
@@ -765,7 +706,7 @@ TEST(ParserClause03, Cl3_5_FunctionsAndTasks) {
 // §3.5: "an interface can also contain processes (i.e., initial or always
 //        procedures) and continuous assignments"
 TEST(ParserClause03, Cl3_5_ProcessesAndContinuousAssign) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "interface ifc;\n"
       "  logic sig_a, sig_b;\n"
       "  initial sig_a = 0;\n"
@@ -784,7 +725,7 @@ TEST(ParserClause03, Cl3_5_ProcessesAndContinuousAssign) {
 
 // §3.5: "the modport construct is provided"
 TEST(ParserClause03, Cl3_5_Modport) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "interface myif;\n"
       "  logic [7:0] data;\n"
       "  logic valid, ready;\n"
@@ -799,34 +740,13 @@ TEST(ParserClause03, Cl3_5_Modport) {
   EXPECT_EQ(r.cu->interfaces[0]->modports[1]->name, "slave");
 }
 
-struct ParseResult306 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult306 Parse(const std::string& src) {
-  ParseResult306 result;
-  DiagEngine diag(result.mgr);
-  auto fid = result.mgr.AddFile("<test>", src);
-  Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.Preprocess(fid);
-  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 // =============================================================================
 // LRM §3.6 — Checkers
 // =============================================================================
 // §3.6: Checker encapsulates assertions (assert property, cover property,
 //        property/sequence declarations) — the primary purpose of checkers.
 TEST(ParserClause03, Cl3_6_AssertionsInChecker) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "checker req_ack_chk(logic clk, req, ack);\n"
       "  property req_followed_by_ack;\n"
       "    @(posedge clk) req |-> ##[1:3] ack;\n"
@@ -850,7 +770,7 @@ TEST(ParserClause03, Cl3_6_AssertionsInChecker) {
 // §3.6: Checker also encapsulates "modeling code" — variables, initial blocks,
 //        always blocks used alongside assertions for auxiliary verification.
 TEST(ParserClause03, Cl3_6_ModelingCodeInChecker) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "checker model_chk;\n"
       "  logic flag;\n"
       "  initial flag = 0;\n"
@@ -866,28 +786,7 @@ TEST(ParserClause03, Cl3_6_ModelingCodeInChecker) {
   EXPECT_GE(r.cu->checkers[0]->items.size(), 3u);  // var + initial + always
 }
 
-struct ParseResult308 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult308 Parse(const std::string& src) {
-  ParseResult308 result;
-  DiagEngine diag(result.mgr);
-  auto fid = result.mgr.AddFile("<test>", src);
-  Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.Preprocess(fid);
-  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static ModuleItem* FindItemByKind(ParseResult308& r, ModuleItemKind kind) {
+static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
   for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == kind) return item;
   }
@@ -917,7 +816,7 @@ static const ModuleItem* FindFunctionByName(
 //        input, output, inout, and ref arguments, but does not return a
 //        value. Tasks can block simulation time during execution."
 TEST(ParserClause03, Cl3_8_TaskAllDirectionsAndBlocking) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  task my_task(input int a, output int b, inout int c, ref int d);\n"
       "    #10;\n"

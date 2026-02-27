@@ -300,27 +300,6 @@ TEST(ParserClause03, Cl3_13_LabeledIfGenerateBlock) {
   EXPECT_TRUE(found_gen_if);
 }
 
-struct ParseResult307 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult307 Parse(const std::string& src) {
-  ParseResult307 result;
-  DiagEngine diag(result.mgr);
-  auto fid = result.mgr.AddFile("<test>", src);
-  Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.Preprocess(fid);
-  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 static bool HasGateOfKind(const std::vector<ModuleItem*>& items,
                           GateKind kind) {
   for (const auto* item : items)
@@ -335,7 +314,7 @@ static bool HasGateOfKind(const std::vector<ModuleItem*>& items,
 // §3.7:
 //       — logic gates and switches instantiated inside a module.
 TEST(ParserClause03, Cl3_7_BuiltInPrimitives) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module gate_test(input a, b, c, output w, x, y, z);\n"
       "  and g1(w, a, b);\n"
       "  nand g2(x, a, b, c);\n"
@@ -354,7 +333,7 @@ TEST(ParserClause03, Cl3_7_BuiltInPrimitives) {
 }
 
 TEST(ParserSection28, BasicAndGate) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  and g1(out, a, b);\n"
       "endmodule\n");
@@ -367,7 +346,7 @@ TEST(ParserSection28, BasicAndGate) {
 }
 
 TEST(ParserSection28, BasicOrGate) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  or (out, a, b, c);\n"
       "endmodule\n");
@@ -379,7 +358,7 @@ TEST(ParserSection28, BasicOrGate) {
 }
 
 TEST(ParserSection28, AllNInputGates) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  and (o, a, b);\n"
       "  nand (o, a, b);\n"
@@ -401,7 +380,7 @@ TEST(ParserSection28, AllNInputGates) {
 // --- Drive strength in gate instantiation context ---
 TEST(ParserA222, DriveStrengthGateInst) {
   // drive_strength used with gate instantiation
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire y, a, b;\n"
       "  and (supply0, supply1) g1(y, a, b);\n"
@@ -416,7 +395,7 @@ TEST(ParserA222, DriveStrengthGateInst) {
 }
 
 TEST(ParserSection28, BasicBufGate) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  buf b1(out, in);\n"
       "endmodule\n");
@@ -428,7 +407,7 @@ TEST(ParserSection28, BasicBufGate) {
 }
 
 TEST(ParserSection28, BasicNotGate) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  not n1(out, in);\n"
       "endmodule\n");
@@ -438,7 +417,7 @@ TEST(ParserSection28, BasicNotGate) {
 }
 
 TEST(ParserSection28, GateArrayRange) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  nand n[0:3](out, a, b);\n"
       "endmodule\n");
@@ -449,7 +428,7 @@ TEST(ParserSection28, GateArrayRange) {
 }
 
 TEST(ParserSection28, GateArrayWithDelay) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  and #5 g[0:7](out, a, b);\n"
       "endmodule\n");
@@ -480,7 +459,7 @@ static void VerifyStrengthDelayInstances(const std::vector<ModuleItem*>& items,
 }
 
 TEST(ParserSection28, MultipleInstances) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  and g1(a, b, c), g2(d, e, f);\n"
       "endmodule\n");
@@ -492,7 +471,7 @@ TEST(ParserSection28, MultipleInstances) {
 }
 
 TEST(ParserSection28, MultipleInstancesThree) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  nand n1(a, b, c), n2(d, e, f), n3(g, h, i);\n"
       "endmodule\n");
@@ -505,7 +484,7 @@ TEST(ParserSection28, MultipleInstancesThree) {
 }
 
 TEST(ParserSection28, MultipleInstancesNoNames) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  or (a, b, c), (d, e, f);\n"
       "endmodule\n");
@@ -517,7 +496,7 @@ TEST(ParserSection28, MultipleInstancesNoNames) {
 }
 
 TEST(ParserSection28, MultipleInstancesWithStrengthAndDelay) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  and (strong0, strong1) #5 g1(a, b, c), g2(d, e, f);\n"
       "endmodule\n");
@@ -528,7 +507,7 @@ TEST(ParserSection28, MultipleInstancesWithStrengthAndDelay) {
 }
 
 TEST(ParserSection28, StrengthWithDelay) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  and (strong0, strong1) #5 g1(out, a, b);\n"
       "endmodule\n");
@@ -541,7 +520,7 @@ TEST(ParserSection28, StrengthWithDelay) {
 }
 
 TEST(Parser, GateNoInstanceName) {
-  auto r = Parse("module t; and (out, a, b); endmodule");
+  auto r = ParseWithPreprocessor("module t; and (out, a, b); endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
@@ -688,7 +667,7 @@ TEST(ParserSection28, ElaboratePullupGate) {
 
 // --- Gate primitive tests ---
 TEST(Parser, GateAndInst) {
-  auto r = Parse("module t; and g1(out, a, b); endmodule");
+  auto r = ParseWithPreprocessor("module t; and g1(out, a, b); endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
@@ -698,7 +677,7 @@ TEST(Parser, GateAndInst) {
 }
 
 TEST(Parser, GateNandWithDelay) {
-  auto r = Parse("module t; nand #(5) g2(out, a, b); endmodule");
+  auto r = ParseWithPreprocessor("module t; nand #(5) g2(out, a, b); endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->gate_kind, GateKind::kNand);
@@ -708,7 +687,7 @@ TEST(Parser, GateNandWithDelay) {
 }
 
 TEST(ParserSection28, PassGateTran) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  tran (a, b);\n"
       "endmodule\n");
@@ -720,7 +699,7 @@ TEST(ParserSection28, PassGateTran) {
 }
 
 TEST(ParserSection28, MosSwitchNmos) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  nmos n1(out, data, control);\n"
       "endmodule\n");
@@ -732,7 +711,7 @@ TEST(ParserSection28, MosSwitchNmos) {
 }
 
 TEST(ParserSection28, CmosSwitchCmos) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  cmos c1(out, data, ncontrol, pcontrol);\n"
       "endmodule\n");
@@ -759,7 +738,7 @@ TEST(ParserSection28, ElaboratePulldownGate) {
 }
 
 TEST(Parser, GateBufMultiOutput) {
-  auto r = Parse("module t; buf (o1, o2, in); endmodule");
+  auto r = ParseWithPreprocessor("module t; buf (o1, o2, in); endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
@@ -769,7 +748,7 @@ TEST(Parser, GateBufMultiOutput) {
 }
 
 TEST(ParserSection28, EnableGates) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  bufif0 (out, in, en);\n"
       "  bufif1 (out, in, en);\n"
@@ -787,7 +766,7 @@ TEST(ParserSection28, EnableGates) {
 }
 
 TEST(Parser, GateBufif0) {
-  auto r = Parse("module t; bufif0 b1(out, in, en); endmodule");
+  auto r = ParseWithPreprocessor("module t; bufif0 b1(out, in, en); endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
@@ -796,7 +775,7 @@ TEST(Parser, GateBufif0) {
 }
 
 TEST(ParserSection28, PullGates) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  pullup (out);\n"
       "  pulldown (out);\n"
@@ -809,7 +788,7 @@ TEST(ParserSection28, PullGates) {
 }
 
 TEST(Parser, GateNmos) {
-  auto r = Parse("module t; nmos (out, in, ctrl); endmodule");
+  auto r = ParseWithPreprocessor("module t; nmos (out, in, ctrl); endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
@@ -818,7 +797,7 @@ TEST(Parser, GateNmos) {
 }
 
 TEST(ParserSection28, GateWithDelay) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  and #5 g1(out, a, b);\n"
       "endmodule\n");
@@ -830,7 +809,7 @@ TEST(ParserSection28, GateWithDelay) {
 }
 
 TEST(Parser, GateTran) {
-  auto r = Parse("module t; tran (a, b); endmodule");
+  auto r = ParseWithPreprocessor("module t; tran (a, b); endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
@@ -839,7 +818,7 @@ TEST(Parser, GateTran) {
 }
 
 TEST(ParserSection28, StrengthSpec) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  and (strong0, weak1) g1(out, a, b);\n"
       "endmodule\n");
@@ -852,7 +831,7 @@ TEST(ParserSection28, StrengthSpec) {
 }
 
 TEST(Parser, GateCmos) {
-  auto r = Parse("module t; cmos (out, in, nctrl, pctrl); endmodule");
+  auto r = ParseWithPreprocessor("module t; cmos (out, in, nctrl, pctrl); endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
@@ -861,7 +840,7 @@ TEST(Parser, GateCmos) {
 }
 
 TEST(ParserSection28, GateWithParenDelay) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  or #(10) g1(out, a, b);\n"
       "endmodule\n");
@@ -871,7 +850,7 @@ TEST(ParserSection28, GateWithParenDelay) {
 }
 
 TEST(ParserSection28, StrengthSpecSupply) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  nand (supply0, supply1) g1(out, a, b);\n"
       "endmodule\n");
@@ -882,7 +861,7 @@ TEST(ParserSection28, StrengthSpecSupply) {
 }
 
 TEST(ParserSection28, StrengthSpecHighz) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  or (highz0, pull1) g1(out, a, b);\n"
       "endmodule\n");
@@ -893,7 +872,7 @@ TEST(ParserSection28, StrengthSpecHighz) {
 }
 
 TEST(Parser, GatePullup) {
-  auto r = Parse("module t; pullup (o); endmodule");
+  auto r = ParseWithPreprocessor("module t; pullup (o); endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
@@ -902,7 +881,7 @@ TEST(Parser, GatePullup) {
 }
 
 TEST(ParserSection28, GateWithTwoDelays) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  and #(10, 12) a2(out, in1, in2);\n"
       "endmodule\n");
@@ -913,7 +892,7 @@ TEST(ParserSection28, GateWithTwoDelays) {
 }
 
 TEST(ParserSection28, GateWithThreeDelays) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  bufif0 #(10, 12, 11) b3(out, in, ctrl);\n"
       "endmodule\n");
@@ -924,7 +903,7 @@ TEST(ParserSection28, GateWithThreeDelays) {
 }
 
 TEST(ParserSection28, GateMinTypMaxDelay) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  bufif0 #(5:7:9, 8:10:12, 15:18:21) b1(io1, io2, dir);\n"
       "endmodule\n");
@@ -936,7 +915,7 @@ TEST(ParserSection28, GateMinTypMaxDelay) {
 
 // delay3: three values on gate (rise, fall, turn-off).
 TEST(ParserA223, Delay3GateThreeValues) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire y, a, b;\n"
       "  bufif1 #(10, 20, 30) g1(y, a, b);\n"

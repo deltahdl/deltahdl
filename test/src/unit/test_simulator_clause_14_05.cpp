@@ -31,19 +31,7 @@ TEST(ClockingSim, HierarchicalAccess) {
   data->value = MakeLogic4VecVal(f.arena, 8, 0xCC);
 
   ClockingManager cmgr;
-  ClockingBlock block;
-  block.name = "cb";
-  block.clock_signal = "clk";
-  block.clock_edge = Edge::kPosedge;
-  block.default_input_skew = SimTime{0};
-  block.default_output_skew = SimTime{0};
-
-  ClockingSignal sig;
-  sig.signal_name = "data_in";
-  sig.direction = ClockingDir::kInput;
-  block.signals.push_back(sig);
-  cmgr.Register(block);
-  cmgr.Attach(f.ctx, f.scheduler);
+  SetupClockingBlock(f, cmgr, "cb", Edge::kPosedge, {0}, {0}, "data_in", ClockingDir::kInput);
 
   SchedulePosedge(f, clk, 10);
   f.scheduler.Run();

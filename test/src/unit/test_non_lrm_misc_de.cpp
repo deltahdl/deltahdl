@@ -331,19 +331,7 @@ TEST(SimA611, OutputDrivingWithSkew) {
   out->value = MakeLogic4VecVal(f.arena, 8, 0);
 
   ClockingManager cmgr;
-  ClockingBlock block;
-  block.name = "cb";
-  block.clock_signal = "clk";
-  block.clock_edge = Edge::kPosedge;
-  block.default_input_skew = SimTime{0};
-  block.default_output_skew = SimTime{3};
-
-  ClockingSignal sig;
-  sig.signal_name = "data_out";
-  sig.direction = ClockingDir::kOutput;
-  block.signals.push_back(sig);
-  cmgr.Register(block);
-  cmgr.Attach(f.ctx, f.scheduler);
+  SetupClockingBlock(f, cmgr, "cb", Edge::kPosedge, {0}, SimTime{3}, "data_out", ClockingDir::kOutput);
 
   auto* ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [&cmgr, &f]() {

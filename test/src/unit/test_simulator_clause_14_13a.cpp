@@ -62,19 +62,7 @@ TEST(ClockingSim, SampledValueUpdatesOnEachEdge) {
   data->value = MakeLogic4VecVal(f.arena, 8, 0x11);
 
   ClockingManager cmgr;
-  ClockingBlock block;
-  block.name = "cb";
-  block.clock_signal = "clk";
-  block.clock_edge = Edge::kPosedge;
-  block.default_input_skew = SimTime{0};
-  block.default_output_skew = SimTime{0};
-
-  ClockingSignal sig;
-  sig.signal_name = "data";
-  sig.direction = ClockingDir::kInput;
-  block.signals.push_back(sig);
-  cmgr.Register(block);
-  cmgr.Attach(f.ctx, f.scheduler);
+  SetupClockingBlock(f, cmgr, "cb", Edge::kPosedge, {0}, {0}, "data", ClockingDir::kInput);
 
   // First posedge: data = 0x11
   auto* ev1 = f.scheduler.GetEventPool().Acquire();

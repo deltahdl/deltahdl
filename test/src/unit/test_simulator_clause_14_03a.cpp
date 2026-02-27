@@ -52,19 +52,7 @@ TEST(ClockingSim, NegedgeClockEvent) {
   data->value = MakeLogic4VecVal(f.arena, 8, 0xDD);
 
   ClockingManager cmgr;
-  ClockingBlock block;
-  block.name = "cb_neg";
-  block.clock_signal = "clk";
-  block.clock_edge = Edge::kNegedge;
-  block.default_input_skew = SimTime{0};
-  block.default_output_skew = SimTime{0};
-
-  ClockingSignal sig;
-  sig.signal_name = "neg_data";
-  sig.direction = ClockingDir::kInput;
-  block.signals.push_back(sig);
-  cmgr.Register(block);
-  cmgr.Attach(f.ctx, f.scheduler);
+  SetupClockingBlock(f, cmgr, "cb_neg", Edge::kNegedge, {0}, {0}, "neg_data", ClockingDir::kInput);
 
   ScheduleNegedge(f, clk, 10);
   f.scheduler.Run();

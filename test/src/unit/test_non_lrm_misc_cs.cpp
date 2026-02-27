@@ -597,25 +597,6 @@ TEST(ParserClause03, Cl3_13_TextMacroNameSpace) {
               "module m; logic [7:0] data; endmodule\n"));
 }
 
-struct ParseResult2206 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult2206 Parse(const std::string& src) {
-  ParseResult2206 result;
-  DiagEngine diag(result.mgr);
-  auto fid = result.mgr.AddFile("<test>", src);
-  Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.Preprocess(fid);
-  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
 TEST(ParserSection22, IfdefDefined) {
   EXPECT_TRUE(
       ParseOk("`define FEATURE_A\n"
@@ -673,7 +654,7 @@ TEST(ParserSection22, NestedIfdef) {
 }
 
 TEST(ParserSection22, IfdefSelectsCorrectModule) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "`define USE_A\n"
       "`ifdef USE_A\n"
       "module a;\n"
@@ -688,7 +669,7 @@ TEST(ParserSection22, IfdefSelectsCorrectModule) {
 }
 
 TEST(ParserSection22, IfndefSelectsElseBranch) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "`define GUARD\n"
       "`ifndef GUARD\n"
       "module unreachable;\n"
@@ -700,25 +681,6 @@ TEST(ParserSection22, IfndefSelectsElseBranch) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
   EXPECT_EQ(r.cu->modules[0]->name, "reached");
-}
-
-struct ParseResult2207 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult2207 Parse(const std::string& src) {
-  ParseResult2207 result;
-  DiagEngine diag(result.mgr);
-  auto fid = result.mgr.AddFile("<test>", src);
-  Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.Preprocess(fid);
-  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
 }
 
 TEST(ParserSection22, TimescaleNsPs) {
@@ -780,7 +742,7 @@ TEST(ParserSection22, TimescaleWithDelays) {
 }
 
 TEST(ParserSection22, TimescaleModuleNamePreserved) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "`timescale 1ns/1ps\n"
       "module foo;\n"
       "endmodule\n");
@@ -794,7 +756,7 @@ TEST(ParserSection22, TimescaleModuleNamePreserved) {
 // `timescale 1ns / 10ps → modules A and B
 // `timescale 1ps / 1ps  → module C
 TEST(ParserClause03, Cl3_14_2_1_LrmExampleThreeModules) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "`timescale 1ns / 10ps\n"
       "module A; endmodule\n"
       "module B; endmodule\n"
@@ -807,25 +769,6 @@ TEST(ParserClause03, Cl3_14_2_1_LrmExampleThreeModules) {
   EXPECT_FALSE(r.cu->modules[0]->has_timeunit);
   EXPECT_FALSE(r.cu->modules[1]->has_timeunit);
   EXPECT_FALSE(r.cu->modules[2]->has_timeunit);
-}
-
-struct ParseResult2208 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult2208 Parse(const std::string& src) {
-  ParseResult2208 result;
-  DiagEngine diag(result.mgr);
-  auto fid = result.mgr.AddFile("<test>", src);
-  Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.Preprocess(fid);
-  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
 }
 
 TEST(ParserSection22, DefaultNettypeTri) {
@@ -913,7 +856,7 @@ TEST(ParserSection22, MultipleDefaultNettypeDirectives) {
 // AST-level checks for `default_nettype
 // ============================================================================
 TEST(ParserSection22, DefaultNettypeModuleCount) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "`default_nettype wire\n"
       "module m1;\n"
       "endmodule\n"

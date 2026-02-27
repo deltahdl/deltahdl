@@ -341,29 +341,7 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardStmtLevelBody) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
   EXPECT_GE(stmt->body->stmts.size(), 2u);
 }
-
-struct ParseResult303 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult303 Parse(const std::string& src) {
-  ParseResult303 result;
-  DiagEngine diag(result.mgr);
-  auto fid = result.mgr.AddFile("<test>", src);
-  Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.Preprocess(fid);
-  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static ModuleItem* FindItemByKind(ParseResult303& r, ModuleItemKind kind) {
+static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
   for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == kind) return item;
   }
@@ -380,7 +358,7 @@ static bool HasAlwaysOfKind(const std::vector<ModuleItem*>& items,
 
 // §3.3 Continuous assignments
 TEST(ParserClause03, Cl3_3_ContinuousAssignment) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  logic a, b, y;\n"
       "  assign y = a & b;\n"
@@ -392,7 +370,7 @@ TEST(ParserClause03, Cl3_3_ContinuousAssignment) {
 }
 
 TEST(Lexical, ContAssign_WithDelay) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module top;\n"
       "  wire out, in;\n"
       "  assign #5 out = in;\n"
@@ -408,7 +386,7 @@ TEST(Lexical, ContAssign_WithDelay) {
 }
 
 TEST(Lexical, ContAssign_WithParenDelay) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module top;\n"
       "  wire out, in;\n"
       "  assign #(10) out = in;\n"
@@ -425,7 +403,7 @@ TEST(Lexical, ContAssign_WithParenDelay) {
 }
 
 TEST(Lexical, ContAssign_NoDelay) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module top;\n"
       "  wire a, b;\n"
       "  assign a = b;\n"
@@ -438,7 +416,7 @@ TEST(Lexical, ContAssign_NoDelay) {
 }
 
 TEST(Parser, ContinuousAssignment) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module top;\n"
       "  logic a, b;\n"
       "  assign a = b;\n"
@@ -457,7 +435,7 @@ TEST(Parser, ContinuousAssignment) {
 // §10.9-10.10: Assignment pattern evaluation
 // ===========================================================================
 TEST(Lexical, AssignmentPattern_DefaultZero) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module top;\n"
       "  logic [7:0] a;\n"
       "  initial a = '{default: 0};\n"
@@ -468,7 +446,7 @@ TEST(Lexical, AssignmentPattern_DefaultZero) {
 }
 
 TEST(Lexical, AssignmentPattern_Positional) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module top;\n"
       "  logic [3:0] a;\n"
       "  initial a = '{1, 0, 1, 0};\n"
@@ -478,7 +456,7 @@ TEST(Lexical, AssignmentPattern_Positional) {
 }
 
 TEST(Lexical, AssignmentPattern_Named) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module top;\n"
       "  initial begin\n"
       "    logic [7:0] x;\n"
@@ -490,7 +468,7 @@ TEST(Lexical, AssignmentPattern_Named) {
 
 // net_alias: alias net1 = net2 = net3;
 TEST(SourceText, NetAlias) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire a, b, c;\n"
       "  alias a = b = c;\n"
@@ -518,7 +496,7 @@ static Stmt* NthInitialStmt(ParseResult& r, size_t n) {
 // LRM section 10.6.1 -- Procedural assign / deassign
 // =============================================================================
 TEST(ParserSection10, ProceduralAssignKind) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg q;\n"
       "  initial begin\n"
@@ -533,7 +511,7 @@ TEST(ParserSection10, ProceduralAssignKind) {
 }
 
 TEST(ParserSection10, ProceduralAssignLhs) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg q;\n"
       "  initial begin\n"
@@ -548,7 +526,7 @@ TEST(ParserSection10, ProceduralAssignLhs) {
 }
 
 TEST(ParserSection10, ProceduralDeassignKind) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg q;\n"
       "  initial begin\n"
@@ -563,7 +541,7 @@ TEST(ParserSection10, ProceduralDeassignKind) {
 }
 
 TEST(ParserSection10, ProceduralDeassignLhs) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg q;\n"
       "  initial begin\n"
@@ -578,7 +556,7 @@ TEST(ParserSection10, ProceduralDeassignLhs) {
 }
 
 TEST(ParserSection10, ProceduralAssignThenDeassign) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg q;\n"
       "  initial begin\n"
@@ -599,7 +577,7 @@ TEST(ParserSection10, ProceduralAssignThenDeassign) {
 // LRM section 10.6.2 -- Force / release
 // =============================================================================
 TEST(ParserSection10, ForceKind) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire w;\n"
       "  initial begin\n"
@@ -614,7 +592,7 @@ TEST(ParserSection10, ForceKind) {
 }
 
 TEST(ParserSection10, ForceLhs) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire w;\n"
       "  initial begin\n"
@@ -629,7 +607,7 @@ TEST(ParserSection10, ForceLhs) {
 }
 
 TEST(ParserSection10, ReleaseKind) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire w;\n"
       "  initial begin\n"
@@ -644,7 +622,7 @@ TEST(ParserSection10, ReleaseKind) {
 }
 
 TEST(ParserSection10, ReleaseLhs) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire w;\n"
       "  initial begin\n"
@@ -659,7 +637,7 @@ TEST(ParserSection10, ReleaseLhs) {
 }
 
 TEST(ParserSection10, ForceThenRelease) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire w;\n"
       "  initial begin\n"
@@ -680,7 +658,7 @@ TEST(ParserSection10, ForceThenRelease) {
 // LRM section 10.4.1 -- Intra-assignment delay
 // =============================================================================
 TEST(ParserSection10, BlockingIntraAssignDelayKind) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg a, b;\n"
       "  initial begin\n"
@@ -695,7 +673,7 @@ TEST(ParserSection10, BlockingIntraAssignDelayKind) {
 }
 
 TEST(ParserSection10, BlockingIntraAssignDelayOperands) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg a, b;\n"
       "  initial begin\n"
@@ -710,7 +688,7 @@ TEST(ParserSection10, BlockingIntraAssignDelayOperands) {
 }
 
 TEST(ParserSection10, NonblockingIntraAssignDelayKind) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg a, b;\n"
       "  initial begin\n"
@@ -725,7 +703,7 @@ TEST(ParserSection10, NonblockingIntraAssignDelayKind) {
 }
 
 TEST(ParserSection10, NonblockingIntraAssignDelayOperands) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg a, b;\n"
       "  initial begin\n"
@@ -743,7 +721,7 @@ TEST(ParserSection10, NonblockingIntraAssignDelayOperands) {
 // LRM section 10.4.2 -- Intra-assignment event control
 // =============================================================================
 TEST(ParserSection10, BlockingIntraAssignEventKind) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg a, b, clk;\n"
       "  initial begin\n"
@@ -759,7 +737,7 @@ TEST(ParserSection10, BlockingIntraAssignEventKind) {
 }
 
 TEST(ParserSection10, BlockingIntraAssignEventEdge) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg a, b, clk;\n"
       "  initial begin\n"
@@ -774,7 +752,7 @@ TEST(ParserSection10, BlockingIntraAssignEventEdge) {
 }
 
 TEST(ParserSection10, NonblockingIntraAssignEventKind) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg a, b, clk;\n"
       "  initial begin\n"
@@ -790,7 +768,7 @@ TEST(ParserSection10, NonblockingIntraAssignEventKind) {
 }
 
 TEST(ParserSection10, NonblockingIntraAssignEventEdge) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg a, b, clk;\n"
       "  initial begin\n"
@@ -808,7 +786,7 @@ TEST(ParserSection10, NonblockingIntraAssignEventEdge) {
 // LRM section 10.11 -- Net aliasing
 // =============================================================================
 TEST(ParserSection10, NetAliasTwoNets) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire a, b;\n"
       "  alias a = b;\n"
@@ -829,7 +807,7 @@ TEST(ParserSection10, NetAliasTwoNets) {
 }
 
 TEST(ParserSection10, NetAliasThreeNets) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire a, b, c;\n"
       "  alias a = b = c;\n"
@@ -848,7 +826,7 @@ TEST(ParserSection10, NetAliasThreeNets) {
 }
 
 TEST(ParserSection10, ContinuousAssignBasic) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire a, b;\n"
       "  assign a = b;\n"
@@ -862,7 +840,7 @@ TEST(ParserSection10, ContinuousAssignBasic) {
 }
 
 TEST(ParserSection10, NetDeclAssignment) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire a = 1'b0;\n"
       "endmodule\n");
@@ -878,7 +856,7 @@ TEST(ParserSection10, NetDeclAssignment) {
 // LRM section 10.3.3 -- Continuous assignment delays
 // =============================================================================
 TEST(ParserSection10, ContinuousAssignDelay) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire a, b;\n"
       "  assign #10 a = b;\n"
@@ -896,7 +874,7 @@ TEST(ParserSection10, ContinuousAssignDelay) {
 // LRM section 10.5 -- Variable declaration assignment
 // =============================================================================
 TEST(ParserSection10, VarDeclAssignment) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  int x = 42;\n"
       "endmodule\n");
@@ -909,7 +887,7 @@ TEST(ParserSection10, VarDeclAssignment) {
 }
 
 TEST(ParserSection10, VarDeclAssignmentLogic) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  logic [7:0] data = 8'hFF;\n"
       "endmodule\n");
@@ -923,7 +901,7 @@ TEST(ParserSection10, VarDeclAssignmentLogic) {
 // LRM section 10.8 -- Operator assignments (+=, -=, etc.)
 // =============================================================================
 TEST(ParserSection10, OperatorAssignPlusEq) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  initial begin\n"
       "    a += 1;\n"
@@ -937,7 +915,7 @@ TEST(ParserSection10, OperatorAssignPlusEq) {
 }
 
 TEST(ParserSection10, OperatorAssignMinusEq) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  initial begin\n"
       "    a -= 2;\n"
@@ -950,7 +928,7 @@ TEST(ParserSection10, OperatorAssignMinusEq) {
 }
 
 TEST(ParserSection10, OperatorAssignStarEq) {
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "module m;\n"
       "  initial begin\n"
       "    a *= 3;\n"
