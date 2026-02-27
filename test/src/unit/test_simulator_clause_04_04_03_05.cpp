@@ -43,23 +43,7 @@ TEST(SimCh4435, PreObservedRegionExecutesPLICallbacks) {
 // A Pre-Observed callback can read state set by the active region set.
 // ---------------------------------------------------------------------------
 TEST(SimCh4435, PreObservedCanReadValues) {
-  Arena arena;
-  Scheduler sched(arena);
-  int value = 0;
-  int sampled = -1;
-
-  // Active sets value = 42.
-  auto* active = sched.GetEventPool().Acquire();
-  active->callback = [&]() { value = 42; };
-  sched.ScheduleEvent({0}, Region::kActive, active);
-
-  // Pre-Observed reads value — should see 42.
-  auto* ev = sched.GetEventPool().Acquire();
-  ev->callback = [&]() { sampled = value; };
-  sched.ScheduleEvent({0}, Region::kPreObserved, ev);
-
-  sched.Run();
-  EXPECT_EQ(sampled, 42);
+  VerifyRegionCanReadActiveValue(Region::kPreObserved);
 }
 
 // ---------------------------------------------------------------------------

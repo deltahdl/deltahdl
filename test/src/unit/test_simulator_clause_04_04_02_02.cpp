@@ -147,23 +147,7 @@ TEST(SimCh4422, ActiveExecutesAfterPreponedAndPreActive) {
 // Each time slot has its own Active region evaluation.
 // ---------------------------------------------------------------------------
 TEST(SimCh4422, ActiveEventsAcrossMultipleTimeSlots) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<uint64_t> times;
-
-  for (uint64_t t = 0; t < 3; ++t) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&times, &sched]() {
-      times.push_back(sched.CurrentTime().ticks);
-    };
-    sched.ScheduleEvent({t}, Region::kActive, ev);
-  }
-
-  sched.Run();
-  ASSERT_EQ(times.size(), 3u);
-  EXPECT_EQ(times[0], 0u);
-  EXPECT_EQ(times[1], 1u);
-  EXPECT_EQ(times[2], 2u);
+  VerifyEventsAcrossTimeSlots(Region::kActive);
 }
 
 // ---------------------------------------------------------------------------
@@ -172,31 +156,7 @@ TEST(SimCh4422, ActiveEventsAcrossMultipleTimeSlots) {
 // again — Active region participates in this iteration loop.
 // ---------------------------------------------------------------------------
 TEST(SimCh4422, ActiveParticipatesInNBAIteration) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  // Initial Active event schedules an NBA.
-  auto* act1 = sched.GetEventPool().Acquire();
-  act1->callback = [&]() {
-    order.push_back("active1");
-    auto* nba = sched.GetEventPool().Acquire();
-    nba->callback = [&]() {
-      order.push_back("nba");
-      // NBA schedules a new Active event -> triggers re-iteration.
-      auto* act2 = sched.GetEventPool().Acquire();
-      act2->callback = [&order]() { order.push_back("active2"); };
-      sched.ScheduleEvent({0}, Region::kActive, act2);
-    };
-    sched.ScheduleEvent({0}, Region::kNBA, nba);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, act1);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 3u);
-  EXPECT_EQ(order[0], "active1");
-  EXPECT_EQ(order[1], "nba");
-  EXPECT_EQ(order[2], "active2");
+  VerifyIterationChain(Region::kActive, "active", Region::kNBA, "nba");
 }
 
 // ---------------------------------------------------------------------------
@@ -205,26 +165,6 @@ TEST(SimCh4422, ActiveParticipatesInNBAIteration) {
 // Active region is the target of this restart path.
 // ---------------------------------------------------------------------------
 TEST(SimCh4422, ActiveRestartsFromReactiveRegion) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto* act1 = sched.GetEventPool().Acquire();
-  act1->callback = [&order]() { order.push_back("active1"); };
-  sched.ScheduleEvent({0}, Region::kActive, act1);
-
-  auto* reactive = sched.GetEventPool().Acquire();
-  reactive->callback = [&]() {
-    order.push_back("reactive");
-    auto* act2 = sched.GetEventPool().Acquire();
-    act2->callback = [&order]() { order.push_back("active2"); };
-    sched.ScheduleEvent({0}, Region::kActive, act2);
-  };
-  sched.ScheduleEvent({0}, Region::kReactive, reactive);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 3u);
-  EXPECT_EQ(order[0], "active1");
-  EXPECT_EQ(order[1], "reactive");
-  EXPECT_EQ(order[2], "active2");
+  VerifyRegionRestart(Region::kActive, "active1", Region::kReactive, "reactive",
+                      Region::kActive, "active2");
 }

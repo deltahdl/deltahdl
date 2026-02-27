@@ -223,23 +223,7 @@ TEST(SimCh4429, PostponedPLIEventsExecuteInRegion) {
 // Each time slot has its own Postponed region evaluation.
 // ---------------------------------------------------------------------------
 TEST(SimCh4429, PostponedEventsAcrossMultipleTimeSlots) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<uint64_t> times;
-
-  for (uint64_t t = 0; t < 3; ++t) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&times, &sched]() {
-      times.push_back(sched.CurrentTime().ticks);
-    };
-    sched.ScheduleEvent({t}, Region::kPostponed, ev);
-  }
-
-  sched.Run();
-  ASSERT_EQ(times.size(), 3u);
-  EXPECT_EQ(times[0], 0u);
-  EXPECT_EQ(times[1], 1u);
-  EXPECT_EQ(times[2], 2u);
+  VerifyEventsAcrossTimeSlots(Region::kPostponed);
 }
 
 // ---------------------------------------------------------------------------

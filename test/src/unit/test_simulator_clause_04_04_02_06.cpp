@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
-#include <string>
 #include <vector>
 
 #include "common/arena.h"
@@ -150,23 +149,7 @@ TEST(SimCh4426, ReactiveExecutesAfterObservedAndPostObserved) {
 // Each time slot has its own Reactive region evaluation.
 // ---------------------------------------------------------------------------
 TEST(SimCh4426, ReactiveEventsAcrossMultipleTimeSlots) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<uint64_t> times;
-
-  for (uint64_t t = 0; t < 3; ++t) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&times, &sched]() {
-      times.push_back(sched.CurrentTime().ticks);
-    };
-    sched.ScheduleEvent({t}, Region::kReactive, ev);
-  }
-
-  sched.Run();
-  ASSERT_EQ(times.size(), 3u);
-  EXPECT_EQ(times[0], 0u);
-  EXPECT_EQ(times[1], 1u);
-  EXPECT_EQ(times[2], 2u);
+  VerifyEventsAcrossTimeSlots(Region::kReactive);
 }
 
 // ---------------------------------------------------------------------------
@@ -175,31 +158,7 @@ TEST(SimCh4426, ReactiveEventsAcrossMultipleTimeSlots) {
 // the reactive set iterates again — dual of NBA->Active iteration.
 // ---------------------------------------------------------------------------
 TEST(SimCh4426, ReactiveParticipatesInReNBAIteration) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  // Initial Reactive event schedules a Re-NBA.
-  auto* react1 = sched.GetEventPool().Acquire();
-  react1->callback = [&]() {
-    order.push_back("reactive1");
-    auto* renba = sched.GetEventPool().Acquire();
-    renba->callback = [&]() {
-      order.push_back("renba");
-      // Re-NBA schedules a new Reactive event -> triggers re-iteration.
-      auto* react2 = sched.GetEventPool().Acquire();
-      react2->callback = [&order]() { order.push_back("reactive2"); };
-      sched.ScheduleEvent({0}, Region::kReactive, react2);
-    };
-    sched.ScheduleEvent({0}, Region::kReNBA, renba);
-  };
-  sched.ScheduleEvent({0}, Region::kReactive, react1);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 3u);
-  EXPECT_EQ(order[0], "reactive1");
-  EXPECT_EQ(order[1], "renba");
-  EXPECT_EQ(order[2], "reactive2");
+  VerifyIterationChain(Region::kReactive, "reactive", Region::kReNBA, "renba");
 }
 
 // ---------------------------------------------------------------------------
@@ -208,26 +167,6 @@ TEST(SimCh4426, ReactiveParticipatesInReNBAIteration) {
 // restarts (per Figure 4-1 feedback).
 // ---------------------------------------------------------------------------
 TEST(SimCh4426, ReactiveSchedulesActiveRestart) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto* act1 = sched.GetEventPool().Acquire();
-  act1->callback = [&order]() { order.push_back("active1"); };
-  sched.ScheduleEvent({0}, Region::kActive, act1);
-
-  auto* reactive = sched.GetEventPool().Acquire();
-  reactive->callback = [&]() {
-    order.push_back("reactive");
-    auto* act2 = sched.GetEventPool().Acquire();
-    act2->callback = [&order]() { order.push_back("active2"); };
-    sched.ScheduleEvent({0}, Region::kActive, act2);
-  };
-  sched.ScheduleEvent({0}, Region::kReactive, reactive);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 3u);
-  EXPECT_EQ(order[0], "active1");
-  EXPECT_EQ(order[1], "reactive");
-  EXPECT_EQ(order[2], "active2");
+  VerifyRegionRestart(Region::kActive, "active1", Region::kReactive, "reactive",
+                      Region::kActive, "active2");
 }

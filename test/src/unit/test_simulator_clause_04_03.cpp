@@ -5,6 +5,7 @@
 
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
+#include "helpers_scheduler_event.h"
 
 using namespace delta;
 
@@ -586,21 +587,7 @@ TEST(SimCh43, EventPoolRecycles) {
 // execute in FIFO order.
 // ---------------------------------------------------------------------------
 TEST(SimCh43, SameTimeAndRegionFIFO) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<int> order;
-
-  for (int i = 0; i < 3; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, i]() { order.push_back(i); };
-    sched.ScheduleEvent({0}, Region::kActive, ev);
-  }
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 3u);
-  EXPECT_EQ(order[0], 0);
-  EXPECT_EQ(order[1], 1);
-  EXPECT_EQ(order[2], 2);
+  VerifyActiveRegionFIFO();
 }
 
 // ---------------------------------------------------------------------------

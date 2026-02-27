@@ -131,31 +131,7 @@ TEST(SimCh4428, NonblockingAssignmentSchedulesReNBALaterTime) {
 // re-iteration of the reactive region set.
 // ---------------------------------------------------------------------------
 TEST(SimCh4428, ReNBAToReactiveIteration) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  // Initial Reactive event schedules a Re-NBA.
-  auto* react1 = sched.GetEventPool().Acquire();
-  react1->callback = [&]() {
-    order.push_back("reactive1");
-    auto* renba = sched.GetEventPool().Acquire();
-    renba->callback = [&]() {
-      order.push_back("renba");
-      // Re-NBA schedules a new Reactive event -> triggers re-iteration.
-      auto* react2 = sched.GetEventPool().Acquire();
-      react2->callback = [&order]() { order.push_back("reactive2"); };
-      sched.ScheduleEvent({0}, Region::kReactive, react2);
-    };
-    sched.ScheduleEvent({0}, Region::kReNBA, renba);
-  };
-  sched.ScheduleEvent({0}, Region::kReactive, react1);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 3u);
-  EXPECT_EQ(order[0], "reactive1");
-  EXPECT_EQ(order[1], "renba");
-  EXPECT_EQ(order[2], "reactive2");
+  VerifyIterationChain(Region::kReactive, "reactive", Region::kReNBA, "renba");
 }
 
 // ---------------------------------------------------------------------------
@@ -163,22 +139,9 @@ TEST(SimCh4428, ReNBAToReactiveIteration) {
 // PostReNBA.  This confirms its position in the region ordering per §4.4.2.
 // ---------------------------------------------------------------------------
 TEST(SimCh4428, ReNBAExecutesAfterReactiveAndReInactiveBeforePostReNBA) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  // Schedule in reverse order to prove region ordering, not insertion order.
-  ScheduleLabeled(sched, Region::kPostReNBA, "post_renba", order);
-  ScheduleLabeled(sched, Region::kReNBA, "renba", order);
-  ScheduleLabeled(sched, Region::kReInactive, "reinactive", order);
-  ScheduleLabeled(sched, Region::kReactive, "reactive", order);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 4u);
-  EXPECT_EQ(order[0], "reactive");
-  EXPECT_EQ(order[1], "reinactive");
-  EXPECT_EQ(order[2], "renba");
-  EXPECT_EQ(order[3], "post_renba");
+  VerifyFourRegionOrder(Region::kReactive, "reactive", Region::kReInactive,
+                        "reinactive", Region::kReNBA, "renba",
+                        Region::kPostReNBA, "post_renba");
 }
 
 // ---------------------------------------------------------------------------
@@ -198,23 +161,7 @@ TEST(SimCh4428, ReNBAIsWithinReactiveRegionSet) {
 // Each time slot has its own Re-NBA region evaluation.
 // ---------------------------------------------------------------------------
 TEST(SimCh4428, ReNBAEventsAcrossMultipleTimeSlots) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<uint64_t> times;
-
-  for (uint64_t t = 0; t < 3; ++t) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&times, &sched]() {
-      times.push_back(sched.CurrentTime().ticks);
-    };
-    sched.ScheduleEvent({t}, Region::kReNBA, ev);
-  }
-
-  sched.Run();
-  ASSERT_EQ(times.size(), 3u);
-  EXPECT_EQ(times[0], 0u);
-  EXPECT_EQ(times[1], 1u);
-  EXPECT_EQ(times[2], 2u);
+  VerifyEventsAcrossTimeSlots(Region::kReNBA);
 }
 
 // ---------------------------------------------------------------------------

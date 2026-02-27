@@ -5,6 +5,7 @@
 
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
+#include "helpers_scheduler_event.h"
 
 using namespace delta;
 
@@ -18,42 +19,7 @@ using namespace delta;
 // callback), not as a one-shot operation.
 // ---------------------------------------------------------------------------
 TEST(SimCh4091, ContinuousAssignmentCorrespondsToProcess) {
-  Arena arena;
-  Scheduler sched(arena);
-  int src = 0;
-  int dst = 0;
-  int process_eval_count = 0;
-
-  // Model: assign dst = src;
-  // Each time src changes, the process re-evaluates and schedules an update.
-  // Change src at time 0 and time 5 to show the process triggers twice.
-  auto* drive0 = sched.GetEventPool().Acquire();
-  drive0->kind = EventKind::kEvaluation;
-  drive0->callback = [&]() {
-    src = 10;
-    ++process_eval_count;
-    auto* update = sched.GetEventPool().Acquire();
-    update->kind = EventKind::kUpdate;
-    update->callback = [&]() { dst = src; };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, drive0);
-
-  auto* drive5 = sched.GetEventPool().Acquire();
-  drive5->kind = EventKind::kEvaluation;
-  drive5->callback = [&]() {
-    src = 20;
-    ++process_eval_count;
-    auto* update = sched.GetEventPool().Acquire();
-    update->kind = EventKind::kUpdate;
-    update->callback = [&]() { dst = src; };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
-  };
-  sched.ScheduleEvent({5}, Region::kActive, drive5);
-
-  sched.Run();
-  EXPECT_EQ(dst, 20);
-  EXPECT_EQ(process_eval_count, 2);
+  VerifyCACorrespondsToProcess();
 }
 
 // ---------------------------------------------------------------------------
@@ -103,31 +69,7 @@ TEST(SimCh4091, SensitiveToSourceElements) {
 // region (not Inactive, NBA, or any other region).
 // ---------------------------------------------------------------------------
 TEST(SimCh4091, SchedulesActiveUpdateEvent) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  // Schedule a continuous assignment update in Active region and an NBA event
-  // to prove the continuous assignment event executes in Active (before NBA).
-  auto* eval = sched.GetEventPool().Acquire();
-  eval->kind = EventKind::kEvaluation;
-  eval->callback = [&]() {
-    auto* active_update = sched.GetEventPool().Acquire();
-    active_update->kind = EventKind::kUpdate;
-    active_update->callback = [&]() { order.push_back("active_update"); };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, active_update);
-
-    auto* nba_update = sched.GetEventPool().Acquire();
-    nba_update->kind = EventKind::kUpdate;
-    nba_update->callback = [&]() { order.push_back("nba_update"); };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba_update);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, eval);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 2u);
-  EXPECT_EQ(order[0], "active_update");
-  EXPECT_EQ(order[1], "nba_update");
+  VerifyCASchedulesActiveUpdateEvent();
 }
 
 // ---------------------------------------------------------------------------

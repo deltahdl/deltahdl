@@ -121,22 +121,8 @@ TEST(SimCh4425, MultiplePassFailActionsScheduledInReactive) {
 // This confirms its position in the region ordering per §4.4.2.
 // ---------------------------------------------------------------------------
 TEST(SimCh4425, ObservedExecutesAfterActiveRegionSet) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  // Schedule in reverse order to prove region ordering, not insertion order.
-  ScheduleLabeled(sched, Region::kObserved, "observed", order);
-  ScheduleLabeled(sched, Region::kNBA, "nba", order);
-  ScheduleLabeled(sched, Region::kInactive, "inactive", order);
-  ScheduleLabeled(sched, Region::kActive, "active", order);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 4u);
-  EXPECT_EQ(order[0], "active");
-  EXPECT_EQ(order[1], "inactive");
-  EXPECT_EQ(order[2], "nba");
-  EXPECT_EQ(order[3], "observed");
+  VerifyFourRegionOrder(Region::kActive, "active", Region::kInactive, "inactive",
+                        Region::kNBA, "nba", Region::kObserved, "observed");
 }
 
 // ---------------------------------------------------------------------------

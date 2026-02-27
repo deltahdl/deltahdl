@@ -130,31 +130,7 @@ TEST(SimCh4424, NonblockingAssignmentSchedulesNBALaterTime) {
 // re-iteration of the active region set.
 // ---------------------------------------------------------------------------
 TEST(SimCh4424, NBAToActiveIteration) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  // Initial Active event schedules an NBA.
-  auto* act1 = sched.GetEventPool().Acquire();
-  act1->callback = [&]() {
-    order.push_back("active1");
-    auto* nba = sched.GetEventPool().Acquire();
-    nba->callback = [&]() {
-      order.push_back("nba");
-      // NBA schedules a new Active event -> triggers re-iteration.
-      auto* act2 = sched.GetEventPool().Acquire();
-      act2->callback = [&order]() { order.push_back("active2"); };
-      sched.ScheduleEvent({0}, Region::kActive, act2);
-    };
-    sched.ScheduleEvent({0}, Region::kNBA, nba);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, act1);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 3u);
-  EXPECT_EQ(order[0], "active1");
-  EXPECT_EQ(order[1], "nba");
-  EXPECT_EQ(order[2], "active2");
+  VerifyIterationChain(Region::kActive, "active", Region::kNBA, "nba");
 }
 
 // ---------------------------------------------------------------------------
@@ -162,22 +138,8 @@ TEST(SimCh4424, NBAToActiveIteration) {
 // This confirms its position in the region ordering per §4.4.2.
 // ---------------------------------------------------------------------------
 TEST(SimCh4424, NBAExecutesAfterActiveAndInactiveBeforeObserved) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  // Schedule in reverse order to prove region ordering, not insertion order.
-  ScheduleLabeled(sched, Region::kObserved, "observed", order);
-  ScheduleLabeled(sched, Region::kNBA, "nba", order);
-  ScheduleLabeled(sched, Region::kInactive, "inactive", order);
-  ScheduleLabeled(sched, Region::kActive, "active", order);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 4u);
-  EXPECT_EQ(order[0], "active");
-  EXPECT_EQ(order[1], "inactive");
-  EXPECT_EQ(order[2], "nba");
-  EXPECT_EQ(order[3], "observed");
+  VerifyFourRegionOrder(Region::kActive, "active", Region::kInactive, "inactive",
+                        Region::kNBA, "nba", Region::kObserved, "observed");
 }
 
 // ---------------------------------------------------------------------------
@@ -197,23 +159,7 @@ TEST(SimCh4424, NBAIsWithinActiveRegionSet) {
 // Each time slot has its own NBA region evaluation.
 // ---------------------------------------------------------------------------
 TEST(SimCh4424, NBAEventsAcrossMultipleTimeSlots) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<uint64_t> times;
-
-  for (uint64_t t = 0; t < 3; ++t) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&times, &sched]() {
-      times.push_back(sched.CurrentTime().ticks);
-    };
-    sched.ScheduleEvent({t}, Region::kNBA, ev);
-  }
-
-  sched.Run();
-  ASSERT_EQ(times.size(), 3u);
-  EXPECT_EQ(times[0], 0u);
-  EXPECT_EQ(times[1], 1u);
-  EXPECT_EQ(times[2], 2u);
+  VerifyEventsAcrossTimeSlots(Region::kNBA);
 }
 
 // ---------------------------------------------------------------------------
