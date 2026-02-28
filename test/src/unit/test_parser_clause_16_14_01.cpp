@@ -196,4 +196,20 @@ TEST(ParserSection16, Sec16_5_1_AssertPropertyPassAndFailActions) {
   EXPECT_NE(ap->assert_fail_stmt, nullptr);
 }
 
+// Assert property with only a pass action (no else).
+TEST(ParserSection16, Sec16_5_1_AssertPropertyPassOnly) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) valid)\n"
+      "    $display(\"passed\");\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+  auto* ap =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty);
+  ASSERT_NE(ap, nullptr);
+  EXPECT_NE(ap->assert_pass_stmt, nullptr);
+  EXPECT_EQ(ap->assert_fail_stmt, nullptr);
+}
+
 }  // namespace
