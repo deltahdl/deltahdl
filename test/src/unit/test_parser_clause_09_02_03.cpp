@@ -60,4 +60,24 @@ TEST(ParserA602, FinalConstruct_Multiple) {
   EXPECT_EQ(finals.size(), 2u);
 }
 
+TEST(ParserA602, Integration_InitialFinalCoexistence) {
+  // initial and final blocks coexist
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    $display(\"start\");\n"
+      "    a = 0;\n"
+      "  end\n"
+      "  final begin\n"
+      "    $display(\"end\");\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* init = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
+  auto* fin = FindItem(r.cu->modules[0]->items, ModuleItemKind::kFinalBlock);
+  ASSERT_NE(init, nullptr);
+  ASSERT_NE(fin, nullptr);
+}
+
 }  // namespace

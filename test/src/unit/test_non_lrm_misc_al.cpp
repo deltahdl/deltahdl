@@ -5,27 +5,22 @@
 
 using namespace delta;
 
-namespace {
-
-TEST(ParserA602, Integration_InitialFinalCoexistence) {
-  // initial and final blocks coexist
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    $display(\"start\");\n"
-      "    a = 0;\n"
-      "  end\n"
-      "  final begin\n"
-      "    $display(\"end\");\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* init = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
-  auto* fin = FindItem(r.cu->modules[0]->items, ModuleItemKind::kFinalBlock);
-  ASSERT_NE(init, nullptr);
-  ASSERT_NE(fin, nullptr);
+static Stmt* InitialBody(ParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    return item->body;
+  }
+  return nullptr;
 }
+
+static ModuleItem* FirstFunctionDecl(ParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kFunctionDecl) return item;
+  }
+  return nullptr;
+}
+
+namespace {
 
 TEST(ParserA602, Integration_AlwaysCombWithOperatorAssign) {
   auto r = Parse(
@@ -43,14 +38,6 @@ TEST(ParserA602, Integration_AlwaysCombWithOperatorAssign) {
   ASSERT_NE(item->body, nullptr);
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
   EXPECT_EQ(item->body->stmts.size(), 2u);
-}
-
-static Stmt* InitialBody(ParseResult& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    return item->body;
-  }
-  return nullptr;
 }
 
 // =============================================================================
@@ -572,13 +559,6 @@ TEST(ParserA603, ActionBlockWaitOrderElse) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kWaitOrder);
-}
-
-static ModuleItem* FirstFunctionDecl(ParseResult& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kFunctionDecl) return item;
-  }
-  return nullptr;
 }
 
 // =============================================================================
