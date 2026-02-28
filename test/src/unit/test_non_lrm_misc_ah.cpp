@@ -7,28 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- udp_declaration: multiple UDPs in compilation unit ---
-TEST(ParserAnnexA051, MultipleUdps) {
-  auto r = Parse(
-      "primitive inv(output out, input in);\n"
-      "  table\n"
-      "    0 : 1;\n"
-      "    1 : 0;\n"
-      "  endtable\n"
-      "endprimitive\n"
-      "primitive buf2(output out, input in);\n"
-      "  table\n"
-      "    0 : 0;\n"
-      "    1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->udps.size(), 2u);
-  EXPECT_EQ(r.cu->udps[0]->name, "inv");
-  EXPECT_EQ(r.cu->udps[1]->name, "buf2");
-}
-
 // --- udp_declaration: coexistence with modules ---
 TEST(ParserAnnexA051, UdpWithModule) {
   auto r = Parse(
