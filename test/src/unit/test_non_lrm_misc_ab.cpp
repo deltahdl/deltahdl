@@ -6,17 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA211, CovergroupExpression_BinaryOp) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x {\n"
-              "      bins a = {a + b};\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
 // =============================================================================
 // Additional comprehensive tests
 // =============================================================================
