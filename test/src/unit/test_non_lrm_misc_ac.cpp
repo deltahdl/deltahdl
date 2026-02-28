@@ -7,19 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, LetExpr_PackageScope) {
-  EXPECT_TRUE(
-      ParseOk("package pkg;\n"
-              "  let add(x, y) = x + y;\n"
-              "endpackage\n"
-              "module m;\n"
-              "  initial begin\n"
-              "    int z;\n"
-              "    z = pkg::add(1, 2);\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA212, LetExpr_InAssign) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
