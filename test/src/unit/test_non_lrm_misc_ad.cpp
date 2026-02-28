@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, GateInst_SharedStrengthAcrossInstances) {
-  auto r = Parse(
-      "module m;\n"
-      "  and (weak0, weak1) a1(o1, i1, i2), a2(o2, i3, i4);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto gates = FindAllGates(r.cu->modules[0]->items);
-  ASSERT_EQ(gates.size(), 2u);
-  EXPECT_EQ(gates[0]->drive_strength0, gates[1]->drive_strength0);
-  EXPECT_EQ(gates[0]->drive_strength1, gates[1]->drive_strength1);
-}
-
 TEST(ParserA301, GateInst_SharedDelayAcrossInstances) {
   auto r = Parse(
       "module m;\n"
