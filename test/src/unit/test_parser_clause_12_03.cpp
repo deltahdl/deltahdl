@@ -57,4 +57,35 @@ TEST(ParserA602, InitialConstruct_NullStmt) {
   EXPECT_EQ(item->body->kind, StmtKind::kNull);
 }
 
+static Stmt* InitialBody(ParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    return item->body;
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// A.6.4 Statements
+// =============================================================================
+// ---------------------------------------------------------------------------
+// statement_or_null ::= statement | { attribute_instance } ;
+// ---------------------------------------------------------------------------
+// §12.3: null statement (just semicolon)
+TEST(ParserA604, NullStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    ;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kBlock);
+  ASSERT_GE(body->stmts.size(), 1u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kNull);
+}
+
 }  // namespace

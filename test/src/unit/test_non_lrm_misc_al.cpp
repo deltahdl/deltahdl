@@ -22,29 +22,6 @@ static ModuleItem* FirstFunctionDecl(ParseResult& r) {
 
 namespace {
 
-// =============================================================================
-// A.6.4 Statements
-// =============================================================================
-// ---------------------------------------------------------------------------
-// statement_or_null ::= statement | { attribute_instance } ;
-// ---------------------------------------------------------------------------
-// §12.3: null statement (just semicolon)
-TEST(ParserA604, NullStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    ;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = InitialBody(r);
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kBlock);
-  ASSERT_GE(body->stmts.size(), 1u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kNull);
-}
-
 // §12.3: null statement with attribute instance
 TEST(ParserA604, NullStatementWithAttribute) {
   auto r = Parse(
