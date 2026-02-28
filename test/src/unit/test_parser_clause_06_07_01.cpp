@@ -442,4 +442,19 @@ TEST(ParserSection6, WireWithRange) {
   EXPECT_NE(item->data_type.packed_dim_left, nullptr);
 }
 
+// 8. Wire with unpacked dimensions [0:3].
+TEST(ParserSection6, Sec6_5_WireUnpackedDims) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire w [0:3];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_TRUE(item->data_type.is_net);
+  EXPECT_FALSE(item->unpacked_dims.empty());
+}
+
 }  // namespace
