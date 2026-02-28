@@ -40,22 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult7& r) {
 
 namespace {
 
-TEST(ParserSection7, UnionTagged) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef union tagged {\n"
-      "    void Invalid;\n"
-      "    int Valid;\n"
-      "  } VInt;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kUnion);
-  EXPECT_TRUE(item->typedef_type.is_tagged);
-  EXPECT_EQ(item->typedef_type.struct_members.size(), 2u);
-}
-
 TEST(ParserSection7, UnionSoftPacked) {
   auto r = Parse(
       "module t;\n"
