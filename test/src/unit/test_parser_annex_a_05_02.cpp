@@ -129,4 +129,25 @@ TEST(ParserAnnexA052, InputDecl_SingleId) {
   EXPECT_EQ(udp->input_names[0], "a");
 }
 
+// Multiple input identifiers in single declaration
+TEST(ParserAnnexA052, InputDecl_MultipleIds) {
+  auto r = Parse(
+      "primitive gate(out, a, b, c, d);\n"
+      "  output out;\n"
+      "  input a, b, c, d;\n"
+      "  table\n"
+      "    0 0 0 0 : 0;\n"
+      "    1 1 1 1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* udp = r.cu->udps[0];
+  ASSERT_EQ(udp->input_names.size(), 4u);
+  EXPECT_EQ(udp->input_names[0], "a");
+  EXPECT_EQ(udp->input_names[1], "b");
+  EXPECT_EQ(udp->input_names[2], "c");
+  EXPECT_EQ(udp->input_names[3], "d");
+}
+
 }  // namespace
