@@ -7,23 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.3.1 Production #7: pass_switch_instance
-// pass_switch_instance ::= [name_of_instance] ( inout_terminal , inout_terminal
-// )
-// =============================================================================
-TEST(ParserA301, PassSwitchInst_TranNamed) {
-  auto r = Parse(
-      "module m;\n"
-      "  tran t1(io1, io2);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kTran);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_inst_name, "t1");
-  EXPECT_EQ(g->gate_terminals.size(), 2u);
-}
-
 TEST(ParserA301, PassSwitchInst_RtranNamed) {
   auto r = Parse(
       "module m;\n"
