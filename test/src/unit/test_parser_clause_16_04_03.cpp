@@ -38,4 +38,15 @@ TEST(ParserSection16, DeferredAssertModuleLevel) {
   EXPECT_EQ(r.cu->modules.size(), 1u);
 }
 
+TEST(ParserSection16, DeferredAssumeModuleLevel) {
+  auto r = Parse(
+      "module top();\n"
+      "  logic a = 1;\n"
+      "  assume #0 (a != 0);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_EQ(r.cu->modules.size(), 1u);
+}
+
 }  // namespace
