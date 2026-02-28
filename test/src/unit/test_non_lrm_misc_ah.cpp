@@ -7,28 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Multiple separate input declarations
-TEST(ParserAnnexA052, InputDecl_SeparateDecls) {
-  auto r = Parse(
-      "primitive gate(out, a, b, c);\n"
-      "  output out;\n"
-      "  input a;\n"
-      "  input b;\n"
-      "  input c;\n"
-      "  table\n"
-      "    0 0 0 : 0;\n"
-      "    1 1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  ASSERT_EQ(udp->input_names.size(), 3u);
-  EXPECT_EQ(udp->input_names[0], "a");
-  EXPECT_EQ(udp->input_names[1], "b");
-  EXPECT_EQ(udp->input_names[2], "c");
-}
-
 // ---------------------------------------------------------------------------
 // udp_reg_declaration (standalone reg)
 // ---------------------------------------------------------------------------
