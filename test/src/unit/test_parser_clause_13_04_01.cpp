@@ -248,4 +248,26 @@ TEST(ParserSection13, FunctionCallInContAssign) {
   EXPECT_EQ(assign->assign_rhs->kind, ExprKind::kCall);
 }
 
+// Nested function calls: func(func(x)).
+TEST(ParserSection13, NestedFunctionCalls) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int inc(int x);\n"
+      "    return x + 1;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    y = inc(inc(a));\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
+  // The argument to outer inc() is itself a call.
+  ASSERT_EQ(stmt->rhs->args.size(), 1u);
+  EXPECT_EQ(stmt->rhs->args[0]->kind, ExprKind::kCall);
+}
+
 }  // namespace

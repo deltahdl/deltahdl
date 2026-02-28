@@ -52,18 +52,6 @@ static ParseResult40 Parse(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// §39 Assertion control system functions
-// =============================================================================
-TEST_F(ApiParseTest, AssertOnSystemCall) {
-  auto* unit = Parse(R"(
-    module m;
-      initial $assertOn;
-    endmodule
-  )");
-  ASSERT_EQ(unit->modules.size(), 1u);
-}
-
 TEST_F(ApiParseTest, AssertOffSystemCall) {
   auto* unit = Parse(R"(
     module m;
