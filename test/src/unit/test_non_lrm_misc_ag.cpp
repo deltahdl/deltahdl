@@ -13,18 +13,6 @@ bool HasItemOfKind(const std::vector<ModuleItem*>& items, ModuleItemKind kind) {
 
 namespace {
 
-// --- generate_region: empty ---
-TEST(ParserAnnexA042, GenerateRegionEmpty) {
-  auto r = Parse(
-      "module m;\n"
-      "  generate\n"
-      "  endgenerate\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->modules[0]->items.empty());
-}
-
 // --- generate_region: multiple generate_items ---
 TEST(ParserAnnexA042, GenerateRegionMultipleItems) {
   auto r = Parse(

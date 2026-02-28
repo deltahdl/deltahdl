@@ -80,4 +80,16 @@ TEST(ParserAnnexA042, GenerateRegionBasic) {
   EXPECT_GE(r.cu->modules[0]->items.size(), 1u);
 }
 
+// --- generate_region: empty ---
+TEST(ParserAnnexA042, GenerateRegionEmpty) {
+  auto r = Parse(
+      "module m;\n"
+      "  generate\n"
+      "  endgenerate\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->modules[0]->items.empty());
+}
+
 }  // namespace
