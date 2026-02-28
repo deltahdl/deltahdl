@@ -106,4 +106,19 @@ TEST(ParserA29, ClockingPort_NotImportExport) {
   EXPECT_EQ(mp->ports[0].direction, Direction::kNone);
 }
 
+// Clocking block inside an interface with modport.
+TEST(ParserSection19, InterfaceClockingWithModport) {
+  EXPECT_TRUE(
+      ParseOk("interface bus_A (input clk);\n"
+              "  logic [15:0] data;\n"
+              "  logic write;\n"
+              "  clocking cb @(posedge clk);\n"
+              "    input data;\n"
+              "    output write;\n"
+              "  endclocking\n"
+              "  modport test (input data, output write, input clk);\n"
+              "  modport dut (output data, input write, input clk);\n"
+              "endinterface\n"));
+}
+
 }  // namespace
