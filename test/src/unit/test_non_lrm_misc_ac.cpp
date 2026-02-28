@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, LetDecl_InPackage) {
-  EXPECT_TRUE(
-      ParseOk("package pkg;\n"
-              "  let my_op(x, y) = x & y;\n"
-              "endpackage\n"));
-}
-
 TEST(ParserA212, LetDecl_InInterface) {
   EXPECT_TRUE(
       ParseOk("interface ifc;\n"

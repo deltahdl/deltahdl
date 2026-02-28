@@ -78,4 +78,11 @@ TEST(ParserA212, LetDecl_ComplexExpr) {
               "endmodule\n"));
 }
 
+TEST(ParserA212, LetDecl_InPackage) {
+  EXPECT_TRUE(
+      ParseOk("package pkg;\n"
+              "  let my_op(x, y) = x & y;\n"
+              "endpackage\n"));
+}
+
 }  // namespace
