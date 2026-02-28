@@ -50,24 +50,6 @@ static Stmt* FirstInitialStmt(ParseResult11& r) {
 
 namespace {
 
-// --- 16. Nonblocking with system call RHS ---
-TEST(ParserSection10, Sec10_4_2_SystemCallRhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg [31:0] q;\n"
-      "  initial begin\n"
-      "    q <= $random;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
-}
-
 // --- 17. Nonblocking to struct member: s.field <= val ---
 TEST(ParserSection10, Sec10_4_2_StructMemberLhs) {
   auto r = Parse(

@@ -63,4 +63,20 @@ TEST(ParserSection26, MultiplePackages) {
   EXPECT_EQ(r.cu->packages[1]->name, "b");
 }
 
+// =============================================================================
+// LRM section 26.2 -- Package with struct typedef and class
+// =============================================================================
+TEST(ParserSection26, PackageWithStructTypedef) {
+  auto r = Parse(
+      "package types_pkg;\n"
+      "  typedef struct {\n"
+      "    shortreal i, r;\n"
+      "  } Complex;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kTypedef));
+}
+
 }  // namespace

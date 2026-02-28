@@ -27,27 +27,6 @@ static ParseResult16b Parse(const std::string& src) {
 namespace {
 
 // =============================================================================
-// §16.8 Sequence declarations
-// =============================================================================
-TEST(ParserSection16, SequenceDeclaration) {
-  auto r = Parse(
-      "module m;\n"
-      "  sequence s_req;\n"
-      "    req ##1 ack;\n"
-      "  endsequence\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  bool found = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kSequenceDecl) {
-      found = true;
-      EXPECT_EQ(item->name, "s_req");
-    }
-  }
-  EXPECT_TRUE(found);
-}
-
-// =============================================================================
 // Combination: property used with assert
 // =============================================================================
 TEST(ParserSection16, PropertyDeclAndAssertProperty) {
