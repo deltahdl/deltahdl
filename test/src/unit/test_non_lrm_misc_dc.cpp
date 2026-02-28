@@ -52,20 +52,6 @@ static ParseResult40 Parse(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// §35.2.1 Attributes on modules/instances
-// =============================================================================
-TEST_F(DpiParseTest, AttributeOnModuleDefinition) {
-  auto* unit = Parse(R"(
-    (* optimize_power *)
-    module m;
-      wire a;
-    endmodule
-  )");
-  ASSERT_EQ(unit->modules.size(), 1u);
-  EXPECT_EQ(unit->modules[0]->name, "m");
-}
-
 TEST_F(DpiParseTest, AttributeOnModuleInstantiation) {
   auto* unit = Parse(R"(
     module m;

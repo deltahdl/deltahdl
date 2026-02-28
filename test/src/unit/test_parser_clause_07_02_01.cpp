@@ -170,4 +170,58 @@ TEST(ParserSection7, Sec7_2_1_PackedVarDecl) {
   EXPECT_EQ(item->data_type.struct_members.size(), 2u);
 }
 
+static ModuleItem* NthItem(ParseResult7e& r, size_t n) {
+  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.size() <= n)
+    return nullptr;
+  return r.cu->modules[0]->items[n];
+}
+
+// --- Packed struct variable with initial value ---
+TEST(ParserSection7, Sec7_2_1_PackedVarWithInit) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct packed {\n"
+      "    bit [7:0] hi;\n"
+      "    bit [7:0] lo;\n"
+      "  } pair_t;\n"
+      "  pair_t p = 16'hABCD;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = NthItem(r, 1);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->name, "p");
+  EXPECT_NE(item->init_expr, nullptr);
+}
+
+static Stmt* FirstInitialStmt(ParseResult7e& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) {
+      if (item->body && item->body->kind == StmtKind::kBlock) {
+        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+      }
+      return item->body;
+    }
+  }
+  return nullptr;
+}
+
+// --- Packed struct member access via dot notation on RHS ---
+TEST(ParserSection7, Sec7_2_1_PackedMemberAccessRead) {
+  auto r = Parse(
+      "module t;\n"
+      "  struct packed {\n"
+      "    logic [7:0] a;\n"
+      "    logic [7:0] b;\n"
+      "  } s;\n"
+      "  initial x = s.a;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
+}
+
 }  // namespace

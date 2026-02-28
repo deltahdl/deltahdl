@@ -78,4 +78,50 @@ TEST(ParserSection13, FunctionMultipleBodyStmts) {
   EXPECT_GE(fn->func_body_stmts.size(), 3u);
 }
 
+struct ParseResult4e {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult4e Parse(const std::string& src) {
+  ParseResult4e result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// 23. Automatic function with input/output/inout ports
+// =============================================================================
+TEST(ParserSection4, Sec4_9_3_AutoFuncWithAllPortDirs) {
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic void multi_dir(\n"
+      "      input int a,\n"
+      "      output int b,\n"
+      "      inout int c);\n"
+      "    b = a + c;\n"
+      "    c = a;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->is_automatic);
+  ASSERT_EQ(item->func_args.size(), 3u);
+  EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
+  EXPECT_EQ(item->func_args[0].data_type.kind, DataTypeKind::kInt);
+  EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
+  EXPECT_EQ(item->func_args[1].data_type.kind, DataTypeKind::kInt);
+  EXPECT_EQ(item->func_args[2].direction, Direction::kInout);
+  EXPECT_EQ(item->func_args[2].data_type.kind, DataTypeKind::kInt);
+}
+
 }  // namespace

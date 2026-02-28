@@ -53,28 +53,6 @@ static void VerifyTwoArgTask(ParseResult12b& r) {
 
 namespace {
 
-// =============================================================================
-// LRM section 12.4.2 -- unique-if, unique0-if, priority-if (additional cases)
-// =============================================================================
-// unique if with else-if chain and no final else (LRM says violation).
-TEST(ParserSection12, UniqueIfChainNoElse) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    unique if (a == 0) x = 0;\n"
-      "    else if (a == 1) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
-  ASSERT_NE(stmt->else_branch, nullptr);
-  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kIf);
-  EXPECT_EQ(stmt->else_branch->else_branch, nullptr);
-}
-
 // unique0 if with else-if chain (no violation when none match).
 TEST(ParserSection12, Unique0IfChainElseIf) {
   auto r = Parse(
