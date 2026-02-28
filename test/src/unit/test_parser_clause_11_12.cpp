@@ -190,4 +190,22 @@ TEST(ParserA212, LetPortList_MixedTypes) {
   ASSERT_EQ(item->func_args.size(), 3u);
 }
 
+// =============================================================================
+// A.2.12 Production #4: let_port_item
+// let_port_item ::= {attribute_instance} let_formal_type
+//     formal_port_identifier {variable_dimension} [= expression]
+// =============================================================================
+TEST(ParserA212, LetPortItem_ImplicitType) {
+  auto r = Parse(
+      "module m;\n"
+      "  let f(x) = x;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kLetDecl);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->func_args.size(), 1u);
+  EXPECT_EQ(item->func_args[0].name, "x");
+}
+
 }  // namespace
