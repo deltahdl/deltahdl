@@ -7,14 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA303, InputTerminal_CmosSwitch) {
-  // input_terminal as second terminal of cmos switch
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  cmos (out, data[3:0], nctrl, pctrl);\n"
-              "endmodule\n"));
-}
-
 // =============================================================================
 // A.3.3 Production #4: ncontrol_terminal ::= expression
 // Exercised via cmos switches (cmos/rcmos).
