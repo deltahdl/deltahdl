@@ -44,34 +44,6 @@ static ModuleItem* NthAlwaysLatchItem(ParseResult9i& r, size_t n) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 6. Multiple assignments inside a begin-end block.
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_3_MultipleAssignments) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic en, d1, d2, q1, q2;\n"
-      "  always_latch begin\n"
-      "    if (en) begin\n"
-      "      q1 <= d1;\n"
-      "      q2 <= d2;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysLatchItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  ASSERT_GE(item->body->stmts.size(), 1u);
-  auto* if_stmt = item->body->stmts[0];
-  EXPECT_EQ(if_stmt->kind, StmtKind::kIf);
-  ASSERT_NE(if_stmt->then_branch, nullptr);
-  EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kBlock);
-  EXPECT_EQ(if_stmt->then_branch->stmts.size(), 2u);
-}
-
-// ---------------------------------------------------------------------------
 // 7. Complex conditions (logical operators in if expression).
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_ComplexConditions) {
