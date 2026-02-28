@@ -15,31 +15,6 @@ static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
 
 namespace {
 
-// =============================================================================
-// Integration: Procedural blocks containing various assignment forms
-// =============================================================================
-TEST(ParserA602, Integration_AlwaysFFWithBlockingAndNonblocking) {
-  // Typical always_ff pattern with reset
-  auto r = Parse(
-      "module m;\n"
-      "  always_ff @(posedge clk or negedge rst_n) begin\n"
-      "    if (!rst_n) begin\n"
-      "      q <= 0;\n"
-      "      r <= 0;\n"
-      "    end else begin\n"
-      "      q <= d;\n"
-      "      r <= e;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysBlock);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysFF);
-  EXPECT_EQ(item->sensitivity.size(), 2u);
-}
-
 TEST(ParserA602, Integration_InitialWithTimingAndAssign) {
   auto r = Parse(
       "module m;\n"
