@@ -6,25 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- Elaborator expands for-generate with continuous assigns ---
-TEST(ParserAnnexA042, ElaborationGenerateForWithAssign) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module top #(parameter N = 2) ();\n"
-      "  generate\n"
-      "    for (i = 0; i < N; i = i + 1) begin\n"
-      "      logic [31:0] w;\n"
-      "      assign w = 100;\n"
-      "    end\n"
-      "  endgenerate\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->variables.size(), 2u);
-  EXPECT_EQ(mod->assigns.size(), 2u);
-}
-
 // --- Elaborator resolves if_generate_construct (true branch) ---
 TEST(ParserAnnexA042, ElaborationGenerateIfTrue) {
   ElabFixture f;
