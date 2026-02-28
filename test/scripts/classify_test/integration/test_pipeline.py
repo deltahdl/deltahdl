@@ -44,8 +44,12 @@ def _make_classifier_with_topic(_name, clause, topic):
     return classifier
 
 
+def _noop(*_a, **_kw):
+    """No-op stub for side-effect functions."""
+
+
 def _stub_externals(monkeypatch, tmp_path, classifier):
-    """Stub Claude CLI, CMake path, and commit_and_push."""
+    """Stub Claude CLI, CMake path, and side-effect functions."""
     monkeypatch.setattr(classify_test, "_call_claude", classifier)
     cmake = tmp_path / "CMakeLists.txt"
     cmake.write_text(
@@ -53,13 +57,9 @@ def _stub_externals(monkeypatch, tmp_path, classifier):
     )
     monkeypatch.setattr(classify_test, "CMAKE_PATH", cmake)
     monkeypatch.setattr(
-        classify_test, "maybe_tick_issue_checkbox",
-        lambda args, tests: None,
-    )
+        classify_test, "maybe_tick_issue_checkbox", _noop)
     monkeypatch.setattr(
-        classify_test, "commit_classification",
-        lambda *a, **kw: None,
-    )
+        classify_test, "commit_classification", _noop)
 
 
 def _run_pipeline(tmp_path, test, dry_run=False):

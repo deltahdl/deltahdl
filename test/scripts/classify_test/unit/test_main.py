@@ -13,7 +13,7 @@ from classify_test._output import (
 )
 from helpers import make_parsed_file as _parsed
 from helpers import make_test_block as _tb
-from helpers import stub_classifier
+from helpers import stub_classifier, stub_side_effects
 
 _parse_args = getattr(classify_test, "_parse_args")
 _group_tests = getattr(classify_test, "_group_tests")
@@ -784,14 +784,7 @@ def _run_live_non_lrm(tmp_path, monkeypatch, src_body, classifier,
     monkeypatch.setattr(
         classify_test, "_call_claude", classifier,
     )
-    monkeypatch.setattr(
-        classify_test, "maybe_tick_issue_checkbox",
-        lambda args, tests: None,
-    )
-    monkeypatch.setattr(
-        classify_test, "commit_classification",
-        lambda *a, **kw: None,
-    )
+    stub_side_effects(monkeypatch)
     cmake = tmp_path / "CMakeLists.txt"
     cmake.write_text(
         f"# header\nadd_unit_test({src.stem})\n", encoding="utf-8",

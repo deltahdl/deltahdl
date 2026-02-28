@@ -15,7 +15,11 @@ from classify_test._github import (
     tick_checkbox,
     update_issue_body,
 )
-from helpers import make_test_block as _tb, stub_subprocess_failure
+from helpers import (
+    make_test_block as _tb,
+    stub_subprocess_failure,
+    stub_subprocess_success,
+)
 
 _parse_args = getattr(classify_test, "_parse_args")
 
@@ -144,19 +148,10 @@ def test_fetch_issue_body_failure_exits(monkeypatch):
 
 def _capture_update_cmd(monkeypatch):
     """Run update_issue_body and return captured subprocess command."""
-    captured = []
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = ""
-    mock_result.stderr = ""
-
-    def capture_run(cmd, **_kwargs):
-        captured.extend(cmd)
-        return mock_result
-
-    monkeypatch.setattr(subprocess, "run", capture_run)
+    captured = stub_subprocess_success(monkeypatch)
     update_issue_body("myorg", "myrepo", 42, "new body")
-    return captured
+    # Flatten: stub_subprocess_success stores [list, ...]; return flat.
+    return [arg for cmd in captured for arg in cmd]
 
 
 def test_update_issue_body_calls_gh(monkeypatch):

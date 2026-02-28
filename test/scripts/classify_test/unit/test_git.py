@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from classify_test._git import build_commit_message, commit_and_push
-from helpers import stub_subprocess_failure
+from helpers import stub_subprocess_failure, stub_subprocess_success
 
 
 # ---- build_commit_message --------------------------------------------------
@@ -106,25 +106,9 @@ def test_build_commit_message_annex_clause():
 # ---- commit_and_push -------------------------------------------------------
 
 
-def _mock_subprocess_success(monkeypatch):
-    """Stub subprocess.run to always succeed; return captured commands."""
-    captured = []
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = ""
-    mock_result.stderr = ""
-
-    def capture_run(cmd, **_kwargs):
-        captured.append(list(cmd))
-        return mock_result
-
-    monkeypatch.setattr(subprocess, "run", capture_run)
-    return captured
-
-
 def test_commit_and_push_calls_git_add(monkeypatch):
     """Calls git add for each changed file."""
-    captured = _mock_subprocess_success(monkeypatch)
+    captured = stub_subprocess_success(monkeypatch)
     commit_and_push(
         [Path("/a/b.cpp"), Path("/a/c.cpp")], [], "msg",
     )
@@ -134,7 +118,7 @@ def test_commit_and_push_calls_git_add(monkeypatch):
 
 def test_commit_and_push_adds_correct_files(monkeypatch):
     """git add receives the correct file paths."""
-    captured = _mock_subprocess_success(monkeypatch)
+    captured = stub_subprocess_success(monkeypatch)
     commit_and_push([Path("/a/b.cpp")], [], "msg")
     add_cmd = next(c for c in captured if c[:2] == ["git", "add"])
     assert add_cmd[2] == str(Path("/a/b.cpp"))
@@ -142,7 +126,7 @@ def test_commit_and_push_adds_correct_files(monkeypatch):
 
 def test_commit_and_push_calls_git_rm(monkeypatch):
     """Calls git rm for each deleted file."""
-    captured = _mock_subprocess_success(monkeypatch)
+    captured = stub_subprocess_success(monkeypatch)
     commit_and_push([], [Path("/a/d.cpp")], "msg")
     rm_cmds = [c for c in captured if c[:2] == ["git", "rm"]]
     assert len(rm_cmds) == 1
@@ -150,7 +134,7 @@ def test_commit_and_push_calls_git_rm(monkeypatch):
 
 def test_commit_and_push_rm_correct_file(monkeypatch):
     """git rm receives the correct file path."""
-    captured = _mock_subprocess_success(monkeypatch)
+    captured = stub_subprocess_success(monkeypatch)
     commit_and_push([], [Path("/a/d.cpp")], "msg")
     rm_cmd = next(c for c in captured if c[:2] == ["git", "rm"])
     assert rm_cmd[2] == str(Path("/a/d.cpp"))
@@ -158,7 +142,7 @@ def test_commit_and_push_rm_correct_file(monkeypatch):
 
 def test_commit_and_push_calls_git_commit(monkeypatch):
     """Calls git commit."""
-    captured = _mock_subprocess_success(monkeypatch)
+    captured = stub_subprocess_success(monkeypatch)
     commit_and_push([Path("/a/b.cpp")], [], "msg")
     commit_cmds = [c for c in captured if c[:2] == ["git", "commit"]]
     assert len(commit_cmds) == 1
@@ -166,7 +150,7 @@ def test_commit_and_push_calls_git_commit(monkeypatch):
 
 def test_commit_and_push_commit_uses_stdin(monkeypatch):
     """git commit uses -F - to read message from stdin."""
-    captured = _mock_subprocess_success(monkeypatch)
+    captured = stub_subprocess_success(monkeypatch)
     commit_and_push([Path("/a/b.cpp")], [], "msg")
     commit_cmd = next(c for c in captured if c[:2] == ["git", "commit"])
     assert "-F" in commit_cmd and "-" in commit_cmd
@@ -174,7 +158,7 @@ def test_commit_and_push_commit_uses_stdin(monkeypatch):
 
 def test_commit_and_push_calls_git_push(monkeypatch):
     """Calls git push after committing."""
-    captured = _mock_subprocess_success(monkeypatch)
+    captured = stub_subprocess_success(monkeypatch)
     commit_and_push([Path("/a/b.cpp")], [], "msg")
     push_cmds = [c for c in captured if c[:2] == ["git", "push"]]
     assert len(push_cmds) == 1
@@ -182,7 +166,7 @@ def test_commit_and_push_calls_git_push(monkeypatch):
 
 def test_commit_and_push_order(monkeypatch):
     """Operations happen in order: add, rm, commit, push."""
-    captured = _mock_subprocess_success(monkeypatch)
+    captured = stub_subprocess_success(monkeypatch)
     commit_and_push(
         [Path("/a/b.cpp")], [Path("/a/d.cpp")], "msg",
     )
@@ -192,7 +176,7 @@ def test_commit_and_push_order(monkeypatch):
 
 def test_commit_and_push_noop_when_empty(monkeypatch):
     """No git commands when no files changed or deleted."""
-    captured = _mock_subprocess_success(monkeypatch)
+    captured = stub_subprocess_success(monkeypatch)
     commit_and_push([], [], "msg")
     assert len(captured) == 0
 
@@ -213,7 +197,7 @@ def test_commit_and_push_exits_on_commit_failure(monkeypatch):
     failure.returncode = 1
     failure.stderr = "error"
 
-    def alternating(cmd, **_kw):
+    def alternating(_cmd, **_kw):
         call_count[0] += 1
         # First call (add) succeeds, second (commit) fails
         if call_count[0] <= 1:
@@ -234,7 +218,7 @@ def test_commit_and_push_exits_on_push_failure(monkeypatch):
     failure.returncode = 1
     failure.stderr = "push error"
 
-    def alternating(cmd, **_kw):
+    def alternating(_cmd, **_kw):
         call_count[0] += 1
         # add + commit succeed, push fails
         if call_count[0] <= 2:
