@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §9.2.2.2: Combinational logic always_comb procedure
 
 #include "fixture_parser.h"
 #include "simulator/udp_eval.h"
