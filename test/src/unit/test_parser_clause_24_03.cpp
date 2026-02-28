@@ -217,4 +217,20 @@ TEST_F(ProgramTestParse, ProgramWithVariableDecls) {
   EXPECT_GE(unit->programs[0]->items.size(), 2u);
 }
 
+// anonymous_program_item: class_declaration, interface_class_declaration
+TEST(SourceText, AnonymousProgramClasses) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  program;\n"
+      "    class C; endclass\n"
+      "    interface class IC;\n"
+      "      pure virtual function void f();\n"
+      "    endclass\n"
+      "  endprogram\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
 }  // namespace

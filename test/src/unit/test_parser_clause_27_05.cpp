@@ -302,4 +302,22 @@ TEST(Parser, GenerateCase) {
   VerifyGenerateCaseItem(item->gen_case_items[1], 1, false, 1);
 }
 
+TEST(Parser, GenerateCaseDefault) {
+  auto r = Parse(
+      "module t;\n"
+      "  case (WIDTH)\n"
+      "    1: begin\n"
+      "      assign a = b;\n"
+      "    end\n"
+      "    default: begin\n"
+      "      assign a = c;\n"
+      "    end\n"
+      "  endcase\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->gen_case_items.size(), 2);
+  EXPECT_TRUE(item->gen_case_items[1].is_default);
+}
+
 }  // namespace
