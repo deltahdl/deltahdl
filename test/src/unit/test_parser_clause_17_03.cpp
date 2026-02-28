@@ -64,4 +64,18 @@ TEST(ParserAnnexA0414, CheckerInstEmptyPorts) {
   EXPECT_TRUE(item->inst_ports.empty());
 }
 
+// --- name_of_instance: with unpacked_dimension (instance array) ---
+TEST(ParserAnnexA0414, CheckerInstArray) {
+  auto r = Parse(
+      "checker my_chk(input logic clk);\n"
+      "endchecker\n"
+      "module m; my_chk u0 [3:0] (.clk(clk)); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->inst_module, "my_chk");
+  EXPECT_NE(item->inst_range_left, nullptr);
+  EXPECT_NE(item->inst_range_right, nullptr);
+}
+
 }  // namespace
