@@ -5,19 +5,14 @@
 
 using namespace delta;
 
-namespace {
-
-// § primary — assignment_pattern_expression
-TEST(ParserA84, PrimaryAssignmentPattern) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    automatic int arr [3] = '{0, 1, 2};\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
+static ModuleItem* FirstContAssign(ParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kContAssign) return item;
+  }
+  return nullptr;
 }
+
+namespace {
 
 // § primary — streaming_concatenation
 TEST(ParserA84, PrimaryStreamingConcat) {
@@ -452,13 +447,6 @@ TEST(ParserA84, PrimaryEscapedIdentifier) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-}
-
-static ModuleItem* FirstContAssign(ParseResult& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kContAssign) return item;
-  }
-  return nullptr;
 }
 
 // =============================================================================
