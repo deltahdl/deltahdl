@@ -285,4 +285,16 @@ TEST(ParserA212, LetExpr_InAssign) {
               "endmodule\n"));
 }
 
+TEST(ParserA212, LetExpr_Nested) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  let inc(x) = x + 1;\n"
+              "  let dbl(x) = x * 2;\n"
+              "  initial begin\n"
+              "    int z;\n"
+              "    z = dbl(inc(3));\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
