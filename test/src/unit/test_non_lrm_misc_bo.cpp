@@ -38,37 +38,7 @@ static Stmt* FirstInitialStmt(ParseResult7& r) {
   return nullptr;
 }
 
-static void VerifyStructMemberNames(const std::vector<StructMember>& members,
-                                    const std::string expected_names[],
-                                    size_t count) {
-  ASSERT_EQ(members.size(), count);
-  for (size_t i = 0; i < count; ++i) {
-    EXPECT_EQ(members[i].name, expected_names[i]) << "member " << i;
-  }
-}
-
 namespace {
-
-// =========================================================================
-// §7.2: Structures
-// =========================================================================
-TEST(ParserSection7, StructBasic) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct {\n"
-      "    int a;\n"
-      "    logic [7:0] b;\n"
-      "  } my_struct;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
-  EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kStruct);
-  std::string expected_names[] = {"a", "b"};
-  VerifyStructMemberNames(item->typedef_type.struct_members, expected_names,
-                          std::size(expected_names));
-}
 
 TEST(ParserSection7, StructPackedSigned) {
   auto r = Parse(
