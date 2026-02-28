@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA303, OutputTerminal_PullGateBitSelect) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  pulldown (bus[2]);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA303, OutputTerminal_EnableGate) {
   // output_terminal as first terminal of enable gate
   EXPECT_TRUE(

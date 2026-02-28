@@ -257,4 +257,11 @@ TEST(ParserA303, OutputTerminal_Concatenation) {
               "endmodule\n"));
 }
 
+TEST(ParserA303, OutputTerminal_PullGateBitSelect) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  pulldown (bus[2]);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
