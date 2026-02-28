@@ -173,4 +173,17 @@ TEST(ParserSection9, StatementLabelOnAssignment) {
   EXPECT_EQ(stmt->label, "my_label");
 }
 
+TEST(ParserSection9, StatementLabelOnIf) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    check: if (x) a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->label, "check");
+}
+
 }  // namespace
