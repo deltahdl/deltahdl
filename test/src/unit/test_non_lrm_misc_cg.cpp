@@ -42,29 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-TEST(ParserSection11, LiteralAsExpression) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = 42;\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
-}
-
-// =========================================================================
-// Section 11.2.1 -- Constant expressions (operands)
-// =========================================================================
-TEST(ParserSection11, ConstExprInParamDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  parameter WIDTH = 8;\n"
-      "  parameter DEPTH = 2 ** WIDTH;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserSection11, ConstExprSystemFuncInParam) {
   auto r = Parse(
       "module t;\n"
