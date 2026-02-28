@@ -333,4 +333,51 @@ TEST(ParserSection7, Sec7_2_1_PackedAssignFromConcat) {
   EXPECT_EQ(stmt->rhs->elements.size(), 2u);
 }
 
+struct ParseResult9h {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9h Parse(const std::string& src) {
+  ParseResult9h result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// 18. always_comb with struct member access
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_2_StructMemberAccess) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct packed {\n"
+      "    logic [7:0] addr;\n"
+      "    logic [7:0] data;\n"
+      "  } pkt_t;\n"
+      "  pkt_t pkt;\n"
+      "  logic [7:0] a, d;\n"
+      "  always_comb begin\n"
+      "    pkt.addr = a;\n"
+      "    pkt.data = d;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysComb(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  ASSERT_GE(item->body->stmts.size(), 2u);
+  // LHS of first assignment should be a member access expression
+  EXPECT_EQ(item->body->stmts[0]->lhs->kind, ExprKind::kMemberAccess);
+  EXPECT_EQ(item->body->stmts[1]->lhs->kind, ExprKind::kMemberAccess);
+}
+
 }  // namespace

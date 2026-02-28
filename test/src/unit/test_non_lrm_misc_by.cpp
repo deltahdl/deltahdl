@@ -45,35 +45,6 @@ static ModuleItem* NthAlwaysItem(ParseResult9h& r, size_t n) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 18. always_comb with struct member access
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_2_StructMemberAccess) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef struct packed {\n"
-      "    logic [7:0] addr;\n"
-      "    logic [7:0] data;\n"
-      "  } pkt_t;\n"
-      "  pkt_t pkt;\n"
-      "  logic [7:0] a, d;\n"
-      "  always_comb begin\n"
-      "    pkt.addr = a;\n"
-      "    pkt.data = d;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysComb(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  ASSERT_GE(item->body->stmts.size(), 2u);
-  // LHS of first assignment should be a member access expression
-  EXPECT_EQ(item->body->stmts[0]->lhs->kind, ExprKind::kMemberAccess);
-  EXPECT_EQ(item->body->stmts[1]->lhs->kind, ExprKind::kMemberAccess);
-}
-
-// ---------------------------------------------------------------------------
 // 19. always_comb with unique case
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_UniqueCase) {
