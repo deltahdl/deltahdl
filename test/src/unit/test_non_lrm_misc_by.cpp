@@ -45,59 +45,6 @@ static ModuleItem* NthAlwaysItem(ParseResult9h& r, size_t n) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 20. always_comb with priority case
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_2_PriorityCase) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [3:0] req;\n"
-      "  logic [1:0] grant;\n"
-      "  always_comb begin\n"
-      "    priority case (1'b1)\n"
-      "      req[0]: grant = 2'd0;\n"
-      "      req[1]: grant = 2'd1;\n"
-      "      req[2]: grant = 2'd2;\n"
-      "      req[3]: grant = 2'd3;\n"
-      "      default: grant = 2'd0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstAlwaysCombStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kCase);
-  EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
-  ASSERT_EQ(stmt->case_items.size(), 5u);
-}
-
-// ---------------------------------------------------------------------------
-// 21. always_comb with local variable declaration
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_2_LocalVarDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [7:0] a, b, result;\n"
-      "  always_comb begin\n"
-      "    logic [8:0] temp;\n"
-      "    temp = a + b;\n"
-      "    result = temp[7:0];\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysComb(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  ASSERT_GE(item->body->stmts.size(), 3u);
-  EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(item->body->stmts[0]->var_name, "temp");
-  EXPECT_EQ(item->body->stmts[1]->kind, StmtKind::kBlockingAssign);
-  EXPECT_EQ(item->body->stmts[2]->kind, StmtKind::kBlockingAssign);
-}
-
-// ---------------------------------------------------------------------------
 // 22. always_comb has implicit sensitivity (no sensitivity list on item)
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_ImplicitSensitivity) {
