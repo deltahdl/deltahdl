@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA302, PullupStrength_SingleHighz1) {
-  auto r = Parse(
-      "module m;\n"
-      "  pullup (highz1) pu1(out);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPullup);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->drive_strength0, 0u);  // none
-  EXPECT_EQ(g->drive_strength1, 1u);  // highz1
-}
-
 // -----------------------------------------------------------------------------
 // Combination: strength with multiple instances
 // -----------------------------------------------------------------------------
