@@ -84,4 +84,18 @@ TEST(ParserA601, NetAlias_FourNets) {
   ASSERT_EQ(alias->alias_nets.size(), 4u);
 }
 
+TEST(ParserA601, NetAlias_BitSelect) {
+  // §10.11: alias with bit-selects for byte-swapping
+  auto r = Parse(
+      "module m;\n"
+      "  wire [31:0] A, B;\n"
+      "  alias {A[7:0],A[15:8],A[23:16],A[31:24]} = B;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* alias = FindAlias(r.cu->modules[0]->items);
+  ASSERT_NE(alias, nullptr);
+  ASSERT_EQ(alias->alias_nets.size(), 2u);
+}
+
 }  // namespace
