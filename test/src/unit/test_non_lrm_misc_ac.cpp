@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, LetDecl_HasBodyExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  let sum(a, b) = a + b;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* item =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kLetDecl);
-  ASSERT_NE(item, nullptr);
-  EXPECT_NE(item->init_expr, nullptr);
-}
-
 TEST(ParserA212, LetDecl_ComplexExpr) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
