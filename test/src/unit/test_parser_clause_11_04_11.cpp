@@ -311,4 +311,31 @@ TEST(ParserSection11, Sec11_4_6_TernaryInAlwaysComb) {
   EXPECT_EQ(item->body->rhs->kind, ExprKind::kTernary);
 }
 
+struct ParseResult11e {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult11e Parse(const std::string& src) {
+  ParseResult11e result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+TEST(ParserSection11, ConstExprTernaryInLocalparam) {
+  auto r = Parse(
+      "module t #(parameter A = 1);\n"
+      "  localparam B = (A > 0) ? 10 : 20;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

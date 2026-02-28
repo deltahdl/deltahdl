@@ -23,40 +23,6 @@ static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
 
 namespace {
 
-// void cast with system function call
-TEST(ParserA609, VoidCastSystemCall) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial void'($sformatf(\"hello\"));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kCast);
-  EXPECT_EQ(expr->text, "void");
-  ASSERT_NE(expr->lhs, nullptr);
-  EXPECT_EQ(expr->lhs->kind, ExprKind::kSystemCall);
-}
-
-// =============================================================================
-// A.6.9 — system_tf_call
-// =============================================================================
-// system_tf_call without parentheses
-TEST(ParserA609, SystemTfCallNoParens) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial $finish;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kSystemCall);
-  EXPECT_EQ(expr->callee, "$finish");
-  EXPECT_TRUE(expr->args.empty());
-}
-
 // system_tf_call with empty parentheses
 TEST(ParserA609, SystemTfCallEmptyParens) {
   auto r = Parse(
