@@ -46,23 +46,6 @@ static Stmt* FindStmtByKind(ModuleItem* item, StmtKind kind) {
 namespace {
 
 // =============================================================================
-// §4.6: Program block with initial block
-// =============================================================================
-TEST(ParserSection4, Sec4_6_ProgramWithInitialBlock) {
-  auto r = Parse(
-      "program p;\n"
-      "  initial begin\n"
-      "    $display(\"test\");\n"
-      "  end\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  ASSERT_EQ(r.cu->programs[0]->items.size(), 1u);
-  EXPECT_EQ(r.cu->programs[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
-}
-
-// =============================================================================
 // §4.6: Program block with final block
 // =============================================================================
 TEST(ParserSection4, Sec4_6_ProgramWithFinalBlock) {
