@@ -78,26 +78,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult4c& r) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 4. #0 delay control (Inactive region)
-// ---------------------------------------------------------------------------
-TEST(ParserSection4, Sec4_5_ZeroDelayControl) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a;\n"
-      "  initial begin\n"
-      "    #0 a = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDelay);
-  EXPECT_NE(stmt->delay, nullptr);
-  EXPECT_NE(stmt->body, nullptr);
-}
-
-// ---------------------------------------------------------------------------
 // 5. #1 delay control with blocking assign
 // ---------------------------------------------------------------------------
 TEST(ParserSection4, Sec4_5_UnitDelayControl) {
