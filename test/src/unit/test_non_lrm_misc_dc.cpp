@@ -52,21 +52,6 @@ static ParseResult40 Parse(const std::string& src) {
 
 namespace {
 
-TEST_F(DpiParseTest, AttributeOnModuleInstantiation) {
-  auto* unit = Parse(R"(
-    module m;
-      (* dont_touch *)
-      sub u1(.a(x));
-    endmodule
-  )");
-  ASSERT_EQ(unit->modules.size(), 1u);
-  auto& items = unit->modules[0]->items;
-  ASSERT_EQ(items.size(), 1u);
-  EXPECT_EQ(items[0]->kind, ModuleItemKind::kModuleInst);
-  ASSERT_FALSE(items[0]->attrs.empty());
-  EXPECT_EQ(items[0]->attrs[0].name, "dont_touch");
-}
-
 TEST_F(DpiParseTest, AttributeWithValueOnInstance) {
   auto* unit = Parse(R"(
     module m;

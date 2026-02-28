@@ -209,4 +209,35 @@ TEST(ParserSection9, Sec9_3_1_BlockInFinalBlock) {
   EXPECT_TRUE(found);
 }
 
+struct ParseResult90301 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult90301 Parse(const std::string& src) {
+  ParseResult90301 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// =============================================================================
+// §24.12 Program with final block
+// =============================================================================
+TEST_F(ProgramTestParse, ProgramWithFinalBlock) {
+  auto* unit = Parse(
+      "program p;\n"
+      "  final begin\n"
+      "    $display(\"done\");\n"
+      "  end\n"
+      "endprogram\n");
+  ASSERT_EQ(unit->programs.size(), 1u);
+  ASSERT_EQ(unit->programs[0]->items.size(), 1u);
+  EXPECT_EQ(unit->programs[0]->items[0]->kind, ModuleItemKind::kFinalBlock);
+}
+
 }  // namespace

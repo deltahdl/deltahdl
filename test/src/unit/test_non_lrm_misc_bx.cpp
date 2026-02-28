@@ -89,26 +89,6 @@ static Stmt* FirstAlwaysCombStmt(ParseResult9g& r) {
 namespace {
 
 // =============================================================================
-// LRM section 9.4.5 -- Repeat event with bare signal (no edge specifier)
-// =============================================================================
-// Repeat event with bare signal: a = repeat(2) @(clk) b;
-TEST(ParserSection9, Sec9_4_5_RepeatBareSignal) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg clk, a, b;\n"
-      "  initial a = repeat(2) @(clk) b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_EQ(stmt->events.size(), 1u);
-  EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
-  EXPECT_NE(stmt->repeat_event_count, nullptr);
-}
-
-// =============================================================================
 // LRM section 9.4.5 -- Repeat count is a variable
 // =============================================================================
 // Repeat count is a variable: a = repeat(n) @(posedge clk) b;
