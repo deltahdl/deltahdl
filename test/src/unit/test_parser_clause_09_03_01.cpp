@@ -285,4 +285,63 @@ TEST(ParserSection9c, SequentialBlockWithLocalVarDecl) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
 }
 
+TEST(ParserSection9c, SequentialBlockMultipleLocalVars) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int a;\n"
+      "    int b;\n"
+      "    a = 1;\n"
+      "    b = a + 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  ASSERT_GE(body->stmts.size(), 4u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kVarDecl);
+}
+
+struct ParseResult9e {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9e Parse(const std::string& src) {
+  ParseResult9e result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// LRM section 9.3.1 -- Blocks with system function calls.
+// =============================================================================
+TEST(ParserSection9, Sec9_3_1_BlockWithSystemCalls) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    $display(\"hello\");\n"
+      "    $write(\"world\");\n"
+      "    $finish;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = FirstInitialBody(r);
+  ASSERT_NE(body, nullptr);
+  ASSERT_GE(body->stmts.size(), 3u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kExprStmt);
+  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kExprStmt);
+  EXPECT_EQ(body->stmts[2]->kind, StmtKind::kExprStmt);
+}
+
 }  // namespace
