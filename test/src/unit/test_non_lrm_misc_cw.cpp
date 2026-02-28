@@ -5,19 +5,26 @@
 
 using namespace delta;
 
-namespace {
-
-// Program parameter port list and ports
-TEST(SourceText, ProgramParamsAndPorts) {
-  auto r = Parse(
-      "program prg #(parameter int N = 10)(input logic clk);\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_EQ(r.cu->programs[0]->params.size(), 1u);
-  EXPECT_EQ(r.cu->programs[0]->ports.size(), 1u);
+static int CountItemsOfKind(const std::vector<ModuleItem*>& items,
+                            ModuleItemKind kind) {
+  int count = 0;
+  for (const auto* item : items) {
+    if (item->kind == kind) ++count;
+  }
+  return count;
 }
+
+static void VerifyModportPorts(const std::vector<ModportPort>& ports,
+                               const ModportPortExpected expected[],
+                               size_t count) {
+  ASSERT_EQ(ports.size(), count);
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(ports[i].direction, expected[i].dir) << "port " << i;
+    EXPECT_EQ(ports[i].name, expected[i].name) << "port " << i;
+  }
+}
+
+namespace {
 
 TEST(Parser, ProgramWithInitial) {
   auto r = Parse(
@@ -28,15 +35,6 @@ TEST(Parser, ProgramWithInitial) {
   ASSERT_EQ(r.cu->programs.size(), 1);
   EXPECT_EQ(r.cu->programs[0]->items.size(), 1);
   EXPECT_EQ(r.cu->programs[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
-}
-
-static int CountItemsOfKind(const std::vector<ModuleItem*>& items,
-                            ModuleItemKind kind) {
-  int count = 0;
-  for (const auto* item : items) {
-    if (item->kind == kind) ++count;
-  }
-  return count;
 }
 
 TEST_F(ProgramTestParse, ProgramAutomaticLifetime) {
@@ -654,16 +652,6 @@ TEST(SourceText, InterfaceItemPortDecl) {
   EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 2u);
   EXPECT_EQ(r.cu->interfaces[0]->ports[0].name, "clk");
   EXPECT_EQ(r.cu->interfaces[0]->ports[1].name, "data");
-}
-
-static void VerifyModportPorts(const std::vector<ModportPort>& ports,
-                               const ModportPortExpected expected[],
-                               size_t count) {
-  ASSERT_EQ(ports.size(), count);
-  for (size_t i = 0; i < count; ++i) {
-    EXPECT_EQ(ports[i].direction, expected[i].dir) << "port " << i;
-    EXPECT_EQ(ports[i].name, expected[i].name) << "port " << i;
-  }
 }
 
 TEST(Parser, InterfaceWithModport) {

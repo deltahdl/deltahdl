@@ -45,4 +45,16 @@ TEST(ParserAnnexA0413, MultipleProgramInstances) {
   EXPECT_EQ(i1->inst_name, "u1");
 }
 
+// Program parameter port list and ports
+TEST(SourceText, ProgramParamsAndPorts) {
+  auto r = Parse(
+      "program prg #(parameter int N = 10)(input logic clk);\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->params.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->ports.size(), 1u);
+}
+
 }  // namespace
