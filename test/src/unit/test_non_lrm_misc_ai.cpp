@@ -7,22 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Initial statement with value 1
-TEST(ParserAnnexA053, InitStmt_ValueOne) {
-  auto r = Parse(
-      "primitive dff(output reg q, input d, clk);\n"
-      "  initial q = 1;\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
-  EXPECT_TRUE(udp->has_initial);
-  EXPECT_EQ(udp->initial_value, '1');
-}
-
 // ---------------------------------------------------------------------------
 // Production 6: init_val ::= 1'b0 | 1'b1 | 1'bx | 1'bX | 1'B0 | 1'B1 |
 //               1'Bx | 1'BX | 1 | 0

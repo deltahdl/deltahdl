@@ -112,4 +112,20 @@ TEST(ParserAnnexA053, SeqBody_SimInitialValue) {
   EXPECT_EQ(eval.GetOutput(), '1');
 }
 
+// Initial statement with value 1
+TEST(ParserAnnexA053, InitStmt_ValueOne) {
+  auto r = Parse(
+      "primitive dff(output reg q, input d, clk);\n"
+      "  initial q = 1;\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "    1 r : ? : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* udp = r.cu->udps[0];
+  EXPECT_TRUE(udp->has_initial);
+  EXPECT_EQ(udp->initial_value, '1');
+}
+
 }  // namespace
