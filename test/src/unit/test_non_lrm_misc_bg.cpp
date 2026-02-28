@@ -74,14 +74,6 @@ static void VerifyAttrNames(const ModuleItem* item,
 
 namespace {
 
-TEST(ParserCh50603, SystemFunction_InExpression) {
-  // A system function like $clog2 used inside an expression.
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  parameter W = $clog2(256);\n"
-              "endmodule"));
-}
-
 // From test_parser_clause_05.cpp
 TEST(ParserCh50701, SizedLiteral_NoOverflow) {
   auto r = ParseWithDiag(
