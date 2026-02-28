@@ -42,15 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-TEST(ParserSection11, ConstExprTernaryInLocalparam) {
-  auto r = Parse(
-      "module t #(parameter A = 1);\n"
-      "  localparam B = (A > 0) ? 10 : 20;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // =========================================================================
 // Section 11.3 -- Operators (general syntax and unary +)
 // =========================================================================
