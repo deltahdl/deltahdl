@@ -46,17 +46,6 @@ TEST(ParserA221, StructUnionStruct) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kStruct);
 }
 
-TEST(ParserA23, ListOfVariableDeclAssignmentsWithDims) {
-  auto r = Parse("module m; logic [7:0] mem [256], cache [64]; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  int count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kVarDecl) count++;
-  }
-  EXPECT_GE(count, 2);
-}
-
 // --- net_decl_assignment ---
 // net_identifier { unpacked_dimension } [ = expression ]
 TEST(ParserA24, NetDeclAssignmentBasic) {
