@@ -52,4 +52,16 @@ TEST(ParserA60701, AssignmentPatternReplication) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// §10.9.1: replication form with multiple elements
+TEST(ParserA60701, AssignmentPatternReplicationMultiElem) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    x = '{2{a, b}};\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

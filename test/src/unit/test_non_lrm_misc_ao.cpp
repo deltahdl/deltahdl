@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §10.9.1: replication form with multiple elements
-TEST(ParserA60701, AssignmentPatternReplicationMultiElem) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    x = '{2{a, b}};\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // ---------------------------------------------------------------------------
 // assignment_pattern_expression ::= [ type ] assignment_pattern
 // assignment_pattern_expression_type ::=
