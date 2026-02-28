@@ -268,4 +268,12 @@ TEST(ParserA213, NettypeDeclBasic) {
   EXPECT_EQ(item->name, "my_real_net");
 }
 
+// §6.6.7: Nettype with shortreal data type.
+TEST(ParserSection6, Sec6_6_7_NettypeWithShortrealType) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  nettype shortreal sr_net;\n"
+              "endmodule\n"));
+}
+
 }  // namespace

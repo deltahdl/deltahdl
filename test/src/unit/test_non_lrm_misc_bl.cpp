@@ -73,22 +73,6 @@ TEST(ParserSection6, CastCompatibleEnumToInt) {
   EXPECT_TRUE(IsCastCompatible(a, b));
 }
 
-// §6.6.7: Nettype with real data type.
-TEST(ParserSection6, Sec6_6_7_NettypeWithRealType) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  nettype real real_net;\n"
-              "endmodule\n"));
-}
-
-// §6.6.7: Nettype with shortreal data type.
-TEST(ParserSection6, Sec6_6_7_NettypeWithShortrealType) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  nettype shortreal sr_net;\n"
-              "endmodule\n"));
-}
-
 // §6.6.7: Nettype used to declare a net variable.
 TEST(ParserSection6, Sec6_6_7_NettypeUsedForNetDecl) {
   EXPECT_TRUE(
