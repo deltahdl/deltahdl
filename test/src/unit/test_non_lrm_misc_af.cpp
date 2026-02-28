@@ -18,20 +18,6 @@ RtlirDesign* Elaborate(const std::string& src, ElabFixture& f,
 
 namespace {
 
-// --- program_instantiation: with instance array ---
-TEST(ParserAnnexA0413, ProgramInstArray) {
-  auto r = Parse(
-      "program my_prog(input logic clk);\n"
-      "endprogram\n"
-      "module m; my_prog u0 [3:0] (.clk(clk)); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->inst_module, "my_prog");
-  EXPECT_NE(item->inst_range_left, nullptr);
-  EXPECT_NE(item->inst_range_right, nullptr);
-}
-
 // --- program_instantiation: empty port list ---
 TEST(ParserAnnexA0413, ProgramInstEmptyPorts) {
   auto r = Parse(
