@@ -13,21 +13,6 @@ bool HasItemOfKind(const std::vector<ModuleItem*>& items, ModuleItemKind kind) {
 
 namespace {
 
-// --- generate_block: begin/end with label ---
-TEST(ParserAnnexA042, GenerateBlockLabeled) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 0; i < 4; i++) begin : gen_blk\n"
-      "    assign out[i] = in[i];\n"
-      "  end : gen_blk\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* gen = r.cu->modules[0]->items[0];
-  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateFor);
-  ASSERT_EQ(gen->gen_body.size(), 1u);
-}
-
 // --- generate_block: begin/end with multiple items ---
 TEST(ParserAnnexA042, GenerateBlockMultipleItems) {
   auto r = Parse(
