@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA303, OutputTerminal_Concatenation) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  buf ({o1, o2}, in);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA303, OutputTerminal_MultipleOutputs) {
   // Multiple output_terminals in n-output gate
   auto r = Parse(

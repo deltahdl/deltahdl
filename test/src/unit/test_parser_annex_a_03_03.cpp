@@ -250,4 +250,11 @@ TEST(ParserA303, OutputTerminal_PartSelect) {
               "endmodule\n"));
 }
 
+TEST(ParserA303, OutputTerminal_Concatenation) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  buf ({o1, o2}, in);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
