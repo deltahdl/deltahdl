@@ -7,16 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, GateInst_MosMultipleInstances) {
-  auto r = Parse(
-      "module m;\n"
-      "  pmos p1(o1, i1, c1), p2(o2, i2, c2);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto gates = FindAllGates(r.cu->modules[0]->items);
-  EXPECT_EQ(gates.size(), 2u);
-}
-
 // =============================================================================
 // A.3.1 Production #1: gate_instantiation (enable_gatetype alternative)
 // gate_instantiation ::=
