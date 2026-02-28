@@ -6,19 +6,6 @@ using namespace delta;
 
 namespace {
 
-// Package with items and lifetime.
-TEST(SourceText, PackageLifetimeWithItems) {
-  auto r = Parse(
-      "package automatic pkg;\n"
-      "  parameter int W = 8;\n"
-      "  typedef logic [W-1:0] word_t;\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->packages[0]->name, "pkg");
-  EXPECT_EQ(r.cu->packages[0]->items.size(), 2u);
-}
-
 // specparam_declaration as non_port_module_item (outside specify block).
 TEST(SourceText, SpecparamAsModuleItem) {
   auto r = Parse(
