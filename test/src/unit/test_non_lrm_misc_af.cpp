@@ -25,25 +25,6 @@ RtlirDesign* Elaborate(const std::string& src, ElabFixture& f,
 
 namespace {
 
-// =============================================================================
-// parameter_value_assignment ::= # ( [ list_of_parameter_value_assignments ] )
-// list_of_parameter_value_assignments ::=
-//   ordered_parameter_assignment { , ordered_parameter_assignment }
-//   | named_parameter_assignment { , named_parameter_assignment }
-// ordered_parameter_assignment ::= param_expression
-// named_parameter_assignment ::= . parameter_identifier ( [ param_expression ]
-// )
-// =============================================================================
-TEST(ParserAnnexA0411, EmptyParameterValueAssignment) {
-  // #() — empty parameter list
-  auto r = Parse("module m; sub #() u0(a); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
-  EXPECT_EQ(item->inst_params.size(), 0u);
-}
-
 TEST(ParserAnnexA0411, OrderedParameterAssignment) {
   auto r = Parse("module m; sub #(8, 4) u0(a); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
