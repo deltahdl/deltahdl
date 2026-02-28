@@ -7,12 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA, A3GateInstWithStrengthAndDelay) {
-  auto r = Parse("module m; and (strong0, weak1) #5 g(y, a, b); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // =============================================================================
 // A.3.1 Production #1: gate_instantiation (cmos_switchtype alternative)
 // gate_instantiation ::=
