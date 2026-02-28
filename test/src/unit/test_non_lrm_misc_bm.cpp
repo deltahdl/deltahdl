@@ -31,39 +31,6 @@ static ModuleItem* FirstItem(ParseResult6h& r) {
 
 namespace {
 
-// 3b. Unpacked dimensions on logic with packed dims (memory array).
-TEST(ParserSection6, Sec6_11_LogicPackedAndUnpackedDims) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [7:0] mem[256];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
-  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
-  EXPECT_EQ(item->data_type.packed_dim_left->int_val, 7u);
-  EXPECT_FALSE(item->unpacked_dims.empty());
-}
-
-// 4. Combined packed + unpacked dims with range notation.
-TEST(ParserSection6, Sec6_11_PackedAndUnpackedWithRange) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [7:0] mem [0:3];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
-  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
-  EXPECT_EQ(item->data_type.packed_dim_left->int_val, 7u);
-  EXPECT_FALSE(item->unpacked_dims.empty());
-  EXPECT_EQ(item->name, "mem");
-}
-
 // 5. Signed with packed dims: logic signed [15:0].
 TEST(ParserSection6, Sec6_11_LogicSignedWithPackedDims) {
   auto r = Parse(

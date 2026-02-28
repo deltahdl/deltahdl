@@ -40,17 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult6& r) {
 
 namespace {
 
-TEST(ParserA221, EnumBaseTypeIdentifier) {
-  // enum type_identifier { ... }
-  auto r = Parse(
-      "module m;\n"
-      "  typedef logic [3:0] nibble_t;\n"
-      "  enum nibble_t {A, B} x;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // 27. Parameter and localparam in module scope
 TEST(ParserClause03, Cl3_13_ParameterAndLocalparamInModule) {
   auto r = Parse(

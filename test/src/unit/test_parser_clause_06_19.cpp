@@ -116,4 +116,15 @@ TEST(ParserA221, EnumBaseVectorWithDim) {
   EXPECT_NE(r.cu->modules[0]->items[0]->data_type.packed_dim_left, nullptr);
 }
 
+TEST(ParserA221, EnumBaseTypeIdentifier) {
+  // enum type_identifier { ... }
+  auto r = Parse(
+      "module m;\n"
+      "  typedef logic [3:0] nibble_t;\n"
+      "  enum nibble_t {A, B} x;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
