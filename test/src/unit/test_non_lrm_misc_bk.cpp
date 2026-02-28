@@ -63,21 +63,6 @@ TEST(ParserSection6, MatchingTypesSameSigningModifier) {
   EXPECT_TRUE(TypesMatch(a, b));
 }
 
-// =============================================================================
-// LRM section 6.10 -- Implicit declarations
-// =============================================================================
-TEST(ParserSection6, ImplicitNetInPortList) {
-  auto r = ParseWithPreprocessor(
-      "module m(a, b);\n"
-      "  input a;\n"
-      "  output b;\n"
-      "  assign b = a;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->ports.size(), 2u);
-}
-
 TEST(ParserSection6, ImplicitNetInContAssign) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
