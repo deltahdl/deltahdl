@@ -73,49 +73,6 @@ TEST(ParserSection6, CastCompatibleEnumToInt) {
   EXPECT_TRUE(IsCastCompatible(a, b));
 }
 
-// §6.6.7: Nettype with a struct data type.
-TEST(ParserSection6, Sec6_6_7_NettypeWithStruct) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef struct { real field1; bit field2; } T;\n"
-      "  nettype T wT;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* nt = FindNettypeDecl(r, "wT");
-  ASSERT_NE(nt, nullptr);
-  EXPECT_EQ(nt->name, "wT");
-}
-
-// §6.6.7: Nettype with resolution function — checks resolve func field.
-TEST(ParserSection6, Sec6_6_7_NettypeWithResolveFuncName) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef struct { real field1; bit field2; } T;\n"
-      "  nettype T wTsum with Tsum;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* nt = FindNettypeDecl(r, "wTsum");
-  ASSERT_NE(nt, nullptr);
-  EXPECT_EQ(nt->nettype_resolve_func, "Tsum");
-}
-
-// §6.6.7: Nettype alias — declaring a new name for an existing nettype.
-TEST(ParserSection6, Sec6_6_7_NettypeAlias) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef real TR[5];\n"
-      "  nettype TR wTR;\n"
-      "  nettype wTR alias_net;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* nt = FindNettypeDecl(r, "alias_net");
-  ASSERT_NE(nt, nullptr);
-  EXPECT_EQ(nt->name, "alias_net");
-}
-
 // §6.6.7: Multiple nettypes in the same module.
 TEST(ParserSection6, Sec6_6_7_MultipleNettypesInModule) {
   auto r = Parse(

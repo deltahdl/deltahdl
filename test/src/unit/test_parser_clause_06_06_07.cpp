@@ -180,4 +180,45 @@ TEST(Parser, NettypeDeclaration) {
   EXPECT_EQ(item->name, "mynet");
 }
 
+// §6.6.7: Nettype with resolution function — checks resolve func field.
+TEST(ParserSection6, Sec6_6_7_NettypeWithResolveFuncName) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct { real field1; bit field2; } T;\n"
+      "  nettype T wTsum with Tsum;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* nt = FindNettypeDecl(r, "wTsum");
+  ASSERT_NE(nt, nullptr);
+  EXPECT_EQ(nt->nettype_resolve_func, "Tsum");
+}
+
+// §6.6.7: Nettype alias — declaring a new name for an existing nettype.
+TEST(ParserSection6, Sec6_6_7_NettypeAlias) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef real TR[5];\n"
+      "  nettype TR wTR;\n"
+      "  nettype wTR alias_net;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* nt = FindNettypeDecl(r, "alias_net");
+  ASSERT_NE(nt, nullptr);
+  EXPECT_EQ(nt->name, "alias_net");
+}
+
+TEST(Parser, NettypeWithResolutionFunction) {
+  auto r = Parse(
+      "module t;\n"
+      "  nettype logic [7:0] mynet with resolve_fn;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
+  EXPECT_EQ(item->name, "mynet");
+  EXPECT_EQ(item->nettype_resolve_func, "resolve_fn");
+}
+
 }  // namespace
