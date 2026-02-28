@@ -4,7 +4,6 @@
 
 using namespace delta;
 
-
 namespace {
 
 TEST(ParserA211, CovergroupDecl_WithExtends) {

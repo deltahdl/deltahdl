@@ -4,7 +4,6 @@
 
 using namespace delta;
 
-
 namespace {
 
 // sequence_expr ::= sequence_expr and sequence_expr

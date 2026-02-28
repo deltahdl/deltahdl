@@ -4,7 +4,6 @@
 
 using namespace delta;
 
-
 namespace {
 
 // property_expr ::= property_expr until property_expr

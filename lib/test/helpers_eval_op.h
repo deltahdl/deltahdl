@@ -6,8 +6,8 @@
 
 using namespace delta;
 
-inline Variable* MakeVar4(SimFixture& f, std::string_view name,
-                          uint32_t width, uint64_t aval, uint64_t bval) {
+inline Variable* MakeVar4(SimFixture& f, std::string_view name, uint32_t width,
+                          uint64_t aval, uint64_t bval) {
   auto* var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4Vec(f.arena, width);
   var->value.words[0].aval = aval;
@@ -15,8 +15,7 @@ inline Variable* MakeVar4(SimFixture& f, std::string_view name,
   return var;
 }
 
-inline Variable* MakeRealVar(SimFixture& f, std::string_view name,
-                             double val) {
+inline Variable* MakeRealVar(SimFixture& f, std::string_view name, double val) {
   auto* var = f.ctx.CreateVariable(name, 64);
   uint64_t bits = 0;
   std::memcpy(&bits, &val, sizeof(double));

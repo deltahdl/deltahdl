@@ -10,11 +10,11 @@
 #include "parser/ast.h"
 #include "simulator/awaiters.h"
 #include "simulator/exec_task.h"
+#include "simulator/lowerer.h"
 #include "simulator/process.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_result.h"
 #include "simulator/variable.h"
-#include "simulator/lowerer.h"
 
 using namespace delta;
 

@@ -3,14 +3,13 @@
 #include <cstdint>
 #include <string_view>
 
+#include "builders_ast.h"
 #include "common/arena.h"
 #include "parser/ast.h"
 #include "simulator/process.h"
 #include "simulator/sim_context.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_result.h"
-
-#include "builders_ast.h"
 
 using namespace delta;
 

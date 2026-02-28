@@ -4,7 +4,6 @@
 
 using namespace delta;
 
-
 namespace {
 
 // property_expr ::= s_eventually property_expr

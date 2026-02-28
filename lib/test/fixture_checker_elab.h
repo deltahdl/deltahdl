@@ -3,13 +3,12 @@
 #include <string>
 #include <string_view>
 
-#include "gtest/gtest.h"
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "gtest/gtest.h"
 #include "lexer/lexer.h"
 #include "parser/ast.h"
 #include "parser/parser.h"

@@ -109,7 +109,8 @@ inline uint32_t ComputeArraySize(int32_t lhi, int32_t rhi) {
   return static_cast<uint32_t>(std::abs(lhi - rhi)) + 1;
 }
 
-inline bool ValidateStrengthSpec(StrengthLvl s0, StrengthLvl s1, GateType /*type*/) {
+inline bool ValidateStrengthSpec(StrengthLvl s0, StrengthLvl s1,
+                                 GateType /*type*/) {
   return s0 != StrengthLvl::kHighz || s1 != StrengthLvl::kHighz;
 }
 

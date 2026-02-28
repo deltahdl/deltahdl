@@ -4,7 +4,6 @@
 
 using namespace delta;
 
-
 namespace {
 
 // property_expr ::= accept_on ( expression_or_dist ) property_expr

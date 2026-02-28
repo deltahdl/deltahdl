@@ -23,10 +23,9 @@ inline void VerifyClockingSignalDirections(
 }
 
 // Verify full-path src_ports and dst_ports by name.
-inline void VerifyFullPathPorts(
-    SpecifyItem* si,
-    std::initializer_list<const char*> src,
-    std::initializer_list<const char*> dst) {
+inline void VerifyFullPathPorts(SpecifyItem* si,
+                                std::initializer_list<const char*> src,
+                                std::initializer_list<const char*> dst) {
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
   ASSERT_EQ(si->path.src_ports.size(), src.size());
   size_t i = 0;
@@ -55,9 +54,8 @@ inline void VerifyTernaryFieldsAllIdentifier(Expr* expr) {
 }
 
 // Verify func_args directions.
-inline void VerifyFuncArgDirections(
-    ModuleItem* item,
-    std::initializer_list<Direction> expected) {
+inline void VerifyFuncArgDirections(ModuleItem* item,
+                                    std::initializer_list<Direction> expected) {
   ASSERT_EQ(item->func_args.size(), expected.size());
   size_t i = 0;
   for (auto dir : expected) {

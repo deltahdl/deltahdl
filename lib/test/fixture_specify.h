@@ -6,11 +6,10 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "gtest/gtest.h"
 #include "lexer/lexer.h"
 #include "parser/ast.h"
 #include "parser/parser.h"
-
-#include "gtest/gtest.h"
 
 using namespace delta;
 

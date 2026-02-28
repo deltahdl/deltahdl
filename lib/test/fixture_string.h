@@ -1,5 +1,7 @@
 #pragma once
 
+#include <gtest/gtest.h>
+
 #include <cstring>
 #include <string>
 #include <string_view>
@@ -13,8 +15,6 @@
 #include "simulator/eval.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
-
-#include <gtest/gtest.h>
 
 using namespace delta;
 

@@ -4,7 +4,6 @@
 
 using namespace delta;
 
-
 namespace {
 
 // sequence_expr ::= first_match ( sequence_expr {, sequence_match_item} )

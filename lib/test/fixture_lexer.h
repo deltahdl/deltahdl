@@ -1,9 +1,9 @@
 #pragma once
 
+#include <gtest/gtest.h>
+
 #include <string>
 #include <vector>
-
-#include <gtest/gtest.h>
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"

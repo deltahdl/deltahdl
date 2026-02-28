@@ -79,8 +79,7 @@ inline Expr* MakeSelect(Arena& arena, std::string_view base, uint64_t idx) {
 }
 
 inline Expr* MakeMethodCall(Arena& arena, std::string_view obj,
-                            std::string_view method,
-                            std::vector<Expr*> args) {
+                            std::string_view method, std::vector<Expr*> args) {
   auto* access = arena.Create<Expr>();
   access->kind = ExprKind::kMemberAccess;
   access->lhs = MakeId(arena, obj);

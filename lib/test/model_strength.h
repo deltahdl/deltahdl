@@ -35,7 +35,7 @@ inline bool ValidateStrengthPair(StrengthLevel s0, StrengthLevel s1);
 inline StrengthSignal CombineUnambiguous(StrengthSignal a, StrengthSignal b);
 
 inline StrengthSignal CombineWithWiredLogic(StrengthSignal a, StrengthSignal b,
-                                     WiredLogicKind logic);
+                                            WiredLogicKind logic);
 
 inline StrengthLevel ReduceNonresistive(StrengthLevel input);
 
@@ -126,7 +126,7 @@ inline StrengthSignal CombineUnambiguous(StrengthSignal a, StrengthSignal b) {
 }
 
 inline StrengthSignal CombineWithWiredLogic(StrengthSignal a, StrengthSignal b,
-                                     WiredLogicKind logic) {
+                                            WiredLogicKind logic) {
   // For different strengths, the stronger signal dominates (same as
   // unambiguous combination). Wired logic only applies when two
   // same-strength opposite-value signals combine.
@@ -201,4 +201,3 @@ inline StrengthLevel ReduceResistive(StrengthLevel input) {
       return StrengthLevel::kHighz;
   }
 }
-

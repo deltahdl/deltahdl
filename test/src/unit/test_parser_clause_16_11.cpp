@@ -4,7 +4,6 @@
 
 using namespace delta;
 
-
 namespace {
 
 // sequence_match_item ::= subroutine_call

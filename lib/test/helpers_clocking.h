@@ -33,11 +33,11 @@ inline void ScheduleNegedge(Fixture& f, Variable* clk, uint64_t time) {
 
 // Create a clocking block with one signal, register, and attach.
 template <typename Fixture>
-inline void SetupClockingBlock(
-    Fixture& f, ClockingManager& cmgr,
-    const char* block_name, Edge edge,
-    SimTime input_skew, SimTime output_skew,
-    const char* signal_name, ClockingDir signal_dir) {
+inline void SetupClockingBlock(Fixture& f, ClockingManager& cmgr,
+                               const char* block_name, Edge edge,
+                               SimTime input_skew, SimTime output_skew,
+                               const char* signal_name,
+                               ClockingDir signal_dir) {
   ClockingBlock block;
   block.name = block_name;
   block.clock_signal = "clk";
@@ -60,8 +60,8 @@ inline void TestNegedgeSampling(Fixture& f, ClockingManager& cmgr) {
   clk->value = MakeLogic4VecVal(f.arena, 1, 1);
   auto* data = f.ctx.CreateVariable("neg_data", 8);
   data->value = MakeLogic4VecVal(f.arena, 8, 0xDD);
-  SetupClockingBlock(f, cmgr, "cb_neg", Edge::kNegedge,
-                     {0}, {0}, "neg_data", ClockingDir::kInput);
+  SetupClockingBlock(f, cmgr, "cb_neg", Edge::kNegedge, {0}, {0}, "neg_data",
+                     ClockingDir::kInput);
   ScheduleNegedge(f, clk, 10);
   f.scheduler.Run();
   EXPECT_EQ(cmgr.GetSampledValue("cb_neg", "neg_data"), 0xDDu);

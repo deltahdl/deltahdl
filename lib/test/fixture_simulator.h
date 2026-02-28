@@ -1,7 +1,6 @@
 #pragma once
 
 #include "fixture_elaborator.h"
-
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 
@@ -44,8 +43,7 @@ inline RtlirDesign* ElaborateSrc(const std::string& src, SimFixture& f) {
   return elab.Elaborate(cu->modules.back()->name);
 }
 
-inline RtlirDesign* ElaborateSrc(const std::string& src,
-                                 SimFixtureSeeded& f) {
+inline RtlirDesign* ElaborateSrc(const std::string& src, SimFixtureSeeded& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
@@ -64,8 +62,8 @@ inline Expr* ParseExprFrom(const std::string& src, SimFixture& f) {
   return item->body->rhs;
 }
 
-inline Variable* MakeVar(SimFixture& f, std::string_view name,
-                         uint32_t width, uint64_t val) {
+inline Variable* MakeVar(SimFixture& f, std::string_view name, uint32_t width,
+                         uint64_t val) {
   auto* var = f.ctx.CreateVariable(name, width);
   var->value = MakeLogic4VecVal(f.arena, width, val);
   return var;

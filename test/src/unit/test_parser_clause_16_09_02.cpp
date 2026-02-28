@@ -4,7 +4,6 @@
 
 using namespace delta;
 
-
 namespace {
 
 // sequence_expr ::= expression_or_dist [ boolean_abbrev ]

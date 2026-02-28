@@ -44,9 +44,9 @@ inline void VerifyTwoRegionOrder(Region first, const std::string& first_label,
 }
 
 // Verify that three regions execute in the given order.
-inline void VerifyThreeRegionOrder(Region r1, const std::string& l1,
-                                   Region r2, const std::string& l2,
-                                   Region r3, const std::string& l3) {
+inline void VerifyThreeRegionOrder(Region r1, const std::string& l1, Region r2,
+                                   const std::string& l2, Region r3,
+                                   const std::string& l3) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -61,10 +61,10 @@ inline void VerifyThreeRegionOrder(Region r1, const std::string& l1,
 }
 
 // Verify that four regions execute in the given order.
-inline void VerifyFourRegionOrder(Region r1, const std::string& l1,
-                                  Region r2, const std::string& l2,
-                                  Region r3, const std::string& l3,
-                                  Region r4, const std::string& l4) {
+inline void VerifyFourRegionOrder(Region r1, const std::string& l1, Region r2,
+                                  const std::string& l2, Region r3,
+                                  const std::string& l3, Region r4,
+                                  const std::string& l4) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -114,8 +114,7 @@ inline void VerifyIterationChain(Region main_region,
 inline void VerifyRegionRestart(Region initial,
                                 const std::string& initial_label,
                                 Region trigger,
-                                const std::string& trigger_label,
-                                Region target,
+                                const std::string& trigger_label, Region target,
                                 const std::string& target_label) {
   Arena arena;
   Scheduler sched(arena);
@@ -250,10 +249,10 @@ inline void VerifyAllRegionOrder() {
   ScheduleLabeled(sched, Region::kPreponed, "preponed", order);
   sched.Run();
   std::vector<std::string> expected = {
-      "preponed",   "pre_active",  "active",      "inactive",
-      "pre_nba",    "nba",         "post_nba",    "pre_observed",
-      "observed",   "post_observed", "reactive",  "re_inactive",
-      "pre_re_nba", "re_nba",      "post_re_nba", "pre_postponed",
+      "preponed",   "pre_active",    "active",      "inactive",
+      "pre_nba",    "nba",           "post_nba",    "pre_observed",
+      "observed",   "post_observed", "reactive",    "re_inactive",
+      "pre_re_nba", "re_nba",        "post_re_nba", "pre_postponed",
       "postponed"};
   EXPECT_EQ(order, expected);
 }

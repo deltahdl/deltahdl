@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "fixture_parser.h"
 #include "elaborator/const_eval.h"
+#include "fixture_parser.h"
 
 using namespace delta;
 

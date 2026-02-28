@@ -1,9 +1,8 @@
 #pragma once
 
-#include "fixture_parser.h"
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "fixture_parser.h"
 #include "preprocessor/preprocessor.h"
 
 struct ElabFixture {
