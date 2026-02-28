@@ -18,15 +18,6 @@ RtlirDesign* Elaborate(const std::string& src, ElabFixture& f,
 
 namespace {
 
-// --- interface_instantiation: ordered port connections ---
-TEST(ParserAnnexA0412, InterfaceInstOrderedPorts) {
-  auto r = Parse("module m; my_if u0(a, b, c); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->inst_ports.size(), 3u);
-}
-
 // --- interface_instantiation: interface instantiated inside interface ---
 TEST(ParserAnnexA0412, InterfaceInstInsideInterface) {
   auto r = Parse(

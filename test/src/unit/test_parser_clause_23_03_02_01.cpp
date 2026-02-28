@@ -55,4 +55,13 @@ TEST(ParserAnnexA0411, OrderedPortBlankPosition) {
   EXPECT_NE(item->inst_ports[2].second, nullptr);  // c
 }
 
+// --- interface_instantiation: ordered port connections ---
+TEST(ParserAnnexA0412, InterfaceInstOrderedPorts) {
+  auto r = Parse("module m; my_if u0(a, b, c); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->inst_ports.size(), 3u);
+}
+
 }  // namespace
