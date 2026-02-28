@@ -39,4 +39,16 @@ TEST(ParserAnnexA0414, BasicCheckerInst) {
   EXPECT_EQ(item->inst_name, "u0");
 }
 
+// --- named_checker_port_connection: .* (wildcard) ---
+TEST(ParserAnnexA0414, CheckerInstWildcardPort) {
+  auto r = Parse(
+      "checker my_chk(input logic clk);\n"
+      "endchecker\n"
+      "module m; my_chk u0(.*); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_TRUE(item->inst_wildcard);
+}
+
 }  // namespace
