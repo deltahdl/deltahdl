@@ -135,4 +135,11 @@ TEST(ParserA212, LetFormalType_Integer) {
               "endmodule\n"));
 }
 
+TEST(ParserA212, LetFormalType_Real) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  let f(real x) = x;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
