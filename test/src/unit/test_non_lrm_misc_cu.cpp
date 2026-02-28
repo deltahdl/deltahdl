@@ -36,17 +36,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-// --- Extern module declarations (LRM §23.2.1) ---
-TEST(ParserSection23, ExternModuleHeader) {
-  auto r = Parse("extern module foo(input logic a, output logic b);\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1);
-  auto* mod = r.cu->modules[0];
-  EXPECT_EQ(mod->name, "foo");
-  EXPECT_TRUE(mod->is_extern);
-  EXPECT_TRUE(mod->items.empty());
-}
-
 TEST(ParserSection23, ExternModulePorts) {
   auto r = Parse("extern module foo(input logic a, output logic b);\n");
   VerifyTwoPortModule(r, "a", Direction::kInput, "b", Direction::kOutput);

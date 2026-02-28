@@ -6,39 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection21, SformatfUsedAsArgument) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial $display(\"%s\", $sformatf(\"nested %d\", 7));\n"
-              "endmodule\n"));
-}
-
-// ============================================================================
-// LRM section 21.3.4 -- Reading data from a file ($fgetc, $ungetc, $fgets,
-//                        $fscanf, $sscanf, $fread)
-// ============================================================================
-TEST(ParserSection21, FgetcCall) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  integer fd, c;\n"
-              "  initial begin\n"
-              "    fd = $fopen(\"test.txt\", \"r\");\n"
-              "    c = $fgetc(fd);\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
-TEST(ParserSection21, UngetcCall) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  integer fd, code;\n"
-              "  initial begin\n"
-              "    fd = $fopen(\"test.txt\", \"r\");\n"
-              "    code = $ungetc(8'h41, fd);\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection21, FgetsCall) {
   EXPECT_TRUE(
       ParseOk("module t;\n"

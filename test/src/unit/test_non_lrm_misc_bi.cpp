@@ -40,15 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult6& r) {
 
 namespace {
 
-// enum [enum_base_type] { ... } {packed_dimension}
-TEST(ParserA221, DataTypeEnum) {
-  auto r = Parse("module m; enum logic [1:0] {A, B, C} x; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kEnum);
-}
-
 TEST(ParserA221, EnumBaseVectorWithDim) {
   auto r = Parse("module m; enum logic [7:0] {A=0, B=255} x; endmodule");
   ASSERT_NE(r.cu, nullptr);

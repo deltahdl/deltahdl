@@ -100,4 +100,13 @@ TEST(Parser, InlineEnumVar) {
   ASSERT_EQ(item->data_type.enum_members.size(), 2);
 }
 
+// enum [enum_base_type] { ... } {packed_dimension}
+TEST(ParserA221, DataTypeEnum) {
+  auto r = Parse("module m; enum logic [1:0] {A, B, C} x; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kEnum);
+}
+
 }  // namespace
