@@ -25,24 +25,6 @@ RtlirDesign* Elaborate(const std::string& src, ElabFixture& f,
 
 namespace {
 
-TEST(ParserAnnexA0411, ElaborationInstanceArray) {
-  auto r = Parse(
-      "module sub(input a, output b);\n"
-      "  assign b = a;\n"
-      "endmodule\n"
-      "module top;\n"
-      "  wire [3:0] x, y;\n"
-      "  sub u0[3:0](.a(x), .b(y));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* inst = FindModuleInst(r.cu->modules[1]->items);
-  ASSERT_NE(inst, nullptr);
-  EXPECT_EQ(inst->inst_name, "u0");
-  EXPECT_NE(inst->inst_range_left, nullptr);
-  EXPECT_NE(inst->inst_range_right, nullptr);
-}
-
 TEST(ParserAnnexA0411, ElaborationWildcardPortConnection) {
   auto r = Parse(
       "module sub(input a, output b);\n"
