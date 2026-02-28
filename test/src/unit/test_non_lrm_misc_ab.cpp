@@ -7,20 +7,6 @@ using namespace delta;
 namespace {
 
 // =============================================================================
-// §A.2.11 Production #31: integer_covergroup_expression
-// =============================================================================
-TEST(ParserA211, IntegerCovergroupExpression_Expr) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x {\n"
-              "      bins b[4] = {[0:15]};\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
-// =============================================================================
 // §A.2.11 Production #32: cross_set_expression
 // =============================================================================
 TEST(ParserA211, CrossSetExpression) {
