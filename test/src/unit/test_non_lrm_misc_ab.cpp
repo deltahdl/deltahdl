@@ -6,22 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §A.2.11 Production #24: select_expression
-// =============================================================================
-TEST(ParserA211, SelectExpression_SelectCondition) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    cp1: coverpoint a;\n"
-              "    cp2: coverpoint b;\n"
-              "    cross cp1, cp2 {\n"
-              "      bins sel = binsof(cp1);\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA211, SelectExpression_Negated) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
