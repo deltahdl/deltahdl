@@ -99,4 +99,22 @@ TEST(ParserAnnexA042, IfGenerateElseIfChain) {
   ASSERT_NE(gen->gen_else->gen_else, nullptr);
 }
 
+// --- case_generate_construct: basic case ---
+TEST(ParserAnnexA042, CaseGenerateBasic) {
+  auto r = Parse(
+      "module m;\n"
+      "  case (WIDTH)\n"
+      "    8: assign out = in8;\n"
+      "    16: assign out = in16;\n"
+      "  endcase\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* gen = r.cu->modules[0]->items[0];
+  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateCase);
+  ASSERT_EQ(gen->gen_case_items.size(), 2u);
+  EXPECT_FALSE(gen->gen_case_items[0].is_default);
+  EXPECT_FALSE(gen->gen_case_items[1].is_default);
+}
+
 }  // namespace
