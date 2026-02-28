@@ -129,4 +129,20 @@ TEST(ParserA212, LetDecl_Multiple) {
   EXPECT_EQ(count, 2);
 }
 
+// =============================================================================
+// A.2.12 Production #2: let_identifier
+// let_identifier ::= identifier
+// =============================================================================
+TEST(ParserA212, LetIdentifier_Simple) {
+  auto r = Parse(
+      "module m;\n"
+      "  let foo = 1;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kLetDecl);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->name, "foo");
+}
+
 }  // namespace
