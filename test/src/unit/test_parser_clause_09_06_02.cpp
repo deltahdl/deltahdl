@@ -185,4 +185,30 @@ TEST(ParserSection9, DisableNamedBlock) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kDisable);
 }
 
+static Stmt* FirstInitialStmt(ParseResult9c& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+    }
+    return item->body;
+  }
+  return nullptr;
+}
+
+TEST(ParserSection9, DisableTaskName) {
+  auto r = Parse(
+      "module m;\n"
+      "  task my_task;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    disable my_task;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDisable);
+}
+
 }  // namespace

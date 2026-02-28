@@ -49,21 +49,6 @@ static bool HasItemKind(ParseResult9c& r, ModuleItemKind kind) {
 
 namespace {
 
-TEST(ParserSection9, DisableTaskName) {
-  auto r = Parse(
-      "module m;\n"
-      "  task my_task;\n"
-      "  endtask\n"
-      "  initial begin\n"
-      "    disable my_task;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDisable);
-}
-
 TEST(ParserSection9, DisableForkAfterJoinNone) {
   auto r = Parse(
       "module m;\n"

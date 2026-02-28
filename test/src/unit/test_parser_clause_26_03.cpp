@@ -163,4 +163,23 @@ TEST(ParserSection26, ImportWildcardField) {
   EXPECT_TRUE(imp->import_item.is_wildcard);
 }
 
+TEST_F(AnnexHParseTest, AnnexGStdRandomizePackageImport) {
+  // std::randomize usage via package import at module level.
+  // The parser handles import std_pkg::* for scope-qualified access.
+  auto* unit = Parse(
+      "module m;\n"
+      "  import std_pkg::*;\n"
+      "  int a, b;\n"
+      "  initial begin\n"
+      "    a = $urandom_range(0, 255);\n"
+      "    b = $urandom;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  EXPECT_FALSE(diag_.HasErrors());
+  auto& items = unit->modules[0]->items;
+  ASSERT_GE(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kImportDecl);
+}
+
 }  // namespace
