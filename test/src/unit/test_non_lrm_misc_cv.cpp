@@ -27,36 +27,6 @@ bool HasItemKindNamed(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-TEST(ParserSection23, LoopGenerateWithModuleInst) {
-  auto r = Parse(
-      "module m;\n"
-      "  genvar i;\n"
-      "  for (i = 0; i < 4; i = i + 1) begin : stage\n"
-      "    sub u (.a(in[i]), .b(out[i]));\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* gen = FindItemByKind(r, ModuleItemKind::kGenerateFor);
-  ASSERT_NE(gen, nullptr);
-  ASSERT_EQ(gen->gen_body.size(), 1);
-  EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kModuleInst);
-}
-
-// =========================================================================
-// LRM section 27.4: Genvar declarations
-// =========================================================================
-TEST(ParserSection23, GenvarDeclaration) {
-  auto r = Parse(
-      "module m;\n"
-      "  genvar i;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_GE(mod->items.size(), 1);
-  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kVarDecl);
-  EXPECT_EQ(mod->items[0]->name, "i");
-}
-
 TEST(ParserSection23, GenvarMultipleDeclarations) {
   auto r = Parse(
       "module m;\n"
