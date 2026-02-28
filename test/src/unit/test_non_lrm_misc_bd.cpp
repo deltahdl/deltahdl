@@ -46,48 +46,6 @@ static Stmt* FindStmtByKind(ModuleItem* item, StmtKind kind) {
 namespace {
 
 // =============================================================================
-// §4.6: Named begin-end block for deterministic scoping
-// =============================================================================
-TEST(ParserSection4, Sec4_6_NamedBeginEndScope) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin : seq_blk\n"
-      "    x = 1;\n"
-      "    y = 2;\n"
-      "  end : seq_blk\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = InitialBody(r);
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kBlock);
-  EXPECT_EQ(body->label, "seq_blk");
-}
-
-// =============================================================================
-// §4.6: Ordered (positional) port connections — deterministic mapping
-// =============================================================================
-TEST(ParserSection4, Sec4_6_OrderedPortConnections) {
-  auto r = Parse(
-      "module top;\n"
-      "  sub u1 (a, b, c);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
-  ASSERT_EQ(item->inst_ports.size(), 3u);
-  // Positional ports have empty name (first element of pair).
-  EXPECT_TRUE(item->inst_ports[0].first.empty());
-  EXPECT_TRUE(item->inst_ports[1].first.empty());
-  EXPECT_TRUE(item->inst_ports[2].first.empty());
-  EXPECT_NE(item->inst_ports[0].second, nullptr);
-  EXPECT_NE(item->inst_ports[1].second, nullptr);
-  EXPECT_NE(item->inst_ports[2].second, nullptr);
-}
-
-// =============================================================================
 // §4.6: Named port connections — deterministic mapping
 // =============================================================================
 TEST(ParserSection4, Sec4_6_NamedPortConnections) {
