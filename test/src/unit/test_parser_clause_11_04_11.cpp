@@ -357,4 +357,22 @@ TEST(ParserSection11, Sec11_4_6_TernaryInGenerateIfCondition) {
   EXPECT_EQ(gen->gen_cond->kind, ExprKind::kTernary);
 }
 
+// --- Multiple ternaries in same expression ---
+TEST(ParserSection11, Sec11_4_6_MultipleTernariesInExpr) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = (s1 ? a : b) + (s2 ? c : d);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kPlus);
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->rhs, nullptr);
+  EXPECT_EQ(rhs->rhs->kind, ExprKind::kTernary);
+}
+
 }  // namespace
