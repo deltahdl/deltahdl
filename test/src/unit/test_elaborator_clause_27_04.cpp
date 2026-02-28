@@ -69,4 +69,27 @@ TEST(Elaborator, GenerateForWithAssign) {
   EXPECT_EQ(mod->variables[1].name, "i_1_w");
 }
 
+// =============================================================================
+// Elaboration tests -- generate constructs resolved through elaborator
+// =============================================================================
+// --- Elaborator expands loop_generate_construct ---
+TEST(ParserAnnexA042, ElaborationGenerateForExpansion) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top #(parameter N = 3) ();\n"
+      "  generate\n"
+      "    for (i = 0; i < N; i = i + 1) begin\n"
+      "      logic [31:0] x;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  EXPECT_EQ(mod->variables.size(), 3u);
+  EXPECT_EQ(mod->variables[0].name, "i_0_x");
+  EXPECT_EQ(mod->variables[1].name, "i_1_x");
+  EXPECT_EQ(mod->variables[2].name, "i_2_x");
+}
+
 }  // namespace
