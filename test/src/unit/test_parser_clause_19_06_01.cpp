@@ -48,4 +48,17 @@ TEST(ParserA211, CrossBodyItem_BinsSelection) {
               "endmodule\n"));
 }
 
+TEST(ParserA211, BinsSelectionOrOption_BinsSelection) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    cp1: coverpoint a;\n"
+              "    cp2: coverpoint b;\n"
+              "    cross cp1, cp2 {\n"
+              "      bins selected = binsof(cp1);\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
 }  // namespace
