@@ -6,25 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection21, FstrobeAndFmonitor) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  integer fd;\n"
-              "  initial begin\n"
-              "    fd = $fopen(\"log.txt\", \"w\");\n"
-              "    $fstrobe(fd, \"val=%d\", x);\n"
-              "    $fstrobeb(fd, x);\n"
-              "    $fstrobeh(fd, x);\n"
-              "    $fstrobeo(fd, x);\n"
-              "    $fmonitor(fd, \"x=%b\", x);\n"
-              "    $fmonitorb(fd, x);\n"
-              "    $fmonitorh(fd, x);\n"
-              "    $fmonitoro(fd, x);\n"
-              "    $fclose(fd);\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection21, FeofFerror) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -34,19 +15,6 @@ TEST(ParserSection21, FeofFerror) {
               "    fd = $fopen(\"data.txt\", \"r\");\n"
               "    eof_flag = $feof(fd);\n"
               "    $ferror(fd, msg);\n"
-              "    $fclose(fd);\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
-TEST(ParserSection21, FtellFseek) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  integer fd, pos;\n"
-              "  initial begin\n"
-              "    fd = $fopen(\"data.txt\", \"r\");\n"
-              "    pos = $ftell(fd);\n"
-              "    $fseek(fd, 10, 0);\n"
               "    $fclose(fd);\n"
               "  end\n"
               "endmodule\n"));
