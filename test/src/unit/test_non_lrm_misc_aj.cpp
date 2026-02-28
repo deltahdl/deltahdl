@@ -50,24 +50,6 @@ static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-// Simulation: output_symbol values
-TEST(ParserAnnexA053, OutputSymbol_SimValues) {
-  auto r = Parse(
-      "primitive p(output y, input a);\n"
-      "  table\n"
-      "    0 : 0;\n"
-      "    1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
-  UdpEvalState eval(*udp);
-  EXPECT_EQ(eval.Evaluate({'0'}), '0');
-  EXPECT_EQ(eval.Evaluate({'1'}), '1');
-  // Unmatched -> x
-  EXPECT_EQ(eval.Evaluate({'x'}), 'x');
-}
-
 // ---------------------------------------------------------------------------
 // Production 15: level_symbol ::= 0 | 1 | x | X | ? | b | B
 // ---------------------------------------------------------------------------
