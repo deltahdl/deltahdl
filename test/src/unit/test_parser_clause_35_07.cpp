@@ -63,4 +63,38 @@ TEST_F(AnnexHParseTest, AnnexHDpiExportFunction) {
   EXPECT_FALSE(items[0]->dpi_is_task);
 }
 
+using DpiParseTest = ProgramTestParse;
+
+using ApiParseTest = ProgramTestParse;
+
+struct ParseResult40 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult40 Parse(const std::string& src) {
+  ParseResult40 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+TEST_F(DpiParseTest, ExportWithCName) {
+  auto* unit = Parse(R"(
+    module m;
+      export "DPI-C" c_func = function sv_func;
+    endmodule
+  )");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiExport);
+  EXPECT_EQ(items[0]->dpi_c_name, "c_func");
+  EXPECT_EQ(items[0]->name, "sv_func");
+}
+
 }  // namespace
