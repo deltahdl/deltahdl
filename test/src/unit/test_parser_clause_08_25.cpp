@@ -36,4 +36,16 @@ TEST(ParserSection8, ParameterizedClass) {
   EXPECT_EQ(cls->params[0].first, "DEPTH");
 }
 
+TEST(ParserSection8, ParameterizedClassMultipleParams) {
+  auto r = Parse(
+      "class fifo #(parameter int WIDTH = 8, parameter int DEPTH = 16);\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto* cls = r.cu->classes[0];
+  ASSERT_EQ(cls->params.size(), 2u);
+  EXPECT_EQ(cls->params[0].first, "WIDTH");
+  EXPECT_EQ(cls->params[1].first, "DEPTH");
+}
+
 }  // namespace
