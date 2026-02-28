@@ -240,4 +240,20 @@ TEST(ParserA211, CoverGroup_NegedgeEvent) {
               "endmodule\n"));
 }
 
+TEST(ParserA211, CoverGroup_ASTVerification) {
+  auto r = Parse(
+      "module m;\n"
+      "  covergroup my_cg @(posedge clk);\n"
+      "    coverpoint addr;\n"
+      "  endgroup\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kCovergroupDecl);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->name, "my_cg");
+  EXPECT_EQ(item->kind, ModuleItemKind::kCovergroupDecl);
+  EXPECT_TRUE(item->loc.IsValid());
+}
+
 }  // namespace
