@@ -57,4 +57,17 @@ TEST(ParserSection11, ArithmeticShiftLeft) {
   EXPECT_EQ(rhs->op, TokenKind::kLtLtLt);
 }
 
+TEST(ParserSection11, ArithmeticShiftRight) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = a >>> 2;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kGtGtGt);
+}
+
 }  // namespace
