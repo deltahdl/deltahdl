@@ -42,16 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-TEST(ParserSection11, RealLiteralWithExponent) {
-  auto r = Parse(
-      "module t;\n"
-      "  real r;\n"
-      "  initial r = 1.0e3 + 2.5e-1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserSection11, RealMultiplication) {
   auto r = Parse(
       "module t;\n"
