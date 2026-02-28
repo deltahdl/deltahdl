@@ -39,4 +39,22 @@ TEST(SourceText, ElabSeverityFatal) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kElabSystemTask);
 }
 
+// severity_system_task: all four forms ($fatal, $error, $warning, $info).
+TEST(SourceText, ElabSeverityAllForms) {
+  auto r = Parse(
+      "module m;\n"
+      "  $fatal;\n"
+      "  $error(\"err\");\n"
+      "  $warning(\"warn\");\n"
+      "  $info;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->items.size(), 4u);
+  for (size_t i = 0; i < 4; ++i) {
+    EXPECT_EQ(r.cu->modules[0]->items[i]->kind,
+              ModuleItemKind::kElabSystemTask);
+  }
+}
+
 }  // namespace
