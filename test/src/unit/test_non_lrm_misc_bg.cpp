@@ -111,22 +111,6 @@ TEST(ParserCh50701, SizedLiteral_OneBitOverflow) {
   delete r.diag;
 }
 
-TEST(ParserCh508, TimeLiteral_IntegerNs) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial #40ns;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDelay);
-}
-
-TEST(ParserCh508, TimeLiteral_FixedPointNs) {
-  // 2.1ns -- a time literal with a fixed-point value.
-  EXPECT_TRUE(ParseOk("module m; initial #2.1ns; endmodule"));
-}
-
 TEST(ParserCh508, TimeLiteral_Ps) {
   EXPECT_TRUE(ParseOk("module m; initial #40ps; endmodule"));
 }

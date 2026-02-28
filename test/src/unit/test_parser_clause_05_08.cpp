@@ -53,4 +53,9 @@ TEST(ParserA84, PrimaryLiteralTimeLiteral) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ParserCh508, TimeLiteral_FixedPointNs) {
+  // 2.1ns -- a time literal with a fixed-point value.
+  EXPECT_TRUE(ParseOk("module m; initial #2.1ns; endmodule"));
+}
+
 }  // namespace
