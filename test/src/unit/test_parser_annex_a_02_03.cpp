@@ -65,4 +65,15 @@ TEST(ParserA23, ListOfTypeAssignmentsMultiple) {
   EXPECT_GE(count, 3);
 }
 
+// --- list_of_udp_port_identifiers ---
+// port_identifier { , port_identifier }
+TEST(ParserA23, ListOfUdpPortIdentifiersSingle) {
+  auto r = Parse(
+      "primitive buf_p(output out, input in);\n"
+      "  table 0 : 0; 1 : 1; endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

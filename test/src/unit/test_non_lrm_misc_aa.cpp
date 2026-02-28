@@ -46,17 +46,6 @@ TEST(ParserA221, StructUnionStruct) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kStruct);
 }
 
-// --- list_of_udp_port_identifiers ---
-// port_identifier { , port_identifier }
-TEST(ParserA23, ListOfUdpPortIdentifiersSingle) {
-  auto r = Parse(
-      "primitive buf_p(output out, input in);\n"
-      "  table 0 : 0; 1 : 1; endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserA23, ListOfVariableDeclAssignmentsWithDims) {
   auto r = Parse("module m; logic [7:0] mem [256], cache [64]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
