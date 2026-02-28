@@ -49,4 +49,26 @@ TEST(ParserSection16, DeferredAssumeModuleLevel) {
   EXPECT_EQ(r.cu->modules.size(), 1u);
 }
 
+TEST(ParserSection16, DeferredCoverModuleLevel) {
+  auto r = Parse(
+      "module top();\n"
+      "  logic a = 1;\n"
+      "  cover #0 (a != 0);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_EQ(r.cu->modules.size(), 1u);
+}
+
+TEST(ParserSection16, AssertFinalModuleLevel) {
+  auto r = Parse(
+      "module top();\n"
+      "  logic a = 1;\n"
+      "  assert final (a != 0);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_EQ(r.cu->modules.size(), 1u);
+}
+
 }  // namespace

@@ -111,4 +111,18 @@ TEST_F(CheckerParseTest, CheckerCoexistsWithModuleAndProgram) {
   EXPECT_EQ(unit->checkers.size(), 1u);
 }
 
+// =============================================================================
+// §17.9 Checker with assert property
+// =============================================================================
+TEST_F(CheckerParseTest, CheckerWithAssertProperty) {
+  auto* unit = Parse(R"(
+    checker assert_check(input logic clk, input logic a, input logic b);
+      assert property (@(posedge clk) a |-> b);
+    endchecker
+  )");
+  ASSERT_EQ(unit->checkers.size(), 1u);
+  EXPECT_TRUE(
+      HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kAssertProperty));
+}
+
 }  // namespace
