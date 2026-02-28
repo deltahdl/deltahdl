@@ -76,4 +76,20 @@ TEST(ParserSection9c, WaitSequenceTriggeredWithAction) {
               "endmodule\n"));
 }
 
+TEST(ParserSection9c, WaitTriggeredInLoop) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  sequence s;\n"
+              "    @(posedge clk) a ##1 b;\n"
+              "  endsequence\n"
+              "  initial begin\n"
+              "    forever begin\n"
+              "      wait(s.triggered);\n"
+              "      count = count + 1;\n"
+              "      @(posedge clk);\n"
+              "    end\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
