@@ -54,4 +54,17 @@ TEST(ParserSection18, GetRandstateAssignToVar) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
+TEST(ParserSection18, GetRandstateInFunction) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  function void checkpoint(output string s);\n"
+      "    s = this.get_randstate();\n"
+      "  endfunction\n"
+      "endclass\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+}
+
 }  // namespace
