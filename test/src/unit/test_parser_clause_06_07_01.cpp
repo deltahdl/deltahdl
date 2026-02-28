@@ -374,4 +374,21 @@ TEST(ParserSection6, Sec6_5_WirePackedDims) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
 
+// 10. wire signed [7:0] w; — implicit type with signing (already works,
+// baseline).
+TEST(ParserSection6, Sec6_7_1_NetImplicitSigned) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire signed [7:0] ws;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_TRUE(item->data_type.is_net);
+  EXPECT_TRUE(item->data_type.is_signed);
+  EXPECT_EQ(item->name, "ws");
+}
+
 }  // namespace

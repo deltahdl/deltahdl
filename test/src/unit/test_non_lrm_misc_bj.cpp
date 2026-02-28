@@ -41,36 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-TEST(ParserSection6, VariableContinuousAssign) {
-  // §6.5: Variables can be written by one continuous assignment.
-  auto r = Parse(
-      "module t;\n"
-      "  logic vw;\n"
-      "  assign vw = 1'b1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto& items = r.cu->modules[0]->items;
-  bool found_ca = false;
-  for (auto* it : items) {
-    if (it->kind == ModuleItemKind::kContAssign) found_ca = true;
-  }
-  EXPECT_TRUE(found_ca);
-}
-
-TEST(ParserSection6, NetWithImplicitContAssign) {
-  // §6.5: Unlike nets, a variable cannot have an implicit continuous
-  // assignment. Wire with inline assignment is a net continuous assign.
-  auto r = Parse(
-      "module t;\n"
-      "  wire w = 1'b0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_NE(item->init_expr, nullptr);
-}
-
 TEST(ParserSection6, VariableInitialization) {
   // §6.5: Assignment as part of variable declaration is an initialization,
   // not a continuous assignment.

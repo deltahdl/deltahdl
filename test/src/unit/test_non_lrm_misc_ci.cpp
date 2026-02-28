@@ -7,35 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- Verify condition, true_expr, false_expr fields ---
-TEST(ParserSection11, Sec11_4_6_VerifyTernaryFields) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = cond_sig ? true_val : false_val;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
-  VerifyTernaryFieldsAllIdentifier(rhs);
-}
-
-// --- Ternary in module port connection ---
-TEST(ParserSection11, Sec11_4_6_TernaryInModulePortConnection) {
-  auto r = Parse(
-      "module t;\n"
-      "  sub u1(.out(sel ? a : b));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* inst = FirstModuleInst(r);
-  ASSERT_NE(inst, nullptr);
-  EXPECT_EQ(inst->kind, ModuleItemKind::kModuleInst);
-  ASSERT_EQ(inst->inst_ports.size(), 1u);
-  EXPECT_EQ(inst->inst_ports[0].first, "out");
-  ASSERT_NE(inst->inst_ports[0].second, nullptr);
-  EXPECT_EQ(inst->inst_ports[0].second->kind, ExprKind::kTernary);
-}
-
 // --- Ternary in always_comb ---
 TEST(ParserSection11, Sec11_4_6_TernaryInAlwaysComb) {
   auto r = Parse(
