@@ -14,4 +14,13 @@ TEST(ParserA211, CovergroupDecl_WithExtends) {
               "endmodule\n"));
 }
 
+TEST(ParserA211, CoverGroup_ExtendsWithBody) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup child extends parent;\n"
+              "    coverpoint z;\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
 }  // namespace

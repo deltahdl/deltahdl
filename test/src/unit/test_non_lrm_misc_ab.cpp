@@ -6,15 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA211, CoverGroup_ExtendsWithBody) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup child extends parent;\n"
-              "    coverpoint z;\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA211, CoverGroup_SampleFunctionWithBody) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
