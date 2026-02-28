@@ -43,20 +43,6 @@ static void GetClockingBlock(ParseResult19& r, ModuleItem*& out,
 
 namespace {
 
-// =============================================================================
-// LRM section 18.5.3 -- Distribution constraints (additional tests)
-// =============================================================================
-TEST(ParserSection18b, DistEqualWeightSingleValue) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x;\n"
-      "  constraint c { x dist {42 := 1}; }\n"
-      "endclass\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
 TEST(ParserSection18b, DistDivideWeightMultipleValues) {
   auto r = Parse(
       "class C;\n"
