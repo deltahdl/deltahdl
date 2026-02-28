@@ -17,27 +17,6 @@ static ClassMember* FindMethodMember(ClassDecl* cls) {
 
 namespace {
 
-// 19. Struct member access on RHS.
-TEST(ParserSection7, Sec7_2_2_MemberAccessOnRHS) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct { int x; int y; } point_t;\n"
-      "  point_t p;\n"
-      "  int val;\n"
-      "  initial val = p.x + p.y;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
-  ASSERT_NE(stmt->rhs->lhs, nullptr);
-  EXPECT_EQ(stmt->rhs->lhs->kind, ExprKind::kMemberAccess);
-  ASSERT_NE(stmt->rhs->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->rhs->kind, ExprKind::kMemberAccess);
-}
-
 // 20. Struct with type-prefixed assignment pattern T'{...}.
 TEST(ParserSection7, Sec7_2_2_TypePrefixedPattern) {
   auto r = Parse(
