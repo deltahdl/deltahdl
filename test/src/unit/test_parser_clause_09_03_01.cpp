@@ -123,4 +123,24 @@ TEST(ParserA602, AlwaysConstruct_WithBeginEnd) {
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
 
+TEST(ParserA602, Integration_InitialWithTimingAndAssign) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    clk = 0;\n"
+      "    #5 clk = 1;\n"
+      "    #5 clk = 0;\n"
+      "    @(posedge done) $finish;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto stmts = AllInitialStmts(r);
+  ASSERT_EQ(stmts.size(), 4u);
+  EXPECT_EQ(stmts[0]->kind, StmtKind::kBlockingAssign);
+  EXPECT_EQ(stmts[1]->kind, StmtKind::kDelay);
+  EXPECT_EQ(stmts[2]->kind, StmtKind::kDelay);
+  EXPECT_EQ(stmts[3]->kind, StmtKind::kEventControl);
+}
+
 }  // namespace
