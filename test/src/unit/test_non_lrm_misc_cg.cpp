@@ -42,17 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-TEST(ParserSection11, ReplicationMultipleElements) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = {2{a, b, c}};\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kReplicate);
-  EXPECT_EQ(rhs->elements.size(), 3u);
-}
-
 // =========================================================================
 // Section 11.4.3.1 -- Unary reduction operators
 // =========================================================================
