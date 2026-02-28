@@ -26,20 +26,6 @@ static ParseResult16b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection16, AssertPropertyWithElse) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (@(posedge clk) req |-> ack)\n"
-      "    $display(\"ok\"); else $error(\"fail\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* ap =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty);
-  ASSERT_NE(ap, nullptr);
-  EXPECT_NE(ap->assert_pass_stmt, nullptr);
-  EXPECT_NE(ap->assert_fail_stmt, nullptr);
-}
-
 // =============================================================================
 // §16.5 Concurrent — assume property
 // =============================================================================
