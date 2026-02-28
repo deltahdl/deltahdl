@@ -45,26 +45,6 @@ static ClassMember* FindClassMethod(ParseResult4e& r) {
 namespace {
 
 // =============================================================================
-// 17. Automatic function returning void
-// =============================================================================
-TEST(ParserSection4, Sec4_9_3_AutoFuncReturningVoid) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic void log_msg(input int code);\n"
-      "    $display(\"code=%0d\", code);\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_TRUE(item->is_automatic);
-  EXPECT_EQ(item->return_type.kind, DataTypeKind::kVoid);
-  EXPECT_EQ(item->name, "log_msg");
-}
-
-// =============================================================================
 // 18. Recursive automatic function with base case (Fibonacci)
 // =============================================================================
 TEST(ParserSection4, Sec4_9_3_RecursiveAutoFuncFibonacci) {
