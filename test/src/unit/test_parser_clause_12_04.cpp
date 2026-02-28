@@ -155,4 +155,36 @@ TEST(ParserA606, IfNullThen) {
   ASSERT_NE(stmt->else_branch, nullptr);
 }
 
+// If-else with both branches.
+TEST(ParserSection12, IfWithElse) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (a) x = 1;\n"
+      "    else x = 2;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  EXPECT_NE(stmt->then_branch, nullptr);
+  EXPECT_NE(stmt->else_branch, nullptr);
+}
+
+// §12.4: if with null else branch
+TEST(ParserA606, IfNullElse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin if (a) x = 1; else ; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  ASSERT_NE(stmt->else_branch, nullptr);
+  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kNull);
+}
+
 }  // namespace

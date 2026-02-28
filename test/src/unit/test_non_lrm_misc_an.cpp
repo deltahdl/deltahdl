@@ -7,37 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §12.4: if with null statement_or_null (semicolon) for then branch
-TEST(ParserA606, IfNullThen) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin if (a) ; else x = 0; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  ASSERT_NE(stmt->then_branch, nullptr);
-  EXPECT_EQ(stmt->then_branch->kind, StmtKind::kNull);
-  ASSERT_NE(stmt->else_branch, nullptr);
-}
-
-// §12.4: if with null else branch
-TEST(ParserA606, IfNullElse) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin if (a) x = 1; else ; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  ASSERT_NE(stmt->else_branch, nullptr);
-  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kNull);
-}
-
 // §12.4: if with begin-end block in both branches
 TEST(ParserA606, IfElseWithBlocks) {
   auto r = Parse(
