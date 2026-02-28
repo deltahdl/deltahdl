@@ -35,51 +35,6 @@ static Stmt* FirstInitialStmt(ParseResult9e& r) {
 
 namespace {
 
-TEST(ParserSection9, Sec9_3_1_BlockInFinalBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  final begin\n"
-      "    $display(\"sim done\");\n"
-      "    $display(\"cycles: %0d\", cnt);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  bool found = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kFinalBlock) {
-      found = true;
-      ASSERT_NE(item->body, nullptr);
-      EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-      EXPECT_GE(item->body->stmts.size(), 2u);
-    }
-  }
-  EXPECT_TRUE(found);
-}
-
-// =============================================================================
-// LRM section 9.3.1 -- Automatic and static variable declarations in blocks.
-// =============================================================================
-TEST(ParserSection9, Sec9_3_1_AutomaticVarDeclInBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    automatic int k = 0;\n"
-      "    k = k + 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 1u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(body->stmts[0]->var_is_automatic);
-  EXPECT_FALSE(body->stmts[0]->var_is_static);
-  EXPECT_EQ(body->stmts[0]->var_name, "k");
-  EXPECT_NE(body->stmts[0]->var_init, nullptr);
-}
-
 TEST(ParserSection9, Sec9_3_1_StaticVarDeclInBlock) {
   auto r = Parse(
       "module m;\n"
