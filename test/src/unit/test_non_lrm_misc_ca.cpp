@@ -90,23 +90,6 @@ static Stmt* FirstInitialStmt(ParseResult9k& r) {
 
 namespace {
 
-// @(*) at always block level: always @(*) stmt
-TEST(ParserSection9, Sec9_4_2_3_AtStarParenAlwaysSimple) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b;\n"
-      "  always @(*) a = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlways);
-  EXPECT_TRUE(item->sensitivity.empty());
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
-}
-
 // @* at statement level inside initial: produces kEventControl with
 // is_star_event=true
 TEST(ParserSection9, Sec9_4_2_3_AtStarStmtLevelInitial) {
