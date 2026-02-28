@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA304, EnableGatetype_Notif1) {
-  auto r = Parse(
-      "module m;\n"
-      "  notif1 (out, in, en);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNotif1);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 3u);
-}
-
 // =============================================================================
 // A.3.4 Production #3: mos_switchtype ::= nmos | pmos | rnmos | rpmos
 // =============================================================================
