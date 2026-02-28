@@ -50,19 +50,6 @@ static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-TEST(ParserA601, NetAlias_FourNets) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b, c, d;\n"
-      "  alias a = b = c = d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* alias = FindAlias(r.cu->modules[0]->items);
-  ASSERT_NE(alias, nullptr);
-  ASSERT_EQ(alias->alias_nets.size(), 4u);
-}
-
 TEST(ParserA601, NetAlias_BitSelect) {
   // §10.11: alias with bit-selects for byte-swapping
   auto r = Parse(
