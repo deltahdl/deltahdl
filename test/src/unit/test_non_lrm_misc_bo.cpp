@@ -49,19 +49,6 @@ static void VerifyStructMemberNames(const std::vector<StructMember>& members,
 
 namespace {
 
-TEST(Parser, InlineStructVar) {
-  auto r = Parse(
-      "module t;\n"
-      "  struct { int x; int y; } point;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
-  EXPECT_EQ(item->name, "point");
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kStruct);
-  ASSERT_EQ(item->data_type.struct_members.size(), 2);
-}
-
 // =========================================================================
 // §7.2: Structures
 // =========================================================================

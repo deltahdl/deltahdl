@@ -84,4 +84,33 @@ TEST(ParserSection7, Sec7_2_2_MemberAccessOnRHS) {
   EXPECT_EQ(stmt->rhs->rhs->kind, ExprKind::kMemberAccess);
 }
 
+struct ParseResult7 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult7 Parse(const std::string& src) {
+  ParseResult7 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+TEST(Parser, InlineStructVar) {
+  auto r = Parse(
+      "module t;\n"
+      "  struct { int x; int y; } point;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(item->name, "point");
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kStruct);
+  ASSERT_EQ(item->data_type.struct_members.size(), 2);
+}
+
 }  // namespace
