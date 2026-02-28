@@ -45,4 +45,21 @@ TEST(ParserA301, GateInst_Notif1Basic) {
               "endmodule\n"));
 }
 
+// =============================================================================
+// A.3.1 Production #3: enable_gate_instance
+// enable_gate_instance ::= [name_of_instance]
+//   ( output_terminal , input_terminal , enable_terminal )
+// =============================================================================
+TEST(ParserA301, EnableGateInst_Unnamed) {
+  auto r = Parse(
+      "module m;\n"
+      "  bufif0 (out, in, en);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kBufif0);
+  ASSERT_NE(g, nullptr);
+  EXPECT_TRUE(g->gate_inst_name.empty());
+  EXPECT_EQ(g->gate_terminals.size(), 3u);
+}
+
 }  // namespace
