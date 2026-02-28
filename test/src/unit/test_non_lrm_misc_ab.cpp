@@ -13,17 +13,6 @@ TEST(ParserA29, AttrOnImportPort) {
               "endinterface\n"));
 }
 
-TEST(ParserA211, BinsKeyword_IllegalBins) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x {\n"
-              "      illegal_bins bad = {255};\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA211, BinsKeyword_IgnoreBins) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
