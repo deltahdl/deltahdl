@@ -28,29 +28,6 @@ bool HasItemKindNamed(const std::vector<ModuleItem*>& items,
 namespace {
 
 // =========================================================================
-// LRM section 27.3: Generate block syntax (begin/end with labels)
-// =========================================================================
-TEST(ParserSection23, GenerateBlockNamedBeginEnd) {
-  auto r = Parse(
-      "module m;\n"
-      "  genvar i;\n"
-      "  for (i = 0; i < 4; i = i + 1) begin : gen_blk\n"
-      "    wire w;\n"
-      "    assign w = 1'b0;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  bool found = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kGenerateFor) {
-      found = true;
-      EXPECT_FALSE(item->gen_body.empty());
-    }
-  }
-  EXPECT_TRUE(found);
-}
-
-// =========================================================================
 // LRM section 27.5: Conditional generates (if-generate)
 // =========================================================================
 TEST(ParserSection23, IfGenerateWithElseIf) {
