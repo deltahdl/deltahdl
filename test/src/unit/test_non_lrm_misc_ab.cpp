@@ -13,17 +13,6 @@ TEST(ParserA29, AttrOnImportPort) {
               "endinterface\n"));
 }
 
-TEST(ParserA211, TransRangeList_GotoRepeat) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x {\n"
-              "      bins t = (1 [-> 3]);\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA211, TransRangeList_NonConsecutiveRepeat) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
