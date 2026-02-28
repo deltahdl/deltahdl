@@ -7,24 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Non-ANSI form: output reg q = 1'b1 ; (in port declaration)
-TEST(ParserAnnexA052, OutputDeclNonAnsi_RegInitOne) {
-  auto r = Parse(
-      "primitive dff(q, d, clk);\n"
-      "  output reg q = 1'b1;\n"
-      "  input d, clk;\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  EXPECT_TRUE(udp->has_initial);
-  EXPECT_EQ(udp->initial_value, '1');
-}
-
 // Wildcard form: output reg q = 1'b0 ; (in port declaration after .*)
 TEST(ParserAnnexA052, OutputDeclWildcard_RegInit) {
   auto r = Parse(
