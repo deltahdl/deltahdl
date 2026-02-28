@@ -188,4 +188,21 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardLogicalOr) {
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
 }
 
+// ---------------------------------------------------------------------------
+// iff guard with not-equal comparison
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_4_2_4_IffGuardNotEqual) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff state != 0) q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->sensitivity.size(), 1u);
+  ASSERT_NE(item->sensitivity[0].iff_condition, nullptr);
+  EXPECT_EQ(item->sensitivity[0].iff_condition->kind, ExprKind::kBinary);
+}
+
 }  // namespace

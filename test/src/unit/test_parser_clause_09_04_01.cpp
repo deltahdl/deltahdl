@@ -71,4 +71,23 @@ TEST(ParserSection9c, ZeroDelayControl) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
+TEST(ParserSection9c, ChainedDelayControls) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    #5 a = 0;\n"
+      "    #10 a = 1;\n"
+      "    #15 a = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  ASSERT_GE(body->stmts.size(), 3u);
+  for (size_t i = 0; i < 3; ++i) {
+    EXPECT_EQ(body->stmts[i]->kind, StmtKind::kDelay);
+  }
+}
+
 }  // namespace
