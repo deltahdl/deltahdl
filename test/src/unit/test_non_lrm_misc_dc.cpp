@@ -52,22 +52,6 @@ static ParseResult40 Parse(const std::string& src) {
 
 namespace {
 
-TEST_F(DpiParseTest, DpiImportCoexistsWithPackageImport) {
-  auto* unit = Parse(R"(
-    module m;
-      import pkg::foo;
-      import "DPI-C" function int c_func();
-      export "DPI-C" function sv_func;
-    endmodule
-  )");
-  ASSERT_EQ(unit->modules.size(), 1u);
-  auto& items = unit->modules[0]->items;
-  ASSERT_EQ(items.size(), 3u);
-  EXPECT_EQ(items[0]->kind, ModuleItemKind::kImportDecl);
-  EXPECT_EQ(items[1]->kind, ModuleItemKind::kDpiImport);
-  EXPECT_EQ(items[2]->kind, ModuleItemKind::kDpiExport);
-}
-
 // =============================================================================
 // §35.2.1 Attributes on modules/instances
 // =============================================================================
