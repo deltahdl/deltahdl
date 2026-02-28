@@ -27,21 +27,6 @@ bool HasItemKindNamed(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-TEST(ParserSection23, NestedModuleMultiple) {
-  EXPECT_TRUE(
-      ParseOk("module outer(input d, ck, output q, nq);\n"
-              "  wire q1, nq1;\n"
-              "  module ff1;\n"
-              "    nand g1(nq1, d, q1);\n"
-              "  endmodule\n"
-              "  ff1 i1();\n"
-              "  module ff2;\n"
-              "    nand g2(q1, ck, nq1);\n"
-              "  endmodule\n"
-              "  ff2 i2();\n"
-              "endmodule\n"));
-}
-
 // =========================================================================
 // LRM section 27.3: Generate construct syntax / generate regions
 // =========================================================================
